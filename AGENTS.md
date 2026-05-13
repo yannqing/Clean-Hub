@@ -43,7 +43,7 @@ Run all apps:
 ```bash
 pnpm dev
 ```
- 
+  
 Run one app:
 
 ```bash
