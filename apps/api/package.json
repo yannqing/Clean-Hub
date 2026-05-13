@@ -1,0 +1,33 @@
+{
+  "name": "@cleanhub/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cleanhub/db": "workspace:*",
+    "@cleanhub/domain": "workspace:*",
+    "@cleanhub/id": "workspace:*",
+    "@cleanhub/logger": "workspace:*",
+    "@hono/node-server": "^2.0.2",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "^0.45.1",
+    "hono": "^4.12.18",
+    "jose": "^6.2.3",
+    "pg": "^8.16.3",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pg": "^8.15.6",
+    "eslint": "^9",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

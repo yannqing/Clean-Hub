@@ -1,0 +1,31 @@
+.DS_Store
+node_modules
+.turbo
+.next
+dist
+build
+out
+coverage
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+
+# Editors and IDEs
+.idea
+.vscode
+
+# Package manager and tool caches
+.cache
+.pnpm-store
+
+# Hosting/build platform outputs
+.vercel
+.output
+
+# Package manager debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

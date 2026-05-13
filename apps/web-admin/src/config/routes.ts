@@ -1,0 +1,46 @@
+export const webAdminRoutes = {
+  home: "/",
+  login: "/login",
+  apiHealth: "/api-health",
+  saas: {
+    home: "/saas",
+    profile: "/saas/profile",
+    tenants: "/saas/tenants",
+    newTenant: "/saas/tenants/new",
+    users: "/saas/users",
+    auditLogs: "/saas/audit-logs",
+    config: {
+      tenants: "/saas/tenants",
+      featureFlags: "/saas/config/feature-flags",
+      localization: "/saas/config/localization",
+      platformSettings: "/saas/config/platform-settings",
+    },
+    system: {
+      logs: "/saas/system/logs",
+      backups: "/saas/system/backups",
+      security: "/saas/system/security",
+    },
+  },
+  tenant: {
+    home: "/tenant",
+    profile: "/tenant/profile",
+    branches: "/tenant/branches",
+    users: "/tenant/users",
+    services: "/tenant/services",
+    prices: "/tenant/prices",
+    hardware: "/tenant/hardware",
+    reports: "/tenant/reports",
+    config: {
+      branches: "/tenant/branches",
+      services: "/tenant/services",
+      prices: "/tenant/prices",
+      hardware: "/tenant/hardware",
+      notifications: "/tenant/config/notifications",
+    },
+    system: {
+      logs: "/tenant/system/logs",
+      backups: "/tenant/system/backups",
+      preferences: "/tenant/system/preferences",
+    },
+  },
+} as const;
