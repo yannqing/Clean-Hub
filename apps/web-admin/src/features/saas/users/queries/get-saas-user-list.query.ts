@@ -1,5 +1,16 @@
-import type { SaasUserSummary } from "../types";
+import { webAdminApi } from "@/lib/api-client";
 
-export async function getSaasUserListQuery(): Promise<SaasUserSummary[]> {
-  return [];
+import type { SaasUserListResponse, SaasUserStatus } from "../types";
+
+export type GetSaasUserListQueryInput = {
+  q?: string;
+  status?: SaasUserStatus;
+  limit?: number;
+  offset?: number;
+};
+
+export async function getSaasUserListQuery(
+  input: GetSaasUserListQueryInput = {},
+): Promise<SaasUserListResponse> {
+  return webAdminApi.saas.users.list(input);
 }
