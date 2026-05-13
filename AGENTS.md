@@ -88,9 +88,9 @@ pnpm lint
 ### Apps
 
 - `apps/web-admin`: Next.js SaaS admin and tenant back office.
-- `apps/pos-web`: Next.js POS frontend, intended to be reused by desktop and mobile shells.
-- `apps/desktop`: Electron shell for Windows/macOS hardware integration.
-- `apps/mobile`: Capacitor shell for Android/iOS device APIs.
+- `apps/pos-web`: Next.js POS frontend for in-store staff workflows.
+- `apps/desktop`: Electron shell for the official Windows/macOS in-store POS runtime and local hardware integration.
+- `apps/mobile`: Capacitor shell for customer-facing and delivery-facing Android/iOS workflows. Do not treat it as the default mobile cashier POS.
 - `apps/api`: standalone TypeScript API service.
 
 ### Packages
@@ -132,6 +132,8 @@ Start with:
 - Prefer existing project patterns and shared packages before introducing new abstractions.
 - Keep business rules shared where possible, especially between POS, desktop, mobile, and API.
 - Do not put all backend business logic into Next.js route handlers; use `apps/api` for backend services, webhooks, sync, audit, and integrations.
+- Keep terminal boundaries clear: `pos-web` is the staff POS UI, `desktop` is the store POS shell, and `mobile` is primarily for customer/delivery workflows.
+- If customer mobile UI becomes substantial, prefer a dedicated `apps/customer-web` or `apps/mobile-web` loaded by `apps/mobile`.
 - Treat POS, offline sync, payment, printing, and audit flows as high-risk areas.
 - Preserve tenant isolation from the first implementation. Business data should include `tenant_id`; branch-scoped data should include `branch_id`.
 - All business entity IDs must use ULID strings generated through `@cleanhub/id`. Do not add auto-increment IDs or PostgreSQL `uuid` primary keys.

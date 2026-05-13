@@ -4,6 +4,7 @@
 | ---- | ---- | ------ | ------ | ---- | ---- |
 | v0.1 | 2026-05-11 | yannqing | yannqing | Draft | Web Admin Phase 1 基础模块技术方案初稿 |
 | v0.1.1 | 2026-05-12 | yannqing | yannqing | Draft | 补充 Access Token + Refresh Token + HttpOnly Cookie 认证模型 |
+| v0.1.2 | 2026-05-13 | yannqing | yannqing | Draft | 补充消息通知、日志管理、数据备份等 Phase 1 基础运维模块 |
 
 ---
 
@@ -20,7 +21,7 @@ CleanHub Phase 1 需要先完成 Web Admin 的基础管理能力，用于支持�
 - `(tenant)` 租户管理区域。
 - 认证登录模块。
 - RBAC 权限守卫。
-- 基础布局、导航、Token 登录态和审计接入。
+- 基础布局、导航、Token 登录态、审计接入、消息通知配置、日志管理和数据备份入口。
 
 > **重要边界：支付暂不设计。**  
 > Web Admin 中 SaaS 订阅付款、租户支付、B2B 应收、支付配置、Z Report 深度财务规则等内容不在本文档设计范围内，下一个版本单独设计。
@@ -31,7 +32,7 @@ CleanHub Phase 1 需要先完成 Web Admin 的基础管理能力，用于支持�
 - 明确 `src/app/(saas)` 和 `src/app/(tenant)` 两个核心业务目录边界。
 - 明确登录、Token 登录态、租户选择、角色跳转和权限保护方式。
 - 为后续租户管理、门店管理、员工管理、服务价格、硬件配置和基础报表提供稳定扩展点。
-- 保证后续可平滑接入独立 `apps/api`、Drizzle/PostgreSQL、RLS 和审计日志。
+- 保证后续可平滑接入独立 `apps/api`、Drizzle/PostgreSQL、RLS、审计日志、通知队列、备份恢复和运维监控。
 
 ### 1.3 非目标
 
@@ -43,6 +44,8 @@ CleanHub Phase 1 需要先完成 Web Admin 的基础管理能力，用于支持�
 - POS 收款流程。
 - 完整离线同步技术方案。
 - 完整硬件驱动集成。
+- 完整消息发送供应商接入和模板审核流程。
+- 完整数据库灾备、跨区域恢复和自动演练。
 - 完整 UI 高保真设计。
 
 ### 1.4 关联文档
@@ -67,6 +70,9 @@ CleanHub Phase 1 需要先完成 Web Admin 的基础管理能力，用于支持�
 | **Tenant Admin** | 租户概览、门店管理、员工管理、服务价格管理、基础硬件配置、基础报表入口 |
 | **权限守卫** | 路由级守卫、角色级守卫、租户级访问边界 |
 | **审计接入** | 登录、登出、租户启停、用户禁用、价格修改等敏感操作记录审计事件 |
+| **消息通知基础** | Tenant 通知配置入口、渠道开关、模板占位、发送记录查询边界 |
+| **日志管理基础** | SaaS/Tenant 操作日志入口、API 错误日志查看边界、运行日志采集说明 |
+| **数据备份基础** | 备份策略展示、手动备份入口、备份状态和恢复申请入口 |
 | **布局与导航** | SaaS 与 Tenant 两套导航和布局 |
 
 ### 2.2 Out of Scope
@@ -79,6 +85,8 @@ CleanHub Phase 1 需要先完成 Web Admin 的基础管理能力，用于支持�
 | **配送** | 预约日历、配送员任务、GPS、ETA |
 | **库存 HR** | 库存流水、供应商、排班、打卡、薪资 |
 | **AI** | 污渍识别、预测、智能排程 |
+| **通知发送深度集成** | WhatsApp/SMS/Email 供应商真实发送、模板审核、退订管理、营销自动化 |
+| **灾备恢复自动化** | 跨区域容灾、自动恢复演练、租户自助恢复生产数据 |
 
 ### 2.3 技术约束
 
@@ -91,6 +99,7 @@ CleanHub Phase 1 需要先完成 Web Admin 的基础管理能力，用于支持�
 - 权限校验不能只依赖前端隐藏菜单，API 层必须再次校验。
 - 所有业务数据必须具备 `tenant_id`；门店数据必须具备 `branch_id`。
 - 敏感操作必须写入审计日志。
+- 通知、日志和备份均属于运维与合规基础能力，Phase 1 只做最小可用入口和数据边界，不做完整平台化运维系统。
 
 ---
 
@@ -152,6 +161,16 @@ apps/web-admin/src/
         page.tsx
       reports/
         page.tsx
+      config/
+        notifications/
+          page.tsx
+      system/
+        logs/
+          page.tsx
+        backups/
+          page.tsx
+        preferences/
+          page.tsx
     api-health/
       page.tsx
     layout.tsx
@@ -237,7 +256,7 @@ Cookie 建议：
 | Cookie | 说明 |
 | ------ | ---- |
 | `cleanhub_access_token` | Access Token，`HttpOnly`、`Secure`、`SameSite=Lax` |
-| `cleanhub_refresh_token` | Refresh Token，`HttpOnly`、`Secure`、`SameSite=Lax`，Path 可限制为 `/auth/refresh` 和 `/auth/logout` |
+| `cleanhub_refresh_token` | Refresh Token，`HttpOnly`、`Secure`、`SameSite=Lax`，Path 使用 `/`，以便 Next.js route guard/proxy 在受保护页面渲染前完成刷新 |
 
 前端只读取脱敏后的 Auth Context，不读取 token 本体。
 
@@ -358,7 +377,14 @@ type Permission =
   | "tenant:service:update"
   | "tenant:hardware:read"
   | "tenant:hardware:update"
-  | "tenant:report:read";
+  | "tenant:report:read"
+  | "tenant:notification:read"
+  | "tenant:notification:update"
+  | "tenant:operation_log:read"
+  | "tenant:backup:read"
+  | "tenant:backup:create"
+  | "saas:operation_log:read"
+  | "saas:backup:read";
 ```
 
 > **支付权限不在本版本设计。**  
@@ -381,6 +407,8 @@ Phase 1 SaaS Admin 只负责平台方试点管理能力。
 | 租户设置 | `/saas/tenants/[tenantId]/settings` | 编辑基础配置、启用/停用租户 |
 | 平台用户 | `/saas/users` | 管理平台管理员和支持账号，Phase 1 可简化 |
 | 审计日志 | `/saas/audit-logs` | 查看平台级敏感操作日志 |
+| 系统日志 | `/saas/system/logs` | 查看平台级运行错误、安全事件和关键 API 异常摘要 |
+| 数据备份 | `/saas/system/backups` | 查看全局备份任务状态、最近备份和恢复申请入口 |
 
 ### 6.2 租户创建字段
 
@@ -424,6 +452,10 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 | 价格管理 | `/tenant/prices` | 标准价格配置 |
 | 硬件配置 | `/tenant/hardware` | 打印机、扫码枪、钱箱基础配置 |
 | 基础报表 | `/tenant/reports` | 今日营收、订单数、支付方式汇总入口 |
+| 通知配置 | `/tenant/config/notifications` | 配置订单通知、Ready 通知、取送通知等基础模板和渠道开关 |
+| 操作日志 | `/tenant/system/logs` | 查看租户范围内操作日志、认证事件和关键错误摘要 |
+| 数据备份 | `/tenant/system/backups` | 查看租户数据备份状态、手动备份入口和恢复申请入口 |
+| 租户偏好 | `/tenant/system/preferences` | 语言、货币、时区、基础编号规则等偏好配置入口 |
 
 ### 7.2 Tenant 操作审计
 
@@ -434,6 +466,8 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 - 修改服务项目。
 - 修改价格。
 - 修改硬件配置。
+- 修改通知模板或通知渠道。
+- 创建手动备份或提交恢复申请。
 - 查看或导出敏感报表，若 Phase 1 支持导出。
 
 ### 7.3 Tenant 数据边界
@@ -445,9 +479,72 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 
 ---
 
-## 8. 数据设计
+## 8. 运维基础模块设计
 
-### 8.1 Phase 1 Web Admin 相关实体
+### 8.1 消息通知基础
+
+Phase 1 的消息通知目标是为订单状态通知、Ready 通知、取件提醒和后续配送通知建立配置入口和数据边界。该阶段不强制完成 WhatsApp/SMS/Email 真实供应商深度接入。
+
+Tenant Admin 需要提供：
+
+| 页面 | 路由 | Phase 1 能力 |
+| ---- | ---- | ------------ |
+| 通知配置 | `/tenant/config/notifications` | 查看渠道开关、基础模板、默认语言和发送场景 |
+| 发送记录 | `/tenant/config/notifications` 或后续子页 | 查看通知状态、关联订单、接收人、失败原因 |
+
+Phase 1 推荐先支持以下通知场景的配置和记录：
+
+- 订单创建通知。
+- 订单 Ready 通知。
+- 逾期未取提醒预留。
+- 取送/配送状态通知预留。
+
+技术边界：
+
+- 通知发送应由 `apps/api` 统一触发，前端只负责配置和查看记录。
+- 通知事件应记录 `tenant_id`、`branch_id`、业务对象、渠道、模板、接收人脱敏摘要、状态和失败原因。
+- 真实 WhatsApp/SMS/Email provider、模板审核、退订、营销自动化进入后续专题 TRD。
+
+### 8.2 日志管理基础
+
+日志管理需要区分三类数据：
+
+| 类型 | 用途 | Phase 1 入口 |
+| ---- | ---- | ------------ |
+| 审计日志 Audit Log | 追踪敏感业务操作和安全事件，不允许普通管理员修改 | `/saas/audit-logs`、`/tenant/system/logs` |
+| 操作日志 Operation Log | 帮助 Owner/Manager 查看关键配置变更、登录、禁用、重印等事件 | `/tenant/system/logs` |
+| 运行日志 Runtime Log | API 错误、任务失败、通知失败、备份失败等运维排查信息 | `/saas/system/logs` |
+
+Phase 1 设计原则：
+
+- API 层负责写入审计事件和结构化运行日志。
+- Web Admin 只展示摘要、筛选和详情入口，不直接读取服务器本地 `.log` 文件。
+- 服务端日志通过 `@cleanhub/logger` 输出到 stdout/stderr，由 Docker 或运行平台采集。
+- 不在业务代码中自行写文件日志。
+
+### 8.3 数据备份基础
+
+Phase 1 的备份目标是提供可见、可追踪、可人工执行的基础备份能力，不要求完成完整自动灾备平台。
+
+Web Admin 需要提供：
+
+| 页面 | 路由 | Phase 1 能力 |
+| ---- | ---- | ------------ |
+| 租户备份 | `/tenant/system/backups` | 查看本租户最近备份、备份状态、手动备份入口、恢复申请入口 |
+| 平台备份 | `/saas/system/backups` | 查看全局备份任务、失败任务、最近成功时间和恢复申请 |
+
+技术边界：
+
+- 备份执行应由 API 或后台任务触发，不在 Next.js 页面中直接执行数据库备份命令。
+- 备份记录至少包含触发人、范围、状态、开始时间、结束时间、文件引用、失败原因和恢复申请状态。
+- Phase 1 允许“手动备份 + 管理员审核恢复”的模式。
+- 自动定时备份、跨区域容灾、租户自助恢复生产数据、恢复演练报告进入后续部署/运维 TRD。
+
+---
+
+## 9. 数据设计
+
+### 9.1 Phase 1 Web Admin 相关实体
 
 | 实体 | 用途 |
 | ---- | ---- |
@@ -460,11 +557,15 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 | `auth_refresh_tokens` | Refresh Token 哈希、轮换、吊销和设备上下文 |
 | `auth_login_events` | 登录成功/失败、登出、异常登录等认证审计 |
 | `audit_logs` | 审计日志 |
+| `operation_logs` | API 错误、系统运行事件、安全事件和同步/通知/备份摘要日志 |
+| `notification_settings` | 租户通知渠道、模板开关和基础模板配置 |
+| `notification_events` | 通知发送请求、状态、失败原因和关联业务对象 |
+| `backup_jobs` | 备份任务、触发方式、状态、文件引用和恢复申请状态 |
 | `services` | 服务项目 |
 | `prices` | 标准价格 |
 | `hardware_configs` | 基础硬件配置 |
 
-### 8.2 通用字段要求
+### 9.2 通用字段要求
 
 业务表建议包含：
 
@@ -483,11 +584,11 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 
 ---
 
-## 9. API 设计
+## 10. API 设计
 
 > Phase 1 Web Admin 应优先通过 `apps/api` 提供业务 API。Next.js route handlers 可作为临时 BFF，但不应承载最终业务核心逻辑。
 
-### 9.1 Auth API
+### 10.1 Auth API
 
 | 方法 | 路径 | 说明 |
 | ---- | ---- | ---- |
@@ -496,7 +597,7 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 | `POST` | `/auth/logout` | 登出 |
 | `GET` | `/auth/me` | 获取当前用户 Auth Context |
 
-### 9.2 SaaS API
+### 10.2 SaaS API
 
 | 方法 | 路径 | 说明 |
 | ---- | ---- | ---- |
@@ -507,7 +608,7 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 | `PATCH` | `/saas/tenants/:tenantId/status` | 启用/停用租户 |
 | `GET` | `/saas/audit-logs` | 平台审计日志 |
 
-### 9.3 Tenant API
+### 10.3 Tenant API
 
 | 方法 | 路径 | 说明 |
 | ---- | ---- | ---- |
@@ -524,8 +625,24 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 | `PATCH` | `/tenant/prices/:priceId` | 更新价格 |
 | `GET` | `/tenant/hardware-configs` | 硬件配置 |
 | `PATCH` | `/tenant/hardware-configs/:configId` | 更新硬件配置 |
+| `GET` | `/tenant/notification-settings` | 获取通知配置 |
+| `PATCH` | `/tenant/notification-settings` | 更新通知配置 |
+| `GET` | `/tenant/notification-events` | 查询通知发送记录 |
+| `GET` | `/tenant/operation-logs` | 查询租户操作/运行日志摘要 |
+| `GET` | `/tenant/backups` | 查询租户备份任务 |
+| `POST` | `/tenant/backups` | 创建手动备份任务 |
+| `POST` | `/tenant/backups/:backupId/restore-requests` | 提交恢复申请 |
 
-### 9.4 暂不设计 API
+### 10.4 SaaS System API
+
+| 方法 | 路径 | 说明 |
+| ---- | ---- | ---- |
+| `GET` | `/saas/operation-logs` | 查询平台级运行日志和安全事件摘要 |
+| `GET` | `/saas/backups` | 查询全局备份任务和最近备份状态 |
+| `POST` | `/saas/backups` | 创建平台级手动备份任务 |
+| `POST` | `/saas/backups/:backupId/restore-requests` | 提交平台级恢复申请 |
+
+### 10.5 暂不设计 API
 
 以下 API 不在本文档设计范围：
 
@@ -534,12 +651,14 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 - `/invoices/**`
 - `/receivables/**`
 - `/subscriptions/payments/**`
+- `/marketing-campaigns/**`
+- `/notification-providers/**` 的真实供应商管理和模板审核回调。
 
 ---
 
-## 10. 前端状态与错误处理
+## 11. 前端状态与错误处理
 
-### 10.1 页面状态
+### 11.1 页面状态
 
 所有列表和表单页面至少支持：
 
@@ -550,7 +669,7 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 - Saving。
 - Saved。
 
-### 10.2 错误码处理
+### 11.2 错误码处理
 
 | 错误类型 | 前端处理 |
 | -------- | -------- |
@@ -563,9 +682,9 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 
 ---
 
-## 11. 安全设计
+## 12. 安全设计
 
-### 11.1 认证安全
+### 12.1 认证安全
 
 - Access Token 与 Refresh Token 均通过 `HttpOnly`、`Secure`、`SameSite=Lax` Cookie 承载。
 - Web Admin 不得把 token 存入 `localStorage`、`sessionStorage` 或可被前端 JS 读取的位置。
@@ -578,14 +697,14 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 - 登录失败返回统一错误信息，避免暴露账号是否存在。
 - 生产环境必须使用 HTTPS。
 
-### 11.2 权限安全
+### 12.2 权限安全
 
 - 前端菜单基于权限过滤。
 - 页面 layout 层执行 route guard。
 - API 层执行最终权限校验。
 - 所有租户级 API 必须校验 `tenant_id`。
 
-### 11.3 审计安全
+### 12.3 审计安全
 
 审计事件应记录：
 
@@ -605,7 +724,7 @@ Phase 1 Tenant Admin 负责试点门店的基础经营配置。
 
 ---
 
-## 12. 可观测性
+## 13. 可观测性
 
 Phase 1 Web Admin 至少需要记录：
 
@@ -622,7 +741,7 @@ Phase 1 Web Admin 至少需要记录：
 
 ---
 
-## 13. 测试策略
+## 14. 测试策略
 
 | 类型 | 测试内容 |
 | ---- | -------- |
@@ -632,7 +751,7 @@ Phase 1 Web Admin 至少需要记录：
 | 权限测试 | Tenant 用户不能访问 `/saas`，SaaS 用户不能越权访问租户数据 |
 | 回归测试 | 服务价格修改不影响既有订单，若订单模块接入 |
 
-### 13.1 核心验收用例
+### 14.1 核心验收用例
 
 | 用例 | 通过标准 |
 | ---- | -------- |
@@ -645,10 +764,13 @@ Phase 1 Web Admin 至少需要记录：
 | 创建租户 | 租户创建成功，写入审计日志 |
 | 禁用员工 | 员工无法继续登录，写入审计日志 |
 | 修改价格 | 保存成功，写入审计日志 |
+| 修改通知配置 | 保存成功，写入审计日志，通知发送记录可查询 |
+| 查看操作日志 | Owner / Super Admin 可按权限查看日志摘要 |
+| 创建手动备份 | 备份任务创建成功，可查看状态和失败原因 |
 
 ---
 
-## 14. 实施计划
+## 15. 实施计划
 
 ```mermaid
 gantt
@@ -664,16 +786,17 @@ gantt
     Branch + User Management     :c1, after a2, 3d
     Services + Prices            :c2, after c1, 3d
     Hardware + Reports Entry     :c3, after c2, 2d
+    Notifications + Logs + Backup:c4, after c3, 2d
     section QA
     Auth + RBAC Test             :d1, after b2, 2d
-    UAT Fixes                    :d2, after c3, 2d
+    UAT Fixes                    :d2, after c4, 2d
 ```
 
 ---
 
-## 15. 发布与回滚
+## 16. 发布与回滚
 
-### 15.1 发布前检查
+### 16.1 发布前检查
 
 - `pnpm --filter @cleanhub/web-admin typecheck`
 - `pnpm --filter @cleanhub/web-admin lint`
@@ -681,8 +804,9 @@ gantt
 - Auth API 可用。
 - SaaS/Tenant 权限测试通过。
 - 基础审计写入通过。
+- 通知配置、日志列表和备份任务入口可访问。
 
-### 15.2 回滚策略
+### 16.2 回滚策略
 
 - 前端可回滚到上一构建版本。
 - API 新增字段需保持向后兼容。
@@ -691,7 +815,7 @@ gantt
 
 ---
 
-## 16. 风险与待确认
+## 17. 风险与待确认
 
 | 风险 | 影响 | 建议 |
 | ---- | ---- | ---- |
@@ -702,10 +826,12 @@ gantt
 | 支付提前混入设计 | 扩大 Phase 1 范围 | 本版本明确排除支付，后续单独 TRD |
 | 审计遗漏 | 难以追责敏感操作 | 将审计作为 API 层强制能力 |
 | RLS 暂未实现 | 数据隔离依赖应用层 | 数据模型预留 `tenant_id`，后续升级 RLS |
+| 通知供应商未确认 | 影响真实消息发送 | Phase 1 先做配置和事件记录，真实发送接入后续专题 |
+| 备份恢复权限过大 | 误恢复可能影响生产数据 | Phase 1 恢复采用申请/审核，不提供普通租户自助恢复生产数据 |
 
 ---
 
-## 17. 技术评审清单
+## 18. 技术评审清单
 
 - [ ] `(saas)` 和 `(tenant)` 路由边界清晰。
 - [ ] 登录后跳转逻辑清晰。
@@ -716,4 +842,7 @@ gantt
 - [ ] 支付相关内容已明确排除。
 - [ ] 数据模型预留 `tenant_id`、`branch_id`、审计字段和 `version`。
 - [ ] 审计事件列表覆盖 Phase 1 敏感操作。
+- [ ] 通知配置和发送记录边界清晰，不误导为完整营销系统。
+- [ ] 操作日志、审计日志和运行日志边界清晰。
+- [ ] 数据备份入口、备份任务状态和恢复申请边界清晰。
 - [ ] 测试策略覆盖登录、权限、租户和租户后台核心路径。

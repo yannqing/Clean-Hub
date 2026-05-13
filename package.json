@@ -1,6 +1,7 @@
 {
   "name": "clean-hub",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "packageManager": "pnpm@10.15.0",
   "engines": {

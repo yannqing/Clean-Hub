@@ -237,9 +237,9 @@ pnpm lint
 ### Apps
 
 - `apps/web-admin`：Next.js SaaS 管理后台，用于平台管理、租户后台、报表和配置。
-- `apps/pos-web`：Next.js POS 前端，后续会被 Desktop 和 Mobile 壳复用。
-- `apps/desktop`：Electron 桌面端壳，用于 Windows/macOS 本地硬件集成。
-- `apps/mobile`：Capacitor 移动端壳，用于 Android/iOS 设备能力。
+- `apps/pos-web`：Next.js POS 前端，用于门店员工收件、收银、打印、扫码和订单状态更新。
+- `apps/desktop`：Electron 桌面端壳，是门店 Windows/macOS 正式 POS 收银入口，负责加载 POS UI，并处理本地硬件、本地数据库、离线同步运行时、自动更新和窗口控制。
+- `apps/mobile`：Capacitor 移动端壳，主要用于客户侧和配送侧 Android/iOS 场景，不是默认的收银员移动 POS。
 - `apps/api`：独立 TypeScript API 服务，承载认证、SaaS/Tenant API、审计、同步、webhook 和第三方集成。
 
 ### Packages
@@ -275,11 +275,32 @@ API Client 使用说明见 [Clean_Hub-API_Client使用说明.md](./docs/04-techn
 ## 开发说明
 
 - `web-admin` 和 `pos-web` 是两个独立的 Next.js 应用。
-- `pos-web` 后续应尽量复用于桌面端和移动端壳，避免多端重复实现 POS 业务逻辑。
-- `desktop` 负责 Windows/macOS 本地硬件能力，例如打印机、扫码枪、钱箱、本地数据库等。
-- `mobile` 负责 Android/iOS 设备能力，例如摄像头、GPS、蓝牙打印、移动配送等。
+- `pos-web` 是门店员工 POS UI，应优先优化收银速度、离线营业、键盘/扫码枪操作和桌面 POS 体验。
+- `desktop` 是门店 Windows/macOS 正式 POS 运行容器，应加载 `pos-web`，并负责打印机、扫码枪、钱箱、本地存储、离线同步、自动更新和原生窗口能力。
+- `mobile` 优先面向客户侧和配送侧流程，例如客户预约、订单状态、取送追踪、客户通知、现场照片、GPS、便携蓝牙打印等。
+- 不要默认把 `mobile` 理解为收银员移动 POS，除非后续阶段明确提出该业务流程。
 - `api` 应承载后端业务 API、支付 webhook、同步队列、审计逻辑和第三方集成，不建议把全部后端业务塞进 Next.js route handlers。
 - 前端调用后端 API 时，优先使用 `packages/api-client`。各 app 的 `src/lib/api-client.ts` 只做薄适配，不要在页面和 feature 中到处手写 `fetch`。
+
+## 终端边界
+
+规划页面、路由和共享包时，按下面边界理解：
+
+```text
+web-admin
+  SaaS Admin 和 Tenant Admin，给平台人员、租户 Owner、Manager 和后台人员使用。
+
+pos-web
+  门店员工 POS Web App。开发时可以在浏览器运行，正式门店通常由 desktop 加载。
+
+desktop
+  Windows/macOS POS 应用壳。它是门店正式收银入口。
+
+mobile
+  客户侧 / 配送侧移动 App 壳。默认不复制桌面 POS，也不是普通收银员的主入口。
+```
+
+如果客户侧移动 UI 后续变复杂，优先考虑新增独立的 `apps/customer-web` 或 `apps/mobile-web` Next.js 应用，再由 `apps/mobile` 通过 Capacitor 加载。
 
 ## 认证与路由守卫
 
@@ -419,3 +440,7 @@ pnpm --filter @cleanhub/db typecheck
 pnpm typecheck
 pnpm build
 ```
+
+## License
+
+本项目使用 [MIT License](./LICENSE)。

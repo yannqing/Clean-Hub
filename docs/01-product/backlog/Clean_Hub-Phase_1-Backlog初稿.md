@@ -3,6 +3,8 @@
 | 版本 | 修改日期 | 修改人 | 状态 | 说明 |
 | ---- | -------- | ------ | ---- | ---- |
 | v0.1 | 2026.05.12 | yannqing | Draft | 基于 PRD、Phase 1 范围、Web Admin TRD 和当前项目结构生成的 Backlog 初稿 |
+| v0.1.1 | 2026.05.13 | yannqing | Draft | 对齐 POS/Desktop/Mobile 终端边界 |
+| v0.1.2 | 2026.05.13 | yannqing | Draft | 新增消息通知、日志管理、数据备份基础 Epic |
 
 ---
 
@@ -52,10 +54,13 @@ Epic -> User Story -> Acceptance Criteria -> Engineering Tasks
 | EPIC-05 | Tenant 门店与组织配置 | P0 | 租户可配置门店和基础营业信息 |
 | EPIC-06 | Tenant 用户、角色与权限 | P0 | 租户可管理员工账号、角色和门店访问范围 |
 | EPIC-07 | 服务目录与价格管理 | P0 | 租户可配置 POS 所需服务和基础价格 |
-| EPIC-08 | 硬件配置入口 | P1 | 租户可维护打印机、扫码枪、钱箱等基础配置 |
+| EPIC-08 | 硬件配置入口 | P1 | 租户可维护 POS/Desktop 所需打印机、扫码枪、钱箱等基础配置，并为后续配送移动端设备预留 |
 | EPIC-09 | 基础报表入口 | P1 | 租户可查看 Phase 1 所需基础经营指标入口 |
 | EPIC-10 | API Client、错误处理与页面状态 | P0 | 建立前后端调用、错误码、Loading/Empty/Error 状态规范 |
 | EPIC-11 | 审计日志与安全事件 | P0 | 敏感操作必须可追溯 |
+| EPIC-13 | 消息通知基础 | P1 | 租户可配置基础通知场景并查看发送记录 |
+| EPIC-14 | 日志管理基础 | P1 | 平台方和租户方可查看权限范围内的操作日志和运行摘要 |
+| EPIC-15 | 数据备份基础 | P1 | 平台方和租户方可查看备份状态并触发手动备份或恢复申请 |
 | EPIC-12 | Phase 1 验收与质量门禁 | P0 | 明确测试、构建、验收和发布准入标准 |
 
 ---
@@ -549,7 +554,7 @@ Epic -> User Story -> Acceptance Criteria -> Engineering Tasks
 
 ## EPIC-08 硬件配置入口
 
-**目标**：租户可以维护 Phase 1 所需硬件配置，供 POS、desktop、mobile 后续读取。
+**目标**：租户可以维护 Phase 1 所需硬件配置，供 POS 和 desktop 读取，并为后续客户/配送 mobile 场景预留设备配置边界。
 
 **Owner**：Fullstack / Hardware  
 **Priority**：P1  
@@ -721,6 +726,141 @@ Epic -> User Story -> Acceptance Criteria -> Engineering Tasks
 
 ---
 
+## EPIC-13 消息通知基础
+
+**目标**：为订单通知、Ready 通知、逾期未取提醒和后续配送通知建立基础配置、记录和权限边界。
+
+**Owner**：Fullstack  
+**Priority**：P1  
+**Dependencies**：Tenant Admin、Audit、notification settings/events schema
+
+### STORY-13-01 通知配置入口
+
+**User Story**：作为 Owner 或 Manager，我希望配置基础通知场景和渠道开关，以便后续可以向客户发送订单状态消息。
+
+**Acceptance Criteria**：
+
+- `/tenant/config/notifications` 展示通知配置页面。
+- 支持订单创建、订单 Ready、逾期未取、配送通知等模板占位。
+- 支持 WhatsApp、SMS、Email 渠道开关占位。
+- 页面明确标识真实供应商发送是否已接入。
+- 修改通知配置写入审计日志。
+
+**Engineering Tasks**：
+
+- 创建 notification settings 类型和页面。
+- 增加通知配置 API client 方法。
+- 增加通知配置保存 action。
+- 接入审计事件。
+
+### STORY-13-02 通知发送记录
+
+**User Story**：作为 Manager，我希望查看通知发送记录，以便知道客户是否收到订单消息。
+
+**Acceptance Criteria**：
+
+- 列表展示渠道、接收人脱敏摘要、关联订单、状态、失败原因和发送时间。
+- 支持按状态、渠道和时间筛选。
+- 未接入真实供应商时，可展示待发送或模拟记录，不误导用户。
+
+**Engineering Tasks**：
+
+- 定义 notification events 类型。
+- 创建发送记录列表。
+- 预留失败原因和重试入口。
+
+---
+
+## EPIC-14 日志管理基础
+
+**目标**：提供基础日志查看能力，支持平台方、租户方和支持团队排查认证、权限、配置和系统异常问题。
+
+**Owner**：Backend / Fullstack  
+**Priority**：P1  
+**Dependencies**：Audit、Logger、operation logs schema
+
+### STORY-14-01 租户操作日志
+
+**User Story**：作为 Owner 或 Manager，我希望查看租户范围内的关键操作日志，以便追踪员工和配置变更。
+
+**Acceptance Criteria**：
+
+- `/tenant/system/logs` 展示租户操作日志。
+- 支持按时间、操作类型、操作者和门店筛选。
+- 敏感字段脱敏。
+- Manager 只能查看授权范围内日志。
+
+**Engineering Tasks**：
+
+- 定义 operation log 类型。
+- 创建日志列表页面。
+- 增加日志 API client 方法。
+- 接入权限过滤。
+
+### STORY-14-02 平台系统日志摘要
+
+**User Story**：作为 Super Admin 或 Support，我希望查看平台级系统日志摘要，以便发现 API 错误、通知失败和备份失败。
+
+**Acceptance Criteria**：
+
+- `/saas/system/logs` 展示平台级日志摘要。
+- 展示错误级别、服务名、request id、租户、时间和摘要。
+- 不直接读取服务器本地 `.log` 文件。
+- 运行日志由 `@cleanhub/logger` 输出到 stdout/stderr 并由平台采集。
+
+**Engineering Tasks**：
+
+- 创建 SaaS system logs 页面。
+- 预留运行日志聚合接口。
+- 文档说明运行日志采集边界。
+
+---
+
+## EPIC-15 数据备份基础
+
+**目标**：提供 Phase 1 试点数据的备份可见性和最小手动备份能力，避免门店试点数据不可恢复。
+
+**Owner**：Backend / DevOps / Fullstack  
+**Priority**：P1  
+**Dependencies**：PostgreSQL、Backup job schema、Audit
+
+### STORY-15-01 租户备份状态
+
+**User Story**：作为 Owner，我希望看到本租户最近备份状态，以便知道数据是否有基础保护。
+
+**Acceptance Criteria**：
+
+- `/tenant/system/backups` 展示最近备份时间、状态、触发方式和失败原因。
+- 支持提交手动备份任务或备份申请。
+- 备份任务写入审计日志。
+- 普通租户不能直接恢复生产数据。
+
+**Engineering Tasks**：
+
+- 定义 backup job 类型。
+- 创建备份状态页面。
+- 增加手动备份 action。
+- 增加恢复申请入口。
+
+### STORY-15-02 平台备份管理入口
+
+**User Story**：作为 Super Admin，我希望查看平台级备份任务，以便确认试点环境数据有可恢复通道。
+
+**Acceptance Criteria**：
+
+- `/saas/system/backups` 展示全局备份任务列表。
+- 支持查看 pending、running、succeeded、failed 状态。
+- 支持查看失败原因。
+- 恢复生产数据需要管理员审核流程。
+
+**Engineering Tasks**：
+
+- 创建 SaaS backups 页面。
+- 预留平台级备份 API。
+- 定义恢复申请状态。
+
+---
+
 ## EPIC-12 Phase 1 验收与质量门禁
 
 **目标**：确保 Phase 1 进入验收前具备基本质量、可维护性和可交付性。
@@ -778,8 +918,11 @@ Epic -> User Story -> Acceptance Criteria -> Engineering Tasks
 7. EPIC-07 服务目录与价格管理。
 8. EPIC-11 审计日志与安全事件。
 9. EPIC-08 硬件配置入口。
-10. EPIC-09 基础报表入口。
-11. EPIC-12 Phase 1 验收与质量门禁。
+10. EPIC-13 消息通知基础。
+11. EPIC-14 日志管理基础。
+12. EPIC-15 数据备份基础。
+13. EPIC-09 基础报表入口。
+14. EPIC-12 Phase 1 验收与质量门禁。
 
 ## 7. 建议并行分工
 
@@ -789,7 +932,8 @@ Epic -> User Story -> Acceptance Criteria -> Engineering Tasks
 | Auth / Security | 登录、token、route guard、RBAC | 必须与 API 和 DB schema 同步 |
 | SaaS Admin | 租户管理、平台用户、平台审计 | 不要混入 Tenant 业务逻辑 |
 | Tenant Admin | 门店、员工、服务、价格、硬件、报表 | 所有请求必须带 tenant context |
-| Backend API | Auth API、SaaS API、Tenant API、Audit | API 是最终权限边界 |
+| Ops Foundation | 通知配置、操作日志、数据备份入口 | Phase 1 做基础能力，不扩成完整运维平台 |
+| Backend API | Auth API、SaaS API、Tenant API、Audit、Notifications、Logs、Backups | API 是最终权限边界 |
 | QA / PM | 验收用例、缺陷管理、UAT | 以 Phase 1 验收标准为准 |
 
 ## 8. 当前未决问题
@@ -801,6 +945,8 @@ Epic -> User Story -> Acceptance Criteria -> Engineering Tasks
 | 权限矩阵未单独成文 | 影响 RBAC 实现和测试 | 补充 `docs/01-product/permissions` 文档 |
 | 页面清单和用户流程未单独成文 | 影响 UI/UX 和验收 | 补充页面清单与关键流程 |
 | 支付和 POS 不在本 Backlog 详细展开 | Web Admin 报表数据依赖后续模块 | 支付、POS、离线应单独拆 Backlog |
+| 通知供应商未确认 | 影响真实发送能力 | Phase 1 先做配置和记录，供应商接入单独确认 |
+| 备份恢复策略未确认 | 影响恢复 SLA 和责任边界 | Phase 1 先做状态和申请入口，恢复审批流程需单独确认 |
 
 ## 9. Definition of Ready
 
@@ -825,4 +971,3 @@ Epic -> User Story -> Acceptance Criteria -> Engineering Tasks
 - 相关 typecheck、lint、build 通过。
 - 必要测试用例已补充或记录。
 - 文档或 API 变更已同步。
-

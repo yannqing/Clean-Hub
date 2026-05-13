@@ -237,9 +237,9 @@ pnpm lint
 ### Apps
 
 - `apps/web-admin`: Next.js SaaS/admin/back-office.
-- `apps/pos-web`: Next.js POS web shell shared by desktop and mobile wrappers.
-- `apps/desktop`: Electron shell for Windows/macOS hardware integration.
-- `apps/mobile`: Capacitor shell for Android/iOS device APIs.
+- `apps/pos-web`: Next.js POS web app for in-store staff workflows such as intake, cashiering, printing, scanning, and order status updates.
+- `apps/desktop`: Electron shell for the official Windows/macOS in-store POS app. It loads the POS UI and owns local hardware, local database, offline sync runtime, auto-update, and window control.
+- `apps/mobile`: Capacitor shell for customer-facing and delivery-facing Android/iOS workflows. It is not the primary cashier POS surface.
 - `apps/api`: Standalone TypeScript API service for auth, SaaS/Tenant APIs, audit, sync, webhooks, and integrations.
 
 ### Packages
@@ -275,11 +275,32 @@ See [Clean_Hub-API_Client使用说明.md](./docs/04-technical/api/Clean_Hub-API_
 ## Development Notes
 
 - `web-admin` and `pos-web` are independent Next.js apps.
-- `pos-web` is intended to be reused by desktop and mobile shells where possible.
-- `desktop` is responsible for Windows/macOS local hardware integration.
-- `mobile` is responsible for Android/iOS device APIs such as camera, GPS, Bluetooth printing, and mobile workflows.
+- `pos-web` is the in-store staff POS UI. It should be optimized for speed, offline operation, keyboard/scanner workflows, and desktop POS usage.
+- `desktop` is the official Windows/macOS POS runtime for stores. It should load `pos-web` and handle printers, scanners, cash drawers, local storage, offline sync, auto-update, and native window behavior.
+- `mobile` is primarily for customer-facing and delivery-facing workflows such as appointment booking, order status, pickup/delivery tracking, customer notifications, proof photos, GPS, and Bluetooth portable printing.
+- Do not treat `mobile` as a default mobile cashier POS unless a future phase explicitly defines that workflow.
 - `api` should host backend business APIs, payment webhooks, sync queues, audit logic, and integrations instead of placing all backend logic inside Next.js route handlers.
 - Frontend apps should call backend APIs through `packages/api-client`. Each app may keep a thin `src/lib/api-client.ts` adapter, but pages and feature modules should not scatter raw `fetch` calls.
+
+## Terminal Boundaries
+
+Use these boundaries when planning pages, routes, and shared packages:
+
+```text
+web-admin
+  SaaS Admin and Tenant Admin for platform staff, owners, managers, and back-office users.
+
+pos-web
+  In-store staff POS web app. Runs in browser for development and can be loaded by desktop.
+
+desktop
+  Windows/macOS POS application shell. This is the normal store cashier entry point.
+
+mobile
+  Customer/delivery mobile app shell. It should load customer-facing or delivery-facing mobile web UI, not duplicate the desktop POS by default.
+```
+
+If customer mobile UI grows beyond a few routes, prefer introducing a dedicated `apps/customer-web` or `apps/mobile-web` Next.js app and let `apps/mobile` load it through Capacitor.
 
 ## Auth And Route Guard
 
@@ -417,3 +438,7 @@ For shared package or broad monorepo changes:
 pnpm typecheck
 pnpm build
 ```
+
+## License
+
+This project is licensed under the [MIT License](./LICENSE).
