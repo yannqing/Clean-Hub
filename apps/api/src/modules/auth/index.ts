@@ -5,4 +5,5 @@ export * from "./auth.service.js";
 export * from "./auth.types.js";
 export * from "./cookie.service.js";
 export * from "./password.service.js";
+export * from "./permission.helper.js";
 export * from "./token.service.js";

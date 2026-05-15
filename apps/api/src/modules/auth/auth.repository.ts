@@ -7,7 +7,6 @@ import {
 } from "drizzle-orm";
 
 import {
-  auditLogs,
   authRefreshTokens,
   permissions,
   rolePermissions,
@@ -18,6 +17,7 @@ import {
   type Database,
 } from "@cleanhub/db";
 
+import { writeAuditLog } from "../audit/index.js";
 import type {
   AuthRequestMeta,
   AuthenticatedUser,
@@ -229,7 +229,7 @@ export class AuthRepository {
     meta?: AuthRequestMeta;
     metadata?: Record<string, unknown>;
   }): Promise<void> {
-    await this.db.insert(auditLogs).values({
+    await writeAuditLog(this.db, {
       tenantId,
       actorUserId,
       eventCategory: "auth",
