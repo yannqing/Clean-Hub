@@ -17,7 +17,7 @@ import {
   type Database,
 } from "@cleanhub/db";
 
-import { writeAuditLog } from "../audit/index.js";
+import { writeAuditLog } from "../audit/audit.helper.js";
 import type {
   AuthRequestMeta,
   AuthenticatedUser,
