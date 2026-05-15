@@ -1,11 +1,8 @@
 import { AuthError } from "../auth/auth.errors.js";
+import { requireSaasOperation } from "../auth/permission.helper.js";
 import { listSaasUsers, listTenantUsers } from "./users.service.js";
 import type { UserListInput } from "./users.types.js";
 import type { AppBindings } from "../../http/types.js";
-
-function canReadSaasUsers(role: string): boolean {
-  return role === "super_admin" || role === "support";
-}
 
 function readUserListQuery(
   c: import("hono").Context<AppBindings>,
@@ -33,9 +30,7 @@ export async function listSaasUsersController(
 ) {
   const authContext = c.get("authContext");
 
-  if (!canReadSaasUsers(authContext.role)) {
-    throw new AuthError("FORBIDDEN", "User cannot access SaaS users.");
-  }
+  requireSaasOperation(authContext, "saas.users.read");
 
   const query = readUserListQuery(c);
   const users = await listSaasUsers(query);
