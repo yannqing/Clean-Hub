@@ -230,7 +230,6 @@ export class AuthRepository {
     metadata?: Record<string, unknown>;
   }): Promise<void> {
     await writeAuditLog(this.db, {
-    await writeAuditLog(this.db, {
       tenantId,
       actorUserId,
       eventCategory: "auth",
