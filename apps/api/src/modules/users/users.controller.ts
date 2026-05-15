@@ -1,5 +1,5 @@
 import { AuthError } from "../auth/auth.errors.js";
-import { requireSaasOperation } from "../auth/permission.helper.js";
+import { requireSaasRole } from "../auth/permission.helper.js";
 import { listSaasUsers, listTenantUsers } from "./users.service.js";
 import type { UserListInput } from "./users.types.js";
 import type { AppBindings } from "../../http/types.js";
@@ -30,7 +30,7 @@ export async function listSaasUsersController(
 ) {
   const authContext = c.get("authContext");
 
-  requireSaasOperation(authContext, "saas.users.read");
+  requireSaasRole(authContext, ["super_admin", "support"]);
 
   const query = readUserListQuery(c);
   const users = await listSaasUsers(query);
