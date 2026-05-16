@@ -1,6 +1,8 @@
-import type { AuthContext } from "../auth/auth.types.js";
+import type { AuthContext, AuthRequestMeta } from "../auth/auth.types.js";
 
 export type SaasUserStatus = "invited" | "active" | "disabled" | "suspended";
+export type SaasUserLanguage = "en" | "fr" | "zh-CN";
+export type SaasUserRoleCode = "super_admin" | "support";
 
 export type ListSaasUsersQuery = {
   q?: string;
@@ -12,6 +14,23 @@ export type ListSaasUsersQuery = {
 export type ListSaasUsersInput = {
   authContext: AuthContext;
   query: ListSaasUsersQuery;
+};
+
+export type CreateSaasUserRequest = {
+  email: string;
+  phone?: string;
+  displayName: string;
+  password: string;
+  roleCode: SaasUserRoleCode;
+  language?: SaasUserLanguage;
+};
+
+export type CreateSaasUserInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  data: CreateSaasUserRequest & {
+    language: SaasUserLanguage;
+  };
 };
 
 export type SaasUserListItem = {
