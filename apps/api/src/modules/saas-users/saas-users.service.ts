@@ -8,11 +8,16 @@ import { SaasUsersError } from "./saas-users.errors.js";
 import {
   createSaasUserRecord,
   findActiveSaasRoleByCode,
+  findOtherSaasUserByNormalizedEmail,
+  findOtherSaasUserByPhone,
+  findSaasUserAuditSnapshotById,
   findSaasUserDetailById,
   findSaasUserByNormalizedEmail,
   findSaasUserByPhone,
   findSaasUsers,
+  updateSaasUserRecord,
   writeSaasUserCreatedAuditLog,
+  writeSaasUserUpdatedAuditLog,
 } from "./saas-users.repository.js";
 import type {
   CreateSaasUserInput,
@@ -20,6 +25,7 @@ import type {
   ListSaasUsersInput,
   SaasUserDetail,
   SaasUserListItem,
+  UpdateSaasUserInput,
 } from "./saas-users.types.js";
 
 function normalizeEmail(email: string): string {
@@ -30,6 +36,16 @@ function normalizePhone(phone: string | undefined): string | undefined {
   const trimmed = phone?.trim();
 
   return trimmed ? trimmed : undefined;
+}
+
+function normalizeUpdatePhone(
+  phone: string | null | undefined,
+): string | null | undefined {
+  if (phone === null) {
+    return null;
+  }
+
+  return normalizePhone(phone);
 }
 
 function requireSaasUsersAccess(
@@ -131,6 +147,110 @@ export async function createSaasUser(
     await writeSaasUserCreatedAuditLog(tx, {
       actorUserId: input.authContext.userId,
       user,
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return user;
+  });
+}
+
+export async function updateSaasUser(
+  input: UpdateSaasUserInput,
+  db: Database = getDb(),
+): Promise<SaasUserDetail> {
+  requireSaasUsersAccess(input.authContext, ["super_admin"]);
+
+  if (!Object.values(input.data).some((value) => value !== undefined)) {
+    throw new SaasUsersError(
+      "SAAS_USER_UPDATE_EMPTY",
+      "At least one SaaS user field must be provided.",
+      422,
+    );
+  }
+
+  const normalizedEmail =
+    input.data.email !== undefined
+      ? normalizeEmail(input.data.email)
+      : undefined;
+  const phone = normalizeUpdatePhone(input.data.phone);
+
+  return db.transaction(async (tx) => {
+    const before = await findSaasUserAuditSnapshotById(tx, input.userId);
+
+    if (!before) {
+      throw new SaasUsersError(
+        "SAAS_USER_NOT_FOUND",
+        "SaaS user was not found.",
+        404,
+      );
+    }
+
+    if (normalizedEmail !== undefined) {
+      const existingUser = await findOtherSaasUserByNormalizedEmail(
+        tx,
+        normalizedEmail,
+        input.userId,
+      );
+
+      if (existingUser) {
+        throw new SaasUsersError(
+          "SAAS_USER_EMAIL_CONFLICT",
+          "A SaaS user with this email already exists.",
+          409,
+        );
+      }
+    }
+
+    if (phone) {
+      const existingPhoneUser = await findOtherSaasUserByPhone(
+        tx,
+        phone,
+        input.userId,
+      );
+
+      if (existingPhoneUser) {
+        throw new SaasUsersError(
+          "SAAS_USER_PHONE_CONFLICT",
+          "A SaaS user with this phone already exists.",
+          409,
+        );
+      }
+    }
+
+    const user = await updateSaasUserRecord(tx, {
+      userId: input.userId,
+      email: normalizedEmail,
+      normalizedEmail,
+      phone,
+      displayName: input.data.displayName,
+      language: input.data.language,
+      timezone: input.data.timezone,
+    });
+
+    if (!user) {
+      throw new SaasUsersError(
+        "SAAS_USER_NOT_FOUND",
+        "SaaS user was not found.",
+        404,
+      );
+    }
+
+    const after = await findSaasUserAuditSnapshotById(tx, input.userId);
+
+    if (!after) {
+      throw new SaasUsersError(
+        "SAAS_USER_NOT_FOUND",
+        "SaaS user was not found.",
+        404,
+      );
+    }
+
+    await writeSaasUserUpdatedAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      userId: input.userId,
+      before,
+      after,
       ipAddress: input.requestMeta?.ipAddress,
       userAgent: input.requestMeta?.userAgent,
     });

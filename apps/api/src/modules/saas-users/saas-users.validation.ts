@@ -30,3 +30,28 @@ export const createSaasUserBodySchema = z.object({
   roleCode: z.enum(["super_admin", "support"]),
   language: saasUserLanguageSchema.default("en"),
 });
+
+const optionalPhoneSchema = z.preprocess(
+  (value) => (typeof value === "string" && !value.trim() ? null : value),
+  z
+    .string()
+    .trim()
+    .min(3)
+    .max(32)
+    .regex(/^\+?[0-9][0-9\s().-]*$/)
+    .nullable()
+    .optional(),
+);
+
+export const updateSaasUserBodySchema = z
+  .object({
+    email: z.string().trim().email().max(320).optional(),
+    phone: optionalPhoneSchema,
+    displayName: z.string().trim().min(1).max(120).optional(),
+    language: saasUserLanguageSchema.optional(),
+    timezone: z.string().trim().min(1).max(64).optional(),
+  })
+  .refine(
+    (data) => Object.values(data).some((value) => value !== undefined),
+    "At least one SaaS user field must be provided.",
+  );

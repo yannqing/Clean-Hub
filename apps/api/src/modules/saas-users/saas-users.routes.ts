@@ -5,6 +5,7 @@ import {
   createSaasUserController,
   getSaasUserController,
   listSaasUsersController,
+  updateSaasUserController,
 } from "./saas-users.controller.js";
 
 export function createSaasUsersRoutes() {
@@ -13,6 +14,7 @@ export function createSaasUsersRoutes() {
   routes.get("/", listSaasUsersController);
   routes.post("/", createSaasUserController);
   routes.get("/:userId", getSaasUserController);
+  routes.patch("/:userId", updateSaasUserController);
 
   return routes;
 }

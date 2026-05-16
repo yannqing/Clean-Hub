@@ -1,5 +1,15 @@
 import { createId } from "@cleanhub/id";
-import { and, asc, desc, eq, ilike, inArray, isNull, or } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  ne,
+  or,
+} from "drizzle-orm";
 
 import {
   type Database,
@@ -33,6 +43,24 @@ export type CreateSaasUserRecordInput = {
   passwordHash: string;
   role: SaasRoleRecord;
   language: SaasUserLanguage;
+};
+
+export type UpdateSaasUserRecordInput = {
+  userId: string;
+  email?: string;
+  normalizedEmail?: string;
+  phone?: string | null;
+  displayName?: string;
+  language?: SaasUserLanguage;
+  timezone?: string;
+};
+
+export type SaasUserAuditSnapshot = {
+  email: string | null;
+  phone: string | null;
+  displayName: string;
+  language: string;
+  timezone: string;
 };
 
 function resolveDisplayName(row: {
@@ -81,6 +109,30 @@ export async function findSaasUserByNormalizedEmail(
   return rows[0] ?? null;
 }
 
+export async function findOtherSaasUserByNormalizedEmail(
+  db: Database,
+  normalizedEmail: string,
+  userId: string,
+): Promise<{ id: string } | null> {
+  const rows = await db
+    .select({
+      id: users.id,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        eq(users.normalizedEmail, normalizedEmail),
+        ne(users.id, userId),
+        isNull(users.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
 export async function findSaasUserByPhone(
   db: Database,
   phone: string,
@@ -95,6 +147,30 @@ export async function findSaasUserByPhone(
         eq(users.userType, "saas"),
         isNull(users.tenantId),
         eq(users.phone, phone),
+        isNull(users.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export async function findOtherSaasUserByPhone(
+  db: Database,
+  phone: string,
+  userId: string,
+): Promise<{ id: string } | null> {
+  const rows = await db
+    .select({
+      id: users.id,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        eq(users.phone, phone),
+        ne(users.id, userId),
         isNull(users.deletedAt),
       ),
     )
@@ -213,6 +289,140 @@ export async function writeSaasUserCreatedAuditLog(
       roles: input.user.roles,
       language: input.user.language,
     },
+  });
+}
+
+export async function findSaasUserAuditSnapshotById(
+  db: Database,
+  userId: string,
+): Promise<SaasUserAuditSnapshot | null> {
+  const rows = await db
+    .select({
+      email: users.email,
+      phone: users.phone,
+      displayName: userProfiles.displayName,
+      language: userProfiles.language,
+      timezone: userProfiles.timezone,
+    })
+    .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(
+      and(
+        eq(users.id, userId),
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        isNull(users.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  const user = rows[0];
+
+  if (!user) {
+    return null;
+  }
+
+  return {
+    email: user.email,
+    phone: user.phone,
+    displayName: resolveDisplayName(user),
+    language: user.language ?? "en",
+    timezone: user.timezone ?? "UTC",
+  };
+}
+
+export async function updateSaasUserRecord(
+  db: Database,
+  input: UpdateSaasUserRecordInput,
+): Promise<SaasUserDetail | null> {
+  const now = new Date();
+  const userUpdates: {
+    updatedAt: Date;
+    email?: string;
+    normalizedEmail?: string;
+    phone?: string | null;
+  } = {
+    updatedAt: now,
+  };
+  const profileUpdates: {
+    updatedAt: Date;
+    displayName?: string;
+    language?: SaasUserLanguage;
+    timezone?: string;
+  } = {
+    updatedAt: now,
+  };
+  let shouldUpdateProfile = false;
+
+  if (input.email !== undefined && input.normalizedEmail !== undefined) {
+    userUpdates.email = input.email;
+    userUpdates.normalizedEmail = input.normalizedEmail;
+  }
+
+  if (input.phone !== undefined) {
+    userUpdates.phone = input.phone;
+  }
+
+  if (input.displayName !== undefined) {
+    profileUpdates.displayName = input.displayName;
+    shouldUpdateProfile = true;
+  }
+
+  if (input.language !== undefined) {
+    profileUpdates.language = input.language;
+    shouldUpdateProfile = true;
+  }
+
+  if (input.timezone !== undefined) {
+    profileUpdates.timezone = input.timezone;
+    shouldUpdateProfile = true;
+  }
+
+  await db
+    .update(users)
+    .set(userUpdates)
+    .where(
+      and(
+        eq(users.id, input.userId),
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        isNull(users.deletedAt),
+      ),
+    );
+
+  if (shouldUpdateProfile) {
+    await db
+      .update(userProfiles)
+      .set(profileUpdates)
+      .where(eq(userProfiles.userId, input.userId));
+  }
+
+  return findSaasUserDetailById(db, input.userId);
+}
+
+export async function writeSaasUserUpdatedAuditLog(
+  db: Database,
+  input: {
+    actorUserId: string;
+    userId: string;
+    before: SaasUserAuditSnapshot;
+    after: SaasUserAuditSnapshot;
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: null,
+    actorUserId: input.actorUserId,
+    eventCategory: "saas_user",
+    eventType: "saas_user.updated",
+    entityType: "user",
+    entityId: input.userId,
+    success: true,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    before: input.before,
+    after: input.after,
   });
 }
 

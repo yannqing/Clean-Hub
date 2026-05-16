@@ -38,6 +38,21 @@ export type CreateSaasUserInput = {
   };
 };
 
+export type UpdateSaasUserRequest = {
+  email?: string;
+  phone?: string | null;
+  displayName?: string;
+  language?: SaasUserLanguage;
+  timezone?: string;
+};
+
+export type UpdateSaasUserInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  userId: string;
+  data: UpdateSaasUserRequest;
+};
+
 export type SaasUserListItem = {
   id: string;
   tenantId: null;

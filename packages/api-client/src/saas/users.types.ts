@@ -11,6 +11,14 @@ export type CreateSaasUserRequest = {
   language?: SaasUserLanguage;
 };
 
+export type UpdateSaasUserRequest = {
+  email?: string;
+  phone?: string | null;
+  displayName?: string;
+  language?: SaasUserLanguage;
+  timezone?: string;
+};
+
 export type SaasUserSummary = {
   id: string;
   tenantId: null;
