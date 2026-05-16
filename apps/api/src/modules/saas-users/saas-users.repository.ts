@@ -13,6 +13,7 @@ import { writeAuditLog } from "../audit/audit.helper.js";
 
 import type {
   ListSaasUsersQuery,
+  SaasUserDetail,
   SaasUserLanguage,
   SaasUserListItem,
   SaasUserRoleCode,
@@ -50,6 +51,12 @@ function normalizeSearchQuery(value: string | undefined): string | undefined {
 
 function toIsoString(value: Date | null): string | null {
   return value ? value.toISOString() : null;
+}
+
+function getLatestDate(primary: Date, secondary: Date | null): Date {
+  return secondary && secondary.getTime() > primary.getTime()
+    ? secondary
+    : primary;
 }
 
 export async function findSaasUserByNormalizedEmail(
@@ -296,4 +303,85 @@ export async function findSaasUsers(
     lastLoginAt: toIsoString(row.lastLoginAt),
     createdAt: row.createdAt.toISOString(),
   }));
+}
+
+export async function findSaasUserDetailById(
+  db: Database,
+  userId: string,
+): Promise<SaasUserDetail | null> {
+  const rows = await db
+    .select({
+      id: users.id,
+      tenantId: users.tenantId,
+      email: users.email,
+      phone: users.phone,
+      displayName: userProfiles.displayName,
+      language: userProfiles.language,
+      avatarUrl: userProfiles.avatarUrl,
+      timezone: userProfiles.timezone,
+      status: users.status,
+      lastLoginAt: users.lastLoginAt,
+      createdAt: users.createdAt,
+      userUpdatedAt: users.updatedAt,
+      profileUpdatedAt: userProfiles.updatedAt,
+    })
+    .from(users)
+    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(
+      and(
+        eq(users.id, userId),
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        isNull(users.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  const user = rows[0];
+
+  if (!user) {
+    return null;
+  }
+
+  const roleRows = await db
+    .select({
+      roleCode: roles.code,
+    })
+    .from(userRoles)
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(
+      and(
+        eq(userRoles.userId, user.id),
+        isNull(userRoles.tenantId),
+        isNull(userRoles.branchId),
+        isNull(userRoles.revokedAt),
+        eq(roles.scope, "saas"),
+        eq(roles.status, "active"),
+        isNull(roles.tenantId),
+        isNull(roles.deletedAt),
+      ),
+    )
+    .orderBy(asc(roles.code));
+
+  const userRolesList = roleRows.map((row) => row.roleCode);
+
+  return {
+    id: user.id,
+    tenantId: null,
+    email: user.email,
+    phone: user.phone,
+    displayName: resolveDisplayName(user),
+    role: userRolesList[0] ?? "unassigned",
+    roles: userRolesList,
+    status: user.status,
+    language: user.language ?? "en",
+    avatarUrl: user.avatarUrl ?? null,
+    timezone: user.timezone ?? "UTC",
+    lastLoginAt: toIsoString(user.lastLoginAt),
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: getLatestDate(
+      user.userUpdatedAt,
+      user.profileUpdatedAt,
+    ).toISOString(),
+  };
 }

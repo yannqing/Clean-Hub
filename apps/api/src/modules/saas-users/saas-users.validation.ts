@@ -9,6 +9,10 @@ export const listSaasUsersQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+export const getSaasUserParamsSchema = z.object({
+  userId: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+});
+
 export const createSaasUserBodySchema = z.object({
   email: z.string().trim().email().max(320),
   phone: z.preprocess(

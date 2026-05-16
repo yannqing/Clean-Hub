@@ -34,6 +34,7 @@ export function createSaasApi(client: ApiClient) {
       input: UpdateTenantStatusRequest,
     ) => tenants.updateStatus(tenantId, input),
     listUsers: (query?: QueryParams) => users.list(query),
+    getUser: (userId: string) => users.get(userId),
     listAuditLogs: (query?: QueryParams) => auditLogs.list(query),
     test: () => users.test(),
   };

@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppBindings } from "../../http/types.js";
 import {
   createSaasUserController,
+  getSaasUserController,
   listSaasUsersController,
 } from "./saas-users.controller.js";
 
@@ -11,6 +12,7 @@ export function createSaasUsersRoutes() {
 
   routes.get("/", listSaasUsersController);
   routes.post("/", createSaasUserController);
+  routes.get("/:userId", getSaasUserController);
 
   return routes;
 }

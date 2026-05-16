@@ -1,10 +1,15 @@
 import type { Context } from "hono";
 
 import type { AppBindings } from "../../http/types.js";
-import { createSaasUser, listSaasUsers } from "./saas-users.service.js";
+import {
+  createSaasUser,
+  getSaasUserDetail,
+  listSaasUsers,
+} from "./saas-users.service.js";
 import { SaasUsersError } from "./saas-users.errors.js";
 import {
   createSaasUserBodySchema,
+  getSaasUserParamsSchema,
   listSaasUsersQuerySchema,
 } from "./saas-users.validation.js";
 
@@ -37,6 +42,25 @@ export async function listSaasUsersController(c: Context<AppBindings>) {
   });
 
   return c.json(users);
+}
+
+export async function getSaasUserController(c: Context<AppBindings>) {
+  const params = getSaasUserParamsSchema.parse(c.req.param());
+
+  try {
+    const user = await getSaasUserDetail({
+      authContext: c.get("authContext"),
+      userId: params.userId,
+    });
+
+    return c.json(user);
+  } catch (error) {
+    if (error instanceof SaasUsersError) {
+      return createSaasUsersErrorResponse(c, error);
+    }
+
+    throw error;
+  }
 }
 
 export async function createSaasUserController(c: Context<AppBindings>) {

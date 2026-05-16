@@ -24,3 +24,9 @@ export type SaasUserSummary = {
   lastLoginAt: string | null;
   createdAt: string;
 };
+
+export type SaasUserDetail = SaasUserSummary & {
+  avatarUrl: string | null;
+  timezone: string;
+  updatedAt: string;
+};

@@ -16,6 +16,11 @@ export type ListSaasUsersInput = {
   query: ListSaasUsersQuery;
 };
 
+export type GetSaasUserDetailInput = {
+  authContext: AuthContext;
+  userId: string;
+};
+
 export type CreateSaasUserRequest = {
   email: string;
   phone?: string;
@@ -45,4 +50,10 @@ export type SaasUserListItem = {
   language: string;
   lastLoginAt: string | null;
   createdAt: string;
+};
+
+export type SaasUserDetail = SaasUserListItem & {
+  avatarUrl: string | null;
+  timezone: string;
+  updatedAt: string;
 };
