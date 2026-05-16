@@ -9,11 +9,9 @@ import { createRequestContextMiddleware } from "./http/request-context.middlewar
 import type { AppBindings } from "./http/types.js";
 import { createAuthServiceFromEnv } from "./modules/auth/auth.factory.js";
 import { createAuthRoutes } from "./modules/auth/auth.routes.js";
-import {
-  createSaasUserRoutes,
-  createTenantUserRoutes,
-} from "./modules/users/users.routes.js";
-import {createSaaSTestRoutes} from "./modules/saas/saas.routes.js";
+import { createSaasUsersRoutes } from "./modules/saas-users/saas-users.routes.js";
+import { createTenantUserRoutes } from "./modules/users/users.routes.js";
+import { createSaaSTestRoutes } from "./modules/saas/saas.routes.js";
 
 export type CreateApiAppOptions = {
   env?: NodeJS.ProcessEnv;
@@ -61,7 +59,7 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.route("/auth", createAuthRoutes({ authService }));
   app.use("/saas/*", createRequireAuthMiddleware(authService));
   app.use("/tenant/*", createRequireAuthMiddleware(authService));
-  app.route("/saas/users", createSaasUserRoutes());
+  app.route("/saas/users", createSaasUsersRoutes());
   app.route("/tenant/users", createTenantUserRoutes());
 
   app.route("/saas/test/user", createSaaSTestRoutes());

@@ -1,6 +1,20 @@
+import type { AuthContext } from "../auth/auth.types.js";
+
 export type SaasUserStatus = "invited" | "active" | "disabled" | "suspended";
 
-export type SaasUserSummary = {
+export type ListSaasUsersQuery = {
+  q?: string;
+  status?: SaasUserStatus;
+  limit: number;
+  offset: number;
+};
+
+export type ListSaasUsersInput = {
+  authContext: AuthContext;
+  query: ListSaasUsersQuery;
+};
+
+export type SaasUserListItem = {
   id: string;
   tenantId: null;
   email: string | null;
