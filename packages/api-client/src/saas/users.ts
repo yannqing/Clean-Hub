@@ -4,6 +4,7 @@ import type {
   SaasUserDetail,
   SaasUserSummary,
   UpdateSaasUserRequest,
+  UpdateSaasUserRolesRequest,
   UpdateSaasUserStatusRequest,
 } from "./users.types";
 
@@ -27,6 +28,14 @@ export function createSaasUsersApi(client: ApiClient) {
       `/saas/users/${encodeURIComponent(userId)}/status`,
       input,
     );
+  const updateSaasUserRoles = (
+    userId: string,
+    input: UpdateSaasUserRolesRequest,
+  ) =>
+    client.patch<SaasUserDetail>(
+      `/saas/users/${encodeURIComponent(userId)}/roles`,
+      input,
+    );
 
   return {
     createSaasUser,
@@ -39,7 +48,10 @@ export function createSaasUsersApi(client: ApiClient) {
       updateSaasUser(userId, input),
     updateStatus: (userId: string, input: UpdateSaasUserStatusRequest) =>
       updateSaasUserStatus(userId, input),
+    updateRoles: (userId: string, input: UpdateSaasUserRolesRequest) =>
+      updateSaasUserRoles(userId, input),
     updateSaasUser,
+    updateSaasUserRoles,
     updateSaasUserStatus,
   };
 }

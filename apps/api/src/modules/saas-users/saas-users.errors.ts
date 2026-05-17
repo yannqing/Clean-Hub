@@ -5,7 +5,8 @@ export type SaasUsersErrorCode =
   | "SAAS_USER_PHONE_CONFLICT"
   | "SAAS_USER_ROLE_INVALID"
   | "SAAS_USER_CANNOT_DISABLE_SELF"
-  | "SAAS_USER_LAST_SUPER_ADMIN";
+  | "SAAS_USER_LAST_SUPER_ADMIN"
+  | "SAAS_USER_ROLES_INVALID";
 
 export class SaasUsersError extends Error {
   constructor(

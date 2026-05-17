@@ -59,3 +59,10 @@ export const updateSaasUserBodySchema = z
 export const updateSaasUserStatusBodySchema = z.object({
   status: z.enum(["active", "disabled"]),
 });
+
+export const updateSaasUserRolesBodySchema = z.object({
+  roleCodes: z.preprocess(
+    (value) => (Array.isArray(value) ? [...new Set(value)] : value),
+    z.array(z.enum(["super_admin", "support"])).min(1).max(2),
+  ),
+});

@@ -30,11 +30,18 @@ import type {
   SaasUserDetail,
   SaasUserLanguage,
   SaasUserListItem,
+  SaasUserStatus,
   SaasUserRoleCode,
 } from "./saas-users.types.js";
 
 export type SaasRoleRecord = {
   id: string;
+  code: SaasUserRoleCode;
+};
+
+export type SaasUserRoleRecord = {
+  userRoleId: string;
+  roleId: string;
   code: SaasUserRoleCode;
 };
 
@@ -208,6 +215,36 @@ export async function findActiveSaasRoleByCode(
   const role = rows[0];
 
   return role ? { id: role.id, code: role.code as SaasUserRoleCode } : null;
+}
+
+export async function findActiveSaasRolesByCodes(
+  db: Database,
+  roleCodes: SaasUserRoleCode[],
+): Promise<SaasRoleRecord[]> {
+  if (roleCodes.length === 0) {
+    return [];
+  }
+
+  const roleRows = await db
+    .select({
+      id: roles.id,
+      code: roles.code,
+    })
+    .from(roles)
+    .where(
+      and(
+        eq(roles.scope, "saas"),
+        isNull(roles.tenantId),
+        inArray(roles.code, roleCodes),
+        eq(roles.status, "active"),
+        isNull(roles.deletedAt),
+      ),
+    );
+
+  return roleRows.map((role) => ({
+    id: role.id,
+    code: role.code as SaasUserRoleCode,
+  }));
 }
 
 export async function findSaasRoles(
@@ -394,12 +431,47 @@ export async function findSaasUserAuditSnapshotById(
   };
 }
 
+export async function lockSaasUserForRoleUpdate(
+  db: Database,
+  userId: string,
+): Promise<{ id: string; status: SaasUserStatus } | null> {
+  const rows = await db
+    .select({
+      id: users.id,
+      status: users.status,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, userId),
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        isNull(users.deletedAt),
+      ),
+    )
+    .limit(1)
+    .for("update");
+
+  return rows[0] ?? null;
+}
+
 export async function findActiveSaasUserRoleCodes(
   db: Database,
   userId: string,
 ): Promise<SaasUserRoleCode[]> {
+  const roleRows = await findActiveSaasUserRoleRecords(db, userId);
+
+  return roleRows.map((row) => row.code);
+}
+
+export async function findActiveSaasUserRoleRecords(
+  db: Database,
+  userId: string,
+): Promise<SaasUserRoleRecord[]> {
   const roleRows = await db
     .select({
+      userRoleId: userRoles.id,
+      roleId: roles.id,
       roleCode: roles.code,
     })
     .from(userRoles)
@@ -418,7 +490,11 @@ export async function findActiveSaasUserRoleCodes(
     )
     .orderBy(asc(roles.code));
 
-  return roleRows.map((row) => row.roleCode as SaasUserRoleCode);
+  return roleRows.map((row) => ({
+    userRoleId: row.userRoleId,
+    roleId: row.roleId,
+    code: row.roleCode as SaasUserRoleCode,
+  }));
 }
 
 export async function countActiveSaasSuperAdmins(
@@ -517,6 +593,72 @@ export async function writeSaasUserStatusUpdatedAuditLog(
     userAgent: input.userAgent,
     before: input.before,
     after: input.after,
+  });
+}
+
+export async function replaceSaasUserRolesRecord(
+  db: Database,
+  input: {
+    userId: string;
+    actorUserId: string;
+    currentUserRoleIds: string[];
+    roles: SaasRoleRecord[];
+  },
+): Promise<SaasUserDetail | null> {
+  const now = new Date();
+
+  if (input.currentUserRoleIds.length > 0) {
+    await db
+      .update(userRoles)
+      .set({
+        revokedAt: now,
+      })
+      .where(inArray(userRoles.id, input.currentUserRoleIds));
+  }
+
+  if (input.roles.length > 0) {
+    await db.insert(userRoles).values(
+      input.roles.map((role) => ({
+        id: createId(),
+        userId: input.userId,
+        roleId: role.id,
+        tenantId: null,
+        branchId: null,
+        assignedBy: input.actorUserId,
+      })),
+    );
+  }
+
+  return findSaasUserDetailById(db, input.userId);
+}
+
+export async function writeSaasUserRolesUpdatedAuditLog(
+  db: Database,
+  input: {
+    actorUserId: string;
+    userId: string;
+    beforeRoles: SaasUserRoleCode[];
+    afterRoles: SaasUserRoleCode[];
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: null,
+    actorUserId: input.actorUserId,
+    eventCategory: "saas_user",
+    eventType: "saas_user.roles_updated",
+    entityType: "user",
+    entityId: input.userId,
+    success: true,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    before: {
+      roles: input.beforeRoles,
+    },
+    after: {
+      roles: input.afterRoles,
+    },
   });
 }
 

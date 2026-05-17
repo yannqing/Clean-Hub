@@ -67,11 +67,22 @@ export type UpdateSaasUserStatusRequest = {
   status: Extract<SaasUserStatus, "active" | "disabled">;
 };
 
+export type UpdateSaasUserRolesRequest = {
+  roleCodes: SaasUserRoleCode[];
+};
+
 export type UpdateSaasUserStatusInput = {
   authContext: AuthContext;
   requestMeta?: AuthRequestMeta;
   userId: string;
   data: UpdateSaasUserStatusRequest;
+};
+
+export type UpdateSaasUserRolesInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  userId: string;
+  data: UpdateSaasUserRolesRequest;
 };
 
 export type SaasUserListItem = {

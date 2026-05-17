@@ -6,6 +6,7 @@ import {
   getSaasUserController,
   listSaasUsersController,
   updateSaasUserController,
+  updateSaasUserRolesController,
   updateSaasUserStatusController,
 } from "./saas-users.controller.js";
 
@@ -15,6 +16,7 @@ export function createSaasUsersRoutes() {
   routes.get("/", listSaasUsersController);
   routes.post("/", createSaasUserController);
   routes.get("/:userId", getSaasUserController);
+  routes.patch("/:userId/roles", updateSaasUserRolesController);
   routes.patch("/:userId/status", updateSaasUserStatusController);
   routes.patch("/:userId", updateSaasUserController);
 
