@@ -6,6 +6,7 @@ import {
   getSaasUserDetail,
   listSaasUsers,
   updateSaasUser,
+  updateSaasUserStatus,
 } from "./saas-users.service.js";
 import { SaasUsersError } from "./saas-users.errors.js";
 import {
@@ -13,6 +14,7 @@ import {
   getSaasUserParamsSchema,
   listSaasUsersQuerySchema,
   updateSaasUserBodySchema,
+  updateSaasUserStatusBodySchema,
 } from "./saas-users.validation.js";
 
 function getClientIp(c: Context<AppBindings>): string | undefined {
@@ -96,6 +98,32 @@ export async function updateSaasUserController(c: Context<AppBindings>) {
 
   try {
     const user = await updateSaasUser({
+      authContext: c.get("authContext"),
+      requestMeta: {
+        ipAddress: getClientIp(c),
+        userAgent: c.req.header("user-agent"),
+      },
+      userId: params.userId,
+      data,
+    });
+
+    return c.json(user);
+  } catch (error) {
+    if (error instanceof SaasUsersError) {
+      return createSaasUsersErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function updateSaasUserStatusController(c: Context<AppBindings>) {
+  const params = getSaasUserParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = updateSaasUserStatusBodySchema.parse(rawBody);
+
+  try {
+    const user = await updateSaasUserStatus({
       authContext: c.get("authContext"),
       requestMeta: {
         ipAddress: getClientIp(c),

@@ -19,6 +19,10 @@ export type UpdateSaasUserRequest = {
   timezone?: string;
 };
 
+export type UpdateSaasUserStatusRequest = {
+  status: Extract<SaasUserStatus, "active" | "disabled">;
+};
+
 export type SaasUserSummary = {
   id: string;
   tenantId: null;

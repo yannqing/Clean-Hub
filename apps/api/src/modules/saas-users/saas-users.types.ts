@@ -53,6 +53,17 @@ export type UpdateSaasUserInput = {
   data: UpdateSaasUserRequest;
 };
 
+export type UpdateSaasUserStatusRequest = {
+  status: Extract<SaasUserStatus, "active" | "disabled">;
+};
+
+export type UpdateSaasUserStatusInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  userId: string;
+  data: UpdateSaasUserStatusRequest;
+};
+
 export type SaasUserListItem = {
   id: string;
   tenantId: null;

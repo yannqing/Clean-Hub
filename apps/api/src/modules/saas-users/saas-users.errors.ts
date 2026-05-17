@@ -3,13 +3,15 @@ export type SaasUsersErrorCode =
   | "SAAS_USER_UPDATE_EMPTY"
   | "SAAS_USER_EMAIL_CONFLICT"
   | "SAAS_USER_PHONE_CONFLICT"
-  | "SAAS_USER_ROLE_INVALID";
+  | "SAAS_USER_ROLE_INVALID"
+  | "SAAS_USER_CANNOT_DISABLE_SELF"
+  | "SAAS_USER_LAST_SUPER_ADMIN";
 
 export class SaasUsersError extends Error {
   constructor(
     public readonly code: SaasUsersErrorCode,
     message: string,
-    public readonly status: 404 | 409 | 422,
+    public readonly status: 400 | 404 | 409 | 422,
   ) {
     super(message);
     this.name = "SaasUsersError";

@@ -13,6 +13,7 @@ import {
 
 import {
   type Database,
+  authRefreshTokens,
   roles,
   userProfiles,
   userRoles,
@@ -59,6 +60,7 @@ export type SaasUserAuditSnapshot = {
   email: string | null;
   phone: string | null;
   displayName: string;
+  status: string;
   language: string;
   timezone: string;
 };
@@ -301,6 +303,7 @@ export async function findSaasUserAuditSnapshotById(
       email: users.email,
       phone: users.phone,
       displayName: userProfiles.displayName,
+      status: users.status,
       language: userProfiles.language,
       timezone: userProfiles.timezone,
     })
@@ -326,9 +329,136 @@ export async function findSaasUserAuditSnapshotById(
     email: user.email,
     phone: user.phone,
     displayName: resolveDisplayName(user),
+    status: user.status,
     language: user.language ?? "en",
     timezone: user.timezone ?? "UTC",
   };
+}
+
+export async function findActiveSaasUserRoleCodes(
+  db: Database,
+  userId: string,
+): Promise<SaasUserRoleCode[]> {
+  const roleRows = await db
+    .select({
+      roleCode: roles.code,
+    })
+    .from(userRoles)
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(
+      and(
+        eq(userRoles.userId, userId),
+        isNull(userRoles.tenantId),
+        isNull(userRoles.branchId),
+        isNull(userRoles.revokedAt),
+        eq(roles.scope, "saas"),
+        eq(roles.status, "active"),
+        isNull(roles.tenantId),
+        isNull(roles.deletedAt),
+      ),
+    )
+    .orderBy(asc(roles.code));
+
+  return roleRows.map((row) => row.roleCode as SaasUserRoleCode);
+}
+
+export async function countActiveSaasSuperAdmins(
+  db: Database,
+): Promise<number> {
+  const rows = await db
+    .select({
+      userId: users.id,
+    })
+    .from(users)
+    .innerJoin(userRoles, eq(userRoles.userId, users.id))
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(
+      and(
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        eq(users.status, "active"),
+        isNull(users.deletedAt),
+        isNull(userRoles.tenantId),
+        isNull(userRoles.branchId),
+        isNull(userRoles.revokedAt),
+        eq(roles.scope, "saas"),
+        isNull(roles.tenantId),
+        eq(roles.code, "super_admin"),
+        eq(roles.status, "active"),
+        isNull(roles.deletedAt),
+      ),
+    );
+
+  return new Set(rows.map((row) => row.userId)).size;
+}
+
+export async function updateSaasUserStatusRecord(
+  db: Database,
+  input: {
+    userId: string;
+    status: Extract<SaasUserListItem["status"], "active" | "disabled">;
+  },
+): Promise<SaasUserDetail | null> {
+  await db
+    .update(users)
+    .set({
+      status: input.status,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(users.id, input.userId),
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        isNull(users.deletedAt),
+      ),
+    );
+
+  return findSaasUserDetailById(db, input.userId);
+}
+
+export async function revokeSaasUserRefreshTokens(
+  db: Database,
+  userId: string,
+): Promise<void> {
+  await db
+    .update(authRefreshTokens)
+    .set({
+      revokedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(authRefreshTokens.userId, userId),
+        isNull(authRefreshTokens.tenantId),
+        isNull(authRefreshTokens.revokedAt),
+      ),
+    );
+}
+
+export async function writeSaasUserStatusUpdatedAuditLog(
+  db: Database,
+  input: {
+    actorUserId: string;
+    userId: string;
+    before: Pick<SaasUserAuditSnapshot, "status">;
+    after: Pick<SaasUserAuditSnapshot, "status">;
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: null,
+    actorUserId: input.actorUserId,
+    eventCategory: "saas_user",
+    eventType: "saas_user.status_updated",
+    entityType: "user",
+    entityId: input.userId,
+    success: true,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    before: input.before,
+    after: input.after,
+  });
 }
 
 export async function updateSaasUserRecord(

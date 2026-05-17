@@ -55,3 +55,7 @@ export const updateSaasUserBodySchema = z
     (data) => Object.values(data).some((value) => value !== undefined),
     "At least one SaaS user field must be provided.",
   );
+
+export const updateSaasUserStatusBodySchema = z.object({
+  status: z.enum(["active", "disabled"]),
+});
