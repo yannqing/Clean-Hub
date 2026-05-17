@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
 import { feedbackTickets, type Database } from "@cleanhub/db";
 
@@ -6,6 +6,8 @@ import type {
   FeedbackTicketDetail,
   FeedbackTicketListInput,
   FeedbackTicketListItem,
+  FeedbackTicketStatus,
+  FeedbackTicketStatusAuditSnapshot,
 } from "./feedback-tickets.types.js";
 
 export async function findFeedbackTickets(
@@ -92,4 +94,60 @@ export async function findFeedbackTicketDetailById(
     createdAt: ticket.createdAt.toISOString(),
     updatedAt: ticket.updatedAt.toISOString(),
   };
+}
+
+export async function findFeedbackTicketStatusAuditSnapshotById(
+  db: Database,
+  ticketId: string,
+): Promise<FeedbackTicketStatusAuditSnapshot | null> {
+  const rows = await db
+    .select({
+      tenantId: feedbackTickets.tenantId,
+      branchId: feedbackTickets.branchId,
+      status: feedbackTickets.status,
+    })
+    .from(feedbackTickets)
+    .where(
+      and(
+        eq(feedbackTickets.id, ticketId),
+        isNull(feedbackTickets.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export async function updateFeedbackTicketStatusRecord(
+  db: Database,
+  input: {
+    ticketId: string;
+    status: FeedbackTicketStatus;
+    actorUserId: string;
+  },
+): Promise<FeedbackTicketDetail | null> {
+  const now = new Date();
+  const rows = await db
+    .update(feedbackTickets)
+    .set({
+      status: input.status,
+      updatedAt: now,
+      updatedBy: input.actorUserId,
+      version: sql`${feedbackTickets.version} + 1`,
+    })
+    .where(
+      and(
+        eq(feedbackTickets.id, input.ticketId),
+        isNull(feedbackTickets.deletedAt),
+      ),
+    )
+    .returning({
+      id: feedbackTickets.id,
+    });
+
+  if (!rows[0]) {
+    return null;
+  }
+
+  return findFeedbackTicketDetailById(db, input.ticketId);
 }

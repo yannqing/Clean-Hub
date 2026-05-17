@@ -4,4 +4,5 @@ export type {
   FeedbackTicketListInput,
   FeedbackTicketListItem,
   FeedbackTicketStatus,
+  UpdateFeedbackTicketStatusRequest,
 } from "./feedback-tickets.types.js";

@@ -33,3 +33,14 @@ export type FeedbackTicketDetail = FeedbackTicketListItem & {
   createdBy: string | null;
   updatedBy: string | null;
 };
+
+export type UpdateFeedbackTicketStatusRequest = {
+  status: FeedbackTicketStatus;
+  reason?: string;
+};
+
+export type FeedbackTicketStatusAuditSnapshot = {
+  tenantId: string | null;
+  branchId: string | null;
+  status: FeedbackTicketStatus;
+};

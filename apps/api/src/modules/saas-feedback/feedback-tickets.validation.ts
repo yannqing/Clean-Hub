@@ -14,3 +14,8 @@ export const feedbackTicketListQuerySchema = z.object({
 export const feedbackTicketParamsSchema = z.object({
   ticketId: z.string().regex(ULID_PATTERN),
 });
+
+export const updateFeedbackTicketStatusBodySchema = z.object({
+  status: z.enum(["open", "in_progress", "resolved", "closed"]),
+  reason: z.string().trim().min(1).max(500).optional(),
+});
