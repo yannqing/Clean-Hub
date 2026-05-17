@@ -26,3 +26,10 @@ export type FeedbackTicketListItem = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type FeedbackTicketDetail = FeedbackTicketListItem & {
+  description: string | null;
+  metadata: Record<string, unknown> | null;
+  createdBy: string | null;
+  updatedBy: string | null;
+};

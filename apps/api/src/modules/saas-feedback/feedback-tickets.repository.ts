@@ -3,6 +3,7 @@ import { and, desc, eq, isNull } from "drizzle-orm";
 import { feedbackTickets, type Database } from "@cleanhub/db";
 
 import type {
+  FeedbackTicketDetail,
   FeedbackTicketListInput,
   FeedbackTicketListItem,
 } from "./feedback-tickets.types.js";
@@ -46,4 +47,49 @@ export async function findFeedbackTickets(
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }));
+}
+
+export async function findFeedbackTicketDetailById(
+  db: Database,
+  ticketId: string,
+): Promise<FeedbackTicketDetail | null> {
+  const rows = await db
+    .select({
+      id: feedbackTickets.id,
+      tenantId: feedbackTickets.tenantId,
+      branchId: feedbackTickets.branchId,
+      title: feedbackTickets.title,
+      description: feedbackTickets.description,
+      status: feedbackTickets.status,
+      priority: feedbackTickets.priority,
+      source: feedbackTickets.source,
+      reporterUserId: feedbackTickets.reporterUserId,
+      assigneeUserId: feedbackTickets.assigneeUserId,
+      metadata: feedbackTickets.metadata,
+      createdAt: feedbackTickets.createdAt,
+      updatedAt: feedbackTickets.updatedAt,
+      createdBy: feedbackTickets.createdBy,
+      updatedBy: feedbackTickets.updatedBy,
+    })
+    .from(feedbackTickets)
+    .where(
+      and(
+        eq(feedbackTickets.id, ticketId),
+        isNull(feedbackTickets.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  const ticket = rows[0];
+
+  if (!ticket) {
+    return null;
+  }
+
+  return {
+    ...ticket,
+    metadata: ticket.metadata ?? null,
+    createdAt: ticket.createdAt.toISOString(),
+    updatedAt: ticket.updatedAt.toISOString(),
+  };
 }
