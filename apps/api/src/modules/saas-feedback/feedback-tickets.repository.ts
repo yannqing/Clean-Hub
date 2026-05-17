@@ -1,8 +1,9 @@
 import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
-import { feedbackTickets, type Database } from "@cleanhub/db";
+import { feedbackTickets, type Database, users } from "@cleanhub/db";
 
 import type {
+  FeedbackTicketAssigneeAuditSnapshot,
   FeedbackTicketDetail,
   FeedbackTicketListInput,
   FeedbackTicketListItem,
@@ -131,6 +132,85 @@ export async function updateFeedbackTicketStatusRecord(
     .update(feedbackTickets)
     .set({
       status: input.status,
+      updatedAt: now,
+      updatedBy: input.actorUserId,
+      version: sql`${feedbackTickets.version} + 1`,
+    })
+    .where(
+      and(
+        eq(feedbackTickets.id, input.ticketId),
+        isNull(feedbackTickets.deletedAt),
+      ),
+    )
+    .returning({
+      id: feedbackTickets.id,
+    });
+
+  if (!rows[0]) {
+    return null;
+  }
+
+  return findFeedbackTicketDetailById(db, input.ticketId);
+}
+
+export async function findFeedbackTicketAssigneeAuditSnapshotById(
+  db: Database,
+  ticketId: string,
+): Promise<FeedbackTicketAssigneeAuditSnapshot | null> {
+  const rows = await db
+    .select({
+      tenantId: feedbackTickets.tenantId,
+      branchId: feedbackTickets.branchId,
+      assigneeUserId: feedbackTickets.assigneeUserId,
+    })
+    .from(feedbackTickets)
+    .where(
+      and(
+        eq(feedbackTickets.id, ticketId),
+        isNull(feedbackTickets.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export async function findActiveSaasAssigneeById(
+  db: Database,
+  userId: string,
+): Promise<{ id: string } | null> {
+  const rows = await db
+    .select({
+      id: users.id,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, userId),
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        eq(users.status, "active"),
+        isNull(users.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export async function updateFeedbackTicketAssigneeRecord(
+  db: Database,
+  input: {
+    ticketId: string;
+    assigneeUserId: string | null;
+    actorUserId: string;
+  },
+): Promise<FeedbackTicketDetail | null> {
+  const now = new Date();
+  const rows = await db
+    .update(feedbackTickets)
+    .set({
+      assigneeUserId: input.assigneeUserId,
       updatedAt: now,
       updatedBy: input.actorUserId,
       version: sql`${feedbackTickets.version} + 1`,

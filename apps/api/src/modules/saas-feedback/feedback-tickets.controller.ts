@@ -5,11 +5,13 @@ import { FeedbackTicketsError } from "./feedback-tickets.errors.js";
 import {
   getFeedbackTicketDetail,
   listFeedbackTickets,
+  updateFeedbackTicketAssignee,
   updateFeedbackTicketStatus,
 } from "./feedback-tickets.service.js";
 import {
   feedbackTicketListQuerySchema,
   feedbackTicketParamsSchema,
+  updateFeedbackTicketAssigneeBodySchema,
   updateFeedbackTicketStatusBodySchema,
 } from "./feedback-tickets.validation.js";
 
@@ -48,6 +50,34 @@ export async function getFeedbackTicketController(c: Context<AppBindings>) {
     const ticket = await getFeedbackTicketDetail(
       c.get("authContext"),
       params.ticketId,
+    );
+
+    return c.json(ticket);
+  } catch (error) {
+    if (error instanceof FeedbackTicketsError) {
+      return createFeedbackTicketsErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function updateFeedbackTicketAssigneeController(
+  c: Context<AppBindings>,
+) {
+  const params = feedbackTicketParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = updateFeedbackTicketAssigneeBodySchema.parse(rawBody);
+
+  try {
+    const ticket = await updateFeedbackTicketAssignee(
+      c.get("authContext"),
+      params.ticketId,
+      data,
+      {
+        ipAddress: getClientIp(c),
+        userAgent: c.req.header("user-agent"),
+      },
     );
 
     return c.json(ticket);

@@ -19,3 +19,7 @@ export const updateFeedbackTicketStatusBodySchema = z.object({
   status: z.enum(["open", "in_progress", "resolved", "closed"]),
   reason: z.string().trim().min(1).max(500).optional(),
 });
+
+export const updateFeedbackTicketAssigneeBodySchema = z.object({
+  assigneeUserId: z.string().regex(ULID_PATTERN).nullable(),
+});

@@ -44,3 +44,13 @@ export type FeedbackTicketStatusAuditSnapshot = {
   branchId: string | null;
   status: FeedbackTicketStatus;
 };
+
+export type UpdateFeedbackTicketAssigneeRequest = {
+  assigneeUserId: string | null;
+};
+
+export type FeedbackTicketAssigneeAuditSnapshot = {
+  tenantId: string | null;
+  branchId: string | null;
+  assigneeUserId: string | null;
+};
