@@ -1,9 +1,11 @@
 import type { Context } from "hono";
 
 import type { AppBindings } from "../../http/types.js";
+import { requireSaasRole } from "../auth/permission.helper.js";
 import {
   createSaasUser,
   getSaasUserDetail,
+  listSaasRoles,
   listSaasUsers,
   updateSaasUser,
   updateSaasUserStatus,
@@ -65,6 +67,16 @@ export async function getSaasUserController(c: Context<AppBindings>) {
 
     throw error;
   }
+}
+
+export async function listSaasRolesController(c: Context<AppBindings>) {
+  requireSaasRole(c.get("authContext"), ["super_admin", "support"]);
+
+  const roles = await listSaasRoles({
+    authContext: c.get("authContext"),
+  });
+
+  return c.json(roles);
 }
 
 export async function createSaasUserController(c: Context<AppBindings>) {

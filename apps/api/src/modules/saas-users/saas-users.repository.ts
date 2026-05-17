@@ -14,6 +14,8 @@ import {
 import {
   type Database,
   authRefreshTokens,
+  permissions,
+  rolePermissions,
   roles,
   userProfiles,
   userRoles,
@@ -24,6 +26,7 @@ import { writeAuditLog } from "../audit/audit.helper.js";
 
 import type {
   ListSaasUsersQuery,
+  SaasRoleListItem,
   SaasUserDetail,
   SaasUserLanguage,
   SaasUserListItem,
@@ -205,6 +208,62 @@ export async function findActiveSaasRoleByCode(
   const role = rows[0];
 
   return role ? { id: role.id, code: role.code as SaasUserRoleCode } : null;
+}
+
+export async function findSaasRoles(
+  db: Database,
+): Promise<SaasRoleListItem[]> {
+  const roleRows = await db
+    .select({
+      id: roles.id,
+      code: roles.code,
+      name: roles.name,
+      description: roles.description,
+      status: roles.status,
+      isSystem: roles.isSystem,
+      permissionCode: permissions.code,
+    })
+    .from(roles)
+    .leftJoin(rolePermissions, eq(rolePermissions.roleId, roles.id))
+    .leftJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+    .where(
+      and(
+        eq(roles.scope, "saas"),
+        isNull(roles.tenantId),
+        isNull(roles.deletedAt),
+      ),
+    )
+    .orderBy(
+      desc(roles.isSystem),
+      asc(roles.name),
+      asc(roles.code),
+      asc(permissions.code),
+    );
+
+  const rolesById = new Map<string, SaasRoleListItem>();
+
+  for (const role of roleRows) {
+    const roleItem = rolesById.get(role.id) ?? {
+      id: role.id,
+      code: role.code as SaasUserRoleCode,
+      name: role.name,
+      description: role.description,
+      status: role.status,
+      isSystem: role.isSystem,
+      permissions: [],
+    };
+
+    if (
+      role.permissionCode &&
+      !roleItem.permissions.includes(role.permissionCode)
+    ) {
+      roleItem.permissions.push(role.permissionCode);
+    }
+
+    rolesById.set(role.id, roleItem);
+  }
+
+  return [...rolesById.values()];
 }
 
 export async function createSaasUserRecord(

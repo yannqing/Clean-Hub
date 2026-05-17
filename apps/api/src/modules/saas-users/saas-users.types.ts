@@ -4,6 +4,16 @@ export type SaasUserStatus = "invited" | "active" | "disabled" | "suspended";
 export type SaasUserLanguage = "en" | "fr" | "zh-CN";
 export type SaasUserRoleCode = "super_admin" | "support";
 
+export type SaasRoleListItem = {
+  id: string;
+  code: SaasUserRoleCode;
+  name: string;
+  description: string | null;
+  status: "active" | "disabled";
+  isSystem: boolean;
+  permissions: string[];
+};
+
 export type ListSaasUsersQuery = {
   q?: string;
   status?: SaasUserStatus;

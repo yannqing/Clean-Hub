@@ -12,6 +12,7 @@ import {
   findActiveSaasRoleByCode,
   findOtherSaasUserByNormalizedEmail,
   findOtherSaasUserByPhone,
+  findSaasRoles,
   findSaasUserAuditSnapshotById,
   findSaasUserDetailById,
   findSaasUserByNormalizedEmail,
@@ -28,6 +29,7 @@ import type {
   CreateSaasUserInput,
   GetSaasUserDetailInput,
   ListSaasUsersInput,
+  SaasRoleListItem,
   SaasUserDetail,
   SaasUserListItem,
   UpdateSaasUserInput,
@@ -91,6 +93,15 @@ export async function getSaasUserDetail(
   }
 
   return user;
+}
+
+export async function listSaasRoles(
+  input: Pick<ListSaasUsersInput, "authContext">,
+  db: Database = getDb(),
+): Promise<SaasRoleListItem[]> {
+  requireSaasUsersAccess(input.authContext, ["super_admin", "support"]);
+
+  return findSaasRoles(db);
 }
 
 export async function createSaasUser(
