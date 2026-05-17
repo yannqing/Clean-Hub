@@ -13,6 +13,9 @@ import {
 
 import {
   type Database,
+  authRefreshTokens,
+  permissions,
+  rolePermissions,
   roles,
   userProfiles,
   userRoles,
@@ -23,14 +26,22 @@ import { writeAuditLog } from "../audit/audit.helper.js";
 
 import type {
   ListSaasUsersQuery,
+  SaasRoleListItem,
   SaasUserDetail,
   SaasUserLanguage,
   SaasUserListItem,
+  SaasUserStatus,
   SaasUserRoleCode,
 } from "./saas-users.types.js";
 
 export type SaasRoleRecord = {
   id: string;
+  code: SaasUserRoleCode;
+};
+
+export type SaasUserRoleRecord = {
+  userRoleId: string;
+  roleId: string;
   code: SaasUserRoleCode;
 };
 
@@ -59,6 +70,7 @@ export type SaasUserAuditSnapshot = {
   email: string | null;
   phone: string | null;
   displayName: string;
+  status: string;
   language: string;
   timezone: string;
 };
@@ -205,6 +217,92 @@ export async function findActiveSaasRoleByCode(
   return role ? { id: role.id, code: role.code as SaasUserRoleCode } : null;
 }
 
+export async function findActiveSaasRolesByCodes(
+  db: Database,
+  roleCodes: SaasUserRoleCode[],
+): Promise<SaasRoleRecord[]> {
+  if (roleCodes.length === 0) {
+    return [];
+  }
+
+  const roleRows = await db
+    .select({
+      id: roles.id,
+      code: roles.code,
+    })
+    .from(roles)
+    .where(
+      and(
+        eq(roles.scope, "saas"),
+        isNull(roles.tenantId),
+        inArray(roles.code, roleCodes),
+        eq(roles.status, "active"),
+        isNull(roles.deletedAt),
+      ),
+    );
+
+  return roleRows.map((role) => ({
+    id: role.id,
+    code: role.code as SaasUserRoleCode,
+  }));
+}
+
+export async function findSaasRoles(
+  db: Database,
+): Promise<SaasRoleListItem[]> {
+  const roleRows = await db
+    .select({
+      id: roles.id,
+      code: roles.code,
+      name: roles.name,
+      description: roles.description,
+      status: roles.status,
+      isSystem: roles.isSystem,
+      permissionCode: permissions.code,
+    })
+    .from(roles)
+    .leftJoin(rolePermissions, eq(rolePermissions.roleId, roles.id))
+    .leftJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+    .where(
+      and(
+        eq(roles.scope, "saas"),
+        isNull(roles.tenantId),
+        isNull(roles.deletedAt),
+      ),
+    )
+    .orderBy(
+      desc(roles.isSystem),
+      asc(roles.name),
+      asc(roles.code),
+      asc(permissions.code),
+    );
+
+  const rolesById = new Map<string, SaasRoleListItem>();
+
+  for (const role of roleRows) {
+    const roleItem = rolesById.get(role.id) ?? {
+      id: role.id,
+      code: role.code as SaasUserRoleCode,
+      name: role.name,
+      description: role.description,
+      status: role.status,
+      isSystem: role.isSystem,
+      permissions: [],
+    };
+
+    if (
+      role.permissionCode &&
+      !roleItem.permissions.includes(role.permissionCode)
+    ) {
+      roleItem.permissions.push(role.permissionCode);
+    }
+
+    rolesById.set(role.id, roleItem);
+  }
+
+  return [...rolesById.values()];
+}
+
 export async function createSaasUserRecord(
   db: Database,
   input: CreateSaasUserRecordInput,
@@ -301,6 +399,7 @@ export async function findSaasUserAuditSnapshotById(
       email: users.email,
       phone: users.phone,
       displayName: userProfiles.displayName,
+      status: users.status,
       language: userProfiles.language,
       timezone: userProfiles.timezone,
     })
@@ -326,9 +425,241 @@ export async function findSaasUserAuditSnapshotById(
     email: user.email,
     phone: user.phone,
     displayName: resolveDisplayName(user),
+    status: user.status,
     language: user.language ?? "en",
     timezone: user.timezone ?? "UTC",
   };
+}
+
+export async function lockSaasUserForRoleUpdate(
+  db: Database,
+  userId: string,
+): Promise<{ id: string; status: SaasUserStatus } | null> {
+  const rows = await db
+    .select({
+      id: users.id,
+      status: users.status,
+    })
+    .from(users)
+    .where(
+      and(
+        eq(users.id, userId),
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        isNull(users.deletedAt),
+      ),
+    )
+    .limit(1)
+    .for("update");
+
+  return rows[0] ?? null;
+}
+
+export async function findActiveSaasUserRoleCodes(
+  db: Database,
+  userId: string,
+): Promise<SaasUserRoleCode[]> {
+  const roleRows = await findActiveSaasUserRoleRecords(db, userId);
+
+  return roleRows.map((row) => row.code);
+}
+
+export async function findActiveSaasUserRoleRecords(
+  db: Database,
+  userId: string,
+): Promise<SaasUserRoleRecord[]> {
+  const roleRows = await db
+    .select({
+      userRoleId: userRoles.id,
+      roleId: roles.id,
+      roleCode: roles.code,
+    })
+    .from(userRoles)
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(
+      and(
+        eq(userRoles.userId, userId),
+        isNull(userRoles.tenantId),
+        isNull(userRoles.branchId),
+        isNull(userRoles.revokedAt),
+        eq(roles.scope, "saas"),
+        eq(roles.status, "active"),
+        isNull(roles.tenantId),
+        isNull(roles.deletedAt),
+      ),
+    )
+    .orderBy(asc(roles.code));
+
+  return roleRows.map((row) => ({
+    userRoleId: row.userRoleId,
+    roleId: row.roleId,
+    code: row.roleCode as SaasUserRoleCode,
+  }));
+}
+
+export async function countActiveSaasSuperAdmins(
+  db: Database,
+): Promise<number> {
+  const rows = await db
+    .select({
+      userId: users.id,
+    })
+    .from(users)
+    .innerJoin(userRoles, eq(userRoles.userId, users.id))
+    .innerJoin(roles, eq(roles.id, userRoles.roleId))
+    .where(
+      and(
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        eq(users.status, "active"),
+        isNull(users.deletedAt),
+        isNull(userRoles.tenantId),
+        isNull(userRoles.branchId),
+        isNull(userRoles.revokedAt),
+        eq(roles.scope, "saas"),
+        isNull(roles.tenantId),
+        eq(roles.code, "super_admin"),
+        eq(roles.status, "active"),
+        isNull(roles.deletedAt),
+      ),
+    );
+
+  return new Set(rows.map((row) => row.userId)).size;
+}
+
+export async function updateSaasUserStatusRecord(
+  db: Database,
+  input: {
+    userId: string;
+    status: Extract<SaasUserListItem["status"], "active" | "disabled">;
+  },
+): Promise<SaasUserDetail | null> {
+  await db
+    .update(users)
+    .set({
+      status: input.status,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(users.id, input.userId),
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        isNull(users.deletedAt),
+      ),
+    );
+
+  return findSaasUserDetailById(db, input.userId);
+}
+
+export async function revokeSaasUserRefreshTokens(
+  db: Database,
+  userId: string,
+): Promise<void> {
+  await db
+    .update(authRefreshTokens)
+    .set({
+      revokedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(authRefreshTokens.userId, userId),
+        isNull(authRefreshTokens.tenantId),
+        isNull(authRefreshTokens.revokedAt),
+      ),
+    );
+}
+
+export async function writeSaasUserStatusUpdatedAuditLog(
+  db: Database,
+  input: {
+    actorUserId: string;
+    userId: string;
+    before: Pick<SaasUserAuditSnapshot, "status">;
+    after: Pick<SaasUserAuditSnapshot, "status">;
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: null,
+    actorUserId: input.actorUserId,
+    eventCategory: "saas_user",
+    eventType: "saas_user.status_updated",
+    entityType: "user",
+    entityId: input.userId,
+    success: true,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    before: input.before,
+    after: input.after,
+  });
+}
+
+export async function replaceSaasUserRolesRecord(
+  db: Database,
+  input: {
+    userId: string;
+    actorUserId: string;
+    currentUserRoleIds: string[];
+    roles: SaasRoleRecord[];
+  },
+): Promise<SaasUserDetail | null> {
+  const now = new Date();
+
+  if (input.currentUserRoleIds.length > 0) {
+    await db
+      .update(userRoles)
+      .set({
+        revokedAt: now,
+      })
+      .where(inArray(userRoles.id, input.currentUserRoleIds));
+  }
+
+  if (input.roles.length > 0) {
+    await db.insert(userRoles).values(
+      input.roles.map((role) => ({
+        id: createId(),
+        userId: input.userId,
+        roleId: role.id,
+        tenantId: null,
+        branchId: null,
+        assignedBy: input.actorUserId,
+      })),
+    );
+  }
+
+  return findSaasUserDetailById(db, input.userId);
+}
+
+export async function writeSaasUserRolesUpdatedAuditLog(
+  db: Database,
+  input: {
+    actorUserId: string;
+    userId: string;
+    beforeRoles: SaasUserRoleCode[];
+    afterRoles: SaasUserRoleCode[];
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: null,
+    actorUserId: input.actorUserId,
+    eventCategory: "saas_user",
+    eventType: "saas_user.roles_updated",
+    entityType: "user",
+    entityId: input.userId,
+    success: true,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    before: {
+      roles: input.beforeRoles,
+    },
+    after: {
+      roles: input.afterRoles,
+    },
+  });
 }
 
 export async function updateSaasUserRecord(

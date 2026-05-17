@@ -1,5 +1,6 @@
 import type { ApiClient, QueryParams } from "../types";
 import { createSaasAuditLogsApi } from "./audit-logs";
+import { createSaasRolesApi } from "./roles";
 import { createSaasTenantsApi } from "./tenants";
 import type {
   CreateTenantRequest,
@@ -9,10 +10,15 @@ import type {
   UpdateTenantStatusRequest,
 } from "./tenants.types";
 import { createSaasUsersApi } from "./users";
-import type { UpdateSaasUserRequest } from "./users.types";
+import type {
+  UpdateSaasUserRequest,
+  UpdateSaasUserRolesRequest,
+} from "./users.types";
 
 export * from "./audit-logs";
 export * from "./audit-logs.types";
+export * from "./roles";
+export * from "./roles.types";
 export * from "./tenants";
 export * from "./tenants.types";
 export * from "./users";
@@ -21,11 +27,13 @@ export * from "./users.types";
 export function createSaasApi(client: ApiClient) {
   const tenants = createSaasTenantsApi(client);
   const users = createSaasUsersApi(client);
+  const roles = createSaasRolesApi(client);
   const auditLogs = createSaasAuditLogsApi(client);
 
   return {
     tenants,
     users,
+    roles,
     auditLogs,
     listTenants: (query?: QueryParams) => tenants.list(query),
     createTenant: (input: CreateTenantRequest) => tenants.create(input),
@@ -49,6 +57,9 @@ export function createSaasApi(client: ApiClient) {
     getUser: (userId: string) => users.get(userId),
     updateUser: (userId: string, input: UpdateSaasUserRequest) =>
       users.update(userId, input),
+    updateUserRoles: (userId: string, input: UpdateSaasUserRolesRequest) =>
+      users.updateRoles(userId, input),
+    listRoles: () => roles.list(),
     listAuditLogs: (query?: QueryParams) => auditLogs.list(query),
     test: () => users.test(),
   };

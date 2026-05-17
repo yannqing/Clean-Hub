@@ -6,26 +6,41 @@ import { hashPassword } from "../auth/password.service.js";
 import { requireSaasRole, type SaasRole } from "../auth/permission.helper.js";
 import { SaasUsersError } from "./saas-users.errors.js";
 import {
+  countActiveSaasSuperAdmins,
   createSaasUserRecord,
+  findActiveSaasUserRoleCodes,
+  findActiveSaasUserRoleRecords,
+  findActiveSaasRolesByCodes,
   findActiveSaasRoleByCode,
   findOtherSaasUserByNormalizedEmail,
   findOtherSaasUserByPhone,
+  findSaasRoles,
   findSaasUserAuditSnapshotById,
   findSaasUserDetailById,
   findSaasUserByNormalizedEmail,
   findSaasUserByPhone,
   findSaasUsers,
+  lockSaasUserForRoleUpdate,
+  replaceSaasUserRolesRecord,
+  revokeSaasUserRefreshTokens,
   updateSaasUserRecord,
+  updateSaasUserStatusRecord,
   writeSaasUserCreatedAuditLog,
+  writeSaasUserRolesUpdatedAuditLog,
+  writeSaasUserStatusUpdatedAuditLog,
   writeSaasUserUpdatedAuditLog,
 } from "./saas-users.repository.js";
 import type {
   CreateSaasUserInput,
   GetSaasUserDetailInput,
   ListSaasUsersInput,
+  SaasRoleListItem,
   SaasUserDetail,
   SaasUserListItem,
+  SaasUserRoleCode,
   UpdateSaasUserInput,
+  UpdateSaasUserRolesInput,
+  UpdateSaasUserStatusInput,
 } from "./saas-users.types.js";
 
 function normalizeEmail(email: string): string {
@@ -46,6 +61,23 @@ function normalizeUpdatePhone(
   }
 
   return normalizePhone(phone);
+}
+
+function normalizeRoleCodes(
+  roleCodes: SaasUserRoleCode[],
+): SaasUserRoleCode[] {
+  return [...new Set(roleCodes)].sort();
+}
+
+function areRoleCodesEqual(
+  left: SaasUserRoleCode[],
+  right: SaasUserRoleCode[],
+): boolean {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((roleCode, index) => roleCode === right[index]);
 }
 
 function requireSaasUsersAccess(
@@ -85,6 +117,15 @@ export async function getSaasUserDetail(
   }
 
   return user;
+}
+
+export async function listSaasRoles(
+  input: Pick<ListSaasUsersInput, "authContext">,
+  db: Database = getDb(),
+): Promise<SaasRoleListItem[]> {
+  requireSaasUsersAccess(input.authContext, ["super_admin", "support"]);
+
+  return findSaasRoles(db);
 }
 
 export async function createSaasUser(
@@ -251,6 +292,197 @@ export async function updateSaasUser(
       userId: input.userId,
       before,
       after,
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return user;
+  });
+}
+
+export async function updateSaasUserStatus(
+  input: UpdateSaasUserStatusInput,
+  db: Database = getDb(),
+): Promise<SaasUserDetail> {
+  requireSaasUsersAccess(input.authContext, ["super_admin"]);
+
+  return db.transaction(async (tx) => {
+    const before = await findSaasUserAuditSnapshotById(tx, input.userId);
+
+    if (!before) {
+      throw new SaasUsersError(
+        "SAAS_USER_NOT_FOUND",
+        "SaaS user was not found.",
+        404,
+      );
+    }
+
+    if (
+      input.data.status === "disabled" &&
+      input.userId === input.authContext.userId
+    ) {
+      throw new SaasUsersError(
+        "SAAS_USER_CANNOT_DISABLE_SELF",
+        "Super admins cannot disable their own account.",
+        400,
+      );
+    }
+
+    const roleCodes = await findActiveSaasUserRoleCodes(tx, input.userId);
+
+    if (
+      input.data.status === "disabled" &&
+      roleCodes.includes("super_admin")
+    ) {
+      const activeSuperAdminCount = await countActiveSaasSuperAdmins(tx);
+
+      if (before.status === "active" && activeSuperAdminCount <= 1) {
+        throw new SaasUsersError(
+          "SAAS_USER_LAST_SUPER_ADMIN",
+          "At least one active super admin must remain.",
+          422,
+        );
+      }
+    }
+
+    const isStatusChanged = before.status !== input.data.status;
+    const user = isStatusChanged
+      ? await updateSaasUserStatusRecord(tx, {
+          userId: input.userId,
+          status: input.data.status,
+        })
+      : await findSaasUserDetailById(tx, input.userId);
+
+    if (!user) {
+      throw new SaasUsersError(
+        "SAAS_USER_NOT_FOUND",
+        "SaaS user was not found.",
+        404,
+      );
+    }
+
+    if (input.data.status === "disabled") {
+      await revokeSaasUserRefreshTokens(tx, input.userId);
+    }
+
+    if (isStatusChanged || input.data.status === "disabled") {
+      await writeSaasUserStatusUpdatedAuditLog(tx, {
+        actorUserId: input.authContext.userId,
+        userId: input.userId,
+        before: {
+          status: before.status,
+        },
+        after: {
+          status: input.data.status,
+        },
+        ipAddress: input.requestMeta?.ipAddress,
+        userAgent: input.requestMeta?.userAgent,
+      });
+    }
+
+    return user;
+  });
+}
+
+export async function updateSaasUserRoles(
+  input: UpdateSaasUserRolesInput,
+  db: Database = getDb(),
+): Promise<SaasUserDetail> {
+  requireSaasUsersAccess(input.authContext, ["super_admin"]);
+
+  const desiredRoleCodes = normalizeRoleCodes(input.data.roleCodes);
+
+  return db.transaction(async (tx) => {
+    const targetUser = await lockSaasUserForRoleUpdate(tx, input.userId);
+
+    if (!targetUser) {
+      throw new SaasUsersError(
+        "SAAS_USER_NOT_FOUND",
+        "SaaS user was not found.",
+        404,
+      );
+    }
+
+    const requestedRoles = await findActiveSaasRolesByCodes(
+      tx,
+      desiredRoleCodes,
+    );
+    const requestedRoleCodes = new Set(requestedRoles.map((role) => role.code));
+
+    if (
+      requestedRoles.length !== desiredRoleCodes.length ||
+      !desiredRoleCodes.every((roleCode) => requestedRoleCodes.has(roleCode))
+    ) {
+      throw new SaasUsersError(
+        "SAAS_USER_ROLES_INVALID",
+        "One or more SaaS roles are invalid or disabled.",
+        422,
+      );
+    }
+
+    const currentRoles = await findActiveSaasUserRoleRecords(tx, input.userId);
+    const currentRoleCodes = normalizeRoleCodes(
+      currentRoles.map((role) => role.code),
+    );
+    const hasDuplicateCurrentRoleRecords =
+      currentRoles.length !== currentRoleCodes.length;
+
+    if (
+      targetUser.status === "active" &&
+      currentRoleCodes.includes("super_admin") &&
+      !desiredRoleCodes.includes("super_admin")
+    ) {
+      const activeSuperAdminCount = await countActiveSaasSuperAdmins(tx);
+
+      if (activeSuperAdminCount <= 1) {
+        throw new SaasUsersError(
+          "SAAS_USER_LAST_SUPER_ADMIN",
+          "At least one active super admin must remain.",
+          422,
+        );
+      }
+    }
+
+    if (
+      !hasDuplicateCurrentRoleRecords &&
+      areRoleCodesEqual(currentRoleCodes, desiredRoleCodes)
+    ) {
+      const user = await findSaasUserDetailById(tx, input.userId);
+
+      if (!user) {
+        throw new SaasUsersError(
+          "SAAS_USER_NOT_FOUND",
+          "SaaS user was not found.",
+          404,
+        );
+      }
+
+      return user;
+    }
+
+    const rolesByCode = new Map(
+      requestedRoles.map((role) => [role.code, role]),
+    );
+    const user = await replaceSaasUserRolesRecord(tx, {
+      actorUserId: input.authContext.userId,
+      userId: input.userId,
+      currentUserRoleIds: currentRoles.map((role) => role.userRoleId),
+      roles: desiredRoleCodes.map((roleCode) => rolesByCode.get(roleCode)!),
+    });
+
+    if (!user) {
+      throw new SaasUsersError(
+        "SAAS_USER_NOT_FOUND",
+        "SaaS user was not found.",
+        404,
+      );
+    }
+
+    await writeSaasUserRolesUpdatedAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      userId: input.userId,
+      beforeRoles: currentRoleCodes,
+      afterRoles: desiredRoleCodes,
       ipAddress: input.requestMeta?.ipAddress,
       userAgent: input.requestMeta?.userAgent,
     });
