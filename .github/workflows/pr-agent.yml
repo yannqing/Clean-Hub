@@ -4,9 +4,11 @@ on:
   pull_request:
     types: [opened, synchronize] # 当新建 PR，或者有人往现有的 PR 追加提交代码时触发
 
+# 💡 核心修复 1：在代码中强制索要“写入评论”和“读取内容”的权限，绕过网页端设置
 permissions:
-  pull-requests: write # 赋予 AI 往你的 PR 页面写评论和代码建议的权限
-  contents: read
+  pull-requests: write # 强行赋予 AI 往你的 PR 页面写评论和代码建议的权限
+  contents: read       # 允许读取代码内容
+  issues: write        # 备用：部分机器人会将部分摘要写入 issue
 
 jobs:
   pr_agent_job:
@@ -16,14 +18,15 @@ jobs:
         uses: the-pr-agent/pr-agent@main
         env:
           PROVIDER: "gemini" 
-          GEMINI.API_KEY: ${{ secrets.GEMINI_API_KEY }} # 动态读取你刚才在网页配的那个密钥
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}      # GitHub 自动生成的临时通行证，不用动
+          # 💡 核心修复 2：将 GEMINI.API_KEY 改为标准的 GEMINI_API_KEY（去掉了点号）
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}      # GitHub 自动生成的临时通行证
           
-          # 针对你们小型团队的体验优化设置
-          PR_REVIEW.REQUIRE_SECURITY_ANALYSIS: "true" # 开启安全漏洞和敏感信息检测
-          PR_REVIEW.REQUIRE_TESTS_ANALYSIS: "false"    # 如果没写单元测试，关掉此项避免刷屏
-          PR_DESCRIPTION.PUBLISH_LABELS: "true"      # 自动根据代码变动给 PR 打标签（如 bug, feat）
+          # 针对你们小型团队的体验优化设置（将内部的“.”统一换成“_”，防止 Linux 环境解析失效）
+          PR_REVIEW_REQUIRE_SECURITY_ANALYSIS: "true"   # 开启安全漏洞和敏感信息检测
+          PR_REVIEW_REQUIRE_TESTS_ANALYSIS: "false"      # 如果没写单元测试，关掉此项避免刷屏
+          PR_DESCRIPTION_PUBLISH_LABELS: "true"         # 自动根据代码变动给 PR 打标签
           
           # 📢 语言设置：让谷歌 Gemini 评审完代码后，直接用中文在 PR 里发评论
-          PR_REVIEW.LANGUAGE: "zh"
-          PR_DESCRIPTION.LANGUAGE: "zh"
+          PR_REVIEW_LANGUAGE: "zh"
+          PR_DESCRIPTION_LANGUAGE: "zh"
