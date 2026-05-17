@@ -1,11 +1,5 @@
-import { PagePlaceholder } from "@/components/app-shell";
+import { TenantListView } from "@/features/saas/tenants/components";
 
 export default function SaasTenantsPage() {
-  return (
-    <PagePlaceholder
-      description="Manage tenant accounts, tenant status, subscriptions, and tenant-level settings."
-      items={["Tenant list", "Tenant search", "Tenant status", "Tenant detail entry"]}
-      title="Tenants"
-    />
-  );
+  return <TenantListView />;
 }
