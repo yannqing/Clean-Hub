@@ -1,6 +1,25 @@
+import type { AuthContext, AuthRequestMeta } from "../auth/auth.types.js";
+
 export type SaasUserStatus = "invited" | "active" | "disabled" | "suspended";
 export type SaasUserLanguage = "en" | "fr" | "zh-CN";
 export type SaasUserRoleCode = "super_admin" | "support";
+
+export type ListSaasUsersQuery = {
+  q?: string;
+  status?: SaasUserStatus;
+  limit: number;
+  offset: number;
+};
+
+export type ListSaasUsersInput = {
+  authContext: AuthContext;
+  query: ListSaasUsersQuery;
+};
+
+export type GetSaasUserDetailInput = {
+  authContext: AuthContext;
+  userId: string;
+};
 
 export type CreateSaasUserRequest = {
   email: string;
@@ -11,6 +30,14 @@ export type CreateSaasUserRequest = {
   language?: SaasUserLanguage;
 };
 
+export type CreateSaasUserInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  data: CreateSaasUserRequest & {
+    language: SaasUserLanguage;
+  };
+};
+
 export type UpdateSaasUserRequest = {
   email?: string;
   phone?: string | null;
@@ -19,7 +46,14 @@ export type UpdateSaasUserRequest = {
   timezone?: string;
 };
 
-export type SaasUserSummary = {
+export type UpdateSaasUserInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  userId: string;
+  data: UpdateSaasUserRequest;
+};
+
+export type SaasUserListItem = {
   id: string;
   tenantId: null;
   email: string | null;
@@ -33,7 +67,7 @@ export type SaasUserSummary = {
   createdAt: string;
 };
 
-export type SaasUserDetail = SaasUserSummary & {
+export type SaasUserDetail = SaasUserListItem & {
   avatarUrl: string | null;
   timezone: string;
   updatedAt: string;

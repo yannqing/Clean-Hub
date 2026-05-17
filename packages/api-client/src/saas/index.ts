@@ -7,6 +7,7 @@ import type {
   UpdateTenantStatusRequest,
 } from "./tenants.types";
 import { createSaasUsersApi } from "./users";
+import type { UpdateSaasUserRequest } from "./users.types";
 
 export * from "./audit-logs";
 export * from "./audit-logs.types";
@@ -29,11 +30,12 @@ export function createSaasApi(client: ApiClient) {
     getTenant: (tenantId: string) => tenants.get(tenantId),
     updateTenant: (tenantId: string, input: UpdateTenantRequest) =>
       tenants.update(tenantId, input),
-    updateTenantStatus: (
-      tenantId: string,
-      input: UpdateTenantStatusRequest,
-    ) => tenants.updateStatus(tenantId, input),
+    updateTenantStatus: (tenantId: string, input: UpdateTenantStatusRequest) =>
+      tenants.updateStatus(tenantId, input),
     listUsers: (query?: QueryParams) => users.list(query),
+    getUser: (userId: string) => users.get(userId),
+    updateUser: (userId: string, input: UpdateSaasUserRequest) =>
+      users.update(userId, input),
     listAuditLogs: (query?: QueryParams) => auditLogs.list(query),
     test: () => users.test(),
   };
