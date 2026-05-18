@@ -1,5 +1,8 @@
 import type { ApiClient, QueryParams } from "../types";
 import { createSaasAuditLogsApi } from "./audit-logs";
+import { createSaasOverviewApi } from "./overview";
+import { createSaasPlatformSettingsApi } from "./platform-settings";
+import type { UpdatePlatformSettingsRequest } from "./platform-settings.types";
 import { createSaasRolesApi } from "./roles";
 import { createSaasTenantsApi } from "./tenants";
 import type {
@@ -17,6 +20,10 @@ import type {
 
 export * from "./audit-logs";
 export * from "./audit-logs.types";
+export * from "./overview";
+export * from "./overview.types";
+export * from "./platform-settings";
+export * from "./platform-settings.types";
 export * from "./roles";
 export * from "./roles.types";
 export * from "./tenants";
@@ -29,12 +36,16 @@ export function createSaasApi(client: ApiClient) {
   const users = createSaasUsersApi(client);
   const roles = createSaasRolesApi(client);
   const auditLogs = createSaasAuditLogsApi(client);
+  const overview = createSaasOverviewApi(client);
+  const platformSettings = createSaasPlatformSettingsApi(client);
 
   return {
     tenants,
     users,
     roles,
     auditLogs,
+    overview,
+    platformSettings,
     listTenants: (query?: QueryParams) => tenants.list(query),
     createTenant: (input: CreateTenantRequest) => tenants.create(input),
     getTenant: (tenantId: string) => tenants.get(tenantId),
@@ -61,6 +72,11 @@ export function createSaasApi(client: ApiClient) {
       users.updateRoles(userId, input),
     listRoles: () => roles.list(),
     listAuditLogs: (query?: QueryParams) => auditLogs.list(query),
+    getAuditLog: (logId: string) => auditLogs.get(logId),
+    getOverview: () => overview.get(),
+    getPlatformSettings: () => platformSettings.get(),
+    updatePlatformSettings: (input: UpdatePlatformSettingsRequest) =>
+      platformSettings.update(input),
     test: () => users.test(),
   };
 }
