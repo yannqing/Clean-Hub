@@ -5,6 +5,7 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -43,11 +44,13 @@ import type {
   SaasUserSummary,
 } from "../types";
 import type {
+  InviteSaasUserFormErrors,
   InviteSaasUserFormInput,
   UpdateSaasUserFormInput,
 } from "../validators";
 
 type StatusFilter = "all" | SaasUserStatus;
+type InviteSaasUserField = keyof InviteSaasUserFormInput;
 
 type SaasUserMetrics = SaasUserStatusCounts & {
   total: number;
@@ -139,9 +142,14 @@ export function SaasUserListView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
+  const [inviteFormError, setInviteFormError] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteForm, setInviteForm] =
     useState<InviteSaasUserFormInput>(defaultInviteForm);
+  const [inviteErrors, setInviteErrors] = useState<InviteSaasUserFormErrors>(
+    {},
+  );
   const [inviteSubmitting, setInviteSubmitting] = useState(false);
   const [editingUser, setEditingUser] = useState<SaasUserSummary | null>(null);
   const [editForm, setEditForm] = useState<UpdateSaasUserFormInput>({
@@ -184,6 +192,22 @@ export function SaasUserListView() {
       setLoading(false);
     }
   }, [listQuery]);
+
+  const clearInviteFieldError = useCallback((field: InviteSaasUserField) => {
+    setInviteErrors((current) => ({
+      ...current,
+      [field]: undefined,
+    }));
+    setInviteFormError(null);
+  }, []);
+
+  const openInviteForm = useCallback(() => {
+    setInviteForm(defaultInviteForm);
+    setInviteErrors({});
+    setInviteFormError(null);
+    setInviteNotice(null);
+    setInviteOpen(true);
+  }, []);
 
   useEffect(() => {
     let isCurrent = true;
@@ -310,21 +334,27 @@ export function SaasUserListView() {
     async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       setInviteSubmitting(true);
-      setFormError(null);
+      setInviteErrors({});
+      setInviteFormError(null);
+      setInviteNotice(null);
 
       try {
         const result = await inviteSaasUserAction(inviteForm);
 
         if (!result.ok) {
-          setFormError(Object.values(result.errors)[0] ?? "Invite failed.");
+          setInviteErrors(result.errors);
+          setInviteFormError(
+            Object.values(result.errors)[0] ?? "Invite could not be sent.",
+          );
           return;
         }
 
         setInviteForm(defaultInviteForm);
         setInviteOpen(false);
+        setInviteNotice("Invitation created successfully.");
         await loadUsers();
       } catch (submitError) {
-        setFormError(getErrorMessage(submitError));
+        setInviteFormError(getErrorMessage(submitError));
       } finally {
         setInviteSubmitting(false);
       }
@@ -373,13 +403,7 @@ export function SaasUserListView() {
         </div>
 
         <div className="flex gap-2">
-          <Button
-            onClick={() => {
-              setFormError(null);
-              setInviteOpen(true);
-            }}
-            type="button"
-          >
+          <Button onClick={openInviteForm} type="button">
             Invite member
           </Button>
           <Button onClick={loadUsers} type="button" variant="outline">
@@ -387,6 +411,14 @@ export function SaasUserListView() {
           </Button>
         </div>
       </div>
+
+      {inviteNotice ? (
+        <div className="border-b p-5">
+          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-700">
+            {inviteNotice}
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 border-b p-5 sm:grid-cols-2 lg:grid-cols-5">
         {[
@@ -539,44 +571,82 @@ export function SaasUserListView() {
         </Table>
       )}
 
-      <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+      <Dialog
+        open={inviteOpen}
+        onOpenChange={(open) => {
+          setInviteOpen(open);
+
+          if (!open) {
+            setInviteForm(defaultInviteForm);
+            setInviteErrors({});
+            setInviteFormError(null);
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Invite platform member</DialogTitle>
+            <DialogDescription className="sr-only">
+              Invite a SaaS-only platform member and assign the initial platform
+              role.
+            </DialogDescription>
           </DialogHeader>
-          <form className="grid gap-4" onSubmit={handleInviteSubmit}>
+          <form className="grid gap-4" noValidate onSubmit={handleInviteSubmit}>
             <div className="grid gap-2">
               <Label htmlFor="invite-display-name">Display name</Label>
               <Input
+                aria-invalid={Boolean(inviteErrors.displayName)}
                 id="invite-display-name"
+                maxLength={120}
                 onChange={(event) => {
+                  clearInviteFieldError("displayName");
                   setInviteForm((current) => ({
                     ...current,
                     displayName: event.target.value,
                   }));
                 }}
+                required
                 value={inviteForm.displayName}
               />
+              {inviteErrors.displayName ? (
+                <p className="text-xs text-destructive">
+                  {inviteErrors.displayName}
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="invite-email">Email</Label>
               <Input
+                aria-invalid={Boolean(inviteErrors.email)}
+                autoComplete="email"
                 id="invite-email"
+                maxLength={320}
                 onChange={(event) => {
+                  clearInviteFieldError("email");
                   setInviteForm((current) => ({
                     ...current,
                     email: event.target.value,
                   }));
                 }}
+                required
                 type="email"
                 value={inviteForm.email}
               />
+              {inviteErrors.email ? (
+                <p className="text-xs text-destructive">
+                  {inviteErrors.email}
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="invite-phone">Phone</Label>
               <Input
+                aria-invalid={Boolean(inviteErrors.phone)}
+                autoComplete="tel"
                 id="invite-phone"
+                maxLength={32}
                 onChange={(event) => {
+                  clearInviteFieldError("phone");
                   setInviteForm((current) => ({
                     ...current,
                     phone: event.target.value,
@@ -584,26 +654,43 @@ export function SaasUserListView() {
                 }}
                 value={inviteForm.phone}
               />
+              {inviteErrors.phone ? (
+                <p className="text-xs text-destructive">
+                  {inviteErrors.phone}
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="invite-password">Initial password</Label>
+              <Label htmlFor="invite-password">Temporary password</Label>
               <Input
+                aria-invalid={Boolean(inviteErrors.password)}
+                autoComplete="new-password"
                 id="invite-password"
+                maxLength={128}
+                minLength={6}
                 onChange={(event) => {
+                  clearInviteFieldError("password");
                   setInviteForm((current) => ({
                     ...current,
                     password: event.target.value,
                   }));
                 }}
+                required
                 type="password"
                 value={inviteForm.password}
               />
+              {inviteErrors.password ? (
+                <p className="text-xs text-destructive">
+                  {inviteErrors.password}
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
                 <Label htmlFor="invite-role">Role</Label>
                 <Select
                   onValueChange={(value) => {
+                    clearInviteFieldError("roleCode");
                     setInviteForm((current) => ({
                       ...current,
                       roleCode: value as InviteSaasUserFormInput["roleCode"],
@@ -619,11 +706,17 @@ export function SaasUserListView() {
                     <SelectItem value="super_admin">Super Admin</SelectItem>
                   </SelectContent>
                 </Select>
+                {inviteErrors.roleCode ? (
+                  <p className="text-xs text-destructive">
+                    {inviteErrors.roleCode}
+                  </p>
+                ) : null}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="invite-language">Language</Label>
                 <Select
                   onValueChange={(value) => {
+                    clearInviteFieldError("language");
                     setInviteForm((current) => ({
                       ...current,
                       language: value as InviteSaasUserFormInput["language"],
@@ -640,16 +733,21 @@ export function SaasUserListView() {
                     <SelectItem value="zh-CN">Chinese</SelectItem>
                   </SelectContent>
                 </Select>
+                {inviteErrors.language ? (
+                  <p className="text-xs text-destructive">
+                    {inviteErrors.language}
+                  </p>
+                ) : null}
               </div>
             </div>
-            {formError ? (
+            {inviteFormError ? (
               <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                {formError}
+                {inviteFormError}
               </div>
             ) : null}
             <DialogFooter>
               <Button disabled={inviteSubmitting} type="submit">
-                {inviteSubmitting ? "Saving" : "Invite"}
+                {inviteSubmitting ? "Sending invite" : "Invite member"}
               </Button>
             </DialogFooter>
           </form>

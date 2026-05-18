@@ -14,6 +14,14 @@ export type InviteSaasUserFormInput = {
   language: SaasUserLanguage;
 };
 
+export type InviteSaasUserFormErrors = Partial<
+  Record<keyof InviteSaasUserFormInput, string>
+>;
+
+export type UpdateSaasUserFormErrors = Partial<
+  Record<keyof UpdateSaasUserFormInput, string>
+>;
+
 export type UpdateSaasUserFormInput = {
   email: string;
   phone?: string;
@@ -22,21 +30,27 @@ export type UpdateSaasUserFormInput = {
   timezone: string;
 };
 
-export type SaasUserFormResult<TData> =
+export type SaasUserFormResult<TData, TErrors = Record<string, string>> =
   | {
       ok: true;
       data: TData;
     }
   | {
       ok: false;
-      errors: Record<string, string>;
+      errors: TErrors;
     };
+
+const saasUserLanguages = ["en", "fr", "zh-CN"] as const;
 
 function validateEmail(email: string): string | null {
   const trimmed = email.trim();
 
   if (!trimmed) {
     return "Email is required.";
+  }
+
+  if (trimmed.length > 320) {
+    return "Email must be 320 characters or fewer.";
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
@@ -52,11 +66,30 @@ function normalizeOptionalPhone(phone: string | undefined): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+function validateOptionalPhone(phone: string | undefined): string | null {
+  const trimmed = normalizeOptionalPhone(phone);
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.length < 3 || trimmed.length > 32) {
+    return "Phone must be 3 to 32 characters.";
+  }
+
+  if (!/^\+?[0-9][0-9\s().-]*$/.test(trimmed)) {
+    return "Phone must use numbers and common phone symbols.";
+  }
+
+  return null;
+}
+
 export function validateInviteSaasUserForm(
   input: InviteSaasUserFormInput,
-): SaasUserFormResult<CreateSaasUserRequest> {
-  const errors: Record<string, string> = {};
+): SaasUserFormResult<CreateSaasUserRequest, InviteSaasUserFormErrors> {
+  const errors: InviteSaasUserFormErrors = {};
   const emailError = validateEmail(input.email);
+  const phoneError = validateOptionalPhone(input.phone);
   const displayName = input.displayName.trim();
   const password = input.password.trim();
 
@@ -64,12 +97,32 @@ export function validateInviteSaasUserForm(
     errors.email = emailError;
   }
 
+  if (phoneError) {
+    errors.phone = phoneError;
+  }
+
   if (!displayName) {
     errors.displayName = "Display name is required.";
   }
 
+  if (displayName.length > 120) {
+    errors.displayName = "Display name must be 120 characters or fewer.";
+  }
+
   if (password.length < 6) {
     errors.password = "Password must be at least 6 characters.";
+  }
+
+  if (password.length > 128) {
+    errors.password = "Password must be 128 characters or fewer.";
+  }
+
+  if (input.roleCode !== "support" && input.roleCode !== "super_admin") {
+    errors.roleCode = "Select a valid SaaS role.";
+  }
+
+  if (!saasUserLanguages.includes(input.language)) {
+    errors.language = "Select a valid language.";
   }
 
   if (Object.keys(errors).length > 0) {
@@ -91,9 +144,10 @@ export function validateInviteSaasUserForm(
 
 export function validateUpdateSaasUserForm(
   input: UpdateSaasUserFormInput,
-): SaasUserFormResult<UpdateSaasUserRequest> {
-  const errors: Record<string, string> = {};
+): SaasUserFormResult<UpdateSaasUserRequest, UpdateSaasUserFormErrors> {
+  const errors: UpdateSaasUserFormErrors = {};
   const emailError = validateEmail(input.email);
+  const phoneError = validateOptionalPhone(input.phone);
   const displayName = input.displayName.trim();
   const timezone = input.timezone.trim();
 
@@ -101,8 +155,20 @@ export function validateUpdateSaasUserForm(
     errors.email = emailError;
   }
 
+  if (phoneError) {
+    errors.phone = phoneError;
+  }
+
   if (!displayName) {
     errors.displayName = "Display name is required.";
+  }
+
+  if (displayName.length > 120) {
+    errors.displayName = "Display name must be 120 characters or fewer.";
+  }
+
+  if (!saasUserLanguages.includes(input.language)) {
+    errors.language = "Select a valid language.";
   }
 
   if (!timezone) {
