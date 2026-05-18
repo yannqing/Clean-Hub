@@ -22,6 +22,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
 } from "@cleanhub/ui";
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -46,11 +47,13 @@ import type {
 import type {
   InviteSaasUserFormErrors,
   InviteSaasUserFormInput,
+  UpdateSaasUserFormErrors,
   UpdateSaasUserFormInput,
 } from "../validators";
 
 type StatusFilter = "all" | SaasUserStatus;
 type InviteSaasUserField = keyof InviteSaasUserFormInput;
+type UpdateSaasUserField = keyof UpdateSaasUserFormInput;
 
 type SaasUserMetrics = SaasUserStatusCounts & {
   total: number;
@@ -72,6 +75,8 @@ const defaultInviteForm: InviteSaasUserFormInput = {
   phone: "",
   roleCode: "support",
 };
+
+const maxStatusReasonLength = 300;
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error
@@ -133,6 +138,34 @@ function getStatusActionLabel(status: SaasUserStatus): string {
   return "No action";
 }
 
+function getNextStatus(
+  status: SaasUserStatus,
+): Extract<SaasUserStatus, "active" | "disabled"> | null {
+  if (status === "active") {
+    return "disabled";
+  }
+
+  if (status === "disabled") {
+    return "active";
+  }
+
+  return null;
+}
+
+function getDefaultStatusReason(user: SaasUserSummary): string {
+  const nextStatus = getNextStatus(user.status);
+
+  if (nextStatus === "disabled") {
+    return "Disabled from SaaS platform member list.";
+  }
+
+  if (nextStatus === "active") {
+    return "Enabled from SaaS platform member list.";
+  }
+
+  return "";
+}
+
 export function SaasUserListView() {
   const editRequestIdRef = useRef(0);
   const [users, setUsers] = useState<SaasUserSummary[]>([]);
@@ -142,7 +175,7 @@ export function SaasUserListView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
-  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [inviteFormError, setInviteFormError] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteForm, setInviteForm] =
@@ -159,8 +192,13 @@ export function SaasUserListView() {
     phone: "",
     timezone: "",
   });
+  const [editErrors, setEditErrors] = useState<UpdateSaasUserFormErrors>({});
   const [editLoading, setEditLoading] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [pendingStatusUser, setPendingStatusUser] =
+    useState<SaasUserSummary | null>(null);
+  const [statusReason, setStatusReason] = useState("");
+  const [statusFormError, setStatusFormError] = useState<string | null>(null);
   const [statusUpdatingUserId, setStatusUpdatingUserId] = useState<
     string | null
   >(null);
@@ -205,8 +243,28 @@ export function SaasUserListView() {
     setInviteForm(defaultInviteForm);
     setInviteErrors({});
     setInviteFormError(null);
-    setInviteNotice(null);
+    setNotice(null);
     setInviteOpen(true);
+  }, []);
+
+  const clearEditFieldError = useCallback((field: UpdateSaasUserField) => {
+    setEditErrors((current) => ({
+      ...current,
+      [field]: undefined,
+    }));
+    setFormError(null);
+  }, []);
+
+  const openStatusDialog = useCallback((user: SaasUserSummary) => {
+    if (!canChangeStatus(user.status)) {
+      return;
+    }
+
+    setPendingStatusUser(user);
+    setStatusReason(getDefaultStatusReason(user));
+    setStatusFormError(null);
+    setError(null);
+    setNotice(null);
   }, []);
 
   useEffect(() => {
@@ -242,38 +300,56 @@ export function SaasUserListView() {
   }, [listQuery]);
 
   const handleStatusChange = useCallback(
-    async (user: SaasUserSummary) => {
-      if (!canChangeStatus(user.status)) {
+    async () => {
+      if (!pendingStatusUser) {
         return;
       }
 
-      const nextStatus = user.status === "active" ? "disabled" : "active";
+      const nextStatus = getNextStatus(pendingStatusUser.status);
 
-      setStatusUpdatingUserId(user.id);
+      if (!nextStatus) {
+        setStatusFormError("This member status cannot be changed here.");
+        return;
+      }
+
+      const reason = statusReason.trim();
+
+      if (!reason) {
+        setStatusFormError("Reason is required.");
+        return;
+      }
+
+      setStatusUpdatingUserId(pendingStatusUser.id);
+      setStatusFormError(null);
       setError(null);
+      setNotice(null);
 
       try {
-        const result = await updateSaasUserStatusAction(user.id, {
+        const result = await updateSaasUserStatusAction(pendingStatusUser.id, {
           status: nextStatus,
-          reason:
-            nextStatus === "disabled"
-              ? "Disabled from SaaS platform member list."
-              : "Enabled from SaaS platform member list.",
+          reason,
         });
 
         if (!result.ok) {
-          setError(result.errors.reason);
+          setStatusFormError(result.errors.reason);
           return;
         }
 
+        setNotice(
+          nextStatus === "disabled"
+            ? "Platform member disabled successfully."
+            : "Platform member enabled successfully.",
+        );
+        setPendingStatusUser(null);
+        setStatusReason("");
         await loadUsers();
       } catch (updateError) {
-        setError(getErrorMessage(updateError));
+        setStatusFormError(getErrorMessage(updateError));
       } finally {
         setStatusUpdatingUserId(null);
       }
     },
-    [loadUsers],
+    [loadUsers, pendingStatusUser, statusReason],
   );
 
   const openEditForm = useCallback((user: SaasUserSummary) => {
@@ -289,6 +365,8 @@ export function SaasUserListView() {
       timezone: "",
     });
     setFormError(null);
+    setEditErrors({});
+    setNotice(null);
 
     const requestId = editRequestIdRef.current + 1;
 
@@ -336,7 +414,7 @@ export function SaasUserListView() {
       setInviteSubmitting(true);
       setInviteErrors({});
       setInviteFormError(null);
-      setInviteNotice(null);
+      setNotice(null);
 
       try {
         const result = await inviteSaasUserAction(inviteForm);
@@ -351,7 +429,7 @@ export function SaasUserListView() {
 
         setInviteForm(defaultInviteForm);
         setInviteOpen(false);
-        setInviteNotice("Invitation created successfully.");
+        setNotice("Invitation created successfully.");
         await loadUsers();
       } catch (submitError) {
         setInviteFormError(getErrorMessage(submitError));
@@ -370,18 +448,27 @@ export function SaasUserListView() {
         return;
       }
 
+      if (editLoading || editSubmitting) {
+        return;
+      }
+
       setEditSubmitting(true);
       setFormError(null);
+      setEditErrors({});
+      setNotice(null);
 
       try {
         const result = await updateSaasUserAction(editingUser.id, editForm);
 
         if (!result.ok) {
+          setEditErrors(result.errors);
           setFormError(Object.values(result.errors)[0] ?? "Update failed.");
           return;
         }
 
         setEditingUser(null);
+        setEditErrors({});
+        setNotice("Platform member updated successfully.");
         await loadUsers();
       } catch (submitError) {
         setFormError(getErrorMessage(submitError));
@@ -389,7 +476,7 @@ export function SaasUserListView() {
         setEditSubmitting(false);
       }
     },
-    [editForm, editingUser, loadUsers],
+    [editForm, editLoading, editingUser, editSubmitting, loadUsers],
   );
 
   return (
@@ -412,10 +499,10 @@ export function SaasUserListView() {
         </div>
       </div>
 
-      {inviteNotice ? (
+      {notice ? (
         <div className="border-b p-5">
           <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-700">
-            {inviteNotice}
+            {notice}
           </div>
         </div>
       ) : null}
@@ -556,7 +643,9 @@ export function SaasUserListView() {
                         statusUpdatingUserId === user.id ||
                         !canChangeStatus(user.status)
                       }
-                      onClick={() => void handleStatusChange(user)}
+                      onClick={() => {
+                        openStatusDialog(user);
+                      }}
                       size="sm"
                       type="button"
                       variant={user.status === "active" ? "outline" : "default"}
@@ -761,49 +850,91 @@ export function SaasUserListView() {
             editRequestIdRef.current += 1;
             setEditingUser(null);
             setEditLoading(false);
+            setEditErrors({});
+            setFormError(null);
           }
         }}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit platform member</DialogTitle>
+            <DialogDescription className="sr-only">
+              Update SaaS-only member profile fields. Role changes are handled
+              separately by the platform roles flow.
+            </DialogDescription>
           </DialogHeader>
-          <form className="grid gap-4" onSubmit={handleEditSubmit}>
+          <form className="grid gap-4" noValidate onSubmit={handleEditSubmit}>
+            {editingUser ? (
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <div className="font-medium">{editingUser.displayName}</div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(editingUser.roles.length > 0
+                    ? editingUser.roles
+                    : [editingUser.role]
+                  ).map((role) => (
+                    <Badge key={role} variant="outline">
+                      {getRoleLabel(role)}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="grid gap-2">
               <Label htmlFor="edit-display-name">Display name</Label>
               <Input
+                aria-invalid={Boolean(editErrors.displayName)}
                 disabled={editLoading}
                 id="edit-display-name"
+                maxLength={120}
                 onChange={(event) => {
+                  clearEditFieldError("displayName");
                   setEditForm((current) => ({
                     ...current,
                     displayName: event.target.value,
                   }));
                 }}
+                required
                 value={editForm.displayName}
               />
+              {editErrors.displayName ? (
+                <p className="text-xs text-destructive">
+                  {editErrors.displayName}
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-email">Email</Label>
               <Input
+                aria-invalid={Boolean(editErrors.email)}
+                autoComplete="email"
                 disabled={editLoading}
                 id="edit-email"
+                maxLength={320}
                 onChange={(event) => {
+                  clearEditFieldError("email");
                   setEditForm((current) => ({
                     ...current,
                     email: event.target.value,
                   }));
                 }}
+                required
                 type="email"
                 value={editForm.email}
               />
+              {editErrors.email ? (
+                <p className="text-xs text-destructive">{editErrors.email}</p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-phone">Phone</Label>
               <Input
+                aria-invalid={Boolean(editErrors.phone)}
+                autoComplete="tel"
                 disabled={editLoading}
                 id="edit-phone"
+                maxLength={32}
                 onChange={(event) => {
+                  clearEditFieldError("phone");
                   setEditForm((current) => ({
                     ...current,
                     phone: event.target.value,
@@ -811,6 +942,9 @@ export function SaasUserListView() {
                 }}
                 value={editForm.phone}
               />
+              {editErrors.phone ? (
+                <p className="text-xs text-destructive">{editErrors.phone}</p>
+              ) : null}
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
@@ -818,6 +952,7 @@ export function SaasUserListView() {
                 <Select
                   disabled={editLoading}
                   onValueChange={(value) => {
+                    clearEditFieldError("language");
                     setEditForm((current) => ({
                       ...current,
                       language: value as UpdateSaasUserFormInput["language"],
@@ -834,20 +969,34 @@ export function SaasUserListView() {
                     <SelectItem value="zh-CN">Chinese</SelectItem>
                   </SelectContent>
                 </Select>
+                {editErrors.language ? (
+                  <p className="text-xs text-destructive">
+                    {editErrors.language}
+                  </p>
+                ) : null}
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="edit-timezone">Timezone</Label>
                 <Input
+                  aria-invalid={Boolean(editErrors.timezone)}
                   disabled={editLoading}
                   id="edit-timezone"
+                  maxLength={64}
                   onChange={(event) => {
+                    clearEditFieldError("timezone");
                     setEditForm((current) => ({
                       ...current,
                       timezone: event.target.value,
                     }));
                   }}
+                  required
                   value={editForm.timezone}
                 />
+                {editErrors.timezone ? (
+                  <p className="text-xs text-destructive">
+                    {editErrors.timezone}
+                  </p>
+                ) : null}
               </div>
             </div>
             {formError ? (
@@ -856,11 +1005,124 @@ export function SaasUserListView() {
               </div>
             ) : null}
             <DialogFooter>
+              <Button
+                disabled={editSubmitting}
+                onClick={() => {
+                  editRequestIdRef.current += 1;
+                  setEditingUser(null);
+                  setEditLoading(false);
+                  setEditErrors({});
+                  setFormError(null);
+                }}
+                type="button"
+                variant="outline"
+              >
+                Cancel
+              </Button>
               <Button disabled={editLoading || editSubmitting} type="submit">
                 {editSubmitting ? "Saving" : "Save changes"}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(pendingStatusUser)}
+        onOpenChange={(open) => {
+          if (!open && !statusUpdatingUserId) {
+            setPendingStatusUser(null);
+            setStatusReason("");
+            setStatusFormError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {pendingStatusUser?.status === "active"
+                ? "Disable platform member"
+                : "Enable platform member"}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              {pendingStatusUser?.status === "active"
+                ? "Confirm disabling this SaaS platform member."
+                : "Confirm enabling this SaaS platform member."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {pendingStatusUser ? (
+            <div className="grid gap-4">
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <div className="font-medium">
+                  {pendingStatusUser.displayName}
+                </div>
+                <div className="text-muted-foreground">
+                  {pendingStatusUser.email ??
+                    pendingStatusUser.phone ??
+                    pendingStatusUser.id}
+                </div>
+                <div className="mt-2">
+                  <Badge variant={getStatusVariant(pendingStatusUser.status)}>
+                    {saasUserStatusLabels[pendingStatusUser.status]}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="status-reason">Reason</Label>
+                <Textarea
+                  disabled={Boolean(statusUpdatingUserId)}
+                  id="status-reason"
+                  maxLength={maxStatusReasonLength}
+                  onChange={(event) => {
+                    setStatusReason(event.target.value);
+                    setStatusFormError(null);
+                  }}
+                  required
+                  rows={4}
+                  value={statusReason}
+                />
+              </div>
+
+              {statusFormError ? (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                  {statusFormError}
+                </div>
+              ) : null}
+
+              <DialogFooter>
+                <Button
+                  disabled={Boolean(statusUpdatingUserId)}
+                  onClick={() => {
+                    setPendingStatusUser(null);
+                    setStatusReason("");
+                    setStatusFormError(null);
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  disabled={
+                    Boolean(statusUpdatingUserId) || !statusReason.trim()
+                  }
+                  onClick={() => void handleStatusChange()}
+                  type="button"
+                  variant={
+                    pendingStatusUser.status === "active"
+                      ? "destructive"
+                      : "default"
+                  }
+                >
+                  {statusUpdatingUserId
+                    ? "Saving"
+                    : getStatusActionLabel(pendingStatusUser.status)}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </section>
