@@ -2,31 +2,35 @@ name: AI Code Review Agent
 
 on:
   pull_request:
-    types: [opened, synchronize] # 当新建 PR，或者有人往现有的 PR 追加提交代码时触发
+    types: [opened, synchronize] # 新建 PR，或向现有 PR 追加提交时触发
 
-# 💡 核心修复 1：在代码中强制索要“写入评论”和“读取内容”的权限，绕过网页端设置
 permissions:
-  pull-requests: write # 强行赋予 AI 往你的 PR 页面写评论和代码建议的权限
-  contents: read       # 允许读取代码内容
-  issues: write        # 备用：部分机器人会将部分摘要写入 issue
+  pull-requests: write
+  contents: read
+  issues: write
 
 jobs:
   pr_agent_job:
+    if: ${{ github.event.sender.type != 'Bot' }}
     runs-on: ubuntu-latest
     steps:
       - name: Run PR Agent
         uses: the-pr-agent/pr-agent@main
         env:
-          PROVIDER: "gemini" 
-          # 💡 核心修复 2：将 GEMINI.API_KEY 改为标准的 GEMINI_API_KEY（去掉了点号）
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }} 
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}      # GitHub 自动生成的临时通行证
-          
-          # 针对你们小型团队的体验优化设置（将内部的“.”统一换成“_”，防止 Linux 环境解析失效）
-          PR_REVIEW_REQUIRE_SECURITY_ANALYSIS: "true"   # 开启安全漏洞和敏感信息检测
-          PR_REVIEW_REQUIRE_TESTS_ANALYSIS: "false"      # 如果没写单元测试，关掉此项避免刷屏
-          PR_DESCRIPTION_PUBLISH_LABELS: "true"         # 自动根据代码变动给 PR 打标签
-          
-          # 📢 语言设置：让谷歌 Gemini 评审完代码后，直接用中文在 PR 里发评论
-          PR_REVIEW_LANGUAGE: "zh"
-          PR_DESCRIPTION_LANGUAGE: "zh"
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+          # 锁定 Google AI Studio / Gemini 模型，避免回退到默认 OpenAI 模型。
+          config.model: "gemini/gemini-2.5-flash"
+          config.fallback_models: '["gemini/gemini-2.5-flash"]'
+          config.response_language: "zh-CN"
+          GOOGLE_AI_STUDIO.GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+          # GitHub Action 自动执行项。
+          github_action_config.auto_review: "true"
+          github_action_config.auto_describe: "true"
+          github_action_config.auto_improve: "false"
+
+          # 小团队体验优化。
+          pr_reviewer.require_security_review: "true"
+          pr_reviewer.require_tests_review: "false"
+          pr_description.publish_labels: "true"
