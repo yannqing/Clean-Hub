@@ -9,13 +9,18 @@ import { createRequestContextMiddleware } from "./http/request-context.middlewar
 import type { AppBindings } from "./http/types.js";
 import { createAuthServiceFromEnv } from "./modules/auth/auth.factory.js";
 import { createAuthRoutes } from "./modules/auth/auth.routes.js";
+import { createSaasAuditRoutes } from "./modules/saas-audit/audit.routes.js";
+import { createSaasBackupRoutes } from "./modules/saas-backups/backups.routes.js";
+import { createSaasFeedbackTicketRoutes } from "./modules/saas-feedback/feedback-tickets.routes.js";
+import { createSaasOperationLogRoutes } from "./modules/saas-ops/operation-logs.routes.js";
+import { createSaasOverviewRoutes } from "./modules/saas-overview/overview.routes.js";
+import { createSaasPlatformSettingsRoutes } from "./modules/saas-platform-settings/platform-settings.routes.js";
+import { createSaaSTestRoutes } from "./modules/saas/saas.routes.js";
+import { createSaasSecurityEventRoutes } from "./modules/saas-security/security-events.routes.js";
+import { createSaasTenantsRoutes } from "./modules/saas-tenants/tenants.routes.js";
 import { createSaasRolesRoutes } from "./modules/saas-users/saas-roles.routes.js";
 import { createSaasUsersRoutes } from "./modules/saas-users/saas-users.routes.js";
 import { createTenantUserRoutes } from "./modules/users/users.routes.js";
-import { createSaaSTestRoutes } from "./modules/saas/saas.routes.js";
-import { createSaasOverviewRoutes } from "./modules/saas-overview/overview.routes.js";
-import { createSaasAuditRoutes } from "./modules/saas-audit/audit.routes.js";
-import { createSaasPlatformSettingsRoutes } from "./modules/saas-platform-settings/platform-settings.routes.js";
 
 export type CreateApiAppOptions = {
   env?: NodeJS.ProcessEnv;
@@ -61,15 +66,32 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   );
 
   app.route("/auth", createAuthRoutes({ authService }));
+
   app.use("/saas/*", createRequireAuthMiddleware(authService));
   app.use("/tenant/*", createRequireAuthMiddleware(authService));
+
+  // SaaS 平台 - 公共模块
   app.route("/saas/overview", createSaasOverviewRoutes());
   app.route("/saas/audit-logs", createSaasAuditRoutes());
   app.route("/saas/platform-settings", createSaasPlatformSettingsRoutes());
+
+  // SaaS 平台 - 租户管理
+  app.route("/saas/tenants", createSaasTenantsRoutes());
+
+  // SaaS 平台 - 用户与权限
   app.route("/saas/roles", createSaasRolesRoutes());
   app.route("/saas/users", createSaasUsersRoutes());
+
+  // SaaS 平台 - 运营管理
+  app.route("/saas/feedback-tickets", createSaasFeedbackTicketRoutes());
+  app.route("/saas/backups", createSaasBackupRoutes());
+  app.route("/saas/operation-logs", createSaasOperationLogRoutes());
+  app.route("/saas/security-events", createSaasSecurityEventRoutes());
+
+  // 租户侧
   app.route("/tenant/users", createTenantUserRoutes());
 
+  // 测试路由
   app.route("/saas/test/user", createSaaSTestRoutes());
 
   app.notFound((c) =>
