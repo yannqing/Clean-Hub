@@ -1,6 +1,6 @@
 import { webAdminApi } from "@/lib/api-client";
 
-import type { SaasUserDetail, UpdateSaasUserStatusRequest } from "../types";
+import type { UpdateSaasUserStatusRequest } from "../types";
 
 const MAX_STATUS_REASON_LENGTH = 300;
 
@@ -37,13 +37,10 @@ export async function updateSaasUserStatusAction(
     };
   }
 
-  const user = await webAdminApi.http.patch<SaasUserDetail>(
-    `/saas/users/${encodeURIComponent(userId)}/status`,
-    {
-      status: input.status,
-      reason,
-    },
-  );
+  const user = await webAdminApi.saas.users.updateStatus(userId, {
+    status: input.status,
+    reason,
+  });
 
   return {
     ok: true as const,

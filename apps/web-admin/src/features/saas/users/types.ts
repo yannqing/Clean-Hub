@@ -5,6 +5,8 @@ import type {
 } from "@cleanhub/api-client";
 
 export type {
+  AuthContext,
+  SaasRoleSummary,
   SaasUserDetail,
   SaasUserLanguage,
   SaasUserRoleCode,

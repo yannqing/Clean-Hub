@@ -577,6 +577,7 @@ export async function writeSaasUserStatusUpdatedAuditLog(
     userId: string;
     before: Pick<SaasUserAuditSnapshot, "status">;
     after: Pick<SaasUserAuditSnapshot, "status">;
+    reason?: string;
     ipAddress?: string;
     userAgent?: string;
   },
@@ -589,6 +590,7 @@ export async function writeSaasUserStatusUpdatedAuditLog(
     entityType: "user",
     entityId: input.userId,
     success: true,
+    reason: input.reason,
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
     before: input.before,

@@ -324,7 +324,7 @@ export async function updateSaasUserStatus(
       throw new SaasUsersError(
         "SAAS_USER_CANNOT_DISABLE_SELF",
         "Super admins cannot disable their own account.",
-        400,
+        422,
       );
     }
 
@@ -375,6 +375,7 @@ export async function updateSaasUserStatus(
         after: {
           status: input.data.status,
         },
+        reason: input.data.reason,
         ipAddress: input.requestMeta?.ipAddress,
         userAgent: input.requestMeta?.userAgent,
       });
