@@ -1,11 +1,26 @@
 export type AuditLogSummary = {
   id: string;
+  tenantId: string | null;
+  actorUserId: string | null;
   eventCategory: string;
   eventType: string;
-  actorUserId?: string | null;
-  entityType?: string | null;
-  entityId?: string | null;
+  entityType: string | null;
+  entityId: string | null;
   success: boolean;
-  reason?: string | null;
+  reason: string | null;
+  ipAddress: string | null;
   createdAt: string;
+};
+
+export type AuditLogDetail = AuditLogSummary & {
+  branchId: string | null;
+  userAgent: string | null;
+  before: Record<string, unknown> | null;
+  after: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+};
+
+export type AuditLogListResult = {
+  items: AuditLogSummary[];
+  total: number;
 };

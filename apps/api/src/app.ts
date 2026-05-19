@@ -13,6 +13,9 @@ import { createSaasRolesRoutes } from "./modules/saas-users/saas-roles.routes.js
 import { createSaasUsersRoutes } from "./modules/saas-users/saas-users.routes.js";
 import { createTenantUserRoutes } from "./modules/users/users.routes.js";
 import { createSaaSTestRoutes } from "./modules/saas/saas.routes.js";
+import { createSaasOverviewRoutes } from "./modules/saas-overview/overview.routes.js";
+import { createSaasAuditRoutes } from "./modules/saas-audit/audit.routes.js";
+import { createSaasPlatformSettingsRoutes } from "./modules/saas-platform-settings/platform-settings.routes.js";
 
 export type CreateApiAppOptions = {
   env?: NodeJS.ProcessEnv;
@@ -60,6 +63,9 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.route("/auth", createAuthRoutes({ authService }));
   app.use("/saas/*", createRequireAuthMiddleware(authService));
   app.use("/tenant/*", createRequireAuthMiddleware(authService));
+  app.route("/saas/overview", createSaasOverviewRoutes());
+  app.route("/saas/audit-logs", createSaasAuditRoutes());
+  app.route("/saas/platform-settings", createSaasPlatformSettingsRoutes());
   app.route("/saas/roles", createSaasRolesRoutes());
   app.route("/saas/users", createSaasUsersRoutes());
   app.route("/tenant/users", createTenantUserRoutes());
