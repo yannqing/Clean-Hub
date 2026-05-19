@@ -1,11 +1,5 @@
-import { PagePlaceholder } from "@/components/app-shell";
+import { BackupJobListView } from "@/features/saas/backups/components";
 
 export default function SaasSystemBackupsPage() {
-  return (
-    <PagePlaceholder
-      description="Platform backup overview, restore checkpoints, retention policies, and backup health."
-      items={["Backup status", "Restore points", "Retention", "Backup alerts"]}
-      title="Data Backups"
-    />
-  );
+  return <BackupJobListView />;
 }
