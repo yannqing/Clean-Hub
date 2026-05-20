@@ -58,6 +58,12 @@ export const updateSaasUserBodySchema = z
 
 export const updateSaasUserStatusBodySchema = z.object({
   status: z.enum(["active", "disabled"]),
+  reason: z
+    .preprocess(
+      (value) =>
+        typeof value === "string" && !value.trim() ? undefined : value,
+      z.string().trim().max(300).optional(),
+    ),
 });
 
 export const updateSaasUserRolesBodySchema = z.object({

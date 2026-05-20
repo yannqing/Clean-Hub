@@ -1,6 +1,7 @@
 import type {
   CreateSaasUserRequest,
   UpdateSaasUserRequest,
+  UpdateSaasUserRolesRequest,
 } from "@cleanhub/api-client";
 
 import type { SaasUserLanguage, SaasUserRoleCode } from "../types";
@@ -22,12 +23,20 @@ export type UpdateSaasUserFormErrors = Partial<
   Record<keyof UpdateSaasUserFormInput, string>
 >;
 
+export type UpdateSaasUserRolesFormErrors = {
+  roleCodes?: string;
+};
+
 export type UpdateSaasUserFormInput = {
   email: string;
   phone?: string;
   displayName: string;
   language: SaasUserLanguage;
   timezone: string;
+};
+
+export type UpdateSaasUserRolesFormInput = {
+  roleCodes: SaasUserRoleCode[];
 };
 
 export type SaasUserFormResult<TData, TErrors = Record<string, string>> =
@@ -187,6 +196,44 @@ export function validateUpdateSaasUserForm(
       language: input.language,
       phone: normalizeOptionalPhone(input.phone) ?? null,
       timezone,
+    },
+  };
+}
+
+export function validateUpdateSaasUserRolesForm(
+  input: UpdateSaasUserRolesFormInput,
+): SaasUserFormResult<
+  UpdateSaasUserRolesRequest,
+  UpdateSaasUserRolesFormErrors
+> {
+  const roleCodes = [...new Set(input.roleCodes)].sort();
+
+  if (roleCodes.length === 0) {
+    return {
+      ok: false,
+      errors: {
+        roleCodes: "Select at least one SaaS role.",
+      },
+    };
+  }
+
+  if (
+    roleCodes.some(
+      (roleCode) => roleCode !== "support" && roleCode !== "super_admin",
+    )
+  ) {
+    return {
+      ok: false,
+      errors: {
+        roleCodes: "Select valid SaaS roles only.",
+      },
+    };
+  }
+
+  return {
+    ok: true,
+    data: {
+      roleCodes,
     },
   };
 }

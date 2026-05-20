@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   inviteSaasUserAction,
   updateSaasUserAction,
+  updateSaasUserRolesAction,
   updateSaasUserStatusAction,
 } from "../actions";
 import {
@@ -38,8 +39,16 @@ import {
   saasUserStatusLabels,
   saasUserStatusOptions,
 } from "../constants";
-import { getSaasUserDetailQuery, getSaasUserListQuery } from "../queries";
+import {
+  getCurrentSaasAuthQuery,
+  getSaasRoleListQuery,
+  getSaasUserDetailQuery,
+  getSaasUserListQuery,
+} from "../queries";
 import type {
+  AuthContext,
+  SaasRoleSummary,
+  SaasUserRoleCode,
   SaasUserStatus,
   SaasUserStatusCounts,
   SaasUserSummary,
@@ -49,6 +58,7 @@ import type {
   InviteSaasUserFormInput,
   UpdateSaasUserFormErrors,
   UpdateSaasUserFormInput,
+  UpdateSaasUserRolesFormInput,
 } from "../validators";
 
 type StatusFilter = "all" | SaasUserStatus;
@@ -74,6 +84,10 @@ const defaultInviteForm: InviteSaasUserFormInput = {
   password: "",
   phone: "",
   roleCode: "support",
+};
+
+const defaultRoleForm: UpdateSaasUserRolesFormInput = {
+  roleCodes: [],
 };
 
 const maxStatusReasonLength = 300;
@@ -172,6 +186,11 @@ export function SaasUserListView() {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [metrics, setMetrics] = useState<SaasUserMetrics>(emptyMetrics);
+  const [authContext, setAuthContext] = useState<AuthContext | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [roles, setRoles] = useState<SaasRoleSummary[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesError, setRolesError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -195,6 +214,12 @@ export function SaasUserListView() {
   const [editErrors, setEditErrors] = useState<UpdateSaasUserFormErrors>({});
   const [editLoading, setEditLoading] = useState(false);
   const [editSubmitting, setEditSubmitting] = useState(false);
+  const [roleEditingUser, setRoleEditingUser] =
+    useState<SaasUserSummary | null>(null);
+  const [roleForm, setRoleForm] =
+    useState<UpdateSaasUserRolesFormInput>(defaultRoleForm);
+  const [roleFormError, setRoleFormError] = useState<string | null>(null);
+  const [roleSubmitting, setRoleSubmitting] = useState(false);
   const [pendingStatusUser, setPendingStatusUser] =
     useState<SaasUserSummary | null>(null);
   const [statusReason, setStatusReason] = useState("");
@@ -212,6 +237,22 @@ export function SaasUserListView() {
     }),
     [query, status],
   );
+
+  const isSuperAdmin = authContext?.role === "super_admin";
+  const canManageMembers = isSuperAdmin && !authError;
+  const activeRoleCodes = useMemo<SaasUserRoleCode[]>(() => {
+    const loadedRoleCodes = roles
+      .filter((role) => role.status === "active")
+      .map((role) => role.code)
+      .filter(
+        (roleCode): roleCode is SaasUserRoleCode =>
+          roleCode === "support" || roleCode === "super_admin",
+      );
+
+    return loadedRoleCodes.length > 0
+      ? [...new Set(loadedRoleCodes)].sort()
+      : ["super_admin", "support"];
+  }, [roles]);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -231,6 +272,41 @@ export function SaasUserListView() {
     }
   }, [listQuery]);
 
+  useEffect(() => {
+    let isCurrent = true;
+
+    Promise.allSettled([getCurrentSaasAuthQuery(), getSaasRoleListQuery()])
+      .then(([authResult, rolesResult]) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        if (authResult.status === "fulfilled") {
+          setAuthContext(authResult.value);
+          setAuthError(null);
+        } else {
+          setAuthError(getErrorMessage(authResult.reason));
+        }
+
+        if (rolesResult.status === "fulfilled") {
+          setRoles(rolesResult.value);
+          setRolesError(null);
+        } else {
+          setRoles([]);
+          setRolesError(getErrorMessage(rolesResult.reason));
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setRolesLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
   const clearInviteFieldError = useCallback((field: InviteSaasUserField) => {
     setInviteErrors((current) => ({
       ...current,
@@ -240,12 +316,16 @@ export function SaasUserListView() {
   }, []);
 
   const openInviteForm = useCallback(() => {
+    if (!canManageMembers) {
+      return;
+    }
+
     setInviteForm(defaultInviteForm);
     setInviteErrors({});
     setInviteFormError(null);
     setNotice(null);
     setInviteOpen(true);
-  }, []);
+  }, [canManageMembers]);
 
   const clearEditFieldError = useCallback((field: UpdateSaasUserField) => {
     setEditErrors((current) => ({
@@ -256,7 +336,11 @@ export function SaasUserListView() {
   }, []);
 
   const openStatusDialog = useCallback((user: SaasUserSummary) => {
-    if (!canChangeStatus(user.status)) {
+    if (
+      !canManageMembers ||
+      authContext?.userId === user.id ||
+      !canChangeStatus(user.status)
+    ) {
       return;
     }
 
@@ -265,6 +349,36 @@ export function SaasUserListView() {
     setStatusFormError(null);
     setError(null);
     setNotice(null);
+  }, [authContext?.userId, canManageMembers]);
+
+  const openRoleForm = useCallback(
+    (user: SaasUserSummary) => {
+      if (!canManageMembers) {
+        return;
+      }
+
+      const roleCodes = user.roles.filter(
+        (role): role is SaasUserRoleCode =>
+          role === "support" || role === "super_admin",
+      );
+
+      setRoleEditingUser(user);
+      setRoleForm({
+        roleCodes,
+      });
+      setRoleFormError(null);
+      setNotice(null);
+    },
+    [canManageMembers],
+  );
+
+  const toggleRoleCode = useCallback((roleCode: SaasUserRoleCode) => {
+    setRoleFormError(null);
+    setRoleForm((current) => ({
+      roleCodes: current.roleCodes.includes(roleCode)
+        ? current.roleCodes.filter((currentRole) => currentRole !== roleCode)
+        : [...current.roleCodes, roleCode],
+    }));
   }, []);
 
   useEffect(() => {
@@ -353,6 +467,10 @@ export function SaasUserListView() {
   );
 
   const openEditForm = useCallback((user: SaasUserSummary) => {
+    if (!canManageMembers) {
+      return;
+    }
+
     setEditingUser(user);
     setEditForm({
       displayName: user.displayName,
@@ -406,7 +524,7 @@ export function SaasUserListView() {
 
         setEditLoading(false);
       });
-  }, []);
+  }, [canManageMembers]);
 
   const handleInviteSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -479,6 +597,44 @@ export function SaasUserListView() {
     [editForm, editLoading, editingUser, editSubmitting, loadUsers],
   );
 
+  const handleRoleSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+
+      if (!roleEditingUser || roleSubmitting) {
+        return;
+      }
+
+      setRoleSubmitting(true);
+      setRoleFormError(null);
+      setNotice(null);
+
+      try {
+        const result = await updateSaasUserRolesAction(
+          roleEditingUser.id,
+          roleForm,
+        );
+
+        if (!result.ok) {
+          setRoleFormError(
+            result.errors.roleCodes ?? "Role update failed.",
+          );
+          return;
+        }
+
+        setRoleEditingUser(null);
+        setRoleForm(defaultRoleForm);
+        setNotice("Platform member roles updated successfully.");
+        await loadUsers();
+      } catch (submitError) {
+        setRoleFormError(getErrorMessage(submitError));
+      } finally {
+        setRoleSubmitting(false);
+      }
+    },
+    [loadUsers, roleEditingUser, roleForm, roleSubmitting],
+  );
+
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
@@ -490,7 +646,11 @@ export function SaasUserListView() {
         </div>
 
         <div className="flex gap-2">
-          <Button onClick={openInviteForm} type="button">
+          <Button
+            disabled={!canManageMembers}
+            onClick={openInviteForm}
+            type="button"
+          >
             Invite member
           </Button>
           <Button onClick={loadUsers} type="button" variant="outline">
@@ -503,6 +663,25 @@ export function SaasUserListView() {
         <div className="border-b p-5">
           <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-700">
             {notice}
+          </div>
+        </div>
+      ) : null}
+
+      {authError || rolesError ? (
+        <div className="border-b p-5">
+          <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-800">
+            {authError
+              ? `Member management is read-only because the current session could not be verified: ${authError}`
+              : `Role options could not be refreshed: ${rolesError}`}
+          </div>
+        </div>
+      ) : null}
+
+      {!authError && authContext && !isSuperAdmin ? (
+        <div className="border-b p-5">
+          <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+            Support users can view platform members and roles. Member edits,
+            role changes, and disable actions require Super Admin.
           </div>
         </div>
       ) : null}
@@ -629,6 +808,7 @@ export function SaasUserListView() {
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     <Button
+                      disabled={!canManageMembers}
                       onClick={() => {
                         openEditForm(user);
                       }}
@@ -639,7 +819,20 @@ export function SaasUserListView() {
                       Edit
                     </Button>
                     <Button
+                      disabled={!canManageMembers || rolesLoading}
+                      onClick={() => {
+                        openRoleForm(user);
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      Roles
+                    </Button>
+                    <Button
                       disabled={
+                        !canManageMembers ||
+                        authContext?.userId === user.id ||
                         statusUpdatingUserId === user.id ||
                         !canChangeStatus(user.status)
                       }
@@ -1021,6 +1214,98 @@ export function SaasUserListView() {
               </Button>
               <Button disabled={editLoading || editSubmitting} type="submit">
                 {editSubmitting ? "Saving" : "Save changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(roleEditingUser)}
+        onOpenChange={(open) => {
+          if (!open && !roleSubmitting) {
+            setRoleEditingUser(null);
+            setRoleForm(defaultRoleForm);
+            setRoleFormError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit platform roles</DialogTitle>
+            <DialogDescription className="sr-only">
+              Update SaaS-only platform roles for this member.
+            </DialogDescription>
+          </DialogHeader>
+          <form className="grid gap-4" noValidate onSubmit={handleRoleSubmit}>
+            {roleEditingUser ? (
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <div className="font-medium">{roleEditingUser.displayName}</div>
+                <div className="text-muted-foreground">
+                  {roleEditingUser.email ??
+                    roleEditingUser.phone ??
+                    roleEditingUser.id}
+                </div>
+              </div>
+            ) : null}
+
+            <div className="grid gap-3">
+              <Label>Roles</Label>
+              <div className="grid gap-2">
+                {activeRoleCodes.map((roleCode) => (
+                  <label
+                    className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm"
+                    key={roleCode}
+                  >
+                    <input
+                      checked={roleForm.roleCodes.includes(roleCode)}
+                      className="size-4"
+                      disabled={roleSubmitting || rolesLoading}
+                      onChange={() => {
+                        toggleRoleCode(roleCode);
+                      }}
+                      type="checkbox"
+                    />
+                    <span>{getRoleLabel(roleCode)}</span>
+                  </label>
+                ))}
+              </div>
+              {rolesError ? (
+                <p className="text-xs text-amber-700">
+                  Role list refresh failed. Using the built-in SaaS role
+                  boundary for this form.
+                </p>
+              ) : null}
+            </div>
+
+            {roleFormError ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                {roleFormError}
+              </div>
+            ) : null}
+
+            <DialogFooter>
+              <Button
+                disabled={roleSubmitting}
+                onClick={() => {
+                  setRoleEditingUser(null);
+                  setRoleForm(defaultRoleForm);
+                  setRoleFormError(null);
+                }}
+                type="button"
+                variant="outline"
+              >
+                Cancel
+              </Button>
+              <Button
+                disabled={
+                  roleSubmitting ||
+                  rolesLoading ||
+                  roleForm.roleCodes.length === 0
+                }
+                type="submit"
+              >
+                {roleSubmitting ? "Saving" : "Save roles"}
               </Button>
             </DialogFooter>
           </form>

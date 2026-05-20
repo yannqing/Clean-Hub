@@ -21,6 +21,7 @@ export type UpdateSaasUserRequest = {
 
 export type UpdateSaasUserStatusRequest = {
   status: Extract<SaasUserStatus, "active" | "disabled">;
+  reason?: string;
 };
 
 export type UpdateSaasUserRolesRequest = {
