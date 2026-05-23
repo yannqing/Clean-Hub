@@ -1,5 +1,11 @@
 import type { ApiClient, QueryParams } from "../types";
 import { createSaasAuditLogsApi } from "./audit-logs";
+import { createSaasFeedbackTicketsApi } from "./feedback-tickets";
+import type {
+  FeedbackTicketListQuery,
+  UpdateFeedbackTicketAssigneeRequest,
+  UpdateFeedbackTicketStatusRequest,
+} from "./feedback-tickets.types";
 import { createSaasOverviewApi } from "./overview";
 import { createSaasPlatformSettingsApi } from "./platform-settings";
 import type { UpdatePlatformSettingsRequest } from "./platform-settings.types";
@@ -20,6 +26,8 @@ import type {
 
 export * from "./audit-logs";
 export * from "./audit-logs.types";
+export * from "./feedback-tickets";
+export * from "./feedback-tickets.types";
 export * from "./overview";
 export * from "./overview.types";
 export * from "./platform-settings";
@@ -36,6 +44,7 @@ export function createSaasApi(client: ApiClient) {
   const users = createSaasUsersApi(client);
   const roles = createSaasRolesApi(client);
   const auditLogs = createSaasAuditLogsApi(client);
+  const feedbackTickets = createSaasFeedbackTicketsApi(client);
   const overview = createSaasOverviewApi(client);
   const platformSettings = createSaasPlatformSettingsApi(client);
 
@@ -44,6 +53,7 @@ export function createSaasApi(client: ApiClient) {
     users,
     roles,
     auditLogs,
+    feedbackTickets,
     overview,
     platformSettings,
     listTenants: (query?: QueryParams) => tenants.list(query),
@@ -73,6 +83,17 @@ export function createSaasApi(client: ApiClient) {
     listRoles: () => roles.list(),
     listAuditLogs: (query?: QueryParams) => auditLogs.list(query),
     getAuditLog: (logId: string) => auditLogs.get(logId),
+    listFeedbackTickets: (query?: FeedbackTicketListQuery) =>
+      feedbackTickets.list(query),
+    getFeedbackTicket: (ticketId: string) => feedbackTickets.get(ticketId),
+    updateFeedbackTicketStatus: (
+      ticketId: string,
+      input: UpdateFeedbackTicketStatusRequest,
+    ) => feedbackTickets.updateStatus(ticketId, input),
+    updateFeedbackTicketAssignee: (
+      ticketId: string,
+      input: UpdateFeedbackTicketAssigneeRequest,
+    ) => feedbackTickets.updateAssignee(ticketId, input),
     getOverview: () => overview.get(),
     getPlatformSettings: () => platformSettings.get(),
     updatePlatformSettings: (input: UpdatePlatformSettingsRequest) =>

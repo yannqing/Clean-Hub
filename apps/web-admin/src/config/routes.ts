@@ -9,6 +9,7 @@ export const webAdminRoutes = {
     newTenant: "/saas/tenants/new",
     users: "/saas/users",
     auditLogs: "/saas/audit-logs",
+    feedbackTickets: "/saas/feedback-tickets",
     config: {
       tenants: "/saas/tenants",
       featureFlags: "/saas/config/feature-flags",

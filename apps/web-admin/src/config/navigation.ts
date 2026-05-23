@@ -6,6 +6,7 @@ export const webAdminNavigation = {
     { label: "Tenants", href: webAdminRoutes.saas.tenants },
     { label: "Users", href: webAdminRoutes.saas.users },
     { label: "Audit Logs", href: webAdminRoutes.saas.auditLogs },
+    { label: "Feedback Tickets", href: webAdminRoutes.saas.feedbackTickets },
   ],
   tenant: [
     { label: "Overview", href: webAdminRoutes.tenant.home },
@@ -40,6 +41,10 @@ export const webAdminSidebarNavigation = {
       items: [
         { label: "Dashboard", href: webAdminRoutes.saas.home },
         { label: "User Management", href: webAdminRoutes.saas.users },
+        {
+          label: "Feedback Tickets",
+          href: webAdminRoutes.saas.feedbackTickets,
+        },
       ],
     },
     {
