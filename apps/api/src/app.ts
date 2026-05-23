@@ -19,7 +19,7 @@ import { createSaasOperationLogRoutes } from "./modules/saas-ops/operation-logs.
 import { createSaasOverviewRoutes } from "./modules/saas-overview/overview.routes.js";
 import { createSaasPlatformSettingsRoutes } from "./modules/saas-platform-settings/platform-settings.routes.js";
 import { createSaaSTestRoutes } from "./modules/saas/saas.routes.js";
-import { createSaasSecurityEventRoutes } from "./modules/saas-security/security-events.routes.js";
+import { createSaasSecurityRoutes } from "./modules/saas-security/security.routes.js";
 import { createSaasTenantsRoutes } from "./modules/saas-tenants/tenants.routes.js";
 import { createSaasRolesRoutes } from "./modules/saas-users/saas-roles.routes.js";
 import { createSaasUsersRoutes } from "./modules/saas-users/saas-users.routes.js";
@@ -90,7 +90,7 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.route("/saas/backups", createSaasBackupRoutes());
   app.route("/saas/restore-requests", createSaasRestoreRequestRoutes());
   app.route("/saas/operation-logs", createSaasOperationLogRoutes());
-  app.route("/saas/security-events", createSaasSecurityEventRoutes());
+  app.route("/saas/security", createSaasSecurityRoutes());
 
   // 租户侧
   app.route("/tenant/users", createTenantUserRoutes());

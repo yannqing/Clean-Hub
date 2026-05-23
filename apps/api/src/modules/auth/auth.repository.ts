@@ -18,6 +18,7 @@ import {
 } from "@cleanhub/db";
 
 import { writeAuditLog } from "../audit/audit.helper.js";
+import { writeSecurityEvent } from "../saas-security/security-events.helper.js";
 import type {
   AuthRequestMeta,
   AuthenticatedUser,
@@ -240,5 +241,21 @@ export class AuthRepository {
       userAgent: meta?.userAgent,
       metadata,
     });
+
+    if (eventType === "auth.login.failed") {
+      await writeSecurityEvent(this.db, {
+        tenantId,
+        actorUserId,
+        eventType,
+        severity: "medium",
+        ipAddress: meta?.ipAddress,
+        userAgent: meta?.userAgent,
+        description: "Login attempt failed.",
+        metadata: {
+          reason,
+          ...metadata,
+        },
+      });
+    }
   }
 }

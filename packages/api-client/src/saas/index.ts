@@ -18,6 +18,10 @@ import type { UpdatePlatformSettingsRequest } from "./platform-settings.types";
 import { createSaasRolesApi } from "./roles";
 import { createSaasRestoreRequestsApi } from "./restore-requests";
 import type { RestoreRequestListQuery } from "./restore-requests.types";
+import { createSaasSecurityEventsApi } from "./security-events";
+import type { SecurityEventListQuery } from "./security-events.types";
+import { createSaasSecuritySettingsApi } from "./security-settings";
+import type { UpdateSecuritySettingsRequest } from "./security-settings.types";
 import { createSaasTenantsApi } from "./tenants";
 import type {
   CreateTenantRequest,
@@ -46,6 +50,10 @@ export * from "./roles";
 export * from "./roles.types";
 export * from "./restore-requests";
 export * from "./restore-requests.types";
+export * from "./security-events";
+export * from "./security-events.types";
+export * from "./security-settings";
+export * from "./security-settings.types";
 export * from "./tenants";
 export * from "./tenants.types";
 export * from "./users";
@@ -61,6 +69,8 @@ export function createSaasApi(client: ApiClient) {
   const overview = createSaasOverviewApi(client);
   const platformSettings = createSaasPlatformSettingsApi(client);
   const restoreRequests = createSaasRestoreRequestsApi(client);
+  const securityEvents = createSaasSecurityEventsApi(client);
+  const securitySettings = createSaasSecuritySettingsApi(client);
 
   return {
     tenants,
@@ -72,6 +82,8 @@ export function createSaasApi(client: ApiClient) {
     overview,
     platformSettings,
     restoreRequests,
+    securityEvents,
+    securitySettings,
     listTenants: (query?: QueryParams) => tenants.list(query),
     createTenant: (input: CreateTenantRequest) => tenants.create(input),
     getTenant: (tenantId: string) => tenants.get(tenantId),
@@ -108,6 +120,11 @@ export function createSaasApi(client: ApiClient) {
     ) => backups.createRestoreRequest(backupJobId, input),
     listRestoreRequests: (query?: RestoreRequestListQuery) =>
       restoreRequests.list(query),
+    listSecurityEvents: (query?: SecurityEventListQuery) =>
+      securityEvents.list(query),
+    getSecuritySettings: () => securitySettings.get(),
+    updateSecuritySettings: (input: UpdateSecuritySettingsRequest) =>
+      securitySettings.update(input),
     listFeedbackTickets: (query?: FeedbackTicketListQuery) =>
       feedbackTickets.list(query),
     getFeedbackTicket: (ticketId: string) => feedbackTickets.get(ticketId),

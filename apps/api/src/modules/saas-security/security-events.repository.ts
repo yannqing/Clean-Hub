@@ -1,10 +1,12 @@
 import { and, desc, eq, gte, lte } from "drizzle-orm";
 
 import { securityEvents, type Database } from "@cleanhub/db";
+import { createId } from "@cleanhub/id";
 
 import type {
   SecurityEventListInput,
   SecurityEventListItem,
+  WriteSecurityEventInput,
 } from "./security-events.types.js";
 
 function toDate(value: string | undefined): Date | undefined {
@@ -48,4 +50,31 @@ export async function findSecurityEvents(
     ...row,
     createdAt: row.createdAt.toISOString(),
   }));
+}
+
+export async function insertSecurityEvent(
+  db: Database,
+  input: WriteSecurityEventInput,
+): Promise<void> {
+  await db.insert(securityEvents).values({
+    id: createId(),
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    actorUserId: input.actorUserId,
+    eventType: input.eventType,
+    severity: input.severity ?? "medium",
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    description: input.description,
+    metadata: input.metadata,
+  });
+}
+
+export async function hasSecurityEvents(db: Database): Promise<boolean> {
+  const rows = await db
+    .select({ id: securityEvents.id })
+    .from(securityEvents)
+    .limit(1);
+
+  return rows.length > 0;
 }
