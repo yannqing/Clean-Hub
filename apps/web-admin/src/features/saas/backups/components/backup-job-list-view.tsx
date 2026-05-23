@@ -24,12 +24,14 @@ import {
   backupJobScopeOptions,
   backupJobStatusLabels,
   backupJobStatusOptions,
+  restoreRequestStatusLabels,
 } from "../constants";
-import { getBackupJobListQuery } from "../queries";
+import { getBackupJobListQuery, getRestoreRequestListQuery } from "../queries";
 import type {
   BackupJobListItem,
   BackupJobScope,
   BackupJobStatus,
+  RestoreRequest,
 } from "../types";
 import { CreateBackupJobForm } from "./create-backup-job-form";
 import { CreateRestoreRequestForm } from "./create-restore-request-form";
@@ -87,13 +89,18 @@ function toListItem(backupJob: BackupJobListItem): BackupJobListItem {
 
 export function BackupJobListView() {
   const [backupJobs, setBackupJobs] = useState<BackupJobListItem[]>([]);
+  const [restoreRequests, setRestoreRequests] = useState<RestoreRequest[]>([]);
   const [selectedBackupJob, setSelectedBackupJob] =
     useState<BackupJobListItem | null>(null);
   const [scope, setScope] = useState<ScopeFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [tenantId, setTenantId] = useState("");
   const [loading, setLoading] = useState(true);
+  const [restoreRequestsLoading, setRestoreRequestsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [restoreRequestsError, setRestoreRequestsError] = useState<string | null>(
+    null,
+  );
 
   const listQuery = useMemo(
     () => ({
@@ -130,6 +137,10 @@ export function BackupJobListView() {
     setSelectedBackupJob(backupJob);
   }
 
+  function handleRestoreRequestCreated(restoreRequest: RestoreRequest) {
+    setRestoreRequests((current) => [restoreRequest, ...current]);
+  }
+
   useEffect(() => {
     let isCurrent = true;
 
@@ -162,6 +173,40 @@ export function BackupJobListView() {
       isCurrent = false;
     };
   }, [listQuery]);
+
+  useEffect(() => {
+    let isCurrent = true;
+
+    setRestoreRequestsLoading(true);
+    setRestoreRequestsError(null);
+
+    getRestoreRequestListQuery({ limit: 50, offset: 0 })
+      .then((data) => {
+        if (!isCurrent) {
+          return;
+        }
+
+        setRestoreRequests(data);
+      })
+      .catch((loadError: unknown) => {
+        if (isCurrent) {
+          setRestoreRequestsError(
+            loadError instanceof Error
+              ? loadError.message
+              : "Failed to load restore requests.",
+          );
+        }
+      })
+      .finally(() => {
+        if (isCurrent) {
+          setRestoreRequestsLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
 
   return (
     <section className="min-h-[560px]">
@@ -333,7 +378,10 @@ export function BackupJobListView() {
                 </div>
               </div>
 
-              <CreateRestoreRequestForm backupJobId={selectedBackupJob.id} />
+              <CreateRestoreRequestForm
+                backupJobId={selectedBackupJob.id}
+                onCreated={handleRestoreRequestCreated}
+              />
             </>
           ) : (
             <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -341,6 +389,60 @@ export function BackupJobListView() {
               manual review.
             </div>
           )}
+
+          <div className="grid gap-3">
+            <div>
+              <h2 className="text-base font-semibold">Restore Requests</h2>
+            </div>
+
+            {restoreRequestsLoading ? (
+              <div className="grid gap-2">
+                {[0, 1, 2].map((item) => (
+                  <div
+                    className="h-12 animate-pulse rounded-md bg-muted"
+                    key={item}
+                  />
+                ))}
+              </div>
+            ) : restoreRequestsError ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+                {restoreRequestsError}
+              </div>
+            ) : restoreRequests.length === 0 ? (
+              <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+                No restore requests found.
+              </div>
+            ) : (
+              <div className="overflow-hidden rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Tenant</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {restoreRequests.map((restoreRequest) => (
+                      <TableRow key={restoreRequest.id}>
+                        <TableCell>
+                          {formatDate(restoreRequest.createdAt)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {restoreRequestStatusLabels[restoreRequest.status]}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {restoreRequest.tenantId ?? "Platform"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
         </aside>
       </div>
     </section>

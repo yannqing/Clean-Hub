@@ -4,13 +4,16 @@ import { Button, Label, Textarea, toast } from "@cleanhub/ui";
 import { useState, type FormEvent } from "react";
 
 import { createRestoreRequestAction } from "../actions";
+import type { RestoreRequest } from "../types";
 
 type CreateRestoreRequestFormProps = {
   backupJobId: string;
+  onCreated: (restoreRequest: RestoreRequest) => void;
 };
 
 export function CreateRestoreRequestForm({
   backupJobId,
+  onCreated,
 }: CreateRestoreRequestFormProps) {
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -26,6 +29,7 @@ export function CreateRestoreRequestForm({
     if (result.ok) {
       toast.success("Restore request submitted.");
       setReason("");
+      onCreated(result.data);
     } else {
       toast.error(result.error);
     }

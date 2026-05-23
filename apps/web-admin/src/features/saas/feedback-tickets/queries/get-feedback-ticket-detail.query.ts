@@ -5,7 +5,5 @@ import type { FeedbackTicketDetail } from "../types";
 export async function getFeedbackTicketDetailQuery(
   ticketId: string,
 ): Promise<FeedbackTicketDetail> {
-  return webAdminApi.http.request<FeedbackTicketDetail>(
-    `/saas/feedback-tickets/${ticketId}`,
-  );
+  return webAdminApi.saas.feedbackTickets.get(ticketId);
 }

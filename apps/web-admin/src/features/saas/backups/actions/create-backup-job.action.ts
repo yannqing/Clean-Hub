@@ -2,7 +2,6 @@ import { webAdminApi } from "@/lib/api-client";
 
 import type {
   BackupJobActionResult,
-  BackupJobListItem,
   CreateBackupJobInput,
 } from "../types";
 import { validateCreateBackupJob } from "../validators";
@@ -23,13 +22,7 @@ export async function createBackupJobAction(
   }
 
   try {
-    const backupJob = await webAdminApi.http.request<BackupJobListItem>(
-      "/saas/backups",
-      {
-        method: "POST",
-        body: validation.data,
-      },
-    );
+    const backupJob = await webAdminApi.saas.backups.create(validation.data);
 
     return {
       ok: true,

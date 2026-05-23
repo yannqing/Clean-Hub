@@ -1,13 +1,13 @@
 export type SecurityEventSeverity = "low" | "medium" | "high" | "critical";
 
-export type SecurityEventListInput = {
+export type SecurityEventListQuery = {
   severity?: SecurityEventSeverity;
   eventType?: string;
   tenantId?: string;
   dateFrom?: string;
   dateTo?: string;
-  limit: number;
-  offset: number;
+  limit?: number;
+  offset?: number;
 };
 
 export type SecurityEventListItem = {
@@ -20,16 +20,4 @@ export type SecurityEventListItem = {
   ipAddress: string | null;
   description: string | null;
   createdAt: string;
-};
-
-export type WriteSecurityEventInput = {
-  tenantId?: string | null;
-  branchId?: string | null;
-  actorUserId?: string | null;
-  eventType: string;
-  severity?: SecurityEventSeverity;
-  ipAddress?: string;
-  userAgent?: string;
-  description?: string;
-  metadata?: Record<string, unknown>;
 };

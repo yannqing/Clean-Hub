@@ -1,4 +1,8 @@
-import type { BackupJobScope, BackupJobStatus } from "./types";
+import type {
+  BackupJobScope,
+  BackupJobStatus,
+  RestoreRequestStatus,
+} from "./types";
 
 export const backupJobScopeOptions = [
   { label: "Platform", value: "platform" },
@@ -28,4 +32,12 @@ export const backupJobStatusLabels: Record<BackupJobStatus, string> = {
   running: "Running",
   succeeded: "Succeeded",
   failed: "Failed",
+};
+
+export const restoreRequestStatusLabels: Record<RestoreRequestStatus, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+  completed: "Completed",
+  cancelled: "Cancelled",
 };

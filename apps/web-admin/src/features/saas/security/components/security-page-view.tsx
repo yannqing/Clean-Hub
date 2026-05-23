@@ -103,7 +103,7 @@ export function SecurityPageView() {
             initialValues={
               settings ? toFormValues(settings) : securitySettingsDefaultValues
             }
-            key={settings?.updatedAt ?? "default-security-settings"}
+            key={settings?.updatedAt ?? settings?.version ?? "default-security-settings"}
             onUpdated={setSettings}
           />
         )}

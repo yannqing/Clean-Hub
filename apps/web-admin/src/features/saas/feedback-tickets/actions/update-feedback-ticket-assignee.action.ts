@@ -2,7 +2,6 @@ import { webAdminApi } from "@/lib/api-client";
 
 import type {
   FeedbackTicketActionResult,
-  FeedbackTicketDetail,
   UpdateFeedbackTicketAssigneeInput,
 } from "../types";
 import { validateFeedbackTicketAssigneeUpdate } from "../validators";
@@ -24,12 +23,9 @@ export async function updateFeedbackTicketAssigneeAction(
   }
 
   try {
-    const ticket = await webAdminApi.http.request<FeedbackTicketDetail>(
-      `/saas/feedback-tickets/${ticketId}/assignee`,
-      {
-        method: "PATCH",
-        body: validation.data,
-      },
+    const ticket = await webAdminApi.saas.feedbackTickets.updateAssignee(
+      ticketId,
+      validation.data,
     );
 
     return {

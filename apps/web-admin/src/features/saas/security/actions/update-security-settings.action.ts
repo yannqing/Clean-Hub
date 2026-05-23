@@ -1,7 +1,6 @@
 import { webAdminApi } from "@/lib/api-client";
 
 import type {
-  SecuritySettings,
   SecuritySettingsActionResult,
   SecuritySettingsFormValues,
 } from "../types";
@@ -23,12 +22,8 @@ export async function updateSecuritySettingsAction(
   }
 
   try {
-    const settings = await webAdminApi.http.request<SecuritySettings>(
-      "/saas/security/settings",
-      {
-        method: "PATCH",
-        body: validation.data,
-      },
+    const settings = await webAdminApi.saas.securitySettings.update(
+      validation.data,
     );
 
     return {

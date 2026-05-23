@@ -1,39 +1,19 @@
-export type BackupJobScope = "platform" | "tenant";
+import type {
+  BackupJobListItem,
+  RestoreRequest,
+} from "@cleanhub/api-client";
 
-export type BackupJobStatus = "pending" | "running" | "succeeded" | "failed";
-
-export type RestoreRequestStatus = "pending" | "approved" | "rejected";
-
-export type BackupJobListQuery = {
-  scope?: BackupJobScope;
-  status?: BackupJobStatus;
-  tenantId?: string;
-  limit?: number;
-  offset?: number;
-};
-
-export type BackupJobListItem = {
-  id: string;
-  tenantId: string | null;
-  scope: BackupJobScope;
-  status: BackupJobStatus;
-  requestedBy: string | null;
-  startedAt: string | null;
-  finishedAt: string | null;
-  failureReason: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-export type CreateBackupJobInput = {
-  scope: BackupJobScope;
-  tenantId?: string;
-  reason?: string;
-};
-
-export type CreateRestoreRequestInput = {
-  reason: string;
-};
+export type {
+  BackupJobListItem,
+  BackupJobListQuery,
+  BackupJobScope,
+  BackupJobStatus,
+  CreateBackupJobRequest as CreateBackupJobInput,
+  CreateRestoreRequestRequest as CreateRestoreRequestInput,
+  RestoreRequest,
+  RestoreRequestListQuery,
+  RestoreRequestStatus,
+} from "@cleanhub/api-client";
 
 export type BackupJobActionResult =
   | {
@@ -44,17 +24,6 @@ export type BackupJobActionResult =
       ok: false;
       error: string;
     };
-
-export type RestoreRequest = {
-  id: string;
-  backupJobId: string;
-  tenantId: string | null;
-  requestedBy: string | null;
-  reason: string;
-  status: RestoreRequestStatus;
-  createdAt: string;
-  updatedAt: string;
-};
 
 export type RestoreRequestActionResult =
   | {
