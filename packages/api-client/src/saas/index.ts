@@ -13,6 +13,8 @@ import type {
   UpdateFeedbackTicketStatusRequest,
 } from "./feedback-tickets.types";
 import { createSaasOverviewApi } from "./overview";
+import { createSaasOperationLogsApi } from "./operation-logs";
+import type { OperationLogListQuery } from "./operation-logs.types";
 import { createSaasPlatformSettingsApi } from "./platform-settings";
 import type { UpdatePlatformSettingsRequest } from "./platform-settings.types";
 import { createSaasRolesApi } from "./roles";
@@ -44,6 +46,8 @@ export * from "./feedback-tickets";
 export * from "./feedback-tickets.types";
 export * from "./overview";
 export * from "./overview.types";
+export * from "./operation-logs";
+export * from "./operation-logs.types";
 export * from "./platform-settings";
 export * from "./platform-settings.types";
 export * from "./roles";
@@ -67,6 +71,7 @@ export function createSaasApi(client: ApiClient) {
   const backups = createSaasBackupsApi(client);
   const feedbackTickets = createSaasFeedbackTicketsApi(client);
   const overview = createSaasOverviewApi(client);
+  const operationLogs = createSaasOperationLogsApi(client);
   const platformSettings = createSaasPlatformSettingsApi(client);
   const restoreRequests = createSaasRestoreRequestsApi(client);
   const securityEvents = createSaasSecurityEventsApi(client);
@@ -80,6 +85,7 @@ export function createSaasApi(client: ApiClient) {
     backups,
     feedbackTickets,
     overview,
+    operationLogs,
     platformSettings,
     restoreRequests,
     securityEvents,
@@ -122,6 +128,8 @@ export function createSaasApi(client: ApiClient) {
       restoreRequests.list(query),
     listSecurityEvents: (query?: SecurityEventListQuery) =>
       securityEvents.list(query),
+    listOperationLogs: (query?: OperationLogListQuery) =>
+      operationLogs.list(query),
     getSecuritySettings: () => securitySettings.get(),
     updateSecuritySettings: (input: UpdateSecuritySettingsRequest) =>
       securitySettings.update(input),
