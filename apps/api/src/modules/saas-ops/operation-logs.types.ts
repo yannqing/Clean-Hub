@@ -22,3 +22,15 @@ export type OperationLogListItem = {
   actorUserId: string | null;
   createdAt: string;
 };
+
+export type WriteOperationLogInput = {
+  tenantId?: string | null;
+  branchId?: string | null;
+  level?: OperationLogLevel;
+  service: string;
+  eventType: string;
+  message: string;
+  requestId?: string;
+  actorUserId?: string | null;
+  metadata?: Record<string, unknown>;
+};

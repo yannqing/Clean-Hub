@@ -5,6 +5,7 @@ import { operationLogs, type Database } from "@cleanhub/db";
 import type {
   OperationLogListInput,
   OperationLogListItem,
+  WriteOperationLogInput,
 } from "./operation-logs.types.js";
 
 function toDate(value: string | undefined): Date | undefined {
@@ -49,4 +50,21 @@ export async function findOperationLogs(
     ...row,
     createdAt: row.createdAt.toISOString(),
   }));
+}
+
+export async function insertOperationLog(
+  db: Database,
+  input: WriteOperationLogInput,
+): Promise<void> {
+  await db.insert(operationLogs).values({
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    level: input.level ?? "info",
+    service: input.service,
+    eventType: input.eventType,
+    message: input.message,
+    requestId: input.requestId,
+    actorUserId: input.actorUserId,
+    metadata: input.metadata,
+  });
 }

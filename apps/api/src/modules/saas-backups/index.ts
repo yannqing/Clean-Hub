@@ -1,4 +1,5 @@
 export * from "./backups.controller.js";
+export * from "./backups.errors.js";
 export * from "./backups.repository.js";
 export * from "./backups.routes.js";
 export * from "./backups.service.js";

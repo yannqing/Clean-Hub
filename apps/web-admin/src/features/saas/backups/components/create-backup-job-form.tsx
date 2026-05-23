@@ -81,7 +81,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
             disabled={scope === "platform"}
             id="backup-tenant-id"
             onChange={(event) => setTenantId(event.target.value)}
-            placeholder="Required for tenant backups"
+            placeholder="Optional tenant ULID"
             value={scope === "platform" ? "" : tenantId}
           />
         </div>

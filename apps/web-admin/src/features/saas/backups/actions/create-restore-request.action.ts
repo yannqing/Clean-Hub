@@ -2,7 +2,6 @@ import { webAdminApi } from "@/lib/api-client";
 
 import type {
   CreateRestoreRequestInput,
-  RestoreRequest,
   RestoreRequestActionResult,
 } from "../types";
 import { validateCreateRestoreRequest } from "../validators";
@@ -24,12 +23,9 @@ export async function createRestoreRequestAction(
   }
 
   try {
-    const restoreRequest = await webAdminApi.http.request<RestoreRequest>(
-      `/saas/backups/${backupJobId}/restore-requests`,
-      {
-        method: "POST",
-        body: validation.data,
-      },
+    const restoreRequest = await webAdminApi.saas.backups.createRestoreRequest(
+      backupJobId,
+      validation.data,
     );
 
     return {

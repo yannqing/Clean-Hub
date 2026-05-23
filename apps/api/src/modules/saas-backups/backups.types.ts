@@ -10,6 +10,12 @@ export type BackupJobListInput = {
   offset: number;
 };
 
+export type CreateBackupJobInput = {
+  scope: BackupJobScope;
+  tenantId?: string;
+  reason?: string;
+};
+
 export type BackupJobListItem = {
   id: string;
   tenantId: string | null;
@@ -19,6 +25,39 @@ export type BackupJobListItem = {
   startedAt: string | null;
   finishedAt: string | null;
   failureReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RestoreRequestStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "completed"
+  | "cancelled";
+
+export type CreateRestoreRequestInput = {
+  reason: string;
+};
+
+export type RestoreRequestListInput = {
+  status?: RestoreRequestStatus;
+  tenantId?: string;
+  backupJobId?: string;
+  limit: number;
+  offset: number;
+};
+
+export type RestoreRequestListItem = {
+  id: string;
+  backupJobId: string | null;
+  tenantId: string | null;
+  requestedBy: string | null;
+  reason: string;
+  status: RestoreRequestStatus;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  reviewNote: string | null;
   createdAt: string;
   updatedAt: string;
 };

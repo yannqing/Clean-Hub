@@ -30,13 +30,6 @@ export function validateCreateBackupJob(
   const tenantId = input.tenantId?.trim().toUpperCase();
   const reason = input.reason?.trim();
 
-  if (input.scope === "tenant" && !tenantId) {
-    return {
-      ok: false,
-      error: "Tenant backups require a tenant ID.",
-    };
-  }
-
   if (tenantId && !ULID_PATTERN.test(tenantId)) {
     return {
       ok: false,

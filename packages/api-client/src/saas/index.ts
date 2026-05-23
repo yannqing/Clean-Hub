@@ -1,5 +1,11 @@
 import type { ApiClient, QueryParams } from "../types";
 import { createSaasAuditLogsApi } from "./audit-logs";
+import { createSaasBackupsApi } from "./backups";
+import type {
+  BackupJobListQuery,
+  CreateBackupJobRequest,
+  CreateRestoreRequestRequest,
+} from "./backups.types";
 import { createSaasFeedbackTicketsApi } from "./feedback-tickets";
 import type {
   FeedbackTicketListQuery,
@@ -10,6 +16,8 @@ import { createSaasOverviewApi } from "./overview";
 import { createSaasPlatformSettingsApi } from "./platform-settings";
 import type { UpdatePlatformSettingsRequest } from "./platform-settings.types";
 import { createSaasRolesApi } from "./roles";
+import { createSaasRestoreRequestsApi } from "./restore-requests";
+import type { RestoreRequestListQuery } from "./restore-requests.types";
 import { createSaasTenantsApi } from "./tenants";
 import type {
   CreateTenantRequest,
@@ -26,6 +34,8 @@ import type {
 
 export * from "./audit-logs";
 export * from "./audit-logs.types";
+export * from "./backups";
+export * from "./backups.types";
 export * from "./feedback-tickets";
 export * from "./feedback-tickets.types";
 export * from "./overview";
@@ -34,6 +44,8 @@ export * from "./platform-settings";
 export * from "./platform-settings.types";
 export * from "./roles";
 export * from "./roles.types";
+export * from "./restore-requests";
+export * from "./restore-requests.types";
 export * from "./tenants";
 export * from "./tenants.types";
 export * from "./users";
@@ -44,18 +56,22 @@ export function createSaasApi(client: ApiClient) {
   const users = createSaasUsersApi(client);
   const roles = createSaasRolesApi(client);
   const auditLogs = createSaasAuditLogsApi(client);
+  const backups = createSaasBackupsApi(client);
   const feedbackTickets = createSaasFeedbackTicketsApi(client);
   const overview = createSaasOverviewApi(client);
   const platformSettings = createSaasPlatformSettingsApi(client);
+  const restoreRequests = createSaasRestoreRequestsApi(client);
 
   return {
     tenants,
     users,
     roles,
     auditLogs,
+    backups,
     feedbackTickets,
     overview,
     platformSettings,
+    restoreRequests,
     listTenants: (query?: QueryParams) => tenants.list(query),
     createTenant: (input: CreateTenantRequest) => tenants.create(input),
     getTenant: (tenantId: string) => tenants.get(tenantId),
@@ -83,6 +99,15 @@ export function createSaasApi(client: ApiClient) {
     listRoles: () => roles.list(),
     listAuditLogs: (query?: QueryParams) => auditLogs.list(query),
     getAuditLog: (logId: string) => auditLogs.get(logId),
+    listBackupJobs: (query?: BackupJobListQuery) => backups.list(query),
+    createBackupJob: (input: CreateBackupJobRequest) =>
+      backups.create(input),
+    createRestoreRequest: (
+      backupJobId: string,
+      input: CreateRestoreRequestRequest,
+    ) => backups.createRestoreRequest(backupJobId, input),
+    listRestoreRequests: (query?: RestoreRequestListQuery) =>
+      restoreRequests.list(query),
     listFeedbackTickets: (query?: FeedbackTicketListQuery) =>
       feedbackTickets.list(query),
     getFeedbackTicket: (ticketId: string) => feedbackTickets.get(ticketId),

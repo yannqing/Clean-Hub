@@ -1,6 +1,8 @@
 import { getDb, type Database } from "@cleanhub/db";
 
-import { findOperationLogs } from "./operation-logs.repository.js";
+import {
+  findOperationLogs,
+} from "./operation-logs.repository.js";
 import type {
   OperationLogListInput,
   OperationLogListItem,
