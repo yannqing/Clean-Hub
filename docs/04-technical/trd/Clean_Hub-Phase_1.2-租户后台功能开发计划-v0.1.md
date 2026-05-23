@@ -7,6 +7,7 @@
 | v0.1.13 | 2026-05-23 | Draft | 完善概念说明、§6/§9/§12 结构；赵付杰任务清单与 `tenant-overview` 说明；SaaS 开户 UI 与可选分步 API |
 | v0.1.14 | 2026-05-23 | Draft | **数据库职责**：Phase 1.2 **初始 schema**（含 `hardware_configs`）由 **李龙杰** 定稿并落迁移；**后续** `hardware_configs` 等表结构补丁由 **杨序** 整改（李龙杰审核方案） |
 | v0.1.15 | 2026-05-23 | Draft | **负荷调整**：**`tenant-users`**（含用户创建 helper、PIN/token）划归 **杨序**；**赵付杰** 保留 `initialOwner` 开户链路 + `tenant-overview` + `tenant-settings` |
+| v0.1.16 | 2026-05-24 | Draft | 增补 **§8.1 权限矩阵**、**§8.2 Manager 默认决策**；**§12.10.1 / §12.13**；修正 §13 编号；新增 **§19 核心难点实现说明**；原 §19–§24 顺延为 §20–§25 |
 
 ---
 
@@ -19,6 +20,7 @@
 - 规划文件所有权，尽量避免多人同时修改同一个文件。
 - 约束 AI 生成代码时的边界，降低权限、审计、租户隔离等关键偏差。
 - 为测试、联调和验收提供统一依据。
+- 为 **核心难点**（开户、员工 PIN、权限、备份边界等）提供逐步逻辑对照（§19）。
 
 本次开发优先目标是跑通 **Owner / Manager** 在 `/tenant` 下的经营配置闭环（门店、员工、服务、价格），为后续 POS / Desktop 提供主数据。前端页面允许由 AI 先生成基础页面，视觉、交互和设计细节后续再统一调整。
 
@@ -148,7 +150,7 @@ SaaS super_admin 完成 ①②③（见 §12.0）
 分工原则：
 
 - **数据库（初始 → 后续补丁）**：
-  - **李龙杰（Day 1 阻塞）**：完成 Phase 1.2 **全部新表初始 schema**（含 **branches、services、prices、notification_settings、hardware_configs**、`users.pin_hash` 等），写入 `packages/db/src/schema/**`；在同一 PR 内执行 `pnpm db:generate`、`pnpm db:migrate`，维护 **`packages/db/src/schema/index.ts` 首次导出**；并完成 **Tenant `permission.helper` 初始扩展**（`assertTenantContext`、`requireTenantRole`、`assertActiveTenant`、`requireFeatureEnabled`）；制定 §16 审计 `eventCategory` 命名表。
+  - **李龙杰（Day 1 阻塞）**：完成 Phase 1.2 **全部新表初始 schema**（含 **branches、services、prices、notification_settings、hardware_configs、user_branches（预留）**、`users.pin_hash` 等），写入 `packages/db/src/schema/**`；在同一 PR 内执行 `pnpm db:generate`、`pnpm db:migrate`，维护 **`packages/db/src/schema/index.ts` 首次导出**；并完成 **Tenant `permission.helper` 初始扩展**（`assertTenantContext`、`requireTenantRole`、`assertActiveTenant`、`requireFeatureEnabled`）；制定 §16 审计 `eventCategory` 命名表。
   - **杨序（后续）**：Phase 1.2 开发过程中，若 **`hardware_configs` 等表**需增删改字段、索引或约束，由杨序提交 **schema 补丁迁移 PR**（须先与李龙杰确认字段方案，李龙杰审核合并）；**不负责** Day 1 初始建表与首次迁移。
   - **模块负责人不得自行 `db:generate` 或新增表**；缺字段/缺表先报 **李龙杰** 定初始或变更方案；**初始**由李龙杰落库，**后续补丁**（尤其 `hardware_configs`）由杨序落迁移。
 - **`hardware_configs`**：初始表结构由 **李龙杰** 在 Day 1 schema PR 中一并定义（§13.5）；杨序实现 `tenant-hardware` 业务时若需改表，走 **后续补丁** 流程，不自行改初始 PR。
@@ -226,10 +228,51 @@ routes -> controller -> service -> repository -> db
 3. 查询与写入必须带 `tenant_id = authContext.tenantId`，禁止信任前端传入的 `tenantId` 覆盖当前租户。
 4. 若 SaaS 在 Phase 1.1 已停用租户（`tenants.status !== active`），`/tenant/**` 统一返回 `403`。
 5. 业务 API 必须尊重 `tenant_feature_flags`（只读）：未开通能力不得创建对应业务数据；API 返回 `403` 或 `FEATURE_DISABLED`，不能只隐藏菜单。
-6. Manager 仅能访问授权门店范围内数据（`branch_id` 过滤）；Owner 可访问租户内全部门店（Phase 1 试点可先简化为全租户可见，Manager 门店范围在 schema 预留 `user_branch` 或等价关联）。
+6. Manager 门店数据范围见 **§8.2（Phase 1.2 默认决策）**；schema 预留 `user_branches`（或等价关联）供后续 POS 使用。
 7. 租户操作日志查询范围：**本租户全部记录**，可选 `branchId` 筛选；不是「仅门店级」独立日志表。
 8. **不实现 Tenant 离线**；schema 保留 `version`、软删除字段，供后续 POS 同步使用。
 9. 改价、禁员工、改门店、改服务等必须写 `audit_logs`，`eventCategory` 建议使用 `tenant_*` 前缀。
+
+### 8.1 租户角色与权限矩阵（Phase 1.2 默认）
+
+前端路由守卫见 `Clean_Hub-Phase_1-Web_Admin基础模块-TRD-v0.1.md` §5.2：`/tenant/**` 仅允许 `owner`、`manager` 进入；**Cashier 不得进入 Tenant 后台**（无 `/tenant` 菜单，API 返回 `403`）。
+
+后端在 `assertTenantContext` 之后，按角色与模块校验（可与 `requireTenantRole` 组合；细粒度 `tenant:*` 权限点见 Web Admin TRD §5.3，Phase 1.2 以角色为主）：
+
+| 模块 / 操作 | Owner | Manager | Cashier |
+| ----------- | ----- | ------- | ------- |
+| 进入 `/tenant` 路由 | ✅ | ✅ | ❌ |
+| `GET /tenant/overview` | ✅ | ✅ | ❌ |
+| 门店 CRUD / 启用停用 | ✅ | ✅ | ❌ |
+| 员工列表 / 详情 | ✅ | ✅ | ❌ |
+| 创建员工 / 编辑资料 / 重置 PIN / 禁用 | ✅ | ✅ | ❌ |
+| 服务目录 / 价格维护 | ✅ | ✅ | ❌ |
+| 操作日志查询 | ✅ | ✅ | ❌ |
+| 租户设置 `PATCH` | ✅ | ❌ | ❌ |
+| 租户设置 `GET`（含只读功能开关） | ✅ | ✅ | ❌ |
+| 硬件 / 通知 / 备份 / 报表（P1） | ✅ | ✅（备份创建建议仅 Owner，见 §19.7） | ❌ |
+| 个人中心（§12.13） | ✅ | ✅ | ❌ |
+| `POST /auth/logout` | ✅ | ✅ | ✅（POS 侧，非 Tenant 页） |
+
+实现注意：
+
+- **Cashier**：`userType = tenant`，仅用于 POS（Phase 1.3）；不得调用任何 `/tenant/**` 写接口或配置读接口（除未来明确的 POS API）。
+- **Owner**：租户内最高权限；**仅 Owner** 可 `PATCH /tenant/settings`。
+- **Manager**：与 Owner 共享经营主数据写权限；**不可**改租户级设置与功能开关。
+- 禁止通过 `POST /saas/users` 创建商户员工；商户员工仅 `POST /saas/tenants` + `initialOwner` 或 `POST /tenant/users`。
+
+### 8.2 Manager 门店范围（Phase 1.2 默认决策）
+
+为避免 `user_branches` 未落地时阻塞 P0，**本阶段采用下列固定方案**（验收与 Code Review 以此为准）：
+
+| 项 | Phase 1.2 交付 | 后续波次 |
+| -- | -------------- | -------- |
+| `user_branches`（或等价表） | **李龙杰** 在初始 schema 中**预留**（`user_id` + `branch_id`）；创建/更新员工时 **可写入** `branchIds` | Phase 1.3+ 启用 API 层 `branch_id` 过滤 |
+| 门店/服务/价格/员工 **列表与写操作** | Owner、Manager 均按 **全租户** `tenant_id` 过滤，**不按** `branchIds` 限制 | Manager 仅能见授权门店 |
+| `GET /tenant/audit-logs` | Owner、Manager 均返回 **本租户全部** 日志；支持查询参数 `branchId` 筛选，**不**对 Manager 强制过滤 | Manager 默认仅授权门店 + `branch_id IS NULL` 的租户级记录 |
+| 报表 `GET /tenant/reports/summary` | 全租户占位数据；`branchId` 参数可选但不强制 | 与门店范围一致 |
+
+**结论**：文档与验收中「Manager 门店范围」在 1.2 **不作为 P0 阻塞项**；杨序在 `tenant-users` 落库 `branchIds` 即可，过滤逻辑留待 POS/多门店强化阶段。
 
 ---
 
@@ -276,7 +319,7 @@ routes -> controller -> service -> repository -> db
 **约定**
 
 - **删除**：业务数据一律软删除（`deleted_at`），页面上以 **停用/禁用** 为主，不做物理删除按钮（除非未来单独审批流）。
-- **权限**：Owner / Manager 可写主数据；Cashier 不可进入 Tenant 配置写接口；具体见第 15.1 节权限表。
+- **权限**：Owner / Manager 可写主数据；Cashier 不可进入 Tenant 后台；具体见 **§8.1 权限矩阵**。
 - **功能开关**：未开通业务线（`tenant_feature_flags`）时，对应侧边栏入口隐藏，且 API 返回 `403` / `FEATURE_DISABLED`。
 - **占位**：依赖订单/POS API 的指标与列表，Phase 1.2 允许 Empty / 占位数字，须在页面标注「待订单模块接入」。
 
@@ -715,7 +758,9 @@ type ResetTenantUserPinRequest = {
 | PATCH | `/tenant/services/:serviceId` | 更新服务 | P0 |
 | PATCH | `/tenant/services/:serviceId/status` | 启用/停用 | P0 |
 
-服务字段建议：`name`、`categoryId`、`pricingUnit`（`per_item` | `per_kg`）、`status`。
+服务字段建议：`name`、`categoryId`、`pricingUnit`（`per_item` | `per_kg`）、`status`、`businessLine`（与 §13.0 功能开关联动）。
+
+业务规则与改价逻辑见 **§19.4、§19.5**。
 
 ### 12.5 价格管理
 
@@ -725,6 +770,8 @@ type ResetTenantUserPinRequest = {
 | POST | `/tenant/prices` | 新增价格项（若与 service 分开） | P1 |
 | PATCH | `/tenant/prices/:priceId` | 更新标准价格 | P0 |
 
+每服务标准价 1:1、改价审计等见 **§19.5**。
+
 ### 12.6 硬件配置
 
 | 方法 | 路径 | 说明 | 优先级 |
@@ -732,6 +779,8 @@ type ResetTenantUserPinRequest = {
 | GET | `/tenant/hardware-configs` | 硬件配置列表 | P1 |
 | POST | `/tenant/hardware-configs` | 新建设备配置 | P1 |
 | PATCH | `/tenant/hardware-configs/:configId` | 更新设备配置 | P1 |
+
+实现边界见 **§19.7**（占位配置，不连真实设备）。
 
 ### 12.7 通知配置
 
@@ -833,7 +882,7 @@ offset
 ```
 
 服务层强制：`audit_logs.tenant_id = authContext.tenantId`。  
-Manager 额外过滤：仅 `branch_id` 属于授权门店或 `branch_id IS NULL` 的租户级记录。
+Phase 1.2 **不对 Manager 做门店过滤**（见 §8.2）；`branchId` 仅作可选查询参数，Owner/Manager 均可查本租户全量日志。
 
 ### 12.9 租户设置
 
@@ -866,6 +915,37 @@ Manager 额外过滤：仅 `branch_id` 属于授权门店或 `branch_id IS NULL`
 | POST | `/tenant/backups` | 创建手动备份任务记录 | P1 |
 | POST | `/tenant/backups/:backupId/restore-requests` | 提交恢复申请 | P1 |
 
+#### 12.10.1 Phase 1.2 实现约定（任务记录，不执行真实备份）
+
+**定位**：与 SaaS 侧 `saas-backups`（Phase 1.1 §10.7）一致——只持久化备份任务与恢复申请，**不**执行 `pg_dump`、**不**自动恢复生产库。
+
+**守卫**
+
+1. `assertTenantContext` + `assertActiveTenant`。
+2. 列表/创建备份、提交恢复申请：**Owner**；Manager 可 **GET** 列表（只读）或按产品统一为 Owner-only 写操作（推荐：**写仅 Owner**，见 §8.1）。
+3. `tenant_id` 固定为 `authContext.tenantId`；`backup_jobs.tenant_id` 不得由 body 覆盖。
+4. `scope` 固定为 `tenant`（禁止 Tenant 用户创建 `platform` 范围任务）。
+
+**核心逻辑**
+
+```text
+POST /tenant/backups
+  -> requireTenantRole(owner)   # 写操作推荐仅 Owner
+  -> 插入 backup_jobs（scope=tenant, status=pending, tenant_id=authContext.tenantId）
+  -> writeAuditLog（tenant_backup / backup_job.created）
+  -> 返回任务记录（不触发真实备份命令）
+
+POST /tenant/backups/:backupId/restore-requests
+  -> 校验 backup 属于本租户且 scope=tenant
+  -> 插入 restore_requests（status=pending）
+  -> writeAuditLog（tenant_backup / restore_request.created）
+  -> 不执行恢复；审批流留待 SaaS 或运维后台
+```
+
+**禁止**：在 Tenant 模块引入 shell 执行备份、直接 `DROP`/`RESTORE`、或让普通商户一键恢复生产数据。
+
+实现可参考 `apps/api/src/modules/saas-backups/**`，复制分层与审计模式，替换为 Tenant 守卫与 `tenant_id` 注入（孙蕊蕊，`tenant-backups`）。
+
 ### 12.11 基础报表
 
 | 方法 | 路径 | 说明 | 优先级 |
@@ -879,6 +959,53 @@ Manager 额外过滤：仅 `branch_id` 属于授权门店或 `branch_id IS NULL`
 | GET | `/saas/audit-logs` | 增加查询参数 `tenantId`（可选） | P1 |
 
 便于 SaaS Support 按租户排查：平台对该租户的操作 + 该租户用户登录 + 日后该租户经营操作。
+
+### 12.13 个人中心（Profile，P1）
+
+**定位**：当前登录 **租户用户** 的自服务资料与密码，**不**放在 `tenant-users`（后者管理他人账号）。复用 **`auth` 模块**，避免与员工 CRUD 混淆。
+
+| 方法 | 路径 | 说明 | 优先级 |
+| ---- | ---- | ---- | ---- |
+| GET | `/auth/me` | 已有；返回当前用户、角色、租户、门店绑定摘要 | P1 |
+| PATCH | `/auth/me` | 更新本人 `displayName`、`user_profiles.language` | P1 |
+| POST | `/auth/change-password` | 旧密码 + 新密码；写 `auth` 审计 | P1 |
+
+**PATCH `/auth/me` 请求体建议**
+
+```ts
+type UpdateAuthMeRequest = {
+  displayName?: string;
+  language?: "en" | "fr" | "zh-CN";
+};
+```
+
+**POST `/auth/change-password` 请求体建议**
+
+```ts
+type ChangePasswordRequest = {
+  currentPassword: string;
+  newPassword: string;
+};
+```
+
+**核心逻辑**
+
+```text
+PATCH /auth/me
+  -> assertTenantContext（或 saas/tenant 均可，按 userType）
+  -> 仅允许修改「当前 userId」的 profile
+  -> 不写 PIN；改 PIN 仅能通过 /tenant/users/:id/pin（管理员重置）
+
+POST /auth/change-password
+  -> 校验 currentPassword
+  -> 更新 password_hash
+  -> 可选：吊销除当前会话外 refresh token
+  -> writeAuditLog（auth / password.changed，不含密码明文）
+```
+
+**前端**：`/tenant/profile` 调用上述接口；「登录设备列表」Phase 1.2 **占位 Empty**。
+
+**负责人**：实现放在 `apps/api/src/modules/auth/**`；**李龙杰审核**（涉及公共 auth）；前端可由 **赵付杰** 或各模块负责人在 P1 联调时补齐。
 
 ---
 
@@ -894,13 +1021,14 @@ services
 prices                      # 或 price_items，与 TRD 对齐命名
 hardware_configs
 notification_settings
+user_branches               # 预留；Phase 1.2 仅写入不过滤 API（§8.2、§13.7）
 ```
 
 ### 13.0 协作原则（初始：李龙杰；后续补丁：杨序）
 
 | 步骤 | 负责人 | 交付物 |
 | ---- | ------ | ------ |
-| 1. 字段与表结构定稿（初始） | **李龙杰** | 表名、核心列、外键、`tenant_id` / 软删除 / `version` / `business_line`；**含 `hardware_configs`** |
+| 1. 字段与表结构定稿（初始） | **李龙杰** | 表名、核心列、外键、`tenant_id` / 软删除 / `version` / `business_line`；**含 `hardware_configs`、`user_branches`** |
 | 2. 写入 Drizzle schema 并首次迁移 | **李龙杰** | `packages/db/src/schema/**` + `pnpm db:generate` + `pnpm db:migrate` + `schema/index.ts` 导出（见数据库迁移文档） |
 | 3. 后续 schema 补丁 | **杨序** | `hardware_configs` 等表的字段/索引调整；**须李龙杰确认方案并审核 PR** |
 | 4. Tenant 权限 helper（初始版） | **李龙杰** | `permission.helper.ts` Tenant 扩展；他人**只调用、不直接改** |
@@ -996,13 +1124,25 @@ config            jsonb
 status            active | inactive
 ```
 
-### 13.5 notification_settings
+### 13.6 notification_settings
 
 - **粒度**：每租户一行（`tenant_id` UNIQUE），Phase 1.2 不用 `branch_id`。
 - **列建议**：`id`、`tenant_id`、`settings`（jsonb，形状见 §12.7.1）、`created_at` / `updated_at` / `created_by` / `updated_by` / `version`（与 §13.1 通用字段对齐）。
 - **`settings` 含义**：渠道开关 + 场景模板 key + `defaultLanguage`；**不存**供应商密钥与手机号池。
 
-### 13.6 索引与外键
+### 13.7 user_branches（预留，Phase 1.2 不过滤 API）
+
+```text
+user_id           varchar(26) NOT NULL  -> users.id
+branch_id         varchar(26) NOT NULL  -> branches.id
+tenant_id         varchar(26) NOT NULL  # 冗余便于租户隔离查询
+created_at        timestamptz
+```
+
+- **用途**：创建/更新员工时写入 `branchIds`；Phase 1.2 **不**用于 list/audit 过滤（见 §8.2）。
+- 唯一约束建议：`(user_id, branch_id)`。
+
+### 13.8 索引与外键
 
 - 所有表：`tenant_id` 索引。
 - 门店级：`branch_id` 索引。
@@ -1039,12 +1179,12 @@ status            active | inactive
 
 ### 15.1 李龙杰
 
-职责：**Day 1 初始 schema（含迁移）与 permission.helper 定义**、审计规范、代码审核、验收。
+职责：**Day 1 初始 schema（含迁移）与 permission.helper 定义**、**§8.1 权限矩阵与 §8.2 默认决策**、**§19 难点规范**、审计规范、代码审核、验收。
 
 **Day 1 上午（阻塞项，须先于业务模块合并）**
 
 1. 确认 Phase 1.2 任务拆分、文件边界与 5 日计划。
-2. 建立并提交 **初始 schema PR**（`packages/db/src/schema/**`）：**branches**、**services**（含 `business_line`）、**prices**、**notification_settings**、**hardware_configs**（§13.5）；**`users.pin_hash`**（§13.4）；含 §13.1 通用字段与索引/外键约定；**同一 PR 内**执行 `pnpm db:generate`、`pnpm db:migrate`，维护 `schema/index.ts` 导出。
+2. 建立并提交 **初始 schema PR**（`packages/db/src/schema/**`）：**branches**、**services**（含 `business_line`）、**prices**、**notification_settings**、**hardware_configs**（§13.5）、**user_branches**（§13.7，预留）；**`users.pin_hash`**（§13.4）；含 §13.1 通用字段与索引/外键约定；**同一 PR 内**执行 `pnpm db:generate`、`pnpm db:migrate`，维护 `schema/index.ts` 导出。
 3. 提交 **Tenant `permission.helper` 初始扩展**：`assertTenantContext`、`requireTenantRole`、`assertActiveTenant`、`requireFeatureEnabled`（参数见 §13.0）；未开通时 `403` / `FEATURE_DISABLED`。
 4. 制定租户侧 `audit_logs` 的 `eventCategory` / `eventType` 命名表（§16）。
 5. 初始 schema PR 合并后，通知全员 `pnpm db:migrate`；**审核杨序后续 `hardware_configs` 等 schema 补丁 PR**（若有）。
@@ -1199,9 +1339,8 @@ SaaS 用户不能访问 /tenant/**
 未开通功能时对应 API 返回 403
 创建门店/员工/改价写 audit_logs 且 tenant_id 正确
 禁用员工后 refresh token 失效
-/tenant/audit-logs 仅返回本租户数据
-Manager 仅能见授权门店日志（若本阶段实现）
-/tenant/system/logs 页面可筛选门店
+/tenant/audit-logs 仅返回本租户数据（Phase 1.2 不对 Manager 强制门店过滤，§8.2）
+/tenant/system/logs 页面可筛选门店（branchId 查询参数）
 SaaS /saas/audit-logs?tenantId= 可筛选指定租户
 未实现 Tenant 离线相关接口
 ```
@@ -1264,6 +1403,7 @@ await writeAuditLog(db, {
 
 ```text
 请按照 CleanHub 当前项目结构开发 Phase 1.2 租户后台。
+编码前先阅读本文档 §8.1、§8.2、§19（核心难点逐步逻辑）。
 前置已完成 Phase 1.1 SaaS 平台，请复用 audit.helper、permission.helper 模式。
 不要修改无关文件。
 不要修改 packages/ui/src/components/ui/**。
@@ -1309,7 +1449,254 @@ await writeAuditLog(db, {
 
 ---
 
-## 19. 验收命令
+## 19. 核心难点实现说明
+
+本节对齐 Phase 1.1 文档 §19，给开发者提供**逐步逻辑对照**。编码前应先读 **§8.1、§8.2** 与本节，再进入具体模块。
+
+### 19.1 SaaS 开户（`initialOwner`）与 `createTenantOwnerUser` helper
+
+难点：
+
+- Phase 1.1 只创建租户档案，没有可登录的商户 `users`。
+- `saas-tenants` 与 `tenant-users` 分属不同负责人，**必须共用同一套**用户创建逻辑，避免 PIN/密码哈希不一致。
+
+**边界**
+
+| 调用方 | 允许操作 | 禁止 |
+| ------ | -------- | ---- |
+| `POST /saas/tenants`（赵付杰） | 同事务：租户档案 + `initialOwner` | 在 `saas-tenants` 内重复实现哈希/roles |
+| `createTenantOwnerUser`（杨序，`tenant-users`） | 创建 `users` + `user_profiles` + `user_roles(owner)` + 审计 | 被 `POST /tenant/users` 以外路径绕过校验 |
+| `POST /tenant/users` | 创建员工（非 Owner 或额外 Owner 需产品明确禁止） | 创建 `userType=saas` |
+
+**核心逻辑（推荐：扩展 `POST /saas/tenants`）**
+
+```text
+POST /saas/tenants（含 initialOwner）
+  -> requireSuperAdmin
+  -> 校验 tenants 字段 + initialOwner（email/password/pin）
+  -> 开启事务
+  -> 插入 tenants
+  -> 初始化 tenant_settings、tenant_feature_flags（1.1 已有逻辑，不重复实现）
+  -> 调用 createTenantOwnerUser(tx, { tenantId, ...initialOwner, actorUserId })
+       -> users（userType=tenant, status=active, password_hash, pin_hash）
+       -> user_profiles
+       -> user_roles（owner）
+       -> writeAuditLog（tenant_user / user.created）
+  -> writeAuditLog（saas_tenant / tenant.created）
+  -> 提交事务
+  -> 返回 tenant + initialOwnerUserId（无密码/PIN）
+```
+
+**实现注意**
+
+- `initialOwner.email` 在**租户内**唯一（`normalized_email` + `tenant_id`）。
+- 每个租户经本接口**仅创建 1 个** Owner；已有 Owner 时 `POST .../owners`（§12.0.2）应返回 `409`。
+- 赵付杰 **不得**复制 PIN/密码哈希代码；只编排事务并调用杨序 helper。
+
+### 19.2 租户员工、PIN 与会话失效
+
+难点：
+
+- Tenant 员工与 SaaS 平台成员不是同一类用户（`userType`、`tenantId`）。
+- 禁用后 refresh token 仍有效会导致「已禁用仍可续签」。
+- PIN 不得进入审计明文；创建与重置是两条路径。
+
+**创建员工**
+
+```text
+POST /tenant/users
+  -> assertTenantContext + assertActiveTenant
+  -> requireTenantRole(owner, manager)
+  -> 校验 displayName/phone/role/pin（4–6 位数字）/password（Owner·Manager 必填）
+  -> phone、email 在租户内唯一
+  -> userType=tenant, tenantId=authContext.tenantId, status=active
+  -> 哈希 password、pin -> users 表
+  -> user_profiles
+  -> user_roles + user_branches（写入 branchIds，§13.7，不过滤 API）
+  -> writeAuditLog（tenant_user / user.created）
+```
+
+**禁用员工**
+
+```text
+PATCH /tenant/users/:userId/status  { status: "disabled" }
+  -> assertTenantContext + requireTenantRole(owner, manager)
+  -> 目标用户 tenantId 必须等于 authContext.tenantId
+  -> 禁止禁用自己
+  -> 禁止禁用租户内最后一个 active Owner（至少保留 1 个 Owner）
+  -> 更新 users.status = disabled
+  -> 吊销该用户全部 auth_refresh_tokens
+  -> writeAuditLog（tenant_user / user.disabled，含 reason 若有）
+```
+
+**重置 PIN**（独立路由，见 §12.3）
+
+```text
+PATCH /tenant/users/:userId/pin  { pin, reason }
+  -> requireTenantRole(owner, manager)
+  -> reason 必填，写入 audit_logs.reason
+  -> 更新 pin_hash
+  -> writeAuditLog（tenant_user / user.pin_reset，before/after 不含 pin/pin_hash）
+```
+
+**实现注意**
+
+- 复用 1.1 `saas-users` 中 **吊销 refresh token** 的 repository 方法（抽公共函数，避免复制）。
+- Cashier **不得**调用 `/tenant/users` 写接口。
+- Phase 1.2 **不做**员工自助「忘记 PIN」；走管理员重置。
+
+### 19.3 权限校验与 API 安全边界
+
+难点：前端隐藏菜单不是安全边界；SaaS 与 Tenant 上下文不可混用。
+
+**请求链路**
+
+```text
+/tenant/*
+  -> createRequireAuthMiddleware
+  -> assertTenantContext（userType=tenant, tenantId 非空）
+  -> assertActiveTenant（tenants.status=active）
+  -> requireTenantRole / requireFeatureEnabled（按接口）
+  -> service：所有查询/写入带 tenant_id = authContext.tenantId
+```
+
+**推荐 Tenant helper**（李龙杰初始实现，他人只调用）
+
+```ts
+function assertTenantContext(authContext: AuthContext): void;
+function requireTenantRole(
+  authContext: AuthContext,
+  allowedRoles: Array<"owner" | "manager">,
+): void;
+function assertActiveTenant(authContext: AuthContext): void;
+function requireFeatureEnabled(
+  authContext: AuthContext,
+  feature: "laundry" | "car_wash" | "retail" | "delivery" | "notifications",
+): void;
+```
+
+角色与模块对照见 **§8.1**。
+
+### 19.4 功能开关与 `business_line`
+
+```text
+创建/更新 services
+  -> requireFeatureEnabled(authContext, service.businessLine)
+  -> 未开通则 403 / FEATURE_DISABLED
+
+创建/更新 prices
+  -> 加载关联 service.business_line
+  -> 同样 requireFeatureEnabled
+```
+
+`tenant_feature_flags` **仅 SaaS 写入**；Tenant `GET /tenant/settings` 只读展示，禁止 PATCH 开关列。
+
+### 19.5 服务目录与标准价格
+
+难点：改价影响经营但不影响历史订单；需与功能开关联动。
+
+**数据关系（Phase 1.2 建议）**
+
+- 每个 `services` 行对应租户内一条经营服务；`prices` 与 `service_id` **1:1**（每服务一个当前标准价）；若已存在则 `PATCH` 改价，不重复插入。
+- `prices.currency` 默认取 `tenant_settings.default_currency`。
+- `amount` 必须 `> 0`；校验失败 `422`。
+
+**改价**
+
+```text
+PATCH /tenant/prices/:priceId
+  -> 查询 price + service，校验 tenant_id
+  -> requireFeatureEnabled(service.businessLine)
+  -> 记录 before.amount
+  -> 更新 amount、updated_by
+  -> writeAuditLog（tenant_price / price.updated）
+```
+
+产品提示（前端）：已确认订单价格不变；仅影响新单。
+
+**停用服务**：`PATCH .../status` 软逻辑停用，不物理删除；关联价格可保持只读展示。
+
+### 19.6 租户审计查询
+
+```text
+GET /tenant/audit-logs
+  -> assertTenantContext
+  -> requireTenantRole(owner, manager)
+  -> WHERE tenant_id = authContext.tenantId
+  -> 可选筛选：branchId, actorUserId, eventCategory, ...
+  -> Phase 1.2 不按 Manager 的 user_branches 过滤（§8.2）
+
+GET /tenant/audit-logs/:logId
+  -> 同上 + 校验 log.tenant_id
+```
+
+SaaS 补强：`GET /saas/audit-logs?tenantId=` 可选筛选，便于支持人员排查。
+
+### 19.7 通知、备份、硬件模块边界
+
+**通知**（详见 §12.7.1）：只读写 `notification_settings` jsonb；不发消息、不接 SDK。
+
+**备份**（详见 §12.10.1）：只写 `backup_jobs` / `restore_requests` 记录；不执行真实 dump/restore。
+
+**硬件**（P1）：
+
+```text
+GET/POST/PATCH /tenant/hardware-configs
+  -> requireTenantRole(owner, manager)
+  -> tenant_id 注入；branch_id 须属于本租户
+  -> config jsonb 占位（连接参数）；不调用 packages/hardware 真实设备
+  -> 写审计 tenant_hardware
+```
+
+表结构变更走杨序 schema 补丁 + 李龙杰审核（§13.0）。
+
+### 19.8 个人中心与 auth 复用
+
+见 **§12.13**。要点：`PATCH /auth/me` 只改本人资料；改他人 PIN 走 `/tenant/users/:id/pin`；登录设备列表占位。
+
+### 19.9 审计日志写入
+
+复用 `apps/api/src/modules/audit/audit.helper.ts`；`eventCategory` 见 §16。
+
+- `before` / `after` / `metadata` **不得**含 password、pin、token、密钥（helper 已过滤常见键，业务仍须避免写入哈希）。
+- 关键写操作与业务更新同一事务。
+
+### 19.10 并发、冲突与错误码
+
+| 场景 | HTTP | code 建议 |
+| ---- | ---- | --------- |
+| 未登录 | 401 | `UNAUTHORIZED` |
+| 非 Tenant 用户访问 `/tenant/**` | 403 | `FORBIDDEN` |
+| 停用租户 / Cashier 访问 Tenant | 403 | `FORBIDDEN` |
+| 功能未开通 | 403 | `FEATURE_DISABLED` |
+| 资源不存在 | 404 | `*_NOT_FOUND` |
+| pressingCode / email / phone 重复 | 409 | `DUPLICATE_*` |
+| 已有 Owner 仍调 `POST .../owners` | 409 | `OWNER_ALREADY_EXISTS` |
+| 禁用自己 / 最后 Owner | 422 | `INVALID_STATUS_TRANSITION` |
+| Zod 校验失败 | 422 | `VALIDATION_ERROR` |
+
+关键写操作使用事务；更新前查询 `before` 用于审计。
+
+### 19.11 Phase 1.2 最容易跑偏的点
+
+```text
+用 POST /saas/users 创建商户管理员
+在 saas-tenants 重复实现 PIN/密码哈希
+禁用员工未吊销 refresh token
+PIN 或 password 写入 audit_logs
+只隐藏菜单不做 API feature flag 校验
+信任 body.tenantId 覆盖 authContext.tenantId
+Tenant 模块实现离线/sync
+真实执行 pg_dump 或恢复数据库
+通知模块接入 Twilio/Meta/SendGrid
+Manager 门店过滤半成品导致 P0 阻塞（1.2 默认全租户，§8.2）
+模块负责人自行 db:generate 新表
+非本人目录修改 app.ts / permission.helper / schema
+```
+
+---
+
+## 20. 验收命令
 
 ```bash
 pnpm --filter @cleanhub/api typecheck
@@ -1331,7 +1718,7 @@ pnpm build
 
 ---
 
-## 20. 最终验收标准
+## 21. 最终验收标准
 
 本期通过标准：
 
@@ -1350,10 +1737,11 @@ pnpm build
 12. API client 类型完整，前后端 typecheck 通过。
 13. 构建通过。
 14. 许婧姝完成测试记录与验收报告。
+15. Phase 1.2 **不对 Manager 做门店级 API 过滤**（`user_branches` 可写入）；与 §8.2、§19.6 一致。
 
 ---
 
-## 21. 风险与控制
+## 22. 风险与控制
 
 | 风险 | 影响 | 控制方式 |
 | ---- | ---- | -------- |
@@ -1361,7 +1749,7 @@ pnpm build
 | 与 Phase 1.1 `users` 模块冲突 | 合并冲突 | **杨序**主导 `tenant-users` 新目录，旧路由逐步迁移 |
 | `initialOwner` 依赖 helper 未就绪 | Day 1 开户阻塞 | **杨序**上午优先合并 `createTenantOwnerUser`；赵付杰 `saas-tenants` 紧随其后 |
 | 权限/审计遗漏 | 越权或不可追溯 | 李龙杰审核 checklist；许婧姝按用例测试 |
-| Manager 门店范围复杂 | 延期 | Phase 1 试点可简化为 Owner 全量；预留 schema |
+| Manager 门店范围复杂 | 延期 | **已决策**：1.2 全租户可见 + 预留 `user_branches`（§8.2）；过滤留后续 |
 | 报表无订单 API | 页面空 | 允许占位，文档标注依赖 1.3 |
 | AI 改公共文件 | 冲突 | 同 1.1：撤回 + 李龙杰协调 |
 | 与 SaaS 功能开关不一致 | 菜单与 API 不一致 | 统一读 `tenant_feature_flags`，SaaS 为唯一写入方 |
@@ -1370,7 +1758,7 @@ pnpm build
 
 ---
 
-## 22. 交付物
+## 23. 交付物
 
 1. **SaaS 租户开户**：`saas-tenants` 扩展（`initialOwner`）、`packages/api-client/src/saas/tenants*`、`features/saas/tenants` 创建页（赵付杰）。
 2. 租户后台后端接口代码（`apps/api/src/modules/tenant-*`）。
@@ -1380,13 +1768,14 @@ pnpm build
 6. 接口说明（许婧姝维护）。
 7. 测试用例与执行记录（含 §12.0 开户 → 登录 `/tenant` 用例）。
 8. 验收报告与未通过问题清单。
-9. 风险与遗留事项（订单/POS/离线）。
+9. 风险与遗留事项（订单/POS/离线、Manager 门店过滤延后至 1.3+）。
+10. 本文档 **§19 核心难点实现说明**（团队实现对照）。
 
 ---
 
-## 23. 每日开发计划
+## 24. 每日开发计划
 
-### 23.1 Day 1：Schema、权限与 P0 后端
+### 24.1 Day 1：Schema、权限与 P0 后端
 
 **李龙杰**
 
@@ -1417,7 +1806,7 @@ pnpm build
 
 - 编写 P0 API 测试用例与租户隔离用例。
 
-### 23.2 Day 2：审计、守卫与 P0 收尾
+### 24.2 Day 2：审计、守卫与 P0 收尾
 
 **李龙杰**
 
@@ -1443,7 +1832,7 @@ pnpm build
 
 - 执行 P0 API 测试。
 
-### 23.3 Day 3：前端流程页（P0）
+### 24.3 Day 3：前端流程页（P0）
 
 **赵付杰**
 
@@ -1465,7 +1854,7 @@ pnpm build
 
 - 页面流程测试（Loading/Empty/Error）。
 
-### 23.4 Day 4：P1 模块与联调
+### 24.4 Day 4：P1 模块与联调
 
 **杨序**
 
@@ -1487,7 +1876,7 @@ pnpm build
 
 - 回归测试与问题清单。
 
-### 23.5 Day 5：验收
+### 24.5 Day 5：验收
 
 **李龙杰**
 
@@ -1503,7 +1892,7 @@ pnpm build
 
 ---
 
-## 24. 后续波次预告（非本文档范围）
+## 25. 后续波次预告（非本文档范围）
 
 | 波次 | 内容 |
 | ---- | ---- |
