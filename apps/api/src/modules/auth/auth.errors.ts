@@ -1,5 +1,6 @@
 export type AuthErrorCode =
   | "FORBIDDEN"
+  | "FEATURE_DISABLED"
   | "INVALID_CREDENTIALS"
   | "USER_DISABLED"
   | "USER_SUSPENDED"
