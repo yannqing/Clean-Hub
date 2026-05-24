@@ -213,9 +213,8 @@ export async function findSaasTenants(
   query: ListSaasTenantsQuery,
 ): Promise<SaasTenantListResult> {
   const searchQuery = normalizeSearchQuery(query.q);
-  const whereClause = and(
+  const baseWhereClause = and(
     isNull(tenants.deletedAt),
-    query.status ? eq(tenants.status, query.status) : undefined,
     searchQuery
       ? or(
           ilike(tenants.name, searchQuery),
@@ -224,6 +223,10 @@ export async function findSaasTenants(
           ilike(tenants.city, searchQuery),
         )
       : undefined,
+  );
+  const listWhereClause = and(
+    baseWhereClause,
+    query.status ? eq(tenants.status, query.status) : undefined,
   );
   const rows = await db
     .select({
@@ -237,21 +240,21 @@ export async function findSaasTenants(
       updatedAt: tenants.updatedAt,
     })
     .from(tenants)
-    .where(whereClause)
+    .where(listWhereClause)
     .orderBy(desc(tenants.createdAt))
     .limit(query.limit)
     .offset(query.offset);
   const totalRows = await db
     .select({ value: count() })
     .from(tenants)
-    .where(whereClause);
+    .where(listWhereClause);
   const statusRows = await db
     .select({
       status: tenants.status,
       value: count(),
     })
     .from(tenants)
-    .where(whereClause)
+    .where(baseWhereClause)
     .groupBy(tenants.status);
   const statusCounts = createEmptyStatusCounts();
 
