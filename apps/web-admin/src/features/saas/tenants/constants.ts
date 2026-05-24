@@ -27,3 +27,31 @@ export const tenantDefaultValues = {
   name: "",
   pressingCode: "",
 } as const;
+
+export const tenantFeatureFlagOptions = [
+  {
+    key: "laundryEnabled",
+    label: "Laundry and dry cleaning",
+    description: "Core laundry, pressing, and dry cleaning workflows.",
+  },
+  {
+    key: "carWashEnabled",
+    label: "Car wash",
+    description: "Car wash services, pricing, and operations entry points.",
+  },
+  {
+    key: "retailProductsEnabled",
+    label: "Retail products",
+    description: "Laundry liquid, care products, consumables, and retail sales.",
+  },
+  {
+    key: "deliveryEnabled",
+    label: "Pickup and delivery",
+    description: "Doorstep pickup, delivery states, and delivery staff flows.",
+  },
+  {
+    key: "notificationsEnabled",
+    label: "Notifications",
+    description: "WhatsApp, SMS, email settings, and send records.",
+  },
+] as const;

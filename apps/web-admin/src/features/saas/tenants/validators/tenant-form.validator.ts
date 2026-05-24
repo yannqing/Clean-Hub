@@ -1,6 +1,9 @@
 import type {
   CreateTenantRequest,
+  TenantFeatureFlagsFormValues,
   TenantFormValues,
+  TenantSettingsFormValues,
+  UpdateTenantFeatureFlagsRequest,
   UpdateTenantRequest,
   UpdateTenantSettingsRequest,
 } from "../types";
@@ -13,6 +16,26 @@ export type TenantFormValidationResult<TData> =
   | {
       ok: false;
       errors: Partial<Record<keyof TenantFormValues, string>>;
+    };
+
+export type TenantSettingsValidationResult<TData> =
+  | {
+      ok: true;
+      data: TData;
+    }
+  | {
+      ok: false;
+      errors: Partial<Record<keyof TenantSettingsFormValues, string>>;
+    };
+
+export type TenantFeatureFlagsValidationResult<TData> =
+  | {
+      ok: true;
+      data: TData;
+    }
+  | {
+      ok: false;
+      error: string;
     };
 
 function normalizeOptional(value: string): string | undefined {
@@ -94,12 +117,12 @@ function validateTenantBasics(input: TenantFormValues): {
   };
 }
 
-function validateSettings(input: TenantFormValues): {
-  errors: Partial<Record<keyof TenantFormValues, string>>;
-  defaultLanguage: TenantFormValues["defaultLanguage"];
+function validateSettings(input: TenantSettingsFormValues): {
+  errors: Partial<Record<keyof TenantSettingsFormValues, string>>;
+  defaultLanguage: TenantSettingsFormValues["defaultLanguage"];
   defaultCurrency: string;
 } {
-  const errors: Partial<Record<keyof TenantFormValues, string>> = {};
+  const errors: Partial<Record<keyof TenantSettingsFormValues, string>> = {};
   const defaultCurrency = input.defaultCurrency.trim().toUpperCase();
   const defaultLanguage = input.defaultLanguage;
 
@@ -178,8 +201,8 @@ export function validateTenantUpdateForm(
 }
 
 export function validateTenantSettingsForm(
-  input: TenantFormValues,
-): TenantFormValidationResult<UpdateTenantSettingsRequest> {
+  input: TenantSettingsFormValues,
+): TenantSettingsValidationResult<UpdateTenantSettingsRequest> {
   const settings = validateSettings(input);
 
   if (Object.keys(settings.errors).length > 0) {
@@ -194,6 +217,36 @@ export function validateTenantSettingsForm(
     data: {
       defaultLanguage: settings.defaultLanguage,
       defaultCurrency: settings.defaultCurrency,
+    },
+  };
+}
+
+export function validateTenantFeatureFlagsForm(
+  input: TenantFeatureFlagsFormValues,
+): TenantFeatureFlagsValidationResult<UpdateTenantFeatureFlagsRequest> {
+  const values = [
+    input.laundryEnabled,
+    input.carWashEnabled,
+    input.retailProductsEnabled,
+    input.deliveryEnabled,
+    input.notificationsEnabled,
+  ];
+
+  if (values.some((value) => typeof value !== "boolean")) {
+    return {
+      ok: false,
+      error: "Feature flags must be enabled or disabled.",
+    };
+  }
+
+  return {
+    ok: true,
+    data: {
+      laundryEnabled: input.laundryEnabled,
+      carWashEnabled: input.carWashEnabled,
+      retailProductsEnabled: input.retailProductsEnabled,
+      deliveryEnabled: input.deliveryEnabled,
+      notificationsEnabled: input.notificationsEnabled,
     },
   };
 }

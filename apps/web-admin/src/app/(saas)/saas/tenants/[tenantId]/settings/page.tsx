@@ -1,4 +1,4 @@
-import { PagePlaceholder } from "@/components/app-shell";
+import { TenantSettingsView } from "@/features/saas/tenants/components";
 
 type TenantSettingsPageProps = {
   params: Promise<{
@@ -11,11 +11,5 @@ export default async function TenantSettingsPage({
 }: TenantSettingsPageProps) {
   const { tenantId } = await params;
 
-  return (
-    <PagePlaceholder
-      description={`Platform-controlled settings placeholder for tenant ${tenantId}.`}
-      items={["Tenant status", "Feature flags", "Limits", "Compliance settings"]}
-      title="Tenant Settings"
-    />
-  );
+  return <TenantSettingsView tenantId={tenantId} />;
 }

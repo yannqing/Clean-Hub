@@ -1,11 +1,11 @@
 import { webAdminApi } from "@/lib/api-client";
 
-import type { TenantFormValues } from "../types";
+import type { TenantSettingsFormValues } from "../types";
 import { validateTenantSettingsForm } from "../validators";
 
 export async function updateTenantSettingsAction(
   tenantId: string,
-  input: TenantFormValues,
+  input: TenantSettingsFormValues,
 ) {
   const validation = validateTenantSettingsForm(input);
 
