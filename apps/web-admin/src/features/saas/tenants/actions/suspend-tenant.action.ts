@@ -1,8 +1,9 @@
-import { isApiHttpError, type TenantStatus } from "@cleanhub/api-client";
+import type { TenantStatus } from "@cleanhub/api-client";
 
 import { webAdminApi } from "@/lib/api-client";
 
 import type { TenantDetail } from "../types";
+import { getTenantStatusActionErrorMessage } from "./tenant-action-errors";
 
 type TenantStatusActionResult =
   | {
@@ -16,32 +17,6 @@ type TenantStatusActionResult =
       };
       message: string;
     };
-
-function getStatusActionErrorMessage(error: unknown): string {
-  if (!isApiHttpError(error)) {
-    return error instanceof Error
-      ? error.message
-      : "Tenant status could not be updated.";
-  }
-
-  if (error.status === 403) {
-    return "You do not have permission to update tenant status.";
-  }
-
-  if (error.status === 404) {
-    return "Tenant was not found.";
-  }
-
-  if (error.status === 409) {
-    return error.message || "Tenant status could not be updated right now.";
-  }
-
-  if (error.status === 422) {
-    return error.message || "Please correct the tenant status request.";
-  }
-
-  return error.message || "Tenant status could not be updated.";
-}
 
 export async function suspendTenantAction(
   tenantId: string,
@@ -73,7 +48,7 @@ export async function suspendTenantAction(
     return {
       ok: false,
       errors: {},
-      message: getStatusActionErrorMessage(error),
+      message: getTenantStatusActionErrorMessage(error),
     };
   }
 }

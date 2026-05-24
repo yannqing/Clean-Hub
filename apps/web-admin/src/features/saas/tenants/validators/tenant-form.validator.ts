@@ -1,5 +1,6 @@
 import type {
   CreateTenantRequest,
+  TenantLanguage,
   TenantFeatureFlagsFormValues,
   TenantFormValues,
   TenantSettingsFormValues,
@@ -52,7 +53,7 @@ function normalizeNullable(value: string): string | null {
 
 function isValidDefaultLanguage(
   value: string,
-): value is TenantFormValues["defaultLanguage"] {
+): value is TenantLanguage {
   return value === "en" || value === "fr" || value === "zh-CN";
 }
 
@@ -141,11 +142,39 @@ function validateSettings(input: TenantSettingsFormValues): {
   };
 }
 
+function validateCreateDefaults(input: TenantFormValues): {
+  errors: Partial<Record<keyof TenantFormValues, string>>;
+  defaultLanguage?: TenantLanguage;
+  defaultCurrency: string;
+} {
+  const errors: Partial<Record<keyof TenantFormValues, string>> = {};
+  const defaultCurrency = input.defaultCurrency.trim().toUpperCase();
+  const defaultLanguage = input.defaultLanguage;
+
+  if (
+    defaultLanguage !== "platform-default" &&
+    !isValidDefaultLanguage(defaultLanguage)
+  ) {
+    errors.defaultLanguage = "Select a valid default language.";
+  }
+
+  if (!/^[A-Z]{3}$/.test(defaultCurrency)) {
+    errors.defaultCurrency = "Currency must be a 3-letter code.";
+  }
+
+  return {
+    errors,
+    defaultLanguage:
+      defaultLanguage === "platform-default" ? undefined : defaultLanguage,
+    defaultCurrency,
+  };
+}
+
 export function validateTenantForm(
   input: TenantFormValues,
 ): TenantFormValidationResult<CreateTenantRequest> {
   const basics = validateTenantBasics(input);
-  const settings = validateSettings(input);
+  const settings = validateCreateDefaults(input);
   const errors = {
     ...basics.errors,
     ...settings.errors,

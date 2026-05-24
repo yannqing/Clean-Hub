@@ -8,7 +8,6 @@ import { webAdminRoutes } from "@/config/routes";
 
 import {
   updateTenantAction,
-  updateTenantSettingsAction,
   updateTenantStatusAction,
 } from "../actions";
 import { tenantStatusLabels } from "../constants";
@@ -98,20 +97,7 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
       return tenantResult;
     }
 
-    const settingsResult = await updateTenantSettingsAction(tenantId, values);
-
-    if (!settingsResult.ok) {
-      return settingsResult;
-    }
-
-    return {
-      ok: true as const,
-      data: {
-        ...tenantResult.data,
-        defaultLanguage: settingsResult.data.defaultLanguage,
-        defaultCurrency: settingsResult.data.defaultCurrency,
-      },
-    };
+    return tenantResult;
   }
 
   async function handleUpdateStatus(status: TenantStatus) {

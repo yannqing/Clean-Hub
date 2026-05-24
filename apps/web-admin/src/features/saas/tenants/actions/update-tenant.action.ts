@@ -2,6 +2,7 @@ import { webAdminApi } from "@/lib/api-client";
 
 import type { TenantFormValues } from "../types";
 import { validateTenantUpdateForm } from "../validators";
+import { getTenantFormActionErrorResult } from "./tenant-action-errors";
 
 export async function updateTenantAction(
   tenantId: string,
@@ -13,10 +14,21 @@ export async function updateTenantAction(
     return validation;
   }
 
-  const tenant = await webAdminApi.saas.tenants.update(tenantId, validation.data);
+  try {
+    const tenant = await webAdminApi.saas.tenants.update(
+      tenantId,
+      validation.data,
+    );
 
-  return {
-    ok: true as const,
-    data: tenant,
-  };
+    return {
+      ok: true as const,
+      data: tenant,
+    };
+  } catch (error) {
+    return getTenantFormActionErrorResult(error, {
+      fallbackMessage: "Tenant could not be updated.",
+      forbiddenMessage: "Only super admins can update tenants.",
+      notFoundMessage: "Tenant was not found.",
+    });
+  }
 }

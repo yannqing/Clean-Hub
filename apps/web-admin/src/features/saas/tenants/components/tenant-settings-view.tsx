@@ -205,8 +205,12 @@ function TenantSettingsForm({
 
       if (!result.ok) {
         setErrors(result.errors);
+        const message = "message" in result ? result.message : undefined;
+
         toast.error(
-          Object.values(result.errors)[0] ?? "Tenant settings update failed.",
+          Object.values(result.errors)[0] ??
+            message ??
+            "Tenant settings update failed.",
         );
         return;
       }

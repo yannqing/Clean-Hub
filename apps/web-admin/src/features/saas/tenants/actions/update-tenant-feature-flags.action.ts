@@ -2,6 +2,7 @@ import { webAdminApi } from "@/lib/api-client";
 
 import type { TenantFeatureFlagsFormValues } from "../types";
 import { validateTenantFeatureFlagsForm } from "../validators";
+import { getTenantFeatureFlagsActionErrorResult } from "./tenant-action-errors";
 
 export async function updateTenantFeatureFlagsAction(
   tenantId: string,
@@ -13,13 +14,17 @@ export async function updateTenantFeatureFlagsAction(
     return validation;
   }
 
-  const featureFlags = await webAdminApi.saas.tenants.updateFeatureFlags(
-    tenantId,
-    validation.data,
-  );
+  try {
+    const featureFlags = await webAdminApi.saas.tenants.updateFeatureFlags(
+      tenantId,
+      validation.data,
+    );
 
-  return {
-    ok: true as const,
-    data: featureFlags,
-  };
+    return {
+      ok: true as const,
+      data: featureFlags,
+    };
+  } catch (error) {
+    return getTenantFeatureFlagsActionErrorResult(error);
+  }
 }

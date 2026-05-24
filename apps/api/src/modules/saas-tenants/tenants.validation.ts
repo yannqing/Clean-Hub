@@ -23,6 +23,12 @@ const nullableStringSchema = (max: number) =>
     z.string().trim().max(max).nullable().optional(),
   );
 
+const currencyCodeSchema = z.preprocess(
+  (value) =>
+    typeof value === "string" ? value.trim().toUpperCase() : value,
+  z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code."),
+);
+
 export const listSaasTenantsQuerySchema = z.object({
   q: z.string().trim().min(1).optional(),
   status: saasTenantStatusSchema.optional(),
@@ -40,7 +46,7 @@ export const createSaasTenantBodySchema = z.object({
   country: z.string().trim().min(1).max(80),
   city: optionalStringSchema(120),
   defaultLanguage: saasTenantLanguageSchema.optional(),
-  defaultCurrency: z.string().trim().min(3).max(3).default("XOF"),
+  defaultCurrency: currencyCodeSchema.default("XOF"),
   contactName: optionalStringSchema(120),
   contactPhone: optionalStringSchema(32),
   contactEmail: z
@@ -81,7 +87,7 @@ export const updateSaasTenantStatusBodySchema = z.object({
 export const updateSaasTenantSettingsBodySchema = z
   .object({
     defaultLanguage: saasTenantLanguageSchema.optional(),
-    defaultCurrency: z.string().trim().min(3).max(3).optional(),
+    defaultCurrency: currencyCodeSchema.optional(),
   })
   .refine(
     (data) => Object.values(data).some((value) => value !== undefined),

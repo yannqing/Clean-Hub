@@ -1,3 +1,5 @@
+import type { TenantLanguage } from "@cleanhub/api-client";
+
 export type {
   CreateTenantRequest,
   TenantDetail,
@@ -13,12 +15,14 @@ export type {
   UpdateTenantRequest,
 } from "@cleanhub/api-client";
 
+export type TenantFormDefaultLanguage = TenantLanguage | "platform-default";
+
 export type TenantFormValues = {
   name: string;
   pressingCode: string;
   country: string;
   city: string;
-  defaultLanguage: "en" | "fr" | "zh-CN";
+  defaultLanguage: TenantFormDefaultLanguage;
   defaultCurrency: string;
   contactName: string;
   contactPhone: string;
@@ -26,7 +30,7 @@ export type TenantFormValues = {
 };
 
 export type TenantSettingsFormValues = {
-  defaultLanguage: TenantFormValues["defaultLanguage"];
+  defaultLanguage: TenantLanguage;
   defaultCurrency: string;
 };
 

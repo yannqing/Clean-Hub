@@ -10,6 +10,11 @@ export const tenantLanguageOptions = [
   { label: "Chinese", value: "zh-CN" },
 ] as const;
 
+export const tenantCreateLanguageOptions = [
+  { label: "Use platform default", value: "platform-default" },
+  ...tenantLanguageOptions,
+] as const;
+
 export const tenantStatusOptions = [
   { label: tenantStatusLabels.active, value: "active" },
   { label: tenantStatusLabels.suspended, value: "suspended" },
@@ -23,7 +28,7 @@ export const tenantDefaultValues = {
   contactPhone: "",
   country: "Senegal",
   defaultCurrency: "XOF",
-  defaultLanguage: "en",
+  defaultLanguage: "platform-default",
   name: "",
   pressingCode: "",
 } as const;

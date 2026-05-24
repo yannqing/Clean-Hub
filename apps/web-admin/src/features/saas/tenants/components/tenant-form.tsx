@@ -13,7 +13,11 @@ import {
 } from "@cleanhub/ui";
 import { useState } from "react";
 
-import { tenantDefaultValues, tenantLanguageOptions } from "../constants";
+import {
+  tenantCreateLanguageOptions,
+  tenantDefaultValues,
+  tenantLanguageOptions,
+} from "../constants";
 import type { TenantDetail, TenantFormValues } from "../types";
 
 type TenantFormResult =
@@ -61,6 +65,10 @@ export function TenantForm({
   >({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const showDefaults = mode === "create";
+  const languageOptions = showDefaults
+    ? tenantCreateLanguageOptions
+    : tenantLanguageOptions;
 
   function updateValue(key: keyof TenantFormValues, value: string): void {
     setValues((current) => ({
@@ -183,62 +191,66 @@ export function TenantForm({
         </div>
       </section>
 
-      <section className="grid gap-4 border-b p-5">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">Defaults</h2>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="grid gap-2">
-            <Label htmlFor="default-language">Default language</Label>
-            <Select
-              disabled={submitting}
-              onValueChange={(value) =>
-                updateValue(
-                  "defaultLanguage",
-                  value as TenantFormValues["defaultLanguage"],
-                )
-              }
-              value={values.defaultLanguage}
-            >
-              <SelectTrigger className="w-full" id="default-language">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {tenantLanguageOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.defaultLanguage ? (
-              <p className="text-xs text-destructive">
-                {errors.defaultLanguage}
-              </p>
-            ) : null}
+      {showDefaults ? (
+        <section className="grid gap-4 border-b p-5">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              Defaults
+            </h2>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="default-currency">Default currency</Label>
-            <Input
-              aria-invalid={Boolean(errors.defaultCurrency)}
-              disabled={submitting}
-              id="default-currency"
-              maxLength={3}
-              onChange={(event) =>
-                updateValue("defaultCurrency", event.target.value)
-              }
-              value={values.defaultCurrency}
-            />
-            {errors.defaultCurrency ? (
-              <p className="text-xs text-destructive">
-                {errors.defaultCurrency}
-              </p>
-            ) : null}
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="default-language">Default language</Label>
+              <Select
+                disabled={submitting}
+                onValueChange={(value) =>
+                  updateValue(
+                    "defaultLanguage",
+                    value as TenantFormValues["defaultLanguage"],
+                  )
+                }
+                value={values.defaultLanguage}
+              >
+                <SelectTrigger className="w-full" id="default-language">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {languageOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.defaultLanguage ? (
+                <p className="text-xs text-destructive">
+                  {errors.defaultLanguage}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="default-currency">Default currency</Label>
+              <Input
+                aria-invalid={Boolean(errors.defaultCurrency)}
+                disabled={submitting}
+                id="default-currency"
+                maxLength={3}
+                onChange={(event) =>
+                  updateValue("defaultCurrency", event.target.value)
+                }
+                value={values.defaultCurrency}
+              />
+              {errors.defaultCurrency ? (
+                <p className="text-xs text-destructive">
+                  {errors.defaultCurrency}
+                </p>
+              ) : null}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 p-5">
         <div>

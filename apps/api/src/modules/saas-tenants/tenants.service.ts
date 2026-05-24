@@ -14,6 +14,7 @@ import {
   findSaasTenantSettingsByTenantId,
   findSaasTenants,
   findTenantByPressingCode,
+  revokeTenantRefreshTokens,
   updateSaasTenantFeatureFlagsRecord,
   updateSaasTenantRecord,
   updateSaasTenantSettingsRecord,
@@ -373,6 +374,14 @@ export async function updateSaasTenantStatus(
       );
     }
 
+    if (before.status === input.data.status) {
+      throw new SaasTenantsError(
+        "SAAS_TENANT_STATUS_UNCHANGED",
+        "Tenant already has this status.",
+        409,
+      );
+    }
+
     const tenant = await updateSaasTenantStatusRecord(tx, {
       tenantId: input.tenantId,
       status: input.data.status,
@@ -384,6 +393,10 @@ export async function updateSaasTenantStatus(
         "SaaS tenant was not found.",
         404,
       );
+    }
+
+    if (input.data.status !== "active") {
+      await revokeTenantRefreshTokens(tx, input.tenantId);
     }
 
     const after = await findSaasTenantAuditSnapshotById(tx, input.tenantId);

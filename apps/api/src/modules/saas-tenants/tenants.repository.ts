@@ -14,6 +14,7 @@ import {
 
 import {
   type Database,
+  authRefreshTokens,
   platformSettings,
   tenantFeatureFlags,
   tenantSettings,
@@ -548,6 +549,23 @@ export async function updateSaasTenantStatusRecord(
     .where(and(eq(tenants.id, input.tenantId), isNull(tenants.deletedAt)));
 
   return findSaasTenantDetailById(db, input.tenantId);
+}
+
+export async function revokeTenantRefreshTokens(
+  db: Database,
+  tenantId: string,
+): Promise<void> {
+  await db
+    .update(authRefreshTokens)
+    .set({
+      revokedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(authRefreshTokens.tenantId, tenantId),
+        isNull(authRefreshTokens.revokedAt),
+      ),
+    );
 }
 
 export async function updateSaasTenantFeatureFlagsRecord(
