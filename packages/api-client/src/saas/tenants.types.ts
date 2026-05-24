@@ -1,6 +1,31 @@
 export type TenantStatus = "active" | "suspended" | "disabled";
 export type TenantLanguage = "en" | "fr" | "zh-CN";
 
+export type TenantErrorCode =
+  | "SAAS_TENANT_NOT_FOUND"
+  | "SAAS_TENANT_UPDATE_EMPTY"
+  | "SAAS_TENANT_STATUS_UNCHANGED"
+  | "SAAS_TENANT_SETTINGS_UPDATE_EMPTY"
+  | "SAAS_TENANT_FEATURE_FLAGS_UPDATE_EMPTY"
+  | "SAAS_TENANT_PRESSING_CODE_CONFLICT"
+  | "VALIDATION_ERROR"
+  | "INVALID_CREDENTIALS"
+  | "FORBIDDEN"
+  | "TOKEN_INVALID"
+  | "TOKEN_EXPIRED"
+  | "TOKEN_REUSE_DETECTED"
+  | "USER_DISABLED"
+  | "USER_SUSPENDED"
+  | "AUTH_CONFIG_INVALID"
+  | "INTERNAL_SERVER_ERROR";
+
+export type TenantErrorResponse = {
+  message: string;
+  code: TenantErrorCode | string;
+  requestId?: string;
+  validationErrors?: unknown;
+};
+
 export type TenantSummary = {
   id: string;
   name: string;

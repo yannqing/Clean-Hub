@@ -6,10 +6,8 @@ import { useEffect, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 
-import {
-  updateTenantAction,
-  updateTenantStatusAction,
-} from "../actions";
+import { updateTenantAction, updateTenantStatusAction } from "../actions";
+import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantStatusLabels } from "../constants";
 import { getTenantDetailQuery } from "../queries";
 import type { TenantDetail, TenantFormValues, TenantStatus } from "../types";
@@ -18,10 +16,6 @@ import { TenantForm } from "./tenant-form";
 type TenantDetailViewProps = {
   tenantId: string;
 };
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Failed to load tenant.";
-}
 
 function toFormValues(tenant: TenantDetail): TenantFormValues {
   return {
@@ -140,7 +134,9 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(
+            getTenantLoadErrorMessage(loadError, "Failed to load tenant."),
+          );
         }
       })
       .finally(() => {

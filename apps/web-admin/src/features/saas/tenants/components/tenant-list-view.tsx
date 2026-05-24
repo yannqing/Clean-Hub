@@ -22,6 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 
+import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantStatusLabels, tenantStatusOptions } from "../constants";
 import { getTenantListQuery } from "../queries";
 import type { TenantStatus, TenantStatusCounts, TenantSummary } from "../types";
@@ -41,10 +42,6 @@ const emptyMetrics: TenantMetrics = {
   disabled: 0,
   total: 0,
 };
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Failed to load tenants.";
-}
 
 function formatDate(value: string): string {
   const date = new Date(value);
@@ -160,7 +157,7 @@ export function TenantListView() {
         return;
       }
 
-      setError(getErrorMessage(loadError));
+      setError(getTenantLoadErrorMessage(loadError, "Failed to load tenants."));
     } finally {
       if (requestIdRef.current === requestId) {
         setLoading(false);
@@ -338,7 +335,9 @@ export function TenantListView() {
                   <TableCell>
                     <div className="flex justify-end gap-2">
                       <Button asChild size="sm" variant="outline">
-                        <Link href={getTenantDetailHref(tenant.id)}>Detail</Link>
+                        <Link href={getTenantDetailHref(tenant.id)}>
+                          Detail
+                        </Link>
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link href={getTenantSettingsHref(tenant.id)}>

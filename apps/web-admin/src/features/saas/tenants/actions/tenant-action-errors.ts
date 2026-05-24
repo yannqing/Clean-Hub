@@ -1,4 +1,9 @@
-import { isApiHttpError } from "@cleanhub/api-client";
+import {
+  isApiHttpError,
+  isApiNetworkError,
+  isApiTimeoutError,
+  type TenantErrorCode,
+} from "@cleanhub/api-client";
 
 import type {
   TenantFeatureFlagsFormValues,
@@ -31,8 +36,11 @@ export const tenantFeatureFlagFieldNames = [
   "notificationsEnabled",
 ] as const satisfies ReadonlyArray<keyof TenantFeatureFlagsFormValues>;
 
+const tenantStatusFieldNames = ["status", "reason"] as const;
+
 type FieldName<TFields extends string> = readonly TFields[];
 type FieldErrorMap<TFields extends string> = Partial<Record<TFields, string>>;
+type TenantStatusFieldName = (typeof tenantStatusFieldNames)[number];
 
 type FlattenedValidationErrors = {
   fieldErrors?: Record<string, string[] | undefined>;
@@ -48,6 +56,35 @@ function getUnknownErrorMessage(
   fallbackMessage: string,
 ): string {
   return error instanceof Error ? error.message : fallbackMessage;
+}
+
+function getTenantErrorCode(error: unknown): TenantErrorCode | undefined {
+  if (!isApiHttpError(error)) {
+    return undefined;
+  }
+
+  return error.code as TenantErrorCode | undefined;
+}
+
+function getRequestIdSuffix(error: unknown): string {
+  if (
+    error instanceof Error &&
+    "requestId" in error &&
+    typeof error.requestId === "string"
+  ) {
+    return ` Request ID: ${error.requestId}`;
+  }
+
+  return "";
+}
+
+function getFirstValidationFormError(validationErrors: unknown): string | null {
+  if (!isRecord(validationErrors)) {
+    return null;
+  }
+
+  const formErrors = (validationErrors as FlattenedValidationErrors).formErrors;
+  return formErrors?.find(Boolean) ?? null;
 }
 
 function getValidationErrors<TFields extends string>(
@@ -95,6 +132,55 @@ function getValidationErrors<TFields extends string>(
   return errors;
 }
 
+export function getTenantLoadErrorMessage(
+  error: unknown,
+  fallbackMessage = "Tenant request failed.",
+): string {
+  if (isApiTimeoutError(error)) {
+    return "The tenant request timed out. Please try again.";
+  }
+
+  if (isApiNetworkError(error)) {
+    return "The tenant request could not reach the API. Check the API service and try again.";
+  }
+
+  if (!isApiHttpError(error)) {
+    return getUnknownErrorMessage(error, fallbackMessage);
+  }
+
+  const code = getTenantErrorCode(error);
+
+  if (error.status === 401) {
+    return "Your session has expired. Please sign in again.";
+  }
+
+  if (error.status === 403) {
+    return "You do not have permission to access this tenant area.";
+  }
+
+  if (error.status === 404 || code === "SAAS_TENANT_NOT_FOUND") {
+    return "Tenant was not found.";
+  }
+
+  if (error.status === 409) {
+    return error.message || "The tenant was changed by another request.";
+  }
+
+  if (error.status === 422) {
+    return (
+      getFirstValidationFormError(error.validationErrors) ??
+      error.message ??
+      "Please correct the tenant request."
+    );
+  }
+
+  if (error.status >= 500) {
+    return `Tenant service is temporarily unavailable.${getRequestIdSuffix(error)}`;
+  }
+
+  return error.message || fallbackMessage;
+}
+
 export function getTenantFormActionErrorResult(
   error: unknown,
   options: {
@@ -111,11 +197,13 @@ export function getTenantFormActionErrorResult(
     return {
       ok: false,
       errors: {},
-      message: getUnknownErrorMessage(error, options.fallbackMessage),
+      message: getTenantLoadErrorMessage(error, options.fallbackMessage),
     };
   }
 
-  if (error.code === "SAAS_TENANT_PRESSING_CODE_CONFLICT") {
+  const code = getTenantErrorCode(error);
+
+  if (code === "SAAS_TENANT_PRESSING_CODE_CONFLICT") {
     return {
       ok: false,
       errors: {
@@ -125,25 +213,33 @@ export function getTenantFormActionErrorResult(
     };
   }
 
-  if (error.code === "SAAS_TENANT_SCHEMA_MISMATCH") {
-    return {
-      ok: false,
-      errors: {},
-      message:
-        "Tenant database schema is out of date. Run database migrations before managing tenants.",
-    };
-  }
-
   const validationErrors = getValidationErrors(
     error.validationErrors,
     tenantFormFieldNames,
   );
+  const formError = getFirstValidationFormError(error.validationErrors);
 
   if (Object.keys(validationErrors).length > 0) {
     return {
       ok: false,
       errors: validationErrors,
       message: "Please correct the highlighted fields.",
+    };
+  }
+
+  if (formError) {
+    return {
+      ok: false,
+      errors: {},
+      message: formError,
+    };
+  }
+
+  if (error.status === 401) {
+    return {
+      ok: false,
+      errors: {},
+      message: "Your session has expired. Please sign in again.",
     };
   }
 
@@ -163,6 +259,22 @@ export function getTenantFormActionErrorResult(
     };
   }
 
+  if (error.status === 409) {
+    return {
+      ok: false,
+      errors: {},
+      message: error.message || "Tenant request conflicts with current data.",
+    };
+  }
+
+  if (error.status >= 500) {
+    return {
+      ok: false,
+      errors: {},
+      message: `Tenant service is temporarily unavailable.${getRequestIdSuffix(error)}`,
+    };
+  }
+
   return {
     ok: false,
     errors: {},
@@ -170,9 +282,7 @@ export function getTenantFormActionErrorResult(
   };
 }
 
-export function getTenantSettingsActionErrorResult(
-  error: unknown,
-): {
+export function getTenantSettingsActionErrorResult(error: unknown): {
   ok: false;
   errors: Partial<Record<keyof TenantSettingsFormValues, string>>;
   message: string;
@@ -183,7 +293,7 @@ export function getTenantSettingsActionErrorResult(
     return {
       ok: false,
       errors: {},
-      message: getUnknownErrorMessage(error, fallbackMessage),
+      message: getTenantLoadErrorMessage(error, fallbackMessage),
     };
   }
 
@@ -191,12 +301,29 @@ export function getTenantSettingsActionErrorResult(
     error.validationErrors,
     tenantSettingsFieldNames,
   );
+  const formError = getFirstValidationFormError(error.validationErrors);
 
   if (Object.keys(validationErrors).length > 0) {
     return {
       ok: false,
       errors: validationErrors,
       message: "Please correct the highlighted fields.",
+    };
+  }
+
+  if (formError) {
+    return {
+      ok: false,
+      errors: {},
+      message: formError,
+    };
+  }
+
+  if (error.status === 401) {
+    return {
+      ok: false,
+      errors: {},
+      message: "Your session has expired. Please sign in again.",
     };
   }
 
@@ -216,6 +343,22 @@ export function getTenantSettingsActionErrorResult(
     };
   }
 
+  if (error.status === 409) {
+    return {
+      ok: false,
+      errors: {},
+      message: error.message || "Tenant settings conflict with current data.",
+    };
+  }
+
+  if (error.status >= 500) {
+    return {
+      ok: false,
+      errors: {},
+      message: `Tenant service is temporarily unavailable.${getRequestIdSuffix(error)}`,
+    };
+  }
+
   return {
     ok: false,
     errors: {},
@@ -232,7 +375,7 @@ export function getTenantFeatureFlagsActionErrorResult(error: unknown): {
   if (!isApiHttpError(error)) {
     return {
       ok: false,
-      error: getUnknownErrorMessage(error, fallbackMessage),
+      error: getTenantLoadErrorMessage(error, fallbackMessage),
     };
   }
 
@@ -241,11 +384,26 @@ export function getTenantFeatureFlagsActionErrorResult(error: unknown): {
     tenantFeatureFlagFieldNames,
   );
   const firstValidationError = Object.values(validationErrors)[0];
+  const formError = getFirstValidationFormError(error.validationErrors);
 
   if (firstValidationError) {
     return {
       ok: false,
       error: firstValidationError,
+    };
+  }
+
+  if (formError) {
+    return {
+      ok: false,
+      error: formError,
+    };
+  }
+
+  if (error.status === 401) {
+    return {
+      ok: false,
+      error: "Your session has expired. Please sign in again.",
     };
   }
 
@@ -263,35 +421,108 @@ export function getTenantFeatureFlagsActionErrorResult(error: unknown): {
     };
   }
 
+  if (error.status === 409) {
+    return {
+      ok: false,
+      error:
+        error.message || "Tenant feature flags conflict with current data.",
+    };
+  }
+
+  if (error.status >= 500) {
+    return {
+      ok: false,
+      error: `Tenant service is temporarily unavailable.${getRequestIdSuffix(error)}`,
+    };
+  }
+
   return {
     ok: false,
     error: error.message || fallbackMessage,
   };
 }
 
-export function getTenantStatusActionErrorMessage(error: unknown): string {
+export function getTenantStatusActionErrorResult(error: unknown): {
+  ok: false;
+  errors: FieldErrorMap<TenantStatusFieldName>;
+  message: string;
+} {
   if (!isApiHttpError(error)) {
-    return getUnknownErrorMessage(
-      error,
-      "Tenant status could not be updated.",
-    );
+    return {
+      ok: false,
+      errors: {},
+      message: getTenantLoadErrorMessage(
+        error,
+        "Tenant status could not be updated.",
+      ),
+    };
+  }
+
+  if (error.status === 401) {
+    return {
+      ok: false,
+      errors: {},
+      message: "Your session has expired. Please sign in again.",
+    };
   }
 
   if (error.status === 403) {
-    return "You do not have permission to update tenant status.";
+    return {
+      ok: false,
+      errors: {},
+      message: "You do not have permission to update tenant status.",
+    };
   }
 
   if (error.status === 404) {
-    return "Tenant was not found.";
+    return {
+      ok: false,
+      errors: {},
+      message: "Tenant was not found.",
+    };
   }
 
   if (error.status === 409) {
-    return error.message || "Tenant status could not be updated right now.";
+    return {
+      ok: false,
+      errors: {},
+      message: error.message || "Tenant status could not be updated right now.",
+    };
   }
 
   if (error.status === 422) {
-    return error.message || "Please correct the tenant status request.";
+    const validationErrors = getValidationErrors(
+      error.validationErrors,
+      tenantStatusFieldNames,
+    );
+    const firstValidationError = Object.values(validationErrors)[0];
+
+    return {
+      ok: false,
+      errors: validationErrors,
+      message:
+        firstValidationError ??
+        getFirstValidationFormError(error.validationErrors) ??
+        error.message ??
+        "Please correct the tenant status request.",
+    };
   }
 
-  return error.message || "Tenant status could not be updated.";
+  if (error.status >= 500) {
+    return {
+      ok: false,
+      errors: {},
+      message: `Tenant service is temporarily unavailable.${getRequestIdSuffix(error)}`,
+    };
+  }
+
+  return {
+    ok: false,
+    errors: {},
+    message: error.message || "Tenant status could not be updated.",
+  };
+}
+
+export function getTenantStatusActionErrorMessage(error: unknown): string {
+  return getTenantStatusActionErrorResult(error).message;
 }

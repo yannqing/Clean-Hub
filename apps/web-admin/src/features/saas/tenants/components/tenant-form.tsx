@@ -19,6 +19,7 @@ import {
   tenantLanguageOptions,
 } from "../constants";
 import type { TenantDetail, TenantFormValues } from "../types";
+import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 
 type TenantFormResult =
   | {
@@ -45,10 +46,6 @@ function getInitialValues(
     ...tenantDefaultValues,
     ...values,
   };
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Tenant request failed.";
 }
 
 export function TenantForm({
@@ -102,12 +99,13 @@ export function TenantForm({
       }
 
       setErrors({});
-      toast.success(
-        mode === "create" ? "Tenant created." : "Tenant updated.",
-      );
+      toast.success(mode === "create" ? "Tenant created." : "Tenant updated.");
       onSuccess?.(result.data);
     } catch (error) {
-      const message = getErrorMessage(error);
+      const message = getTenantLoadErrorMessage(
+        error,
+        "Tenant request failed.",
+      );
       setFormError(message);
       toast.error(message);
     } finally {

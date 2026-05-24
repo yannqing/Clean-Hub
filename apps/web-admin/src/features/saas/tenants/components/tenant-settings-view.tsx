@@ -23,6 +23,7 @@ import {
   updateTenantSettingsAction,
   updateTenantStatusAction,
 } from "../actions";
+import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import {
   tenantFeatureFlagOptions,
   tenantLanguageOptions,
@@ -48,11 +49,12 @@ type TenantSettingsViewProps = {
   tenantId: string;
 };
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Failed to load tenant settings.";
-}
+type TenantSettingsLoadResults = readonly [
+  PromiseSettledResult<AuthContext>,
+  PromiseSettledResult<TenantDetail>,
+  PromiseSettledResult<TenantSettings>,
+  PromiseSettledResult<TenantFeatureFlags>,
+];
 
 function formatDate(value: string | null): string {
   if (!value) {
@@ -127,8 +129,9 @@ function SettingsSummary({
   settings: TenantSettings;
   featureFlags: TenantFeatureFlags;
 }) {
-  const enabledCount = Object.values(toFeatureFlagsFormValues(featureFlags))
-    .filter(Boolean).length;
+  const enabledCount = Object.values(
+    toFeatureFlagsFormValues(featureFlags),
+  ).filter(Boolean).length;
 
   return (
     <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-4">
@@ -175,8 +178,7 @@ function TenantSettingsForm({
   onUpdated: (settings: TenantSettings) => void;
   tenantId: string;
 }) {
-  const [values, setValues] =
-    useState<TenantSettingsFormValues>(initialValues);
+  const [values, setValues] = useState<TenantSettingsFormValues>(initialValues);
   const [errors, setErrors] = useState<
     Partial<Record<keyof TenantSettingsFormValues, string>>
   >({});
@@ -220,7 +222,9 @@ function TenantSettingsForm({
       onUpdated(result.data);
       toast.success("Tenant settings updated.");
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(
+        getTenantLoadErrorMessage(error, "Tenant settings update failed."),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -257,9 +261,7 @@ function TenantSettingsForm({
             </SelectContent>
           </Select>
           {errors.defaultLanguage ? (
-            <p className="text-xs text-destructive">
-              {errors.defaultLanguage}
-            </p>
+            <p className="text-xs text-destructive">{errors.defaultLanguage}</p>
           ) : null}
         </div>
 
@@ -276,9 +278,7 @@ function TenantSettingsForm({
             value={values.defaultCurrency}
           />
           {errors.defaultCurrency ? (
-            <p className="text-xs text-destructive">
-              {errors.defaultCurrency}
-            </p>
+            <p className="text-xs text-destructive">{errors.defaultCurrency}</p>
           ) : null}
         </div>
       </div>
@@ -333,7 +333,9 @@ function TenantFeatureFlagsForm({
       onUpdated(result.data);
       toast.success("Tenant feature flags updated.");
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(
+        getTenantLoadErrorMessage(error, "Tenant feature flags update failed."),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -456,7 +458,9 @@ function TenantStatusForm({
                 type="button"
                 variant={status === "active" ? "default" : "outline"}
               >
-                {submitting === status ? "Updating..." : getStatusActionLabel(status)}
+                {submitting === status
+                  ? "Updating..."
+                  : getStatusActionLabel(status)}
               </Button>
             ))}
         </div>
@@ -477,33 +481,75 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
   const [error, setError] = useState<string | null>(null);
   const canManageTenantSettings = authContext?.role === "super_admin";
 
-  const loadSettings = useCallback(async (showLoading = true) => {
-    if (showLoading) {
-      setLoading(true);
-      setError(null);
-    }
+  const applyLoadResults = useCallback(
+    ([
+      authResult,
+      tenantResult,
+      settingsResult,
+      featureFlagsResult,
+    ]: TenantSettingsLoadResults) => {
+      if (authResult.status === "fulfilled") {
+        setAuthContext(authResult.value);
+        setAuthError(null);
+      } else {
+        setAuthContext(null);
+        setAuthError(
+          getTenantLoadErrorMessage(
+            authResult.reason,
+            "Failed to verify the current session.",
+          ),
+        );
+      }
 
-    try {
-      const [loadedAuth, loadedTenant, loadedSettings, loadedFeatureFlags] =
-        await Promise.all([
+      if (tenantResult.status === "rejected") {
+        throw tenantResult.reason;
+      }
+
+      if (settingsResult.status === "rejected") {
+        throw settingsResult.reason;
+      }
+
+      if (featureFlagsResult.status === "rejected") {
+        throw featureFlagsResult.reason;
+      }
+
+      setTenant(tenantResult.value);
+      setSettings(settingsResult.value);
+      setFeatureFlags(featureFlagsResult.value);
+      setError(null);
+    },
+    [],
+  );
+
+  const loadSettings = useCallback(
+    async (showLoading = true) => {
+      if (showLoading) {
+        setLoading(true);
+        setError(null);
+      }
+
+      try {
+        const results = await Promise.allSettled([
           getCurrentSaasAuthQuery(),
           getTenantDetailQuery(tenantId),
           getTenantSettingsQuery(tenantId),
           getTenantFeatureFlagsQuery(tenantId),
         ]);
 
-      setAuthContext(loadedAuth);
-      setAuthError(null);
-      setTenant(loadedTenant);
-      setSettings(loadedSettings);
-      setFeatureFlags(loadedFeatureFlags);
-      setError(null);
-    } catch (loadError) {
-      setError(getErrorMessage(loadError));
-    } finally {
-      setLoading(false);
-    }
-  }, [tenantId]);
+        applyLoadResults(results);
+      } catch (loadError) {
+        setError(
+          getTenantLoadErrorMessage(
+            loadError,
+            "Failed to load tenant settings.",
+          ),
+        );
+      } finally {
+        setLoading(false);
+      }
+    },
+    [applyLoadResults, tenantId],
+  );
 
   useEffect(() => {
     let isCurrent = true;
@@ -514,39 +560,21 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
       getTenantSettingsQuery(tenantId),
       getTenantFeatureFlagsQuery(tenantId),
     ])
-      .then(([authResult, tenantResult, settingsResult, featureFlagsResult]) => {
+      .then((results) => {
         if (!isCurrent) {
           return;
         }
 
-        if (authResult.status === "fulfilled") {
-          setAuthContext(authResult.value);
-          setAuthError(null);
-        } else {
-          setAuthContext(null);
-          setAuthError(getErrorMessage(authResult.reason));
-        }
-
-        if (tenantResult.status === "rejected") {
-          throw tenantResult.reason;
-        }
-
-        if (settingsResult.status === "rejected") {
-          throw settingsResult.reason;
-        }
-
-        if (featureFlagsResult.status === "rejected") {
-          throw featureFlagsResult.reason;
-        }
-
-        setTenant(tenantResult.value);
-        setSettings(settingsResult.value);
-        setFeatureFlags(featureFlagsResult.value);
-        setError(null);
+        applyLoadResults(results);
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(
+            getTenantLoadErrorMessage(
+              loadError,
+              "Failed to load tenant settings.",
+            ),
+          );
         }
       })
       .finally(() => {
@@ -558,7 +586,7 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
     return () => {
       isCurrent = false;
     };
-  }, [tenantId]);
+  }, [applyLoadResults, tenantId]);
 
   return (
     <section className="min-h-[560px]">

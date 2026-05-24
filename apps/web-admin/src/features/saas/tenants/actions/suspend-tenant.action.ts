@@ -3,7 +3,7 @@ import type { TenantStatus } from "@cleanhub/api-client";
 import { webAdminApi } from "@/lib/api-client";
 
 import type { TenantDetail } from "../types";
-import { getTenantStatusActionErrorMessage } from "./tenant-action-errors";
+import { getTenantStatusActionErrorResult } from "./tenant-action-errors";
 
 type TenantStatusActionResult =
   | {
@@ -14,6 +14,7 @@ type TenantStatusActionResult =
       ok: false;
       errors: {
         reason?: string;
+        status?: string;
       };
       message: string;
     };
@@ -45,11 +46,7 @@ export async function suspendTenantAction(
       data: tenant,
     };
   } catch (error) {
-    return {
-      ok: false,
-      errors: {},
-      message: getTenantStatusActionErrorMessage(error),
-    };
+    return getTenantStatusActionErrorResult(error);
   }
 }
 

@@ -49,12 +49,57 @@ function requireSaasTenantsAccess(
   requireSaasRole(authContext, allowedRoles);
 
   if (authContext.tenantId !== null) {
-    throw new AuthError("FORBIDDEN", "Tenant users cannot access SaaS tenants.");
+    throw new AuthError(
+      "FORBIDDEN",
+      "Tenant users cannot access SaaS tenants.",
+    );
   }
 }
 
 function normalizePressingCode(value: string): string {
   return value.trim().toUpperCase();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function isPressingCodeUniqueViolation(
+  error: unknown,
+  seen = new Set<unknown>(),
+): boolean {
+  if (!isRecord(error) || seen.has(error)) {
+    return false;
+  }
+
+  seen.add(error);
+
+  const constraint = error.constraint;
+  const detail = error.detail;
+
+  if (
+    error.code === "23505" &&
+    ((typeof constraint === "string" &&
+      constraint.toLowerCase().includes("pressing")) ||
+      (typeof detail === "string" &&
+        detail.toLowerCase().includes("pressing_code")))
+  ) {
+    return true;
+  }
+
+  return isPressingCodeUniqueViolation(error.cause, seen);
+}
+
+function createPressingCodeConflictError(): SaasTenantsError {
+  return new SaasTenantsError(
+    "SAAS_TENANT_PRESSING_CODE_CONFLICT",
+    "A tenant with this pressing code already exists.",
+    409,
+  );
+}
+
+function hasUpdateField(data: object): boolean {
+  return Object.values(data).some((value) => value !== undefined);
 }
 
 async function resolveDefaultLanguage(
@@ -104,37 +149,41 @@ export async function createSaasTenant(
 
   const pressingCode = normalizePressingCode(input.data.pressingCode);
 
-  return db.transaction(async (tx) => {
-    const existingTenant = await findTenantByPressingCode(tx, pressingCode);
+  try {
+    return await db.transaction(async (tx) => {
+      const existingTenant = await findTenantByPressingCode(tx, pressingCode);
 
-    if (existingTenant) {
-      throw new SaasTenantsError(
-        "SAAS_TENANT_PRESSING_CODE_CONFLICT",
-        "A tenant with this pressing code already exists.",
-        409,
+      if (existingTenant) {
+        throw createPressingCodeConflictError();
+      }
+
+      const defaultLanguage = await resolveDefaultLanguage(
+        tx,
+        input.data.defaultLanguage,
       );
+      const tenant = await createSaasTenantRecord(tx, {
+        ...input.data,
+        actorUserId: input.authContext.userId,
+        pressingCode,
+        defaultLanguage,
+      });
+
+      await writeSaasTenantCreatedAuditLog(tx, {
+        actorUserId: input.authContext.userId,
+        tenant,
+        ipAddress: input.requestMeta?.ipAddress,
+        userAgent: input.requestMeta?.userAgent,
+      });
+
+      return tenant;
+    });
+  } catch (error) {
+    if (isPressingCodeUniqueViolation(error)) {
+      throw createPressingCodeConflictError();
     }
 
-    const defaultLanguage = await resolveDefaultLanguage(
-      tx,
-      input.data.defaultLanguage,
-    );
-    const tenant = await createSaasTenantRecord(tx, {
-      ...input.data,
-      actorUserId: input.authContext.userId,
-      pressingCode,
-      defaultLanguage,
-    });
-
-    await writeSaasTenantCreatedAuditLog(tx, {
-      actorUserId: input.authContext.userId,
-      tenant,
-      ipAddress: input.requestMeta?.ipAddress,
-      userAgent: input.requestMeta?.userAgent,
-    });
-
-    return tenant;
-  });
+    throw error;
+  }
 }
 
 export async function updateSaasTenant(
@@ -143,7 +192,7 @@ export async function updateSaasTenant(
 ): Promise<SaasTenantDetail> {
   requireSaasTenantsAccess(input.authContext, ["super_admin"]);
 
-  if (!Object.values(input.data).some((value) => value !== undefined)) {
+  if (!hasUpdateField(input.data)) {
     throw new SaasTenantsError(
       "SAAS_TENANT_UPDATE_EMPTY",
       "At least one tenant field must be provided.",
@@ -156,71 +205,75 @@ export async function updateSaasTenant(
       ? normalizePressingCode(input.data.pressingCode)
       : undefined;
 
-  return db.transaction(async (tx) => {
-    const before = await findSaasTenantAuditSnapshotById(tx, input.tenantId);
+  try {
+    return await db.transaction(async (tx) => {
+      const before = await findSaasTenantAuditSnapshotById(tx, input.tenantId);
 
-    if (!before) {
-      throw new SaasTenantsError(
-        "SAAS_TENANT_NOT_FOUND",
-        "SaaS tenant was not found.",
-        404,
-      );
-    }
-
-    if (pressingCode !== undefined) {
-      const existingTenant = await findOtherTenantByPressingCode(
-        tx,
-        pressingCode,
-        input.tenantId,
-      );
-
-      if (existingTenant) {
+      if (!before) {
         throw new SaasTenantsError(
-          "SAAS_TENANT_PRESSING_CODE_CONFLICT",
-          "A tenant with this pressing code already exists.",
-          409,
+          "SAAS_TENANT_NOT_FOUND",
+          "SaaS tenant was not found.",
+          404,
         );
       }
-    }
 
-    const tenant = await updateSaasTenantRecord(tx, {
-      actorUserId: input.authContext.userId,
-      tenantId: input.tenantId,
-      data: {
-        ...input.data,
-        pressingCode,
-      },
+      if (pressingCode !== undefined) {
+        const existingTenant = await findOtherTenantByPressingCode(
+          tx,
+          pressingCode,
+          input.tenantId,
+        );
+
+        if (existingTenant) {
+          throw createPressingCodeConflictError();
+        }
+      }
+
+      const tenant = await updateSaasTenantRecord(tx, {
+        actorUserId: input.authContext.userId,
+        tenantId: input.tenantId,
+        data: {
+          ...input.data,
+          pressingCode,
+        },
+      });
+
+      if (!tenant) {
+        throw new SaasTenantsError(
+          "SAAS_TENANT_NOT_FOUND",
+          "SaaS tenant was not found.",
+          404,
+        );
+      }
+
+      const after = await findSaasTenantAuditSnapshotById(tx, input.tenantId);
+
+      if (!after) {
+        throw new SaasTenantsError(
+          "SAAS_TENANT_NOT_FOUND",
+          "SaaS tenant was not found.",
+          404,
+        );
+      }
+
+      await writeSaasTenantUpdatedAuditLog(tx, {
+        actorUserId: input.authContext.userId,
+        tenantId: input.tenantId,
+        before,
+        after,
+        ipAddress: input.requestMeta?.ipAddress,
+        userAgent: input.requestMeta?.userAgent,
+      });
+
+      return tenant;
     });
-
-    if (!tenant) {
-      throw new SaasTenantsError(
-        "SAAS_TENANT_NOT_FOUND",
-        "SaaS tenant was not found.",
-        404,
-      );
+  } catch (error) {
+    if (isPressingCodeUniqueViolation(error)) {
+      throw createPressingCodeConflictError();
     }
 
-    const after = await findSaasTenantAuditSnapshotById(tx, input.tenantId);
-
-    if (!after) {
-      throw new SaasTenantsError(
-        "SAAS_TENANT_NOT_FOUND",
-        "SaaS tenant was not found.",
-        404,
-      );
-    }
-
-    await writeSaasTenantUpdatedAuditLog(tx, {
-      actorUserId: input.authContext.userId,
-      tenantId: input.tenantId,
-      before,
-      after,
-      ipAddress: input.requestMeta?.ipAddress,
-      userAgent: input.requestMeta?.userAgent,
-    });
-
-    return tenant;
-  });
+    throw error;
+  }
 }
 
 export async function getSaasTenantSettings(
@@ -247,6 +300,14 @@ export async function updateSaasTenantSettings(
   db: Database = getDb(),
 ): Promise<SaasTenantSettings> {
   requireSaasTenantsAccess(input.authContext, ["super_admin"]);
+
+  if (!hasUpdateField(input.data)) {
+    throw new SaasTenantsError(
+      "SAAS_TENANT_SETTINGS_UPDATE_EMPTY",
+      "At least one tenant setting must be provided.",
+      422,
+    );
+  }
 
   return db.transaction(async (tx) => {
     const before = await findSaasTenantSettingsByTenantId(tx, input.tenantId);
@@ -314,6 +375,14 @@ export async function updateSaasTenantFeatureFlags(
   db: Database = getDb(),
 ): Promise<SaasTenantFeatureFlags> {
   requireSaasTenantsAccess(input.authContext, ["super_admin"]);
+
+  if (!hasUpdateField(input.data)) {
+    throw new SaasTenantsError(
+      "SAAS_TENANT_FEATURE_FLAGS_UPDATE_EMPTY",
+      "At least one tenant feature flag must be provided.",
+      422,
+    );
+  }
 
   return db.transaction(async (tx) => {
     const before = await findSaasTenantFeatureFlagsByTenantId(
