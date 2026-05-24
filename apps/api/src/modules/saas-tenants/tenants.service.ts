@@ -2,7 +2,12 @@ import { getDb, type Database } from "@cleanhub/db";
 
 import { AuthError } from "../auth/auth.errors.js";
 import type { AuthContext } from "../auth/auth.types.js";
-import { requireSaasRole, type SaasRole } from "../auth/permission.helper.js";
+import {
+  assertSaasContext,
+  hasPermission,
+  requireSaasRole,
+  type SaasRole,
+} from "../auth/permission.helper.js";
 import { SaasTenantsError } from "./tenants.errors.js";
 import {
   createSaasTenantRecord,
@@ -53,6 +58,24 @@ function requireSaasTenantsAccess(
       "FORBIDDEN",
       "Tenant users cannot access SaaS tenants.",
     );
+  }
+}
+
+function requireSaasTenantsWriteAccess(authContext: AuthContext): void {
+  assertSaasContext(authContext);
+
+  if (authContext.tenantId !== null) {
+    throw new AuthError(
+      "FORBIDDEN",
+      "Tenant users cannot access SaaS tenants.",
+    );
+  }
+
+  if (
+    authContext.role !== "super_admin" &&
+    !hasPermission(authContext, "saas:tenant:write")
+  ) {
+    throw new AuthError("FORBIDDEN", "User does not have enough permission.");
   }
 }
 
@@ -190,7 +213,7 @@ export async function updateSaasTenant(
   input: UpdateSaasTenantInput,
   db: Database = getDb(),
 ): Promise<SaasTenantDetail> {
-  requireSaasTenantsAccess(input.authContext, ["super_admin"]);
+  requireSaasTenantsWriteAccess(input.authContext);
 
   if (!hasUpdateField(input.data)) {
     throw new SaasTenantsError(
@@ -299,7 +322,7 @@ export async function updateSaasTenantSettings(
   input: UpdateSaasTenantSettingsInput,
   db: Database = getDb(),
 ): Promise<SaasTenantSettings> {
-  requireSaasTenantsAccess(input.authContext, ["super_admin"]);
+  requireSaasTenantsWriteAccess(input.authContext);
 
   if (!hasUpdateField(input.data)) {
     throw new SaasTenantsError(
@@ -374,7 +397,7 @@ export async function updateSaasTenantFeatureFlags(
   input: UpdateSaasTenantFeatureFlagsInput,
   db: Database = getDb(),
 ): Promise<SaasTenantFeatureFlags> {
-  requireSaasTenantsAccess(input.authContext, ["super_admin"]);
+  requireSaasTenantsWriteAccess(input.authContext);
 
   if (!hasUpdateField(input.data)) {
     throw new SaasTenantsError(

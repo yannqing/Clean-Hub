@@ -33,6 +33,7 @@ type TenantFormResult =
     };
 
 type TenantFormProps = {
+  disabled?: boolean;
   initialValues?: Partial<TenantFormValues>;
   mode: "create" | "edit";
   onSubmit: (values: TenantFormValues) => Promise<TenantFormResult>;
@@ -49,6 +50,7 @@ function getInitialValues(
 }
 
 export function TenantForm({
+  disabled = false,
   initialValues,
   mode,
   onSubmit,
@@ -81,6 +83,11 @@ export function TenantForm({
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (disabled) {
+      return;
+    }
+
     setSubmitting(true);
     setFormError(null);
 
@@ -133,7 +140,7 @@ export function TenantForm({
             <Label htmlFor="tenant-name">Tenant name</Label>
             <Input
               aria-invalid={Boolean(errors.name)}
-              disabled={submitting}
+              disabled={disabled || submitting}
               id="tenant-name"
               onChange={(event) => updateValue("name", event.target.value)}
               value={values.name}
@@ -147,7 +154,7 @@ export function TenantForm({
             <Label htmlFor="pressing-code">Pressing code</Label>
             <Input
               aria-invalid={Boolean(errors.pressingCode)}
-              disabled={submitting}
+              disabled={disabled || submitting}
               id="pressing-code"
               onChange={(event) =>
                 updateValue("pressingCode", event.target.value)
@@ -163,7 +170,7 @@ export function TenantForm({
             <Label htmlFor="tenant-country">Country</Label>
             <Input
               aria-invalid={Boolean(errors.country)}
-              disabled={submitting}
+              disabled={disabled || submitting}
               id="tenant-country"
               onChange={(event) => updateValue("country", event.target.value)}
               value={values.country}
@@ -177,7 +184,7 @@ export function TenantForm({
             <Label htmlFor="tenant-city">City</Label>
             <Input
               aria-invalid={Boolean(errors.city)}
-              disabled={submitting}
+              disabled={disabled || submitting}
               id="tenant-city"
               onChange={(event) => updateValue("city", event.target.value)}
               value={values.city}
@@ -201,7 +208,7 @@ export function TenantForm({
             <div className="grid gap-2">
               <Label htmlFor="default-language">Default language</Label>
               <Select
-                disabled={submitting}
+                disabled={disabled || submitting}
                 onValueChange={(value) =>
                   updateValue(
                     "defaultLanguage",
@@ -232,7 +239,7 @@ export function TenantForm({
               <Label htmlFor="default-currency">Default currency</Label>
               <Input
                 aria-invalid={Boolean(errors.defaultCurrency)}
-                disabled={submitting}
+                disabled={disabled || submitting}
                 id="default-currency"
                 maxLength={3}
                 onChange={(event) =>
@@ -260,7 +267,7 @@ export function TenantForm({
             <Label htmlFor="contact-name">Contact name</Label>
             <Input
               aria-invalid={Boolean(errors.contactName)}
-              disabled={submitting}
+              disabled={disabled || submitting}
               id="contact-name"
               onChange={(event) =>
                 updateValue("contactName", event.target.value)
@@ -276,7 +283,7 @@ export function TenantForm({
             <Label htmlFor="contact-phone">Contact phone</Label>
             <Input
               aria-invalid={Boolean(errors.contactPhone)}
-              disabled={submitting}
+              disabled={disabled || submitting}
               id="contact-phone"
               onChange={(event) =>
                 updateValue("contactPhone", event.target.value)
@@ -292,7 +299,7 @@ export function TenantForm({
             <Label htmlFor="contact-email">Contact email</Label>
             <Input
               aria-invalid={Boolean(errors.contactEmail)}
-              disabled={submitting}
+              disabled={disabled || submitting}
               id="contact-email"
               onChange={(event) =>
                 updateValue("contactEmail", event.target.value)
@@ -307,7 +314,7 @@ export function TenantForm({
       </section>
 
       <div className="flex justify-end border-t bg-muted/30 px-5 py-4">
-        <Button disabled={submitting} type="submit">
+        <Button disabled={disabled || submitting} type="submit">
           {submitting
             ? mode === "create"
               ? "Creating..."

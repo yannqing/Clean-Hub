@@ -1,5 +1,6 @@
 "use client";
 
+import type { AuthContext } from "@cleanhub/api-client";
 import {
   Badge,
   Button,
@@ -43,7 +44,6 @@ import type {
   TenantSettingsFormValues,
   TenantStatus,
 } from "../types";
-import type { AuthContext } from "@cleanhub/api-client";
 
 type TenantSettingsViewProps = {
   tenantId: string;
@@ -118,6 +118,19 @@ function toFeatureFlagsFormValues(
     deliveryEnabled: featureFlags.deliveryEnabled,
     notificationsEnabled: featureFlags.notificationsEnabled,
   };
+}
+
+function canWriteTenant(authContext: AuthContext | null): boolean {
+  return Boolean(
+    authContext &&
+      authContext.tenantId === null &&
+      (authContext.role === "super_admin" ||
+        authContext.permissions.includes("saas:tenant:write")),
+  );
+}
+
+function canUpdateTenantStatus(authContext: AuthContext | null): boolean {
+  return authContext?.role === "super_admin" && authContext.tenantId === null;
 }
 
 function SettingsSummary({
@@ -200,6 +213,11 @@ function TenantSettingsForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (disabled) {
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -319,6 +337,11 @@ function TenantFeatureFlagsForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (disabled) {
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -393,6 +416,10 @@ function TenantStatusForm({
   const [submitting, setSubmitting] = useState<TenantStatus | null>(null);
 
   async function handleStatusUpdate(status: TenantStatus) {
+    if (disabled) {
+      return;
+    }
+
     setSubmitting(status);
     setError(null);
 
@@ -479,7 +506,8 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const canManageTenantSettings = authContext?.role === "super_admin";
+  const canManageTenantSettings = canWriteTenant(authContext);
+  const canManageTenantStatus = canUpdateTenantStatus(authContext);
 
   const applyLoadResults = useCallback(
     ([
@@ -645,7 +673,13 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
               <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
                 {authError
                   ? `Tenant settings are read-only because the current session could not be verified: ${authError}`
-                  : "Support users can view tenant settings. Updating defaults, pilot status, and feature flags requires Super Admin."}
+                  : "You can view tenant settings. Updating defaults and feature flags requires Super Admin or SaaS tenant write permission."}
+              </div>
+            ) : null}
+
+            {!canManageTenantStatus ? (
+              <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
+                Tenant status changes require Super Admin.
               </div>
             ) : null}
 
@@ -658,7 +692,7 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
             />
 
             <TenantStatusForm
-              disabled={!canManageTenantSettings}
+              disabled={!canManageTenantStatus}
               key={`${tenant.id}-${tenant.status}-${tenant.updatedAt}`}
               onUpdated={setTenant}
               tenant={tenant}

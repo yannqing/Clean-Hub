@@ -27,7 +27,8 @@ export async function updateTenantAction(
   } catch (error) {
     return getTenantFormActionErrorResult(error, {
       fallbackMessage: "Tenant could not be updated.",
-      forbiddenMessage: "Only super admins can update tenants.",
+      forbiddenMessage:
+        "Tenant updates require Super Admin or SaaS tenant write permission.",
       notFoundMessage: "Tenant was not found.",
     });
   }

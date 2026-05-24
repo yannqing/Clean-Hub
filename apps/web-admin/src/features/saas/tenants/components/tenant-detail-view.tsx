@@ -1,5 +1,6 @@
 "use client";
 
+import type { AuthContext } from "@cleanhub/api-client";
 import { Badge, Button, Input, Label, toast } from "@cleanhub/ui";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -9,7 +10,7 @@ import { webAdminRoutes } from "@/config/routes";
 import { updateTenantAction, updateTenantStatusAction } from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantStatusLabels } from "../constants";
-import { getTenantDetailQuery } from "../queries";
+import { getCurrentSaasAuthQuery, getTenantDetailQuery } from "../queries";
 import type { TenantDetail, TenantFormValues, TenantStatus } from "../types";
 import { TenantForm } from "./tenant-form";
 
@@ -74,7 +75,22 @@ function getStatusActionLabel(status: TenantStatus): string {
   return "Disable";
 }
 
+function canWriteTenant(authContext: AuthContext | null): boolean {
+  return Boolean(
+    authContext &&
+      authContext.tenantId === null &&
+      (authContext.role === "super_admin" ||
+        authContext.permissions.includes("saas:tenant:write")),
+  );
+}
+
+function canUpdateTenantStatus(authContext: AuthContext | null): boolean {
+  return authContext?.role === "super_admin" && authContext.tenantId === null;
+}
+
 export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
+  const [authContext, setAuthContext] = useState<AuthContext | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +99,8 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
   const [statusSubmitting, setStatusSubmitting] = useState<TenantStatus | null>(
     null,
   );
+  const canManageTenant = canWriteTenant(authContext);
+  const canManageStatus = canUpdateTenantStatus(authContext);
 
   async function handleUpdateTenant(values: TenantFormValues) {
     const tenantResult = await updateTenantAction(tenantId, values);
@@ -95,6 +113,13 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
   }
 
   async function handleUpdateStatus(status: TenantStatus) {
+    if (!canManageStatus) {
+      const message = "Only super admins can update tenant status.";
+      setStatusError(message);
+      toast.error(message);
+      return;
+    }
+
     setStatusSubmitting(status);
     setStatusError(null);
 
@@ -123,13 +148,33 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
   useEffect(() => {
     let isCurrent = true;
 
-    getTenantDetailQuery(tenantId)
-      .then((data) => {
+    Promise.allSettled([
+      getCurrentSaasAuthQuery(),
+      getTenantDetailQuery(tenantId),
+    ])
+      .then(([authResult, tenantResult]) => {
         if (!isCurrent) {
           return;
         }
 
-        setTenant(data);
+        if (authResult.status === "fulfilled") {
+          setAuthContext(authResult.value);
+          setAuthError(null);
+        } else {
+          setAuthContext(null);
+          setAuthError(
+            getTenantLoadErrorMessage(
+              authResult.reason,
+              "Failed to verify the current session.",
+            ),
+          );
+        }
+
+        if (tenantResult.status === "rejected") {
+          throw tenantResult.reason;
+        }
+
+        setTenant(tenantResult.value);
         setError(null);
       })
       .catch((loadError: unknown) => {
@@ -302,11 +347,17 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
               </div>
             ) : null}
 
+            {!canManageStatus ? (
+              <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
+                Tenant status changes require Super Admin.
+              </div>
+            ) : null}
+
             <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
               <div className="grid gap-2">
                 <Label htmlFor="tenant-status-reason">Reason</Label>
                 <Input
-                  disabled={Boolean(statusSubmitting)}
+                  disabled={!canManageStatus || Boolean(statusSubmitting)}
                   id="tenant-status-reason"
                   onChange={(event) => {
                     setStatusReason(event.target.value);
@@ -322,7 +373,7 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
                   .filter((status) => status !== tenant.status)
                   .map((status) => (
                     <Button
-                      disabled={Boolean(statusSubmitting)}
+                      disabled={!canManageStatus || Boolean(statusSubmitting)}
                       key={status}
                       onClick={() => {
                         void handleUpdateStatus(status);
@@ -339,7 +390,16 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
             </div>
           </section>
 
+          {authError || !canManageTenant ? (
+            <div className="mx-5 mt-5 rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
+              {authError
+                ? `Tenant editing is read-only because the current session could not be verified: ${authError}`
+                : "You can view tenant details. Updating tenant profile fields requires Super Admin or SaaS tenant write permission."}
+            </div>
+          ) : null}
+
           <TenantForm
+            disabled={!canManageTenant}
             initialValues={toFormValues(tenant)}
             key={`${tenant.id}-${tenant.updatedAt}`}
             mode="edit"

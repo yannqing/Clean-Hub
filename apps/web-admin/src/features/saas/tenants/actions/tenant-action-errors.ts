@@ -331,7 +331,8 @@ export function getTenantSettingsActionErrorResult(error: unknown): {
     return {
       ok: false,
       errors: {},
-      message: "Only super admins can update tenant settings.",
+      message:
+        "Tenant settings updates require Super Admin or SaaS tenant write permission.",
     };
   }
 
@@ -410,7 +411,8 @@ export function getTenantFeatureFlagsActionErrorResult(error: unknown): {
   if (error.status === 403) {
     return {
       ok: false,
-      error: "Only super admins can update tenant feature flags.",
+      error:
+        "Tenant feature flag updates require Super Admin or SaaS tenant write permission.",
     };
   }
 

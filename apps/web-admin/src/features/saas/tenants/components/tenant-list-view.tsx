@@ -1,5 +1,6 @@
 "use client";
 
+import type { AuthContext } from "@cleanhub/api-client";
 import {
   Badge,
   Button,
@@ -24,7 +25,7 @@ import { webAdminRoutes } from "@/config/routes";
 
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantStatusLabels, tenantStatusOptions } from "../constants";
-import { getTenantListQuery } from "../queries";
+import { getCurrentSaasAuthQuery, getTenantListQuery } from "../queries";
 import type { TenantStatus, TenantStatusCounts, TenantSummary } from "../types";
 
 type StatusFilter = "all" | TenantStatus;
@@ -89,8 +90,13 @@ function getTenantSettingsHref(tenantId: string): string {
   return `${getTenantDetailHref(tenantId)}/settings`;
 }
 
+function canCreateTenant(authContext: AuthContext | null): boolean {
+  return authContext?.role === "super_admin" && authContext.tenantId === null;
+}
+
 export function TenantListView() {
   const requestIdRef = useRef(0);
+  const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -132,20 +138,36 @@ export function TenantListView() {
     setError(null);
 
     try {
-      const [response, metricsResponse] =
+      const tenantRequest =
         status === "all"
-          ? await getTenantListQuery(listQuery).then((tenantResponse) => [
+          ? getTenantListQuery(listQuery).then((tenantResponse) => [
               tenantResponse,
               tenantResponse,
             ])
-          : await Promise.all([
+          : Promise.all([
               getTenantListQuery(listQuery),
               getTenantListQuery(metricsQuery),
             ]);
+      const [authResult, tenantResults] = await Promise.allSettled([
+        getCurrentSaasAuthQuery(),
+        tenantRequest,
+      ]);
 
       if (requestIdRef.current !== requestId) {
         return;
       }
+
+      if (authResult.status === "fulfilled") {
+        setAuthContext(authResult.value);
+      } else {
+        setAuthContext(null);
+      }
+
+      if (tenantResults.status === "rejected") {
+        throw tenantResults.reason;
+      }
+
+      const [response, metricsResponse] = tenantResults.value;
 
       setTenants(response.data);
       setMetrics({
@@ -190,9 +212,11 @@ export function TenantListView() {
           </h1>
         </div>
 
-        <Button asChild>
-          <Link href={webAdminRoutes.saas.newTenant}>New tenant</Link>
-        </Button>
+        {canCreateTenant(authContext) ? (
+          <Button asChild>
+            <Link href={webAdminRoutes.saas.newTenant}>New tenant</Link>
+          </Button>
+        ) : null}
       </div>
 
       <div className="grid gap-3 border-b p-5 sm:grid-cols-2 lg:grid-cols-4">
