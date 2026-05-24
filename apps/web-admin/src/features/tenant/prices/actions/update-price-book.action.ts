@@ -1,5 +1,33 @@
-"use server";
+import { webAdminApi } from "@/lib/api-client";
 
-export async function updatePriceBookAction(): Promise<void> {
-  throw new Error("updatePriceBookAction is not implemented yet.");
+import type { PriceBookFormValues } from "../types";
+import { validatePriceBookUpdateForm } from "../validators";
+
+export async function updatePriceBookAction(
+  priceBookId: string,
+  input: PriceBookFormValues,
+) {
+  const validation = validatePriceBookUpdateForm(input);
+
+  if (!validation.ok) {
+    return validation;
+  }
+
+  const priceBook = await webAdminApi.tenant.prices.update(
+    priceBookId,
+    validation.data,
+  );
+
+  return {
+    ok: true as const,
+    data: priceBook,
+  };
+}
+
+export async function deletePriceBookAction(priceBookId: string) {
+  await webAdminApi.tenant.prices.remove(priceBookId);
+
+  return {
+    ok: true as const,
+  };
 }
