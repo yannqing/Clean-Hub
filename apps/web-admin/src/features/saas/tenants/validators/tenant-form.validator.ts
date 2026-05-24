@@ -27,6 +27,12 @@ function normalizeNullable(value: string): string | null {
   return trimmed ? trimmed : null;
 }
 
+function isValidDefaultLanguage(
+  value: string,
+): value is TenantFormValues["defaultLanguage"] {
+  return value === "en" || value === "fr" || value === "zh-CN";
+}
+
 function validateTenantBasics(input: TenantFormValues): {
   errors: Partial<Record<keyof TenantFormValues, string>>;
   name: string;
@@ -39,21 +45,44 @@ function validateTenantBasics(input: TenantFormValues): {
   const pressingCode = input.pressingCode.trim().toUpperCase();
   const country = input.country.trim();
   const contactEmail = normalizeOptional(input.contactEmail);
+  const city = normalizeOptional(input.city);
+  const contactName = normalizeOptional(input.contactName);
+  const contactPhone = normalizeOptional(input.contactPhone);
 
   if (!name) {
     errors.name = "Tenant name is required.";
+  } else if (name.length > 160) {
+    errors.name = "Tenant name must be 160 characters or fewer.";
   }
 
   if (!pressingCode) {
     errors.pressingCode = "Pressing code is required.";
+  } else if (pressingCode.length > 80) {
+    errors.pressingCode = "Pressing code must be 80 characters or fewer.";
   }
 
   if (!country) {
     errors.country = "Country is required.";
+  } else if (country.length > 80) {
+    errors.country = "Country must be 80 characters or fewer.";
   }
 
   if (contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactEmail)) {
     errors.contactEmail = "Enter a valid email address.";
+  } else if (contactEmail && contactEmail.length > 320) {
+    errors.contactEmail = "Email must be 320 characters or fewer.";
+  }
+
+  if (city && city.length > 120) {
+    errors.city = "City must be 120 characters or fewer.";
+  }
+
+  if (contactName && contactName.length > 120) {
+    errors.contactName = "Contact name must be 120 characters or fewer.";
+  }
+
+  if (contactPhone && contactPhone.length > 32) {
+    errors.contactPhone = "Contact phone must be 32 characters or fewer.";
   }
 
   return {
@@ -67,17 +96,24 @@ function validateTenantBasics(input: TenantFormValues): {
 
 function validateSettings(input: TenantFormValues): {
   errors: Partial<Record<keyof TenantFormValues, string>>;
+  defaultLanguage: TenantFormValues["defaultLanguage"];
   defaultCurrency: string;
 } {
   const errors: Partial<Record<keyof TenantFormValues, string>> = {};
   const defaultCurrency = input.defaultCurrency.trim().toUpperCase();
+  const defaultLanguage = input.defaultLanguage;
 
-  if (defaultCurrency.length !== 3) {
+  if (!isValidDefaultLanguage(defaultLanguage)) {
+    errors.defaultLanguage = "Select a valid default language.";
+  }
+
+  if (!/^[A-Z]{3}$/.test(defaultCurrency)) {
     errors.defaultCurrency = "Currency must be a 3-letter code.";
   }
 
   return {
     errors,
+    defaultLanguage,
     defaultCurrency,
   };
 }
@@ -106,7 +142,7 @@ export function validateTenantForm(
       pressingCode: basics.pressingCode,
       country: basics.country,
       city: normalizeOptional(input.city),
-      defaultLanguage: input.defaultLanguage,
+      defaultLanguage: settings.defaultLanguage,
       defaultCurrency: settings.defaultCurrency,
       contactName: normalizeOptional(input.contactName),
       contactPhone: normalizeOptional(input.contactPhone),
@@ -156,7 +192,7 @@ export function validateTenantSettingsForm(
   return {
     ok: true,
     data: {
-      defaultLanguage: input.defaultLanguage,
+      defaultLanguage: settings.defaultLanguage,
       defaultCurrency: settings.defaultCurrency,
     },
   };
