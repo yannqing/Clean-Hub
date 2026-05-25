@@ -1,5 +1,33 @@
-"use server";
+import { webAdminApi } from "@/lib/api-client";
 
-export async function updateServiceAction(): Promise<void> {
-  throw new Error("updateServiceAction is not implemented yet.");
+import type { ServiceFormValues } from "../types";
+import { validateServiceUpdateForm } from "../validators";
+
+export async function updateServiceAction(
+  serviceId: string,
+  input: ServiceFormValues,
+) {
+  const validation = validateServiceUpdateForm(input);
+
+  if (!validation.ok) {
+    return validation;
+  }
+
+  const service = await webAdminApi.tenant.services.update(
+    serviceId,
+    validation.data,
+  );
+
+  return {
+    ok: true as const,
+    data: service,
+  };
+}
+
+export async function deleteServiceAction(serviceId: string) {
+  await webAdminApi.tenant.services.remove(serviceId);
+
+  return {
+    ok: true as const,
+  };
 }
