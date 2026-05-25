@@ -3,5 +3,6 @@ export * from "./auth.js";
 export * from "./id.js";
 export * from "./rbac.js";
 export * from "./saas.js";
+export * from "./tenant.js";
 export * from "./tenants.js";
 export * from "./users.js";

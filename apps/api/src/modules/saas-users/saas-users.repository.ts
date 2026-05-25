@@ -52,6 +52,7 @@ export type CreateSaasUserRecordInput = {
   normalizedEmail: string;
   displayName: string;
   passwordHash: string;
+  pinHash: string;
   role: SaasRoleRecord;
   language: SaasUserLanguage;
 };
@@ -319,6 +320,7 @@ export async function createSaasUserRecord(
       phone: input.phone,
       normalizedEmail: input.normalizedEmail,
       passwordHash: input.passwordHash,
+      pinHash: input.pinHash,
       status: "active",
     })
     .returning({

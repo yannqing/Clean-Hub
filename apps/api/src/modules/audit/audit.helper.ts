@@ -6,6 +6,8 @@ const SENSITIVE_AUDIT_KEYS = new Set([
   "authorization",
   "password",
   "passwordHash",
+  "pin",
+  "pinHash",
   "refreshToken",
   "secret",
   "token",

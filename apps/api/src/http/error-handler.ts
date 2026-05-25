@@ -13,6 +13,7 @@ function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 500 {
     case "USER_DISABLED":
     case "USER_SUSPENDED":
     case "FORBIDDEN":
+    case "FEATURE_DISABLED":
       return 403;
     case "AUTH_CONFIG_INVALID":
       return 500;

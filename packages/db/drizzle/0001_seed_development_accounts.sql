@@ -1,5 +1,6 @@
 -- Development seed accounts for local onboarding and shared team testing.
 -- Password for all accounts: 123456
+-- PIN for all accounts: 1234
 --
 -- SaaS Admin accounts:
 --   saas.admin1@cleanhub.local
@@ -93,6 +94,7 @@ INSERT INTO users (
   email,
   normalized_email,
   password_hash,
+  pin_hash,
   status
 )
 VALUES
@@ -103,6 +105,7 @@ VALUES
     'saas.admin1@cleanhub.local',
     'saas.admin1@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
+    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
     'active'
   ),
   (
@@ -112,6 +115,7 @@ VALUES
     'saas.admin2@cleanhub.local',
     'saas.admin2@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
+    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
     'active'
   ),
   (
@@ -121,6 +125,7 @@ VALUES
     'saas.support1@cleanhub.local',
     'saas.support1@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
+    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
     'active'
   ),
   (
@@ -130,6 +135,7 @@ VALUES
     'tenant.admin1@cleanhub.local',
     'tenant.admin1@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
+    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
     'active'
   ),
   (
@@ -139,6 +145,7 @@ VALUES
     'tenant.admin2@cleanhub.local',
     'tenant.admin2@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
+    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
     'active'
   ),
   (
@@ -148,6 +155,7 @@ VALUES
     'tenant.admin3@cleanhub.local',
     'tenant.admin3@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
+    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
     'active'
   )
 ON CONFLICT (id) DO UPDATE
@@ -157,6 +165,7 @@ SET
   email = EXCLUDED.email,
   normalized_email = EXCLUDED.normalized_email,
   password_hash = EXCLUDED.password_hash,
+  pin_hash = EXCLUDED.pin_hash,
   status = EXCLUDED.status,
   updated_at = now();
 --> statement-breakpoint
