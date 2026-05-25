@@ -1,6 +1,6 @@
 import { webAdminApi } from "@/lib/api-client";
 
-import type { ServiceFormValues } from "../types";
+import type { ServiceFormValues, ServiceStatus } from "../types";
 import { validateServiceUpdateForm } from "../validators";
 
 export async function updateServiceAction(
@@ -29,5 +29,19 @@ export async function deleteServiceAction(serviceId: string) {
 
   return {
     ok: true as const,
+  };
+}
+
+export async function updateServiceStatusAction(
+  serviceId: string,
+  status: ServiceStatus,
+) {
+  const service = await webAdminApi.tenant.services.updateStatus(serviceId, {
+    status,
+  });
+
+  return {
+    ok: true as const,
+    data: service,
   };
 }

@@ -39,3 +39,7 @@ export const updateServiceBodySchema = createServiceBodySchema.partial().refine(
   (value) => Object.keys(value).length > 0,
   "At least one service field must be provided.",
 );
+
+export const updateServiceStatusBodySchema = z.object({
+  status: serviceStatusSchema,
+});

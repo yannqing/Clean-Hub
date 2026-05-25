@@ -12,6 +12,7 @@ import type {
   ServiceAuditSnapshot,
   ServiceBusinessLine,
   ServiceListInput,
+  ServiceStatus,
   ServiceSummary,
   UpdateServiceRequest,
 } from "./services.types.js";
@@ -286,6 +287,32 @@ export async function updateServiceRecord(
       pricing_mode = ${next.pricingMode},
       status = ${next.status},
       sort_order = ${next.sortOrder},
+      updated_at = ${now},
+      updated_by = ${input.actorUserId},
+      version = version + 1
+    where id = ${input.serviceId}
+      and tenant_id = ${input.tenantId}
+      and deleted_at is null
+  `);
+
+  return findServiceById(db, input);
+}
+
+export async function updateServiceStatusRecord(
+  db: Database,
+  input: {
+    tenantId: string;
+    serviceId: string;
+    status: ServiceStatus;
+    actorUserId: string;
+  },
+): Promise<ServiceSummary | null> {
+  const now = new Date();
+
+  await db.execute(sql`
+    update services
+    set
+      status = ${input.status},
       updated_at = ${now},
       updated_by = ${input.actorUserId},
       version = version + 1

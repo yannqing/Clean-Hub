@@ -5,14 +5,17 @@ import { TenantServicesError } from "./services.errors.js";
 import {
   createTenantService,
   deleteTenantService,
+  getTenantServiceDetail,
   listTenantServices,
   updateTenantService,
+  updateTenantServiceStatus,
 } from "./services.service.js";
 import {
   createServiceBodySchema,
   serviceListQuerySchema,
   serviceParamsSchema,
   updateServiceBodySchema,
+  updateServiceStatusBodySchema,
 } from "./services.validation.js";
 
 function getClientIp(c: Context<AppBindings>): string | undefined {
@@ -63,6 +66,25 @@ export async function createTenantServiceController(c: Context<AppBindings>) {
   }
 }
 
+export async function getTenantServiceController(c: Context<AppBindings>) {
+  const params = serviceParamsSchema.parse(c.req.param());
+
+  try {
+    const service = await getTenantServiceDetail(
+      c.get("authContext"),
+      params.serviceId,
+    );
+
+    return c.json(service);
+  } catch (error) {
+    if (error instanceof TenantServicesError) {
+      return createTenantServicesErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
 export async function updateTenantServiceController(c: Context<AppBindings>) {
   const params = serviceParamsSchema.parse(c.req.param());
   const rawBody = await c.req.json().catch(() => ({}));
@@ -73,6 +95,34 @@ export async function updateTenantServiceController(c: Context<AppBindings>) {
       c.get("authContext"),
       params.serviceId,
       data,
+      {
+        ipAddress: getClientIp(c),
+        userAgent: c.req.header("user-agent"),
+      },
+    );
+
+    return c.json(service);
+  } catch (error) {
+    if (error instanceof TenantServicesError) {
+      return createTenantServicesErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function updateTenantServiceStatusController(
+  c: Context<AppBindings>,
+) {
+  const params = serviceParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = updateServiceStatusBodySchema.parse(rawBody);
+
+  try {
+    const service = await updateTenantServiceStatus(
+      c.get("authContext"),
+      params.serviceId,
+      data.status,
       {
         ipAddress: getClientIp(c),
         userAgent: c.req.header("user-agent"),
