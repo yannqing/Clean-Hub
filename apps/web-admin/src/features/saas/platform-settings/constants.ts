@@ -1,4 +1,4 @@
-import type { PlatformSettingsLanguage } from "./types";
+import type { PlatformSettingsFormValues, PlatformSettingsLanguage } from "./types";
 
 export const platformLanguageOptions = [
   { label: "English", value: "en" },
@@ -9,3 +9,9 @@ export const platformLanguageOptions = [
   value: PlatformSettingsLanguage;
 }>;
 
+export const platformSettingsDefaultValues: PlatformSettingsFormValues = {
+  defaultLanguage: "en",
+  defaultCurrency: "XOF",
+  timezone: "Africa/Dakar",
+  maintenanceMode: false,
+};

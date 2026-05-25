@@ -1,3 +1,5 @@
+import type { PlatformSettings, PlatformSettingsLanguage } from "@cleanhub/api-client";
+
 export type {
   PlatformSettings,
   PlatformSettingsLanguage,
@@ -5,8 +7,12 @@ export type {
 } from "@cleanhub/api-client";
 
 export type PlatformSettingsFormValues = {
-  defaultLanguage: "en" | "fr" | "zh-CN";
+  defaultLanguage: PlatformSettingsLanguage;
   defaultCurrency: string;
   timezone: string;
   maintenanceMode: boolean;
 };
+
+export type PlatformSettingsActionResult =
+  | { ok: true; data: PlatformSettings }
+  | { ok: false; error: string };
