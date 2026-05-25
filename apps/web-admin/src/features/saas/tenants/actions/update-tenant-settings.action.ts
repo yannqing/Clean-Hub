@@ -1,11 +1,12 @@
 import { webAdminApi } from "@/lib/api-client";
 
-import type { TenantFormValues } from "../types";
+import type { TenantSettingsFormValues } from "../types";
 import { validateTenantSettingsForm } from "../validators";
+import { getTenantSettingsActionErrorResult } from "./tenant-action-errors";
 
 export async function updateTenantSettingsAction(
   tenantId: string,
-  input: TenantFormValues,
+  input: TenantSettingsFormValues,
 ) {
   const validation = validateTenantSettingsForm(input);
 
@@ -13,13 +14,17 @@ export async function updateTenantSettingsAction(
     return validation;
   }
 
-  const settings = await webAdminApi.saas.tenants.updateSettings(
-    tenantId,
-    validation.data,
-  );
+  try {
+    const settings = await webAdminApi.saas.tenants.updateSettings(
+      tenantId,
+      validation.data,
+    );
 
-  return {
-    ok: true as const,
-    data: settings,
-  };
+    return {
+      ok: true as const,
+      data: settings,
+    };
+  } catch (error) {
+    return getTenantSettingsActionErrorResult(error);
+  }
 }

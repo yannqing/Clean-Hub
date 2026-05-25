@@ -13,8 +13,13 @@ import {
 } from "@cleanhub/ui";
 import { useState } from "react";
 
-import { tenantDefaultValues, tenantLanguageOptions } from "../constants";
+import {
+  tenantCreateLanguageOptions,
+  tenantDefaultValues,
+  tenantLanguageOptions,
+} from "../constants";
 import type { TenantDetail, TenantFormValues } from "../types";
+import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 
 type TenantFormResult =
   | {
@@ -24,9 +29,11 @@ type TenantFormResult =
   | {
       ok: false;
       errors: Partial<Record<keyof TenantFormValues, string>>;
+      message?: string;
     };
 
 type TenantFormProps = {
+  disabled?: boolean;
   initialValues?: Partial<TenantFormValues>;
   mode: "create" | "edit";
   onSubmit: (values: TenantFormValues) => Promise<TenantFormResult>;
@@ -42,11 +49,8 @@ function getInitialValues(
   };
 }
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Tenant request failed.";
-}
-
 export function TenantForm({
+  disabled = false,
   initialValues,
   mode,
   onSubmit,
@@ -58,7 +62,12 @@ export function TenantForm({
   const [errors, setErrors] = useState<
     Partial<Record<keyof TenantFormValues, string>>
   >({});
+  const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const showDefaults = mode === "create";
+  const languageOptions = showDefaults
+    ? tenantCreateLanguageOptions
+    : tenantLanguageOptions;
 
   function updateValue(key: keyof TenantFormValues, value: string): void {
     setValues((current) => ({
@@ -69,26 +78,43 @@ export function TenantForm({
       ...current,
       [key]: undefined,
     }));
+    setFormError(null);
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (disabled) {
+      return;
+    }
+
     setSubmitting(true);
+    setFormError(null);
 
     try {
       const result = await onSubmit(values);
 
       if (!result.ok) {
         setErrors(result.errors);
+        const message =
+          result.message ??
+          Object.values(result.errors)[0] ??
+          "Tenant request failed.";
+        setFormError(message);
+        toast.error(message);
         return;
       }
 
-      toast.success(
-        mode === "create" ? "Tenant created." : "Tenant updated.",
-      );
+      setErrors({});
+      toast.success(mode === "create" ? "Tenant created." : "Tenant updated.");
       onSuccess?.(result.data);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      const message = getTenantLoadErrorMessage(
+        error,
+        "Tenant request failed.",
+      );
+      setFormError(message);
+      toast.error(message);
     } finally {
       setSubmitting(false);
     }
@@ -96,6 +122,12 @@ export function TenantForm({
 
   return (
     <form className="grid gap-6" onSubmit={handleSubmit}>
+      {formError ? (
+        <div className="mx-5 mt-5 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          {formError}
+        </div>
+      ) : null}
+
       <section className="grid gap-4 border-b p-5">
         <div>
           <h2 className="text-base font-semibold text-foreground">
@@ -108,6 +140,7 @@ export function TenantForm({
             <Label htmlFor="tenant-name">Tenant name</Label>
             <Input
               aria-invalid={Boolean(errors.name)}
+              disabled={disabled || submitting}
               id="tenant-name"
               onChange={(event) => updateValue("name", event.target.value)}
               value={values.name}
@@ -121,6 +154,7 @@ export function TenantForm({
             <Label htmlFor="pressing-code">Pressing code</Label>
             <Input
               aria-invalid={Boolean(errors.pressingCode)}
+              disabled={disabled || submitting}
               id="pressing-code"
               onChange={(event) =>
                 updateValue("pressingCode", event.target.value)
@@ -136,6 +170,7 @@ export function TenantForm({
             <Label htmlFor="tenant-country">Country</Label>
             <Input
               aria-invalid={Boolean(errors.country)}
+              disabled={disabled || submitting}
               id="tenant-country"
               onChange={(event) => updateValue("country", event.target.value)}
               value={values.country}
@@ -148,63 +183,79 @@ export function TenantForm({
           <div className="grid gap-2">
             <Label htmlFor="tenant-city">City</Label>
             <Input
+              aria-invalid={Boolean(errors.city)}
+              disabled={disabled || submitting}
               id="tenant-city"
               onChange={(event) => updateValue("city", event.target.value)}
               value={values.city}
             />
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-4 border-b p-5">
-        <div>
-          <h2 className="text-base font-semibold text-foreground">Defaults</h2>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="grid gap-2">
-            <Label htmlFor="default-language">Default language</Label>
-            <Select
-              onValueChange={(value) =>
-                updateValue(
-                  "defaultLanguage",
-                  value as TenantFormValues["defaultLanguage"],
-                )
-              }
-              value={values.defaultLanguage}
-            >
-              <SelectTrigger className="w-full" id="default-language">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {tenantLanguageOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="default-currency">Default currency</Label>
-            <Input
-              aria-invalid={Boolean(errors.defaultCurrency)}
-              id="default-currency"
-              maxLength={3}
-              onChange={(event) =>
-                updateValue("defaultCurrency", event.target.value)
-              }
-              value={values.defaultCurrency}
-            />
-            {errors.defaultCurrency ? (
-              <p className="text-xs text-destructive">
-                {errors.defaultCurrency}
-              </p>
+            {errors.city ? (
+              <p className="text-xs text-destructive">{errors.city}</p>
             ) : null}
           </div>
         </div>
       </section>
+
+      {showDefaults ? (
+        <section className="grid gap-4 border-b p-5">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              Defaults
+            </h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="default-language">Default language</Label>
+              <Select
+                disabled={disabled || submitting}
+                onValueChange={(value) =>
+                  updateValue(
+                    "defaultLanguage",
+                    value as TenantFormValues["defaultLanguage"],
+                  )
+                }
+                value={values.defaultLanguage}
+              >
+                <SelectTrigger className="w-full" id="default-language">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {languageOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.defaultLanguage ? (
+                <p className="text-xs text-destructive">
+                  {errors.defaultLanguage}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="default-currency">Default currency</Label>
+              <Input
+                aria-invalid={Boolean(errors.defaultCurrency)}
+                disabled={disabled || submitting}
+                id="default-currency"
+                maxLength={3}
+                onChange={(event) =>
+                  updateValue("defaultCurrency", event.target.value)
+                }
+                value={values.defaultCurrency}
+              />
+              {errors.defaultCurrency ? (
+                <p className="text-xs text-destructive">
+                  {errors.defaultCurrency}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 p-5">
         <div>
@@ -215,29 +266,40 @@ export function TenantForm({
           <div className="grid gap-2">
             <Label htmlFor="contact-name">Contact name</Label>
             <Input
+              aria-invalid={Boolean(errors.contactName)}
+              disabled={disabled || submitting}
               id="contact-name"
               onChange={(event) =>
                 updateValue("contactName", event.target.value)
               }
               value={values.contactName}
             />
+            {errors.contactName ? (
+              <p className="text-xs text-destructive">{errors.contactName}</p>
+            ) : null}
           </div>
 
           <div className="grid gap-2">
             <Label htmlFor="contact-phone">Contact phone</Label>
             <Input
+              aria-invalid={Boolean(errors.contactPhone)}
+              disabled={disabled || submitting}
               id="contact-phone"
               onChange={(event) =>
                 updateValue("contactPhone", event.target.value)
               }
               value={values.contactPhone}
             />
+            {errors.contactPhone ? (
+              <p className="text-xs text-destructive">{errors.contactPhone}</p>
+            ) : null}
           </div>
 
           <div className="grid gap-2">
             <Label htmlFor="contact-email">Contact email</Label>
             <Input
               aria-invalid={Boolean(errors.contactEmail)}
+              disabled={disabled || submitting}
               id="contact-email"
               onChange={(event) =>
                 updateValue("contactEmail", event.target.value)
@@ -252,7 +314,7 @@ export function TenantForm({
       </section>
 
       <div className="flex justify-end border-t bg-muted/30 px-5 py-4">
-        <Button disabled={submitting} type="submit">
+        <Button disabled={disabled || submitting} type="submit">
           {submitting
             ? mode === "create"
               ? "Creating..."

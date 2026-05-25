@@ -10,6 +10,11 @@ export const tenantLanguageOptions = [
   { label: "Chinese", value: "zh-CN" },
 ] as const;
 
+export const tenantCreateLanguageOptions = [
+  { label: "Use platform default", value: "platform-default" },
+  ...tenantLanguageOptions,
+] as const;
+
 export const tenantStatusOptions = [
   { label: tenantStatusLabels.active, value: "active" },
   { label: tenantStatusLabels.suspended, value: "suspended" },
@@ -23,7 +28,35 @@ export const tenantDefaultValues = {
   contactPhone: "",
   country: "Senegal",
   defaultCurrency: "XOF",
-  defaultLanguage: "en",
+  defaultLanguage: "platform-default",
   name: "",
   pressingCode: "",
 } as const;
+
+export const tenantFeatureFlagOptions = [
+  {
+    key: "laundryEnabled",
+    label: "Laundry and dry cleaning",
+    description: "Core laundry, pressing, and dry cleaning workflows.",
+  },
+  {
+    key: "carWashEnabled",
+    label: "Car wash",
+    description: "Car wash services, pricing, and operations entry points.",
+  },
+  {
+    key: "retailProductsEnabled",
+    label: "Retail products",
+    description: "Laundry liquid, care products, consumables, and retail sales.",
+  },
+  {
+    key: "deliveryEnabled",
+    label: "Pickup and delivery",
+    description: "Doorstep pickup, delivery states, and delivery staff flows.",
+  },
+  {
+    key: "notificationsEnabled",
+    label: "Notifications",
+    description: "WhatsApp, SMS, email settings, and send records.",
+  },
+] as const;

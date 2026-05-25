@@ -14,6 +14,7 @@ import {
 
 import {
   type Database,
+  authRefreshTokens,
   platformSettings,
   tenantFeatureFlags,
   tenantSettings,
@@ -213,9 +214,8 @@ export async function findSaasTenants(
   query: ListSaasTenantsQuery,
 ): Promise<SaasTenantListResult> {
   const searchQuery = normalizeSearchQuery(query.q);
-  const whereClause = and(
+  const baseWhereClause = and(
     isNull(tenants.deletedAt),
-    query.status ? eq(tenants.status, query.status) : undefined,
     searchQuery
       ? or(
           ilike(tenants.name, searchQuery),
@@ -224,6 +224,10 @@ export async function findSaasTenants(
           ilike(tenants.city, searchQuery),
         )
       : undefined,
+  );
+  const listWhereClause = and(
+    baseWhereClause,
+    query.status ? eq(tenants.status, query.status) : undefined,
   );
   const rows = await db
     .select({
@@ -237,21 +241,21 @@ export async function findSaasTenants(
       updatedAt: tenants.updatedAt,
     })
     .from(tenants)
-    .where(whereClause)
+    .where(listWhereClause)
     .orderBy(desc(tenants.createdAt))
     .limit(query.limit)
     .offset(query.offset);
   const totalRows = await db
     .select({ value: count() })
     .from(tenants)
-    .where(whereClause);
+    .where(listWhereClause);
   const statusRows = await db
     .select({
       status: tenants.status,
       value: count(),
     })
     .from(tenants)
-    .where(whereClause)
+    .where(baseWhereClause)
     .groupBy(tenants.status);
   const statusCounts = createEmptyStatusCounts();
 
@@ -547,6 +551,23 @@ export async function updateSaasTenantStatusRecord(
   return findSaasTenantDetailById(db, input.tenantId);
 }
 
+export async function revokeTenantRefreshTokens(
+  db: Database,
+  tenantId: string,
+): Promise<void> {
+  await db
+    .update(authRefreshTokens)
+    .set({
+      revokedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(authRefreshTokens.tenantId, tenantId),
+        isNull(authRefreshTokens.revokedAt),
+      ),
+    );
+}
+
 export async function updateSaasTenantFeatureFlagsRecord(
   db: Database,
   input: UpdateSaasTenantFeatureFlagsRecordInput,
@@ -710,12 +731,13 @@ export async function writeSaasTenantStatusChangedAuditLog(
     tenantId: input.tenantId,
     actorUserId: input.actorUserId,
     eventCategory: "saas_tenant",
-    eventType: "tenant.status_changed",
+    eventType: "tenant.status_updated",
     entityType: "tenant",
     entityId: input.tenantId,
     success: true,
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
+    reason: input.reason,
     before: input.before,
     after: input.after,
     metadata: {
