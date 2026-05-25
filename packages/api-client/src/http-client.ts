@@ -32,6 +32,20 @@ function ensureLeadingSlash(value: string): string {
   return value.startsWith("/") ? value : `/${value}`;
 }
 
+function isAbsoluteUrl(value: string): boolean {
+  return value.startsWith("http://") || value.startsWith("https://");
+}
+
+function getRuntimeOrigin(): string {
+  if (typeof globalThis.location?.origin === "string") {
+    return globalThis.location.origin;
+  }
+
+  throw new Error(
+    "Relative API URLs require a browser origin. Use an absolute baseUrl on the server.",
+  );
+}
+
 function createRequestId(): string {
   return createId();
 }
@@ -52,11 +66,12 @@ function appendQueryValue(searchParams: URLSearchParams, key: string, value: Que
 }
 
 export function buildApiUrl(baseUrl: string, path: string, query?: QueryParams): string {
-  const url = new URL(
-    path.startsWith("http://") || path.startsWith("https://")
-      ? path
-      : `${trimTrailingSlash(baseUrl)}${ensureLeadingSlash(path)}`,
-  );
+  const requestUrl = isAbsoluteUrl(path)
+    ? path
+    : `${trimTrailingSlash(baseUrl)}${ensureLeadingSlash(path)}`;
+  const url = isAbsoluteUrl(requestUrl)
+    ? new URL(requestUrl)
+    : new URL(requestUrl, getRuntimeOrigin());
 
   if (!query) {
     return url.toString();

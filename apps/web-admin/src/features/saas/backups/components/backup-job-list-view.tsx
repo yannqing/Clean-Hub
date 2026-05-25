@@ -177,9 +177,6 @@ export function BackupJobListView() {
   useEffect(() => {
     let isCurrent = true;
 
-    setRestoreRequestsLoading(true);
-    setRestoreRequestsError(null);
-
     getRestoreRequestListQuery({ limit: 50, offset: 0 })
       .then((data) => {
         if (!isCurrent) {

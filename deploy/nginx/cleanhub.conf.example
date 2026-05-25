@@ -1,0 +1,57 @@
+# Replace cleanhub.example.com with the production domain.
+# This config assumes docker-compose.prod.yml maps:
+# - Web Admin: 127.0.0.1:3010
+# - API:       127.0.0.1:4010
+
+upstream cleanhub_web_admin {
+    server 127.0.0.1:3010;
+}
+
+upstream cleanhub_api {
+    server 127.0.0.1:4010;
+}
+
+server {
+    listen 80;
+    server_name cleanhub.example.com;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name cleanhub.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/cleanhub.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/cleanhub.example.com/privkey.pem;
+
+    client_max_body_size 20m;
+
+    location /api/ {
+        proxy_pass http://cleanhub_api/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Request-Id $request_id;
+    }
+
+    location / {
+        proxy_pass http://cleanhub_web_admin;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Request-Id $request_id;
+    }
+}
