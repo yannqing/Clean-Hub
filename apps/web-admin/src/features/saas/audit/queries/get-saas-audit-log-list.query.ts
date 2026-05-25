@@ -1,7 +1,9 @@
-import type { SaasAuditLogSummary } from "../types";
+import { webAdminApi } from "@/lib/api-client";
 
-export async function getSaasAuditLogListQuery(): Promise<
-  SaasAuditLogSummary[]
-> {
-  return [];
+import type { AuditLogListQuery, AuditLogListResult } from "../types";
+
+export async function getSaasAuditLogListQuery(
+  query?: AuditLogListQuery,
+): Promise<AuditLogListResult> {
+  return webAdminApi.saas.listAuditLogs(query);
 }
