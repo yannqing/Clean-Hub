@@ -8,6 +8,18 @@ import { webAdminRoutes } from "@/config/routes";
 const DEFAULT_API_BASE_URL = "http://localhost:4000";
 let refreshRequest: Promise<unknown> | null = null;
 
+function getApiBaseUrl(): string {
+  if (typeof window === "undefined") {
+    return (
+      process.env.CLEANHUB_API_BASE_URL ??
+      process.env.NEXT_PUBLIC_API_BASE_URL ??
+      DEFAULT_API_BASE_URL
+    );
+  }
+
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
+}
+
 function redirectToLogin(): void {
   if (typeof window === "undefined") {
     return;
@@ -19,7 +31,7 @@ function redirectToLogin(): void {
 }
 
 export const webAdminApi = createCleanHubApiClient({
-  baseUrl: process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL,
+  baseUrl: getApiBaseUrl(),
   credentials: "include",
   timeoutMs: 30_000,
   retry: {

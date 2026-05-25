@@ -23,6 +23,7 @@ coverage
 # Hosting/build platform outputs
 .vercel
 .output
+release
 
 # Package manager debug logs
 npm-debug.log*
