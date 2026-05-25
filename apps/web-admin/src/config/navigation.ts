@@ -62,6 +62,7 @@ export const webAdminSidebarNavigation = {
     {
       title: "System Settings",
       items: [
+        { label: "Audit Logs", href: webAdminRoutes.saas.auditLogs },
         { label: "Operation Logs", href: webAdminRoutes.saas.system.logs },
         { label: "Data Backups", href: webAdminRoutes.saas.system.backups },
         { label: "Security Settings", href: webAdminRoutes.saas.system.security },

@@ -1,1 +1,1 @@
-export * from "./saas-audit-log-table-placeholder";
+export * from "./saas-audit-log-list-view";
