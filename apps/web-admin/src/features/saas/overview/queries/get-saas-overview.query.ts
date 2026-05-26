@@ -3,5 +3,5 @@ import { webAdminApi } from "@/lib/api-client";
 import type { SaasOverview } from "../types";
 
 export async function getSaasOverviewQuery(): Promise<SaasOverview> {
-  return webAdminApi.saas.getOverview();
+  return webAdminApi.saas.overview.get();
 }

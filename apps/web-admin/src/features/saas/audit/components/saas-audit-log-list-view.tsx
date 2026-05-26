@@ -5,6 +5,7 @@ import {
   Button,
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   Input,
@@ -23,12 +24,14 @@ import {
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { auditSuccessOptions } from "../constants";
+import { auditEventCategoryOptions } from "../constants";
 import {
   getSaasAuditLogDetailQuery,
   getSaasAuditLogListQuery,
 } from "../queries";
-import type { AuditLogDetail, AuditLogSummary } from "../types";
+import type { AuditLogDetail, AuditLogListQuery, AuditLogSummary } from "../types";
+
+const limit = 10;
 
 type SuccessFilter = "all" | "true" | "false";
 
@@ -45,55 +48,33 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-function getSuccessVariant(
-  success: boolean,
-): "default" | "destructive" | "outline" {
-  return success ? "default" : "destructive";
-}
-
-function JsonBlock({ value }: { value: Record<string, unknown> | null }) {
-  if (!value) {
-    return <span className="text-muted-foreground">None</span>;
-  }
-
-  return (
-    <pre className="max-h-40 overflow-auto rounded bg-muted p-2 text-xs">
-      {JSON.stringify(value, null, 2)}
-    </pre>
-  );
-}
-
 export function SaasAuditLogListView() {
   const [logs, setLogs] = useState<AuditLogSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
-  const [actorUserId, setActorUserId] = useState("");
   const [eventCategory, setEventCategory] = useState("");
-  const [eventType, setEventType] = useState("");
-  const [successFilter, setSuccessFilter] = useState<SuccessFilter>("all");
+  const [actorUserId, setActorUserId] = useState("");
+  const [success, setSuccess] = useState<SuccessFilter>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [selectedLog, setSelectedLog] = useState<AuditLogDetail | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  const [selectedLog, setSelectedLog] = useState<AuditLogSummary | null>(null);
+  const [detail, setDetail] = useState<AuditLogDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
 
-  const limit = 10;
-
-  const listQuery = useMemo(
+  const listQuery = useMemo<AuditLogListQuery>(
     () => ({
       limit,
       offset,
-      actorUserId: actorUserId.trim() || undefined,
       eventCategory: eventCategory.trim() || undefined,
-      eventType: eventType.trim() || undefined,
-      success: successFilter === "all" ? undefined : successFilter,
+      actorUserId: actorUserId.trim() || undefined,
+      success: success === "all" ? undefined : success,
       dateFrom: dateFrom ? new Date(dateFrom).toISOString() : undefined,
       dateTo: dateTo ? new Date(dateTo).toISOString() : undefined,
     }),
-    [actorUserId, eventCategory, eventType, successFilter, dateFrom, dateTo, offset],
+    [actorUserId, dateFrom, dateTo, eventCategory, offset, success],
   );
 
   const loadLogs = useCallback(async () => {
@@ -116,16 +97,23 @@ export function SaasAuditLogListView() {
 
     getSaasAuditLogListQuery(listQuery)
       .then((result) => {
-        if (!isCurrent) return;
+        if (!isCurrent) {
+          return;
+        }
+
         setLogs(result.items);
         setTotal(result.total);
         setError(null);
       })
       .catch((loadError: unknown) => {
-        if (isCurrent) setError(getErrorMessage(loadError));
+        if (isCurrent) {
+          setError(getErrorMessage(loadError));
+        }
       })
       .finally(() => {
-        if (isCurrent) setLoading(false);
+        if (isCurrent) {
+          setLoading(false);
+        }
       });
 
     return () => {
@@ -133,97 +121,59 @@ export function SaasAuditLogListView() {
     };
   }, [listQuery]);
 
-  async function handleRowClick(log: AuditLogSummary) {
-    setDetailOpen(true);
+  const openDetail = useCallback((log: AuditLogSummary) => {
+    setSelectedLog(log);
+    setDetail(null);
+    setDetailError(null);
     setDetailLoading(true);
-    setSelectedLog(null);
 
-    try {
-      const detail = await getSaasAuditLogDetailQuery(log.id);
-      setSelectedLog(detail);
-    } catch {
-      setSelectedLog(null);
-    } finally {
-      setDetailLoading(false);
-    }
-  }
+    getSaasAuditLogDetailQuery(log.id)
+      .then((data) => {
+        setDetail(data);
+      })
+      .catch((err: unknown) => {
+        setDetailError(getErrorMessage(err));
+      })
+      .finally(() => {
+        setDetailLoading(false);
+      });
+  }, []);
 
-  function handleFilterChange() {
-    setOffset(0);
-  }
+  const hasPrev = offset > 0;
+  const hasNext = offset + limit < total;
 
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">SaaS audit logs</Badge>
+          <Badge variant="secondary">SaaS audit</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
             Audit Logs
           </h1>
         </div>
+
         <Button onClick={loadLogs} type="button" variant="outline">
           Refresh
         </Button>
       </div>
 
-      <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-3">
-        <div className="grid gap-2">
-          <Label htmlFor="audit-actor-filter">Actor User ID</Label>
-          <Input
-            id="audit-actor-filter"
-            onChange={(e) => {
-              setLoading(true);
-              setActorUserId(e.target.value);
-              handleFilterChange();
-            }}
-            placeholder="ULID of actor"
-            value={actorUserId}
-          />
-        </div>
-
+      <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-5">
         <div className="grid gap-2">
           <Label htmlFor="audit-category-filter">Category</Label>
-          <Input
-            id="audit-category-filter"
-            onChange={(e) => {
-              setLoading(true);
-              setEventCategory(e.target.value);
-              handleFilterChange();
-            }}
-            placeholder="e.g. saas_platform"
-            value={eventCategory}
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="audit-event-filter">Event Type</Label>
-          <Input
-            id="audit-event-filter"
-            onChange={(e) => {
-              setLoading(true);
-              setEventType(e.target.value);
-              handleFilterChange();
-            }}
-            placeholder="e.g. platform_settings.updated"
-            value={eventType}
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="audit-success-filter">Result</Label>
           <Select
             onValueChange={(value) => {
+              setOffset(0);
               setLoading(true);
-              setSuccessFilter(value as SuccessFilter);
-              handleFilterChange();
+              setEventCategory(value === "all" ? "" : value);
             }}
-            value={successFilter}
+            value={eventCategory || "all"}
           >
-            <SelectTrigger className="w-full" id="audit-success-filter">
+            <SelectTrigger className="w-full" id="audit-category-filter">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {auditSuccessOptions.map((option) => (
+              <SelectItem value="all">All categories</SelectItem>
+              {auditEventCategoryOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -233,13 +183,48 @@ export function SaasAuditLogListView() {
         </div>
 
         <div className="grid gap-2">
+          <Label htmlFor="audit-success-filter">Result</Label>
+          <Select
+            onValueChange={(value) => {
+              setOffset(0);
+              setLoading(true);
+              setSuccess(value as SuccessFilter);
+            }}
+            value={success}
+          >
+            <SelectTrigger className="w-full" id="audit-success-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All results</SelectItem>
+              <SelectItem value="true">Success</SelectItem>
+              <SelectItem value="false">Failed</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="audit-actor-filter">Actor user ID</Label>
+          <Input
+            id="audit-actor-filter"
+            onChange={(event) => {
+              setOffset(0);
+              setLoading(true);
+              setActorUserId(event.target.value);
+            }}
+            placeholder="Optional ULID"
+            value={actorUserId}
+          />
+        </div>
+
+        <div className="grid gap-2">
           <Label htmlFor="audit-date-from">From</Label>
           <Input
             id="audit-date-from"
-            onChange={(e) => {
+            onChange={(event) => {
+              setOffset(0);
               setLoading(true);
-              setDateFrom(e.target.value);
-              handleFilterChange();
+              setDateFrom(event.target.value);
             }}
             type="date"
             value={dateFrom}
@@ -250,10 +235,10 @@ export function SaasAuditLogListView() {
           <Label htmlFor="audit-date-to">To</Label>
           <Input
             id="audit-date-to"
-            onChange={(e) => {
+            onChange={(event) => {
+              setOffset(0);
               setLoading(true);
-              setDateTo(e.target.value);
-              handleFilterChange();
+              setDateTo(event.target.value);
             }}
             type="date"
             value={dateTo}
@@ -292,7 +277,6 @@ export function SaasAuditLogListView() {
                 <TableHead>Event</TableHead>
                 <TableHead>Entity</TableHead>
                 <TableHead>Actor</TableHead>
-                <TableHead>Tenant</TableHead>
                 <TableHead>Result</TableHead>
               </TableRow>
             </TableHeader>
@@ -301,43 +285,17 @@ export function SaasAuditLogListView() {
                 <TableRow
                   className="cursor-pointer"
                   key={log.id}
-                  onClick={() => handleRowClick(log)}
+                  onClick={() => {
+                    openDetail(log);
+                  }}
                 >
                   <TableCell>{formatDate(log.createdAt)}</TableCell>
                   <TableCell>{log.eventCategory}</TableCell>
                   <TableCell>{log.eventType}</TableCell>
+                  <TableCell>{log.entityType ?? "—"}</TableCell>
+                  <TableCell>{log.actorUserId ?? "System"}</TableCell>
                   <TableCell>
-                    {log.entityType ? (
-                      <span>
-                        {log.entityType}
-                        {log.entityId ? (
-                          <span className="block text-xs text-muted-foreground">
-                            {log.entityId}
-                          </span>
-                        ) : null}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {log.actorUserId ? (
-                      <span className="font-mono text-xs">
-                        {log.actorUserId}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">System</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {log.tenantId ? (
-                      <span className="font-mono text-xs">{log.tenantId}</span>
-                    ) : (
-                      <span className="text-muted-foreground">Platform</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getSuccessVariant(log.success)}>
+                    <Badge variant={log.success ? "default" : "destructive"}>
                       {log.success ? "Success" : "Failed"}
                     </Badge>
                   </TableCell>
@@ -346,101 +304,131 @@ export function SaasAuditLogListView() {
             </TableBody>
           </Table>
 
-          <div className="flex items-center justify-between border-t p-5">
-            <p className="text-sm text-muted-foreground">
+          <div className="flex items-center justify-between border-t px-5 py-3">
+            <span className="text-sm text-muted-foreground">
               {offset + 1}–{Math.min(offset + limit, total)} of {total}
-            </p>
+            </span>
             <div className="flex gap-2">
               <Button
-                disabled={offset === 0}
-                onClick={() => setOffset(Math.max(0, offset - limit))}
-                size="sm"
+                disabled={!hasPrev}
+                onClick={() => {
+                  setOffset(Math.max(0, offset - limit));
+                }}
                 type="button"
                 variant="outline"
               >
-                Previous
+                Previous Page
               </Button>
               <Button
-                disabled={offset + limit >= total}
-                onClick={() => setOffset(offset + limit)}
-                size="sm"
+                disabled={!hasNext}
+                onClick={() => {
+                  setOffset(offset + limit);
+                }}
                 type="button"
                 variant="outline"
               >
-                Next
+                Next Page
               </Button>
             </div>
           </div>
         </>
       )}
 
-      <Dialog onOpenChange={setDetailOpen} open={detailOpen}>
-        <DialogContent className="max-w-2xl">
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedLog(null);
+            setDetail(null);
+            setDetailError(null);
+          }
+        }}
+        open={Boolean(selectedLog)}
+      >
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Audit Log Detail</DialogTitle>
+            <DialogDescription className="sr-only">
+              Full details of the selected audit log entry.
+            </DialogDescription>
           </DialogHeader>
 
           {detailLoading ? (
-            <div className="space-y-3 py-4">
-              {[0, 1, 2].map((i) => (
-                <div
-                  className="h-6 animate-pulse rounded bg-muted"
-                  key={i}
-                />
-              ))}
+            <div className="grid gap-3">
+              <div className="h-8 animate-pulse rounded-md bg-muted" />
+              <div className="h-32 animate-pulse rounded-md bg-muted" />
             </div>
-          ) : selectedLog ? (
-            <div className="space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  ["ID", selectedLog.id],
-                  ["Created", formatDate(selectedLog.createdAt)],
-                  ["Category", selectedLog.eventCategory],
-                  ["Event", selectedLog.eventType],
-                  ["Entity Type", selectedLog.entityType ?? "—"],
-                  ["Entity ID", selectedLog.entityId ?? "—"],
-                  ["Actor", selectedLog.actorUserId ?? "System"],
-                  ["Tenant", selectedLog.tenantId ?? "Platform"],
-                  ["IP Address", selectedLog.ipAddress ?? "—"],
-                  ["Result", selectedLog.success ? "Success" : "Failed"],
-                  ["Reason", selectedLog.reason ?? "—"],
-                  [
-                    "User Agent",
-                    selectedLog.userAgent
-                      ? selectedLog.userAgent.slice(0, 60) + "…"
-                      : "—",
-                  ],
-                ].map(([label, value]) => (
-                  <div key={label}>
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {label}
-                    </p>
-                    <p className="mt-0.5 font-mono text-xs break-all">
-                      {value}
-                    </p>
-                  </div>
-                ))}
+          ) : detailError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {detailError}
+            </div>
+          ) : detail ? (
+            <div className="grid gap-3 text-sm">
+              <div className="grid grid-cols-[140px_1fr] gap-y-2">
+                <span className="text-muted-foreground">ID</span>
+                <span className="break-all font-mono text-xs">{detail.id}</span>
+                <span className="text-muted-foreground">Category</span>
+                <span>{detail.eventCategory}</span>
+                <span className="text-muted-foreground">Event</span>
+                <span>{detail.eventType}</span>
+                <span className="text-muted-foreground">Entity type</span>
+                <span>{detail.entityType ?? "—"}</span>
+                <span className="text-muted-foreground">Entity ID</span>
+                <span className="break-all font-mono text-xs">
+                  {detail.entityId ?? "—"}
+                </span>
+                <span className="text-muted-foreground">Actor</span>
+                <span className="break-all font-mono text-xs">
+                  {detail.actorUserId ?? "System"}
+                </span>
+                <span className="text-muted-foreground">Tenant</span>
+                <span className="break-all font-mono text-xs">
+                  {detail.tenantId ?? "Platform"}
+                </span>
+                <span className="text-muted-foreground">Result</span>
+                <Badge
+                  className="w-fit"
+                  variant={detail.success ? "default" : "destructive"}
+                >
+                  {detail.success ? "Success" : "Failed"}
+                </Badge>
+                {detail.reason ? (
+                  <>
+                    <span className="text-muted-foreground">Reason</span>
+                    <span>{detail.reason}</span>
+                  </>
+                ) : null}
+                <span className="text-muted-foreground">IP address</span>
+                <span>{detail.ipAddress ?? "—"}</span>
+                <span className="text-muted-foreground">Created</span>
+                <span>{formatDate(detail.createdAt)}</span>
               </div>
 
-              <div>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">
-                  Before
-                </p>
-                <JsonBlock value={selectedLog.before} />
-              </div>
-
-              <div>
-                <p className="mb-1 text-xs font-medium text-muted-foreground">
-                  After
-                </p>
-                <JsonBlock value={selectedLog.after} />
-              </div>
+              {detail.before ?? detail.after ? (
+                <div className="grid gap-2">
+                  {detail.before ? (
+                    <div className="grid gap-1">
+                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Before
+                      </span>
+                      <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">
+                        {JSON.stringify(detail.before, null, 2)}
+                      </pre>
+                    </div>
+                  ) : null}
+                  {detail.after ? (
+                    <div className="grid gap-1">
+                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        After
+                      </span>
+                      <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">
+                        {JSON.stringify(detail.after, null, 2)}
+                      </pre>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
-          ) : (
-            <p className="py-4 text-center text-sm text-muted-foreground">
-              Failed to load detail.
-            </p>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </section>

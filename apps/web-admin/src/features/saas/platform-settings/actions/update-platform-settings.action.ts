@@ -1,20 +1,23 @@
 import { webAdminApi } from "@/lib/api-client";
 
-import type { PlatformSettings, PlatformSettingsFormValues } from "../types";
+import type {
+  PlatformSettingsActionResult,
+  PlatformSettingsFormValues,
+} from "../types";
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : "Failed to update platform settings.";
+}
 
 export async function updatePlatformSettingsAction(
   input: PlatformSettingsFormValues,
-): Promise<{ ok: true; data: PlatformSettings } | { ok: false; error: string }> {
+): Promise<PlatformSettingsActionResult> {
   try {
-    const data = await webAdminApi.saas.updatePlatformSettings(input);
-    return { ok: true, data };
+    const settings = await webAdminApi.saas.platformSettings.update(input);
+    return { ok: true, data: settings };
   } catch (error) {
-    return {
-      ok: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Failed to update platform settings.",
-    };
+    return { ok: false, error: getErrorMessage(error) };
   }
 }
