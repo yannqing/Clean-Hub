@@ -26,6 +26,10 @@ export type CreateServiceRequest = {
 
 export type UpdateServiceRequest = Partial<CreateServiceRequest>;
 
+export type UpdateServiceStatusRequest = {
+  status: ServiceStatus;
+};
+
 export type ServiceListQuery = {
   businessLine?: ServiceBusinessLine;
   status?: ServiceStatus;

@@ -77,7 +77,7 @@ async function requireTenantReadyForPrices(
 
   if (businessLine && !isBusinessLineEnabled(businessLine, tenant)) {
     throw new TenantPricesError(
-      "TENANT_FEATURE_DISABLED",
+      "FEATURE_DISABLED",
       "This business line is not enabled for the tenant.",
       403,
     );
@@ -132,9 +132,9 @@ export async function createTenantPriceBook(
     await writeAuditLog(tx, {
       actorUserId: authContext.userId,
       tenantId,
-      eventCategory: "tenant_prices",
-      eventType: "tenant_price_book.created",
-      entityType: "tenant_price_book",
+      eventCategory: "tenant_price",
+      eventType: "price.created",
+      entityType: "price",
       entityId: priceBook.id,
       after: priceBook,
       ipAddress: requestMeta.ipAddress,
@@ -154,11 +154,7 @@ export async function updateTenantPriceBook(
 ): Promise<PriceBookSummary> {
   const tenantId = requireTenantContext(authContext);
 
-  if (data.businessLine) {
-    await requireTenantReadyForPrices(db, tenantId, data.businessLine);
-  } else {
-    await requireTenantReadyForPrices(db, tenantId);
-  }
+  await requireTenantReadyForPrices(db, tenantId);
 
   if (data.name) {
     const duplicate = await findPriceBookByName(db, {
@@ -190,6 +186,12 @@ export async function updateTenantPriceBook(
       );
     }
 
+    await requireTenantReadyForPrices(
+      tx,
+      tenantId,
+      data.businessLine ?? before.businessLine,
+    );
+
     const priceBook = await updatePriceBookRecord(tx, {
       ...data,
       tenantId,
@@ -208,9 +210,9 @@ export async function updateTenantPriceBook(
     await writeAuditLog(tx, {
       actorUserId: authContext.userId,
       tenantId,
-      eventCategory: "tenant_prices",
-      eventType: "tenant_price_book.updated",
-      entityType: "tenant_price_book",
+      eventCategory: "tenant_price",
+      eventType: "price.updated",
+      entityType: "price",
       entityId: priceBookId,
       before,
       after: priceBook,
@@ -246,6 +248,8 @@ export async function deleteTenantPriceBook(
       );
     }
 
+    await requireTenantReadyForPrices(tx, tenantId, before.businessLine);
+
     const deleted = await softDeletePriceBookRecord(tx, {
       tenantId,
       priceBookId,
@@ -263,9 +267,9 @@ export async function deleteTenantPriceBook(
     await writeAuditLog(tx, {
       actorUserId: authContext.userId,
       tenantId,
-      eventCategory: "tenant_prices",
-      eventType: "tenant_price_book.deleted",
-      entityType: "tenant_price_book",
+      eventCategory: "tenant_price",
+      eventType: "price.deleted",
+      entityType: "price",
       entityId: priceBookId,
       before,
       after: {

@@ -23,6 +23,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createServiceAction,
   deleteServiceAction,
+  updateServiceStatusAction,
   updateServiceAction,
 } from "../actions";
 import { getServiceListQuery } from "../queries";
@@ -177,6 +178,23 @@ export function ServiceCatalogView() {
       await loadServices();
     } catch (deleteError) {
       setFormError(getErrorMessage(deleteError));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleStatusChange(service: ServiceSummary) {
+    setSaving(true);
+    setFormError(null);
+
+    try {
+      await updateServiceStatusAction(
+        service.id,
+        service.status === "active" ? "disabled" : "active",
+      );
+      await loadServices();
+    } catch (statusError) {
+      setFormError(getErrorMessage(statusError));
     } finally {
       setSaving(false);
     }
@@ -458,6 +476,15 @@ export function ServiceCatalogView() {
                     variant="outline"
                   >
                     Edit
+                  </Button>
+                  <Button
+                    disabled={saving}
+                    onClick={() => void handleStatusChange(service)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    {service.status === "active" ? "Disable" : "Enable"}
                   </Button>
                   <Button
                     disabled={saving}
