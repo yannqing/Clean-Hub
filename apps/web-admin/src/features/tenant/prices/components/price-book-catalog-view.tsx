@@ -23,6 +23,7 @@ import {
   createPriceBookAction,
   deletePriceBookAction,
   updatePriceBookAction,
+  updatePriceBookStatusAction,
 } from "../actions";
 import { getPriceBookListQuery } from "../queries";
 import type {
@@ -198,6 +199,26 @@ export function PriceBookCatalogView() {
       await loadPriceBooks();
     } catch (deleteError) {
       setFormError(getErrorMessage(deleteError));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleStatusChange(
+    priceBookId: string,
+    currentStatus: PriceBookStatus,
+  ) {
+    setSaving(true);
+    setFormError(null);
+
+    try {
+      await updatePriceBookStatusAction(
+        priceBookId,
+        currentStatus === "active" ? "disabled" : "active",
+      );
+      await loadPriceBooks();
+    } catch (statusError) {
+      setFormError(getErrorMessage(statusError));
     } finally {
       setSaving(false);
     }
@@ -483,6 +504,17 @@ export function PriceBookCatalogView() {
                   {formatDate(priceBook.effectiveTo)}
                 </TableCell>
                 <TableCell className="space-x-2 text-right">
+                  <Button
+                    disabled={saving}
+                    onClick={() =>
+                      void handleStatusChange(priceBook.id, priceBook.status)
+                    }
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    {priceBook.status === "active" ? "Disable" : "Activate"}
+                  </Button>
                   <Button
                     onClick={() => {
                       setEditingPriceBookId(priceBook.id);

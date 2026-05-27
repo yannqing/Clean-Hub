@@ -1,6 +1,6 @@
 import { webAdminApi } from "@/lib/api-client";
 
-import type { PriceBookFormValues } from "../types";
+import type { PriceBookFormValues, PriceBookStatus } from "../types";
 import { validatePriceBookUpdateForm } from "../validators";
 
 export async function updatePriceBookAction(
@@ -29,5 +29,19 @@ export async function deletePriceBookAction(priceBookId: string) {
 
   return {
     ok: true as const,
+  };
+}
+
+export async function updatePriceBookStatusAction(
+  priceBookId: string,
+  status: PriceBookStatus,
+) {
+  const priceBook = await webAdminApi.tenant.prices.update(priceBookId, {
+    status,
+  });
+
+  return {
+    ok: true as const,
+    data: priceBook,
   };
 }
