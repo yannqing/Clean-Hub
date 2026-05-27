@@ -9,6 +9,7 @@ import {
 
 import { writeAuditLog } from "../audit/audit.helper.js";
 import type {
+  TenantPilotStatus,
   TenantSettings,
   TenantSettingsLanguage,
   UpdateTenantSettingsRequest,
@@ -29,6 +30,14 @@ function resolveLanguage(value: string | null | undefined): TenantSettingsLangua
   return "en";
 }
 
+function resolvePilotStatus(value: string | null | undefined): TenantPilotStatus {
+  if (value === "live" || value === "paused") {
+    return value;
+  }
+
+  return "pilot";
+}
+
 export async function findTenantSettingsByTenantId(
   db: Database,
   tenantId: string,
@@ -41,6 +50,7 @@ export async function findTenantSettingsByTenantId(
       defaultLanguage: tenantSettings.defaultLanguage,
       defaultCurrency: tenantSettings.defaultCurrency,
       timezone: tenantSettings.timezone,
+      pilotStatus: tenantSettings.pilotStatus,
       settingsUpdatedAt: tenantSettings.updatedAt,
       settingsUpdatedBy: tenantSettings.updatedBy,
       settingsVersion: tenantSettings.version,
@@ -73,6 +83,7 @@ export async function findTenantSettingsByTenantId(
     defaultLanguage: resolveLanguage(row.defaultLanguage),
     defaultCurrency: row.defaultCurrency ?? "XOF",
     timezone: row.timezone ?? "UTC",
+    pilotStatus: resolvePilotStatus(row.pilotStatus),
     updatedAt: row.settingsUpdatedAt?.toISOString() ?? null,
     updatedBy: row.settingsUpdatedBy,
     version: row.settingsVersion ?? 0,

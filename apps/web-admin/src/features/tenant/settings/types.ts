@@ -1,5 +1,3 @@
-import type { AuthContext, AuthRequestMeta } from "../auth/auth.types.js";
-
 export type TenantSettingsLanguage = "en" | "fr" | "zh-CN";
 export type TenantPilotStatus = "pilot" | "live" | "paused";
 
@@ -30,18 +28,14 @@ export type TenantSettings = {
   featureFlags: TenantSettingsFeatureFlags;
 };
 
+export type TenantSettingsFormValues = {
+  defaultLanguage: TenantSettingsLanguage;
+  defaultCurrency: string;
+  timezone: string;
+};
+
 export type UpdateTenantSettingsRequest = {
   defaultLanguage?: TenantSettingsLanguage;
   defaultCurrency?: string;
   timezone?: string;
-};
-
-export type GetTenantSettingsInput = {
-  authContext: AuthContext;
-};
-
-export type UpdateTenantSettingsInput = {
-  authContext: AuthContext;
-  requestMeta?: AuthRequestMeta;
-  data: UpdateTenantSettingsRequest;
 };
