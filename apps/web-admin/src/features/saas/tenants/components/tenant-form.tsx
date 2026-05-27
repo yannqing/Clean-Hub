@@ -257,6 +257,112 @@ export function TenantForm({
         </section>
       ) : null}
 
+      {showDefaults ? (
+        <section className="grid gap-4 border-b p-5">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              Initial Owner
+            </h2>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="initial-owner-name">Owner name</Label>
+              <Input
+                aria-invalid={Boolean(errors.initialOwnerDisplayName)}
+                disabled={disabled || submitting}
+                id="initial-owner-name"
+                onChange={(event) =>
+                  updateValue("initialOwnerDisplayName", event.target.value)
+                }
+                value={values.initialOwnerDisplayName}
+              />
+              {errors.initialOwnerDisplayName ? (
+                <p className="text-xs text-destructive">
+                  {errors.initialOwnerDisplayName}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="initial-owner-email">Owner email</Label>
+              <Input
+                aria-invalid={Boolean(errors.initialOwnerEmail)}
+                disabled={disabled || submitting}
+                id="initial-owner-email"
+                onChange={(event) =>
+                  updateValue("initialOwnerEmail", event.target.value)
+                }
+                type="email"
+                value={values.initialOwnerEmail}
+              />
+              {errors.initialOwnerEmail ? (
+                <p className="text-xs text-destructive">
+                  {errors.initialOwnerEmail}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="initial-owner-phone">Owner phone</Label>
+              <Input
+                aria-invalid={Boolean(errors.initialOwnerPhone)}
+                disabled={disabled || submitting}
+                id="initial-owner-phone"
+                onChange={(event) =>
+                  updateValue("initialOwnerPhone", event.target.value)
+                }
+                value={values.initialOwnerPhone}
+              />
+              {errors.initialOwnerPhone ? (
+                <p className="text-xs text-destructive">
+                  {errors.initialOwnerPhone}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="initial-owner-pin">Owner PIN</Label>
+              <Input
+                aria-invalid={Boolean(errors.initialOwnerPin)}
+                disabled={disabled || submitting}
+                id="initial-owner-pin"
+                inputMode="numeric"
+                maxLength={6}
+                onChange={(event) =>
+                  updateValue("initialOwnerPin", event.target.value)
+                }
+                value={values.initialOwnerPin}
+              />
+              {errors.initialOwnerPin ? (
+                <p className="text-xs text-destructive">
+                  {errors.initialOwnerPin}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-2 md:col-span-2">
+              <Label htmlFor="initial-owner-password">Owner password</Label>
+              <Input
+                aria-invalid={Boolean(errors.initialOwnerPassword)}
+                disabled={disabled || submitting}
+                id="initial-owner-password"
+                onChange={(event) =>
+                  updateValue("initialOwnerPassword", event.target.value)
+                }
+                type="password"
+                value={values.initialOwnerPassword}
+              />
+              {errors.initialOwnerPassword ? (
+                <p className="text-xs text-destructive">
+                  {errors.initialOwnerPassword}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <section className="grid gap-4 p-5">
         <div>
           <h2 className="text-base font-semibold text-foreground">Contact</h2>

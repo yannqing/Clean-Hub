@@ -170,14 +170,69 @@ function validateCreateDefaults(input: TenantFormValues): {
   };
 }
 
+function validateInitialOwner(input: TenantFormValues): {
+  errors: Partial<Record<keyof TenantFormValues, string>>;
+  initialOwner: CreateTenantRequest["initialOwner"];
+} {
+  const errors: Partial<Record<keyof TenantFormValues, string>> = {};
+  const displayName = input.initialOwnerDisplayName.trim();
+  const email = normalizeOptional(input.initialOwnerEmail);
+  const phone = normalizeOptional(input.initialOwnerPhone);
+  const password = input.initialOwnerPassword;
+  const pin = input.initialOwnerPin.trim();
+
+  if (!displayName) {
+    errors.initialOwnerDisplayName = "Owner name is required.";
+  } else if (displayName.length > 120) {
+    errors.initialOwnerDisplayName = "Owner name must be 120 characters or fewer.";
+  }
+
+  if (!email) {
+    errors.initialOwnerEmail = "Owner email is required.";
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    errors.initialOwnerEmail = "Enter a valid owner email address.";
+  } else if (email.length > 320) {
+    errors.initialOwnerEmail = "Owner email must be 320 characters or fewer.";
+  }
+
+  if (phone && phone.length > 32) {
+    errors.initialOwnerPhone = "Owner phone must be 32 characters or fewer.";
+  }
+
+  if (password.length < 8) {
+    errors.initialOwnerPassword = "Owner password must be at least 8 characters.";
+  } else if (password.length > 128) {
+    errors.initialOwnerPassword = "Owner password must be 128 characters or fewer.";
+  }
+
+  if (!/^\d{4,6}$/.test(pin)) {
+    errors.initialOwnerPin = "Owner PIN must be 4 to 6 digits.";
+  }
+
+  return {
+    errors,
+    initialOwner: email
+      ? {
+          displayName,
+          email,
+          phone,
+          password,
+          pin,
+        }
+      : undefined,
+  };
+}
+
 export function validateTenantForm(
   input: TenantFormValues,
 ): TenantFormValidationResult<CreateTenantRequest> {
   const basics = validateTenantBasics(input);
   const settings = validateCreateDefaults(input);
+  const owner = validateInitialOwner(input);
   const errors = {
     ...basics.errors,
     ...settings.errors,
+    ...owner.errors,
   };
 
   if (Object.keys(errors).length > 0) {
@@ -199,6 +254,7 @@ export function validateTenantForm(
       contactName: normalizeOptional(input.contactName),
       contactPhone: normalizeOptional(input.contactPhone),
       contactEmail: basics.contactEmail,
+      initialOwner: owner.initialOwner,
     },
   };
 }

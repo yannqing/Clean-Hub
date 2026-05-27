@@ -8,6 +8,8 @@ export type TenantErrorCode =
   | "SAAS_TENANT_SETTINGS_UPDATE_EMPTY"
   | "SAAS_TENANT_FEATURE_FLAGS_UPDATE_EMPTY"
   | "SAAS_TENANT_PRESSING_CODE_CONFLICT"
+  | "OWNER_ALREADY_EXISTS"
+  | "TENANT_USER_EMAIL_CONFLICT"
   | "VALIDATION_ERROR"
   | "INVALID_CREDENTIALS"
   | "FORBIDDEN"
@@ -69,6 +71,17 @@ export type CreateTenantRequest = {
   contactPhone?: string;
   contactEmail?: string;
   status?: TenantStatus;
+  initialOwner?: {
+    displayName: string;
+    email: string;
+    phone?: string;
+    password: string;
+    pin: string;
+  };
+};
+
+export type CreateTenantResponse = TenantDetail & {
+  initialOwnerUserId?: string;
 };
 
 export type UpdateTenantRequest = {

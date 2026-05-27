@@ -1,6 +1,7 @@
 import type { TenantLanguage } from "@cleanhub/api-client";
 
 export type {
+  CreateTenantResponse,
   CreateTenantRequest,
   TenantDetail,
   TenantFeatureFlags,
@@ -27,6 +28,11 @@ export type TenantFormValues = {
   contactName: string;
   contactPhone: string;
   contactEmail: string;
+  initialOwnerDisplayName: string;
+  initialOwnerEmail: string;
+  initialOwnerPhone: string;
+  initialOwnerPassword: string;
+  initialOwnerPin: string;
 };
 
 export type TenantSettingsFormValues = {

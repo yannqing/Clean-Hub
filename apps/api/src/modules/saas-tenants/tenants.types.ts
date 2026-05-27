@@ -39,6 +39,13 @@ export type CreateSaasTenantRequest = {
   contactPhone?: string;
   contactEmail?: string;
   status?: SaasTenantStatus;
+  initialOwner?: {
+    displayName: string;
+    email: string;
+    phone?: string;
+    password: string;
+    pin: string;
+  };
 };
 
 export type CreateSaasTenantInput = {
@@ -154,6 +161,10 @@ export type SaasTenantDetail = SaasTenantListItem & {
   contactPhone: string | null;
   contactEmail: string | null;
   userCount: number;
+};
+
+export type CreateSaasTenantResult = SaasTenantDetail & {
+  initialOwnerUserId?: string;
 };
 
 export type SaasTenantAuditSnapshot = {

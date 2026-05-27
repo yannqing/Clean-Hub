@@ -1,6 +1,7 @@
 import type { ApiClient, QueryParams } from "../types";
 import type {
   CreateTenantRequest,
+  CreateTenantResponse,
   TenantDetail,
   TenantFeatureFlags,
   TenantListResponse,
@@ -16,7 +17,7 @@ export function createSaasTenantsApi(client: ApiClient) {
     list: (query?: QueryParams) =>
       client.get<TenantListResponse>("/saas/tenants", { query }),
     create: (input: CreateTenantRequest) =>
-      client.post<TenantDetail>("/saas/tenants", input),
+      client.post<CreateTenantResponse>("/saas/tenants", input),
     get: (tenantId: string) =>
       client.get<TenantDetail>(`/saas/tenants/${tenantId}`),
     update: (tenantId: string, input: UpdateTenantRequest) =>
