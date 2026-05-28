@@ -21,6 +21,11 @@ export const tenantFormFieldNames = [
   "contactName",
   "contactPhone",
   "contactEmail",
+  "initialOwnerDisplayName",
+  "initialOwnerEmail",
+  "initialOwnerPhone",
+  "initialOwnerPassword",
+  "initialOwnerPin",
 ] as const satisfies ReadonlyArray<keyof TenantFormValues>;
 
 export const tenantSettingsFieldNames = [
@@ -210,6 +215,24 @@ export function getTenantFormActionErrorResult(
         pressingCode: "A tenant with this pressing code already exists.",
       },
       message: "A tenant with this pressing code already exists.",
+    };
+  }
+
+  if (code === "TENANT_USER_EMAIL_CONFLICT") {
+    return {
+      ok: false,
+      errors: {
+        initialOwnerEmail: "A tenant user with this email already exists.",
+      },
+      message: "A tenant user with this email already exists.",
+    };
+  }
+
+  if (code === "OWNER_ALREADY_EXISTS") {
+    return {
+      ok: false,
+      errors: {},
+      message: "This tenant already has an active owner.",
     };
   }
 

@@ -29,6 +29,14 @@ const currencyCodeSchema = z.preprocess(
   z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code."),
 );
 
+const initialOwnerSchema = z.object({
+  displayName: z.string().trim().min(1).max(120),
+  email: z.string().trim().email().max(320),
+  phone: optionalStringSchema(32),
+  password: z.string().min(8).max(128),
+  pin: z.string().regex(/^\d{4,6}$/, "PIN must be 4 to 6 digits."),
+});
+
 export const listSaasTenantsQuerySchema = z.object({
   q: z.string().trim().min(1).optional(),
   status: saasTenantStatusSchema.optional(),
@@ -58,6 +66,7 @@ export const createSaasTenantBodySchema = z.object({
       z.string().trim().email().max(320).optional(),
     ),
   status: saasTenantStatusSchema.default("active"),
+  initialOwner: initialOwnerSchema.optional(),
 });
 
 export const updateSaasTenantBodySchema = z

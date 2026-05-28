@@ -29,6 +29,11 @@ export const tenantDefaultValues = {
   country: "Senegal",
   defaultCurrency: "XOF",
   defaultLanguage: "platform-default",
+  initialOwnerDisplayName: "",
+  initialOwnerEmail: "",
+  initialOwnerPassword: "",
+  initialOwnerPhone: "",
+  initialOwnerPin: "",
   name: "",
   pressingCode: "",
 } as const;

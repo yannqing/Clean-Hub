@@ -8,6 +8,10 @@ import {
   requireSaasRole,
   type SaasRole,
 } from "../auth/permission.helper.js";
+import {
+  createTenantOwnerUser,
+  TenantOwnerUserHelperError,
+} from "../tenant-users/tenant-users.helper.js";
 import { SaasTenantsError } from "./tenants.errors.js";
 import {
   createSaasTenantRecord,
@@ -32,6 +36,7 @@ import {
 } from "./tenants.repository.js";
 import type {
   CreateSaasTenantInput,
+  CreateSaasTenantResult,
   GetSaasTenantFeatureFlagsInput,
   GetSaasTenantSettingsInput,
   GetSaasTenantDetailInput,
@@ -167,7 +172,7 @@ export async function getSaasTenantDetail(
 export async function createSaasTenant(
   input: CreateSaasTenantInput,
   db: Database = getDb(),
-): Promise<SaasTenantDetail> {
+): Promise<CreateSaasTenantResult> {
   requireSaasTenantsAccess(input.authContext, ["super_admin"]);
 
   const pressingCode = normalizePressingCode(input.data.pressingCode);
@@ -190,19 +195,38 @@ export async function createSaasTenant(
         pressingCode,
         defaultLanguage,
       });
+      const initialOwner = input.data.initialOwner
+        ? await createTenantOwnerUser(tx, {
+            ...input.data.initialOwner,
+            tenantId: tenant.id,
+            actorUserId: input.authContext.userId,
+            ipAddress: input.requestMeta?.ipAddress,
+            userAgent: input.requestMeta?.userAgent,
+          })
+        : undefined;
+      const tenantWithUsers = initialOwner
+        ? await findSaasTenantDetailById(tx, tenant.id)
+        : tenant;
 
       await writeSaasTenantCreatedAuditLog(tx, {
         actorUserId: input.authContext.userId,
-        tenant,
+        tenant: tenantWithUsers ?? tenant,
         ipAddress: input.requestMeta?.ipAddress,
         userAgent: input.requestMeta?.userAgent,
       });
 
-      return tenant;
+      return {
+        ...(tenantWithUsers ?? tenant),
+        initialOwnerUserId: initialOwner?.id,
+      };
     });
   } catch (error) {
     if (isPressingCodeUniqueViolation(error)) {
       throw createPressingCodeConflictError();
+    }
+
+    if (error instanceof TenantOwnerUserHelperError) {
+      throw new SaasTenantsError(error.code, error.message, error.status);
     }
 
     throw error;

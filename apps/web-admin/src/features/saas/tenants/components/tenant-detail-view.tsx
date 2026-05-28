@@ -9,7 +9,7 @@ import { webAdminRoutes } from "@/config/routes";
 
 import { updateTenantAction, updateTenantStatusAction } from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
-import { tenantStatusLabels } from "../constants";
+import { tenantDefaultValues, tenantStatusLabels } from "../constants";
 import { getCurrentSaasAuthQuery, getTenantDetailQuery } from "../queries";
 import type { TenantDetail, TenantFormValues, TenantStatus } from "../types";
 import { TenantForm } from "./tenant-form";
@@ -20,6 +20,7 @@ type TenantDetailViewProps = {
 
 function toFormValues(tenant: TenantDetail): TenantFormValues {
   return {
+    ...tenantDefaultValues,
     name: tenant.name,
     pressingCode: tenant.pressingCode,
     country: tenant.country ?? "",
