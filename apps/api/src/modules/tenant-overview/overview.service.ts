@@ -1,10 +1,10 @@
 import { getDb, type Database } from "@cleanhub/db";
 
-import { AuthError } from "../auth/auth.errors.js";
 import {
   assertActiveTenant,
   requireTenantRole,
 } from "../auth/permission.helper.js";
+import { TenantOverviewError } from "./overview.errors.js";
 import { findTenantOverviewBase } from "./overview.repository.js";
 import type { TenantOverview, TenantOverviewInput } from "./overview.types.js";
 
@@ -19,9 +19,10 @@ export async function getTenantOverview(
   const overview = await findTenantOverviewBase(db, tenantId);
 
   if (!overview) {
-    throw new AuthError(
-      "FEATURE_DISABLED",
-      "Tenant overview requires active tenant feature flags.",
+    throw new TenantOverviewError(
+      "TENANT_OVERVIEW_NOT_FOUND",
+      "Tenant overview is not available for the current tenant.",
+      404,
     );
   }
 
