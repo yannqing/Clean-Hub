@@ -29,10 +29,18 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Tenant overview failed to load.";
 }
 
-export function TenantOverviewView() {
-  const [overview, setOverview] = useState<TenantOverview | null>(null);
+export type TenantOverviewViewProps = {
+  initialOverview?: TenantOverview;
+};
+
+export function TenantOverviewView({
+  initialOverview,
+}: TenantOverviewViewProps = {}) {
+  const [overview, setOverview] = useState<TenantOverview | null>(
+    initialOverview ?? null,
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialOverview);
   const enabledFeatureCount = useMemo(() => {
     if (!overview) {
       return 0;
@@ -42,6 +50,13 @@ export function TenantOverviewView() {
   }, [overview]);
 
   useEffect(() => {
+    if (initialOverview) {
+      setOverview(initialOverview);
+      setErrorMessage(null);
+      setLoading(false);
+      return;
+    }
+
     let isCurrent = true;
 
     getTenantOverviewQuery()
@@ -70,7 +85,7 @@ export function TenantOverviewView() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [initialOverview]);
 
   if (loading) {
     return (
