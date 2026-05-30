@@ -1,9 +1,6 @@
 import { webAdminApi } from "@/lib/api-client";
 
-import type {
-  NotificationSettingsFormValues,
-  TenantNotificationSettings,
-} from "../types";
+import type { NotificationSettingsFormValues } from "../types";
 import { validateNotificationSettings } from "../validators";
 
 export async function updateNotificationSettingsAction(
@@ -15,10 +12,8 @@ export async function updateNotificationSettingsAction(
     return validation;
   }
 
-  const settings = await webAdminApi.http.patch<TenantNotificationSettings>(
-    "/tenant/notification-settings",
-    validation.data,
-  );
+  const settings =
+    await webAdminApi.tenant.notifications.updateSettings(validation.data);
 
   return {
     ok: true as const,

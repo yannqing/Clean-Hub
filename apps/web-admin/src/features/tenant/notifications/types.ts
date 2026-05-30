@@ -1,32 +1,12 @@
-export type NotificationLanguage = "en" | "fr" | "zh-CN";
-export type NotificationChannel = "whatsapp" | "sms" | "email";
-export type NotificationEvent =
-  | "order.created"
-  | "order.ready"
-  | "order.overdue_pickup"
-  | "delivery.updated";
+import type { NotificationSettingsValue } from "@cleanhub/api-client";
 
-export type NotificationChannelSettings = Record<NotificationChannel, boolean>;
-
-export type NotificationTemplateSettings = Record<
+export type {
+  NotificationChannel,
+  NotificationChannelSettings,
   NotificationEvent,
-  {
-    enabled: boolean;
-    templateKey: string;
-  }
->;
+  NotificationLanguage,
+  NotificationTemplateSettings,
+  TenantNotificationSettings,
+} from "@cleanhub/api-client";
 
-export type NotificationSettingsFormValues = {
-  defaultLanguage: NotificationLanguage;
-  channels: NotificationChannelSettings;
-  templates: NotificationTemplateSettings;
-};
-
-export type TenantNotificationSettings = NotificationSettingsFormValues & {
-  id: string;
-  tenantId: string;
-  deliveryMode: "not_connected";
-  updatedAt: string;
-  updatedBy: string | null;
-  version: number;
-};
+export type NotificationSettingsFormValues = NotificationSettingsValue;
