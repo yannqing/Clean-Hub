@@ -1,5 +1,6 @@
 "use client";
 
+import type { AuthContext } from "@cleanhub/api-client";
 import {
   Badge,
   Button,
@@ -13,6 +14,8 @@ import {
   toast,
 } from "@cleanhub/ui";
 import { useEffect, useMemo, useState } from "react";
+
+import { webAdminApi } from "@/lib/api-client";
 
 import { updateTenantSettingsAction } from "../actions";
 import {
@@ -53,6 +56,7 @@ function formatDate(value: string | null): string {
 }
 
 export function TenantSettingsView() {
+  const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [settings, setSettings] = useState<TenantSettings | null>(null);
   const [form, setForm] = useState<TenantSettingsFormValues>({
     defaultLanguage: "en",
@@ -75,24 +79,35 @@ export function TenantSettingsView() {
       (option) => settings.featureFlags[option.key],
     ).length;
   }, [settings]);
+  const canUpdateSettings =
+    authContext?.role === "owner" &&
+    authContext.tenantId === settings?.tenantId;
+  const formDisabled = saving || !canUpdateSettings;
 
   useEffect(() => {
     let isCurrent = true;
 
-    getTenantSettingsQuery()
-      .then((data) => {
+    Promise.allSettled([getTenantSettingsQuery(), webAdminApi.auth.me()])
+      .then(([settingsResult, authResult]) => {
         if (!isCurrent) {
           return;
         }
 
-        setSettings(data);
-        setForm(toFormValues(data));
-        setLoadError(null);
-      })
-      .catch((error: unknown) => {
-        if (isCurrent) {
-          setLoadError(getErrorMessage(error));
+        if (authResult.status === "fulfilled") {
+          setAuthContext(authResult.value);
+        } else {
+          setAuthContext(null);
         }
+
+        if (settingsResult.status === "fulfilled") {
+          setSettings(settingsResult.value);
+          setForm(toFormValues(settingsResult.value));
+          setLoadError(null);
+          return;
+        }
+
+        setSettings(null);
+        setLoadError(getErrorMessage(settingsResult.reason));
       })
       .finally(() => {
         if (isCurrent) {
@@ -122,6 +137,14 @@ export function TenantSettingsView() {
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!canUpdateSettings) {
+      const message = "Only tenant owners can update tenant settings.";
+      setSaveError(message);
+      toast.error(message);
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
 
@@ -202,7 +225,7 @@ export function TenantSettingsView() {
           <div className="grid gap-2">
             <Label htmlFor="tenant-default-language">Default language</Label>
             <Select
-              disabled={saving}
+              disabled={formDisabled}
               onValueChange={(value) =>
                 updateForm("defaultLanguage", value as TenantSettingsLanguage)
               }
@@ -230,7 +253,7 @@ export function TenantSettingsView() {
             <Label htmlFor="tenant-default-currency">Default currency</Label>
             <Input
               aria-invalid={Boolean(errors.defaultCurrency)}
-              disabled={saving}
+              disabled={formDisabled}
               id="tenant-default-currency"
               maxLength={3}
               onChange={(event) =>
@@ -249,7 +272,7 @@ export function TenantSettingsView() {
             <Label htmlFor="tenant-timezone">Timezone</Label>
             <Input
               aria-invalid={Boolean(errors.timezone)}
-              disabled={saving}
+              disabled={formDisabled}
               id="tenant-timezone"
               onChange={(event) => updateForm("timezone", event.target.value)}
               placeholder="Africa/Dakar"
@@ -266,8 +289,15 @@ export function TenantSettingsView() {
             </div>
           ) : null}
 
+          {!canUpdateSettings ? (
+            <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+              Only tenant owners can update these defaults. Managers can view
+              settings and feature flags.
+            </div>
+          ) : null}
+
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <Button disabled={saving} type="submit">
+            <Button disabled={formDisabled} type="submit">
               {saving ? "Saving..." : "Save settings"}
             </Button>
             <p className="text-xs text-muted-foreground">

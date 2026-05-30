@@ -14,6 +14,7 @@ export const updateTenantSettingsBodySchema = z
     defaultCurrency: currencyCodeSchema.optional(),
     timezone: z.string().trim().min(1).max(64).optional(),
   })
+  .strict()
   .refine(
     (data) => Object.values(data).some((value) => value !== undefined),
     "At least one tenant setting must be provided.",
