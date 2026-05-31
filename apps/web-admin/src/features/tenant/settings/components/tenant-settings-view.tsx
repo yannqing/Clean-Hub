@@ -13,7 +13,7 @@ import {
   SelectValue,
   toast,
 } from "@cleanhub/ui";
-import { useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { webAdminApi } from "@/lib/api-client";
 
@@ -55,18 +55,30 @@ function formatDate(value: string | null): string {
   }).format(new Date(value));
 }
 
-export function TenantSettingsView() {
-  const [authContext, setAuthContext] = useState<AuthContext | null>(null);
-  const [settings, setSettings] = useState<TenantSettings | null>(null);
-  const [form, setForm] = useState<TenantSettingsFormValues>({
-    defaultLanguage: "en",
-    defaultCurrency: "XOF",
-    timezone: "UTC",
-  });
+const defaultFormValues: TenantSettingsFormValues = {
+  defaultLanguage: "en",
+  defaultCurrency: "XOF",
+  timezone: "UTC",
+};
+
+export type TenantSettingsViewProps = {
+  initialSettings?: TenantSettings;
+};
+
+export function TenantSettingsView({
+  initialSettings,
+}: TenantSettingsViewProps = {}) {
+  const { authContext, setAuthContext } = useState<AuthContext | null>(null);
+  const [settings, setSettings] = useState<TenantSettings | null>(
+    initialSettings ?? null,
+  );
+  const [form, setForm] = useState<TenantSettingsFormValues>(
+    initialSettings ? toFormValues(initialSettings) : defaultFormValues,
+  );
   const [errors, setErrors] = useState<
     Partial<Record<keyof TenantSettingsFormValues, string>>
   >({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initialSettings);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -85,6 +97,14 @@ export function TenantSettingsView() {
   const formDisabled = saving || !canUpdateSettings;
 
   useEffect(() => {
+    if (initialSettings) {
+      setSettings(initialSettings);
+      setForm(toFormValues(initialSettings));
+      setLoadError(null);
+      setLoading(false);
+      return;
+    }
+
     let isCurrent = true;
 
     Promise.allSettled([getTenantSettingsQuery(), webAdminApi.auth.me()])
@@ -118,7 +138,7 @@ export function TenantSettingsView() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [initialSettings]);
 
   function updateForm<K extends keyof TenantSettingsFormValues>(
     key: K,
@@ -135,7 +155,7 @@ export function TenantSettingsView() {
     setSaveError(null);
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (!canUpdateSettings) {
@@ -148,20 +168,27 @@ export function TenantSettingsView() {
     setSaving(true);
     setSaveError(null);
 
-    const result = await updateTenantSettingsAction(form);
+    try {
+      const result = await updateTenantSettingsAction(form);
 
-    if (result.ok) {
-      setSettings(result.data);
-      setForm(toFormValues(result.data));
+      if (result.ok) {
+        setSettings(result.data);
+        setForm(toFormValues(result.data));
+        setErrors({});
+        toast.success("Tenant settings updated.");
+      } else {
+        setErrors(result.errors);
+        setSaveError(result.message);
+        toast.error(result.message);
+      }
+    } catch (error) {
+      const message = getErrorMessage(error);
       setErrors({});
-      toast.success("Tenant settings updated.");
-    } else {
-      setErrors(result.errors);
-      setSaveError(result.message);
-      toast.error(result.message);
+      setSaveError(message);
+      toast.error(message);
+    } finally {
+      setSaving(false);
     }
-
-    setSaving(false);
   }
 
   if (loading) {
