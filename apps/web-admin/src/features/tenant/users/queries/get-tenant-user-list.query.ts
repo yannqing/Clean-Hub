@@ -1,5 +1,16 @@
+import { webAdminApi } from "@/lib/api-client";
+
 import type { TenantUserSummary } from "../types";
 
-export async function getTenantUserListQuery(): Promise<TenantUserSummary[]> {
-  return [];
+export type TenantUserListQuery = {
+  limit?: number;
+  offset?: number;
+  q?: string;
+  status?: string;
+};
+
+export async function getTenantUserListQuery(
+  query?: TenantUserListQuery,
+): Promise<TenantUserSummary[]> {
+  return webAdminApi.tenant.users.list(query);
 }

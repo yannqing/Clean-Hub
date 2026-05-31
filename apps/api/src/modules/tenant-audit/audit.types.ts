@@ -1,7 +1,6 @@
 import type { AuthContext } from "../auth/auth.types.js";
 
-export type ListAuditLogsQuery = {
-  tenantId?: string;
+export type ListTenantAuditLogsQuery = {
   actorUserId?: string;
   eventCategory?: string;
   eventType?: string;
@@ -14,7 +13,7 @@ export type ListAuditLogsQuery = {
   offset: number;
 };
 
-export type AuditLogListItem = {
+export type TenantAuditLogListItem = {
   id: string;
   tenantId: string | null;
   actorUserId: string | null;
@@ -28,7 +27,7 @@ export type AuditLogListItem = {
   createdAt: string;
 };
 
-export type AuditLogDetail = AuditLogListItem & {
+export type TenantAuditLogDetail = TenantAuditLogListItem & {
   branchId: string | null;
   userAgent: string | null;
   before: Record<string, unknown> | null;
@@ -36,17 +35,17 @@ export type AuditLogDetail = AuditLogListItem & {
   metadata: Record<string, unknown> | null;
 };
 
-export type ListAuditLogsResult = {
-  items: AuditLogListItem[];
+export type TenantAuditLogListResult = {
+  items: TenantAuditLogListItem[];
   total: number;
 };
 
-export type ListAuditLogsInput = {
+export type ListTenantAuditLogsInput = {
   authContext: AuthContext;
-  query: ListAuditLogsQuery;
+  query: ListTenantAuditLogsQuery;
 };
 
-export type GetAuditLogDetailInput = {
+export type GetTenantAuditLogDetailInput = {
   authContext: AuthContext;
   logId: string;
 };

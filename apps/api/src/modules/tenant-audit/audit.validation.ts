@@ -2,8 +2,7 @@ import { z } from "zod";
 
 const ulidSchema = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/);
 
-export const listAuditLogsQuerySchema = z.object({
-  tenantId: ulidSchema.optional(),
+export const listTenantAuditLogsQuerySchema = z.object({
   actorUserId: ulidSchema.optional(),
   eventCategory: z.string().trim().min(1).max(80).optional(),
   eventType: z.string().trim().min(1).max(120).optional(),
@@ -19,6 +18,6 @@ export const listAuditLogsQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-export const getAuditLogParamsSchema = z.object({
+export const getTenantAuditLogParamsSchema = z.object({
   logId: ulidSchema,
 });
