@@ -3,13 +3,13 @@ import { and, count, desc, eq, gte, lte, type SQL } from "drizzle-orm";
 import { auditLogs, type Database } from "@cleanhub/db";
 
 import type {
-  AuditLogDetail,
-  AuditLogListItem,
-  ListAuditLogsQuery,
-  ListAuditLogsResult,
+  ListTenantAuditLogsQuery,
+  TenantAuditLogDetail,
+  TenantAuditLogListItem,
+  TenantAuditLogListResult,
 } from "./audit.types.js";
 
-function toAuditLogListItem(row: {
+function toTenantAuditLogListItem(row: {
   id: string;
   tenantId: string | null;
   actorUserId: string | null;
@@ -21,7 +21,7 @@ function toAuditLogListItem(row: {
   reason: string | null;
   ipAddress: string | null;
   createdAt: Date;
-}): AuditLogListItem {
+}): TenantAuditLogListItem {
   return {
     id: row.id,
     tenantId: row.tenantId,
@@ -37,9 +37,12 @@ function toAuditLogListItem(row: {
   };
 }
 
-function buildWhereClause(query: ListAuditLogsQuery): SQL | undefined {
+function buildWhereClause(
+  tenantId: string,
+  query: ListTenantAuditLogsQuery,
+): SQL | undefined {
   const conditions: (SQL | undefined)[] = [
-    query.tenantId ? eq(auditLogs.tenantId, query.tenantId) : undefined,
+    eq(auditLogs.tenantId, tenantId),
     query.actorUserId ? eq(auditLogs.actorUserId, query.actorUserId) : undefined,
     query.eventCategory ? eq(auditLogs.eventCategory, query.eventCategory) : undefined,
     query.eventType ? eq(auditLogs.eventType, query.eventType) : undefined,
@@ -53,11 +56,12 @@ function buildWhereClause(query: ListAuditLogsQuery): SQL | undefined {
   return and(...conditions);
 }
 
-export async function findAuditLogs(
+export async function findTenantAuditLogs(
   db: Database,
-  query: ListAuditLogsQuery,
-): Promise<ListAuditLogsResult> {
-  const whereClause = buildWhereClause(query);
+  tenantId: string,
+  query: ListTenantAuditLogsQuery,
+): Promise<TenantAuditLogListResult> {
+  const whereClause = buildWhereClause(tenantId, query);
 
   const [rows, totalRows] = await Promise.all([
     db
@@ -79,26 +83,24 @@ export async function findAuditLogs(
       .orderBy(desc(auditLogs.createdAt))
       .limit(query.limit)
       .offset(query.offset),
-    db
-      .select({ value: count() })
-      .from(auditLogs)
-      .where(whereClause),
+    db.select({ value: count() }).from(auditLogs).where(whereClause),
   ]);
 
   return {
-    items: rows.map(toAuditLogListItem),
+    items: rows.map(toTenantAuditLogListItem),
     total: totalRows[0]?.value ?? 0,
   };
 }
 
-export async function findAuditLogById(
+export async function findTenantAuditLogById(
   db: Database,
+  tenantId: string,
   logId: string,
-): Promise<AuditLogDetail | null> {
+): Promise<TenantAuditLogDetail | null> {
   const rows = await db
     .select()
     .from(auditLogs)
-    .where(eq(auditLogs.id, logId))
+    .where(and(eq(auditLogs.id, logId), eq(auditLogs.tenantId, tenantId)))
     .limit(1);
 
   const row = rows[0];
