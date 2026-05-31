@@ -1,6 +1,7 @@
 import type { ApiClient, QueryParams } from "../types";
 import { createTenantBranchesApi } from "./branches";
 import { createTenantHardwareApi } from "./hardware";
+import { createTenantNotificationsApi } from "./notifications";
 import { createTenantPricesApi } from "./prices";
 import { createTenantReportsApi } from "./reports";
 import { createTenantServicesApi } from "./services";
@@ -10,6 +11,8 @@ export * from "./branches";
 export * from "./branches.types";
 export * from "./hardware";
 export * from "./hardware.types";
+export * from "./notifications";
+export * from "./notifications.types";
 export * from "./prices";
 export * from "./prices.types";
 export * from "./reports";
@@ -25,6 +28,7 @@ export function createTenantApi(client: ApiClient) {
   const services = createTenantServicesApi(client);
   const prices = createTenantPricesApi(client);
   const hardware = createTenantHardwareApi(client);
+  const notifications = createTenantNotificationsApi(client);
   const reports = createTenantReportsApi(client);
 
   return {
@@ -33,6 +37,7 @@ export function createTenantApi(client: ApiClient) {
     services,
     prices,
     hardware,
+    notifications,
     reports,
     listBranches: (query?: QueryParams) => branches.list(query),
     listUsers: (query?: QueryParams) => users.list(query),
