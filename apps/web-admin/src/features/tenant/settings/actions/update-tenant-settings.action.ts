@@ -2,6 +2,7 @@
 
 import { webAdminApi } from "@/lib/api-client";
 
+import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
 import type { TenantSettings, TenantSettingsFormValues } from "../types";
 import { validateTenantSettingsForm } from "../validators";
 
@@ -40,6 +41,7 @@ export async function updateTenantSettingsAction(
     const settings = await webAdminApi.http.patch<TenantSettings>(
       "/tenant/settings",
       validation.data,
+      await getTenantServerApiRequestOptions(),
     );
 
     return {
