@@ -2,6 +2,7 @@
 
 import type { AuthContext } from "@cleanhub/api-client";
 import { Card, CardContent, cn } from "@cleanhub/ui";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
@@ -9,7 +10,7 @@ import { LanguageSwitcher } from "@/components/i18n";
 import { webAdminWorkspaceTabs } from "@/config/navigation";
 import { webAdminRoutes } from "@/config/routes";
 import { LogoutButton } from "@/features/auth/components";
-import { WebAdminLocaleProvider, useWebAdminLocale } from "@/i18n";
+import { useWebAdminLocale } from "@/i18n";
 import { webAdminApi } from "@/lib/api-client";
 
 type AdminDashboardShellProps = {
@@ -56,7 +57,7 @@ function getProfileInitials(authContext: AuthContext | null): string {
     .join("");
 }
 
-function AdminDashboardShellContent({
+export function AdminDashboardShell({
   children,
   scope,
 }: AdminDashboardShellProps) {
@@ -134,7 +135,7 @@ function AdminDashboardShellContent({
                     const active = isActivePath(pathname, item.href);
 
                     return (
-                      <a
+                      <Link
                         aria-current={active ? "page" : undefined}
                         className={cn(
                           "group relative flex h-9 items-center rounded-md px-3 text-sm font-medium transition-colors",
@@ -154,7 +155,7 @@ function AdminDashboardShellContent({
                           )}
                         />
                         <span className="truncate">{item.label}</span>
-                      </a>
+                      </Link>
                     );
                   })}
                 </div>
@@ -164,7 +165,7 @@ function AdminDashboardShellContent({
 
           <div className="border-t pt-4">
             <div className="flex items-center gap-2">
-              <a
+              <Link
                 aria-current={profileActive ? "page" : undefined}
                 className={cn(
                   "group flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 transition-colors",
@@ -187,7 +188,7 @@ function AdminDashboardShellContent({
                     {messages.common.personalCenter}
                   </span>
                 </span>
-              </a>
+              </Link>
 
               <LogoutButton
                 className="h-9 px-3 text-xs"
@@ -223,7 +224,7 @@ function AdminDashboardShellContent({
                     const active = isActivePath(pathname, tab.href);
 
                     return (
-                      <a
+                      <Link
                         aria-current={active ? "page" : undefined}
                         aria-selected={active}
                         className={cn(
@@ -239,7 +240,7 @@ function AdminDashboardShellContent({
                         role="tab"
                       >
                         {tab.label}
-                      </a>
+                      </Link>
                     );
                   })}
                 </div>
@@ -255,13 +256,5 @@ function AdminDashboardShellContent({
         </div>
       </div>
     </div>
-  );
-}
-
-export function AdminDashboardShell(props: AdminDashboardShellProps) {
-  return (
-    <WebAdminLocaleProvider>
-      <AdminDashboardShellContent {...props} />
-    </WebAdminLocaleProvider>
   );
 }

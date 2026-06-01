@@ -27,3 +27,7 @@ export function parseWebAdminLocale(value: string | null | undefined): WebAdminL
 
   return webAdminDefaultLocale;
 }
+
+export function getWebAdminHtmlLang(locale: WebAdminLocale): string {
+  return locale === "zh-CN" ? "zh-CN" : "en";
+}

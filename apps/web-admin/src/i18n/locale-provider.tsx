@@ -11,6 +11,7 @@ import {
 
 import { webAdminMessages } from "./messages";
 import {
+  getWebAdminHtmlLang,
   parseWebAdminLocale,
   webAdminDefaultLocale,
   webAdminLocaleCookieName,
@@ -44,19 +45,29 @@ function writeLocaleCookie(locale: WebAdminLocale): void {
   document.cookie = `${webAdminLocaleCookieName}=${encodeURIComponent(locale)}; path=/; max-age=${maxAgeSeconds}; samesite=lax`;
 }
 
+function resolveInitialLocale(initialLocale?: WebAdminLocale): WebAdminLocale {
+  if (initialLocale) {
+    return initialLocale;
+  }
+
+  return readLocaleFromCookie();
+}
+
 type WebAdminLocaleProviderProps = {
   children: React.ReactNode;
+  initialLocale?: WebAdminLocale;
 };
 
-export function WebAdminLocaleProvider({ children }: WebAdminLocaleProviderProps) {
-  const [locale, setLocaleState] = useState<WebAdminLocale>(webAdminDefaultLocale);
+export function WebAdminLocaleProvider({
+  children,
+  initialLocale,
+}: WebAdminLocaleProviderProps) {
+  const [locale, setLocaleState] = useState<WebAdminLocale>(() =>
+    resolveInitialLocale(initialLocale),
+  );
 
   useEffect(() => {
-    setLocaleState(readLocaleFromCookie());
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.lang = locale === "zh-CN" ? "zh-CN" : "en";
+    document.documentElement.lang = getWebAdminHtmlLang(locale);
   }, [locale]);
 
   const setLocale = useCallback((nextLocale: WebAdminLocale) => {

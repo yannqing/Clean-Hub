@@ -1,13 +1,28 @@
 "use client";
 
-import { cn } from "@cleanhub/ui";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  cn,
+} from "@cleanhub/ui";
 
-import { useWebAdminLocale, type WebAdminLocale } from "@/i18n";
+import { useSaasI18n, useWebAdminLocale, type WebAdminLocale } from "@/i18n";
 
-const localeOptions: { value: WebAdminLocale; label: string }[] = [
-  { value: "en", label: "EN" },
-  { value: "zh-CN", label: "中文" },
-];
+const localeOptions: WebAdminLocale[] = ["en", "zh-CN"];
+
+function getLocaleLabel(
+  languageLabels: ReturnType<typeof useSaasI18n>["m"]["common"]["languageLabels"],
+  locale: WebAdminLocale,
+): string {
+  if (locale === "zh-CN") {
+    return languageLabels.zhCN;
+  }
+
+  return languageLabels.en;
+}
 
 type LanguageSwitcherProps = {
   className?: string;
@@ -15,38 +30,32 @@ type LanguageSwitcherProps = {
 
 export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
   const { locale, setLocale, messages } = useWebAdminLocale();
+  const { m } = useSaasI18n();
 
   return (
-    <div
-      aria-label={messages.common.language}
-      className={cn(
-        "inline-flex w-fit gap-1 rounded-lg border bg-muted p-1",
-        className,
-      )}
-      role="group"
+    <Select
+      onValueChange={(value) => setLocale(value as WebAdminLocale)}
+      value={locale}
     >
-      {localeOptions.map((option) => {
-        const active = locale === option.value;
-
-        return (
-          <button
-            aria-pressed={active}
-            className={cn(
-              "inline-flex h-8 min-w-[3.25rem] items-center justify-center rounded-md px-3 text-sm font-medium transition-colors",
-              "hover:bg-background hover:text-foreground",
-              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              active
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground",
-            )}
-            key={option.value}
-            onClick={() => setLocale(option.value)}
-            type="button"
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
+      <SelectTrigger
+        aria-label={messages.common.language}
+        className={cn("h-9 w-[9.5rem]", className)}
+      >
+        <SelectValue placeholder={messages.common.language} />
+      </SelectTrigger>
+      <SelectContent
+        align="end"
+        avoidCollisions={false}
+        position="popper"
+        side="bottom"
+        sideOffset={4}
+      >
+        {localeOptions.map((option) => (
+          <SelectItem key={option} value={option}>
+            {getLocaleLabel(m.common.languageLabels, option)}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
