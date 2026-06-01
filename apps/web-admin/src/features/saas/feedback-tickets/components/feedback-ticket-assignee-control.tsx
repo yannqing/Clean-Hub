@@ -3,6 +3,7 @@
 import { Button, Input, Label, toast } from "@cleanhub/ui";
 import { useState } from "react";
 
+import { useSaasI18n } from "@/i18n";
 import { updateFeedbackTicketAssigneeAction } from "../actions";
 import type { FeedbackTicketDetail } from "../types";
 
@@ -17,6 +18,7 @@ export function FeedbackTicketAssigneeControl({
   ticketId,
   onUpdated,
 }: FeedbackTicketAssigneeControlProps) {
+  const { m } = useSaasI18n();
   const [value, setValue] = useState(assigneeUserId ?? "");
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,7 +31,7 @@ export function FeedbackTicketAssigneeControl({
     });
 
     if (result.ok) {
-      toast.success("Feedback assignee updated.");
+      toast.success(m.feedback.assignee.updated);
       setValue(result.data.assigneeUserId ?? "");
       onUpdated(result.data);
     } else {
@@ -42,11 +44,13 @@ export function FeedbackTicketAssigneeControl({
   return (
     <form className="grid gap-3" onSubmit={handleSubmit}>
       <div className="grid gap-2">
-        <Label htmlFor={`feedback-assignee-${ticketId}`}>Assignee ID</Label>
+        <Label htmlFor={`feedback-assignee-${ticketId}`}>
+          {m.feedback.assignee.label}
+        </Label>
         <Input
           id={`feedback-assignee-${ticketId}`}
           onChange={(event) => setValue(event.target.value)}
-          placeholder="SaaS user ULID, or leave empty"
+          placeholder={m.feedback.assignee.placeholder}
           value={value}
         />
       </div>
@@ -56,7 +60,7 @@ export function FeedbackTicketAssigneeControl({
         type="submit"
         variant="outline"
       >
-        {submitting ? "Saving..." : "Update assignee"}
+        {submitting ? m.common.saving : m.feedback.assignee.submit}
       </Button>
     </form>
   );

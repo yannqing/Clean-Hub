@@ -3,6 +3,7 @@
 import { Badge, Button } from "@cleanhub/ui";
 import { useCallback, useEffect, useState } from "react";
 
+import { useSaasI18n } from "@/i18n";
 import { securitySettingsDefaultValues } from "../constants";
 import { getSecuritySettingsQuery } from "../queries";
 import type { SecuritySettings } from "../types";
@@ -10,9 +11,7 @@ import { SecurityEventListView } from "./security-event-list-view";
 import { SecuritySettingsForm } from "./security-settings-form";
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Failed to load security settings.";
+  return error instanceof Error ? error.message : "";
 }
 
 function toFormValues(settings: SecuritySettings) {
@@ -27,6 +26,7 @@ function toFormValues(settings: SecuritySettings) {
 }
 
 export function SecurityPageView() {
+  const { m } = useSaasI18n();
   const [settings, setSettings] = useState<SecuritySettings | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(true);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -39,7 +39,7 @@ export function SecurityPageView() {
       const data = await getSecuritySettingsQuery();
       setSettings(data);
     } catch (loadError) {
-      setSettingsError(getErrorMessage(loadError));
+      setSettingsError(getErrorMessage(loadError) || m.security.page.loadError);
     } finally {
       setLoadingSettings(false);
     }
@@ -59,7 +59,7 @@ export function SecurityPageView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setSettingsError(getErrorMessage(loadError));
+          setSettingsError(getErrorMessage(loadError) || m.security.page.loadError);
         }
       })
       .finally(() => {
@@ -71,20 +71,20 @@ export function SecurityPageView() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [m.security.page.loadError]);
 
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">SaaS security</Badge>
+          <Badge variant="secondary">{m.security.page.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Security Management
+            {m.security.page.title}
           </h1>
         </div>
 
         <Button onClick={loadSettings} type="button" variant="outline">
-          Refresh settings
+          {m.security.page.refreshSettings}
         </Button>
       </div>
 

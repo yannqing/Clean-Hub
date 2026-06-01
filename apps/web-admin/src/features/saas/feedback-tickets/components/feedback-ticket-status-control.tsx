@@ -13,6 +13,7 @@ import {
 } from "@cleanhub/ui";
 import { useState } from "react";
 
+import { useSaasI18n } from "@/i18n";
 import { updateFeedbackTicketStatusAction } from "../actions";
 import { feedbackTicketStatusOptions } from "../constants";
 import type {
@@ -32,6 +33,7 @@ export function FeedbackTicketStatusControl({
   status,
   onUpdated,
 }: FeedbackTicketStatusControlProps) {
+  const { m } = useSaasI18n();
   const [value, setValue] = useState<FeedbackTicketStatus>(status);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -47,7 +49,7 @@ export function FeedbackTicketStatusControl({
     const result = await updateFeedbackTicketStatusAction(ticketId, input);
 
     if (result.ok) {
-      toast.success("Feedback status updated.");
+      toast.success(m.feedback.status.updated);
       setReason("");
       onUpdated(result.data);
     } else {
@@ -60,7 +62,7 @@ export function FeedbackTicketStatusControl({
   return (
     <form className="grid gap-3" onSubmit={handleSubmit}>
       <div className="grid gap-2">
-        <Label htmlFor={`feedback-status-${ticketId}`}>Status</Label>
+        <Label htmlFor={`feedback-status-${ticketId}`}>{m.feedback.status.label}</Label>
         <Select
           onValueChange={(nextValue) =>
             setValue(nextValue as FeedbackTicketStatus)
@@ -76,7 +78,13 @@ export function FeedbackTicketStatusControl({
           <SelectContent>
             {feedbackTicketStatusOptions.map((option) => (
               <SelectItem key={option.value} value={option.value}>
-                {option.label}
+                {option.value === "open"
+                  ? m.common.statusLabels.open
+                  : option.value === "in_progress"
+                    ? m.common.statusLabels.inProgress
+                    : option.value === "resolved"
+                      ? m.common.statusLabels.resolved
+                      : m.common.statusLabels.closed}
               </SelectItem>
             ))}
           </SelectContent>
@@ -85,19 +93,19 @@ export function FeedbackTicketStatusControl({
 
       <div className="grid gap-2">
         <Label htmlFor={`feedback-status-reason-${ticketId}`}>
-          Reason
+          {m.feedback.status.reason}
         </Label>
         <Textarea
           id={`feedback-status-reason-${ticketId}`}
           maxLength={500}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="Optional note for the audit trail"
+          placeholder={m.feedback.status.reasonPlaceholder}
           value={reason}
         />
       </div>
 
       <Button disabled={submitting || value === status} type="submit">
-        {submitting ? "Saving..." : "Update status"}
+        {submitting ? m.common.saving : m.feedback.status.submit}
       </Button>
     </form>
   );

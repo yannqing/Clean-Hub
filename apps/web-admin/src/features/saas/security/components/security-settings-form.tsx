@@ -3,6 +3,7 @@
 import { Button, Checkbox, Input, Label, toast } from "@cleanhub/ui";
 import { useState, type FormEvent } from "react";
 
+import { useSaasI18n } from "@/i18n";
 import { updateSecuritySettingsAction } from "../actions";
 import { securitySettingsDefaultValues } from "../constants";
 import type {
@@ -23,6 +24,7 @@ export function SecuritySettingsForm({
   initialValues = securitySettingsDefaultValues,
   onUpdated,
 }: SecuritySettingsFormProps) {
+  const { m } = useSaasI18n();
   const [values, setValues] =
     useState<SecuritySettingsFormValues>(initialValues);
   const [submitting, setSubmitting] = useState(false);
@@ -44,7 +46,7 @@ export function SecuritySettingsForm({
     const result = await updateSecuritySettingsAction(values);
 
     if (result.ok) {
-      toast.success("Security settings updated.");
+      toast.success(m.security.settings.saveSuccess);
       setValues({
         passwordMinLength: result.data.passwordMinLength,
         passwordRequiresNumber: result.data.passwordRequiresNumber,
@@ -64,12 +66,14 @@ export function SecuritySettingsForm({
   return (
     <form className="grid gap-4 rounded-md border p-4" onSubmit={handleSubmit}>
       <div>
-        <h2 className="text-base font-semibold">Security Settings</h2>
+        <h2 className="text-base font-semibold">{m.security.settings.title}</h2>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <div className="grid gap-2">
-          <Label htmlFor="password-min-length">Password minimum length</Label>
+          <Label htmlFor="password-min-length">
+            {m.security.settings.passwordMinLength}
+          </Label>
           <Input
             id="password-min-length"
             min={6}
@@ -84,7 +88,9 @@ export function SecuritySettingsForm({
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="login-max-attempts">Login max attempts</Label>
+          <Label htmlFor="login-max-attempts">
+            {m.security.settings.loginMaxAttempts}
+          </Label>
           <Input
             id="login-max-attempts"
             min={1}
@@ -99,7 +105,7 @@ export function SecuritySettingsForm({
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="lockout-minutes">Lockout minutes</Label>
+          <Label htmlFor="lockout-minutes">{m.security.settings.lockoutMinutes}</Label>
           <Input
             id="lockout-minutes"
             min={1}
@@ -114,7 +120,9 @@ export function SecuritySettingsForm({
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="refresh-token-days">Refresh token days</Label>
+          <Label htmlFor="refresh-token-days">
+            {m.security.settings.refreshTokenDays}
+          </Label>
           <Input
             id="refresh-token-days"
             min={1}
@@ -135,7 +143,7 @@ export function SecuritySettingsForm({
               updateValue("passwordRequiresNumber", checked === true)
             }
           />
-          Require a number
+          {m.security.settings.requireNumber}
         </label>
 
         <label className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
@@ -145,13 +153,13 @@ export function SecuritySettingsForm({
               updateValue("passwordRequiresSymbol", checked === true)
             }
           />
-          Require a symbol
+          {m.security.settings.requireSymbol}
         </label>
       </div>
 
       <div className="flex justify-end">
         <Button disabled={submitting} type="submit">
-          {submitting ? "Saving..." : "Save settings"}
+          {submitting ? m.common.saving : m.security.settings.saveSettings}
         </Button>
       </div>
     </form>

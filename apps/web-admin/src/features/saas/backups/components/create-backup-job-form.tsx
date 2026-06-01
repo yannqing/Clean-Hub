@@ -14,6 +14,7 @@ import {
 } from "@cleanhub/ui";
 import { useState, type FormEvent } from "react";
 
+import { useSaasI18n } from "@/i18n";
 import { createBackupJobAction } from "../actions";
 import { backupJobScopeOptions } from "../constants";
 import type { BackupJobListItem, BackupJobScope } from "../types";
@@ -23,6 +24,7 @@ type CreateBackupJobFormProps = {
 };
 
 export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
+  const { m } = useSaasI18n();
   const [scope, setScope] = useState<BackupJobScope>("platform");
   const [tenantId, setTenantId] = useState("");
   const [reason, setReason] = useState("");
@@ -39,7 +41,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
     });
 
     if (result.ok) {
-      toast.success("Backup task record created.");
+      toast.success(m.backups.backupCreated);
       setReason("");
       onCreated(result.data);
     } else {
@@ -52,12 +54,12 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
   return (
     <form className="grid gap-4 rounded-md border p-4" onSubmit={handleSubmit}>
       <div>
-        <h2 className="text-base font-semibold">Manual Backup</h2>
+        <h2 className="text-base font-semibold">{m.backups.manualBackup}</h2>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
         <div className="grid gap-2">
-          <Label htmlFor="backup-scope">Scope</Label>
+          <Label htmlFor="backup-scope">{m.backups.scope}</Label>
           <Select
             onValueChange={(value) => setScope(value as BackupJobScope)}
             value={scope}
@@ -68,7 +70,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
             <SelectContent>
               {backupJobScopeOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                  {m.common.backupScopeLabels[option.value]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -76,31 +78,31 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="backup-tenant-id">Tenant ID</Label>
+          <Label htmlFor="backup-tenant-id">{m.operationLogs.tenantId}</Label>
           <Input
             disabled={scope === "platform"}
             id="backup-tenant-id"
             onChange={(event) => setTenantId(event.target.value)}
-            placeholder="Optional tenant ULID"
+            placeholder={m.common.optionalTenantUlid}
             value={scope === "platform" ? "" : tenantId}
           />
         </div>
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="backup-reason">Reason</Label>
+        <Label htmlFor="backup-reason">{m.backups.reason}</Label>
         <Textarea
           id="backup-reason"
           maxLength={500}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="Optional note for the backup task record"
+          placeholder={m.backups.backupReasonPlaceholder}
           value={reason}
         />
       </div>
 
       <div className="flex justify-end">
         <Button disabled={submitting} type="submit">
-          {submitting ? "Creating..." : "Create backup task"}
+          {submitting ? m.common.creating : m.backups.createBackupTask}
         </Button>
       </div>
     </form>

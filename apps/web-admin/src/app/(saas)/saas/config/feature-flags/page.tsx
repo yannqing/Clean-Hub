@@ -1,11 +1,5 @@
-import { PagePlaceholder } from "@/components/app-shell";
+import { SaasPagePlaceholder } from "@/components/app-shell/saas-page-placeholder";
 
 export default function SaasFeatureFlagsPage() {
-  return (
-    <PagePlaceholder
-      description="Platform feature switches used to control tenant rollout, experiments, and module visibility."
-      items={["Tenant rollout", "Module switches", "Experiments", "Release notes"]}
-      title="Feature Flags"
-    />
-  );
+  return <SaasPagePlaceholder page="featureFlags" />;
 }

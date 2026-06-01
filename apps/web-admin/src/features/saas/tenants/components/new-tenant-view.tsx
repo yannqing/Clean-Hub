@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { useSaasI18n } from "@/i18n";
 
 import { createTenantAction } from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
@@ -18,6 +19,7 @@ function canCreateTenant(authContext: AuthContext | null): boolean {
 }
 
 export function NewTenantView() {
+  const { m } = useSaasI18n();
   const router = useRouter();
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -45,7 +47,7 @@ export function NewTenantView() {
         setAuthError(
           getTenantLoadErrorMessage(
             error,
-            "Failed to verify the current session.",
+            m.tenants.new.sessionError,
           ),
         );
       })
@@ -58,20 +60,22 @@ export function NewTenantView() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [m.tenants.new.sessionError]);
 
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">Tenant setup</Badge>
+          <Badge variant="secondary">{m.tenants.new.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            New Tenant
+            {m.tenants.new.title}
           </h1>
         </div>
 
         <Button asChild variant="outline">
-          <Link href={webAdminRoutes.saas.tenants}>Back to tenants</Link>
+          <Link href={webAdminRoutes.saas.tenants}>
+            {m.tenants.new.backToTenants}
+          </Link>
         </Button>
       </div>
 
@@ -79,7 +83,7 @@ export function NewTenantView() {
         <div className="mx-5 mt-5 rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
           {authError
             ? `Tenant creation is disabled because the current session could not be verified: ${authError}`
-            : "Only Super Admin can create tenants."}
+            : m.tenants.new.permissionHint}
         </div>
       ) : null}
 

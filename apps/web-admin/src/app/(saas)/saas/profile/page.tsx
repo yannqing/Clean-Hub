@@ -1,11 +1,5 @@
-import { PagePlaceholder } from "@/components/app-shell";
+import { SaasPagePlaceholder } from "@/components/app-shell/saas-page-placeholder";
 
 export default function SaasProfilePage() {
-  return (
-    <PagePlaceholder
-      description="Personal profile, account preferences, password management, and platform operator identity."
-      items={["Profile", "Security", "Language", "Sessions"]}
-      title="Personal Center"
-    />
-  );
+  return <SaasPagePlaceholder page="profile" />;
 }

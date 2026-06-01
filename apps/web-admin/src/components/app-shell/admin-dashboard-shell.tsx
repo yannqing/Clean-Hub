@@ -5,13 +5,11 @@ import { Card, CardContent, cn } from "@cleanhub/ui";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import {
-  webAdminShellCopy,
-  webAdminSidebarNavigation,
-  webAdminWorkspaceTabs,
-} from "@/config/navigation";
+import { LanguageSwitcher } from "@/components/i18n";
+import { webAdminWorkspaceTabs } from "@/config/navigation";
 import { webAdminRoutes } from "@/config/routes";
 import { LogoutButton } from "@/features/auth/components";
+import { WebAdminLocaleProvider, useWebAdminLocale } from "@/i18n";
 import { webAdminApi } from "@/lib/api-client";
 
 type AdminDashboardShellProps = {
@@ -58,16 +56,17 @@ function getProfileInitials(authContext: AuthContext | null): string {
     .join("");
 }
 
-export function AdminDashboardShell({
+function AdminDashboardShellContent({
   children,
   scope,
 }: AdminDashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const { messages } = useWebAdminLocale();
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
-  const copy = webAdminShellCopy[scope];
-  const sidebarSections = webAdminSidebarNavigation[scope];
-  const tabs = webAdminWorkspaceTabs[scope];
+  const copy = messages.shell[scope];
+  const sidebarSections = messages.sidebar[scope];
+  const tabs = scope === "tenant" ? webAdminWorkspaceTabs.tenant : [];
   const profileHref =
     scope === "saas" ? webAdminRoutes.saas.profile : webAdminRoutes.tenant.profile;
   const profileActive = isActivePath(pathname, profileHref);
@@ -185,12 +184,16 @@ export function AdminDashboardShell({
                     {profileLabel}
                   </span>
                   <span className="block truncate text-xs text-muted-foreground">
-                    Personal Center
+                    {messages.common.personalCenter}
                   </span>
                 </span>
               </a>
 
-              <LogoutButton className="h-9 px-3 text-xs" />
+              <LogoutButton
+                className="h-9 px-3 text-xs"
+                signOutLabel={messages.common.signOut}
+                signingOutLabel={messages.common.signingOut}
+              />
             </div>
           </div>
         </aside>
@@ -208,35 +211,39 @@ export function AdminDashboardShell({
                 </p>
               </div>
 
-              <div
-                aria-label={`${scope} tabs`}
-                className="inline-flex w-fit flex-wrap gap-1 rounded-lg border bg-muted p-1"
-                role="tablist"
-              >
-                {tabs.map((tab) => {
-                  const active = isActivePath(pathname, tab.href);
+              {scope === "saas" ? (
+                <LanguageSwitcher />
+              ) : (
+                <div
+                  aria-label={`${scope} tabs`}
+                  className="inline-flex w-fit flex-wrap gap-1 rounded-lg border bg-muted p-1"
+                  role="tablist"
+                >
+                  {tabs.map((tab) => {
+                    const active = isActivePath(pathname, tab.href);
 
-                  return (
-                    <a
-                      aria-current={active ? "page" : undefined}
-                      aria-selected={active}
-                      className={cn(
-                        "inline-flex h-8 items-center rounded-md px-3 text-sm font-medium transition-colors",
-                        "hover:bg-background hover:text-foreground",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        active
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground",
-                      )}
-                      href={tab.href}
-                      key={tab.href}
-                      role="tab"
-                    >
-                      {tab.label}
-                    </a>
-                  );
-                })}
-              </div>
+                    return (
+                      <a
+                        aria-current={active ? "page" : undefined}
+                        aria-selected={active}
+                        className={cn(
+                          "inline-flex h-8 items-center rounded-md px-3 text-sm font-medium transition-colors",
+                          "hover:bg-background hover:text-foreground",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          active
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground",
+                        )}
+                        href={tab.href}
+                        key={tab.href}
+                        role="tab"
+                      >
+                        {tab.label}
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </header>
 
@@ -248,5 +255,13 @@ export function AdminDashboardShell({
         </div>
       </div>
     </div>
+  );
+}
+
+export function AdminDashboardShell(props: AdminDashboardShellProps) {
+  return (
+    <WebAdminLocaleProvider>
+      <AdminDashboardShellContent {...props} />
+    </WebAdminLocaleProvider>
   );
 }
