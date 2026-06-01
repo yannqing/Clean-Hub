@@ -426,12 +426,7 @@ tenantId: authContext.tenantId
 
 **流程**：
 
-1. **模块开发者**（武帅杰 / 赵付杰 / 孙蕊蕊等）提交 PR：**仅含** `modules/tenant-xxx/**`，**不含** `app.ts`。
-2. 模块 PR 合并后，模块负责人在群/issue **@李龙杰**，提供：
-   - import 名：`createTenantBranchesRoutes` 等
-   - 挂载前缀：`/tenant/branches`
-   - 是否 P0 阻塞联调
-3. **李龙杰** 在独立 PR（或每日一次批量 PR）中更新 `app.ts` + 必要时 `packages/api-client/src/tenant/index.ts`。
+1. **模块开发者**（武帅杰 / 赵付杰 / 孙蕊蕊等）提交 PR：**仅含** `modules/tenant-xxx/**`，**不含** `app.ts`。**李龙杰** 在独立 PR（或每日一次批量 PR）中更新 `app.ts` + 必要时 `packages/api-client/src/tenant/index.ts`。
 4. **杨序** 审核：prefix 无重复、与 1.2 模块挂载一致、Tenant 块完整。
 5. **赵付杰 / 模块负责人** 做 **挂载验证**（curl / Postman / 前端联调），**不自行改** `app.ts`。
 
@@ -449,7 +444,7 @@ Day 1：李龙杰 Batch A（app.ts）→ 全员可联调 1.2 模块
 Day 2：武帅杰 tenant-branches 模块 PR（无 app.ts）→ 李龙杰 Batch B（app.ts 一行）→ 赵付杰 branches 前端
 ```
 
-**PR 描述模板**（模块负责人 @李龙杰 时使用）：
+**PR 描述模板**：
 
 ```markdown
 ## 请求挂载 app.ts
@@ -480,7 +475,7 @@ Day 2：武帅杰 tenant-branches 模块 PR（无 app.ts）→ 李龙杰 Batch B
 3. 禁止跨目录改他人模块。
 4. 本波次**不新增表**；`user_branches` 已存在则只写业务逻辑（§8.4）。
 5. 禁止修改 `packages/ui/src/components/ui/**`。
-6. **`tenant-branches` 模块边界**：`apps/api/.../tenant-branches/**` 归武帅杰；`features/tenant/branches/**`、`web-admin/.../branches/**`、`packages/api-client/.../branches*` 归赵付杰。联调通过接口契约与 PR review，不互相改对方目录。武帅杰合模块后 **@李龙杰挂路由**，不自行改 `app.ts`。
+6. **`tenant-branches` 模块边界**：`apps/api/.../tenant-branches/**` 归武帅杰；`features/tenant/branches/**`、`web-admin/.../branches/**`、`packages/api-client/.../branches*` 归赵付杰。联调通过接口契约与 PR review，不互相改对方目录，不自行改 `app.ts`。
 
 ---
 
@@ -497,7 +492,6 @@ Day 2：武帅杰 tenant-branches 模块 PR（无 app.ts）→ 李龙杰 Batch B
    - `assertBranchAccess`
    - `assertBranchIdsSubset`
 2. 从 `apps/api/src/modules/auth/index.ts` 导出；`pnpm --filter @cleanhub/api typecheck` 通过。
-3. PR 合并后 @武帅杰、@杨序 接入。
 
 **Day 1（下午，可与 helper PR 并行）**
 
@@ -563,7 +557,7 @@ routes → controller → service → repository → validation → types → er
 
 1. **等李龙杰 §8.2.1 `branchScope` 合并后**，搭建模块骨架；`GET/POST` 列表与创建（调用 `resolveAllowedBranchIds` / `assertBranchAccess`）。
 2. 写审计；`requireTenantRole(['owner','manager'])`。
-3. **PR 不含 `app.ts`**；合并后在 issue/群 **@李龙杰** 请求 Batch B 挂载（§11.3）。
+3. **PR 不含 `app.ts`**。
 
 **Day 2**
 
@@ -735,7 +729,7 @@ pnpm --filter @cleanhub/api-client typecheck
 
 | 人员 | 任务 |
 | ---- | ---- |
-| **武帅杰** | branches 详情/更新/状态 API；模块 PR 合并；@李龙杰 Batch B |
+| **武帅杰** | branches 详情/更新/状态 API；模块 PR 合并 |
 | **赵付杰** | `api-client/branches` 全量；工作台/设置页联调 |
 | **李龙杰** | **`app.ts` Batch B**；审核 branches 后端 PR |
 | **杨序** | audit/users 过滤 + `user_branches`；与武帅杰、赵付杰联调 Manager |
