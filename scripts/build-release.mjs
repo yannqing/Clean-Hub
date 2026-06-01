@@ -150,6 +150,10 @@ async function writeReleaseCompose() {
     environment:
       NODE_ENV: production
       PORT: 3000
+      # Next.js standalone defaults HOSTNAME to the container hostname IP, which
+      # leaves 127.0.0.1 unbound and makes the container's own healthcheck
+      # (fetch http://127.0.0.1:3000/login) fail. Bind all interfaces instead.
+      HOSTNAME: 0.0.0.0
       CLEANHUB_API_BASE_URL: \${CLEANHUB_API_BASE_URL:-http://api:4000}
       NEXT_PUBLIC_API_BASE_URL: \${NEXT_PUBLIC_API_BASE_URL:-/api}
     ports:
