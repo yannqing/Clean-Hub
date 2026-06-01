@@ -25,6 +25,7 @@ import { createSaasRolesRoutes } from "./modules/saas-users/saas-roles.routes.js
 import { createSaasUsersRoutes } from "./modules/saas-users/saas-users.routes.js";
 import { createTenantAuditRoutes } from "./modules/tenant-audit/audit.routes.js";
 import { createTenantBackupRoutes } from "./modules/tenant-backups/backups.routes.js";
+import { createTenantBranchRoutes } from "./modules/tenant-branches/branches.routes.js";
 import { createTenantNotificationRoutes } from "./modules/tenant-notifications/notifications.routes.js";
 import { createTenantOverviewRoutes } from "./modules/tenant-overview/overview.routes.js";
 import { createTenantPriceRoutes } from "./modules/tenant-prices/prices.routes.js";
@@ -103,6 +104,7 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   // 租户侧
   app.route("/tenant/overview", createTenantOverviewRoutes());
   app.route("/tenant/settings", createTenantSettingsRoutes());
+  app.route("/tenant/branches", createTenantBranchRoutes());
   app.route("/tenant/users", createTenantUserRoutes());
   app.route("/tenant/audit-logs", createTenantAuditRoutes());
   app.route("/tenant/services", createTenantServiceRoutes());
