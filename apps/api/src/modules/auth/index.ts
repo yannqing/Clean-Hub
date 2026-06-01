@@ -3,6 +3,8 @@ export * from "./auth.factory.js";
 export * from "./auth.repository.js";
 export * from "./auth.service.js";
 export * from "./auth.types.js";
+export * from "./branch-scope.errors.js";
+export * from "./branch-scope.helper.js";
 export * from "./cookie.service.js";
 export * from "./password.service.js";
 export * from "./permission.helper.js";
