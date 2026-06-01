@@ -68,7 +68,7 @@ export type TenantSettingsViewProps = {
 export function TenantSettingsView({
   initialSettings,
 }: TenantSettingsViewProps = {}) {
-  const { authContext, setAuthContext } = useState<AuthContext | null>(null);
+  const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [settings, setSettings] = useState<TenantSettings | null>(
     initialSettings ?? null,
   );

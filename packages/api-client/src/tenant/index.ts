@@ -1,5 +1,6 @@
 import type { ApiClient, QueryParams } from "../types";
 import { createTenantAuditLogsApi } from "./audit-logs";
+import { createTenantBackupsApi } from "./backups";
 import { createTenantBranchesApi } from "./branches";
 import { createTenantHardwareApi } from "./hardware";
 import { createTenantNotificationsApi } from "./notifications";
@@ -10,6 +11,8 @@ import { createTenantUsersApi } from "./users";
 
 export * from "./audit-logs";
 export * from "./audit-logs.types";
+export * from "./backups";
+export * from "./backups.types";
 export * from "./branches";
 export * from "./branches.types";
 export * from "./hardware";
@@ -27,6 +30,7 @@ export * from "./users.types";
 
 export function createTenantApi(client: ApiClient) {
   const auditLogs = createTenantAuditLogsApi(client);
+  const backups = createTenantBackupsApi(client);
   const branches = createTenantBranchesApi(client);
   const users = createTenantUsersApi(client);
   const services = createTenantServicesApi(client);
@@ -37,6 +41,7 @@ export function createTenantApi(client: ApiClient) {
 
   return {
     auditLogs,
+    backups,
     branches,
     users,
     services,
