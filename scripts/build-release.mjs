@@ -1,7 +1,16 @@
 import { build } from "esbuild";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
-import { cp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
+import {
+  cp,
+  mkdir,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,12 +21,13 @@ const artifactDir = join(releaseRoot, "cleanhub");
 const webAdminDir = join(rootDir, "apps", "web-admin");
 const webAdminStandaloneDir = join(webAdminDir, ".next", "standalone");
 
-function run(command, args) {
+function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: rootDir,
       stdio: "inherit",
       shell: process.platform === "win32",
+      env: { ...process.env, ...(options.env ?? {}) },
     });
 
     child.on("exit", (code) => {
@@ -190,6 +200,20 @@ async function bundleApi() {
     sourcemap: true,
     packages: "bundle",
     logLevel: "info",
+    // Bundled CommonJS deps (e.g. dotenv) call require()/__dirname at runtime.
+    // In an ESM output those are not defined, so esbuild's shim throws
+    // "Dynamic require of \"fs\" is not supported". Recreate the CJS globals
+    // from module.createRequire so bundled CJS code can require Node builtins.
+    banner: {
+      js: [
+        "import { createRequire as __createRequire } from 'node:module';",
+        "import { fileURLToPath as __fileURLToPath } from 'node:url';",
+        "import { dirname as __pathDirname } from 'node:path';",
+        "const require = __createRequire(import.meta.url);",
+        "const __filename = __fileURLToPath(import.meta.url);",
+        "const __dirname = __pathDirname(__filename);",
+      ].join("\n"),
+    },
   };
 
   await build({
@@ -205,11 +229,40 @@ async function bundleApi() {
   });
 }
 
+// Recursively remove symlinks whose target does not exist. Such dangling links
+// (dev-only transitive deps Next traced but did not emit) make a subsequent
+// copy that preserves symlinks self-inconsistent and can break at runtime.
+async function pruneDanglingSymlinks(dir) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    const entryPath = join(dir, entry.name);
+    if (entry.isSymbolicLink()) {
+      try {
+        await stat(entryPath); // follows the link; throws if target is missing
+      } catch {
+        await unlink(entryPath);
+      }
+      continue;
+    }
+    if (entry.isDirectory()) {
+      await pruneDanglingSymlinks(entryPath);
+    }
+  }
+}
+
 async function copyWebAdminStandalone() {
   await stat(webAdminStandaloneDir);
+  // The Next.js standalone tree relies on pnpm's symlink layout to resolve
+  // dependencies (e.g. next -> .pnpm/next@.../node_modules/next, which sits
+  // next to its @next/env peer). Dereferencing the copy detaches packages from
+  // that layout and breaks module resolution, so the symlinks MUST be
+  // preserved (verbatimSymlinks: true). A few links are dangling — dev-only
+  // transitive deps Next traced but did not emit — so prune those first to keep
+  // the tree self-contained.
+  await pruneDanglingSymlinks(webAdminStandaloneDir);
   await cp(webAdminStandaloneDir, join(artifactDir, "web-admin"), {
     recursive: true,
-    dereference: true,
+    verbatimSymlinks: true,
   });
   await cp(
     join(webAdminDir, ".next", "static"),
@@ -265,7 +318,14 @@ async function main() {
 
   await run("pnpm", ["--filter", "@cleanhub/api-client", "typecheck"]);
   await run("pnpm", ["--filter", "@cleanhub/api", "build"]);
-  await run("pnpm", ["--filter", "@cleanhub/web-admin", "build"]);
+  // NEXT_PUBLIC_* values are inlined at build time, so the browser API base URL
+  // must be set here, not via runtime env on the server. Defaults to the
+  // same-domain "/api" reverse-proxy path; override by exporting the var.
+  await run("pnpm", ["--filter", "@cleanhub/web-admin", "build"], {
+    env: {
+      NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api",
+    },
+  });
 
   await bundleApi();
   await copyWebAdminStandalone();
