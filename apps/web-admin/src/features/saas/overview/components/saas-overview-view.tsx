@@ -3,16 +3,13 @@
 import { Badge, Button } from "@cleanhub/ui";
 import { useCallback, useEffect, useState } from "react";
 
+import { useSaasI18n } from "@/i18n";
+
 import { getSaasOverviewQuery } from "../queries";
 import type { SaasOverview } from "../types";
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Failed to load platform overview.";
-}
-
 export function SaasOverviewView() {
+  const { m } = useSaasI18n();
   const [overview, setOverview] = useState<SaasOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,11 +22,13 @@ export function SaasOverviewView() {
       const data = await getSaasOverviewQuery();
       setOverview(data);
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(
+        loadError instanceof Error ? loadError.message : m.overview.loadError,
+      );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [m.overview.loadError]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -45,7 +44,11 @@ export function SaasOverviewView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(
+            loadError instanceof Error
+              ? loadError.message
+              : m.overview.loadError,
+          );
         }
       })
       .finally(() => {
@@ -57,20 +60,32 @@ export function SaasOverviewView() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [m.overview.loadError]);
+
+  const metricItems = overview
+    ? ([
+        ["tenants", overview.tenantCount],
+        ["activeTenants", overview.activeTenantCount],
+        ["suspendedTenants", overview.suspendedTenantCount],
+        ["branches", overview.branchCount],
+        ["todayOrders", overview.todayOrderCount],
+        ["todayRevenue", overview.todayRevenueAmount],
+        ["pendingFeedback", overview.pendingFeedbackCount],
+      ] as const)
+    : [];
 
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">SaaS platform</Badge>
+          <Badge variant="secondary">{m.overview.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Platform Overview
+            {m.overview.title}
           </h1>
         </div>
 
         <Button onClick={loadOverview} type="button" variant="outline">
-          Refresh
+          {m.common.refresh}
         </Button>
       </div>
 
@@ -88,20 +103,10 @@ export function SaasOverviewView() {
         </div>
       ) : overview ? (
         <div className="grid gap-3 p-5 sm:grid-cols-2 lg:grid-cols-4">
-          {(
-            [
-              ["Tenants", overview.tenantCount],
-              ["Active tenants", overview.activeTenantCount],
-              ["Suspended tenants", overview.suspendedTenantCount],
-              ["Branches", overview.branchCount],
-              ["Today's orders", overview.todayOrderCount],
-              ["Today's revenue", overview.todayRevenueAmount],
-              ["Pending feedback", overview.pendingFeedbackCount],
-            ] as const
-          ).map(([label, value]) => (
-            <div className="rounded-md border bg-background p-4" key={label}>
+          {metricItems.map(([key, value]) => (
+            <div className="rounded-md border bg-background p-4" key={key}>
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {label}
+                {m.overview.metrics[key]}
               </p>
               <p className="mt-2 text-2xl font-semibold">{value}</p>
             </div>

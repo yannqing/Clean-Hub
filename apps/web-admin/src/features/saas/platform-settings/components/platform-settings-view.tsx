@@ -14,15 +14,14 @@ import {
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
+import { useSaasI18n } from "@/i18n";
 import { updatePlatformSettingsAction } from "../actions";
 import { platformLanguageOptions, platformSettingsDefaultValues } from "../constants";
 import { getPlatformSettingsQuery } from "../queries";
 import type { PlatformSettings, PlatformSettingsFormValues } from "../types";
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Failed to load platform settings.";
+  return error instanceof Error ? error.message : "";
 }
 
 function toFormValues(settings: PlatformSettings): PlatformSettingsFormValues {
@@ -35,6 +34,7 @@ function toFormValues(settings: PlatformSettings): PlatformSettingsFormValues {
 }
 
 export function PlatformSettingsView() {
+  const { m, formatDateTime } = useSaasI18n();
   const [settings, setSettings] = useState<PlatformSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [settingsError, setSettingsError] = useState<string | null>(null);
@@ -54,7 +54,7 @@ export function PlatformSettingsView() {
       setSettings(data);
       setForm(toFormValues(data));
     } catch (loadError) {
-      setSettingsError(getErrorMessage(loadError));
+      setSettingsError(getErrorMessage(loadError) || m.platformSettings.loadError);
     } finally {
       setLoading(false);
     }
@@ -75,7 +75,7 @@ export function PlatformSettingsView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setSettingsError(getErrorMessage(loadError));
+          setSettingsError(getErrorMessage(loadError) || m.platformSettings.loadError);
         }
       })
       .finally(() => {
@@ -100,7 +100,7 @@ export function PlatformSettingsView() {
     if (result.ok) {
       setSettings(result.data);
       setForm(toFormValues(result.data));
-      setNotice("Platform settings saved successfully.");
+      setNotice(m.platformSettings.saveSuccess);
     } else {
       setFormError(result.error);
     }
@@ -112,14 +112,14 @@ export function PlatformSettingsView() {
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">SaaS platform</Badge>
+          <Badge variant="secondary">{m.platformSettings.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Platform Settings
+            {m.platformSettings.title}
           </h1>
         </div>
 
         <Button onClick={loadSettings} type="button" variant="outline">
-          Refresh
+          {m.common.refresh}
         </Button>
       </div>
 
@@ -147,11 +147,15 @@ export function PlatformSettingsView() {
             noValidate
             onSubmit={handleSubmit}
           >
-            <h2 className="text-base font-semibold">Default Configuration</h2>
+            <h2 className="text-base font-semibold">
+              {m.platformSettings.defaultConfig}
+            </h2>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="platform-language">Default language</Label>
+                <Label htmlFor="platform-language">
+                  {m.platformSettings.defaultLanguage}
+                </Label>
                 <Select
                   onValueChange={(value) => {
                     setForm((current) => ({
@@ -168,7 +172,11 @@ export function PlatformSettingsView() {
                   <SelectContent>
                     {platformLanguageOptions.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
-                        {option.label}
+                        {option.value === "en"
+                          ? m.common.languageLabels.en
+                          : option.value === "zh-CN"
+                            ? m.common.languageLabels.zhCN
+                            : option.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -176,7 +184,9 @@ export function PlatformSettingsView() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="platform-currency">Default currency</Label>
+                <Label htmlFor="platform-currency">
+                  {m.platformSettings.defaultCurrency}
+                </Label>
                 <Input
                   id="platform-currency"
                   maxLength={8}
@@ -192,7 +202,7 @@ export function PlatformSettingsView() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="platform-timezone">Timezone</Label>
+                <Label htmlFor="platform-timezone">{m.platformSettings.timezone}</Label>
                 <Input
                   id="platform-timezone"
                   maxLength={64}
@@ -217,19 +227,16 @@ export function PlatformSettingsView() {
                     }));
                   }}
                 />
-                Maintenance mode
+                {m.platformSettings.maintenanceMode}
               </label>
             </div>
 
             {settings ? (
               <div className="text-xs text-muted-foreground">
-                Last updated:{" "}
+                {m.platformSettings.lastUpdated}{" "}
                 {settings.updatedAt
-                  ? new Intl.DateTimeFormat("en", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    }).format(new Date(settings.updatedAt))
-                  : "Never"}
+                  ? formatDateTime(settings.updatedAt)
+                  : m.common.never}
               </div>
             ) : null}
 
@@ -241,7 +248,7 @@ export function PlatformSettingsView() {
 
             <div className="flex justify-end">
               <Button disabled={submitting} type="submit">
-                {submitting ? "Saving..." : "Save settings"}
+                {submitting ? m.common.saving : m.platformSettings.saveSettings}
               </Button>
             </div>
           </form>

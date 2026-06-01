@@ -27,6 +27,9 @@ import {
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { useSaasI18n } from "@/i18n";
+import { interpolate } from "@/i18n/messages/saas";
+
 import {
   inviteSaasUserAction,
   updateSaasUserAction,
@@ -34,9 +37,6 @@ import {
   updateSaasUserStatusAction,
 } from "../actions";
 import {
-  saasUserLanguageLabels,
-  saasUserRoleLabels,
-  saasUserStatusLabels,
   saasUserStatusOptions,
 } from "../constants";
 import {
@@ -93,25 +93,19 @@ const defaultRoleForm: UpdateSaasUserRolesFormInput = {
 const maxStatusReasonLength = 300;
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Failed to load platform members.";
+  return error instanceof Error ? error.message : "";
 }
 
-function formatDate(value: string | null): string {
+function formatDate(
+  value: string | null,
+  m: ReturnType<typeof useSaasI18n>["m"],
+  formatDateFn: ReturnType<typeof useSaasI18n>["formatDate"],
+): string {
   if (!value) {
-    return "Never";
+    return m.common.never;
   }
 
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Invalid date";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-  }).format(date);
+  return formatDateFn(value) || m.common.invalidDate;
 }
 
 function getStatusVariant(
@@ -128,28 +122,49 @@ function getStatusVariant(
   return "outline";
 }
 
-function getRoleLabel(role: string): string {
-  return saasUserRoleLabels[role as keyof typeof saasUserRoleLabels] ?? role;
+function getRoleLabel(role: string, m: ReturnType<typeof useSaasI18n>["m"]): string {
+  if (role === "support") {
+    return m.common.roleLabels.support;
+  }
+  if (role === "super_admin") {
+    return m.common.roleLabels.superAdmin;
+  }
+  return role;
 }
 
-function getLanguageLabel(language: string): string {
-  return saasUserLanguageLabels[language] ?? language;
+function getLanguageLabel(
+  language: string,
+  m: ReturnType<typeof useSaasI18n>["m"],
+): string {
+  if (language === "en") {
+    return m.common.languageLabels.en;
+  }
+  if (language === "fr") {
+    return m.common.languageLabels.fr;
+  }
+  if (language === "zh-CN") {
+    return m.common.languageLabels.zhCN;
+  }
+  return language;
 }
 
 function canChangeStatus(status: SaasUserStatus): boolean {
   return status === "active" || status === "disabled";
 }
 
-function getStatusActionLabel(status: SaasUserStatus): string {
+function getStatusActionLabel(
+  status: SaasUserStatus,
+  m: ReturnType<typeof useSaasI18n>["m"],
+): string {
   if (status === "active") {
-    return "Disable";
+    return m.users.actions.disable;
   }
 
   if (status === "disabled") {
-    return "Enable";
+    return m.users.actions.enable;
   }
 
-  return "No action";
+  return m.users.status.noAction;
 }
 
 function getNextStatus(
@@ -166,21 +181,25 @@ function getNextStatus(
   return null;
 }
 
-function getDefaultStatusReason(user: SaasUserSummary): string {
+function getDefaultStatusReason(
+  user: SaasUserSummary,
+  m: ReturnType<typeof useSaasI18n>["m"],
+): string {
   const nextStatus = getNextStatus(user.status);
 
   if (nextStatus === "disabled") {
-    return "Disabled from SaaS platform member list.";
+    return interpolate(m.users.status.disableConfirm, {});
   }
 
   if (nextStatus === "active") {
-    return "Enabled from SaaS platform member list.";
+    return interpolate(m.users.status.enableConfirm, {});
   }
 
   return "";
 }
 
 export function SaasUserListView() {
+  const { m, formatDate: formatSaasDate } = useSaasI18n();
   const editRequestIdRef = useRef(0);
   const [users, setUsers] = useState<SaasUserSummary[]>([]);
   const [query, setQuery] = useState("");
@@ -266,7 +285,7 @@ export function SaasUserListView() {
         total: response.meta.total,
       });
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(getErrorMessage(loadError) || m.users.loadError);
     } finally {
       setLoading(false);
     }
@@ -285,7 +304,7 @@ export function SaasUserListView() {
           setAuthContext(authResult.value);
           setAuthError(null);
         } else {
-          setAuthError(getErrorMessage(authResult.reason));
+          setAuthError(getErrorMessage(authResult.reason) || m.users.loadError);
         }
 
         if (rolesResult.status === "fulfilled") {
@@ -293,7 +312,7 @@ export function SaasUserListView() {
           setRolesError(null);
         } else {
           setRoles([]);
-          setRolesError(getErrorMessage(rolesResult.reason));
+          setRolesError(getErrorMessage(rolesResult.reason) || m.users.loadError);
         }
       })
       .finally(() => {
@@ -345,11 +364,11 @@ export function SaasUserListView() {
     }
 
     setPendingStatusUser(user);
-    setStatusReason(getDefaultStatusReason(user));
+    setStatusReason(getDefaultStatusReason(user, m));
     setStatusFormError(null);
     setError(null);
     setNotice(null);
-  }, [authContext?.userId, canManageMembers]);
+  }, [authContext?.userId, canManageMembers, m]);
 
   const openRoleForm = useCallback(
     (user: SaasUserSummary) => {
@@ -399,7 +418,7 @@ export function SaasUserListView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(getErrorMessage(loadError) || m.users.loadError);
         }
       })
       .finally(() => {
@@ -411,7 +430,7 @@ export function SaasUserListView() {
     return () => {
       isCurrent = false;
     };
-  }, [listQuery]);
+  }, [listQuery, m.users.loadError]);
 
   const handleStatusChange = useCallback(
     async () => {
@@ -422,14 +441,14 @@ export function SaasUserListView() {
       const nextStatus = getNextStatus(pendingStatusUser.status);
 
       if (!nextStatus) {
-        setStatusFormError("This member status cannot be changed here.");
+        setStatusFormError(m.users.status.noAction);
         return;
       }
 
       const reason = statusReason.trim();
 
       if (!reason) {
-        setStatusFormError("Reason is required.");
+        setStatusFormError(m.users.status.reasonRequired);
         return;
       }
 
@@ -451,19 +470,19 @@ export function SaasUserListView() {
 
         setNotice(
           nextStatus === "disabled"
-            ? "Platform member disabled successfully."
-            : "Platform member enabled successfully.",
+            ? m.users.status.disableSuccess
+            : m.users.status.enableSuccess,
         );
         setPendingStatusUser(null);
         setStatusReason("");
         await loadUsers();
       } catch (updateError) {
-        setStatusFormError(getErrorMessage(updateError));
+        setStatusFormError(getErrorMessage(updateError) || m.users.loadError);
       } finally {
         setStatusUpdatingUserId(null);
       }
     },
-    [loadUsers, pendingStatusUser, statusReason],
+    [loadUsers, m.users.loadError, m.users.status, pendingStatusUser, statusReason],
   );
 
   const openEditForm = useCallback((user: SaasUserSummary) => {
@@ -515,7 +534,7 @@ export function SaasUserListView() {
           return;
         }
 
-        setFormError(getErrorMessage(detailError));
+        setFormError(getErrorMessage(detailError) || m.users.loadError);
       })
       .finally(() => {
         if (editRequestIdRef.current !== requestId) {
@@ -524,7 +543,7 @@ export function SaasUserListView() {
 
         setEditLoading(false);
       });
-  }, [canManageMembers]);
+  }, [canManageMembers, m.users.loadError]);
 
   const handleInviteSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -540,22 +559,22 @@ export function SaasUserListView() {
         if (!result.ok) {
           setInviteErrors(result.errors);
           setInviteFormError(
-            Object.values(result.errors)[0] ?? "Invite could not be sent.",
+            Object.values(result.errors)[0] ?? m.users.invite.failed,
           );
           return;
         }
 
         setInviteForm(defaultInviteForm);
         setInviteOpen(false);
-        setNotice("Invitation created successfully.");
+        setNotice(m.users.invite.success);
         await loadUsers();
       } catch (submitError) {
-        setInviteFormError(getErrorMessage(submitError));
+        setInviteFormError(getErrorMessage(submitError) || m.users.invite.failed);
       } finally {
         setInviteSubmitting(false);
       }
     },
-    [inviteForm, loadUsers],
+    [inviteForm, loadUsers, m.users.invite.failed, m.users.invite.success],
   );
 
   const handleEditSubmit = useCallback(
@@ -580,21 +599,29 @@ export function SaasUserListView() {
 
         if (!result.ok) {
           setEditErrors(result.errors);
-          setFormError(Object.values(result.errors)[0] ?? "Update failed.");
+          setFormError(Object.values(result.errors)[0] ?? m.users.edit.failed);
           return;
         }
 
         setEditingUser(null);
         setEditErrors({});
-        setNotice("Platform member updated successfully.");
+        setNotice(m.users.edit.success);
         await loadUsers();
       } catch (submitError) {
-        setFormError(getErrorMessage(submitError));
+        setFormError(getErrorMessage(submitError) || m.users.edit.failed);
       } finally {
         setEditSubmitting(false);
       }
     },
-    [editForm, editLoading, editingUser, editSubmitting, loadUsers],
+    [
+      editForm,
+      editLoading,
+      editingUser,
+      editSubmitting,
+      loadUsers,
+      m.users.edit.failed,
+      m.users.edit.success,
+    ],
   );
 
   const handleRoleSubmit = useCallback(
@@ -617,31 +644,38 @@ export function SaasUserListView() {
 
         if (!result.ok) {
           setRoleFormError(
-            result.errors.roleCodes ?? "Role update failed.",
+            result.errors.roleCodes ?? m.users.roles.failed,
           );
           return;
         }
 
         setRoleEditingUser(null);
         setRoleForm(defaultRoleForm);
-        setNotice("Platform member roles updated successfully.");
+        setNotice(m.users.roles.success);
         await loadUsers();
       } catch (submitError) {
-        setRoleFormError(getErrorMessage(submitError));
+        setRoleFormError(getErrorMessage(submitError) || m.users.roles.failed);
       } finally {
         setRoleSubmitting(false);
       }
     },
-    [loadUsers, roleEditingUser, roleForm, roleSubmitting],
+    [
+      loadUsers,
+      m.users.roles.failed,
+      m.users.roles.success,
+      roleEditingUser,
+      roleForm,
+      roleSubmitting,
+    ],
   );
 
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">SaaS platform</Badge>
+          <Badge variant="secondary">{m.users.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Platform Members
+            {m.users.title}
           </h1>
         </div>
 
@@ -651,10 +685,10 @@ export function SaasUserListView() {
             onClick={openInviteForm}
             type="button"
           >
-            Invite member
+            {m.users.inviteMember}
           </Button>
           <Button onClick={loadUsers} type="button" variant="outline">
-            Refresh
+            {m.common.refresh}
           </Button>
         </div>
       </div>
@@ -672,7 +706,7 @@ export function SaasUserListView() {
           <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-800">
             {authError
               ? `Member management is read-only because the current session could not be verified: ${authError}`
-              : `Role options could not be refreshed: ${rolesError}`}
+              : interpolate(m.users.roleRefreshError, { error: rolesError ?? "" })}
           </div>
         </div>
       ) : null}
@@ -680,19 +714,18 @@ export function SaasUserListView() {
       {!authError && authContext && !isSuperAdmin ? (
         <div className="border-b p-5">
           <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
-            Support users can view platform members and roles. Member edits,
-            role changes, and disable actions require Super Admin.
+            {m.users.readOnlyHint}
           </div>
         </div>
       ) : null}
 
       <div className="grid gap-3 border-b p-5 sm:grid-cols-2 lg:grid-cols-5">
         {[
-          ["Total", metrics.total],
-          ["Active", metrics.active],
-          ["Invited", metrics.invited],
-          ["Disabled", metrics.disabled],
-          ["Suspended", metrics.suspended],
+          [m.users.metrics.total, metrics.total],
+          [m.users.metrics.active, metrics.active],
+          [m.users.metrics.invited, metrics.invited],
+          [m.users.metrics.disabled, metrics.disabled],
+          [m.users.metrics.suspended, metrics.suspended],
         ].map(([label, value]) => (
           <div className="rounded-md border bg-background p-4" key={label}>
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -705,20 +738,20 @@ export function SaasUserListView() {
 
       <div className="grid gap-3 border-b p-5 lg:grid-cols-[1fr_220px] lg:items-end">
         <div className="grid gap-2">
-          <Label htmlFor="saas-user-search">Search</Label>
+          <Label htmlFor="saas-user-search">{m.common.search}</Label>
           <Input
             id="saas-user-search"
             onChange={(event) => {
               setLoading(true);
               setQuery(event.target.value);
             }}
-            placeholder="Name, email, phone"
+            placeholder={m.users.searchPlaceholder}
             value={query}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="saas-user-status-filter">Status</Label>
+          <Label htmlFor="saas-user-status-filter">{m.common.status}</Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
@@ -730,12 +763,22 @@ export function SaasUserListView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {saasUserStatusOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
+              <SelectItem value="all">{m.common.allStatuses}</SelectItem>
+              {saasUserStatusOptions.map((option) => {
+                const label =
+                  option.value === "active"
+                    ? m.common.statusLabels.active
+                    : option.value === "invited"
+                      ? m.common.statusLabels.invited
+                      : option.value === "disabled"
+                        ? m.common.statusLabels.disabled
+                        : m.common.statusLabels.suspended;
+                return (
+                  <SelectItem key={option.value} value={option.value}>
+                    {label}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -760,7 +803,7 @@ export function SaasUserListView() {
         <div className="p-5">
           <div className="rounded-md border border-dashed p-8 text-center">
             <h2 className="text-base font-semibold">
-              No platform members found
+              {m.users.emptyTitle}
             </h2>
           </div>
         </div>
@@ -768,13 +811,13 @@ export function SaasUserListView() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Member</TableHead>
-              <TableHead>Roles</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Language</TableHead>
-              <TableHead>Last login</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{m.users.columns.member}</TableHead>
+              <TableHead>{m.users.columns.roles}</TableHead>
+              <TableHead>{m.common.status}</TableHead>
+              <TableHead>{m.users.columns.language}</TableHead>
+              <TableHead>{m.users.columns.lastLogin}</TableHead>
+              <TableHead>{m.users.columns.created}</TableHead>
+              <TableHead className="text-right">{m.common.actions}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -791,7 +834,7 @@ export function SaasUserListView() {
                     {(user.roles.length > 0 ? user.roles : [user.role]).map(
                       (role) => (
                         <Badge key={role} variant="outline">
-                          {getRoleLabel(role)}
+                          {getRoleLabel(role, m)}
                         </Badge>
                       ),
                     )}
@@ -799,12 +842,12 @@ export function SaasUserListView() {
                 </TableCell>
                 <TableCell>
                   <Badge variant={getStatusVariant(user.status)}>
-                    {saasUserStatusLabels[user.status]}
+                    {m.common.statusLabels[user.status]}
                   </Badge>
                 </TableCell>
-                <TableCell>{getLanguageLabel(user.language)}</TableCell>
-                <TableCell>{formatDate(user.lastLoginAt)}</TableCell>
-                <TableCell>{formatDate(user.createdAt)}</TableCell>
+                <TableCell>{getLanguageLabel(user.language, m)}</TableCell>
+                <TableCell>{formatDate(user.lastLoginAt, m, formatSaasDate)}</TableCell>
+                <TableCell>{formatDate(user.createdAt, m, formatSaasDate)}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     <Button
@@ -816,7 +859,7 @@ export function SaasUserListView() {
                       type="button"
                       variant="outline"
                     >
-                      Edit
+                      {m.users.actions.edit}
                     </Button>
                     <Button
                       disabled={!canManageMembers || rolesLoading}
@@ -827,7 +870,7 @@ export function SaasUserListView() {
                       type="button"
                       variant="outline"
                     >
-                      Roles
+                      {m.users.actions.roles}
                     </Button>
                     <Button
                       disabled={
@@ -843,7 +886,7 @@ export function SaasUserListView() {
                       type="button"
                       variant={user.status === "active" ? "outline" : "default"}
                     >
-                      {getStatusActionLabel(user.status)}
+                      {getStatusActionLabel(user.status, m)}
                     </Button>
                   </div>
                 </TableCell>
@@ -867,15 +910,14 @@ export function SaasUserListView() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Invite platform member</DialogTitle>
+            <DialogTitle>{m.users.invite.title}</DialogTitle>
             <DialogDescription className="sr-only">
-              Invite a SaaS-only platform member and assign the initial platform
-              role.
+              {m.users.invite.description}
             </DialogDescription>
           </DialogHeader>
           <form className="grid gap-4" noValidate onSubmit={handleInviteSubmit}>
             <div className="grid gap-2">
-              <Label htmlFor="invite-display-name">Display name</Label>
+              <Label htmlFor="invite-display-name">{m.users.invite.displayName}</Label>
               <Input
                 aria-invalid={Boolean(inviteErrors.displayName)}
                 id="invite-display-name"
@@ -897,7 +939,7 @@ export function SaasUserListView() {
               ) : null}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="invite-email">Email</Label>
+              <Label htmlFor="invite-email">{m.users.invite.email}</Label>
               <Input
                 aria-invalid={Boolean(inviteErrors.email)}
                 autoComplete="email"
@@ -921,7 +963,7 @@ export function SaasUserListView() {
               ) : null}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="invite-phone">Phone</Label>
+              <Label htmlFor="invite-phone">{m.users.invite.phone}</Label>
               <Input
                 aria-invalid={Boolean(inviteErrors.phone)}
                 autoComplete="tel"
@@ -943,7 +985,9 @@ export function SaasUserListView() {
               ) : null}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="invite-password">Temporary password</Label>
+              <Label htmlFor="invite-password">
+                {m.users.invite.temporaryPassword}
+              </Label>
               <Input
                 aria-invalid={Boolean(inviteErrors.password)}
                 autoComplete="new-password"
@@ -969,7 +1013,7 @@ export function SaasUserListView() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="invite-role">Role</Label>
+                <Label htmlFor="invite-role">{m.users.invite.role}</Label>
                 <Select
                   onValueChange={(value) => {
                     clearInviteFieldError("roleCode");
@@ -984,8 +1028,10 @@ export function SaasUserListView() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="support">Support</SelectItem>
-                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                    <SelectItem value="support">{m.common.roleLabels.support}</SelectItem>
+                    <SelectItem value="super_admin">
+                      {m.common.roleLabels.superAdmin}
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 {inviteErrors.roleCode ? (
@@ -995,7 +1041,7 @@ export function SaasUserListView() {
                 ) : null}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="invite-language">Language</Label>
+                <Label htmlFor="invite-language">{m.users.invite.language}</Label>
                 <Select
                   onValueChange={(value) => {
                     clearInviteFieldError("language");
@@ -1010,9 +1056,9 @@ export function SaasUserListView() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="fr">French</SelectItem>
-                    <SelectItem value="zh-CN">Chinese</SelectItem>
+                    <SelectItem value="en">{m.common.languageLabels.en}</SelectItem>
+                    <SelectItem value="fr">{m.common.languageLabels.fr}</SelectItem>
+                    <SelectItem value="zh-CN">{m.common.languageLabels.zhCN}</SelectItem>
                   </SelectContent>
                 </Select>
                 {inviteErrors.language ? (
@@ -1029,7 +1075,7 @@ export function SaasUserListView() {
             ) : null}
             <DialogFooter>
               <Button disabled={inviteSubmitting} type="submit">
-                {inviteSubmitting ? "Sending invite" : "Invite member"}
+                {inviteSubmitting ? m.users.invite.sending : m.users.invite.submit}
               </Button>
             </DialogFooter>
           </form>
@@ -1050,10 +1096,9 @@ export function SaasUserListView() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit platform member</DialogTitle>
+            <DialogTitle>{m.users.edit.title}</DialogTitle>
             <DialogDescription className="sr-only">
-              Update SaaS-only member profile fields. Role changes are handled
-              separately by the platform roles flow.
+              {m.users.edit.description}
             </DialogDescription>
           </DialogHeader>
           <form className="grid gap-4" noValidate onSubmit={handleEditSubmit}>
@@ -1066,14 +1111,14 @@ export function SaasUserListView() {
                     : [editingUser.role]
                   ).map((role) => (
                     <Badge key={role} variant="outline">
-                      {getRoleLabel(role)}
+                      {getRoleLabel(role, m)}
                     </Badge>
                   ))}
                 </div>
               </div>
             ) : null}
             <div className="grid gap-2">
-              <Label htmlFor="edit-display-name">Display name</Label>
+              <Label htmlFor="edit-display-name">{m.users.invite.displayName}</Label>
               <Input
                 aria-invalid={Boolean(editErrors.displayName)}
                 disabled={editLoading}
@@ -1096,7 +1141,7 @@ export function SaasUserListView() {
               ) : null}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-email">Email</Label>
+              <Label htmlFor="edit-email">{m.users.invite.email}</Label>
               <Input
                 aria-invalid={Boolean(editErrors.email)}
                 autoComplete="email"
@@ -1119,7 +1164,7 @@ export function SaasUserListView() {
               ) : null}
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="edit-phone">Phone</Label>
+              <Label htmlFor="edit-phone">{m.users.invite.phone}</Label>
               <Input
                 aria-invalid={Boolean(editErrors.phone)}
                 autoComplete="tel"
@@ -1141,7 +1186,7 @@ export function SaasUserListView() {
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="edit-language">Language</Label>
+                <Label htmlFor="edit-language">{m.users.invite.language}</Label>
                 <Select
                   disabled={editLoading}
                   onValueChange={(value) => {
@@ -1157,9 +1202,9 @@ export function SaasUserListView() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="en">English</SelectItem>
-                    <SelectItem value="fr">French</SelectItem>
-                    <SelectItem value="zh-CN">Chinese</SelectItem>
+                    <SelectItem value="en">{m.common.languageLabels.en}</SelectItem>
+                    <SelectItem value="fr">{m.common.languageLabels.fr}</SelectItem>
+                    <SelectItem value="zh-CN">{m.common.languageLabels.zhCN}</SelectItem>
                   </SelectContent>
                 </Select>
                 {editErrors.language ? (
@@ -1169,7 +1214,7 @@ export function SaasUserListView() {
                 ) : null}
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="edit-timezone">Timezone</Label>
+                <Label htmlFor="edit-timezone">{m.users.edit.timezone}</Label>
                 <Input
                   aria-invalid={Boolean(editErrors.timezone)}
                   disabled={editLoading}
@@ -1210,10 +1255,10 @@ export function SaasUserListView() {
                 type="button"
                 variant="outline"
               >
-                Cancel
+                {m.common.cancel}
               </Button>
               <Button disabled={editLoading || editSubmitting} type="submit">
-                {editSubmitting ? "Saving" : "Save changes"}
+                {editSubmitting ? m.common.saving : m.common.saveChanges}
               </Button>
             </DialogFooter>
           </form>
@@ -1232,9 +1277,9 @@ export function SaasUserListView() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit platform roles</DialogTitle>
+            <DialogTitle>{m.users.roles.title}</DialogTitle>
             <DialogDescription className="sr-only">
-              Update SaaS-only platform roles for this member.
+              {m.users.roles.description}
             </DialogDescription>
           </DialogHeader>
           <form className="grid gap-4" noValidate onSubmit={handleRoleSubmit}>
@@ -1250,7 +1295,7 @@ export function SaasUserListView() {
             ) : null}
 
             <div className="grid gap-3">
-              <Label>Roles</Label>
+              <Label>{m.users.columns.roles}</Label>
               <div className="grid gap-2">
                 {activeRoleCodes.map((roleCode) => (
                   <label
@@ -1266,14 +1311,13 @@ export function SaasUserListView() {
                       }}
                       type="checkbox"
                     />
-                    <span>{getRoleLabel(roleCode)}</span>
+                    <span>{getRoleLabel(roleCode, m)}</span>
                   </label>
                 ))}
               </div>
               {rolesError ? (
                 <p className="text-xs text-amber-700">
-                  Role list refresh failed. Using the built-in SaaS role
-                  boundary for this form.
+                  {m.users.roles.fallbackHint}
                 </p>
               ) : null}
             </div>
@@ -1295,7 +1339,7 @@ export function SaasUserListView() {
                 type="button"
                 variant="outline"
               >
-                Cancel
+                {m.common.cancel}
               </Button>
               <Button
                 disabled={
@@ -1305,7 +1349,7 @@ export function SaasUserListView() {
                 }
                 type="submit"
               >
-                {roleSubmitting ? "Saving" : "Save roles"}
+                {roleSubmitting ? m.common.saving : m.users.roles.submit}
               </Button>
             </DialogFooter>
           </form>
@@ -1326,13 +1370,13 @@ export function SaasUserListView() {
           <DialogHeader>
             <DialogTitle>
               {pendingStatusUser?.status === "active"
-                ? "Disable platform member"
-                : "Enable platform member"}
+                ? m.users.status.disableTitle
+                : m.users.status.enableTitle}
             </DialogTitle>
             <DialogDescription className="sr-only">
               {pendingStatusUser?.status === "active"
-                ? "Confirm disabling this SaaS platform member."
-                : "Confirm enabling this SaaS platform member."}
+                ? m.users.status.disableConfirm
+                : m.users.status.enableConfirm}
             </DialogDescription>
           </DialogHeader>
 
@@ -1349,13 +1393,13 @@ export function SaasUserListView() {
                 </div>
                 <div className="mt-2">
                   <Badge variant={getStatusVariant(pendingStatusUser.status)}>
-                    {saasUserStatusLabels[pendingStatusUser.status]}
+                    {m.common.statusLabels[pendingStatusUser.status]}
                   </Badge>
                 </div>
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="status-reason">Reason</Label>
+                <Label htmlFor="status-reason">{m.users.status.reason}</Label>
                 <Textarea
                   disabled={Boolean(statusUpdatingUserId)}
                   id="status-reason"
@@ -1387,7 +1431,7 @@ export function SaasUserListView() {
                   type="button"
                   variant="outline"
                 >
-                  Cancel
+                  {m.common.cancel}
                 </Button>
                 <Button
                   disabled={
@@ -1402,8 +1446,8 @@ export function SaasUserListView() {
                   }
                 >
                   {statusUpdatingUserId
-                    ? "Saving"
-                    : getStatusActionLabel(pendingStatusUser.status)}
+                    ? m.common.saving
+                    : getStatusActionLabel(pendingStatusUser.status, m)}
                 </Button>
               </DialogFooter>
             </div>

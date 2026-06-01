@@ -24,6 +24,8 @@ import {
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useSaasI18n } from "@/i18n";
+
 import { auditEventCategoryOptions } from "../constants";
 import {
   getSaasAuditLogDetailQuery,
@@ -36,19 +38,11 @@ const limit = 10;
 type SuccessFilter = "all" | "true" | "false";
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Failed to load audit logs.";
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return error instanceof Error ? error.message : "";
 }
 
 export function SaasAuditLogListView() {
+  const { m, formatDateTime } = useSaasI18n();
   const [logs, setLogs] = useState<AuditLogSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -86,7 +80,7 @@ export function SaasAuditLogListView() {
       setLogs(result.items);
       setTotal(result.total);
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(getErrorMessage(loadError) || m.audit.loadError);
     } finally {
       setLoading(false);
     }
@@ -107,7 +101,7 @@ export function SaasAuditLogListView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(getErrorMessage(loadError) || m.audit.loadError);
         }
       })
       .finally(() => {
@@ -119,7 +113,7 @@ export function SaasAuditLogListView() {
     return () => {
       isCurrent = false;
     };
-  }, [listQuery]);
+  }, [listQuery, m.audit.loadError]);
 
   const openDetail = useCallback((log: AuditLogSummary) => {
     setSelectedLog(log);
@@ -132,7 +126,7 @@ export function SaasAuditLogListView() {
         setDetail(data);
       })
       .catch((err: unknown) => {
-        setDetailError(getErrorMessage(err));
+        setDetailError(getErrorMessage(err) || m.audit.loadError);
       })
       .finally(() => {
         setDetailLoading(false);
@@ -146,20 +140,20 @@ export function SaasAuditLogListView() {
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">SaaS audit</Badge>
+          <Badge variant="secondary">{m.audit.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Audit Logs
+            {m.audit.title}
           </h1>
         </div>
 
         <Button onClick={loadLogs} type="button" variant="outline">
-          Refresh
+          {m.common.refresh}
         </Button>
       </div>
 
       <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-5">
         <div className="grid gap-2">
-          <Label htmlFor="audit-category-filter">Category</Label>
+          <Label htmlFor="audit-category-filter">{m.audit.category}</Label>
           <Select
             onValueChange={(value) => {
               setOffset(0);
@@ -172,10 +166,16 @@ export function SaasAuditLogListView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
+              <SelectItem value="all">{m.common.allCategories}</SelectItem>
               {auditEventCategoryOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                  {option.value === "auth"
+                    ? m.common.auditCategoryLabels.auth
+                    : option.value === "saas_platform"
+                      ? m.common.auditCategoryLabels.saasPlatform
+                      : option.value === "saas_tenant"
+                        ? m.common.auditCategoryLabels.saasTenant
+                        : m.common.auditCategoryLabels.saasUser}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -183,7 +183,7 @@ export function SaasAuditLogListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="audit-success-filter">Result</Label>
+          <Label htmlFor="audit-success-filter">{m.audit.result}</Label>
           <Select
             onValueChange={(value) => {
               setOffset(0);
@@ -196,15 +196,15 @@ export function SaasAuditLogListView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All results</SelectItem>
-              <SelectItem value="true">Success</SelectItem>
-              <SelectItem value="false">Failed</SelectItem>
+              <SelectItem value="all">{m.common.allResults}</SelectItem>
+              <SelectItem value="true">{m.common.resultLabels.success}</SelectItem>
+              <SelectItem value="false">{m.common.resultLabels.failed}</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="audit-actor-filter">Actor user ID</Label>
+          <Label htmlFor="audit-actor-filter">{m.audit.actorUserId}</Label>
           <Input
             id="audit-actor-filter"
             onChange={(event) => {
@@ -212,13 +212,13 @@ export function SaasAuditLogListView() {
               setLoading(true);
               setActorUserId(event.target.value);
             }}
-            placeholder="Optional ULID"
+            placeholder={m.common.optionalUlid}
             value={actorUserId}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="audit-date-from">From</Label>
+          <Label htmlFor="audit-date-from">{m.common.from}</Label>
           <Input
             id="audit-date-from"
             onChange={(event) => {
@@ -232,7 +232,7 @@ export function SaasAuditLogListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="audit-date-to">To</Label>
+          <Label htmlFor="audit-date-to">{m.common.to}</Label>
           <Input
             id="audit-date-to"
             onChange={(event) => {
@@ -264,7 +264,7 @@ export function SaasAuditLogListView() {
       ) : logs.length === 0 ? (
         <div className="p-5">
           <div className="rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">No audit logs found</h2>
+            <h2 className="text-base font-semibold">{m.audit.emptyTitle}</h2>
           </div>
         </div>
       ) : (
@@ -272,12 +272,12 @@ export function SaasAuditLogListView() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Created</TableHead>
-                <TableHead>Category</TableHead>
-                <TableHead>Event</TableHead>
-                <TableHead>Entity</TableHead>
-                <TableHead>Actor</TableHead>
-                <TableHead>Result</TableHead>
+                <TableHead>{m.audit.columns.created}</TableHead>
+                <TableHead>{m.audit.category}</TableHead>
+                <TableHead>{m.audit.columns.event}</TableHead>
+                <TableHead>{m.audit.columns.entity}</TableHead>
+                <TableHead>{m.audit.columns.actor}</TableHead>
+                <TableHead>{m.audit.result}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -289,14 +289,28 @@ export function SaasAuditLogListView() {
                     openDetail(log);
                   }}
                 >
-                  <TableCell>{formatDate(log.createdAt)}</TableCell>
-                  <TableCell>{log.eventCategory}</TableCell>
+                  <TableCell>
+                    {formatDateTime(log.createdAt) || m.common.invalidDate}
+                  </TableCell>
+                  <TableCell>
+                    {log.eventCategory === "auth"
+                      ? m.common.auditCategoryLabels.auth
+                      : log.eventCategory === "saas_platform"
+                        ? m.common.auditCategoryLabels.saasPlatform
+                        : log.eventCategory === "saas_tenant"
+                          ? m.common.auditCategoryLabels.saasTenant
+                          : log.eventCategory === "saas_user"
+                            ? m.common.auditCategoryLabels.saasUser
+                            : log.eventCategory}
+                  </TableCell>
                   <TableCell>{log.eventType}</TableCell>
-                  <TableCell>{log.entityType ?? "—"}</TableCell>
-                  <TableCell>{log.actorUserId ?? "System"}</TableCell>
+                  <TableCell>{log.entityType ?? m.common.notSet}</TableCell>
+                  <TableCell>{log.actorUserId ?? m.common.system}</TableCell>
                   <TableCell>
                     <Badge variant={log.success ? "default" : "destructive"}>
-                      {log.success ? "Success" : "Failed"}
+                      {log.success
+                        ? m.common.resultLabels.success
+                        : m.common.resultLabels.failed}
                     </Badge>
                   </TableCell>
                 </TableRow>
@@ -317,7 +331,7 @@ export function SaasAuditLogListView() {
                 type="button"
                 variant="outline"
               >
-                Previous Page
+                {m.common.previousPage}
               </Button>
               <Button
                 disabled={!hasNext}
@@ -327,7 +341,7 @@ export function SaasAuditLogListView() {
                 type="button"
                 variant="outline"
               >
-                Next Page
+                {m.common.nextPage}
               </Button>
             </div>
           </div>
@@ -346,9 +360,9 @@ export function SaasAuditLogListView() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Audit Log Detail</DialogTitle>
+            <DialogTitle>{m.audit.detail.title}</DialogTitle>
             <DialogDescription className="sr-only">
-              Full details of the selected audit log entry.
+              {m.audit.detail.description}
             </DialogDescription>
           </DialogHeader>
 
@@ -364,43 +378,55 @@ export function SaasAuditLogListView() {
           ) : detail ? (
             <div className="grid gap-3 text-sm">
               <div className="grid grid-cols-[140px_1fr] gap-y-2">
-                <span className="text-muted-foreground">ID</span>
+                <span className="text-muted-foreground">{m.audit.detail.id}</span>
                 <span className="break-all font-mono text-xs">{detail.id}</span>
-                <span className="text-muted-foreground">Category</span>
-                <span>{detail.eventCategory}</span>
-                <span className="text-muted-foreground">Event</span>
+                <span className="text-muted-foreground">{m.audit.category}</span>
+                <span>
+                  {detail.eventCategory === "auth"
+                    ? m.common.auditCategoryLabels.auth
+                    : detail.eventCategory === "saas_platform"
+                      ? m.common.auditCategoryLabels.saasPlatform
+                      : detail.eventCategory === "saas_tenant"
+                        ? m.common.auditCategoryLabels.saasTenant
+                        : detail.eventCategory === "saas_user"
+                          ? m.common.auditCategoryLabels.saasUser
+                          : detail.eventCategory}
+                </span>
+                <span className="text-muted-foreground">{m.audit.columns.event}</span>
                 <span>{detail.eventType}</span>
-                <span className="text-muted-foreground">Entity type</span>
-                <span>{detail.entityType ?? "—"}</span>
-                <span className="text-muted-foreground">Entity ID</span>
+                <span className="text-muted-foreground">{m.audit.detail.entityType}</span>
+                <span>{detail.entityType ?? m.common.notSet}</span>
+                <span className="text-muted-foreground">{m.audit.detail.entityId}</span>
                 <span className="break-all font-mono text-xs">
-                  {detail.entityId ?? "—"}
+                  {detail.entityId ?? m.common.notSet}
                 </span>
-                <span className="text-muted-foreground">Actor</span>
+                <span className="text-muted-foreground">{m.audit.columns.actor}</span>
                 <span className="break-all font-mono text-xs">
-                  {detail.actorUserId ?? "System"}
+                  {detail.actorUserId ?? m.common.system}
                 </span>
-                <span className="text-muted-foreground">Tenant</span>
+                <span className="text-muted-foreground">{m.audit.detail.tenant}</span>
                 <span className="break-all font-mono text-xs">
-                  {detail.tenantId ?? "Platform"}
+                  {detail.tenantId ?? m.common.platform}
                 </span>
-                <span className="text-muted-foreground">Result</span>
+                <span className="text-muted-foreground">{m.audit.result}</span>
                 <Badge
                   className="w-fit"
                   variant={detail.success ? "default" : "destructive"}
                 >
-                  {detail.success ? "Success" : "Failed"}
+                  {detail.success
+                    ? m.common.resultLabels.success
+                    : m.common.resultLabels.failed}
                 </Badge>
                 {detail.reason ? (
                   <>
-                    <span className="text-muted-foreground">Reason</span>
+                    <span className="text-muted-foreground">{m.audit.detail.reason}</span>
                     <span>{detail.reason}</span>
                   </>
                 ) : null}
-                <span className="text-muted-foreground">IP address</span>
-                <span>{detail.ipAddress ?? "—"}</span>
-                <span className="text-muted-foreground">Created</span>
-                <span>{formatDate(detail.createdAt)}</span>
+                <span className="text-muted-foreground">{m.audit.detail.ipAddress}</span>
+                <span>{detail.ipAddress ?? m.common.notSet}</span>
+                <span className="text-muted-foreground">{m.audit.columns.created}</span>
+                <span>{formatDateTime(detail.createdAt) || m.common.invalidDate}</span>
               </div>
 
               {detail.before ?? detail.after ? (
@@ -408,7 +434,7 @@ export function SaasAuditLogListView() {
                   {detail.before ? (
                     <div className="grid gap-1">
                       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        Before
+                        {m.audit.detail.before}
                       </span>
                       <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">
                         {JSON.stringify(detail.before, null, 2)}
@@ -418,7 +444,7 @@ export function SaasAuditLogListView() {
                   {detail.after ? (
                     <div className="grid gap-1">
                       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        After
+                        {m.audit.detail.after}
                       </span>
                       <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">
                         {JSON.stringify(detail.after, null, 2)}

@@ -20,25 +20,16 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
-  operationLogLevelLabels,
   operationLogLevelOptions,
 } from "../constants";
 import { getOperationLogListQuery } from "../queries";
 import type { OperationLogLevel, OperationLogListItem } from "../types";
+import { useSaasI18n } from "@/i18n";
 
 type LevelFilter = "all" | OperationLogLevel;
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Failed to load operation logs.";
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return error instanceof Error ? error.message : "";
 }
 
 function getLevelVariant(
@@ -60,6 +51,7 @@ function getLevelVariant(
 }
 
 export function OperationLogListView() {
+  const { m, formatDateTime } = useSaasI18n();
   const [logs, setLogs] = useState<OperationLogListItem[]>([]);
   const [level, setLevel] = useState<LevelFilter>("all");
   const [service, setService] = useState("");
@@ -90,7 +82,7 @@ export function OperationLogListView() {
       const data = await getOperationLogListQuery(listQuery);
       setLogs(data);
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(getErrorMessage(loadError) || m.operationLogs.loadError);
     } finally {
       setLoading(false);
     }
@@ -110,7 +102,7 @@ export function OperationLogListView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(getErrorMessage(loadError) || m.operationLogs.loadError);
         }
       })
       .finally(() => {
@@ -122,26 +114,26 @@ export function OperationLogListView() {
     return () => {
       isCurrent = false;
     };
-  }, [listQuery]);
+  }, [listQuery, m.operationLogs.loadError]);
 
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">SaaS operation logs</Badge>
+          <Badge variant="secondary">{m.operationLogs.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Operation Logs
+            {m.operationLogs.title}
           </h1>
         </div>
 
         <Button onClick={loadLogs} type="button" variant="outline">
-          Refresh
+          {m.common.refresh}
         </Button>
       </div>
 
       <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-5">
         <div className="grid gap-2">
-          <Label htmlFor="operation-log-level-filter">Level</Label>
+          <Label htmlFor="operation-log-level-filter">{m.operationLogs.level}</Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
@@ -156,10 +148,10 @@ export function OperationLogListView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All levels</SelectItem>
+              <SelectItem value="all">{m.common.allLevels}</SelectItem>
               {operationLogLevelOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                  {m.common.levelLabels[option.value]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -167,33 +159,33 @@ export function OperationLogListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="operation-log-service-filter">Service</Label>
+          <Label htmlFor="operation-log-service-filter">{m.operationLogs.service}</Label>
           <Input
             id="operation-log-service-filter"
             onChange={(event) => {
               setLoading(true);
               setService(event.target.value);
             }}
-            placeholder="cleanhub-api"
+            placeholder={m.operationLogs.servicePlaceholder}
             value={service}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="operation-log-tenant-filter">Tenant ID</Label>
+          <Label htmlFor="operation-log-tenant-filter">{m.operationLogs.tenantId}</Label>
           <Input
             id="operation-log-tenant-filter"
             onChange={(event) => {
               setLoading(true);
               setTenantId(event.target.value);
             }}
-            placeholder="Optional tenant ULID"
+            placeholder={m.common.optionalTenantUlid}
             value={tenantId}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="operation-log-date-from">From</Label>
+          <Label htmlFor="operation-log-date-from">{m.common.from}</Label>
           <Input
             id="operation-log-date-from"
             onChange={(event) => {
@@ -206,7 +198,7 @@ export function OperationLogListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="operation-log-date-to">To</Label>
+          <Label htmlFor="operation-log-date-to">{m.common.to}</Label>
           <Input
             id="operation-log-date-to"
             onChange={(event) => {
@@ -238,7 +230,7 @@ export function OperationLogListView() {
         <div className="p-5">
           <div className="rounded-md border border-dashed p-8 text-center">
             <h2 className="text-base font-semibold">
-              No operation logs found
+              {m.operationLogs.emptyTitle}
             </h2>
           </div>
         </div>
@@ -246,23 +238,25 @@ export function OperationLogListView() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Created</TableHead>
-              <TableHead>Level</TableHead>
-              <TableHead>Service</TableHead>
-              <TableHead>Event</TableHead>
-              <TableHead>Message</TableHead>
-              <TableHead>Tenant</TableHead>
-              <TableHead>Actor</TableHead>
-              <TableHead>Request</TableHead>
+              <TableHead>{m.operationLogs.columns.created}</TableHead>
+              <TableHead>{m.operationLogs.level}</TableHead>
+              <TableHead>{m.operationLogs.service}</TableHead>
+              <TableHead>{m.audit.columns.event}</TableHead>
+              <TableHead>{m.operationLogs.columns.message}</TableHead>
+              <TableHead>{m.operationLogs.columns.tenant}</TableHead>
+              <TableHead>{m.operationLogs.columns.actor}</TableHead>
+              <TableHead>{m.operationLogs.columns.request}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {logs.map((log) => (
               <TableRow key={log.id}>
-                <TableCell>{formatDate(log.createdAt)}</TableCell>
+                <TableCell>
+                  {formatDateTime(log.createdAt) || m.common.invalidDate}
+                </TableCell>
                 <TableCell>
                   <Badge variant={getLevelVariant(log.level)}>
-                    {operationLogLevelLabels[log.level]}
+                    {m.common.levelLabels[log.level]}
                   </Badge>
                 </TableCell>
                 <TableCell>{log.service}</TableCell>
@@ -272,9 +266,9 @@ export function OperationLogListView() {
                     {log.message}
                   </span>
                 </TableCell>
-                <TableCell>{log.tenantId ?? "Platform"}</TableCell>
-                <TableCell>{log.actorUserId ?? "System"}</TableCell>
-                <TableCell>{log.requestId ?? "None"}</TableCell>
+                <TableCell>{log.tenantId ?? m.common.platform}</TableCell>
+                <TableCell>{log.actorUserId ?? m.common.system}</TableCell>
+                <TableCell>{log.requestId ?? m.operationLogs.columns.none}</TableCell>
               </TableRow>
             ))}
           </TableBody>

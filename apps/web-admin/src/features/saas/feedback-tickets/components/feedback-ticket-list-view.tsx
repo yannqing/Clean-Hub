@@ -21,7 +21,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   feedbackTicketPriorityOptions,
-  feedbackTicketStatusLabels,
   feedbackTicketStatusOptions,
 } from "../constants";
 import {
@@ -35,19 +34,13 @@ import type {
 } from "../types";
 import { FeedbackTicketAssigneeControl } from "./feedback-ticket-assignee-control";
 import { FeedbackTicketStatusControl } from "./feedback-ticket-status-control";
+import { useSaasI18n } from "@/i18n";
 
 type StatusFilter = "all" | FeedbackTicketStatus;
 type PriorityFilter = "all" | string;
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Failed to load feedback.";
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return error instanceof Error ? error.message : "";
 }
 
 function getStatusVariant(
@@ -83,6 +76,7 @@ function getSelectedTicket(
 }
 
 export function FeedbackTicketListView() {
+  const { m, formatDateTime } = useSaasI18n();
   const [tickets, setTickets] = useState<FeedbackTicketListItem[]>([]);
   const [selectedTicket, setSelectedTicket] =
     useState<FeedbackTicketDetail | null>(null);
@@ -116,7 +110,7 @@ export function FeedbackTicketListView() {
       setTickets(data);
       setSelectedTicket((current) => getSelectedTicket(current, data));
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(getErrorMessage(loadError) || m.feedback.loadError);
     } finally {
       setLoading(false);
     }
@@ -130,7 +124,7 @@ export function FeedbackTicketListView() {
       const detail = await getFeedbackTicketDetailQuery(ticketId);
       setSelectedTicket(detail);
     } catch (loadError) {
-      setDetailError(getErrorMessage(loadError));
+      setDetailError(getErrorMessage(loadError) || m.feedback.loadError);
     } finally {
       setDetailLoading(false);
     }
@@ -173,7 +167,7 @@ export function FeedbackTicketListView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(getErrorMessage(loadError) || m.feedback.loadError);
         }
       })
       .finally(() => {
@@ -191,20 +185,20 @@ export function FeedbackTicketListView() {
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">SaaS feedback</Badge>
+          <Badge variant="secondary">{m.feedback.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Feedback Tickets
+            {m.feedback.title}
           </h1>
         </div>
 
         <Button onClick={loadTickets} type="button" variant="outline">
-          Refresh
+          {m.common.refresh}
         </Button>
       </div>
 
       <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-4">
         <div className="grid gap-2">
-          <Label htmlFor="feedback-status-filter">Status</Label>
+          <Label htmlFor="feedback-status-filter">{m.common.status}</Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
@@ -216,10 +210,16 @@ export function FeedbackTicketListView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="all">{m.common.allStatuses}</SelectItem>
               {feedbackTicketStatusOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                  {option.value === "open"
+                    ? m.common.statusLabels.open
+                    : option.value === "in_progress"
+                      ? m.common.statusLabels.inProgress
+                      : option.value === "resolved"
+                        ? m.common.statusLabels.resolved
+                        : m.common.statusLabels.closed}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -227,7 +227,7 @@ export function FeedbackTicketListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="feedback-priority-filter">Priority</Label>
+          <Label htmlFor="feedback-priority-filter">{m.feedback.priority}</Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
@@ -239,10 +239,12 @@ export function FeedbackTicketListView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All priorities</SelectItem>
+              <SelectItem value="all">{m.common.allPriorities}</SelectItem>
               {feedbackTicketPriorityOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                  {m.common.priorityLabels[
+                    option.value as keyof typeof m.common.priorityLabels
+                  ] ?? option.label}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -250,27 +252,27 @@ export function FeedbackTicketListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="feedback-tenant-filter">Tenant ID</Label>
+          <Label htmlFor="feedback-tenant-filter">{m.feedback.tenantId}</Label>
           <Input
             id="feedback-tenant-filter"
             onChange={(event) => {
               setLoading(true);
               setTenantId(event.target.value);
             }}
-            placeholder="Optional tenant ULID"
+            placeholder={m.common.optionalTenantUlid}
             value={tenantId}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="feedback-assignee-filter">Assignee ID</Label>
+          <Label htmlFor="feedback-assignee-filter">{m.feedback.assigneeId}</Label>
           <Input
             id="feedback-assignee-filter"
             onChange={(event) => {
               setLoading(true);
               setAssigneeUserId(event.target.value);
             }}
-            placeholder="Optional SaaS user ULID"
+            placeholder={m.feedback.assigneePlaceholder}
             value={assigneeUserId}
           />
         </div>
@@ -297,7 +299,7 @@ export function FeedbackTicketListView() {
             <div className="p-5">
               <div className="rounded-md border border-dashed p-8 text-center">
                 <h2 className="text-base font-semibold">
-                  No feedback tickets found
+                  {m.feedback.emptyTitle}
                 </h2>
               </div>
             </div>
@@ -305,13 +307,13 @@ export function FeedbackTicketListView() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Ticket</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Priority</TableHead>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead>Assignee</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{m.feedback.columns.ticket}</TableHead>
+                  <TableHead>{m.common.status}</TableHead>
+                  <TableHead>{m.feedback.priority}</TableHead>
+                  <TableHead>{m.feedback.columns.tenant}</TableHead>
+                  <TableHead>{m.feedback.columns.assignee}</TableHead>
+                  <TableHead>{m.feedback.columns.created}</TableHead>
+                  <TableHead className="text-right">{m.common.actions}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -325,13 +327,27 @@ export function FeedbackTicketListView() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(ticket.status)}>
-                        {feedbackTicketStatusLabels[ticket.status]}
+                        {ticket.status === "open"
+                          ? m.common.statusLabels.open
+                          : ticket.status === "in_progress"
+                            ? m.common.statusLabels.inProgress
+                            : ticket.status === "resolved"
+                              ? m.common.statusLabels.resolved
+                              : m.common.statusLabels.closed}
                       </Badge>
                     </TableCell>
-                    <TableCell>{ticket.priority}</TableCell>
-                    <TableCell>{ticket.tenantId ?? "Platform"}</TableCell>
-                    <TableCell>{ticket.assigneeUserId ?? "Unassigned"}</TableCell>
-                    <TableCell>{formatDate(ticket.createdAt)}</TableCell>
+                    <TableCell>
+                      {m.common.priorityLabels[
+                        ticket.priority as keyof typeof m.common.priorityLabels
+                      ] ?? ticket.priority}
+                    </TableCell>
+                    <TableCell>{ticket.tenantId ?? m.common.platform}</TableCell>
+                    <TableCell>
+                      {ticket.assigneeUserId ?? m.common.roleLabels.unassigned}
+                    </TableCell>
+                    <TableCell>
+                      {formatDateTime(ticket.createdAt) || m.common.invalidDate}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         onClick={() => loadTicketDetail(ticket.id)}
@@ -339,7 +355,7 @@ export function FeedbackTicketListView() {
                         type="button"
                         variant="outline"
                       >
-                        Details
+                        {m.feedback.detail}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -351,7 +367,7 @@ export function FeedbackTicketListView() {
 
         <aside className="grid content-start gap-5 p-5">
           <div>
-            <h2 className="text-base font-semibold">Ticket Detail</h2>
+            <h2 className="text-base font-semibold">{m.feedback.detailTitle}</h2>
           </div>
 
           {detailLoading ? (
@@ -368,22 +384,30 @@ export function FeedbackTicketListView() {
               <div className="grid gap-3 rounded-md border p-4">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Title
+                    {m.feedback.fields.title}
                   </p>
                   <p className="mt-1 font-medium">{selectedTicket.title}</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Description
+                    {m.feedback.fields.description}
                   </p>
                   <p className="mt-1 whitespace-pre-wrap text-sm">
-                    {selectedTicket.description ?? "No description provided."}
+                    {selectedTicket.description ?? m.feedback.fields.noDescription}
                   </p>
                 </div>
                 <div className="grid gap-2 text-sm">
-                  <p>Reporter: {selectedTicket.reporterUserId ?? "Unknown"}</p>
-                  <p>Source: {selectedTicket.source ?? "Unknown"}</p>
-                  <p>Updated: {formatDate(selectedTicket.updatedAt)}</p>
+                  <p>
+                    {m.feedback.fields.reporter}{" "}
+                    {selectedTicket.reporterUserId ?? m.common.unknown}
+                  </p>
+                  <p>
+                    {m.feedback.fields.source} {selectedTicket.source ?? m.common.unknown}
+                  </p>
+                  <p>
+                    {m.feedback.fields.updated}{" "}
+                    {formatDateTime(selectedTicket.updatedAt) || m.common.invalidDate}
+                  </p>
                 </div>
               </div>
 
@@ -403,8 +427,7 @@ export function FeedbackTicketListView() {
             </>
           ) : (
             <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-              Select a feedback ticket to review details and update workflow
-              fields.
+              {m.feedback.selectHint}
             </div>
           )}
         </aside>

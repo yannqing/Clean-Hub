@@ -3,6 +3,7 @@
 import { Button, Label, Textarea, toast } from "@cleanhub/ui";
 import { useState, type FormEvent } from "react";
 
+import { useSaasI18n } from "@/i18n";
 import { createRestoreRequestAction } from "../actions";
 import type { RestoreRequest } from "../types";
 
@@ -15,6 +16,7 @@ export function CreateRestoreRequestForm({
   backupJobId,
   onCreated,
 }: CreateRestoreRequestFormProps) {
+  const { m } = useSaasI18n();
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -27,7 +29,7 @@ export function CreateRestoreRequestForm({
     });
 
     if (result.ok) {
-      toast.success("Restore request submitted.");
+      toast.success(m.backups.restoreSubmitted);
       setReason("");
       onCreated(result.data);
     } else {
@@ -40,18 +42,20 @@ export function CreateRestoreRequestForm({
   return (
     <form className="grid gap-3" onSubmit={handleSubmit}>
       <div className="grid gap-2">
-        <Label htmlFor={`restore-reason-${backupJobId}`}>Restore reason</Label>
+        <Label htmlFor={`restore-reason-${backupJobId}`}>
+          {m.backups.restoreReason}
+        </Label>
         <Textarea
           id={`restore-reason-${backupJobId}`}
           maxLength={500}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="Explain why this restore needs manual review"
+          placeholder={m.backups.restoreReasonPlaceholder}
           value={reason}
         />
       </div>
 
       <Button disabled={submitting} type="submit" variant="outline">
-        {submitting ? "Submitting..." : "Submit restore request"}
+        {submitting ? m.common.submitting : m.backups.submitRestore}
       </Button>
     </form>
   );

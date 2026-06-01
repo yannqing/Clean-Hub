@@ -9,9 +9,15 @@ import { webAdminApi } from "@/lib/api-client";
 
 type LogoutButtonProps = {
   className?: string;
+  signOutLabel?: string;
+  signingOutLabel?: string;
 };
 
-export function LogoutButton({ className }: LogoutButtonProps) {
+export function LogoutButton({
+  className,
+  signOutLabel = "Sign out",
+  signingOutLabel = "Signing out...",
+}: LogoutButtonProps) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
@@ -41,7 +47,7 @@ export function LogoutButton({ className }: LogoutButtonProps) {
       type="button"
       variant="ghost"
     >
-      {submitting ? "Signing out..." : "Sign out"}
+      {submitting ? signingOutLabel : signOutLabel}
     </Button>
   );
 }

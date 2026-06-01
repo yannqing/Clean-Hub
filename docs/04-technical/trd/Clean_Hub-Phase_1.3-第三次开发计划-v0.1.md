@@ -3,6 +3,7 @@
 | 版本 | 日期 | 状态 | 说明 |
 | ---- | ---- | ---- | ---- |
 | v0.1 | 2026-05-31 | Draft | 门店管理闭环、店长单店权限、租户 API 收口、POS 平板壳层与终端架构说明 |
+| v0.2 | 2026-06-01 | Draft | 任务整合 |
 
 ---
 
@@ -13,7 +14,7 @@
 - 明确**无独立「门店管理平台」**的产品与技术边界：店长能力在**租户后台**（`/tenant`）实现。
 - 交付**门店（branches）全栈 CRUD** 与审计，对齐构设文档 Multi-branch 与 Branch Manager 单店范围。
 - 实现 **Manager 按授权门店过滤**（`user_branches`），从 Phase 1.2「全租户可见」根据权限进行可见适配。
-- **收口** Phase 1.2 未挂载的租户 API 路由（**`apps/api/src/app.ts` 由杨序单点整合**，§11.3）与前端联调缺口。
+- **收口** Phase 1.2 租户模块联调缺口（**杨序**）；**`apps/api/src/app.ts` 与 `packages/api-client/src/tenant/index.ts` 由李龙杰单点整合**（§11.3）。
 - 交付 **POS 平板壳层**（对标 **POS-T1101 · 1280×800**，非完整收银）与 **终端架构说明**（含参考硬件映射），为第四次开发（POS 订单闭环 + 硬件 PoC）铺路。
 
 ---
@@ -76,16 +77,33 @@ Mobile（Capacitor）             → 客户/配送；Owner 手机看店（后�
 | Branch Manager | **单店**、无跨店 | 本店运营 | 可选 |
 | Cashier | 单店 | **禁止** | **仅 POS** |
 
-### 3.3 Phase 1.2 遗留
+### 3.3 Phase 1.2 遗留与本波次衔接
 
-以下项在 1.2 计划中已定义，但仓库/集成可能未完成，**第三次 Day 1 由杨序统一收口**：
+1.2 已规划但仓库/集成可能未完成的事项，按**工作类型**分工如下（勿与「第三次新功能」混为一谈）：
 
-| 遗留项 | 说明 |
-| ------ | ---- |
-| `tenant-branches` 模块 | 1.2 已规划；后端与前端可能仅有占位或部分 `api-client` |
-| `app.ts` 未挂载路由 | `overview`、`settings`、`services`、`prices`、`backups`、`reports` 等模块存在但未注册；**Day 1 Batch A、Day 2 Batch B（branches）由杨序统一挂载**（§11.3） |
-| Manager 门店过滤 | 1.2 §8.2 明确 **延后**；本波次 **P0 实现** |
-| `pos-web` / `desktop` / `mobile` | 占位；本波次 POS 仅壳层 + 架构文档；**不对接** 厂商打印/扫码/钱箱 SDK |
+**A. 路由与 API Client 挂载（历史遗留 + 本波次，均归李龙杰）**
+
+第二次开发结束时，部分 `apps/api/src/modules/**` 已存在，但 **`apps/api/src/app.ts` 未注册**、**`packages/api-client/src/tenant/index.ts` 未聚合导出**——属**历史挂载遗留**，不是本波次新写的业务模块。第三次由**李龙杰**一次性收口（§11.3）：
+
+| 项 | 说明 | 负责人 |
+| -- | ---- | ------ |
+| **Batch A（Day 1）** | 补挂 1.2 已有模块：`overview`、`settings`、`services`、`prices`、`backups`、`reports`、`hardware-configs`（若存在）等 | **李龙杰** |
+| **Batch B（Day 2）** | 武帅杰 `tenant-branches` 模块合并后，补挂 `/tenant/branches` | **李龙杰** |
+| **`api-client` 聚合** | `packages/api-client/src/tenant/index.ts` 导出与上述路由对齐 | **李龙杰** |
+
+**B. 1.2 模块代码与联调（杨序承接，不含 `app.ts` / `index.ts` 挂载）**
+
+| 遗留项 | 说明 | 第三次负责人 |
+| ------ | ---- | ------------ |
+| `tenant-users` / `tenant-audit` | 模块逻辑须接 `branchScope`、`user_branches` 写入与 Manager 过滤 | **杨序** |
+| Manager 门店过滤 | 1.2 §8.2 延后；`branchScope` helper 由李龙杰 Day 1 交付，杨序在 audit/users 接入 | 李龙杰 + **杨序** |
+| `pos-web` / `desktop` / `mobile` | 占位；本波次 POS 仅壳层 + 架构文档 | **杨序** |
+
+**C. 本波次新建（非「未挂载」遗留）**
+
+| 项 | 说明 | 负责人 |
+| -- | ---- | ------ |
+| `tenant-branches` 全栈 | 1.2 仅规划；**第三次**交付后端（武帅杰）、前端与 `api-client/branches*`（赵付杰）；路由挂载仍走李龙杰 **Batch B** | 武帅杰 / 赵付杰 + **李龙杰** 挂路由 |
 
 ### 3.4 Phase 1 参考硬件
 
@@ -116,7 +134,7 @@ Mobile（Capacitor）             → 客户/配送；Owner 手机看店（后�
 1. **门店管理**：Owner / Manager 在 `/tenant/branches` 完成列表、创建、详情、编辑、启用/停用。
 2. **店长单店权限**：Manager 仅能见、能改**绑定门店**；Owner 见全租户门店。
 3. **员工门店绑定**：创建/更新员工时写入 `user_branches`；列表与审计支持按店筛选。
-4. **API 集成收口**：`apps/api/src/app.ts` 由**杨序**挂载本阶段全部 `/tenant/**` 路由（见 §11.2、§11.3）；业务模块 PR **不得**修改 `app.ts`。
+4. **API 集成收口**：`apps/api/src/app.ts` 与 `packages/api-client/src/tenant/index.ts` 由**李龙杰**挂载/聚合本阶段 `/tenant/**` 路由（见 §11.2、§11.3）；业务模块 PR **不得**修改 `app.ts`。
 5. **审计**：门店写操作写入 `audit_logs`（`tenant_branch`，见命名表）。
 6. **端到端**：SaaS 建租户 → Owner 建 2 店 → 建 Manager（绑 A 店）→ Manager 只见 A 店。
 
@@ -154,8 +172,8 @@ Mobile（Capacitor）             → 客户/配送；Owner 手机看店（后�
 
 | 姓名 | 本波次分工原则 |
 | ---- | -------------- |
-| **李龙杰** | **Day 1 实现** `branchScope` helper（§8.2.1）；§8 Manager 单店权限规范；代码审核、验收统筹；终端架构文档评审 |
-| **杨序** | **`apps/api/src/app.ts` 租户路由单点整合**（§11.3）；`tenant-users` / `tenant-audit` **调用** `branchScope` 接过滤；集成检查；**POS 壳层（POS-T1101 1280×800）+ desktop 开发加载**；终端架构说明；`packages/api-client/src/tenant/index.ts` 聚合 |
+| **李龙杰** | **Day 1 实现** `branchScope` helper（§8.2.1）；**`apps/api/src/app.ts` 租户路由单点整合**（§11.3）；**`packages/api-client/src/tenant/index.ts` 聚合**；§8 Manager 单店权限规范；代码审核、验收统筹；终端架构文档评审 |
+| **杨序** | **承接 1.2 未完成**：`tenant-users` / `tenant-audit` **调用** `branchScope` 接过滤、`user_branches` 写入；集成检查；**POS 壳层（POS-T1101 1280×800）+ desktop 开发加载**；终端架构说明 |
 | **武帅杰** | **`tenant-branches` 后端 API（P0）**：CRUD、状态、审计、与 `branchScope` 对接；通知配置 P1 |
 | **赵付杰** | **租户后台主流程 UI（P0）**：工作台、设置、**门店管理页面**；`packages/api-client` branches；端到端 Owner 开户→建店联调 |
 | **孙蕊蕊** | 操作日志页对接 audit；服务/价格/备份/报表路由与页面对接验证 |
@@ -278,10 +296,10 @@ docs/04-technical/trd/
 | 编号 | 功能点 | 负责人 | 说明 |
 | ---- | ------ | ------ | ---- |
 | M-01 | `branchScope` helper | **李龙杰 · Day 1** | 按 §8.2.1 实现；阻塞武帅杰 / 杨序过滤接入 |
-| M-02 | `app.ts` 挂载 | 杨序 | 见 §11.2、§11.3（Batch A/B） |
-| M-03 | `tenant-audit` Manager 过滤 | 杨序 | 列表默认限店；调用 M-01 |
-| M-04 | `tenant-users` 校验 `branchIds` | 杨序 | Manager 分配门店不得超出绑定范围；**写入 `user_branches`**（§8.4）；调用 M-01 |
-| M-05 | `api-client` 聚合 | 杨序 | `packages/api-client/src/tenant/index.ts` |
+| M-02 | `app.ts` 挂载 | **李龙杰** | 见 §11.2、§11.3（Batch A/B） |
+| M-03 | `tenant-audit` Manager 过滤 | 杨序 | 列表默认限店；调用 M-01；**承接 1.2** |
+| M-04 | `tenant-users` 校验 `branchIds` | 杨序 | Manager 分配门店不得超出绑定范围；**写入 `user_branches`**（§8.4）；调用 M-01；**承接 1.2** |
+| M-05 | `api-client` 聚合 | **李龙杰** | `packages/api-client/src/tenant/index.ts` |
 | M-06 | 集成检查 | 杨序 | typecheck / lint 相关 workspace |
 
 ### 9.3 租户后台 UI 收口（赵付杰 / 孙蕊蕊 · P0/P1）
@@ -292,7 +310,7 @@ docs/04-technical/trd/
 | L-02 | `GET/PATCH /tenant/settings` | 赵付杰 |
 | L-03 | 门店管理前端 | 赵付杰（见 §9.1.1） |
 | L-04 | `/tenant/system/logs` 接 audit API | 孙蕊蕊 |
-| L-05 | services / prices / backups / reports 路由可访问 | 孙蕊蕊 + 杨序挂载 |
+| L-05 | services / prices / backups / reports 路由可访问 | 孙蕊蕊 + 李龙杰挂载 |
 
 ### 9.4 POS 平板壳层（杨序 · P1）
 
@@ -376,7 +394,7 @@ branchId: <门店 id>
 tenantId: authContext.tenantId
 ```
 
-### 11.2 本波次须挂载的既有租户 API（杨序 · Day 1）
+### 11.2 本波次须挂载的既有租户 API（李龙杰 · Day 1）
 
 | 前缀 | 模块目录 | 说明 |
 | ---- | -------- | ---- |
@@ -390,31 +408,26 @@ tenantId: authContext.tenantId
 | `/tenant/reports` | `tenant-reports` | 孙蕊蕊 |
 | `/tenant/notification-settings` | `tenant-notifications` | 武帅杰 P1 |
 | `/tenant/hardware-configs` | `tenant-hardware` | 若 1.2 已完成则一并挂载 |
-| `/tenant/branches` | `tenant-branches` | 武帅杰 · **Day 2 模块就绪后由杨序挂载**（见 §11.3） |
+| `/tenant/branches` | `tenant-branches` | 武帅杰 · **Day 2 模块就绪后由李龙杰挂载**（见 §11.3） |
 
-**规则**：`apps/api/src/app.ts` 中 Tenant 路由块**仅杨序**修改；合并前须李龙杰审核。**禁止**武帅杰、赵付杰、孙蕊蕊等业务 PR 夹带 `app.ts` 变更。
+**规则**：`apps/api/src/app.ts` 中 Tenant 路由块**仅李龙杰**修改；合并前须杨序审核（与 1.2 模块一致性）。**禁止**武帅杰、赵付杰、孙蕊蕊等业务 PR 夹带 `app.ts` 变更。
 
-### 11.3 `app.ts` 路由挂载 SOP（杨序单点整合）
+### 11.3 `app.ts` 路由挂载 SOP（李龙杰单点整合）
 
 > **命名辨析（避免口头混淆）**
 >
 > | 路径 | 含义 | 本波次负责人 |
 > | ---- | ---- | ------------ |
-> | `apps/api/src/app.ts` | 后端 API 入口，`app.route("/tenant/...")` | **杨序**（唯一修改人） |
+> | `apps/api/src/app.ts` | 后端 API 入口，`app.route("/tenant/...")` | **李龙杰**（唯一修改人） |
 > | `apps/web-admin/src/app/**` | Next.js **App Router 前端页面** | **赵付杰** 等（与 `app.ts` 无关） |
-> | `packages/api-client/src/tenant/index.ts` | 前端 API 客户端聚合导出 | **杨序** |
+> | `packages/api-client/src/tenant/index.ts` | 前端 API 客户端聚合导出 | **李龙杰** |
 
-**原则**：各模块负责人在 `apps/api/src/modules/**` 内交付 `*.routes.ts`；**路由注册集中由杨序在 `app.ts` 完成**，避免多人改同一文件导致 Git 冲突。
+**原则**：各模块负责人在 `apps/api/src/modules/**` 内交付 `*.routes.ts`；**路由注册集中由李龙杰在 `app.ts` 完成**，避免多人改同一文件导致 Git 冲突。
 
 **流程**：
 
-1. **模块开发者**（武帅杰 / 赵付杰 / 孙蕊蕊等）提交 PR：**仅含** `modules/tenant-xxx/**`，**不含** `app.ts`。
-2. 模块 PR 合并后，模块负责人在群/issue **@杨序**，提供：
-   - import 名：`createTenantBranchesRoutes` 等
-   - 挂载前缀：`/tenant/branches`
-   - 是否 P0 阻塞联调
-3. **杨序** 在独立 PR（或每日一次批量 PR）中更新 `app.ts` + 必要时 `packages/api-client/src/tenant/index.ts`。
-4. **李龙杰** 审核：prefix 无重复、顺序合理、Tenant 块完整。
+1. **模块开发者**（武帅杰 / 赵付杰 / 孙蕊蕊等）提交 PR：**仅含** `modules/tenant-xxx/**`，**不含** `app.ts`。**李龙杰** 在独立 PR（或每日一次批量 PR）中更新 `app.ts` + 必要时 `packages/api-client/src/tenant/index.ts`。
+4. **杨序** 审核：prefix 无重复、与 1.2 模块挂载一致、Tenant 块完整。
 5. **赵付杰 / 模块负责人** 做 **挂载验证**（curl / Postman / 前端联调），**不自行改** `app.ts`。
 
 **两批挂载计划**：
@@ -422,16 +435,16 @@ tenantId: authContext.tenantId
 | 批次 | 时间 | 内容 |
 | ---- | ---- | ---- |
 | **Batch A** | Day 1 上午 | §11.2 中 **1.2 遗留**路由：`overview`、`settings`、`services`、`prices`、`backups`、`reports`、`hardware-configs`（若存在）等 |
-| **Batch B** | Day 2 | 武帅杰 `tenant-branches` 合并后，杨序追加 `app.route("/tenant/branches", ...)` |
+| **Batch B** | Day 2 | 武帅杰 `tenant-branches` 合并后，李龙杰追加 `app.route("/tenant/branches", ...)` |
 
 **合并顺序（强制）**：
 
 ```text
-Day 1：杨序 Batch A（app.ts）→ 全员可联调 1.2 模块
-Day 2：武帅杰 tenant-branches 模块 PR（无 app.ts）→ 杨序 Batch B（app.ts 一行）→ 赵付杰 branches 前端
+Day 1：李龙杰 Batch A（app.ts）→ 全员可联调 1.2 模块
+Day 2：武帅杰 tenant-branches 模块 PR（无 app.ts）→ 李龙杰 Batch B（app.ts 一行）→ 赵付杰 branches 前端
 ```
 
-**PR 描述模板**（模块负责人 @杨序 时使用）：
+**PR 描述模板**：
 
 ```markdown
 ## 请求挂载 app.ts
@@ -448,8 +461,8 @@ Day 2：武帅杰 tenant-branches 模块 PR（无 app.ts）→ 杨序 Batch B（
 
 | 负责人 | 后端 | 前端 | 文档 |
 | ------ | ---- | ---- | ---- |
-| **李龙杰** | **`branch-scope.helper.ts`（Day 1）**；禁止业务 PR 新表（审核） | 审核、验收 | 终端架构评审 |
-| **杨序** | `app.ts`；`tenant-audit` 过滤；`tenant-users` branchIds 校验；`packages/api-client/src/tenant/index.ts` | `apps/pos-web/**` 壳层；`apps/desktop` 加载 | `Clean_Hub-Phase_1.3-终端架构说明-v0.1.md` 起草 |
+| **李龙杰** | **`branch-scope.helper.ts`（Day 1）**；**`app.ts`**；**`packages/api-client/src/tenant/index.ts`**；禁止业务 PR 新表（审核） | 审核、验收 | 终端架构评审 |
+| **杨序** | **`tenant-audit` 过滤**；**`tenant-users` branchIds 校验**（承接 1.2） | `apps/pos-web/**` 壳层；`apps/desktop` 加载 | `Clean_Hub-Phase_1.3-终端架构说明-v0.1.md` 起草 |
 | **武帅杰** | `tenant-branches/**`（后端）；`tenant-notifications/**`（P1） | `config/notifications/**`（P1） | — |
 | **赵付杰** | `tenant-overview`；`tenant-settings`（**挂载验证**，不改 `app.ts`） | `features/tenant/overview`；`settings`；`/tenant`；**`features/tenant/branches/**`**；**`web-admin/src/app/(tenant)/tenant/branches/**`**；`packages/api-client/.../branches*` | — |
 | **孙蕊蕊** | — | `system/logs`；`services`；`prices`；`backups`；`reports` | — |
@@ -457,12 +470,12 @@ Day 2：武帅杰 tenant-branches 模块 PR（无 app.ts）→ 杨序 Batch B（
 
 **公共规则**（延续 1.2）：
 
-1. **`apps/api/src/app.ts`**：**仅杨序**修改 Tenant/SaaS 路由注册；李龙杰审核。业务 PR **禁止**夹带 `app.ts`。
+1. **`apps/api/src/app.ts`**：**仅李龙杰**修改 Tenant/SaaS 路由注册；杨序审核。业务 PR **禁止**夹带 `app.ts`。
 2. **`apps/web-admin/src/app/**`**：前端页面路由，归各模块前端负责人（如赵付杰）；**不是** `app.ts`，不得口头简称为「改 app」而不说明是 API 还是 web-admin。
 3. 禁止跨目录改他人模块。
 4. 本波次**不新增表**；`user_branches` 已存在则只写业务逻辑（§8.4）。
 5. 禁止修改 `packages/ui/src/components/ui/**`。
-6. **`tenant-branches` 模块边界**：`apps/api/.../tenant-branches/**` 归武帅杰；`features/tenant/branches/**`、`web-admin/.../branches/**`、`packages/api-client/.../branches*` 归赵付杰。联调通过接口契约与 PR review，不互相改对方目录。武帅杰合模块后 **@杨序挂路由**，不自行改 `app.ts`。
+6. **`tenant-branches` 模块边界**：`apps/api/.../tenant-branches/**` 归武帅杰；`features/tenant/branches/**`、`web-admin/.../branches/**`、`packages/api-client/.../branches*` 归赵付杰。联调通过接口契约与 PR review，不互相改对方目录，不自行改 `app.ts`。
 
 ---
 
@@ -470,7 +483,7 @@ Day 2：武帅杰 tenant-branches 模块 PR（无 app.ts）→ 杨序 Batch B（
 
 ### 13.1 李龙杰
 
-**职责**：`branchScope` 实现、权限规范、审核、验收。
+**职责**：`branchScope` 实现、**`app.ts` / `api-client` 整合**、权限规范、审核、验收。
 
 **Day 1（阻塞，优先上午）**
 
@@ -479,37 +492,40 @@ Day 2：武帅杰 tenant-branches 模块 PR（无 app.ts）→ 杨序 Batch B（
    - `assertBranchAccess`
    - `assertBranchIdsSubset`
 2. 从 `apps/api/src/modules/auth/index.ts` 导出；`pnpm --filter @cleanhub/api typecheck` 通过。
-3. PR 合并后 @武帅杰、@杨序 接入。
 
-**Day 1（下午）**
+**Day 1（下午，可与 helper PR 并行）**
 
-4. 审核杨序 **Batch A** `app.ts` 挂载 PR（顺序、无重复 prefix）。
-
-**后续**
-
-5. 审核武帅杰 `tenant-branches` 后端 PR：租户隔离、审计、Manager 404 越权店。
-6. 审核赵付杰门店前端与 `api-client/branches` PR：表单校验、错误态、无散落 fetch。
-7. Day 3–5：组织 **Owner / Manager** 两角色验收（Cashier 留第四次 POS）。
-8. 评审《终端架构说明》v0.1。
-9. 推进集成 typecheck / build。
-
-### 13.2 杨序
-
-**职责**：分支数据范围、集成、POS 壳（**POS-T1101 · 1280×800**）、架构文档（含 §22 硬件映射）。
-
-**Day 1（阻塞）**
-
-1. 等李龙杰 **§8.2.1** `branchScope` PR 合并后，与武帅杰对齐调用方式。
-2. **`app.ts` Batch A**：挂载 §11.2 中 **1.2 遗留** `/tenant/**` 路由（**不含** `/tenant/branches`，见 §11.3）。
-3. 更新 `packages/api-client/src/tenant/index.ts` 导出（1.2 模块）。
-4. 与赵付杰对齐：Day 2 起 `api-client/branches` 与后端接口字段一致。
+4. **`app.ts` Batch A**：挂载 §11.2 中 **1.2 遗留** `/tenant/**` 路由（**不含** `/tenant/branches`）。
+5. 更新 `packages/api-client/src/tenant/index.ts` 导出（1.2 模块）。
 
 **Day 2**
 
 6. **`app.ts` Batch B**：武帅杰 `tenant-branches` 合并后，追加 `app.route("/tenant/branches", ...)`。
-7. `tenant-audit`：Manager 列表强制 branch 过滤。
-8. `tenant-users`：`user_branches` 写入（§8.4）；Manager 提交 `branchIds` 校验 ⊆ 绑定店。
-9. 与武帅杰、赵付杰联调：Manager 用户只见单店；门店页可完整 CRUD。
+7. 同步 `api-client` 中 `branches` 等导出（与赵付杰对齐字段）。
+
+**后续**
+
+8. 审核武帅杰 `tenant-branches` 后端 PR：租户隔离、审计、Manager 404 越权店。
+9. 审核赵付杰门店前端与 `api-client/branches` PR：表单校验、错误态、无散落 fetch。
+10. Day 3–5：组织 **Owner / Manager** 两角色验收（Cashier 留第四次 POS）。
+11. 评审《终端架构说明》v0.1。
+12. 推进集成 typecheck / build。
+
+### 13.2 杨序
+
+**职责**：**承接 1.2 未完成**（`tenant-audit` / `tenant-users` + `branchScope` 接入）、POS 壳（**POS-T1101 · 1280×800**）、架构文档（含 §22 硬件映射）。
+
+**Day 1**
+
+1. 等李龙杰 **§8.2.1** `branchScope` PR 合并后，与武帅杰对齐调用方式。
+2. 审核李龙杰 **Batch A** `app.ts` / `api-client` PR（顺序、无重复 prefix、与 1.2 模块一致）。
+3. 与赵付杰对齐：Day 2 起 `api-client/branches` 与后端接口字段（由李龙杰挂载后联调）。
+
+**Day 2**
+
+4. `tenant-audit`：Manager 列表强制 branch 过滤。
+5. `tenant-users`：`user_branches` 写入（§8.4）；Manager 提交 `branchIds` 校验 ⊆ 绑定店。
+6. 与武帅杰、赵付杰联调：Manager 用户只见单店；门店页可完整 CRUD。
 
 **Day 3**
 
@@ -525,7 +541,7 @@ Day 2：武帅杰 tenant-branches 模块 PR（无 app.ts）→ 杨序 Batch B（
 
 14. 修复联调问题；遗留项清单（交第四次）。
 
-**负载说明**：若 Day 3–4 POS/架构与 Day 2 联调冲突，**优先保证 branchScope（李龙杰 Day 1）+ Batch A/B 挂载**；POS 壳层可降为 P1 最小占位（顶栏 + 空白主区），架构文档 v0.1 不晚于 Day 5 中午。
+**负载说明**：若 Day 3–4 POS/架构与 Day 2 联调冲突，**优先保证杨序完成 1.2 audit/users 过滤**；POS 壳层可降为 P1 最小占位（顶栏 + 空白主区），架构文档 v0.1 不晚于 Day 5 中午。`app.ts` Batch A/B 由李龙杰保障，不占用杨序排期。
 
 ### 13.3 武帅杰
 
@@ -541,7 +557,7 @@ routes → controller → service → repository → validation → types → er
 
 1. **等李龙杰 §8.2.1 `branchScope` 合并后**，搭建模块骨架；`GET/POST` 列表与创建（调用 `resolveAllowedBranchIds` / `assertBranchAccess`）。
 2. 写审计；`requireTenantRole(['owner','manager'])`。
-3. **PR 不含 `app.ts`**；合并后在 issue/群 **@杨序** 请求 Batch B 挂载（§11.3）。
+3. **PR 不含 `app.ts`**。
 
 **Day 2**
 
@@ -571,7 +587,7 @@ routes → controller → service → repository → validation → types → er
 
 **Day 1**
 
-1. 等待杨序 **Batch A** `app.ts` PR 合并（§11.3）；**不自行修改** `apps/api/src/app.ts`。
+1. 等待李龙杰 **Batch A** `app.ts` PR 合并（§11.3）；**不自行修改** `apps/api/src/app.ts`。
 2. 验证 `GET /tenant/overview`、`GET/PATCH /tenant/settings` 联调。
 3. 阅读 §11.1 字段与 §9.1.1，准备门店页与 `api-client` 结构。
 
@@ -700,24 +716,24 @@ pnpm --filter @cleanhub/api-client typecheck
 
 | 人员 | 任务 |
 | ---- | ---- |
-| **李龙杰** | **`branchScope` helper（§8.2.1，上午阻塞）**；下午审核 Batch A `app.ts` PR |
-| **杨序** | **`app.ts` Batch A**（1.2 遗留路由）；api-client 聚合（可与李龙杰 PR 并行，Batch A 不依赖 helper） |
+| **李龙杰** | **`branchScope` helper（§8.2.1，上午阻塞）**；下午 **`app.ts` Batch A** + `api-client` 聚合（Batch A 不依赖 helper） |
+| **杨序** | 审核李龙杰 Batch A PR；梳理 1.2 `tenant-audit` / `tenant-users` 待接入项 |
 | **武帅杰** | 等李龙杰 helper 合并后：`tenant-branches` GET/POST + 接 `branchScope`（**无 app.ts**） |
 | **赵付杰** | 等 Batch A 合并后验证 overview/settings；梳理门店页与 `api-client/branches` |
 | **孙蕊蕊** | 梳理 logs/services 页面待联调项 |
 | **许婧姝** | P0 测试用例初稿 |
 
-**合并顺序**：李龙杰 **`branchScope` helper** → 武帅杰 `tenant-branches`（无 app.ts）∥ 杨序 **Batch A** `app.ts` → 杨序 **Batch B** 挂 `/tenant/branches`（Day 2）。
+**合并顺序**：李龙杰 **`branchScope` helper** → 武帅杰 `tenant-branches`（无 app.ts）∥ 李龙杰 **Batch A** `app.ts` → 李龙杰 **Batch B** 挂 `/tenant/branches`（Day 2）→ 杨序 **audit/users** 过滤。
 
 ### 17.2 Day 2（周二）：门店 API 全量 + api-client + 过滤联调
 
 | 人员 | 任务 |
 | ---- | ---- |
-| **武帅杰** | branches 详情/更新/状态 API；模块 PR 合并；@杨序 Batch B |
+| **武帅杰** | branches 详情/更新/状态 API；模块 PR 合并 |
 | **赵付杰** | `api-client/branches` 全量；工作台/设置页联调 |
-| **杨序** | **`app.ts` Batch B**；audit/users 过滤 + `user_branches`；与武帅杰、赵付杰联调 Manager |
+| **李龙杰** | **`app.ts` Batch B**；审核 branches 后端 PR |
+| **杨序** | audit/users 过滤 + `user_branches`；与武帅杰、赵付杰联调 Manager |
 | **孙蕊蕊** | logs 页接 audit API |
-| **李龙杰** | 审核 branches 后端 PR |
 | **许婧姝** | API 自动化/手工测试 |
 
 ### 17.3 Day 3（周三）：门店前端 + 两角色验证
@@ -756,9 +772,10 @@ pnpm --filter @cleanhub/api-client typecheck
 | 风险 | 影响 | 应对 |
 | ---- | ---- | ---- |
 | 1.2 门店模块零实现 | 第三周后端与前端并行压力大 | 前后端分轨：武帅杰 Day1–2 交付 API；赵付杰 Day2–3 交付页面与 api-client |
-| **`app.ts` 多人修改** | 合并冲突、路由重复 | **§11.3 SOP**：仅杨序改；模块 PR 禁止夹带；Batch A/B 分批 |
+| **`app.ts` 多人修改** | 合并冲突、路由重复 | **§11.3 SOP**：仅李龙杰改；模块 PR 禁止夹带；Batch A/B 分批 |
 | **`app.ts` vs `web-admin/src/app`** 口头混淆 | 改错文件、联调阻塞 | §11.3 命名表；周会统一说法「API app.ts / 前端 app 目录」 |
-| 杨序负载集中 | Batch A/B + audit/users 过滤 + POS + 架构文档延期 | §13.2：P0 优先挂载与过滤；POS 可最小占位 |
+| 杨序负载集中 | 1.2 audit/users + POS + 架构文档延期 | §13.2：P0 优先 1.2 过滤；POS 可最小占位 |
+| 李龙杰负载集中 | helper + Batch A/B + 审核 | §13.1：helper 上午优先；Batch A 可与 helper 并行 |
 | **`branchScope` Day 1 未合并** | 武帅杰 / 杨序无法接 Manager 过滤 | 李龙杰上午优先交付 §8.2.1 PR |
 | Manager 过滤漏接口 | 数据泄露 | 清单：branches、audit、users.branchIds |
 | **`user_branches` 未写入** | Manager 绑定无效 | §8.4：杨序在 tenant-users 创建/更新时写入 |

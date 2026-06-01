@@ -22,9 +22,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { useSaasI18n } from "@/i18n";
 
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
-import { tenantStatusLabels, tenantStatusOptions } from "../constants";
+import { tenantStatusOptions } from "../constants";
 import { getCurrentSaasAuthQuery, getTenantListQuery } from "../queries";
 import type { TenantStatus, TenantStatusCounts, TenantSummary } from "../types";
 
@@ -44,18 +45,6 @@ const emptyMetrics: TenantMetrics = {
   total: 0,
 };
 
-function formatDate(value: string): string {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Invalid date";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-  }).format(date);
-}
-
 function getStatusVariant(
   status: TenantStatus,
 ): "default" | "outline" | "secondary" {
@@ -70,16 +59,17 @@ function getStatusVariant(
   return "outline";
 }
 
-function getEmptyStateMessage(query: string, status: StatusFilter): string {
+function getEmptyStateMessage(
+  query: string,
+  status: StatusFilter,
+  filteredMessage: string,
+  defaultMessage: string,
+): string {
   if (query.trim() || status !== "all") {
-    return "No tenants match the current search or status filter.";
+    return filteredMessage;
   }
 
-  return "No tenants have been created yet.";
-}
-
-function getLocationValue(value: string | null): string {
-  return value?.trim() || "Not set";
+  return defaultMessage;
 }
 
 function getTenantDetailHref(tenantId: string): string {
@@ -95,6 +85,7 @@ function canCreateTenant(authContext: AuthContext | null): boolean {
 }
 
 export function TenantListView() {
+  const { m, formatDate } = useSaasI18n();
   const requestIdRef = useRef(0);
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
@@ -123,12 +114,12 @@ export function TenantListView() {
   );
   const metricItems: MetricItem[] = useMemo(
     () => [
-      { label: "Total", value: metrics.total },
-      { label: "Active", value: metrics.active },
-      { label: "Suspended", value: metrics.suspended },
-      { label: "Disabled", value: metrics.disabled },
+      { label: m.tenants.list.metrics.total, value: metrics.total },
+      { label: m.tenants.list.metrics.active, value: metrics.active },
+      { label: m.tenants.list.metrics.suspended, value: metrics.suspended },
+      { label: m.tenants.list.metrics.disabled, value: metrics.disabled },
     ],
-    [metrics],
+    [m.tenants.list.metrics, metrics],
   );
 
   const loadTenants = useCallback(async () => {
@@ -179,13 +170,13 @@ export function TenantListView() {
         return;
       }
 
-      setError(getTenantLoadErrorMessage(loadError, "Failed to load tenants."));
+      setError(getTenantLoadErrorMessage(loadError, m.tenants.list.loadError));
     } finally {
       if (requestIdRef.current === requestId) {
         setLoading(false);
       }
     }
-  }, [listQuery, metricsQuery, status]);
+  }, [listQuery, m.tenants.list.loadError, metricsQuery, status]);
 
   function resetFilters() {
     setQuery("");
@@ -206,15 +197,15 @@ export function TenantListView() {
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">SaaS tenants</Badge>
+          <Badge variant="secondary">{m.tenants.list.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Tenant Management
+            {m.tenants.list.title}
           </h1>
         </div>
 
         {canCreateTenant(authContext) ? (
           <Button asChild>
-            <Link href={webAdminRoutes.saas.newTenant}>New tenant</Link>
+            <Link href={webAdminRoutes.saas.newTenant}>{m.tenants.list.newTenant}</Link>
           </Button>
         ) : null}
       </div>
@@ -232,19 +223,19 @@ export function TenantListView() {
 
       <div className="grid gap-3 border-b p-5 lg:grid-cols-[minmax(0,1fr)_220px_auto_auto] lg:items-end">
         <div className="grid gap-2">
-          <Label htmlFor="tenant-search">Search</Label>
+          <Label htmlFor="tenant-search">{m.common.search}</Label>
           <Input
             id="tenant-search"
             onChange={(event) => {
               setQuery(event.target.value);
             }}
-            placeholder="Name, code, country, city"
+            placeholder={m.tenants.list.searchPlaceholder}
             value={query}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="tenant-status-filter">Status</Label>
+          <Label htmlFor="tenant-status-filter">{m.common.status}</Label>
           <Select
             onValueChange={(value) => {
               setStatus(value as StatusFilter);
@@ -255,12 +246,20 @@ export function TenantListView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {tenantStatusOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
+              <SelectItem value="all">{m.common.allStatuses}</SelectItem>
+              {tenantStatusOptions.map((option) => {
+                const label =
+                  option.value === "active"
+                    ? m.common.statusLabels.active
+                    : option.value === "suspended"
+                      ? m.common.statusLabels.suspended
+                      : m.common.statusLabels.disabled;
+                return (
+                  <SelectItem key={option.value} value={option.value}>
+                    {label}
+                  </SelectItem>
+                );
+              })}
             </SelectContent>
           </Select>
         </div>
@@ -271,7 +270,7 @@ export function TenantListView() {
           type="button"
           variant="outline"
         >
-          Refresh
+          {m.common.refresh}
         </Button>
         <Button
           disabled={loading || (!query.trim() && status === "all")}
@@ -279,7 +278,7 @@ export function TenantListView() {
           type="button"
           variant="outline"
         >
-          Clear
+          {m.common.clear}
         </Button>
       </div>
 
@@ -303,7 +302,7 @@ export function TenantListView() {
                 type="button"
                 variant="outline"
               >
-                Try again
+                {m.common.tryAgain}
               </Button>
             </div>
           </div>
@@ -311,14 +310,19 @@ export function TenantListView() {
       ) : tenants.length === 0 ? (
         <div className="p-5">
           <div className="grid gap-3 rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">No tenants found</h2>
+            <h2 className="text-base font-semibold">{m.tenants.list.emptyTitle}</h2>
             <p className="text-sm text-muted-foreground">
-              {getEmptyStateMessage(query, status)}
+              {getEmptyStateMessage(
+                query,
+                status,
+                m.tenants.list.emptyFiltered,
+                m.tenants.list.emptyDefault,
+              )}
             </p>
             {(query.trim() || status !== "all") && (
               <div>
                 <Button onClick={resetFilters} type="button" variant="outline">
-                  Clear filters
+                  {m.common.clearFilters}
                 </Button>
               </div>
             )}
@@ -329,13 +333,13 @@ export function TenantListView() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Tenant name</TableHead>
-                <TableHead>Pressing code</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Country</TableHead>
-                <TableHead>City</TableHead>
-                <TableHead>Created at</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>{m.tenants.list.columns.name}</TableHead>
+                <TableHead>{m.tenants.list.columns.pressingCode}</TableHead>
+                <TableHead>{m.tenants.list.columns.status}</TableHead>
+                <TableHead>{m.tenants.list.columns.country}</TableHead>
+                <TableHead>{m.tenants.list.columns.city}</TableHead>
+                <TableHead>{m.tenants.list.columns.createdAt}</TableHead>
+                <TableHead className="text-right">{m.common.actions}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -350,22 +354,24 @@ export function TenantListView() {
                   <TableCell>{tenant.pressingCode}</TableCell>
                   <TableCell>
                     <Badge variant={getStatusVariant(tenant.status)}>
-                      {tenantStatusLabels[tenant.status]}
+                      {m.common.statusLabels[tenant.status]}
                     </Badge>
                   </TableCell>
-                  <TableCell>{getLocationValue(tenant.country)}</TableCell>
-                  <TableCell>{getLocationValue(tenant.city)}</TableCell>
-                  <TableCell>{formatDate(tenant.createdAt)}</TableCell>
+                  <TableCell>{tenant.country?.trim() || m.common.notSet}</TableCell>
+                  <TableCell>{tenant.city?.trim() || m.common.notSet}</TableCell>
+                  <TableCell>
+                    {formatDate(tenant.createdAt) || m.common.invalidDate}
+                  </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-2">
                       <Button asChild size="sm" variant="outline">
                         <Link href={getTenantDetailHref(tenant.id)}>
-                          Detail
+                          {m.tenants.list.detail}
                         </Link>
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link href={getTenantSettingsHref(tenant.id)}>
-                          Settings
+                          {m.tenants.list.settings}
                         </Link>
                       </Button>
                     </div>

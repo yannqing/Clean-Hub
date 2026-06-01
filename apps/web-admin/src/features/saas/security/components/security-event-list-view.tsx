@@ -28,20 +28,12 @@ import type {
   SecurityEventListItem,
   SecurityEventSeverity,
 } from "../types";
+import { useSaasI18n } from "@/i18n";
 
 type SeverityFilter = "all" | SecurityEventSeverity;
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Failed to load security events.";
-}
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return error instanceof Error ? error.message : "";
 }
 
 function getSeverityVariant(
@@ -59,6 +51,7 @@ function getSeverityVariant(
 }
 
 export function SecurityEventListView() {
+  const { m, formatDateTime } = useSaasI18n();
   const [events, setEvents] = useState<SecurityEventListItem[]>([]);
   const [severity, setSeverity] = useState<SeverityFilter>("all");
   const [eventType, setEventType] = useState("");
@@ -89,7 +82,7 @@ export function SecurityEventListView() {
       const data = await getSecurityEventListQuery(listQuery);
       setEvents(data);
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(getErrorMessage(loadError) || m.security.events.loadError);
     } finally {
       setLoading(false);
     }
@@ -109,7 +102,7 @@ export function SecurityEventListView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(getErrorMessage(loadError) || m.security.events.loadError);
         }
       })
       .finally(() => {
@@ -121,23 +114,25 @@ export function SecurityEventListView() {
     return () => {
       isCurrent = false;
     };
-  }, [listQuery]);
+  }, [listQuery, m.security.events.loadError]);
 
   return (
     <section className="grid gap-4 rounded-md border p-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
-          <h2 className="text-base font-semibold">Security Events</h2>
+          <h2 className="text-base font-semibold">{m.security.events.title}</h2>
         </div>
 
         <Button onClick={loadEvents} type="button" variant="outline">
-          Refresh events
+          {m.security.events.refreshEvents}
         </Button>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <div className="grid gap-2">
-          <Label htmlFor="security-event-severity-filter">Severity</Label>
+          <Label htmlFor="security-event-severity-filter">
+            {m.security.events.severity}
+          </Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
@@ -152,10 +147,10 @@ export function SecurityEventListView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All severities</SelectItem>
+              <SelectItem value="all">{m.common.allLevels}</SelectItem>
               {securityEventSeverityOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.label}
+                  {m.common.severityLabels[option.value]}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -163,33 +158,37 @@ export function SecurityEventListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="security-event-type-filter">Event type</Label>
+          <Label htmlFor="security-event-type-filter">
+            {m.security.events.eventType}
+          </Label>
           <Input
             id="security-event-type-filter"
             onChange={(event) => {
               setLoading(true);
               setEventType(event.target.value);
             }}
-            placeholder="login_failed"
+            placeholder={m.security.events.eventTypePlaceholder}
             value={eventType}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="security-event-tenant-filter">Tenant ID</Label>
+          <Label htmlFor="security-event-tenant-filter">
+            {m.security.events.tenantId}
+          </Label>
           <Input
             id="security-event-tenant-filter"
             onChange={(event) => {
               setLoading(true);
               setTenantId(event.target.value);
             }}
-            placeholder="Optional tenant ULID"
+            placeholder={m.common.optionalTenantUlid}
             value={tenantId}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="security-event-date-from">From</Label>
+          <Label htmlFor="security-event-date-from">{m.common.from}</Label>
           <Input
             id="security-event-date-from"
             onChange={(event) => {
@@ -202,7 +201,7 @@ export function SecurityEventListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="security-event-date-to">To</Label>
+          <Label htmlFor="security-event-date-to">{m.common.to}</Label>
           <Input
             id="security-event-date-to"
             onChange={(event) => {
@@ -230,39 +229,41 @@ export function SecurityEventListView() {
         </div>
       ) : events.length === 0 ? (
         <div className="rounded-md border border-dashed p-8 text-center">
-          <h3 className="text-base font-semibold">No security events found</h3>
+          <h3 className="text-base font-semibold">{m.security.events.emptyTitle}</h3>
         </div>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Created</TableHead>
-              <TableHead>Severity</TableHead>
-              <TableHead>Event</TableHead>
-              <TableHead>Description</TableHead>
-              <TableHead>Tenant</TableHead>
-              <TableHead>Actor</TableHead>
-              <TableHead>IP</TableHead>
+              <TableHead>{m.security.events.columns.created}</TableHead>
+              <TableHead>{m.security.events.severity}</TableHead>
+              <TableHead>{m.security.events.eventType}</TableHead>
+              <TableHead>{m.security.events.columns.description}</TableHead>
+              <TableHead>{m.security.events.columns.tenant}</TableHead>
+              <TableHead>{m.security.events.columns.actor}</TableHead>
+              <TableHead>{m.security.events.columns.ip}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {events.map((event) => (
               <TableRow key={event.id}>
-                <TableCell>{formatDate(event.createdAt)}</TableCell>
+                <TableCell>
+                  {formatDateTime(event.createdAt) || m.common.invalidDate}
+                </TableCell>
                 <TableCell>
                   <Badge variant={getSeverityVariant(event.severity)}>
-                    {securityEventSeverityLabels[event.severity]}
+                    {m.common.severityLabels[event.severity]}
                   </Badge>
                 </TableCell>
                 <TableCell>{event.eventType}</TableCell>
                 <TableCell>
                   <span className="block max-w-[420px] truncate">
-                    {event.description ?? "No description"}
+                    {event.description ?? m.security.events.noDescription}
                   </span>
                 </TableCell>
-                <TableCell>{event.tenantId ?? "Platform"}</TableCell>
-                <TableCell>{event.actorUserId ?? "System"}</TableCell>
-                <TableCell>{event.ipAddress ?? "Unknown"}</TableCell>
+                <TableCell>{event.tenantId ?? m.common.platform}</TableCell>
+                <TableCell>{event.actorUserId ?? m.common.system}</TableCell>
+                <TableCell>{event.ipAddress ?? m.common.unknown}</TableCell>
               </TableRow>
             ))}
           </TableBody>

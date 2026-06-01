@@ -13,6 +13,8 @@ import {
 } from "@cleanhub/ui";
 import { useState } from "react";
 
+import { useSaasI18n } from "@/i18n";
+
 import {
   tenantCreateLanguageOptions,
   tenantDefaultValues,
@@ -56,6 +58,7 @@ export function TenantForm({
   onSubmit,
   onSuccess,
 }: TenantFormProps) {
+  const { m } = useSaasI18n();
   const [values, setValues] = useState<TenantFormValues>(() =>
     getInitialValues(initialValues),
   );
@@ -68,6 +71,18 @@ export function TenantForm({
   const languageOptions = showDefaults
     ? tenantCreateLanguageOptions
     : tenantLanguageOptions;
+  const getLanguageLabel = (value: string) => {
+    if (value === "platform-default") {
+      return m.common.languageLabels.platformDefault;
+    }
+    if (value === "en") {
+      return m.common.languageLabels.en;
+    }
+    if (value === "fr") {
+      return m.common.languageLabels.fr;
+    }
+    return m.common.languageLabels.zhCN;
+  };
 
   function updateValue(key: keyof TenantFormValues, value: string): void {
     setValues((current) => ({
@@ -99,19 +114,21 @@ export function TenantForm({
         const message =
           result.message ??
           Object.values(result.errors)[0] ??
-          "Tenant request failed.";
+          m.tenants.detail.loadError;
         setFormError(message);
         toast.error(message);
         return;
       }
 
       setErrors({});
-      toast.success(mode === "create" ? "Tenant created." : "Tenant updated.");
+      toast.success(
+        mode === "create" ? m.tenants.form.createdToast : m.tenants.form.updatedToast,
+      );
       onSuccess?.(result.data);
     } catch (error) {
       const message = getTenantLoadErrorMessage(
         error,
-        "Tenant request failed.",
+        m.tenants.detail.loadError,
       );
       setFormError(message);
       toast.error(message);
@@ -131,13 +148,13 @@ export function TenantForm({
       <section className="grid gap-4 border-b p-5">
         <div>
           <h2 className="text-base font-semibold text-foreground">
-            Tenant Profile
+            {m.tenants.form.profileSection}
           </h2>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           <div className="grid gap-2">
-            <Label htmlFor="tenant-name">Tenant name</Label>
+            <Label htmlFor="tenant-name">{m.tenants.form.fields.name}</Label>
             <Input
               aria-invalid={Boolean(errors.name)}
               disabled={disabled || submitting}
@@ -151,7 +168,7 @@ export function TenantForm({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="pressing-code">Pressing code</Label>
+            <Label htmlFor="pressing-code">{m.tenants.form.fields.pressingCode}</Label>
             <Input
               aria-invalid={Boolean(errors.pressingCode)}
               disabled={disabled || submitting}
@@ -167,7 +184,7 @@ export function TenantForm({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="tenant-country">Country</Label>
+            <Label htmlFor="tenant-country">{m.tenants.form.fields.country}</Label>
             <Input
               aria-invalid={Boolean(errors.country)}
               disabled={disabled || submitting}
@@ -181,7 +198,7 @@ export function TenantForm({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="tenant-city">City</Label>
+            <Label htmlFor="tenant-city">{m.tenants.form.fields.city}</Label>
             <Input
               aria-invalid={Boolean(errors.city)}
               disabled={disabled || submitting}
@@ -200,13 +217,15 @@ export function TenantForm({
         <section className="grid gap-4 border-b p-5">
           <div>
             <h2 className="text-base font-semibold text-foreground">
-              Defaults
+              {m.tenants.form.defaultsSection}
             </h2>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="default-language">Default language</Label>
+              <Label htmlFor="default-language">
+                {m.tenants.form.fields.defaultLanguage}
+              </Label>
               <Select
                 disabled={disabled || submitting}
                 onValueChange={(value) =>
@@ -223,7 +242,7 @@ export function TenantForm({
                 <SelectContent>
                   {languageOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                      {getLanguageLabel(option.value)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -236,7 +255,9 @@ export function TenantForm({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="default-currency">Default currency</Label>
+              <Label htmlFor="default-currency">
+                {m.tenants.form.fields.defaultCurrency}
+              </Label>
               <Input
                 aria-invalid={Boolean(errors.defaultCurrency)}
                 disabled={disabled || submitting}
@@ -261,13 +282,15 @@ export function TenantForm({
         <section className="grid gap-4 border-b p-5">
           <div>
             <h2 className="text-base font-semibold text-foreground">
-              Initial Owner
+              {m.tenants.form.ownerSection}
             </h2>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="initial-owner-name">Owner name</Label>
+              <Label htmlFor="initial-owner-name">
+                {m.tenants.form.fields.ownerName}
+              </Label>
               <Input
                 aria-invalid={Boolean(errors.initialOwnerDisplayName)}
                 disabled={disabled || submitting}
@@ -285,7 +308,9 @@ export function TenantForm({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="initial-owner-email">Owner email</Label>
+              <Label htmlFor="initial-owner-email">
+                {m.tenants.form.fields.ownerEmail}
+              </Label>
               <Input
                 aria-invalid={Boolean(errors.initialOwnerEmail)}
                 disabled={disabled || submitting}
@@ -304,7 +329,9 @@ export function TenantForm({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="initial-owner-phone">Owner phone</Label>
+              <Label htmlFor="initial-owner-phone">
+                {m.tenants.form.fields.ownerPhone}
+              </Label>
               <Input
                 aria-invalid={Boolean(errors.initialOwnerPhone)}
                 disabled={disabled || submitting}
@@ -322,7 +349,7 @@ export function TenantForm({
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="initial-owner-pin">Owner PIN</Label>
+              <Label htmlFor="initial-owner-pin">{m.tenants.form.fields.ownerPin}</Label>
               <Input
                 aria-invalid={Boolean(errors.initialOwnerPin)}
                 disabled={disabled || submitting}
@@ -342,7 +369,9 @@ export function TenantForm({
             </div>
 
             <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="initial-owner-password">Owner password</Label>
+              <Label htmlFor="initial-owner-password">
+                {m.tenants.form.fields.ownerPassword}
+              </Label>
               <Input
                 aria-invalid={Boolean(errors.initialOwnerPassword)}
                 disabled={disabled || submitting}
@@ -365,12 +394,14 @@ export function TenantForm({
 
       <section className="grid gap-4 p-5">
         <div>
-          <h2 className="text-base font-semibold text-foreground">Contact</h2>
+          <h2 className="text-base font-semibold text-foreground">
+            {m.tenants.form.contactSection}
+          </h2>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
           <div className="grid gap-2">
-            <Label htmlFor="contact-name">Contact name</Label>
+            <Label htmlFor="contact-name">{m.tenants.form.fields.contactName}</Label>
             <Input
               aria-invalid={Boolean(errors.contactName)}
               disabled={disabled || submitting}
@@ -386,7 +417,7 @@ export function TenantForm({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="contact-phone">Contact phone</Label>
+            <Label htmlFor="contact-phone">{m.tenants.form.fields.contactPhone}</Label>
             <Input
               aria-invalid={Boolean(errors.contactPhone)}
               disabled={disabled || submitting}
@@ -402,7 +433,7 @@ export function TenantForm({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="contact-email">Contact email</Label>
+            <Label htmlFor="contact-email">{m.tenants.form.fields.contactEmail}</Label>
             <Input
               aria-invalid={Boolean(errors.contactEmail)}
               disabled={disabled || submitting}
@@ -423,11 +454,11 @@ export function TenantForm({
         <Button disabled={disabled || submitting} type="submit">
           {submitting
             ? mode === "create"
-              ? "Creating..."
-              : "Saving..."
+              ? m.common.creating
+              : m.common.saving
             : mode === "create"
-              ? "Create tenant"
-              : "Save changes"}
+              ? m.tenants.form.createTenant
+              : m.common.saveChanges}
         </Button>
       </div>
     </form>

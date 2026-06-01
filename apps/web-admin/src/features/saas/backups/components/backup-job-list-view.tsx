@@ -20,11 +20,8 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
-  backupJobScopeLabels,
   backupJobScopeOptions,
-  backupJobStatusLabels,
   backupJobStatusOptions,
-  restoreRequestStatusLabels,
 } from "../constants";
 import { getBackupJobListQuery, getRestoreRequestListQuery } from "../queries";
 import type {
@@ -35,23 +32,25 @@ import type {
 } from "../types";
 import { CreateBackupJobForm } from "./create-backup-job-form";
 import { CreateRestoreRequestForm } from "./create-restore-request-form";
+import { useSaasI18n } from "@/i18n";
 
 type ScopeFilter = "all" | BackupJobScope;
 type StatusFilter = "all" | BackupJobStatus;
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Failed to load backups.";
+  return error instanceof Error ? error.message : "";
 }
 
-function formatDate(value: string | null): string {
+function formatDate(
+  value: string | null,
+  m: ReturnType<typeof useSaasI18n>["m"],
+  formatDateTime: ReturnType<typeof useSaasI18n>["formatDateTime"],
+): string {
   if (!value) {
-    return "Not set";
+    return m.common.notSet;
   }
 
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
+  return formatDateTime(value) || m.common.invalidDate;
 }
 
 function getStatusVariant(
@@ -88,6 +87,7 @@ function toListItem(backupJob: BackupJobListItem): BackupJobListItem {
 }
 
 export function BackupJobListView() {
+  const { m, formatDateTime } = useSaasI18n();
   const [backupJobs, setBackupJobs] = useState<BackupJobListItem[]>([]);
   const [restoreRequests, setRestoreRequests] = useState<RestoreRequest[]>([]);
   const [selectedBackupJob, setSelectedBackupJob] =
@@ -126,7 +126,7 @@ export function BackupJobListView() {
           : null,
       );
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(getErrorMessage(loadError) || m.backups.loadError);
     } finally {
       setLoading(false);
     }
@@ -160,7 +160,7 @@ export function BackupJobListView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(getErrorMessage(loadError) || m.backups.loadError);
         }
       })
       .finally(() => {
@@ -190,7 +190,7 @@ export function BackupJobListView() {
           setRestoreRequestsError(
             loadError instanceof Error
               ? loadError.message
-              : "Failed to load restore requests.",
+              : m.backups.restoreLoadError,
           );
         }
       })
@@ -209,14 +209,14 @@ export function BackupJobListView() {
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">SaaS backups</Badge>
+          <Badge variant="secondary">{m.backups.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Data Backups
+            {m.backups.title}
           </h1>
         </div>
 
         <Button onClick={loadBackupJobs} type="button" variant="outline">
-          Refresh
+          {m.common.refresh}
         </Button>
       </div>
 
@@ -226,7 +226,7 @@ export function BackupJobListView() {
 
           <div className="grid gap-3 rounded-md border p-4 md:grid-cols-3">
             <div className="grid gap-2">
-              <Label htmlFor="backup-scope-filter">Scope</Label>
+              <Label htmlFor="backup-scope-filter">{m.backups.scope}</Label>
               <Select
                 onValueChange={(value) => {
                   setLoading(true);
@@ -238,10 +238,10 @@ export function BackupJobListView() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All scopes</SelectItem>
+                  <SelectItem value="all">{m.common.allScopes}</SelectItem>
                   {backupJobScopeOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                      {m.common.backupScopeLabels[option.value]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -249,7 +249,7 @@ export function BackupJobListView() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="backup-status-filter">Status</Label>
+              <Label htmlFor="backup-status-filter">{m.common.status}</Label>
               <Select
                 onValueChange={(value) => {
                   setLoading(true);
@@ -261,10 +261,10 @@ export function BackupJobListView() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="all">{m.common.allStatuses}</SelectItem>
                   {backupJobStatusOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                      {m.common.backupStatusLabels[option.value]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -272,14 +272,14 @@ export function BackupJobListView() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="backup-tenant-filter">Tenant ID</Label>
+              <Label htmlFor="backup-tenant-filter">{m.operationLogs.tenantId}</Label>
               <Input
                 id="backup-tenant-filter"
                 onChange={(event) => {
                   setLoading(true);
                   setTenantId(event.target.value);
                 }}
-                placeholder="Optional tenant ULID"
+                placeholder={m.common.optionalTenantUlid}
                 value={tenantId}
               />
             </div>
@@ -301,35 +301,39 @@ export function BackupJobListView() {
           ) : backupJobs.length === 0 ? (
             <div className="rounded-md border border-dashed p-8 text-center">
               <h2 className="text-base font-semibold">
-                No backup tasks found
+                {m.backups.emptyBackups}
               </h2>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Scope</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead>Requested by</TableHead>
-                  <TableHead>Finished</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{m.backups.columns.created}</TableHead>
+                  <TableHead>{m.backups.scope}</TableHead>
+                  <TableHead>{m.common.status}</TableHead>
+                  <TableHead>{m.operationLogs.columns.tenant}</TableHead>
+                  <TableHead>{m.backups.columns.requestedBy}</TableHead>
+                  <TableHead>{m.backups.columns.finished}</TableHead>
+                  <TableHead className="text-right">{m.common.actions}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {backupJobs.map((backupJob) => (
                   <TableRow key={backupJob.id}>
-                    <TableCell>{formatDate(backupJob.createdAt)}</TableCell>
-                    <TableCell>{backupJobScopeLabels[backupJob.scope]}</TableCell>
+                    <TableCell>
+                      {formatDate(backupJob.createdAt, m, formatDateTime)}
+                    </TableCell>
+                    <TableCell>{m.common.backupScopeLabels[backupJob.scope]}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(backupJob.status)}>
-                        {backupJobStatusLabels[backupJob.status]}
+                        {m.common.backupStatusLabels[backupJob.status]}
                       </Badge>
                     </TableCell>
-                    <TableCell>{backupJob.tenantId ?? "Platform"}</TableCell>
-                    <TableCell>{backupJob.requestedBy ?? "System"}</TableCell>
-                    <TableCell>{formatDate(backupJob.finishedAt)}</TableCell>
+                    <TableCell>{backupJob.tenantId ?? m.common.platform}</TableCell>
+                    <TableCell>{backupJob.requestedBy ?? m.common.system}</TableCell>
+                    <TableCell>
+                      {formatDate(backupJob.finishedAt, m, formatDateTime)}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         onClick={() => setSelectedBackupJob(backupJob)}
@@ -337,7 +341,7 @@ export function BackupJobListView() {
                         type="button"
                         variant="outline"
                       >
-                        Review
+                        {m.backups.columns.review}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -349,7 +353,7 @@ export function BackupJobListView() {
 
         <aside className="grid content-start gap-5">
           <div>
-            <h2 className="text-base font-semibold">Restore Request</h2>
+            <h2 className="text-base font-semibold">{m.backups.restoreSection}</h2>
           </div>
 
           {selectedBackupJob ? (
@@ -357,20 +361,36 @@ export function BackupJobListView() {
               <div className="grid gap-3 rounded-md border p-4">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Backup task
+                    {m.backups.detail.backupTask}
                   </p>
                   <p className="mt-1 break-all font-medium">
                     {selectedBackupJob.id}
                   </p>
                 </div>
                 <div className="grid gap-2 text-sm">
-                  <p>Scope: {backupJobScopeLabels[selectedBackupJob.scope]}</p>
-                  <p>Status: {backupJobStatusLabels[selectedBackupJob.status]}</p>
-                  <p>Tenant: {selectedBackupJob.tenantId ?? "Platform"}</p>
-                  <p>Started: {formatDate(selectedBackupJob.startedAt)}</p>
-                  <p>Finished: {formatDate(selectedBackupJob.finishedAt)}</p>
+                  <p>
+                    {m.backups.detail.scope}{" "}
+                    {m.common.backupScopeLabels[selectedBackupJob.scope]}
+                  </p>
+                  <p>
+                    {m.backups.detail.status}{" "}
+                    {m.common.backupStatusLabels[selectedBackupJob.status]}
+                  </p>
+                  <p>
+                    {m.backups.detail.tenant} {selectedBackupJob.tenantId ?? m.common.platform}
+                  </p>
+                  <p>
+                    {m.backups.detail.started}{" "}
+                    {formatDate(selectedBackupJob.startedAt, m, formatDateTime)}
+                  </p>
+                  <p>
+                    {m.backups.detail.finished}{" "}
+                    {formatDate(selectedBackupJob.finishedAt, m, formatDateTime)}
+                  </p>
                   {selectedBackupJob.failureReason ? (
-                    <p>Failure: {selectedBackupJob.failureReason}</p>
+                    <p>
+                      {m.backups.detail.failure} {selectedBackupJob.failureReason}
+                    </p>
                   ) : null}
                 </div>
               </div>
@@ -382,14 +402,13 @@ export function BackupJobListView() {
             </>
           ) : (
             <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-              Select a backup task before submitting a restore request for
-              manual review.
+              {m.backups.selectBackupHint}
             </div>
           )}
 
           <div className="grid gap-3">
             <div>
-              <h2 className="text-base font-semibold">Restore Requests</h2>
+              <h2 className="text-base font-semibold">{m.backups.restoreSection}</h2>
             </div>
 
             {restoreRequestsLoading ? (
@@ -407,31 +426,31 @@ export function BackupJobListView() {
               </div>
             ) : restoreRequests.length === 0 ? (
               <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
-                No restore requests found.
+                {m.backups.emptyRestores}
               </div>
             ) : (
               <div className="overflow-hidden rounded-md border">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Created</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Tenant</TableHead>
+                      <TableHead>{m.backups.columns.created}</TableHead>
+                      <TableHead>{m.common.status}</TableHead>
+                      <TableHead>{m.operationLogs.columns.tenant}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {restoreRequests.map((restoreRequest) => (
                       <TableRow key={restoreRequest.id}>
                         <TableCell>
-                          {formatDate(restoreRequest.createdAt)}
+                          {formatDate(restoreRequest.createdAt, m, formatDateTime)}
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">
-                            {restoreRequestStatusLabels[restoreRequest.status]}
+                            {m.common.restoreStatusLabels[restoreRequest.status]}
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {restoreRequest.tenantId ?? "Platform"}
+                          {restoreRequest.tenantId ?? m.common.platform}
                         </TableCell>
                       </TableRow>
                     ))}

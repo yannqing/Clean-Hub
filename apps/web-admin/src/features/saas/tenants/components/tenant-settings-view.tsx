@@ -18,6 +18,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { useSaasI18n } from "@/i18n";
+import { interpolate } from "@/i18n/messages/saas";
 
 import {
   updateTenantFeatureFlagsAction,
@@ -28,7 +30,6 @@ import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import {
   tenantFeatureFlagOptions,
   tenantLanguageOptions,
-  tenantStatusLabels,
 } from "../constants";
 import {
   getCurrentSaasAuthQuery,
@@ -56,23 +57,6 @@ type TenantSettingsLoadResults = readonly [
   PromiseSettledResult<TenantFeatureFlags>,
 ];
 
-function formatDate(value: string | null): string {
-  if (!value) {
-    return "Not set";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Invalid date";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
 function getStatusVariant(
   status: TenantStatus,
 ): "default" | "outline" | "secondary" {
@@ -87,16 +71,19 @@ function getStatusVariant(
   return "outline";
 }
 
-function getStatusActionLabel(status: TenantStatus): string {
+function getStatusActionLabel(
+  status: TenantStatus,
+  m: ReturnType<typeof useSaasI18n>["m"],
+): string {
   if (status === "active") {
-    return "Activate";
+    return m.tenants.detail.activate;
   }
 
   if (status === "suspended") {
-    return "Suspend";
+    return m.tenants.detail.suspend;
   }
 
-  return "Disable";
+  return m.tenants.detail.disable;
 }
 
 function toSettingsFormValues(
@@ -142,6 +129,7 @@ function SettingsSummary({
   settings: TenantSettings;
   featureFlags: TenantFeatureFlags;
 }) {
+  const { m, formatDateTime } = useSaasI18n();
   const enabledCount = Object.values(
     toFeatureFlagsFormValues(featureFlags),
   ).filter(Boolean).length;
@@ -150,27 +138,27 @@ function SettingsSummary({
     <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-4">
       <div className="rounded-md border bg-background p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Pilot status
+          {m.tenants.settings.pilotStatus}
         </p>
         <Badge className="mt-2" variant={getStatusVariant(tenant.status)}>
-          {tenantStatusLabels[tenant.status]}
+          {m.common.statusLabels[tenant.status]}
         </Badge>
       </div>
       <div className="rounded-md border bg-background p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Default language
+          {m.tenants.detail.fields.defaultLanguage}
         </p>
         <p className="mt-2 font-semibold">{settings.defaultLanguage}</p>
       </div>
       <div className="rounded-md border bg-background p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Default currency
+          {m.tenants.detail.fields.defaultCurrency}
         </p>
         <p className="mt-2 font-semibold">{settings.defaultCurrency}</p>
       </div>
       <div className="rounded-md border bg-background p-4">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Enabled features
+          {m.tenants.settings.enabledFeatures}
         </p>
         <p className="mt-2 font-semibold">
           {enabledCount} / {tenantFeatureFlagOptions.length}
@@ -191,6 +179,7 @@ function TenantSettingsForm({
   onUpdated: (settings: TenantSettings) => void;
   tenantId: string;
 }) {
+  const { m } = useSaasI18n();
   const [values, setValues] = useState<TenantSettingsFormValues>(initialValues);
   const [errors, setErrors] = useState<
     Partial<Record<keyof TenantSettingsFormValues, string>>
@@ -230,7 +219,7 @@ function TenantSettingsForm({
         toast.error(
           Object.values(result.errors)[0] ??
             message ??
-            "Tenant settings update failed.",
+            m.tenants.settings.defaultsSaveFailed,
         );
         return;
       }
@@ -238,10 +227,10 @@ function TenantSettingsForm({
       setErrors({});
       setValues(toSettingsFormValues(result.data));
       onUpdated(result.data);
-      toast.success("Tenant settings updated.");
+      toast.success(m.tenants.settings.defaultsSaved);
     } catch (error) {
       toast.error(
-        getTenantLoadErrorMessage(error, "Tenant settings update failed."),
+        getTenantLoadErrorMessage(error, m.tenants.settings.defaultsSaveFailed),
       );
     } finally {
       setSubmitting(false);
@@ -251,12 +240,16 @@ function TenantSettingsForm({
   return (
     <form className="grid gap-4 rounded-md border p-4" onSubmit={handleSubmit}>
       <div>
-        <h2 className="text-base font-semibold">Tenant Defaults</h2>
+        <h2 className="text-base font-semibold">
+          {m.tenants.settings.defaultsSection}
+        </h2>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <div className="grid gap-2">
-          <Label htmlFor="tenant-settings-language">Default language</Label>
+          <Label htmlFor="tenant-settings-language">
+            {m.tenants.detail.fields.defaultLanguage}
+          </Label>
           <Select
             disabled={disabled || submitting}
             onValueChange={(value) =>
@@ -284,7 +277,9 @@ function TenantSettingsForm({
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="tenant-settings-currency">Default currency</Label>
+          <Label htmlFor="tenant-settings-currency">
+            {m.tenants.detail.fields.defaultCurrency}
+          </Label>
           <Input
             aria-invalid={Boolean(errors.defaultCurrency)}
             disabled={disabled || submitting}
@@ -303,7 +298,7 @@ function TenantSettingsForm({
 
       <div className="flex justify-end">
         <Button disabled={disabled || submitting} type="submit">
-          {submitting ? "Saving..." : "Save defaults"}
+          {submitting ? m.common.saving : m.tenants.settings.saveDefaults}
         </Button>
       </div>
     </form>
@@ -321,6 +316,7 @@ function TenantFeatureFlagsForm({
   onUpdated: (featureFlags: TenantFeatureFlags) => void;
   tenantId: string;
 }) {
+  const { m } = useSaasI18n();
   const [values, setValues] =
     useState<TenantFeatureFlagsFormValues>(initialValues);
   const [submitting, setSubmitting] = useState(false);
@@ -354,10 +350,10 @@ function TenantFeatureFlagsForm({
 
       setValues(toFeatureFlagsFormValues(result.data));
       onUpdated(result.data);
-      toast.success("Tenant feature flags updated.");
+      toast.success(m.tenants.settings.flagsSaved);
     } catch (error) {
       toast.error(
-        getTenantLoadErrorMessage(error, "Tenant feature flags update failed."),
+        getTenantLoadErrorMessage(error, m.tenants.settings.flagsSaveFailed),
       );
     } finally {
       setSubmitting(false);
@@ -367,7 +363,9 @@ function TenantFeatureFlagsForm({
   return (
     <form className="grid gap-4 rounded-md border p-4" onSubmit={handleSubmit}>
       <div>
-        <h2 className="text-base font-semibold">Feature Flags</h2>
+        <h2 className="text-base font-semibold">
+          {m.tenants.settings.featureFlagsSection}
+        </h2>
       </div>
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -395,7 +393,7 @@ function TenantFeatureFlagsForm({
 
       <div className="flex justify-end">
         <Button disabled={disabled || submitting} type="submit">
-          {submitting ? "Saving..." : "Save feature flags"}
+          {submitting ? m.common.saving : m.tenants.settings.saveFeatureFlags}
         </Button>
       </div>
     </form>
@@ -411,6 +409,7 @@ function TenantStatusForm({
   onUpdated: (tenant: TenantDetail) => void;
   tenant: TenantDetail;
 }) {
+  const { m } = useSaasI18n();
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<TenantStatus | null>(null);
@@ -432,7 +431,7 @@ function TenantStatusForm({
       const message =
         result.errors.reason ??
         result.message ??
-        "Tenant status update failed.";
+        m.tenants.detail.statusUpdateFailed;
       setError(message);
       toast.error(message);
       setSubmitting(null);
@@ -441,14 +440,18 @@ function TenantStatusForm({
 
     onUpdated(result.data);
     setReason("");
-    toast.success(`Tenant status updated to ${tenantStatusLabels[status]}.`);
+    toast.success(
+      interpolate(m.tenants.detail.statusUpdated, {
+        status: m.common.statusLabels[status],
+      }),
+    );
     setSubmitting(null);
   }
 
   return (
     <section className="grid gap-4 rounded-md border p-4">
       <div>
-        <h2 className="text-base font-semibold">Pilot Status</h2>
+        <h2 className="text-base font-semibold">{m.tenants.settings.pilotSection}</h2>
       </div>
 
       {error ? (
@@ -459,7 +462,9 @@ function TenantStatusForm({
 
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div className="grid gap-2">
-          <Label htmlFor="tenant-settings-status-reason">Reason</Label>
+          <Label htmlFor="tenant-settings-status-reason">
+            {m.tenants.detail.reason}
+          </Label>
           <Input
             disabled={disabled || Boolean(submitting)}
             id="tenant-settings-status-reason"
@@ -467,7 +472,7 @@ function TenantStatusForm({
               setReason(event.target.value);
               setError(null);
             }}
-            placeholder="Required for audit log"
+            placeholder={m.tenants.detail.reasonPlaceholder}
             value={reason}
           />
         </div>
@@ -486,8 +491,8 @@ function TenantStatusForm({
                 variant={status === "active" ? "default" : "outline"}
               >
                 {submitting === status
-                  ? "Updating..."
-                  : getStatusActionLabel(status)}
+                  ? m.common.updating
+                  : getStatusActionLabel(status, m)}
               </Button>
             ))}
         </div>
@@ -497,6 +502,7 @@ function TenantStatusForm({
 }
 
 export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
+  const { m, formatDateTime } = useSaasI18n();
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
@@ -524,7 +530,7 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
         setAuthError(
           getTenantLoadErrorMessage(
             authResult.reason,
-            "Failed to verify the current session.",
+            m.tenants.settings.sessionError,
           ),
         );
       }
@@ -569,7 +575,7 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
         setError(
           getTenantLoadErrorMessage(
             loadError,
-            "Failed to load tenant settings.",
+            m.tenants.settings.loadError,
           ),
         );
       } finally {
@@ -600,7 +606,7 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
           setError(
             getTenantLoadErrorMessage(
               loadError,
-              "Failed to load tenant settings.",
+              m.tenants.settings.loadError,
             ),
           );
         }
@@ -614,15 +620,15 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
     return () => {
       isCurrent = false;
     };
-  }, [applyLoadResults, tenantId]);
+  }, [applyLoadResults, m.tenants.settings.loadError, tenantId]);
 
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <Badge variant="secondary">Tenant settings</Badge>
+          <Badge variant="secondary">{m.tenants.settings.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {tenant?.name ?? "Tenant Settings"}
+            {tenant?.name ?? m.tenants.settings.title}
           </h1>
           <p className="mt-2 break-all text-sm text-muted-foreground">
             {tenant?.id ?? tenantId}
@@ -638,11 +644,11 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
             type="button"
             variant="outline"
           >
-            Refresh
+            {m.tenants.settings.refresh}
           </Button>
           <Button asChild variant="outline">
             <Link href={`${webAdminRoutes.saas.tenants}/${tenantId}`}>
-              Back to detail
+              {m.tenants.settings.backToDetail}
             </Link>
           </Button>
         </div>
@@ -673,13 +679,13 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
               <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
                 {authError
                   ? `Tenant settings are read-only because the current session could not be verified: ${authError}`
-                  : "You can view tenant settings. Updating defaults and feature flags requires Super Admin or SaaS tenant write permission."}
+                  : m.tenants.settings.readOnlyHint}
               </div>
             ) : null}
 
             {!canManageTenantStatus ? (
               <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-                Tenant status changes require Super Admin.
+                {m.tenants.settings.statusPermissionHint}
               </div>
             ) : null}
 
@@ -709,21 +715,33 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
             <div className="grid gap-3 rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground md:grid-cols-3">
               <div>
                 <span className="font-medium text-foreground">
-                  Tenant updated
+                  {m.tenants.settings.tenantUpdated}
                 </span>
-                <p className="mt-1">{formatDate(tenant.updatedAt)}</p>
+                <p className="mt-1">
+                  {tenant.updatedAt
+                    ? formatDateTime(tenant.updatedAt)
+                    : m.common.notSet}
+                </p>
               </div>
               <div>
                 <span className="font-medium text-foreground">
-                  Settings updated
+                  {m.tenants.settings.settingsUpdated}
                 </span>
-                <p className="mt-1">{formatDate(settings.updatedAt)}</p>
+                <p className="mt-1">
+                  {settings.updatedAt
+                    ? formatDateTime(settings.updatedAt)
+                    : m.common.notSet}
+                </p>
               </div>
               <div>
                 <span className="font-medium text-foreground">
-                  Feature flags updated
+                  {m.tenants.settings.flagsUpdated}
                 </span>
-                <p className="mt-1">{formatDate(featureFlags.updatedAt)}</p>
+                <p className="mt-1">
+                  {featureFlags.updatedAt
+                    ? formatDateTime(featureFlags.updatedAt)
+                    : m.common.notSet}
+                </p>
               </div>
             </div>
           </div>
@@ -732,10 +750,10 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
         <div className="p-5">
           <div className="grid gap-3 rounded-md border border-dashed p-8 text-center">
             <h2 className="text-base font-semibold">
-              Tenant settings not found
+              {m.tenants.settings.notFoundTitle}
             </h2>
             <p className="text-sm text-muted-foreground">
-              The requested tenant settings could not be loaded.
+              {m.tenants.settings.notFoundDescription}
             </p>
           </div>
         </div>
