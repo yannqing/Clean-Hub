@@ -72,7 +72,8 @@ export function createTenantApi(client: ApiClient) {
       settings.update(input),
     listBackupJobs: (query?: Parameters<typeof backups.list>[0]) =>
       backups.list(query),
-    listBranches: (query?: QueryParams) => branches.list(query),
+    listBranches: (query?: Parameters<typeof branches.list>[0]) =>
+      branches.list(query),
     listUsers: (query?: QueryParams) => users.list(query),
     listServices: (query?: QueryParams) => services.list(query),
     listPriceBooks: (query?: QueryParams) => prices.list(query),

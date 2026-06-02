@@ -1,4 +1,4 @@
-import { PagePlaceholder } from "@/components/app-shell";
+import { BranchDetailView } from "@/features/tenant/branches";
 
 type BranchDetailPageProps = {
   params: Promise<{
@@ -11,11 +11,5 @@ export default async function BranchDetailPage({
 }: BranchDetailPageProps) {
   const { branchId } = await params;
 
-  return (
-    <PagePlaceholder
-      description={`Branch detail placeholder for branch ${branchId}.`}
-      items={["Profile", "Staff", "Hardware", "Service availability", "Reports"]}
-      title="Branch Detail"
-    />
-  );
+  return <BranchDetailView branchId={branchId} />;
 }

@@ -1,1 +1,2 @@
-export * from "./branch-table-placeholder";
+export * from "./branch-detail-view";
+export * from "./branch-list-view";

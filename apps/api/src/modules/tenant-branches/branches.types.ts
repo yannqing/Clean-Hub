@@ -1,3 +1,5 @@
+import type { AuthContext, AuthRequestMeta } from "../auth/auth.types.js";
+
 export type BranchStatus = "active" | "inactive";
 export type BranchLanguage = "en" | "fr" | "zh-CN";
 export type BranchBusinessHours = Record<string, unknown>;
@@ -17,6 +19,13 @@ export type BranchSummary = {
   status: BranchStatus;
   updatedAt: string;
   version: number;
+};
+
+export type BranchListInput = {
+  q?: string;
+  status?: BranchStatus;
+  limit: number;
+  offset: number;
 };
 
 export type CreateBranchRequest = {
@@ -44,9 +53,10 @@ export type UpdateBranchStatusRequest = {
   version: number;
 };
 
-export type BranchListQuery = {
-  q?: string;
-  status?: BranchStatus;
-  limit?: number;
-  offset?: number;
+export type BranchRequestInput<TData> = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  data: TData;
 };
+
+export type BranchAuditSnapshot = Omit<BranchSummary, "updatedAt">;
