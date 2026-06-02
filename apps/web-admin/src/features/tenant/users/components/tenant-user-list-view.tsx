@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@cleanhub/ui";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { tenantUserRoleOptions, tenantUserStatusOptions } from "../constants";
 import {
@@ -71,7 +71,7 @@ export function TenantUserListView() {
   const [offset, setOffset] = useState(0);
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const [selectedUser, setSelectedUser] = useState<TenantUserSummary | null>(null);
@@ -103,30 +103,29 @@ export function TenantUserListView() {
     };
   }, []);
 
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const loadUsers = useCallback(() => {
+    startTransition(async () => {
+      setError(null);
 
-    try {
-      const result = await getTenantUserListQuery({
-        limit: PAGE_SIZE,
-        offset,
-        q: search.trim() || undefined,
-        status: statusFilter || undefined,
-      });
+      try {
+        const result = await getTenantUserListQuery({
+          limit: PAGE_SIZE,
+          offset,
+          q: search.trim() || undefined,
+          status: statusFilter || undefined,
+        });
 
-      if (!isCurrent.current) return;
-      setUsers(result);
-    } catch (err) {
-      if (!isCurrent.current) return;
-      setError(getErrorMessage(err));
-    } finally {
-      if (isCurrent.current) setLoading(false);
-    }
+        if (!isCurrent.current) return;
+        setUsers(result);
+      } catch (err) {
+        if (!isCurrent.current) return;
+        setError(getErrorMessage(err));
+      }
+    });
   }, [offset, search, statusFilter]);
 
   useEffect(() => {
-    void loadUsers();
+    loadUsers();
   }, [loadUsers]);
 
   const handleSelectUser = useCallback(async (user: TenantUserSummary) => {
@@ -166,7 +165,7 @@ export function TenantUserListView() {
 
     setCreateOpen(false);
     setCreateForm({ displayName: "", email: "", initialPin: "", roleCode: "manager" });
-    void loadUsers();
+    loadUsers();
   }, [createForm, loadUsers]);
 
   const handleDisable = useCallback(async (userId: string) => {
@@ -187,7 +186,7 @@ export function TenantUserListView() {
       setSelectedUser(null);
       setDetail(null);
     }
-    void loadUsers();
+    loadUsers();
   }, [loadUsers, selectedUser]);
 
   const handleResetPin = useCallback(async (userId: string) => {
@@ -249,7 +248,7 @@ export function TenantUserListView() {
         <p className="text-sm text-destructive">{error}</p>
       )}
 
-      {loading ? (
+      {isPending ? (
         <p className="text-sm text-muted-foreground">Loading...</p>
       ) : users.length === 0 ? (
         <p className="text-sm text-muted-foreground">No team members found.</p>

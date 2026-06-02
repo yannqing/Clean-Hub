@@ -1,6 +1,8 @@
-export type DeviceSummary = {
-  id: string;
-  name: string;
-  type: string;
-  branchId: string;
-};
+export type {
+  CreateHardwareConfigRequest,
+  HardwareConfigSummary,
+  HardwareConnectionType,
+  HardwareDeviceStatus,
+  HardwareDeviceType,
+  UpdateHardwareConfigRequest,
+} from "@cleanhub/api-client";

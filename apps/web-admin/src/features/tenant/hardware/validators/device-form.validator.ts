@@ -1,9 +1,7 @@
 export type DeviceFormInput = {
-  name: string;
-  type: string;
   branchId: string;
+  name: string;
+  deviceType: string;
+  connectionType: string;
 };
 
-export function validateDeviceForm(input: DeviceFormInput): DeviceFormInput {
-  return input;
-}
