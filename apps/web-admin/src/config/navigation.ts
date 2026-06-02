@@ -100,8 +100,8 @@ export const webAdminSidebarNavigation = {
         { label: "Operation Logs", href: webAdminRoutes.tenant.system.logs },
         { label: "Data Backups", href: webAdminRoutes.tenant.system.backups },
         {
-          label: "Tenant Preferences",
-          href: webAdminRoutes.tenant.system.preferences,
+          label: "Tenant Settings",
+          href: webAdminRoutes.tenant.system.settings,
         },
       ],
     },

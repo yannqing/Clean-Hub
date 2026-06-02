@@ -11,5 +11,5 @@ type TenantSettingsRequestOptions = Omit<
 export async function getTenantSettingsQuery(
   options: TenantSettingsRequestOptions = {},
 ): Promise<TenantSettings> {
-  return webAdminApi.http.get<TenantSettings>("/tenant/settings", options);
+  return webAdminApi.tenant.settings.get(options);
 }

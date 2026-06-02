@@ -131,8 +131,8 @@ const en: WebAdminMessages = {
           { label: "Operation Logs", href: webAdminRoutes.tenant.system.logs },
           { label: "Data Backups", href: webAdminRoutes.tenant.system.backups },
           {
-            label: "Tenant Preferences",
-            href: webAdminRoutes.tenant.system.preferences,
+            label: "Tenant Settings",
+            href: webAdminRoutes.tenant.system.settings,
           },
         ],
       },
@@ -216,7 +216,7 @@ const zhCN: WebAdminMessages = {
         items: [
           { label: "操作日志", href: webAdminRoutes.tenant.system.logs },
           { label: "数据备份", href: webAdminRoutes.tenant.system.backups },
-          { label: "租户偏好", href: webAdminRoutes.tenant.system.preferences },
+          { label: "租户设置", href: webAdminRoutes.tenant.system.settings },
         ],
       },
     ],

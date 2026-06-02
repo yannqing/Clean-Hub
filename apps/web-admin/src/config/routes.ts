@@ -41,6 +41,7 @@ export const webAdminRoutes = {
     system: {
       logs: "/tenant/system/logs",
       backups: "/tenant/system/backups",
+      settings: "/tenant/system/settings",
       preferences: "/tenant/system/preferences",
     },
   },

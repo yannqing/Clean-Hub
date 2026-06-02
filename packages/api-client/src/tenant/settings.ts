@@ -1,10 +1,15 @@
-import type { ApiClient } from "../types";
+import type { ApiClient, ApiRequestOptions } from "../types";
 import type { TenantSettings, UpdateTenantSettingsRequest } from "./settings.types";
+
+type ApiOptionsWithoutBody = Omit<ApiRequestOptions, "method" | "body">;
 
 export function createTenantSettingsApi(client: ApiClient) {
   return {
-    get: () => client.get<TenantSettings>("/tenant/settings"),
-    update: (input: UpdateTenantSettingsRequest) =>
-      client.patch<TenantSettings>("/tenant/settings", input),
+    get: (options: ApiOptionsWithoutBody = {}) =>
+      client.get<TenantSettings>("/tenant/settings", options),
+    update: (
+      input: UpdateTenantSettingsRequest,
+      options: ApiOptionsWithoutBody = {},
+    ) => client.patch<TenantSettings>("/tenant/settings", input, options),
   };
 }

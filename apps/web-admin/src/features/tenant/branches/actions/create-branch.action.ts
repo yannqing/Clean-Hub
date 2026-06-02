@@ -2,10 +2,24 @@
 
 import { webAdminApi } from "@/lib/api-client";
 
-import type { BranchFormValues } from "../types";
+import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
+import type { BranchFormValues, BranchSummary } from "../types";
 import { validateBranchForm } from "../validators";
 
-function getApiFailure(error: unknown) {
+type BranchActionResult =
+  | {
+      ok: true;
+      data: BranchSummary;
+    }
+  | {
+      ok: false;
+      errors: Partial<Record<keyof BranchFormValues, string>>;
+      message: string;
+      code?: string;
+      status?: number;
+    };
+
+function getActionError(error: unknown) {
   const status =
     typeof (error as { status?: unknown }).status === "number"
       ? (error as { status: number }).status
@@ -16,28 +30,39 @@ function getApiFailure(error: unknown) {
       : undefined;
 
   return {
-    ok: false as const,
-    message: error instanceof Error ? error.message : "Branch request failed.",
-    status,
+    message: error instanceof Error ? error.message : "Branch could not be created.",
     code,
+    status,
   };
 }
 
-export async function createBranchAction(input: BranchFormValues) {
+export async function createBranchAction(
+  input: BranchFormValues,
+): Promise<BranchActionResult> {
   const validation = validateBranchForm(input);
 
   if (!validation.ok) {
-    return validation;
+    return {
+      ...validation,
+      message: "Check the branch form.",
+    };
   }
 
   try {
-    const branch = await webAdminApi.tenant.branches.create(validation.data);
+    const branch = await webAdminApi.tenant.branches.create(
+      validation.data,
+      await getTenantServerApiRequestOptions(),
+    );
 
     return {
-      ok: true as const,
+      ok: true,
       data: branch,
     };
   } catch (error) {
-    return getApiFailure(error);
+    return {
+      ok: false,
+      errors: {},
+      ...getActionError(error),
+    };
   }
 }

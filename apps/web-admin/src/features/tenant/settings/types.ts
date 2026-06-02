@@ -1,41 +1,22 @@
-export type TenantSettingsLanguage = "en" | "fr" | "zh-CN";
-export type TenantPilotStatus = "pilot" | "live" | "paused";
+import type {
+  TenantBackOfficeSettings,
+  TenantPilotStatus,
+  TenantSettingsFeatureFlags,
+  TenantSettingsLanguage,
+  UpdateTenantBackOfficeSettingsRequest,
+} from "@cleanhub/api-client";
 
-export type TenantSettingsFeatureFlags = {
-  id: string | null;
-  tenantId: string;
-  laundryEnabled: boolean;
-  carWashEnabled: boolean;
-  retailProductsEnabled: boolean;
-  deliveryEnabled: boolean;
-  notificationsEnabled: boolean;
-  updatedAt: string | null;
-  updatedBy: string | null;
-  version: number;
+export type {
+  TenantPilotStatus,
+  TenantSettingsFeatureFlags,
+  TenantSettingsLanguage,
 };
 
-export type TenantSettings = {
-  id: string | null;
-  tenantId: string;
-  tenantName: string;
-  defaultLanguage: TenantSettingsLanguage;
-  defaultCurrency: string;
-  timezone: string;
-  pilotStatus: TenantPilotStatus;
-  updatedAt: string | null;
-  updatedBy: string | null;
-  version: number;
-  featureFlags: TenantSettingsFeatureFlags;
-};
+export type TenantSettings = TenantBackOfficeSettings;
+export type UpdateTenantSettingsRequest = UpdateTenantBackOfficeSettingsRequest;
 
 export type TenantSettingsFormValues = {
   defaultLanguage: TenantSettingsLanguage;
   defaultCurrency: string;
   timezone: string;
-};
-
-export type UpdateTenantSettingsRequest = {
-  defaultLanguage?: TenantSettingsLanguage;
-  defaultCurrency?: string;
-  timezone?: string;
 };

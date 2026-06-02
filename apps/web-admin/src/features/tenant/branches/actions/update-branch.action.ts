@@ -2,10 +2,24 @@
 
 import { webAdminApi } from "@/lib/api-client";
 
-import type { BranchFormValues, BranchStatus } from "../types";
+import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
+import type { BranchFormValues, BranchSummary } from "../types";
 import { validateBranchUpdateForm } from "../validators";
 
-function getApiFailure(error: unknown) {
+type BranchActionResult =
+  | {
+      ok: true;
+      data: BranchSummary;
+    }
+  | {
+      ok: false;
+      errors: Partial<Record<keyof BranchFormValues, string>>;
+      message: string;
+      code?: string;
+      status?: number;
+    };
+
+function getActionError(error: unknown) {
   const status =
     typeof (error as { status?: unknown }).status === "number"
       ? (error as { status: number }).status
@@ -16,54 +30,41 @@ function getApiFailure(error: unknown) {
       : undefined;
 
   return {
-    ok: false as const,
-    message: error instanceof Error ? error.message : "Branch request failed.",
-    status,
+    message: error instanceof Error ? error.message : "Branch could not be updated.",
     code,
+    status,
   };
 }
 
 export async function updateBranchAction(
   branchId: string,
   input: BranchFormValues,
-) {
+): Promise<BranchActionResult> {
   const validation = validateBranchUpdateForm(input);
 
   if (!validation.ok) {
-    return validation;
+    return {
+      ...validation,
+      message: "Check the branch form.",
+    };
   }
 
   try {
     const branch = await webAdminApi.tenant.branches.update(
       branchId,
       validation.data,
+      await getTenantServerApiRequestOptions(),
     );
 
     return {
-      ok: true as const,
+      ok: true,
       data: branch,
     };
   } catch (error) {
-    return getApiFailure(error);
-  }
-}
-
-export async function updateBranchStatusAction(
-  branchId: string,
-  status: BranchStatus,
-  version: number,
-) {
-  try {
-    const branch = await webAdminApi.tenant.branches.updateStatus(branchId, {
-      status,
-      version,
-    });
-
     return {
-      ok: true as const,
-      data: branch,
+      ok: false,
+      errors: {},
+      ...getActionError(error),
     };
-  } catch (error) {
-    return getApiFailure(error);
   }
 }

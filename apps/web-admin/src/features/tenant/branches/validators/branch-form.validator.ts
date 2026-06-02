@@ -3,7 +3,14 @@ import type {
   UpdateBranchRequest,
 } from "@cleanhub/api-client";
 
-import type { BranchFormValues, ParsedBranchBusinessHours } from "../types";
+import type {
+  BranchFormValues,
+  BranchLanguage,
+  BranchStatus,
+} from "../types";
+
+const languages: BranchLanguage[] = ["en", "fr", "zh-CN"];
+const statuses: BranchStatus[] = ["active", "inactive"];
 
 export type BranchFormValidationResult<TData> =
   | {
@@ -21,36 +28,44 @@ function normalizeOptional(value: string): string | null {
   return trimmed ? trimmed : null;
 }
 
-function parseBusinessHours(
-  value: string,
-  errors: Partial<Record<keyof BranchFormValues, string>>,
-): ParsedBranchBusinessHours {
+function parseBusinessHours(value: string) {
   const trimmed = value.trim();
 
   if (!trimmed) {
-    return null;
+    return {
+      ok: true as const,
+      data: null,
+    };
   }
 
   try {
     const parsed: unknown = JSON.parse(trimmed);
 
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      errors.businessHours = "Business hours must be a JSON object.";
-      return null;
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+      return {
+        ok: false as const,
+        message: "Business hours must be a JSON object.",
+      };
     }
 
-    return parsed as Record<string, unknown>;
+    return {
+      ok: true as const,
+      data: parsed as Record<string, unknown>,
+    };
   } catch {
-    errors.businessHours = "Business hours must be valid JSON.";
-    return null;
+    return {
+      ok: false as const,
+      message: "Business hours must be valid JSON.",
+    };
   }
 }
 
 function validateBase(input: BranchFormValues) {
   const errors: Partial<Record<keyof BranchFormValues, string>> = {};
   const name = input.name.trim();
-  const defaultCurrency = input.defaultCurrency.trim().toUpperCase();
+  const currency = input.defaultCurrency.trim().toUpperCase();
   const logoUrl = normalizeOptional(input.logoUrl);
+  const businessHours = parseBusinessHours(input.businessHoursJson);
 
   if (!name) {
     errors.name = "Branch name is required.";
@@ -66,11 +81,11 @@ function validateBase(input: BranchFormValues) {
     errors.phone = "Phone must be 32 characters or fewer.";
   }
 
-  if (!["en", "fr", "zh-CN"].includes(input.defaultLanguage)) {
-    errors.defaultLanguage = "Choose a supported language.";
+  if (!languages.includes(input.defaultLanguage)) {
+    errors.defaultLanguage = "Choose a supported default language.";
   }
 
-  if (!/^[A-Z]{3}$/.test(defaultCurrency)) {
+  if (!/^[A-Z]{3}$/.test(currency)) {
     errors.defaultCurrency = "Currency must be a 3-letter code.";
   }
 
@@ -94,7 +109,11 @@ function validateBase(input: BranchFormValues) {
     }
   }
 
-  if (!["active", "inactive"].includes(input.status)) {
+  if (!businessHours.ok) {
+    errors.businessHoursJson = businessHours.message;
+  }
+
+  if (!statuses.includes(input.status)) {
     errors.status = "Choose a supported status.";
   }
 
@@ -104,9 +123,9 @@ function validateBase(input: BranchFormValues) {
       name,
       address: normalizeOptional(input.address),
       phone: normalizeOptional(input.phone),
-      businessHours: parseBusinessHours(input.businessHours, errors),
+      businessHours: businessHours.ok ? businessHours.data : null,
       defaultLanguage: input.defaultLanguage,
-      defaultCurrency,
+      defaultCurrency: currency,
       receiptName: normalizeOptional(input.receiptName),
       receiptPhone: normalizeOptional(input.receiptPhone),
       receiptAddress: normalizeOptional(input.receiptAddress),
@@ -137,35 +156,29 @@ export function validateBranchForm(
 export function validateBranchUpdateForm(
   input: BranchFormValues,
 ): BranchFormValidationResult<UpdateBranchRequest> {
-  const validation = validateBranchForm(input);
+  const result = validateBase(input);
 
-  if (!validation.ok) {
-    return validation;
-  }
-
-  const version = input.version;
-
-  if (
-    typeof version !== "number" ||
-    !Number.isInteger(version) ||
-    version < 1
-  ) {
+  if (Object.keys(result.errors).length > 0) {
     return {
       ok: false,
-      errors: {
-        version: "Refresh the branch before saving changes.",
-      },
+      errors: result.errors,
     };
   }
-
-  const data = { ...validation.data };
-  delete data.status;
 
   return {
     ok: true,
     data: {
-      ...data,
-      version,
+      name: result.data.name,
+      address: result.data.address,
+      phone: result.data.phone,
+      businessHours: result.data.businessHours,
+      defaultLanguage: result.data.defaultLanguage,
+      defaultCurrency: result.data.defaultCurrency,
+      receiptName: result.data.receiptName,
+      receiptPhone: result.data.receiptPhone,
+      receiptAddress: result.data.receiptAddress,
+      logoUrl: result.data.logoUrl,
+      version: input.version,
     },
   };
 }

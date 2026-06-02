@@ -18,6 +18,7 @@ const metricLabels = [
 ] as const;
 
 const quickLinks = [
+  ["Settings", webAdminRoutes.tenant.system.settings],
   ["Branches", webAdminRoutes.tenant.branches],
   ["Users", webAdminRoutes.tenant.users],
   ["Services", webAdminRoutes.tenant.services],
