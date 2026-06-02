@@ -219,6 +219,8 @@ export function TenantUserListView() {
           placeholder="Search by name, email..."
           value={search}
           onChange={(e) => {
+            setLoading(true);
+            setError(null);
             setSearch(e.target.value);
             setOffset(0);
           }}
@@ -226,6 +228,8 @@ export function TenantUserListView() {
         <Select
           value={statusFilter}
           onValueChange={(value) => {
+            setLoading(true);
+            setError(null);
             setStatusFilter(value === "all" ? "" : value);
             setOffset(0);
           }}
@@ -308,14 +312,22 @@ export function TenantUserListView() {
         <Button
           variant="outline"
           disabled={offset === 0}
-          onClick={() => setOffset((prev) => Math.max(0, prev - PAGE_SIZE))}
+          onClick={() => {
+            setLoading(true);
+            setError(null);
+            setOffset((prev) => Math.max(0, prev - PAGE_SIZE));
+          }}
         >
           Previous
         </Button>
         <Button
           variant="outline"
           disabled={users.length < PAGE_SIZE}
-          onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
+          onClick={() => {
+            setLoading(true);
+            setError(null);
+            setOffset((prev) => prev + PAGE_SIZE);
+          }}
         >
           Next
         </Button>

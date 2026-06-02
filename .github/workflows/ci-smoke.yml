@@ -1,0 +1,125 @@
+name: CI Smoke Test
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+concurrency:
+  group: ci-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Build and startup smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: cleanhub
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cleanhub"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+          --health-start-period 10s
+
+    env:
+      NODE_ENV: production
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/cleanhub
+      AUTH_TOKEN_SECRET: ci-smoke-test-secret-with-at-least-32-chars
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: "900"
+      AUTH_REFRESH_TOKEN_TTL_SECONDS: "2592000"
+      AUTH_COOKIE_SECURE: "false"
+      LOG_LEVEL: warn
+      SERVICE_NAME: cleanhub-ci
+      NEXT_PUBLIC_APP_ENV: ci
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:4000
+      CLEANHUB_API_BASE_URL: http://localhost:4000
+      PORT: "4000"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare environment file
+        run: cp .env.example .env
+
+      - name: Run database migrations
+        run: pnpm db:migrate
+
+      - name: Typecheck core apps
+        run: |
+          pnpm --filter @cleanhub/api typecheck
+          pnpm --filter @cleanhub/web-admin typecheck
+
+      - name: Build API and web-admin
+        run: |
+          pnpm --filter @cleanhub/api build
+          pnpm --filter @cleanhub/web-admin build
+
+      - name: Start API and verify /health
+        run: |
+          set -euo pipefail
+          pnpm --filter @cleanhub/api start > /tmp/cleanhub-api.log 2>&1 &
+          echo $! > /tmp/cleanhub-api.pid
+
+          for attempt in $(seq 1 30); do
+            if curl -sf http://localhost:4000/health | grep -q '"status":"ok"'; then
+              echo "API health check passed on attempt ${attempt}"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "API failed to become healthy within 60s"
+          cat /tmp/cleanhub-api.log || true
+          exit 1
+
+      - name: Start web-admin and verify login page
+        run: |
+          set -euo pipefail
+          pnpm --filter @cleanhub/web-admin start > /tmp/cleanhub-web-admin.log 2>&1 &
+          echo $! > /tmp/cleanhub-web-admin.pid
+
+          for attempt in $(seq 1 30); do
+            status="$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/login || true)"
+            if [ "$status" = "200" ]; then
+              echo "web-admin login page responded 200 on attempt ${attempt}"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "web-admin failed to serve /login within 60s"
+          cat /tmp/cleanhub-web-admin.log || true
+          exit 1
+
+      - name: Stop background processes
+        if: always()
+        run: |
+          for pid_file in /tmp/cleanhub-api.pid /tmp/cleanhub-web-admin.pid; do
+            if [ -f "$pid_file" ]; then
+              kill "$(cat "$pid_file")" 2>/dev/null || true
+            fi
+          done
