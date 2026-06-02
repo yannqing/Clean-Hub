@@ -1,1 +1,1 @@
-export * from "./device-table-placeholder";
+export * from "./hardware-list-view";
