@@ -98,10 +98,6 @@ export function TenantSettingsView({
 
   useEffect(() => {
     if (initialSettings) {
-      setSettings(initialSettings);
-      setForm(toFormValues(initialSettings));
-      setLoadError(null);
-      setLoading(false);
       return;
     }
 

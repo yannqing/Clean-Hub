@@ -14,6 +14,7 @@ import {
 import { spawn } from "node:child_process";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
 const releaseRoot = join(rootDir, "release");
@@ -75,8 +76,21 @@ ENV DRIZZLE_MIGRATIONS_FOLDER=/app/db/drizzle
 CMD ["node", "api/migrate.js"]
 
 FROM base AS web-admin
-COPY web-admin ./web-admin
+COPY web-admin/apps/web-admin/package.json ./web-admin/apps/web-admin/
+COPY web-admin/apps/web-admin/server.js ./web-admin/apps/web-admin/
+COPY web-admin/apps/web-admin/.next ./web-admin/apps/web-admin/.next
+COPY web-admin/apps/web-admin/public ./web-admin/apps/web-admin/public
 WORKDIR /app/web-admin/apps/web-admin
+# Materialize a clean Linux runtime node_modules tree in-container.
+# This avoids carrying potentially broken host symlinks from Windows packaging.
+RUN mkdir -p /tmp/next-runtime \
+  && cd /tmp/next-runtime \
+  && npm init -y \
+  && npm install next react react-dom @swc/helpers@0.5.15 @next/env --omit=dev --no-audit --no-fund --registry=https://registry.npmmirror.com \
+  && rm -rf /app/web-admin/apps/web-admin/node_modules \
+  && mkdir -p /app/web-admin/apps/web-admin/node_modules \
+  && cp -R /tmp/next-runtime/node_modules/. /app/web-admin/apps/web-admin/node_modules \
+  && rm -rf /tmp/next-runtime
 ENV PORT=3000
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \\
@@ -256,27 +270,128 @@ async function pruneDanglingSymlinks(dir) {
 
 async function copyWebAdminStandalone() {
   await stat(webAdminStandaloneDir);
-  // The Next.js standalone tree relies on pnpm's symlink layout to resolve
-  // dependencies (e.g. next -> .pnpm/next@.../node_modules/next, which sits
-  // next to its @next/env peer). Dereferencing the copy detaches packages from
-  // that layout and breaks module resolution, so the symlinks MUST be
-  // preserved (verbatimSymlinks: true). A few links are dangling — dev-only
-  // transitive deps Next traced but did not emit — so prune those first to keep
-  // the tree self-contained.
-  await pruneDanglingSymlinks(webAdminStandaloneDir);
-  await cp(webAdminStandaloneDir, join(artifactDir, "web-admin"), {
-    recursive: true,
-    verbatimSymlinks: true,
-  });
+  const webAdminArtifactDir = join(artifactDir, "web-admin");
+
+  // Linux build -> Linux runtime: preserve pnpm symlink layout as-is.
+  // Windows build -> Linux runtime: symlinks/junctions can become invalid after
+  // archive transfer and extraction, which causes runtime "Cannot find module".
+  // On Windows, dereference links and copy real files instead.
+  if (process.platform === "win32") {
+    await cp(webAdminStandaloneDir, webAdminArtifactDir, {
+      recursive: true,
+      dereference: true,
+    });
+  } else {
+    await pruneDanglingSymlinks(webAdminStandaloneDir);
+    await cp(webAdminStandaloneDir, webAdminArtifactDir, {
+      recursive: true,
+      verbatimSymlinks: true,
+    });
+  }
   await cp(
     join(webAdminDir, ".next", "static"),
     join(artifactDir, "web-admin", "apps", "web-admin", ".next", "static"),
     { recursive: true },
   );
+  await mkdir(join(artifactDir, "web-admin", "apps", "web-admin", "public"), {
+    recursive: true,
+  });
   await copyIfExists(
     join(webAdminDir, "public"),
     join(artifactDir, "web-admin", "apps", "web-admin", "public"),
   );
+
+  // Windows release builds may miss this transitive runtime dependency after
+  // flattening pnpm links for Linux deployment. Ensure it exists in artifact.
+  const swcHelpersCandidates = [
+    join(webAdminDir, "node_modules", "@swc", "helpers"),
+    join(webAdminDir, "node_modules", "next", "node_modules", "@swc", "helpers"),
+    join(rootDir, "node_modules", "@swc", "helpers"),
+    join(rootDir, "node_modules", "next", "node_modules", "@swc", "helpers"),
+  ];
+  const swcHelpersTarget = join(
+    webAdminArtifactDir,
+    "apps",
+    "web-admin",
+    "node_modules",
+    "@swc",
+    "helpers",
+  );
+  const webAdminRequire = createRequire(join(webAdminDir, "package.json"));
+  const rootRequire = createRequire(join(rootDir, "package.json"));
+
+  let copiedSwcHelpers = existsSync(swcHelpersTarget);
+  const swcHelpersStandaloneCandidates = [
+    join(webAdminStandaloneDir, "node_modules", "@swc", "helpers"),
+    join(
+      webAdminStandaloneDir,
+      "apps",
+      "web-admin",
+      "node_modules",
+      "@swc",
+      "helpers",
+    ),
+  ];
+
+  for (const candidate of swcHelpersStandaloneCandidates) {
+    if (!existsSync(candidate)) {
+      continue;
+    }
+    await cp(candidate, swcHelpersTarget, { recursive: true, force: true });
+    copiedSwcHelpers = true;
+    break;
+  }
+
+  for (const candidate of swcHelpersCandidates) {
+    if (!existsSync(candidate)) {
+      continue;
+    }
+    await cp(candidate, swcHelpersTarget, { recursive: true, force: true });
+    copiedSwcHelpers = true;
+    break;
+  }
+
+  if (!copiedSwcHelpers) {
+    const resolvedSwcHelpersCandidates = [];
+
+    try {
+      resolvedSwcHelpersCandidates.push(
+        dirname(webAdminRequire.resolve("@swc/helpers/package.json")),
+      );
+    } catch {
+      // ignore
+    }
+
+    try {
+      resolvedSwcHelpersCandidates.push(
+        dirname(rootRequire.resolve("@swc/helpers/package.json")),
+      );
+    } catch {
+      // ignore
+    }
+
+    for (const candidate of resolvedSwcHelpersCandidates) {
+      if (!existsSync(candidate)) {
+        continue;
+      }
+      await cp(candidate, swcHelpersTarget, { recursive: true, force: true });
+      copiedSwcHelpers = true;
+      break;
+    }
+  }
+
+  if (!copiedSwcHelpers) {
+    console.warn(
+      [
+        "Warning: '@swc/helpers' was not found while preparing web-admin artifact.",
+        "Packaging will continue. If runtime fails, ensure dependency installation before build.",
+        "Checked paths:",
+        ...swcHelpersStandaloneCandidates.map((path) => `  - ${path}`),
+        ...swcHelpersCandidates.map((path) => `  - ${path}`),
+        "Also attempted resolution via require.resolve from web-admin/root package contexts.",
+      ].join("\n"),
+    );
+  }
 }
 
 async function writeManifest() {

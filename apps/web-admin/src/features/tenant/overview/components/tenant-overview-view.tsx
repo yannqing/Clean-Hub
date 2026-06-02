@@ -51,9 +51,6 @@ export function TenantOverviewView({
 
   useEffect(() => {
     if (initialOverview) {
-      setOverview(initialOverview);
-      setErrorMessage(null);
-      setLoading(false);
       return;
     }
 
