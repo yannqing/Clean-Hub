@@ -119,7 +119,8 @@ export function SecuritySettingsForm({
           />
         </div>
 
-        <div className="grid gap-2">
+        {/* Phase 1: 刷新令牌天数暂不展示，保存时仍沿用当前配置值 */}
+        {/* <div className="grid gap-2">
           <Label htmlFor="refresh-token-days">
             {m.security.settings.refreshTokenDays}
           </Label>
@@ -134,7 +135,7 @@ export function SecuritySettingsForm({
               ? ""
               : values.refreshTokenDays}
           />
-        </div>
+        </div> */}
 
         <label className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
           <Checkbox

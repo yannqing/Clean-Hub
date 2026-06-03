@@ -1,3 +1,7 @@
+import { redirect } from "next/navigation";
+
+import { isNavFeatureVisible } from "@/config/feature-visibility";
+import { webAdminRoutes } from "@/config/routes";
 import {
   BackupJobListView,
   getTenantBackupJobListQuery,
@@ -28,6 +32,10 @@ function getStringParam(
 export default async function TenantSystemBackupsPage({
   searchParams,
 }: TenantSystemBackupsPageProps) {
+  if (!isNavFeatureVisible("backups")) {
+    redirect(webAdminRoutes.tenant.home);
+  }
+
   const params = (await searchParams) ?? {};
   const status = getStringParam(params, "status");
   const query: BackupJobListQuery = {

@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { getAuditEventDescription } from "@/features/audit/event-description";
 
 import {
   getTenantAuditLogDetailQuery,
@@ -322,7 +323,7 @@ export function TenantAuditLogView() {
               <TableRow key={log.id}>
                 <TableCell>{formatDateTime(log.createdAt)}</TableCell>
                 <TableCell>{getCategoryLabel(log.eventCategory)}</TableCell>
-                <TableCell>{log.eventType}</TableCell>
+                <TableCell>{getAuditEventDescription(log.eventType)}</TableCell>
                 <TableCell>
                   <div>{log.entityType ?? "Unknown"}</div>
                   <div className="text-xs text-muted-foreground">
@@ -330,7 +331,7 @@ export function TenantAuditLogView() {
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div>{log.actorUserId ?? "System"}</div>
+                  <div>{log.actorDisplayName ?? log.actorUserId ?? "System"}</div>
                   <div className="text-xs text-muted-foreground">
                     {log.ipAddress ?? "No IP"}
                   </div>
@@ -369,7 +370,9 @@ export function TenantAuditLogView() {
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Event
               </p>
-              <p className="mt-2 font-medium">{selectedLog.eventType}</p>
+              <p className="mt-2 font-medium">
+                {getAuditEventDescription(selectedLog.eventType)}
+              </p>
               <p className="mt-1 text-sm text-muted-foreground">
                 {selectedLog.eventCategory}
               </p>

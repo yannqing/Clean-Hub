@@ -1,3 +1,7 @@
+/** Large scrollable dialog shell for tenant detail/settings on the list page. */
+export const tenantDialogContentClass =
+  "flex max-h-[min(92vh,960px)] w-full max-w-5xl flex-col gap-0 overflow-hidden p-0 sm:max-w-5xl";
+
 export const tenantStatusLabels = {
   active: "Active",
   suspended: "Suspended",

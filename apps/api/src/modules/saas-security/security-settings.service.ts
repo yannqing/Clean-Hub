@@ -3,6 +3,9 @@ import { getDb, type Database } from "@cleanhub/db";
 import { writeAuditLog } from "../audit/audit.helper.js";
 import { requireSaasRole, requireSuperAdmin } from "../auth/permission.helper.js";
 import {
+  DEFAULT_SECURITY_POLICY,
+} from "./security-policy.js";
+import {
   findSecuritySettings,
   upsertSecuritySettings,
 } from "./security-settings.repository.js";
@@ -15,12 +18,7 @@ import type {
 
 const DEFAULT_SECURITY_SETTINGS = {
   settingKey: "default",
-  passwordMinLength: 8,
-  passwordRequiresNumber: true,
-  passwordRequiresSymbol: false,
-  loginMaxAttempts: 5,
-  lockoutMinutes: 15,
-  refreshTokenDays: 30,
+  ...DEFAULT_SECURITY_POLICY,
 };
 
 function toAuditSnapshot(

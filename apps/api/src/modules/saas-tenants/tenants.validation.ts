@@ -33,7 +33,7 @@ const initialOwnerSchema = z.object({
   displayName: z.string().trim().min(1).max(120),
   email: z.string().trim().email().max(320),
   phone: optionalStringSchema(32),
-  password: z.string().min(8).max(128),
+  password: z.string().min(1).max(128),
   pin: z.string().regex(/^\d{4,6}$/, "PIN must be 4 to 6 digits."),
 });
 

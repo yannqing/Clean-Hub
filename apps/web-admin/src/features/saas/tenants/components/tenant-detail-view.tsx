@@ -1,7 +1,16 @@
 "use client";
 
 import type { AuthContext } from "@cleanhub/api-client";
-import { Badge, Button, Input, Label, toast } from "@cleanhub/ui";
+import {
+  Badge,
+  Button,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  toast,
+} from "@cleanhub/ui";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -16,8 +25,13 @@ import { getCurrentSaasAuthQuery, getTenantDetailQuery } from "../queries";
 import type { TenantDetail, TenantFormValues, TenantStatus } from "../types";
 import { TenantForm } from "./tenant-form";
 
-type TenantDetailViewProps = {
+export type TenantDetailPresentation = "page" | "dialog";
+
+export type TenantDetailViewProps = {
   tenantId: string;
+  presentation?: TenantDetailPresentation;
+  onOpenSettings?: () => void;
+  onTenantUpdated?: () => void;
 };
 
 function toFormValues(tenant: TenantDetail): TenantFormValues {
@@ -77,7 +91,13 @@ function canUpdateTenantStatus(authContext: AuthContext | null): boolean {
   return authContext?.role === "super_admin" && authContext.tenantId === null;
 }
 
-export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
+export function TenantDetailView({
+  tenantId,
+  presentation = "page",
+  onOpenSettings,
+  onTenantUpdated,
+}: TenantDetailViewProps) {
+  const isDialog = presentation === "dialog";
   const { m, formatDate } = useSaasI18n();
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -131,6 +151,7 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
 
     setTenant(result.data);
     setStatusReason("");
+    onTenantUpdated?.();
     toast.success(
       interpolate(m.tenants.detail.statusUpdated, {
         status: m.common.statusLabels[status],
@@ -189,37 +210,60 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
     };
   }, [m.tenants.detail.loadError, m.tenants.detail.sessionError, tenantId]);
 
-  return (
-    <section className="min-h-[560px]">
-      <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
+  const pageHeader = !isDialog ? (
+    <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0">
+        <Badge variant="secondary">{m.tenants.detail.badge}</Badge>
+        <h1 className="mt-3 text-2xl font-semibold tracking-normal">
+          {tenant?.name ?? m.tenants.detail.title}
+        </h1>
+        <p className="mt-2 break-all text-sm text-muted-foreground">
+          {tenant?.id ?? tenantId}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {tenant ? (
+          <Button asChild variant="outline">
+            <Link
+              href={`${webAdminRoutes.saas.tenants}/${tenant.id}/settings`}
+            >
+              {m.tenants.detail.settings}
+            </Link>
+          </Button>
+        ) : null}
+        <Button asChild variant="outline">
+          <Link href={webAdminRoutes.saas.tenants}>
+            {m.tenants.detail.backToTenants}
+          </Link>
+        </Button>
+      </div>
+    </div>
+  ) : (
+    <DialogHeader className="shrink-0 space-y-1 border-b px-6 py-4 text-left">
+      <div className="flex items-start justify-between gap-3 pr-8">
         <div className="min-w-0">
-          <Badge variant="secondary">{m.tenants.detail.badge}</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
+          <DialogTitle className="text-lg">
             {tenant?.name ?? m.tenants.detail.title}
-          </h1>
-          <p className="mt-2 break-all text-sm text-muted-foreground">
+          </DialogTitle>
+          <p className="break-all text-sm text-muted-foreground">
             {tenant?.id ?? tenantId}
           </p>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          {tenant ? (
-            <Button asChild variant="outline">
-              <Link
-                href={`${webAdminRoutes.saas.tenants}/${tenant.id}/settings`}
-              >
-                {m.tenants.detail.settings}
-              </Link>
-            </Button>
-          ) : null}
-          <Button asChild variant="outline">
-            <Link href={webAdminRoutes.saas.tenants}>
-              {m.tenants.detail.backToTenants}
-            </Link>
+        {tenant && onOpenSettings ? (
+          <Button onClick={onOpenSettings} size="sm" type="button" variant="outline">
+            {m.tenants.detail.settings}
           </Button>
-        </div>
+        ) : null}
       </div>
+      <DialogDescription className="sr-only">
+        {m.tenants.detail.title}
+      </DialogDescription>
+    </DialogHeader>
+  );
 
+  const body = (
+    <>
       {loading ? (
         <div className="grid gap-4 p-5">
           <div className="h-24 animate-pulse rounded-md bg-muted" />
@@ -402,6 +446,7 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
             onSubmit={handleUpdateTenant}
             onSuccess={(updatedTenant) => {
               setTenant(updatedTenant);
+              onTenantUpdated?.();
             }}
           />
         </>
@@ -414,16 +459,34 @@ export function TenantDetailView({ tenantId }: TenantDetailViewProps) {
             <p className="text-sm text-muted-foreground">
               {m.tenants.detail.notFoundDescription}
             </p>
-            <div>
-              <Button asChild variant="outline">
-                <Link href={webAdminRoutes.saas.tenants}>
-                  {m.tenants.detail.backToTenants}
-                </Link>
-              </Button>
-            </div>
+            {!isDialog ? (
+              <div>
+                <Button asChild variant="outline">
+                  <Link href={webAdminRoutes.saas.tenants}>
+                    {m.tenants.detail.backToTenants}
+                  </Link>
+                </Button>
+              </div>
+            ) : null}
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (isDialog) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {pageHeader}
+        <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
+      </div>
+    );
+  }
+
+  return (
+    <section className="min-h-[560px]">
+      {pageHeader}
+      {body}
     </section>
   );
 }

@@ -67,13 +67,18 @@ export class TokenService {
     this.refreshTokenTtlSeconds = refreshTokenTtlSeconds;
   }
 
-  async issueTokenPair(context: Omit<AuthContext, "accessTokenExpiresAt">): Promise<AuthTokenPair> {
+  async issueTokenPair(
+    context: Omit<AuthContext, "accessTokenExpiresAt">,
+    options?: { refreshTokenTtlSeconds?: number },
+  ): Promise<AuthTokenPair> {
     const now = Math.floor(Date.now() / 1000);
+    const refreshTokenTtlSeconds =
+      options?.refreshTokenTtlSeconds ?? this.refreshTokenTtlSeconds;
     const accessTokenExpiresAt = new Date(
       (now + this.accessTokenTtlSeconds) * 1000,
     );
     const refreshTokenExpiresAt = new Date(
-      (now + this.refreshTokenTtlSeconds) * 1000,
+      (now + refreshTokenTtlSeconds) * 1000,
     );
 
     const accessToken = await new SignJWT({

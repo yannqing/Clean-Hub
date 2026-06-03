@@ -5,6 +5,9 @@ import {
   Badge,
   Button,
   Checkbox,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
   Input,
   Label,
   Select,
@@ -46,8 +49,12 @@ import type {
   TenantStatus,
 } from "../types";
 
-type TenantSettingsViewProps = {
+export type TenantSettingsPresentation = "page" | "dialog";
+
+export type TenantSettingsViewProps = {
   tenantId: string;
+  presentation?: TenantSettingsPresentation;
+  onTenantUpdated?: () => void;
 };
 
 type TenantSettingsLoadResults = readonly [
@@ -402,10 +409,12 @@ function TenantFeatureFlagsForm({
 
 function TenantStatusForm({
   disabled,
+  onTenantUpdated,
   onUpdated,
   tenant,
 }: {
   disabled: boolean;
+  onTenantUpdated?: () => void;
   onUpdated: (tenant: TenantDetail) => void;
   tenant: TenantDetail;
 }) {
@@ -440,6 +449,7 @@ function TenantStatusForm({
 
     onUpdated(result.data);
     setReason("");
+    onTenantUpdated?.();
     toast.success(
       interpolate(m.tenants.detail.statusUpdated, {
         status: m.common.statusLabels[status],
@@ -501,7 +511,12 @@ function TenantStatusForm({
   );
 }
 
-export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
+export function TenantSettingsView({
+  tenantId,
+  presentation = "page",
+  onTenantUpdated,
+}: TenantSettingsViewProps) {
+  const isDialog = presentation === "dialog";
   const { m, formatDateTime } = useSaasI18n();
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
@@ -622,38 +637,62 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
     };
   }, [applyLoadResults, m.tenants.settings.loadError, tenantId]);
 
-  return (
-    <section className="min-h-[560px]">
-      <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
+  const refreshButton = (
+    <Button
+      disabled={loading}
+      onClick={() => {
+        void loadSettings();
+      }}
+      size={isDialog ? "sm" : undefined}
+      type="button"
+      variant="outline"
+    >
+      {m.tenants.settings.refresh}
+    </Button>
+  );
+
+  const pageHeader = !isDialog ? (
+    <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0">
+        <Badge variant="secondary">{m.tenants.settings.badge}</Badge>
+        <h1 className="mt-3 text-2xl font-semibold tracking-normal">
+          {tenant?.name ?? m.tenants.settings.title}
+        </h1>
+        <p className="mt-2 break-all text-sm text-muted-foreground">
+          {tenant?.id ?? tenantId}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {refreshButton}
+        <Button asChild variant="outline">
+          <Link href={`${webAdminRoutes.saas.tenants}/${tenantId}`}>
+            {m.tenants.settings.backToDetail}
+          </Link>
+        </Button>
+      </div>
+    </div>
+  ) : (
+    <DialogHeader className="shrink-0 space-y-1 border-b px-6 py-4 text-left">
+      <div className="flex items-start justify-between gap-3 pr-8">
         <div className="min-w-0">
-          <Badge variant="secondary">{m.tenants.settings.badge}</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
+          <DialogTitle className="text-lg">
             {tenant?.name ?? m.tenants.settings.title}
-          </h1>
-          <p className="mt-2 break-all text-sm text-muted-foreground">
+          </DialogTitle>
+          <p className="break-all text-sm text-muted-foreground">
             {tenant?.id ?? tenantId}
           </p>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button
-            disabled={loading}
-            onClick={() => {
-              void loadSettings();
-            }}
-            type="button"
-            variant="outline"
-          >
-            {m.tenants.settings.refresh}
-          </Button>
-          <Button asChild variant="outline">
-            <Link href={`${webAdminRoutes.saas.tenants}/${tenantId}`}>
-              {m.tenants.settings.backToDetail}
-            </Link>
-          </Button>
-        </div>
+        {refreshButton}
       </div>
+      <DialogDescription className="sr-only">
+        {m.tenants.settings.title}
+      </DialogDescription>
+    </DialogHeader>
+  );
 
+  const body = (
+    <>
       {loading ? (
         <div className="grid gap-4 p-5">
           <div className="h-28 animate-pulse rounded-md bg-muted" />
@@ -693,13 +732,17 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
               disabled={!canManageTenantSettings}
               initialValues={toSettingsFormValues(settings)}
               key={`${settings.tenantId}-${settings.updatedAt ?? "settings"}`}
-              onUpdated={setSettings}
+              onUpdated={(nextSettings) => {
+                setSettings(nextSettings);
+                onTenantUpdated?.();
+              }}
               tenantId={tenantId}
             />
 
             <TenantStatusForm
               disabled={!canManageTenantStatus}
               key={`${tenant.id}-${tenant.status}-${tenant.updatedAt}`}
+              onTenantUpdated={onTenantUpdated}
               onUpdated={setTenant}
               tenant={tenant}
             />
@@ -708,7 +751,10 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
               disabled={!canManageTenantSettings}
               initialValues={toFeatureFlagsFormValues(featureFlags)}
               key={`${featureFlags.tenantId}-${featureFlags.updatedAt ?? "flags"}`}
-              onUpdated={setFeatureFlags}
+              onUpdated={(nextFlags) => {
+                setFeatureFlags(nextFlags);
+                onTenantUpdated?.();
+              }}
               tenantId={tenantId}
             />
 
@@ -758,6 +804,22 @@ export function TenantSettingsView({ tenantId }: TenantSettingsViewProps) {
           </div>
         </div>
       )}
+    </>
+  );
+
+  if (isDialog) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col">
+        {pageHeader}
+        <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
+      </div>
+    );
+  }
+
+  return (
+    <section className="min-h-[560px]">
+      {pageHeader}
+      {body}
     </section>
   );
 }

@@ -10,7 +10,8 @@ export default function LoginPage() {
           </p>
           <h1 className="mt-3 text-3xl font-semibold">Login</h1>
           <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            Authentication entry for SaaS Admin and Tenant Admin users.
+            Choose store or platform sign-in. Store administrators must enter
+            their pressing code.
           </p>
         </div>
         <LoginFormPlaceholder />

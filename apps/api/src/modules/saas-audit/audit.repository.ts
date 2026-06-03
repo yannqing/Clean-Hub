@@ -1,6 +1,6 @@
 import { and, count, desc, eq, gte, lte, type SQL } from "drizzle-orm";
 
-import { auditLogs, type Database } from "@cleanhub/db";
+import { auditLogs, type Database, userProfiles } from "@cleanhub/db";
 
 import type {
   AuditLogDetail,
@@ -13,6 +13,7 @@ function toAuditLogListItem(row: {
   id: string;
   tenantId: string | null;
   actorUserId: string | null;
+  actorDisplayName: string | null;
   eventCategory: string;
   eventType: string;
   entityType: string | null;
@@ -26,6 +27,7 @@ function toAuditLogListItem(row: {
     id: row.id,
     tenantId: row.tenantId,
     actorUserId: row.actorUserId,
+    actorDisplayName: row.actorDisplayName,
     eventCategory: row.eventCategory,
     eventType: row.eventType,
     entityType: row.entityType,
@@ -65,6 +67,7 @@ export async function findAuditLogs(
         id: auditLogs.id,
         tenantId: auditLogs.tenantId,
         actorUserId: auditLogs.actorUserId,
+        actorDisplayName: userProfiles.displayName,
         eventCategory: auditLogs.eventCategory,
         eventType: auditLogs.eventType,
         entityType: auditLogs.entityType,
@@ -75,6 +78,7 @@ export async function findAuditLogs(
         createdAt: auditLogs.createdAt,
       })
       .from(auditLogs)
+      .leftJoin(userProfiles, eq(userProfiles.userId, auditLogs.actorUserId))
       .where(whereClause)
       .orderBy(desc(auditLogs.createdAt))
       .limit(query.limit)
@@ -96,8 +100,27 @@ export async function findAuditLogById(
   logId: string,
 ): Promise<AuditLogDetail | null> {
   const rows = await db
-    .select()
+    .select({
+      id: auditLogs.id,
+      tenantId: auditLogs.tenantId,
+      branchId: auditLogs.branchId,
+      actorUserId: auditLogs.actorUserId,
+      actorDisplayName: userProfiles.displayName,
+      eventCategory: auditLogs.eventCategory,
+      eventType: auditLogs.eventType,
+      entityType: auditLogs.entityType,
+      entityId: auditLogs.entityId,
+      success: auditLogs.success,
+      reason: auditLogs.reason,
+      ipAddress: auditLogs.ipAddress,
+      userAgent: auditLogs.userAgent,
+      before: auditLogs.before,
+      after: auditLogs.after,
+      metadata: auditLogs.metadata,
+      createdAt: auditLogs.createdAt,
+    })
     .from(auditLogs)
+    .leftJoin(userProfiles, eq(userProfiles.userId, auditLogs.actorUserId))
     .where(eq(auditLogs.id, logId))
     .limit(1);
 
@@ -112,6 +135,7 @@ export async function findAuditLogById(
     tenantId: row.tenantId,
     branchId: row.branchId,
     actorUserId: row.actorUserId,
+    actorDisplayName: row.actorDisplayName,
     eventCategory: row.eventCategory,
     eventType: row.eventType,
     entityType: row.entityType,

@@ -1,3 +1,4 @@
+export * from "./security-policy.js";
 export * from "./security.routes.js";
 export * from "./security-events.controller.js";
 export * from "./security-events.helper.js";

@@ -4,6 +4,11 @@ import type {
   UpdateSaasUserRolesRequest,
 } from "@cleanhub/api-client";
 
+import {
+  type PasswordPolicyRules,
+  validatePasswordAgainstPolicy,
+} from "@/features/saas/security/validators/password-policy.validator";
+
 import type { SaasUserLanguage, SaasUserRoleCode } from "../types";
 
 export type InviteSaasUserFormInput = {
@@ -95,6 +100,7 @@ function validateOptionalPhone(phone: string | undefined): string | null {
 
 export function validateInviteSaasUserForm(
   input: InviteSaasUserFormInput,
+  passwordPolicy?: PasswordPolicyRules,
 ): SaasUserFormResult<CreateSaasUserRequest, InviteSaasUserFormErrors> {
   const errors: InviteSaasUserFormErrors = {};
   const emailError = validateEmail(input.email);
@@ -118,12 +124,13 @@ export function validateInviteSaasUserForm(
     errors.displayName = "Display name must be 120 characters or fewer.";
   }
 
-  if (password.length < 6) {
-    errors.password = "Password must be at least 6 characters.";
-  }
+  const passwordPolicyError = validatePasswordAgainstPolicy(
+    password,
+    passwordPolicy,
+  );
 
-  if (password.length > 128) {
-    errors.password = "Password must be 128 characters or fewer.";
+  if (passwordPolicyError) {
+    errors.password = passwordPolicyError;
   }
 
   if (input.roleCode !== "support" && input.roleCode !== "super_admin") {

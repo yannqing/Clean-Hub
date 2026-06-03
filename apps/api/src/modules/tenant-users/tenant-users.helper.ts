@@ -10,7 +10,9 @@ import {
 } from "@cleanhub/db";
 
 import { writeAuditLog } from "../audit/audit.helper.js";
+import { assertPasswordMeetsPolicy } from "../auth/password-policy.helper.js";
 import { hashPassword, hashPin } from "../auth/password.service.js";
+import { resolveEffectiveSecurityPolicy } from "../saas-security/security-policy.js";
 
 export type CreateTenantOwnerUserInput = {
   tenantId: string;
@@ -180,6 +182,10 @@ export async function createTenantOwnerUser(
       409,
     );
   }
+
+  const securityPolicy = await resolveEffectiveSecurityPolicy(db);
+
+  assertPasswordMeetsPolicy(input.password, securityPolicy);
 
   const [passwordHash, pinHash] = await Promise.all([
     hashPassword(input.password),

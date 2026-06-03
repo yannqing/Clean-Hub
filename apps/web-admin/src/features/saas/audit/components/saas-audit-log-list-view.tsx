@@ -25,6 +25,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useSaasI18n } from "@/i18n";
+import { getAuditEventDescription } from "@/features/audit/event-description";
 
 import { auditEventCategoryOptions } from "../constants";
 import {
@@ -303,9 +304,11 @@ export function SaasAuditLogListView() {
                             ? m.common.auditCategoryLabels.saasUser
                             : log.eventCategory}
                   </TableCell>
-                  <TableCell>{log.eventType}</TableCell>
+                  <TableCell>{getAuditEventDescription(log.eventType)}</TableCell>
                   <TableCell>{log.entityType ?? m.common.notSet}</TableCell>
-                  <TableCell>{log.actorUserId ?? m.common.system}</TableCell>
+                  <TableCell>
+                    {log.actorDisplayName ?? log.actorUserId ?? m.common.system}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={log.success ? "default" : "destructive"}>
                       {log.success
@@ -393,7 +396,7 @@ export function SaasAuditLogListView() {
                           : detail.eventCategory}
                 </span>
                 <span className="text-muted-foreground">{m.audit.columns.event}</span>
-                <span>{detail.eventType}</span>
+                <span>{getAuditEventDescription(detail.eventType)}</span>
                 <span className="text-muted-foreground">{m.audit.detail.entityType}</span>
                 <span>{detail.entityType ?? m.common.notSet}</span>
                 <span className="text-muted-foreground">{m.audit.detail.entityId}</span>
@@ -401,9 +404,7 @@ export function SaasAuditLogListView() {
                   {detail.entityId ?? m.common.notSet}
                 </span>
                 <span className="text-muted-foreground">{m.audit.columns.actor}</span>
-                <span className="break-all font-mono text-xs">
-                  {detail.actorUserId ?? m.common.system}
-                </span>
+                <span>{detail.actorDisplayName ?? detail.actorUserId ?? m.common.system}</span>
                 <span className="text-muted-foreground">{m.audit.detail.tenant}</span>
                 <span className="break-all font-mono text-xs">
                   {detail.tenantId ?? m.common.platform}

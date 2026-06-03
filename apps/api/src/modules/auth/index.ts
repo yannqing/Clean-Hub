@@ -6,6 +6,8 @@ export * from "./auth.types.js";
 export * from "./branch-scope.errors.js";
 export * from "./branch-scope.helper.js";
 export * from "./cookie.service.js";
+export * from "./login-lockout.helper.js";
+export * from "./password-policy.helper.js";
 export * from "./password.service.js";
 export * from "./permission.helper.js";
 export * from "./token.service.js";

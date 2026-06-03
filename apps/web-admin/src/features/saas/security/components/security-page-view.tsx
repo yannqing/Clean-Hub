@@ -7,7 +7,7 @@ import { useSaasI18n } from "@/i18n";
 import { securitySettingsDefaultValues } from "../constants";
 import { getSecuritySettingsQuery } from "../queries";
 import type { SecuritySettings } from "../types";
-import { SecurityEventListView } from "./security-event-list-view";
+// import { SecurityEventListView } from "./security-event-list-view";
 import { SecuritySettingsForm } from "./security-settings-form";
 
 function getErrorMessage(error: unknown): string {
@@ -108,7 +108,8 @@ export function SecurityPageView() {
           />
         )}
 
-        <SecurityEventListView />
+        {/* Phase 1: 安全事件列表暂不展示 */}
+        {/* <SecurityEventListView /> */}
       </div>
     </section>
   );
