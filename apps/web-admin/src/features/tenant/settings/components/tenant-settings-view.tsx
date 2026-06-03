@@ -44,6 +44,29 @@ function toFormValues(settings: TenantSettings): TenantSettingsFormValues {
   };
 }
 
+function normalizeFormValues(
+  values: TenantSettingsFormValues,
+): TenantSettingsFormValues {
+  return {
+    defaultLanguage: values.defaultLanguage,
+    defaultCurrency: values.defaultCurrency.trim().toUpperCase(),
+    timezone: values.timezone.trim(),
+  };
+}
+
+function hasSettingsChange(
+  settings: TenantSettings,
+  values: TenantSettingsFormValues,
+): boolean {
+  const normalizedValues = normalizeFormValues(values);
+
+  return (
+    normalizedValues.defaultLanguage !== settings.defaultLanguage ||
+    normalizedValues.defaultCurrency !== settings.defaultCurrency ||
+    normalizedValues.timezone !== settings.timezone
+  );
+}
+
 function formatDate(value: string | null): string {
   if (!value) {
     return "Not updated";
@@ -97,33 +120,48 @@ export function TenantSettingsView({
   const formDisabled = saving || !canUpdateSettings;
 
   useEffect(() => {
+    let isCurrent = true;
+
+    webAdminApi.auth
+      .me()
+      .then((data) => {
+        if (isCurrent) {
+          setAuthContext(data);
+        }
+      })
+      .catch(() => {
+        if (isCurrent) {
+          setAuthContext(null);
+        }
+      });
+
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (initialSettings) {
       return;
     }
 
     let isCurrent = true;
 
-    Promise.allSettled([getTenantSettingsQuery(), webAdminApi.auth.me()])
-      .then(([settingsResult, authResult]) => {
+    getTenantSettingsQuery()
+      .then((data) => {
         if (!isCurrent) {
           return;
         }
 
-        if (authResult.status === "fulfilled") {
-          setAuthContext(authResult.value);
-        } else {
-          setAuthContext(null);
+        setSettings(data);
+        setForm(toFormValues(data));
+        setLoadError(null);
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) {
+          setSettings(null);
+          setLoadError(getErrorMessage(error));
         }
-
-        if (settingsResult.status === "fulfilled") {
-          setSettings(settingsResult.value);
-          setForm(toFormValues(settingsResult.value));
-          setLoadError(null);
-          return;
-        }
-
-        setSettings(null);
-        setLoadError(getErrorMessage(settingsResult.reason));
       })
       .finally(() => {
         if (isCurrent) {
@@ -161,11 +199,21 @@ export function TenantSettingsView({
       return;
     }
 
+    const normalizedForm = normalizeFormValues(form);
+    setForm(normalizedForm);
+
+    if (!hasSettingsChange(settings, normalizedForm)) {
+      setErrors({});
+      setSaveError(null);
+      toast.success("Tenant settings are already up to date.");
+      return;
+    }
+
     setSaving(true);
     setSaveError(null);
 
     try {
-      const result = await updateTenantSettingsAction(form);
+      const result = await updateTenantSettingsAction(normalizedForm);
 
       if (result.ok) {
         setSettings(result.data);

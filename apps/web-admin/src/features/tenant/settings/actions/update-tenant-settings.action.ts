@@ -38,8 +38,7 @@ export async function updateTenantSettingsAction(
   }
 
   try {
-    const settings = await webAdminApi.http.patch<TenantSettings>(
-      "/tenant/settings",
+    const settings = await webAdminApi.tenant.settings.update(
       validation.data,
       await getTenantServerApiRequestOptions(),
     );

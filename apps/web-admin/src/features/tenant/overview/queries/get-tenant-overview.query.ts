@@ -11,5 +11,5 @@ type TenantOverviewRequestOptions = Omit<
 export async function getTenantOverviewQuery(
   options: TenantOverviewRequestOptions = {},
 ): Promise<TenantOverview> {
-  return webAdminApi.http.get<TenantOverview>("/tenant/overview", options);
+  return webAdminApi.tenant.overview.get(options);
 }

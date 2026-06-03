@@ -22,12 +22,13 @@ import {
   TableHeader,
   TableRow,
 } from "@cleanhub/ui";
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { tenantUserRoleOptions, tenantUserStatusOptions } from "../constants";
 import {
   getTenantUserDetailQuery,
   getTenantUserListQuery,
+  type TenantUserListQuery,
 } from "../queries";
 import {
   createTenantUserAction,
@@ -71,7 +72,7 @@ export function TenantUserListView() {
   const [offset, setOffset] = useState(0);
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
-  const [isPending, startTransition] = useTransition();
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [selectedUser, setSelectedUser] = useState<TenantUserSummary | null>(null);
@@ -96,6 +97,16 @@ export function TenantUserListView() {
   const [resetPinLoading, setResetPinLoading] = useState(false);
   const [temporaryPin, setTemporaryPin] = useState<string | null>(null);
 
+  const listQuery = useMemo<TenantUserListQuery>(
+    () => ({
+      limit: PAGE_SIZE,
+      offset,
+      q: search.trim() || undefined,
+      status: statusFilter || undefined,
+    }),
+    [offset, search, statusFilter],
+  );
+
   useEffect(() => {
     isCurrent.current = true;
     return () => {
@@ -103,30 +114,46 @@ export function TenantUserListView() {
     };
   }, []);
 
-  const loadUsers = useCallback(() => {
-    startTransition(async () => {
-      setError(null);
+  const loadUsers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
 
-      try {
-        const result = await getTenantUserListQuery({
-          limit: PAGE_SIZE,
-          offset,
-          q: search.trim() || undefined,
-          status: statusFilter || undefined,
-        });
+    try {
+      const result = await getTenantUserListQuery(listQuery);
 
-        if (!isCurrent.current) return;
-        setUsers(result);
-      } catch (err) {
-        if (!isCurrent.current) return;
-        setError(getErrorMessage(err));
-      }
-    });
-  }, [offset, search, statusFilter]);
+      if (!isCurrent.current) return;
+      setUsers(result);
+    } catch (err) {
+      if (!isCurrent.current) return;
+      setError(getErrorMessage(err));
+    } finally {
+      if (isCurrent.current) setLoading(false);
+    }
+  }, [listQuery]);
 
   useEffect(() => {
-    loadUsers();
-  }, [loadUsers]);
+    let isCurrentRequest = true;
+
+    getTenantUserListQuery(listQuery)
+      .then((result) => {
+        if (!isCurrent.current || !isCurrentRequest) return;
+        setUsers(result);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (!isCurrent.current || !isCurrentRequest) return;
+        setError(getErrorMessage(err));
+      })
+      .finally(() => {
+        if (isCurrent.current && isCurrentRequest) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isCurrentRequest = false;
+    };
+  }, [listQuery]);
 
   const handleSelectUser = useCallback(async (user: TenantUserSummary) => {
     setSelectedUser(user);
@@ -228,9 +255,14 @@ export function TenantUserListView() {
         <Select
           value={statusFilter}
           onValueChange={(value) => {
-            setLoading(true);
-            setError(null);
-            setStatusFilter(value === "all" ? "" : value);
+            const nextStatus = value === "all" ? "" : value;
+
+            if (nextStatus !== statusFilter) {
+              setLoading(true);
+              setError(null);
+            }
+
+            setStatusFilter(nextStatus);
             setOffset(0);
           }}
         >
@@ -252,7 +284,7 @@ export function TenantUserListView() {
         <p className="text-sm text-destructive">{error}</p>
       )}
 
-      {isPending ? (
+      {loading ? (
         <p className="text-sm text-muted-foreground">Loading...</p>
       ) : users.length === 0 ? (
         <p className="text-sm text-muted-foreground">No team members found.</p>

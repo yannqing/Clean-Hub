@@ -66,10 +66,14 @@ export function createTenantApi(client: ApiClient) {
     hardware,
     notifications,
     reports,
-    getOverview: () => overview.get(),
-    getSettings: () => settings.get(),
-    updateSettings: (input: UpdateTenantSettingsRequest) =>
-      settings.update(input),
+    getOverview: (options?: Parameters<typeof overview.get>[0]) =>
+      overview.get(options),
+    getSettings: (options?: Parameters<typeof settings.get>[0]) =>
+      settings.get(options),
+    updateSettings: (
+      input: UpdateTenantSettingsRequest,
+      options?: Parameters<typeof settings.update>[1],
+    ) => settings.update(input, options),
     listBackupJobs: (query?: Parameters<typeof backups.list>[0]) =>
       backups.list(query),
     listBranches: (query?: Parameters<typeof branches.list>[0]) =>

@@ -13,12 +13,12 @@ export const emptyBranchFormValues: BranchFormValues = {
   name: "",
   address: "",
   phone: "",
-  businessHours: "",
   defaultLanguage: "en",
   defaultCurrency: "XOF",
   receiptName: "",
   receiptPhone: "",
   receiptAddress: "",
   logoUrl: "",
+  businessHoursJson: "",
   status: "active",
 };

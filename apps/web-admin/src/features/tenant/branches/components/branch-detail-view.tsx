@@ -14,30 +14,28 @@ import {
   toast,
 } from "@cleanhub/ui";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 
 import { updateBranchAction, updateBranchStatusAction } from "../actions";
-import { branchLanguageOptions, emptyBranchFormValues } from "../constants";
-import { getBranchDetailQuery } from "../queries";
-import type { BranchFormValues, BranchLanguage, BranchSummary } from "../types";
+import type { BranchFormValues, BranchStatus, BranchSummary } from "../types";
 
-type BranchDetailViewProps = {
-  branchId: string;
-};
-type BranchActionFailure = {
-  ok: false;
-  errors?: Partial<Record<keyof BranchFormValues, string>>;
-  message?: string;
-  code?: string;
-  status?: number;
+const branchStatusLabels: Record<BranchStatus, string> = {
+  active: "Active",
+  inactive: "Inactive",
 };
 
-const VERSION_CONFLICT_MESSAGE = "门店已被他人修改，请刷新后重试";
+const VERSION_CONFLICT_MESSAGE = "Branch was updated by another request. Refresh and try again.";
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Branch request failed.";
+}
+
+function businessHoursToText(
+  businessHours: BranchSummary["businessHours"],
+): string {
+  return businessHours ? JSON.stringify(businessHours, null, 2) : "";
 }
 
 function toFormValues(branch: BranchSummary): BranchFormValues {
@@ -45,371 +43,369 @@ function toFormValues(branch: BranchSummary): BranchFormValues {
     name: branch.name,
     address: branch.address ?? "",
     phone: branch.phone ?? "",
-    businessHours: branch.businessHours
-      ? JSON.stringify(branch.businessHours, null, 2)
-      : "",
     defaultLanguage: branch.defaultLanguage,
     defaultCurrency: branch.defaultCurrency,
     receiptName: branch.receiptName ?? "",
     receiptPhone: branch.receiptPhone ?? "",
     receiptAddress: branch.receiptAddress ?? "",
     logoUrl: branch.logoUrl ?? "",
+    businessHoursJson: businessHoursToText(branch.businessHours),
     status: branch.status,
     version: branch.version,
   };
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function isVersionConflict(result: BranchActionFailure): boolean {
+function isVersionConflict(result: { code?: string; status?: number }): boolean {
   return result.status === 409 || result.code === "BRANCH_VERSION_CONFLICT";
 }
 
-function getActionFailureMessage(result: BranchActionFailure): string {
-  if (isVersionConflict(result)) {
-    return VERSION_CONFLICT_MESSAGE;
-  }
+export type BranchDetailViewProps = {
+  initialBranch: BranchSummary;
+};
 
-  return (
-    (result.errors ? Object.values(result.errors)[0] : undefined) ??
-    result.message ??
-    "Branch request failed."
+export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
+  const [branch, setBranch] = useState(initialBranch);
+  const [formValues, setFormValues] = useState<BranchFormValues>(
+    toFormValues(initialBranch),
   );
-}
-
-export function BranchDetailView({ branchId }: BranchDetailViewProps) {
-  const [branch, setBranch] = useState<BranchSummary | null>(null);
-  const [form, setForm] = useState<BranchFormValues>(emptyBranchFormValues);
-  const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState<
+    Partial<Record<keyof BranchFormValues, string>>
+  >({});
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [formError, setFormError] = useState<string | null>(null);
-
-  const loadBranch = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const item = await getBranchDetailQuery(branchId);
-      setBranch(item);
-      setForm(toFormValues(item));
-    } catch (loadError) {
-      setError(getErrorMessage(loadError));
-    } finally {
-      setLoading(false);
-    }
-  }, [branchId]);
-
-  useEffect(() => {
-    let isCurrent = true;
-
-    getBranchDetailQuery(branchId)
-      .then((item) => {
-        if (isCurrent) {
-          setBranch(item);
-          setForm(toFormValues(item));
-          setError(null);
-        }
-      })
-      .catch((loadError: unknown) => {
-        if (isCurrent) {
-          setError(getErrorMessage(loadError));
-        }
-      })
-      .finally(() => {
-        if (isCurrent) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [branchId]);
+  const [message, setMessage] = useState<string | null>(null);
 
   function updateForm<K extends keyof BranchFormValues>(
     key: K,
     value: BranchFormValues[K],
-  ) {
-    setForm((current) => ({
+  ): void {
+    setFormValues((current) => ({
       ...current,
       [key]: value,
     }));
+    setErrors((current) => ({
+      ...current,
+      [key]: undefined,
+    }));
+    setMessage(null);
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!branch) {
-      return;
-    }
-
+  async function handleSave() {
     setSaving(true);
-    setFormError(null);
+    setMessage(null);
 
     try {
-      const result = await updateBranchAction(branchId, {
-        ...form,
+      const result = await updateBranchAction(branch.id, {
+        ...formValues,
         version: branch.version,
       });
 
       if (!result.ok) {
-        const message = getActionFailureMessage(result);
-        setFormError(message);
-        toast.error(message);
-        if (isVersionConflict(result)) {
-          await loadBranch();
-        }
+        const nextMessage = isVersionConflict(result)
+          ? VERSION_CONFLICT_MESSAGE
+          : result.message;
+        setErrors(result.errors);
+        setMessage(nextMessage);
+        toast.error(nextMessage);
         return;
       }
 
       setBranch(result.data);
-      setForm(toFormValues(result.data));
-      toast.success("Branch profile updated.");
-    } catch (submitError) {
-      const message = getErrorMessage(submitError);
-      setFormError(message);
-      toast.error(message);
+      setFormValues(toFormValues(result.data));
+      setErrors({});
+      toast.success("Branch updated.");
+    } catch (saveError) {
+      const nextMessage = getErrorMessage(saveError);
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setSaving(false);
     }
   }
 
   async function handleStatusChange() {
-    if (!branch) {
-      return;
-    }
-
     setSaving(true);
-    setFormError(null);
+    setMessage(null);
 
     try {
+      const nextStatus: BranchStatus =
+        branch.status === "active" ? "inactive" : "active";
       const result = await updateBranchStatusAction(
-        branchId,
-        branch.status === "active" ? "inactive" : "active",
+        branch.id,
+        nextStatus,
         branch.version,
       );
 
       if (!result.ok) {
-        const message = getActionFailureMessage(result);
-        setFormError(message);
-        toast.error(message);
-        if (isVersionConflict(result)) {
-          await loadBranch();
-        }
+        setMessage(result.message);
+        toast.error(result.message);
         return;
       }
 
       setBranch(result.data);
-      setForm(toFormValues(result.data));
-      toast.success(
-        result.data.status === "active"
-          ? "Branch activated."
-          : "Branch marked inactive.",
-      );
-    } catch (submitError) {
-      const message = getErrorMessage(submitError);
-      setFormError(message);
-      toast.error(message);
+      setFormValues(toFormValues(result.data));
+      toast.success("Branch status updated.");
+    } catch (statusError) {
+      const nextMessage = getErrorMessage(statusError);
+      setMessage(nextMessage);
+      toast.error(nextMessage);
     } finally {
       setSaving(false);
     }
-  }
-
-  if (loading) {
-    return (
-      <section className="grid gap-5 p-5">
-        <div className="h-28 animate-pulse rounded-md bg-muted" />
-        <div className="h-[620px] animate-pulse rounded-md bg-muted" />
-      </section>
-    );
-  }
-
-  if (error || !branch) {
-    return (
-      <section className="grid gap-3 p-5">
-        <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-          {error ?? "Branch is unavailable."}
-        </div>
-        <div className="flex gap-3">
-          <Button onClick={loadBranch} type="button" variant="outline">
-            Try again
-          </Button>
-          <Link
-            className="inline-flex items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
-            href={webAdminRoutes.tenant.branches}
-          >
-            Back to branches
-          </Link>
-        </div>
-      </section>
-    );
   }
 
   return (
     <section className="grid gap-6 p-5">
       <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Link
-            className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-            href={webAdminRoutes.tenant.branches}
-          >
-            Back to branches
-          </Link>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">Branch profile</Badge>
-            <Badge
-              variant={branch.status === "active" ? "secondary" : "outline"}
-            >
-              {branch.status === "active" ? "Active" : "Inactive"}
-            </Badge>
-            <Badge variant="outline">v{branch.version}</Badge>
-          </div>
+          <Badge variant="secondary">Branch profile</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
             {branch.name}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Updated {formatDate(branch.updatedAt)}
+            Edit store defaults, receipt identity, and operating metadata.
           </p>
         </div>
-        <Button
-          disabled={saving}
-          onClick={handleStatusChange}
-          type="button"
-          variant={branch.status === "active" ? "destructive" : "outline"}
-        >
-          {branch.status === "active" ? "Mark inactive" : "Activate branch"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant={branch.status === "active" ? "default" : "outline"}>
+            {branchStatusLabels[branch.status]}
+          </Badge>
+          <Badge variant="outline">v{branch.version}</Badge>
+        </div>
       </div>
 
-      <form className="grid gap-6" onSubmit={handleSubmit}>
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="grid gap-2">
-            <Label htmlFor="branch-detail-name">Name</Label>
-            <Input
-              id="branch-detail-name"
-              onChange={(event) => updateForm("name", event.target.value)}
-              value={form.name}
-            />
+      <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
+        <div className="grid gap-5 rounded-md border bg-background p-5">
+          <div className="grid gap-4 lg:grid-cols-[1fr_180px_160px]">
+            <div className="grid gap-2">
+              <Label htmlFor="branch-detail-name">Name</Label>
+              <Input
+                aria-invalid={Boolean(errors.name)}
+                id="branch-detail-name"
+                onChange={(event) => updateForm("name", event.target.value)}
+                value={formValues.name}
+              />
+              {errors.name ? (
+                <p className="text-xs text-destructive">{errors.name}</p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="branch-detail-phone">Phone</Label>
+              <Input
+                aria-invalid={Boolean(errors.phone)}
+                id="branch-detail-phone"
+                onChange={(event) => updateForm("phone", event.target.value)}
+                value={formValues.phone}
+              />
+              {errors.phone ? (
+                <p className="text-xs text-destructive">{errors.phone}</p>
+              ) : null}
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="branch-detail-currency">Currency</Label>
+              <Input
+                aria-invalid={Boolean(errors.defaultCurrency)}
+                id="branch-detail-currency"
+                maxLength={3}
+                onChange={(event) =>
+                  updateForm("defaultCurrency", event.target.value.toUpperCase())
+                }
+                value={formValues.defaultCurrency}
+              />
+              {errors.defaultCurrency ? (
+                <p className="text-xs text-destructive">
+                  {errors.defaultCurrency}
+                </p>
+              ) : null}
+            </div>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="branch-detail-phone">Phone</Label>
-            <Input
-              id="branch-detail-phone"
-              onChange={(event) => updateForm("phone", event.target.value)}
-              value={form.phone}
-            />
+
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-2">
+              <Label htmlFor="branch-detail-language">Default language</Label>
+              <Select
+                onValueChange={(value) =>
+                  updateForm(
+                    "defaultLanguage",
+                    value as BranchFormValues["defaultLanguage"],
+                  )
+                }
+                value={formValues.defaultLanguage}
+              >
+                <SelectTrigger id="branch-detail-language">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="fr">French</SelectItem>
+                  <SelectItem value="zh-CN">Chinese</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="branch-detail-status">Status</Label>
+              <Select
+                onValueChange={(value) =>
+                  updateForm("status", value as BranchStatus)
+                }
+                value={formValues.status}
+              >
+                <SelectTrigger id="branch-detail-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="branch-detail-logo-url">Logo URL</Label>
+              <Input
+                aria-invalid={Boolean(errors.logoUrl)}
+                id="branch-detail-logo-url"
+                onChange={(event) => updateForm("logoUrl", event.target.value)}
+                value={formValues.logoUrl}
+              />
+              {errors.logoUrl ? (
+                <p className="text-xs text-destructive">{errors.logoUrl}</p>
+              ) : null}
+            </div>
           </div>
+
           <div className="grid gap-2">
             <Label htmlFor="branch-detail-address">Address</Label>
-            <Input
+            <Textarea
+              aria-invalid={Boolean(errors.address)}
               id="branch-detail-address"
               onChange={(event) => updateForm("address", event.target.value)}
-              value={form.address}
+              value={formValues.address}
             />
+            {errors.address ? (
+              <p className="text-xs text-destructive">{errors.address}</p>
+            ) : null}
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="branch-detail-language">Default language</Label>
-            <Select
-              onValueChange={(value) =>
-                updateForm("defaultLanguage", value as BranchLanguage)
-              }
-              value={form.defaultLanguage}
-            >
-              <SelectTrigger id="branch-detail-language">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {branchLanguageOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="branch-detail-currency">Default currency</Label>
-            <Input
-              id="branch-detail-currency"
-              maxLength={3}
-              onChange={(event) =>
-                updateForm("defaultCurrency", event.target.value.toUpperCase())
-              }
-              value={form.defaultCurrency}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="branch-detail-logo">Logo URL</Label>
-            <Input
-              id="branch-detail-logo"
-              onChange={(event) => updateForm("logoUrl", event.target.value)}
-              placeholder="https://..."
-              value={form.logoUrl}
-            />
-          </div>
-        </div>
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="grid gap-2">
-            <Label htmlFor="branch-detail-hours">Business hours JSON</Label>
-            <Textarea
-              className="min-h-40 font-mono text-xs"
-              id="branch-detail-hours"
-              onChange={(event) =>
-                updateForm("businessHours", event.target.value)
-              }
-              placeholder={'{"monday":"08:00-18:00"}'}
-              value={form.businessHours}
-            />
-          </div>
-          <div className="grid gap-4">
+          <div className="grid gap-4 lg:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="branch-detail-receipt-name">Receipt name</Label>
               <Input
+                aria-invalid={Boolean(errors.receiptName)}
                 id="branch-detail-receipt-name"
                 onChange={(event) =>
                   updateForm("receiptName", event.target.value)
                 }
-                value={form.receiptName}
+                value={formValues.receiptName}
               />
+              {errors.receiptName ? (
+                <p className="text-xs text-destructive">
+                  {errors.receiptName}
+                </p>
+              ) : null}
             </div>
+
             <div className="grid gap-2">
               <Label htmlFor="branch-detail-receipt-phone">Receipt phone</Label>
               <Input
+                aria-invalid={Boolean(errors.receiptPhone)}
                 id="branch-detail-receipt-phone"
                 onChange={(event) =>
                   updateForm("receiptPhone", event.target.value)
                 }
-                value={form.receiptPhone}
+                value={formValues.receiptPhone}
               />
+              {errors.receiptPhone ? (
+                <p className="text-xs text-destructive">
+                  {errors.receiptPhone}
+                </p>
+              ) : null}
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor="branch-detail-receipt-address">
-                Receipt address
-              </Label>
-              <Textarea
-                id="branch-detail-receipt-address"
-                onChange={(event) =>
-                  updateForm("receiptAddress", event.target.value)
-                }
-                value={form.receiptAddress}
-              />
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="branch-detail-receipt-address">Receipt address</Label>
+            <Textarea
+              aria-invalid={Boolean(errors.receiptAddress)}
+              id="branch-detail-receipt-address"
+              onChange={(event) =>
+                updateForm("receiptAddress", event.target.value)
+              }
+              value={formValues.receiptAddress}
+            />
+            {errors.receiptAddress ? (
+              <p className="text-xs text-destructive">
+                {errors.receiptAddress}
+              </p>
+            ) : null}
+          </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="branch-detail-hours">Business hours JSON</Label>
+            <Textarea
+              aria-invalid={Boolean(errors.businessHoursJson)}
+              id="branch-detail-hours"
+              onChange={(event) =>
+                updateForm("businessHoursJson", event.target.value)
+              }
+              value={formValues.businessHoursJson}
+            />
+            {errors.businessHoursJson ? (
+              <p className="text-xs text-destructive">
+                {errors.businessHoursJson}
+              </p>
+            ) : null}
+          </div>
+
+          {message ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {message}
             </div>
+          ) : null}
+
+          <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center">
+            <Button disabled={saving} onClick={handleSave} type="button">
+              {saving ? "Saving..." : "Save branch"}
+            </Button>
+            <Button
+              disabled={saving}
+              onClick={handleStatusChange}
+              type="button"
+              variant="outline"
+            >
+              {branch.status === "active" ? "Disable branch" : "Enable branch"}
+            </Button>
+            <Button asChild type="button" variant="outline">
+              <Link href={webAdminRoutes.tenant.branches}>Back to list</Link>
+            </Button>
           </div>
         </div>
 
-        {formError ? (
-          <p className="text-sm text-destructive">{formError}</p>
-        ) : null}
-        <Button className="w-fit" disabled={saving} type="submit">
-          {saving ? "Saving..." : "Save branch profile"}
-        </Button>
-      </form>
+        <aside className="h-fit rounded-md border bg-background p-5">
+          <div className="border-b pb-3">
+            <h2 className="text-base font-semibold">Integration checks</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Branch scope and tenant isolation are enforced by the API.
+            </p>
+          </div>
+          <dl className="mt-4 grid gap-3 text-sm">
+            <div>
+              <dt className="text-muted-foreground">Branch ID</dt>
+              <dd className="mt-1 break-all font-medium">{branch.id}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Tenant ID</dt>
+              <dd className="mt-1 break-all font-medium">{branch.tenantId}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Updated</dt>
+              <dd className="mt-1 font-medium">{branch.updatedAt}</dd>
+            </div>
+          </dl>
+        </aside>
+      </div>
     </section>
   );
 }
