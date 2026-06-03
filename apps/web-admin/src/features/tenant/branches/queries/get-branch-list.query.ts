@@ -3,7 +3,10 @@ import { webAdminApi } from "@/lib/api-client";
 import type { ApiRequestOptions } from "@cleanhub/api-client";
 import type { BranchListFilters, BranchSummary } from "../types";
 
-type BranchListRequestOptions = Omit<ApiRequestOptions, "method" | "body">;
+type BranchListRequestOptions = Omit<
+  ApiRequestOptions,
+  "method" | "body" | "query"
+>;
 
 export const BRANCH_LIST_LIMIT = 100;
 

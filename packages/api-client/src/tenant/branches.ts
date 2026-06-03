@@ -1,5 +1,6 @@
 import type { ApiClient, ApiRequestOptions, QueryParams } from "../types";
 import type {
+  BranchDetail,
   BranchListQuery,
   BranchSummary,
   CreateBranchRequest,
@@ -7,41 +8,43 @@ import type {
   UpdateBranchStatusRequest,
 } from "./branches.types";
 
-type ApiOptionsWithoutBody = Omit<ApiRequestOptions, "method" | "body">;
+type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
 
 export function createTenantBranchesApi(client: ApiClient) {
   return {
-    list: (
-      query?: BranchListQuery | QueryParams,
-      options: ApiOptionsWithoutBody = {},
-    ) => client.get<BranchSummary[]>("/tenant/branches", { ...options, query }),
-    get: (branchId: string, options: ApiOptionsWithoutBody = {}) =>
-      client.get<BranchSummary>(`/tenant/branches/${branchId}`, options),
-    create: (
-      data: CreateBranchRequest,
-      options: ApiOptionsWithoutBody = {},
-    ) => client.post<BranchSummary>("/tenant/branches", data, options),
+    list: (query?: BranchListQuery | QueryParams, options?: RequestOptions) =>
+      client.get<BranchSummary[]>("/tenant/branches", { ...options, query }),
+    get: (branchId: string, options?: RequestOptions) =>
+      client.get<BranchDetail>(
+        `/tenant/branches/${encodeURIComponent(branchId)}`,
+        options,
+      ),
+    getDetail: (branchId: string, options?: RequestOptions) =>
+      client.get<BranchDetail>(
+        `/tenant/branches/${encodeURIComponent(branchId)}`,
+        options,
+      ),
+    create: (input: CreateBranchRequest, options?: RequestOptions) =>
+      client.post<BranchDetail>("/tenant/branches", input, options),
     update: (
       branchId: string,
-      data: UpdateBranchRequest,
-      options: ApiOptionsWithoutBody = {},
+      input: UpdateBranchRequest,
+      options?: RequestOptions,
     ) =>
-      client.patch<BranchSummary>(
-        `/tenant/branches/${branchId}`,
-        data,
+      client.patch<BranchDetail>(
+        `/tenant/branches/${encodeURIComponent(branchId)}`,
+        input,
         options,
       ),
     updateStatus: (
       branchId: string,
-      data: UpdateBranchStatusRequest,
-      options: ApiOptionsWithoutBody = {},
+      input: UpdateBranchStatusRequest,
+      options?: RequestOptions,
     ) =>
-      client.patch<BranchSummary>(
-        `/tenant/branches/${branchId}/status`,
-        data,
+      client.patch<BranchDetail>(
+        `/tenant/branches/${encodeURIComponent(branchId)}/status`,
+        input,
         options,
       ),
-    getDetail: (branchId: string, options: ApiOptionsWithoutBody = {}) =>
-      client.get<BranchSummary>(`/tenant/branches/${branchId}`, options),
   };
 }

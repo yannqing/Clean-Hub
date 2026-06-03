@@ -117,7 +117,7 @@ export function TenantOverviewView({
             {overview.tenantName}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Order metrics are placeholders until the order module is connected.
+            Daily operating snapshot for the current tenant.
           </p>
         </div>
         <div className="flex items-center gap-2">

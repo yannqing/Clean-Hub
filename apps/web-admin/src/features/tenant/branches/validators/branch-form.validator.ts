@@ -165,6 +165,15 @@ export function validateBranchUpdateForm(
     };
   }
 
+  if (!input.version) {
+    return {
+      ok: false,
+      errors: {
+        version: "Branch version is required. Refresh and try again.",
+      },
+    };
+  }
+
   return {
     ok: true,
     data: {

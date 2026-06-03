@@ -22,19 +22,18 @@ import {
   TableHeader,
   TableRow,
 } from "@cleanhub/ui";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { tenantUserRoleOptions, tenantUserStatusOptions } from "../constants";
-import {
-  getTenantUserDetailQuery,
-  getTenantUserListQuery,
-  type TenantUserListQuery,
-} from "../queries";
 import {
   createTenantUserAction,
   disableTenantUserAction,
   resetTenantUserPinAction,
 } from "../actions";
+import { tenantUserRoleOptions, tenantUserStatusOptions } from "../constants";
+import {
+  getTenantUserDetailQuery,
+  getTenantUserListQuery,
+} from "../queries";
 import type {
   CreateTenantUserRequest,
   TenantUserDetail,
@@ -65,17 +64,32 @@ function StatusBadge({ status }: { status: string }) {
   return <Badge variant={variant}>{status}</Badge>;
 }
 
-export function TenantUserListView() {
+type TenantUserListViewProps = {
+  initialError?: string;
+  initialUsers?: TenantUserSummary[];
+};
+
+type LoadUsersInput = {
+  offset?: number;
+  search?: string;
+  statusFilter?: string;
+};
+
+export function TenantUserListView({
+  initialError,
+  initialUsers = [],
+}: TenantUserListViewProps) {
   const isCurrent = useRef(true);
 
-  const [users, setUsers] = useState<TenantUserSummary[]>([]);
+  const [users, setUsers] = useState<TenantUserSummary[]>(initialUsers);
   const [offset, setOffset] = useState(0);
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(initialError ?? null);
 
-  const [selectedUser, setSelectedUser] = useState<TenantUserSummary | null>(null);
+  const [selectedUser, setSelectedUser] =
+    useState<TenantUserSummary | null>(null);
   const [detail, setDetail] = useState<TenantUserDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -97,16 +111,6 @@ export function TenantUserListView() {
   const [resetPinLoading, setResetPinLoading] = useState(false);
   const [temporaryPin, setTemporaryPin] = useState<string | null>(null);
 
-  const listQuery = useMemo<TenantUserListQuery>(
-    () => ({
-      limit: PAGE_SIZE,
-      offset,
-      q: search.trim() || undefined,
-      status: statusFilter || undefined,
-    }),
-    [offset, search, statusFilter],
-  );
-
   useEffect(() => {
     isCurrent.current = true;
     return () => {
@@ -114,46 +118,37 @@ export function TenantUserListView() {
     };
   }, []);
 
-  const loadUsers = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const loadUsers = useCallback(
+    async (input: LoadUsersInput = {}) => {
+      const nextOffset = input.offset ?? offset;
+      const nextSearch = input.search ?? search;
+      const nextStatusFilter = input.statusFilter ?? statusFilter;
 
-    try {
-      const result = await getTenantUserListQuery(listQuery);
+      setLoading(true);
+      setError(null);
 
-      if (!isCurrent.current) return;
-      setUsers(result);
-    } catch (err) {
-      if (!isCurrent.current) return;
-      setError(getErrorMessage(err));
-    } finally {
-      if (isCurrent.current) setLoading(false);
-    }
-  }, [listQuery]);
+      try {
+        const result = await getTenantUserListQuery({
+          limit: PAGE_SIZE,
+          offset: nextOffset,
+          q: nextSearch.trim() || undefined,
+          status: nextStatusFilter || undefined,
+        });
 
-  useEffect(() => {
-    let isCurrentRequest = true;
-
-    getTenantUserListQuery(listQuery)
-      .then((result) => {
-        if (!isCurrent.current || !isCurrentRequest) return;
+        if (!isCurrent.current) return;
         setUsers(result);
-        setError(null);
-      })
-      .catch((err: unknown) => {
-        if (!isCurrent.current || !isCurrentRequest) return;
+        setOffset(nextOffset);
+        setSearch(nextSearch);
+        setStatusFilter(nextStatusFilter);
+      } catch (err) {
+        if (!isCurrent.current) return;
         setError(getErrorMessage(err));
-      })
-      .finally(() => {
-        if (isCurrent.current && isCurrentRequest) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      isCurrentRequest = false;
-    };
-  }, [listQuery]);
+      } finally {
+        if (isCurrent.current) setLoading(false);
+      }
+    },
+    [offset, search, statusFilter],
+  );
 
   const handleSelectUser = useCallback(async (user: TenantUserSummary) => {
     setSelectedUser(user);
@@ -191,30 +186,38 @@ export function TenantUserListView() {
     }
 
     setCreateOpen(false);
-    setCreateForm({ displayName: "", email: "", initialPin: "", roleCode: "manager" });
-    loadUsers();
+    setCreateForm({
+      displayName: "",
+      email: "",
+      initialPin: "",
+      roleCode: "manager",
+    });
+    void loadUsers();
   }, [createForm, loadUsers]);
 
-  const handleDisable = useCallback(async (userId: string) => {
-    setDisableLoading(true);
+  const handleDisable = useCallback(
+    async (userId: string) => {
+      setDisableLoading(true);
 
-    const result = await disableTenantUserAction(userId);
+      const result = await disableTenantUserAction(userId);
 
-    if (!isCurrent.current) return;
-    setDisableLoading(false);
+      if (!isCurrent.current) return;
+      setDisableLoading(false);
 
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
 
-    setDisableUserId(null);
-    if (selectedUser?.id === userId) {
-      setSelectedUser(null);
-      setDetail(null);
-    }
-    loadUsers();
-  }, [loadUsers, selectedUser]);
+      setDisableUserId(null);
+      if (selectedUser?.id === userId) {
+        setSelectedUser(null);
+        setDetail(null);
+      }
+      void loadUsers();
+    },
+    [loadUsers, selectedUser],
+  );
 
   const handleResetPin = useCallback(async (userId: string) => {
     setResetPinLoading(true);
@@ -243,46 +246,43 @@ export function TenantUserListView() {
       <div className="flex gap-3">
         <Input
           className="max-w-xs"
+          onChange={(event) => {
+            setSearch(event.target.value);
+            setOffset(0);
+          }}
           placeholder="Search by name, email..."
           value={search}
-          onChange={(e) => {
-            setLoading(true);
-            setError(null);
-            setSearch(e.target.value);
-            setOffset(0);
-          }}
         />
         <Select
-          value={statusFilter}
           onValueChange={(value) => {
-            const nextStatus = value === "all" ? "" : value;
-
-            if (nextStatus !== statusFilter) {
-              setLoading(true);
-              setError(null);
-            }
-
-            setStatusFilter(nextStatus);
+            setStatusFilter(value === "all" ? "" : value);
             setOffset(0);
           }}
+          value={statusFilter}
         >
           <SelectTrigger className="w-40">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
-            {tenantUserStatusOptions.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
+            {tenantUserStatusOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        <Button
+          disabled={loading}
+          onClick={() => void loadUsers({ offset: 0, search, statusFilter })}
+          type="button"
+          variant="outline"
+        >
+          Apply
+        </Button>
       </div>
 
-      {error && (
-        <p className="text-sm text-destructive">{error}</p>
-      )}
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading...</p>
@@ -303,35 +303,38 @@ export function TenantUserListView() {
           <TableBody>
             {users.map((user) => (
               <TableRow
-                key={user.id}
                 className="cursor-pointer"
+                key={user.id}
                 onClick={() => void handleSelectUser(user)}
               >
                 <TableCell className="font-medium">{user.displayName}</TableCell>
-                <TableCell>{user.email ?? "—"}</TableCell>
+                <TableCell>{user.email ?? "No email"}</TableCell>
                 <TableCell>{user.role}</TableCell>
                 <TableCell>
                   <StatusBadge status={user.status} />
                 </TableCell>
                 <TableCell>{formatDate(user.createdAt)}</TableCell>
                 <TableCell>
-                  <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="flex gap-2"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <Button
+                      onClick={() => setResetPinUserId(user.id)}
                       size="sm"
                       variant="outline"
-                      onClick={() => setResetPinUserId(user.id)}
                     >
                       Reset PIN
                     </Button>
-                    {user.status !== "disabled" && (
+                    {user.status !== "disabled" ? (
                       <Button
+                        onClick={() => setDisableUserId(user.id)}
                         size="sm"
                         variant="destructive"
-                        onClick={() => setDisableUserId(user.id)}
                       >
                         Disable
                       </Button>
-                    )}
+                    ) : null}
                   </div>
                 </TableCell>
               </TableRow>
@@ -342,60 +345,55 @@ export function TenantUserListView() {
 
       <div className="flex gap-3">
         <Button
-          variant="outline"
           disabled={offset === 0}
           onClick={() => {
-            setLoading(true);
-            setError(null);
-            setOffset((prev) => Math.max(0, prev - PAGE_SIZE));
+            const nextOffset = Math.max(0, offset - PAGE_SIZE);
+            void loadUsers({ offset: nextOffset });
           }}
+          variant="outline"
         >
           Previous
         </Button>
         <Button
-          variant="outline"
           disabled={users.length < PAGE_SIZE}
           onClick={() => {
-            setLoading(true);
-            setError(null);
-            setOffset((prev) => prev + PAGE_SIZE);
+            const nextOffset = offset + PAGE_SIZE;
+            void loadUsers({ offset: nextOffset });
           }}
+          variant="outline"
         >
           Next
         </Button>
       </div>
 
-      {/* Detail side panel */}
       <Dialog
-        open={selectedUser !== null}
         onOpenChange={(open) => {
           if (!open) {
             setSelectedUser(null);
             setDetail(null);
           }
         }}
+        open={selectedUser !== null}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Member Detail</DialogTitle>
-            <DialogDescription>
-              {selectedUser?.displayName}
-            </DialogDescription>
+            <DialogDescription>{selectedUser?.displayName}</DialogDescription>
           </DialogHeader>
 
-          {detailLoading && (
+          {detailLoading ? (
             <p className="text-sm text-muted-foreground">Loading...</p>
-          )}
-          {detailError && (
+          ) : null}
+          {detailError ? (
             <p className="text-sm text-destructive">{detailError}</p>
-          )}
-          {detail && (
+          ) : null}
+          {detail ? (
             <div className="flex flex-col gap-3 text-sm">
               <div className="grid grid-cols-2 gap-2">
                 <span className="text-muted-foreground">Email</span>
-                <span>{detail.email ?? "—"}</span>
+                <span>{detail.email ?? "No email"}</span>
                 <span className="text-muted-foreground">Phone</span>
-                <span>{detail.phone ?? "—"}</span>
+                <span>{detail.phone ?? "No phone"}</span>
                 <span className="text-muted-foreground">Role</span>
                 <span>{detail.role}</span>
                 <span className="text-muted-foreground">Status</span>
@@ -408,12 +406,11 @@ export function TenantUserListView() {
                 </span>
               </div>
             </div>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
 
-      {/* Create member dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog onOpenChange={setCreateOpen} open={createOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Team Member</DialogTitle>
@@ -426,40 +423,46 @@ export function TenantUserListView() {
             <div className="flex flex-col gap-1.5">
               <Label>Display Name *</Label>
               <Input
-                value={createForm.displayName}
-                onChange={(e) =>
-                  setCreateForm((prev) => ({ ...prev, displayName: e.target.value }))
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    displayName: event.target.value,
+                  }))
                 }
+                value={createForm.displayName}
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Email</Label>
               <Input
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    email: event.target.value,
+                  }))
+                }
                 type="email"
                 value={createForm.email ?? ""}
-                onChange={(e) =>
-                  setCreateForm((prev) => ({ ...prev, email: e.target.value }))
-                }
               />
             </div>
             <div className="flex flex-col gap-1.5">
               <Label>Role *</Label>
               <Select
-                value={createForm.roleCode}
                 onValueChange={(value) =>
                   setCreateForm((prev) => ({
                     ...prev,
                     roleCode: value as "owner" | "manager",
                   }))
                 }
+                value={createForm.roleCode}
               >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {tenantUserRoleOptions.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
+                  {tenantUserRoleOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -469,17 +472,20 @@ export function TenantUserListView() {
               <Label>Initial PIN (6 digits) *</Label>
               <Input
                 maxLength={6}
+                onChange={(event) =>
+                  setCreateForm((prev) => ({
+                    ...prev,
+                    initialPin: event.target.value,
+                  }))
+                }
                 placeholder="000000"
                 value={createForm.initialPin}
-                onChange={(e) =>
-                  setCreateForm((prev) => ({ ...prev, initialPin: e.target.value }))
-                }
               />
             </div>
 
-            {createError && (
+            {createError ? (
               <p className="text-sm text-destructive">{createError}</p>
-            )}
+            ) : null}
 
             <Button disabled={createLoading} onClick={() => void handleCreate()}>
               {createLoading ? "Creating..." : "Create Member"}
@@ -488,12 +494,11 @@ export function TenantUserListView() {
         </DialogContent>
       </Dialog>
 
-      {/* Disable confirmation dialog */}
       <Dialog
-        open={disableUserId !== null}
         onOpenChange={(open) => {
           if (!open) setDisableUserId(null);
         }}
+        open={disableUserId !== null}
       >
         <DialogContent>
           <DialogHeader>
@@ -503,13 +508,13 @@ export function TenantUserListView() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setDisableUserId(null)}>
+            <Button onClick={() => setDisableUserId(null)} variant="outline">
               Cancel
             </Button>
             <Button
-              variant="destructive"
               disabled={disableLoading}
               onClick={() => disableUserId && void handleDisable(disableUserId)}
+              variant="destructive"
             >
               {disableLoading ? "Disabling..." : "Disable"}
             </Button>
@@ -517,27 +522,29 @@ export function TenantUserListView() {
         </DialogContent>
       </Dialog>
 
-      {/* Reset PIN confirmation dialog */}
       <Dialog
-        open={resetPinUserId !== null}
         onOpenChange={(open) => {
           if (!open) setResetPinUserId(null);
         }}
+        open={resetPinUserId !== null}
       >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reset PIN</DialogTitle>
             <DialogDescription>
-              A new 6-digit PIN will be generated. Share it with the employee immediately.
+              A new 6-digit PIN will be generated. Share it with the employee
+              immediately.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setResetPinUserId(null)}>
+            <Button onClick={() => setResetPinUserId(null)} variant="outline">
               Cancel
             </Button>
             <Button
               disabled={resetPinLoading}
-              onClick={() => resetPinUserId && void handleResetPin(resetPinUserId)}
+              onClick={() =>
+                resetPinUserId && void handleResetPin(resetPinUserId)
+              }
             >
               {resetPinLoading ? "Resetting..." : "Reset PIN"}
             </Button>
@@ -545,12 +552,11 @@ export function TenantUserListView() {
         </DialogContent>
       </Dialog>
 
-      {/* Temporary PIN display dialog */}
       <Dialog
-        open={temporaryPin !== null}
         onOpenChange={(open) => {
           if (!open) setTemporaryPin(null);
         }}
+        open={temporaryPin !== null}
       >
         <DialogContent>
           <DialogHeader>
@@ -560,7 +566,7 @@ export function TenantUserListView() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-4 py-4">
-            <span className="text-4xl font-mono font-bold tracking-widest">
+            <span className="font-mono text-4xl font-bold tracking-widest">
               {temporaryPin}
             </span>
           </div>

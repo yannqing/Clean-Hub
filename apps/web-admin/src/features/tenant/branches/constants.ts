@@ -5,8 +5,8 @@ export const branchLanguageOptions: {
   value: BranchLanguage;
 }[] = [
   { label: "English", value: "en" },
-  { label: "Français", value: "fr" },
-  { label: "简体中文", value: "zh-CN" },
+  { label: "French", value: "fr" },
+  { label: "Chinese", value: "zh-CN" },
 ];
 
 export const emptyBranchFormValues: BranchFormValues = {

@@ -25,9 +25,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { webAdminRoutes } from "@/config/routes";
 
 import { createBranchAction, updateBranchStatusAction } from "../actions";
+import { branchLanguageOptions, emptyBranchFormValues } from "../constants";
 import { getBranchListQuery } from "../queries";
 import type {
   BranchFormValues,
+  BranchLanguage,
   BranchListFilters,
   BranchStatus,
   BranchSummary,
@@ -40,41 +42,35 @@ const branchStatusLabels: Record<BranchStatus, string> = {
   inactive: "Inactive",
 };
 
-const languageLabels = {
+const languageLabels: Record<BranchLanguage, string> = {
   en: "English",
   fr: "French",
   "zh-CN": "Chinese",
-} as const;
-
-const defaultFormValues: BranchFormValues = {
-  name: "",
-  address: "",
-  phone: "",
-  defaultLanguage: "fr",
-  defaultCurrency: "XOF",
-  receiptName: "",
-  receiptPhone: "",
-  receiptAddress: "",
-  logoUrl: "",
-  businessHoursJson: "",
-  status: "active",
 };
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Branch request failed.";
 }
 
-function getBranchStatusVariant(
-  status: BranchStatus,
-): "default" | "outline" {
+function getBranchStatusVariant(status: BranchStatus): "default" | "outline" {
   return status === "active" ? "default" : "outline";
 }
 
-function formatDate(value: string): string {
+function formatDate(value?: string | null): string {
+  if (!value) {
+    return "Not updated";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Invalid date";
+  }
+
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(date);
 }
 
 function branchDetailHref(branchId: string): string {
@@ -83,24 +79,30 @@ function branchDetailHref(branchId: string): string {
 
 export type BranchManagementViewProps = {
   initialBranches?: BranchSummary[];
+  initialError?: string;
+  initialFilters?: BranchListFilters;
 };
 
 export function BranchManagementView({
   initialBranches,
+  initialError,
+  initialFilters,
 }: BranchManagementViewProps = {}) {
   const [branches, setBranches] = useState<BranchSummary[]>(
     initialBranches ?? [],
   );
-  const [status, setStatus] = useState<StatusFilter>("all");
-  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<StatusFilter>(
+    initialFilters?.status ?? "all",
+  );
+  const [query, setQuery] = useState(initialFilters?.q ?? "");
   const [formValues, setFormValues] =
-    useState<BranchFormValues>(defaultFormValues);
+    useState<BranchFormValues>(emptyBranchFormValues);
   const [errors, setErrors] = useState<
     Partial<Record<keyof BranchFormValues, string>>
   >({});
-  const [loading, setLoading] = useState(!initialBranches);
+  const [loading, setLoading] = useState(!initialBranches && !initialError);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [formError, setFormError] = useState<string | null>(null);
 
   const filters: BranchListFilters = useMemo(
@@ -179,7 +181,7 @@ export function BranchManagementView({
         return;
       }
 
-      setFormValues(defaultFormValues);
+      setFormValues(emptyBranchFormValues);
       setErrors({});
       toast.success("Branch created.");
       await loadBranches();
@@ -199,7 +201,11 @@ export function BranchManagementView({
     try {
       const nextStatus: BranchStatus =
         branch.status === "active" ? "inactive" : "active";
-      const result = await updateBranchStatusAction(branch.id, nextStatus);
+      const result = await updateBranchStatusAction(
+        branch.id,
+        nextStatus,
+        branch.version,
+      );
 
       if (!result.ok) {
         setFormError(result.message);
@@ -232,7 +238,12 @@ export function BranchManagementView({
           </p>
         </div>
 
-        <Button disabled={loading} onClick={loadBranches} type="button" variant="outline">
+        <Button
+          disabled={loading}
+          onClick={loadBranches}
+          type="button"
+          variant="outline"
+        >
           Refresh
         </Button>
       </div>
@@ -321,10 +332,7 @@ export function BranchManagementView({
           <Label htmlFor="branch-language">Default language</Label>
           <Select
             onValueChange={(value) =>
-              updateForm(
-                "defaultLanguage",
-                value as BranchFormValues["defaultLanguage"],
-              )
+              updateForm("defaultLanguage", value as BranchLanguage)
             }
             value={formValues.defaultLanguage}
           >
@@ -332,9 +340,11 @@ export function BranchManagementView({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="en">English</SelectItem>
-              <SelectItem value="fr">French</SelectItem>
-              <SelectItem value="zh-CN">Chinese</SelectItem>
+              {branchLanguageOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

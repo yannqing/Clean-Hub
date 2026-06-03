@@ -44,11 +44,21 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Branch request failed.";
 }
 
-function formatDate(value: string): string {
+function formatDate(value?: string | null): string {
+  if (!value) {
+    return "Not updated";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Invalid date";
+  }
+
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(date);
 }
 
 function getActionFailureMessage(result: BranchActionFailure): string {
@@ -336,7 +346,7 @@ export function BranchListView() {
                           {branch.status === "active" ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
-                      <TableCell>{branch.phone ?? "—"}</TableCell>
+                      <TableCell>{branch.phone ?? "No phone"}</TableCell>
                       <TableCell>{branch.defaultCurrency}</TableCell>
                       <TableCell>{formatDate(branch.updatedAt)}</TableCell>
                       <TableCell className="text-right">

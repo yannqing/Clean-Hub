@@ -1,4 +1,4 @@
-import type { ApiClient, QueryParams } from "../types";
+import type { ApiClient, ApiRequestOptions, QueryParams } from "../types";
 import type {
   CreateTenantUserRequest,
   ResetTenantUserPinResult,
@@ -9,8 +9,10 @@ import type {
 
 export function createTenantUsersApi(client: ApiClient) {
   return {
-    list: (query?: QueryParams) =>
-      client.get<TenantUserSummary[]>("/tenant/users", { query }),
+    list: (
+      query?: QueryParams,
+      options?: Omit<ApiRequestOptions, "method" | "body" | "query">,
+    ) => client.get<TenantUserSummary[]>("/tenant/users", { ...options, query }),
     get: (userId: string) =>
       client.get<TenantUserDetail>(`/tenant/users/${userId}`),
     create: (input: CreateTenantUserRequest) =>

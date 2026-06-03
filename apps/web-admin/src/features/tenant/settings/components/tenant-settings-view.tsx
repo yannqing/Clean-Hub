@@ -72,10 +72,16 @@ function formatDate(value: string | null): string {
     return "Not updated";
   }
 
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Invalid date";
+  }
+
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: "short",
-  }).format(new Date(value));
+  }).format(date);
 }
 
 const defaultFormValues: TenantSettingsFormValues = {
@@ -122,46 +128,32 @@ export function TenantSettingsView({
   useEffect(() => {
     let isCurrent = true;
 
-    webAdminApi.auth
-      .me()
-      .then((data) => {
-        if (isCurrent) {
-          setAuthContext(data);
-        }
-      })
-      .catch(() => {
-        if (isCurrent) {
-          setAuthContext(null);
-        }
-      });
-
-    return () => {
-      isCurrent = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (initialSettings) {
-      return;
-    }
-
-    let isCurrent = true;
-
-    getTenantSettingsQuery()
-      .then((data) => {
+    Promise.allSettled([
+      initialSettings
+        ? Promise.resolve(initialSettings)
+        : getTenantSettingsQuery(),
+      webAdminApi.auth.me(),
+    ])
+      .then(([settingsResult, authResult]) => {
         if (!isCurrent) {
           return;
         }
 
-        setSettings(data);
-        setForm(toFormValues(data));
-        setLoadError(null);
-      })
-      .catch((error: unknown) => {
-        if (isCurrent) {
-          setSettings(null);
-          setLoadError(getErrorMessage(error));
+        if (authResult.status === "fulfilled") {
+          setAuthContext(authResult.value);
+        } else {
+          setAuthContext(null);
         }
+
+        if (settingsResult.status === "fulfilled") {
+          setSettings(settingsResult.value);
+          setForm(toFormValues(settingsResult.value));
+          setLoadError(null);
+          return;
+        }
+
+        setSettings(null);
+        setLoadError(getErrorMessage(settingsResult.reason));
       })
       .finally(() => {
         if (isCurrent) {
@@ -191,6 +183,10 @@ export function TenantSettingsView({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (!settings) {
+      return;
+    }
 
     if (!canUpdateSettings) {
       const message = "Only tenant owners can update tenant settings.";
