@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { LanguageSwitcher } from "@/components/i18n";
+import { filterSidebarSections } from "@/config/feature-visibility";
 import { webAdminWorkspaceTabs } from "@/config/navigation";
 import { webAdminRoutes } from "@/config/routes";
 import { LogoutButton } from "@/features/auth/components";
@@ -66,7 +67,10 @@ export function AdminDashboardShell({
   const { messages } = useWebAdminLocale();
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const copy = messages.shell[scope];
-  const sidebarSections = messages.sidebar[scope];
+  const sidebarSections = useMemo(
+    () => filterSidebarSections(messages.sidebar[scope]),
+    [messages.sidebar, scope],
+  );
   const tabs = scope === "tenant" ? webAdminWorkspaceTabs.tenant : [];
   const profileHref =
     scope === "saas" ? webAdminRoutes.saas.profile : webAdminRoutes.tenant.profile;

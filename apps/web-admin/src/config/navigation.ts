@@ -51,8 +51,6 @@ export const webAdminSidebarNavigation = {
       title: "Configuration Management",
       items: [
         { label: "Tenant Management", href: webAdminRoutes.saas.config.tenants },
-        { label: "Feature Flags", href: webAdminRoutes.saas.config.featureFlags },
-        { label: "Localization", href: webAdminRoutes.saas.config.localization },
         {
           label: "Platform Settings",
           href: webAdminRoutes.saas.config.platformSettings,
@@ -64,7 +62,6 @@ export const webAdminSidebarNavigation = {
       items: [
         { label: "Audit Logs", href: webAdminRoutes.saas.auditLogs },
         { label: "Operation Logs", href: webAdminRoutes.saas.system.logs },
-        { label: "Data Backups", href: webAdminRoutes.saas.system.backups },
         { label: "Security Settings", href: webAdminRoutes.saas.system.security },
       ],
     },
@@ -98,7 +95,6 @@ export const webAdminSidebarNavigation = {
       title: "System Settings",
       items: [
         { label: "Operation Logs", href: webAdminRoutes.tenant.system.logs },
-        { label: "Data Backups", href: webAdminRoutes.tenant.system.backups },
         {
           label: "Tenant Settings",
           href: webAdminRoutes.tenant.system.settings,
