@@ -2,7 +2,9 @@ import { getDb, type Database } from "@cleanhub/db";
 
 import { AuthError } from "../auth/auth.errors.js";
 import type { AuthContext } from "../auth/auth.types.js";
+import { assertPasswordMeetsPolicy } from "../auth/password-policy.helper.js";
 import { hashPassword, hashPin } from "../auth/password.service.js";
+import { resolveEffectiveSecurityPolicy } from "../saas-security/security-policy.js";
 import { randomUUID } from "node:crypto";
 import { requireSaasRole, type SaasRole } from "../auth/permission.helper.js";
 import { SaasUsersError } from "./saas-users.errors.js";
@@ -137,6 +139,10 @@ export async function createSaasUser(
 
   const normalizedEmail = normalizeEmail(input.data.email);
   const phone = normalizePhone(input.data.phone);
+  const securityPolicy = await resolveEffectiveSecurityPolicy(db);
+
+  assertPasswordMeetsPolicy(input.data.password, securityPolicy);
+
   const [passwordHash, pinHash] = await Promise.all([
     hashPassword(input.data.password),
     // SaaS platform users do not use POS PIN; store a non-guessable placeholder hash.

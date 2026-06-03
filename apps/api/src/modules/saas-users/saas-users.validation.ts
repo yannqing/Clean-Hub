@@ -26,7 +26,7 @@ export const createSaasUserBodySchema = z.object({
       .optional(),
   ),
   displayName: z.string().trim().min(1).max(120),
-  password: z.string().min(6).max(128),
+  password: z.string().min(1).max(128),
   roleCode: z.enum(["super_admin", "support"]),
   language: saasUserLanguageSchema.default("en"),
 });

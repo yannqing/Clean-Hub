@@ -1,3 +1,9 @@
+import type { Database } from "@cleanhub/db";
+
+import {
+  getRefreshTokenTtlSeconds,
+  resolveEffectiveSecurityPolicy,
+} from "../saas-security/security-policy.js";
 import { AuthError, invalidCredentials } from "./auth.errors.js";
 import { AuthRepository } from "./auth.repository.js";
 import type {
@@ -16,6 +22,12 @@ import {
   createAuthCookieHeaders,
   createClearAuthCookieHeaders,
 } from "./cookie.service.js";
+import {
+  assertLoginNotLocked,
+  buildLoginLockKey,
+  clearLoginLockout,
+  recordLoginFailure,
+} from "./login-lockout.helper.js";
 import { verifyPassword } from "./password.service.js";
 import { hashOpaqueToken, TokenService } from "./token.service.js";
 
@@ -55,9 +67,11 @@ function resolvePrimaryRole(user: AuthenticatedUser, access: UserAccess): AdminR
 }
 
 export class AuthService {
+  private readonly db: Database;
   private readonly repository: AuthRepository;
   private readonly tokenService: TokenService;
   private readonly cookieSecure: boolean;
+  private readonly envRefreshTokenTtlSeconds: number;
 
   constructor({
     db,
@@ -66,23 +80,53 @@ export class AuthService {
     accessTokenTtlSeconds,
     refreshTokenTtlSeconds,
   }: AuthServiceOptions) {
+    this.db = db;
     this.repository = new AuthRepository(db);
+    this.envRefreshTokenTtlSeconds =
+      refreshTokenTtlSeconds ?? 30 * 24 * 60 * 60;
     this.tokenService = new TokenService({
       secret: accessTokenSecret,
       accessTokenTtlSeconds,
-      refreshTokenTtlSeconds,
+      refreshTokenTtlSeconds: this.envRefreshTokenTtlSeconds,
     });
     this.cookieSecure = cookieSecure;
   }
 
+  private async getRefreshTokenTtlSeconds(): Promise<number> {
+    const policy = await resolveEffectiveSecurityPolicy(this.db);
+
+    return getRefreshTokenTtlSeconds(policy);
+  }
+
   async login(input: LoginInput): Promise<AuthResult> {
     const normalizedIdentifier = normalizeIdentifier(input.identifier);
+    const lockKey = buildLoginLockKey(normalizedIdentifier, input.tenantCode);
+    const policy = await resolveEffectiveSecurityPolicy(this.db);
+
+    await assertLoginNotLocked(this.db, lockKey);
+
     const user = await this.repository.findLoginUser({
       identifier: normalizedIdentifier,
       tenantCode: input.tenantCode,
     });
 
     if (!user) {
+      try {
+        await recordLoginFailure(this.db, lockKey, policy);
+      } catch (error) {
+        if (error instanceof AuthError && error.code === "ACCOUNT_LOCKED") {
+          await this.repository.writeAuditLog({
+            eventType: "auth.login.failed",
+            success: false,
+            reason: error.code,
+            meta: input,
+            metadata: { identifier: normalizedIdentifier },
+          });
+        }
+
+        throw error;
+      }
+
       await this.repository.writeAuditLog({
         eventType: "auth.login.failed",
         success: false,
@@ -98,12 +142,34 @@ export class AuthService {
       const passwordValid = await verifyPassword(input.password, user.passwordHash);
 
       if (!passwordValid) {
+        try {
+          await recordLoginFailure(this.db, lockKey, policy);
+        } catch (error) {
+          if (error instanceof AuthError && error.code === "ACCOUNT_LOCKED") {
+            await this.repository.writeAuditLog({
+              tenantId: user.tenantId,
+              actorUserId: user.id,
+              eventType: "auth.login.failed",
+              success: false,
+              reason: error.code,
+              meta: input,
+            });
+          }
+
+          throw error;
+        }
+
         throw invalidCredentials();
       }
 
+      await clearLoginLockout(this.db, lockKey);
+
       const access = await this.repository.getUserAccess(user.id);
       const authContextBase = this.buildAuthContextBase(user, access);
-      const tokens = await this.tokenService.issueTokenPair(authContextBase);
+      const refreshTokenTtlSeconds = await this.getRefreshTokenTtlSeconds();
+      const tokens = await this.tokenService.issueTokenPair(authContextBase, {
+        refreshTokenTtlSeconds,
+      });
       const authContext = this.withAccessTokenExpiresAt(
         authContextBase,
         tokens.accessTokenExpiresAt,
@@ -138,7 +204,16 @@ export class AuthService {
         }),
       };
     } catch (error) {
-      if (error instanceof AuthError) {
+      if (error instanceof AuthError && error.code === "INVALID_CREDENTIALS") {
+        await this.repository.writeAuditLog({
+          tenantId: user.tenantId,
+          actorUserId: user.id,
+          eventType: "auth.login.failed",
+          success: false,
+          reason: error.code,
+          meta: input,
+        });
+      } else if (error instanceof AuthError) {
         await this.repository.writeAuditLog({
           tenantId: user.tenantId,
           actorUserId: user.id,
@@ -192,7 +267,10 @@ export class AuthService {
 
     const access = await this.repository.getUserAccess(user.id);
     const authContextBase = this.buildAuthContextBase(user, access);
-    const issuedTokens = await this.tokenService.issueTokenPair(authContextBase);
+    const refreshTokenTtlSeconds = await this.getRefreshTokenTtlSeconds();
+    const issuedTokens = await this.tokenService.issueTokenPair(authContextBase, {
+      refreshTokenTtlSeconds,
+    });
     const tokens = {
       ...issuedTokens,
       refreshTokenFamilyId: storedToken.familyId,

@@ -1,10 +1,12 @@
+import { getSecuritySettingsQuery } from "@/features/saas/security/queries";
 import { webAdminApi } from "@/lib/api-client";
 
 import type { InviteSaasUserFormInput } from "../validators";
 import { validateInviteSaasUserForm } from "../validators";
 
 export async function inviteSaasUserAction(input: InviteSaasUserFormInput) {
-  const validation = validateInviteSaasUserForm(input);
+  const passwordPolicy = await getSecuritySettingsQuery();
+  const validation = validateInviteSaasUserForm(input, passwordPolicy);
 
   if (!validation.ok) {
     return validation;

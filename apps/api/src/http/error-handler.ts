@@ -3,7 +3,7 @@ import { ZodError } from "zod";
 import { AuthError } from "../modules/auth/auth.errors.js";
 import type { AppBindings, ApiErrorResponse } from "./types.js";
 
-function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 500 {
+function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 422 | 500 {
   switch (error.code) {
     case "INVALID_CREDENTIALS":
     case "TOKEN_INVALID":
@@ -14,7 +14,10 @@ function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 500 {
     case "USER_SUSPENDED":
     case "FORBIDDEN":
     case "FEATURE_DISABLED":
+    case "ACCOUNT_LOCKED":
       return 403;
+    case "PASSWORD_POLICY_VIOLATION":
+      return 422;
     case "AUTH_CONFIG_INVALID":
       return 500;
     default:

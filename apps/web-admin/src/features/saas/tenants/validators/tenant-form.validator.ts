@@ -1,3 +1,8 @@
+import {
+  type PasswordPolicyRules,
+  validatePasswordAgainstPolicy,
+} from "@/features/saas/security/validators/password-policy.validator";
+
 import type {
   CreateTenantRequest,
   TenantLanguage,
@@ -170,7 +175,10 @@ function validateCreateDefaults(input: TenantFormValues): {
   };
 }
 
-function validateInitialOwner(input: TenantFormValues): {
+function validateInitialOwner(
+  input: TenantFormValues,
+  passwordPolicy?: PasswordPolicyRules,
+): {
   errors: Partial<Record<keyof TenantFormValues, string>>;
   initialOwner: CreateTenantRequest["initialOwner"];
 } {
@@ -199,10 +207,13 @@ function validateInitialOwner(input: TenantFormValues): {
     errors.initialOwnerPhone = "Owner phone must be 32 characters or fewer.";
   }
 
-  if (password.length < 8) {
-    errors.initialOwnerPassword = "Owner password must be at least 8 characters.";
-  } else if (password.length > 128) {
-    errors.initialOwnerPassword = "Owner password must be 128 characters or fewer.";
+  const passwordPolicyError = validatePasswordAgainstPolicy(
+    password,
+    passwordPolicy,
+  );
+
+  if (passwordPolicyError) {
+    errors.initialOwnerPassword = passwordPolicyError;
   }
 
   if (!/^\d{4,6}$/.test(pin)) {
@@ -225,10 +236,11 @@ function validateInitialOwner(input: TenantFormValues): {
 
 export function validateTenantForm(
   input: TenantFormValues,
+  passwordPolicy?: PasswordPolicyRules,
 ): TenantFormValidationResult<CreateTenantRequest> {
   const basics = validateTenantBasics(input);
   const settings = validateCreateDefaults(input);
-  const owner = validateInitialOwner(input);
+  const owner = validateInitialOwner(input, passwordPolicy);
   const errors = {
     ...basics.errors,
     ...settings.errors,

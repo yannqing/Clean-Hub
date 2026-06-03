@@ -1,5 +1,6 @@
 import {
   index,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -37,5 +38,21 @@ export const authRefreshTokens = pgTable(
     index("auth_refresh_tokens_family_id_idx").on(table.familyId),
     index("auth_refresh_tokens_expires_at_idx").on(table.expiresAt),
     index("auth_refresh_tokens_revoked_at_idx").on(table.revokedAt),
+  ],
+);
+
+export const authLoginLockouts = pgTable(
+  "auth_login_lockouts",
+  {
+    id: ulidPrimaryKey(),
+    lockKey: varchar("lock_key", { length: 320 }).notNull(),
+    failedAttempts: integer("failed_attempts").notNull().default(0),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("auth_login_lockouts_lock_key_unique").on(table.lockKey),
   ],
 );

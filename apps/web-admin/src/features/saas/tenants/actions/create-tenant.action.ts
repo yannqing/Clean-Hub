@@ -1,3 +1,4 @@
+import { getSecuritySettingsQuery } from "@/features/saas/security/queries";
 import { webAdminApi } from "@/lib/api-client";
 
 import type { TenantFormValues } from "../types";
@@ -5,7 +6,8 @@ import { validateTenantForm } from "../validators";
 import { getTenantFormActionErrorResult } from "./tenant-action-errors";
 
 export async function createTenantAction(input: TenantFormValues) {
-  const validation = validateTenantForm(input);
+  const passwordPolicy = await getSecuritySettingsQuery();
+  const validation = validateTenantForm(input, passwordPolicy);
 
   if (!validation.ok) {
     return validation;
