@@ -18,6 +18,7 @@ export type AuditLogListItem = {
   id: string;
   tenantId: string | null;
   actorUserId: string | null;
+  actorDisplayName: string | null;
   eventCategory: string;
   eventType: string;
   entityType: string | null;

@@ -3,6 +3,7 @@ export type TenantAuditLogSummary = {
   tenantId: string | null;
   branchId?: string | null;
   actorUserId: string | null;
+  actorDisplayName: string | null;
   eventCategory: string;
   eventType: string;
   entityType: string | null;
