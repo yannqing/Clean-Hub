@@ -1,5 +1,3 @@
-"use server";
-
 import { webAdminApi } from "@/lib/api-client";
 
 import type { CreateTenantUserRequest, TenantUserSummary } from "../types";
