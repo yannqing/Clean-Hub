@@ -137,6 +137,13 @@ export class AuthService {
       throw invalidCredentials();
     }
 
+    if (user.tenantId && !input.tenantCode?.trim()) {
+      throw new AuthError(
+        "TENANT_CODE_REQUIRED",
+        "Pressing code is required for store administrators.",
+      );
+    }
+
     try {
       assertActiveUser(user);
       const passwordValid = await verifyPassword(input.password, user.passwordHash);

@@ -4,6 +4,8 @@ import type { AuthContext } from "@cleanhub/api-client";
 import {
   Badge,
   Button,
+  Dialog,
+  DialogContent,
   Input,
   Label,
   Select,
@@ -25,9 +27,11 @@ import { webAdminRoutes } from "@/config/routes";
 import { useSaasI18n } from "@/i18n";
 
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
-import { tenantStatusOptions } from "../constants";
+import { tenantDialogContentClass, tenantStatusOptions } from "../constants";
 import { getCurrentSaasAuthQuery, getTenantListQuery } from "../queries";
 import type { TenantStatus, TenantStatusCounts, TenantSummary } from "../types";
+import { TenantDetailView } from "./tenant-detail-view";
+import { TenantSettingsView } from "./tenant-settings-view";
 
 type StatusFilter = "all" | TenantStatus;
 type TenantMetrics = TenantStatusCounts & {
@@ -72,14 +76,6 @@ function getEmptyStateMessage(
   return defaultMessage;
 }
 
-function getTenantDetailHref(tenantId: string): string {
-  return `${webAdminRoutes.saas.tenants}/${tenantId}`;
-}
-
-function getTenantSettingsHref(tenantId: string): string {
-  return `${getTenantDetailHref(tenantId)}/settings`;
-}
-
 function canCreateTenant(authContext: AuthContext | null): boolean {
   return authContext?.role === "super_admin" && authContext.tenantId === null;
 }
@@ -94,6 +90,8 @@ export function TenantListView() {
   const [metrics, setMetrics] = useState<TenantMetrics>(emptyMetrics);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [detailTenantId, setDetailTenantId] = useState<string | null>(null);
+  const [settingsTenantId, setSettingsTenantId] = useState<string | null>(null);
 
   const listQuery = useMemo(
     () => ({
@@ -364,15 +362,27 @@ export function TenantListView() {
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-2">
-                      <Button asChild size="sm" variant="outline">
-                        <Link href={getTenantDetailHref(tenant.id)}>
-                          {m.tenants.list.detail}
-                        </Link>
+                      <Button
+                        onClick={() => {
+                          setSettingsTenantId(null);
+                          setDetailTenantId(tenant.id);
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {m.tenants.list.detail}
                       </Button>
-                      <Button asChild size="sm" variant="outline">
-                        <Link href={getTenantSettingsHref(tenant.id)}>
-                          {m.tenants.list.settings}
-                        </Link>
+                      <Button
+                        onClick={() => {
+                          setDetailTenantId(null);
+                          setSettingsTenantId(tenant.id);
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {m.tenants.list.settings}
                       </Button>
                     </div>
                   </TableCell>
@@ -382,6 +392,50 @@ export function TenantListView() {
           </Table>
         </div>
       )}
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) {
+            setDetailTenantId(null);
+          }
+        }}
+        open={detailTenantId !== null}
+      >
+        <DialogContent className={tenantDialogContentClass}>
+          {detailTenantId ? (
+            <TenantDetailView
+              key={detailTenantId}
+              onOpenSettings={() => {
+                setSettingsTenantId(detailTenantId);
+                setDetailTenantId(null);
+              }}
+              onTenantUpdated={loadTenants}
+              presentation="dialog"
+              tenantId={detailTenantId}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) {
+            setSettingsTenantId(null);
+          }
+        }}
+        open={settingsTenantId !== null}
+      >
+        <DialogContent className={tenantDialogContentClass}>
+          {settingsTenantId ? (
+            <TenantSettingsView
+              key={settingsTenantId}
+              onTenantUpdated={loadTenants}
+              presentation="dialog"
+              tenantId={settingsTenantId}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

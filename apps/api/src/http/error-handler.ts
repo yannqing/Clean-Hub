@@ -17,6 +17,7 @@ function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 422 | 500 {
     case "ACCOUNT_LOCKED":
       return 403;
     case "PASSWORD_POLICY_VIOLATION":
+    case "TENANT_CODE_REQUIRED":
       return 422;
     case "AUTH_CONFIG_INVALID":
       return 500;
