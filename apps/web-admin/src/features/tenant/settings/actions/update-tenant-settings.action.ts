@@ -1,5 +1,8 @@
 "use server";
 
+import type { AuthContext } from "@cleanhub/api-client";
+import { revalidatePath } from "next/cache";
+
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
@@ -17,6 +20,8 @@ type TenantSettingsActionResult =
       message: string;
     };
 
+const OWNER_ONLY_MESSAGE = "Only tenant owners can update tenant settings.";
+
 function getActionErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message;
@@ -28,6 +33,29 @@ function getActionErrorMessage(error: unknown): string {
 export async function updateTenantSettingsAction(
   input: TenantSettingsFormValues,
 ): Promise<TenantSettingsActionResult> {
+  const requestOptions = await getTenantServerApiRequestOptions();
+
+  try {
+    const authContext = await webAdminApi.http.get<AuthContext>(
+      "/auth/me",
+      requestOptions,
+    );
+
+    if (authContext.role !== "owner" || !authContext.tenantId) {
+      return {
+        ok: false,
+        errors: {},
+        message: OWNER_ONLY_MESSAGE,
+      };
+    }
+  } catch {
+    return {
+      ok: false,
+      errors: {},
+      message: OWNER_ONLY_MESSAGE,
+    };
+  }
+
   const validation = validateTenantSettingsForm(input);
 
   if (!validation.ok) {
@@ -40,8 +68,11 @@ export async function updateTenantSettingsAction(
   try {
     const settings = await webAdminApi.tenant.settings.update(
       validation.data,
-      await getTenantServerApiRequestOptions(),
+      requestOptions,
     );
+
+    revalidatePath("/tenant/system/settings");
+    revalidatePath("/tenant/system/preferences");
 
     return {
       ok: true,

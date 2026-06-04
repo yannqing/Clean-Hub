@@ -91,13 +91,20 @@ const defaultFormValues: TenantSettingsFormValues = {
 };
 
 export type TenantSettingsViewProps = {
+  initialAuthContext?: AuthContext | null;
   initialSettings?: TenantSettings;
 };
 
 export function TenantSettingsView({
+  initialAuthContext,
   initialSettings,
 }: TenantSettingsViewProps = {}) {
-  const [authContext, setAuthContext] = useState<AuthContext | null>(null);
+  const [authContext, setAuthContext] = useState<AuthContext | null>(
+    initialAuthContext ?? null,
+  );
+  const [authLoaded, setAuthLoaded] = useState(
+    initialAuthContext !== undefined,
+  );
   const [settings, setSettings] = useState<TenantSettings | null>(
     initialSettings ?? null,
   );
@@ -123,7 +130,7 @@ export function TenantSettingsView({
   const canUpdateSettings =
     authContext?.role === "owner" &&
     authContext.tenantId === settings?.tenantId;
-  const formDisabled = saving || !canUpdateSettings;
+  const formDisabled = saving || !authLoaded || !canUpdateSettings;
 
   useEffect(() => {
     let isCurrent = true;
@@ -132,7 +139,9 @@ export function TenantSettingsView({
       initialSettings
         ? Promise.resolve(initialSettings)
         : getTenantSettingsQuery(),
-      webAdminApi.auth.me(),
+      initialAuthContext !== undefined
+        ? Promise.resolve(initialAuthContext)
+        : webAdminApi.auth.me(),
     ])
       .then(([settingsResult, authResult]) => {
         if (!isCurrent) {
@@ -144,6 +153,7 @@ export function TenantSettingsView({
         } else {
           setAuthContext(null);
         }
+        setAuthLoaded(true);
 
         if (settingsResult.status === "fulfilled") {
           setSettings(settingsResult.value);
@@ -164,7 +174,7 @@ export function TenantSettingsView({
     return () => {
       isCurrent = false;
     };
-  }, [initialSettings]);
+  }, [initialAuthContext, initialSettings]);
 
   function updateForm<K extends keyof TenantSettingsFormValues>(
     key: K,
@@ -356,7 +366,7 @@ export function TenantSettingsView({
             </div>
           ) : null}
 
-          {!canUpdateSettings ? (
+          {authLoaded && !canUpdateSettings ? (
             <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
               Only tenant owners can update these defaults. Managers can view
               settings and feature flags.
@@ -364,9 +374,19 @@ export function TenantSettingsView({
           ) : null}
 
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
-            <Button disabled={formDisabled} type="submit">
-              {saving ? "Saving..." : "Save settings"}
-            </Button>
+            {canUpdateSettings ? (
+              <Button disabled={formDisabled} type="submit">
+                {saving ? "Saving..." : "Save settings"}
+              </Button>
+            ) : !authLoaded ? (
+              <Badge className="w-fit" variant="outline">
+                Checking permissions
+              </Badge>
+            ) : (
+              <Badge className="w-fit" variant="outline">
+                Read-only
+              </Badge>
+            )}
             <p className="text-xs text-muted-foreground">
               Updated {formatDate(settings.updatedAt)}
             </p>
