@@ -431,7 +431,9 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
             </div>
             <div>
               <dt className="text-muted-foreground">Updated</dt>
-              <dd className="mt-1 font-medium">{formatDate(branch.updatedAt)}</dd>
+              <dd className="mt-1 font-medium">
+                {formatDate(branch.updatedAt)}
+              </dd>
             </div>
           </dl>
         </aside>
