@@ -1,3 +1,4 @@
+export type { BranchSummary } from "@cleanhub/api-client";
 export type {
   CreateTenantUserRequest,
   ResetTenantUserPinRequest,
