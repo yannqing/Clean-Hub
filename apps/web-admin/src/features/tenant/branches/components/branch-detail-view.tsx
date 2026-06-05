@@ -271,21 +271,17 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="branch-detail-status">Status</Label>
-              <Select
-                onValueChange={(value) =>
-                  updateForm("status", value as BranchStatus)
-                }
-                value={formValues.status}
-              >
-                <SelectTrigger id="branch-detail-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Status</Label>
+              <div className="flex h-10 items-center rounded-md border bg-muted/30 px-3">
+                <Badge
+                  variant={branch.status === "active" ? "default" : "outline"}
+                >
+                  {branchStatusLabels[branch.status]}
+                </Badge>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Use Enable or Disable to update status.
+              </p>
             </div>
 
             <div className="grid gap-2">
