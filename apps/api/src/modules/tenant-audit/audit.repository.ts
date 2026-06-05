@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, lte, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, isNull, lte, or, type SQL } from "drizzle-orm";
 
 import { auditLogs, type Database, userProfiles } from "@cleanhub/db";
 
@@ -42,7 +42,20 @@ function toTenantAuditLogListItem(row: {
 function buildWhereClause(
   tenantId: string,
   query: ListTenantAuditLogsQuery,
+  allowedBranchIds?: string[],
 ): SQL | undefined {
+  let branchScopeCondition: SQL | undefined;
+
+  if (allowedBranchIds !== undefined) {
+    branchScopeCondition =
+      allowedBranchIds.length > 0
+        ? or(
+            inArray(auditLogs.branchId, allowedBranchIds),
+            isNull(auditLogs.branchId),
+          )
+        : isNull(auditLogs.branchId);
+  }
+
   const conditions: (SQL | undefined)[] = [
     eq(auditLogs.tenantId, tenantId),
     query.actorUserId ? eq(auditLogs.actorUserId, query.actorUserId) : undefined,
@@ -50,9 +63,11 @@ function buildWhereClause(
     query.eventType ? eq(auditLogs.eventType, query.eventType) : undefined,
     query.entityType ? eq(auditLogs.entityType, query.entityType) : undefined,
     query.entityId ? eq(auditLogs.entityId, query.entityId) : undefined,
+    query.branchId ? eq(auditLogs.branchId, query.branchId) : undefined,
     query.success !== undefined ? eq(auditLogs.success, query.success) : undefined,
     query.dateFrom ? gte(auditLogs.createdAt, new Date(query.dateFrom)) : undefined,
     query.dateTo ? lte(auditLogs.createdAt, new Date(query.dateTo)) : undefined,
+    branchScopeCondition,
   ];
 
   return and(...conditions);
@@ -62,8 +77,9 @@ export async function findTenantAuditLogs(
   db: Database,
   tenantId: string,
   query: ListTenantAuditLogsQuery,
+  allowedBranchIds?: string[],
 ): Promise<TenantAuditLogListResult> {
-  const whereClause = buildWhereClause(tenantId, query);
+  const whereClause = buildWhereClause(tenantId, query, allowedBranchIds);
 
   const [rows, totalRows] = await Promise.all([
     db

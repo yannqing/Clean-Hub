@@ -1,4 +1,5 @@
 export type TenantUserStatus = "invited" | "active" | "disabled" | "suspended";
+export type TenantUserRoleCode = "owner" | "manager" | "cashier";
 
 export type TenantUserSummary = {
   id: string;
@@ -24,7 +25,7 @@ export type CreateTenantUserRequest = {
   displayName: string;
   email?: string;
   phone?: string;
-  roleCode: "owner" | "manager";
+  roleCode: TenantUserRoleCode;
   branchIds?: string[];
   initialPin: string;
 };
@@ -33,6 +34,11 @@ export type UpdateTenantUserRequest = {
   displayName?: string;
   phone?: string | null;
   branchIds?: string[];
+  roleCode?: TenantUserRoleCode;
+};
+
+export type ResetTenantUserPinRequest = {
+  reason: string;
 };
 
 export type ResetTenantUserPinResult = {

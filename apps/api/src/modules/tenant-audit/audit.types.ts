@@ -6,6 +6,7 @@ export type ListTenantAuditLogsQuery = {
   eventType?: string;
   entityType?: string;
   entityId?: string;
+  branchId?: string;
   success?: boolean;
   dateFrom?: string;
   dateTo?: string;

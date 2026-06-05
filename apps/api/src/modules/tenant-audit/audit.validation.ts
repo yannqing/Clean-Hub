@@ -8,6 +8,7 @@ export const listTenantAuditLogsQuerySchema = z.object({
   eventType: z.string().trim().min(1).max(120).optional(),
   entityType: z.string().trim().min(1).max(80).optional(),
   entityId: ulidSchema.optional(),
+  branchId: ulidSchema.optional(),
   success: z
     .enum(["true", "false"])
     .transform((v) => v === "true")

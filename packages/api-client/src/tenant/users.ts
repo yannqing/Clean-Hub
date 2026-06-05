@@ -1,6 +1,7 @@
 import type { ApiClient, ApiRequestOptions, QueryParams } from "../types";
 import type {
   CreateTenantUserRequest,
+  ResetTenantUserPinRequest,
   ResetTenantUserPinResult,
   TenantUserDetail,
   TenantUserSummary,
@@ -21,10 +22,12 @@ export function createTenantUsersApi(client: ApiClient) {
       client.patch<TenantUserDetail>(`/tenant/users/${userId}`, input),
     disable: (userId: string) =>
       client.patch<void>(`/tenant/users/${userId}/disable`, {}),
-    resetPin: (userId: string) =>
+    enable: (userId: string) =>
+      client.patch<void>(`/tenant/users/${userId}/enable`, {}),
+    resetPin: (userId: string, input: ResetTenantUserPinRequest) =>
       client.patch<ResetTenantUserPinResult>(
         `/tenant/users/${userId}/reset-pin`,
-        {},
+        input,
       ),
   };
 }
