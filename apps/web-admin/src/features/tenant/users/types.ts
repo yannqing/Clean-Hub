@@ -1,7 +1,9 @@
 export type {
   CreateTenantUserRequest,
+  ResetTenantUserPinRequest,
   ResetTenantUserPinResult,
   TenantUserDetail,
+  TenantUserRoleCode,
   TenantUserStatus,
   TenantUserSummary,
   UpdateTenantUserRequest,

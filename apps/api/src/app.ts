@@ -33,7 +33,7 @@ import { createTenantPriceRoutes } from "./modules/tenant-prices/prices.routes.j
 import { createTenantReportRoutes } from "./modules/tenant-reports/reports.routes.js";
 import { createTenantServiceRoutes } from "./modules/tenant-services/services.routes.js";
 import { createTenantSettingsRoutes } from "./modules/tenant-settings/settings.routes.js";
-import { createTenantUserRoutes } from "./modules/users/users.routes.js";
+import { createTenantUsersRoutes } from "./modules/tenant-users/index.js";
 
 export type CreateApiAppOptions = {
   env?: NodeJS.ProcessEnv;
@@ -106,7 +106,7 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.route("/tenant/overview", createTenantOverviewRoutes());
   app.route("/tenant/settings", createTenantSettingsRoutes());
   app.route("/tenant/branches", createTenantBranchRoutes());
-  app.route("/tenant/users", createTenantUserRoutes());
+  app.route("/tenant/users", createTenantUsersRoutes());
   app.route("/tenant/audit-logs", createTenantAuditRoutes());
   app.route("/tenant/hardware-configs", createTenantHardwareRoutes());
   app.route("/tenant/services", createTenantServiceRoutes());

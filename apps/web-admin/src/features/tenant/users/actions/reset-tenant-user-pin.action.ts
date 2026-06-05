@@ -8,9 +8,10 @@ export type ResetTenantUserPinActionResult =
 
 export async function resetTenantUserPinAction(
   userId: string,
+  reason: string,
 ): Promise<ResetTenantUserPinActionResult> {
   try {
-    const result = await webAdminApi.tenant.users.resetPin(userId);
+    const result = await webAdminApi.tenant.users.resetPin(userId, { reason });
     return { ok: true, data: result };
   } catch (error) {
     return {

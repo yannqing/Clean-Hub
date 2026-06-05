@@ -1,6 +1,7 @@
 export const tenantUserRoleOptions = [
   { label: "Owner", value: "owner" },
   { label: "Manager", value: "manager" },
+  { label: "Cashier", value: "cashier" },
 ] as const satisfies ReadonlyArray<{ label: string; value: string }>;
 
 export const tenantUserStatusOptions = [

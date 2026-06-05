@@ -1,5 +1,6 @@
 import { getDb, type Database } from "@cleanhub/db";
 
+import { resolveAllowedBranchIds } from "../auth/branch-scope.helper.js";
 import { requireTenantRole } from "../auth/permission.helper.js";
 import { TenantAuditError } from "./audit.errors.js";
 import {
@@ -19,7 +20,20 @@ export async function listTenantAuditLogs(
 ): Promise<TenantAuditLogListResult> {
   requireTenantRole(input.authContext, ["owner", "manager"]);
 
-  return findTenantAuditLogs(db, input.authContext.tenantId!, input.query);
+  let allowedBranchIds: string[] | undefined;
+
+  if (input.authContext.role === "manager") {
+    const scope = await resolveAllowedBranchIds(input.authContext, db);
+
+    allowedBranchIds = scope === "all" ? undefined : scope;
+  }
+
+  return findTenantAuditLogs(
+    db,
+    input.authContext.tenantId!,
+    input.query,
+    allowedBranchIds,
+  );
 }
 
 export async function getTenantAuditLogDetail(
