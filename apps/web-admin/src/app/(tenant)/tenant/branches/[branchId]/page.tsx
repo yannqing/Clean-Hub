@@ -9,22 +9,36 @@ type BranchDetailPageProps = {
   }>;
 };
 
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error
+    ? error.message
+    : "Branch detail failed to load.";
+}
+
 export default async function BranchDetailPage({
   params,
 }: BranchDetailPageProps) {
   const { branchId } = await params;
-  const branch = await getBranchDetailQuery(
+  const result = await getBranchDetailQuery(
     branchId,
     await getTenantServerApiRequestOptions(),
-  ).catch(() => undefined);
+  )
+    .then((branch) => ({ branch, error: undefined }))
+    .catch((error: unknown) => ({
+      branch: undefined,
+      error: getErrorMessage(error),
+    }));
 
-  if (branch) {
-    return <BranchDetailView initialBranch={branch} />;
+  if (result.branch) {
+    return <BranchDetailView initialBranch={result.branch} />;
   }
 
   return (
     <PagePlaceholder
-      description={`Branch ${branchId} could not be loaded. It may be outside the current user's branch scope or unavailable.`}
+      description={
+        result.error ??
+        `Branch ${branchId} could not be loaded. It may be outside the current user's branch scope or unavailable.`
+      }
       items={["Check API route mounting", "Check branch scope", "Retry from list"]}
       title="Branch unavailable"
     />

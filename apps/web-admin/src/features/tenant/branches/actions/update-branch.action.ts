@@ -1,9 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
-import type { BranchFormValues, BranchSummary } from "../types";
+import type { BranchFormValues, BranchStatus, BranchSummary } from "../types";
 import { validateBranchUpdateForm } from "../validators";
 
 type BranchActionResult =
@@ -30,7 +32,8 @@ function getActionError(error: unknown) {
       : undefined;
 
   return {
-    message: error instanceof Error ? error.message : "Branch could not be updated.",
+    message:
+      error instanceof Error ? error.message : "Branch could not be updated.",
     code,
     status,
   };
@@ -55,6 +58,39 @@ export async function updateBranchAction(
       validation.data,
       await getTenantServerApiRequestOptions(),
     );
+
+    revalidatePath("/tenant");
+    revalidatePath("/tenant/branches");
+    revalidatePath(`/tenant/branches/${branchId}`);
+
+    return {
+      ok: true,
+      data: branch,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      errors: {},
+      ...getActionError(error),
+    };
+  }
+}
+
+export async function updateBranchStatusAction(
+  branchId: string,
+  status: BranchStatus,
+  version: number,
+): Promise<BranchActionResult> {
+  try {
+    const branch = await webAdminApi.tenant.branches.updateStatus(
+      branchId,
+      { status, version },
+      await getTenantServerApiRequestOptions(),
+    );
+
+    revalidatePath("/tenant");
+    revalidatePath("/tenant/branches");
+    revalidatePath(`/tenant/branches/${branchId}`);
 
     return {
       ok: true,

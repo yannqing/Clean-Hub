@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
@@ -24,7 +26,7 @@ function getActionErrorMessage(error: unknown): string {
 export async function updateBranchStatusAction(
   branchId: string,
   status: BranchStatus,
-  version?: number,
+  version: number,
 ): Promise<BranchStatusActionResult> {
   try {
     const branch = await webAdminApi.tenant.branches.updateStatus(
@@ -32,6 +34,10 @@ export async function updateBranchStatusAction(
       { status, version },
       await getTenantServerApiRequestOptions(),
     );
+
+    revalidatePath("/tenant");
+    revalidatePath("/tenant/branches");
+    revalidatePath(`/tenant/branches/${branchId}`);
 
     return {
       ok: true,

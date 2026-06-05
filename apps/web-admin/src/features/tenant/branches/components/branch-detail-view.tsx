@@ -19,17 +19,41 @@ import { useState } from "react";
 import { webAdminRoutes } from "@/config/routes";
 
 import { updateBranchAction, updateBranchStatusAction } from "../actions";
-import type { BranchFormValues, BranchStatus, BranchSummary } from "../types";
+import { branchLanguageOptions } from "../constants";
+import type {
+  BranchFormValues,
+  BranchLanguage,
+  BranchStatus,
+  BranchSummary,
+} from "../types";
 
 const branchStatusLabels: Record<BranchStatus, string> = {
   active: "Active",
   inactive: "Inactive",
 };
 
-const VERSION_CONFLICT_MESSAGE = "Branch was updated by another request. Refresh and try again.";
+const VERSION_CONFLICT_MESSAGE =
+  "Branch was updated by another request. Refresh and try again.";
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Branch request failed.";
+}
+
+function formatDate(value?: string | null): string {
+  if (!value) {
+    return "Not updated";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Invalid date";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
 function businessHoursToText(
@@ -122,13 +146,13 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
     }
   }
 
-  async function handleStatusChange() {
+  async function handleStatusChange(status?: BranchStatus) {
     setSaving(true);
     setMessage(null);
 
     try {
       const nextStatus: BranchStatus =
-        branch.status === "active" ? "inactive" : "active";
+        status ?? (branch.status === "active" ? "inactive" : "active");
       const result = await updateBranchStatusAction(
         branch.id,
         nextStatus,
@@ -136,8 +160,11 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
       );
 
       if (!result.ok) {
-        setMessage(result.message);
-        toast.error(result.message);
+        const nextMessage = isVersionConflict(result)
+          ? VERSION_CONFLICT_MESSAGE
+          : result.message;
+        setMessage(nextMessage);
+        toast.error(nextMessage);
         return;
       }
 
@@ -226,10 +253,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
               <Label htmlFor="branch-detail-language">Default language</Label>
               <Select
                 onValueChange={(value) =>
-                  updateForm(
-                    "defaultLanguage",
-                    value as BranchFormValues["defaultLanguage"],
-                  )
+                  updateForm("defaultLanguage", value as BranchLanguage)
                 }
                 value={formValues.defaultLanguage}
               >
@@ -237,9 +261,11 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="fr">French</SelectItem>
-                  <SelectItem value="zh-CN">Chinese</SelectItem>
+                  {branchLanguageOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -370,12 +396,20 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
               {saving ? "Saving..." : "Save branch"}
             </Button>
             <Button
-              disabled={saving}
-              onClick={handleStatusChange}
+              disabled={saving || branch.status === "active"}
+              onClick={() => void handleStatusChange("active")}
               type="button"
               variant="outline"
             >
-              {branch.status === "active" ? "Disable branch" : "Enable branch"}
+              Enable
+            </Button>
+            <Button
+              disabled={saving || branch.status === "inactive"}
+              onClick={() => void handleStatusChange("inactive")}
+              type="button"
+              variant="outline"
+            >
+              Disable
             </Button>
             <Button asChild type="button" variant="outline">
               <Link href={webAdminRoutes.tenant.branches}>Back to list</Link>
@@ -396,12 +430,10 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
               <dd className="mt-1 break-all font-medium">{branch.id}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Tenant ID</dt>
-              <dd className="mt-1 break-all font-medium">{branch.tenantId}</dd>
-            </div>
-            <div>
               <dt className="text-muted-foreground">Updated</dt>
-              <dd className="mt-1 font-medium">{branch.updatedAt}</dd>
+              <dd className="mt-1 font-medium">
+                {formatDate(branch.updatedAt)}
+              </dd>
             </div>
           </dl>
         </aside>

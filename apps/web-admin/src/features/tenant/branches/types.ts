@@ -1,18 +1,28 @@
 import type {
   BranchBusinessHours,
+  BranchDetail,
   BranchLanguage,
   BranchListQuery,
   BranchStatus,
   BranchSummary,
+  CreateBranchRequest,
+  UpdateBranchRequest,
+  UpdateBranchStatusRequest,
 } from "@cleanhub/api-client";
 
 export type {
   BranchBusinessHours,
+  BranchDetail,
   BranchLanguage,
   BranchListQuery,
   BranchStatus,
   BranchSummary,
+  CreateBranchRequest,
+  UpdateBranchRequest,
+  UpdateBranchStatusRequest,
 };
+
+export type BranchListFilters = Pick<BranchListQuery, "q" | "status">;
 
 export type BranchFormValues = {
   name: string;
@@ -28,10 +38,3 @@ export type BranchFormValues = {
   status: BranchStatus;
   version?: number;
 };
-
-export type BranchListFilters = {
-  q?: string;
-  status?: BranchStatus;
-};
-
-export type ParsedBranchBusinessHours = BranchBusinessHours | null;

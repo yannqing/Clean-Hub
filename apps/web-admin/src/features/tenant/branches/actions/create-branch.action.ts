@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
@@ -30,7 +32,8 @@ function getActionError(error: unknown) {
       : undefined;
 
   return {
-    message: error instanceof Error ? error.message : "Branch could not be created.",
+    message:
+      error instanceof Error ? error.message : "Branch could not be created.",
     code,
     status,
   };
@@ -53,6 +56,9 @@ export async function createBranchAction(
       validation.data,
       await getTenantServerApiRequestOptions(),
     );
+
+    revalidatePath("/tenant");
+    revalidatePath("/tenant/branches");
 
     return {
       ok: true,
