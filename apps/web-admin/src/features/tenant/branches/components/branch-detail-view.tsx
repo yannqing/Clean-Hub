@@ -163,6 +163,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
         const nextMessage = isVersionConflict(result)
           ? VERSION_CONFLICT_MESSAGE
           : result.message;
+        setErrors(result.errors);
         setMessage(nextMessage);
         toast.error(nextMessage);
         return;
@@ -170,6 +171,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
 
       setBranch(result.data);
       setFormValues(toFormValues(result.data));
+      setErrors({});
       toast.success("Branch status updated.");
     } catch (statusError) {
       const nextMessage = getErrorMessage(statusError);

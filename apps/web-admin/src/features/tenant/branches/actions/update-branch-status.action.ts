@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
-import type { BranchStatus, BranchSummary } from "../types";
+import type { BranchFormValues, BranchStatus, BranchSummary } from "../types";
+import { validateBranchStatusUpdate } from "../validators";
+import { getBranchActionError } from "./branch-action-errors";
 
 type BranchStatusActionResult =
   | {
@@ -15,23 +17,29 @@ type BranchStatusActionResult =
   | {
       ok: false;
       message: string;
+      errors: Partial<Record<keyof BranchFormValues, string>>;
+      code?: string;
+      status?: number;
     };
-
-function getActionErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Branch status could not be updated.";
-}
 
 export async function updateBranchStatusAction(
   branchId: string,
   status: BranchStatus,
   version: number,
 ): Promise<BranchStatusActionResult> {
+  const validation = validateBranchStatusUpdate(status, version);
+
+  if (!validation.ok) {
+    return {
+      ...validation,
+      message: "Check the branch status request.",
+    };
+  }
+
   try {
     const branch = await webAdminApi.tenant.branches.updateStatus(
       branchId,
-      { status, version },
+      validation.data,
       await getTenantServerApiRequestOptions(),
     );
 
@@ -46,7 +54,7 @@ export async function updateBranchStatusAction(
   } catch (error) {
     return {
       ok: false,
-      message: getActionErrorMessage(error),
+      ...getBranchActionError(error, "Branch status could not be updated."),
     };
   }
 }
