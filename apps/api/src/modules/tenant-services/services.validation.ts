@@ -4,14 +4,13 @@ const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 export const serviceBusinessLineSchema = z.enum([
   "laundry",
-  "dry_cleaning",
-  "pressing",
   "car_wash",
-  "retail_products",
+  "retail",
+  "delivery",
 ]);
 
-export const servicePricingModeSchema = z.enum(["per_item", "per_kg"]);
-export const serviceStatusSchema = z.enum(["active", "disabled"]);
+export const servicePricingUnitSchema = z.enum(["per_item", "per_kg"]);
+export const serviceStatusSchema = z.enum(["active", "inactive"]);
 
 export const serviceListQuerySchema = z.object({
   businessLine: serviceBusinessLineSchema.optional(),
@@ -28,11 +27,9 @@ export const serviceParamsSchema = z.object({
 export const createServiceBodySchema = z.object({
   businessLine: serviceBusinessLineSchema,
   name: z.string().trim().min(1).max(120),
-  category: z.string().trim().max(80).nullable().optional(),
-  description: z.string().trim().max(500).nullable().optional(),
-  pricingMode: servicePricingModeSchema,
+  categoryId: z.string().regex(ULID_PATTERN).nullable().optional(),
+  pricingUnit: servicePricingUnitSchema,
   status: serviceStatusSchema.default("active"),
-  sortOrder: z.number().int().min(0).max(9999).default(0),
 });
 
 export const updateServiceBodySchema = createServiceBodySchema.partial().refine(

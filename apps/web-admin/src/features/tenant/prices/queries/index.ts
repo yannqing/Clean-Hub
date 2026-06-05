@@ -1,1 +1,1 @@
-export * from "./get-price-book-list.query";
+export * from "./get-price-list.query";

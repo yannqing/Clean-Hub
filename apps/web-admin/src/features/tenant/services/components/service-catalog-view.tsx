@@ -16,7 +16,6 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Textarea,
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -39,30 +38,27 @@ type StatusFilter = "all" | ServiceStatus;
 
 const businessLineOptions: { label: string; value: ServiceBusinessLine }[] = [
   { label: "Laundry", value: "laundry" },
-  { label: "Dry cleaning", value: "dry_cleaning" },
-  { label: "Pressing", value: "pressing" },
   { label: "Car wash", value: "car_wash" },
-  { label: "Retail products", value: "retail_products" },
+  { label: "Retail", value: "retail" },
+  { label: "Delivery", value: "delivery" },
 ];
 
-const pricingModeLabels = {
+const pricingUnitLabels = {
   per_item: "Per item",
   per_kg: "Per kg",
 };
 
 const statusLabels = {
   active: "Active",
-  disabled: "Disabled",
+  inactive: "Inactive",
 };
 
 const defaultFormValues: ServiceFormValues = {
   businessLine: "laundry",
   name: "",
-  category: "",
-  description: "",
-  pricingMode: "per_item",
+  categoryId: "",
+  pricingUnit: "per_item",
   status: "active",
-  sortOrder: 0,
 };
 
 function getErrorMessage(error: unknown): string {
@@ -73,11 +69,9 @@ function toFormValues(service: ServiceSummary): ServiceFormValues {
   return {
     businessLine: service.businessLine,
     name: service.name,
-    category: service.category ?? "",
-    description: service.description ?? "",
-    pricingMode: service.pricingMode,
+    categoryId: service.categoryId ?? "",
+    pricingUnit: service.pricingUnit,
     status: service.status,
-    sortOrder: service.sortOrder,
   };
 }
 
@@ -190,7 +184,7 @@ export function ServiceCatalogView() {
     try {
       await updateServiceStatusAction(
         service.id,
-        service.status === "active" ? "disabled" : "active",
+        service.status === "active" ? "inactive" : "active",
       );
       await loadServices();
     } catch (statusError) {
@@ -222,7 +216,7 @@ export function ServiceCatalogView() {
               setLoading(true);
               setQuery(event.target.value);
             }}
-            placeholder="Name or category"
+            placeholder="Service name"
             value={query}
           />
         </div>
@@ -265,13 +259,13 @@ export function ServiceCatalogView() {
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="disabled">Disabled</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <div className="grid gap-4 border-b p-5 lg:grid-cols-[1fr_1fr_180px]">
+      <div className="grid gap-4 border-b p-5 lg:grid-cols-[1fr_180px_180px_180px]">
         <div className="grid gap-2">
           <Label htmlFor="service-name">Name</Label>
           <Input
@@ -280,36 +274,6 @@ export function ServiceCatalogView() {
               setFormValues((current) => ({ ...current, name: event.target.value }))
             }
             value={formValues.name}
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="service-category">Category</Label>
-          <Input
-            id="service-category"
-            onChange={(event) =>
-              setFormValues((current) => ({
-                ...current,
-                category: event.target.value,
-              }))
-            }
-            value={formValues.category}
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="service-sort-order">Sort</Label>
-          <Input
-            id="service-sort-order"
-            min={0}
-            onChange={(event) =>
-              setFormValues((current) => ({
-                ...current,
-                sortOrder: Number(event.target.value),
-              }))
-            }
-            type="number"
-            value={formValues.sortOrder}
           />
         </div>
 
@@ -338,17 +302,17 @@ export function ServiceCatalogView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="service-pricing-mode">Pricing</Label>
+          <Label htmlFor="service-pricing-unit">Pricing</Label>
           <Select
             onValueChange={(value) =>
               setFormValues((current) => ({
                 ...current,
-                pricingMode: value as ServiceFormValues["pricingMode"],
+                pricingUnit: value as ServiceFormValues["pricingUnit"],
               }))
             }
-            value={formValues.pricingMode}
+            value={formValues.pricingUnit}
           >
-            <SelectTrigger id="service-pricing-mode">
+            <SelectTrigger id="service-pricing-unit">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -374,26 +338,12 @@ export function ServiceCatalogView() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="disabled">Disabled</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="grid gap-2 lg:col-span-3">
-          <Label htmlFor="service-description">Description</Label>
-          <Textarea
-            id="service-description"
-            onChange={(event) =>
-              setFormValues((current) => ({
-                ...current,
-                description: event.target.value,
-              }))
-            }
-            value={formValues.description}
-          />
-        </div>
-
-        <div className="flex flex-col gap-3 lg:col-span-3 lg:flex-row lg:items-center">
+        <div className="flex flex-col gap-3 lg:col-span-4 lg:flex-row lg:items-center">
           <Button disabled={saving} onClick={handleSubmit} type="button">
             {editingServiceId ? "Update service" : "Create service"}
           </Button>
@@ -442,7 +392,6 @@ export function ServiceCatalogView() {
               <TableHead>Business line</TableHead>
               <TableHead>Pricing</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Sort</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -451,12 +400,9 @@ export function ServiceCatalogView() {
               <TableRow key={service.id}>
                 <TableCell>
                   <div className="font-medium">{service.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {service.category || "Uncategorized"}
-                  </div>
                 </TableCell>
                 <TableCell>{formatBusinessLine(service.businessLine)}</TableCell>
-                <TableCell>{pricingModeLabels[service.pricingMode]}</TableCell>
+                <TableCell>{pricingUnitLabels[service.pricingUnit]}</TableCell>
                 <TableCell>
                   <Badge
                     variant={service.status === "active" ? "default" : "outline"}
@@ -464,7 +410,6 @@ export function ServiceCatalogView() {
                     {statusLabels[service.status]}
                   </Badge>
                 </TableCell>
-                <TableCell>{service.sortOrder}</TableCell>
                 <TableCell className="space-x-2 text-right">
                   <Button
                     onClick={() => {
@@ -484,7 +429,7 @@ export function ServiceCatalogView() {
                     type="button"
                     variant="outline"
                   >
-                    {service.status === "active" ? "Disable" : "Enable"}
+                    {service.status === "active" ? "Deactivate" : "Activate"}
                   </Button>
                   <Button
                     disabled={saving}

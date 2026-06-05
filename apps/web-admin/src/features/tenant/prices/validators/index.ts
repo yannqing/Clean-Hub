@@ -1,1 +1,1 @@
-export * from "./price-book-form.validator";
+export * from "./price-form.validator";

@@ -1,5 +1,5 @@
-import { PriceBookCatalogView } from "@/features/tenant/prices";
+import { PriceCatalogView } from "@/features/tenant/prices";
 
 export default function PricesPage() {
-  return <PriceBookCatalogView />;
+  return <PriceCatalogView />;
 }

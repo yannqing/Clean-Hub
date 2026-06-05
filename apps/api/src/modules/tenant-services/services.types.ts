@@ -2,13 +2,12 @@ import type { AuthContext, AuthRequestMeta } from "../auth/auth.types.js";
 
 export type ServiceBusinessLine =
   | "laundry"
-  | "dry_cleaning"
-  | "pressing"
   | "car_wash"
-  | "retail_products";
+  | "retail"
+  | "delivery";
 
-export type ServicePricingMode = "per_item" | "per_kg";
-export type ServiceStatus = "active" | "disabled";
+export type ServicePricingUnit = "per_item" | "per_kg";
+export type ServiceStatus = "active" | "inactive";
 
 export type ServiceListInput = {
   businessLine?: ServiceBusinessLine;
@@ -23,11 +22,9 @@ export type ServiceSummary = {
   tenantId: string;
   businessLine: ServiceBusinessLine;
   name: string;
-  category: string | null;
-  description: string | null;
-  pricingMode: ServicePricingMode;
+  categoryId: string | null;
+  pricingUnit: ServicePricingUnit;
   status: ServiceStatus;
-  sortOrder: number;
   createdAt: string;
   updatedAt: string;
   version: number;
@@ -36,11 +33,9 @@ export type ServiceSummary = {
 export type CreateServiceRequest = {
   businessLine: ServiceBusinessLine;
   name: string;
-  category?: string | null;
-  description?: string | null;
-  pricingMode: ServicePricingMode;
+  categoryId?: string | null;
+  pricingUnit: ServicePricingUnit;
   status?: ServiceStatus;
-  sortOrder?: number;
 };
 
 export type UpdateServiceRequest = Partial<CreateServiceRequest>;
@@ -55,9 +50,7 @@ export type ServiceAuditSnapshot = {
   tenantId: string;
   businessLine: ServiceBusinessLine;
   name: string;
-  category: string | null;
-  description: string | null;
-  pricingMode: ServicePricingMode;
+  categoryId: string | null;
+  pricingUnit: ServicePricingUnit;
   status: ServiceStatus;
-  sortOrder: number;
 };

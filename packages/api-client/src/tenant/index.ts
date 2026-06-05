@@ -80,7 +80,7 @@ export function createTenantApi(client: ApiClient) {
       branches.list(query),
     listUsers: (query?: QueryParams) => users.list(query),
     listServices: (query?: QueryParams) => services.list(query),
-    listPriceBooks: (query?: QueryParams) => prices.list(query),
+    listPrices: (query?: QueryParams) => prices.list(query),
     listDevices: (query?: QueryParams) => hardware.listDevices(query),
     getReportSummary: (query?: QueryParams) => reports.getSummary(query),
   };

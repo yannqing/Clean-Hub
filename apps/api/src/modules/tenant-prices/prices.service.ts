@@ -1,208 +1,96 @@
 import { getDb, type Database } from "@cleanhub/db";
 
-import { AuthError } from "../auth/auth.errors.js";
+import {
+  assertActiveTenant,
+  assertTenantContext,
+  requireFeatureEnabled,
+} from "../auth/permission.helper.js";
 import type { AuthContext, AuthRequestMeta } from "../auth/auth.types.js";
 import { writeAuditLog } from "../audit/audit.helper.js";
 import { TenantPricesError } from "./prices.errors.js";
 import {
-  createPriceBookRecord,
-  findPriceBookAuditSnapshotById,
-  findPriceBookByName,
-  findPriceBooks,
-  findTenantAccessById,
-  softDeletePriceBookRecord,
-  updatePriceBookRecord,
+  findPriceAuditSnapshotById,
+  findPriceById,
+  findPrices,
+  updatePriceRecord,
 } from "./prices.repository.js";
 import type {
-  CreatePriceBookRequest,
-  PriceBookListInput,
-  PriceBookSummary,
-  PriceBusinessLine,
-  UpdatePriceBookRequest,
+  PriceListInput,
+  PriceSummary,
+  UpdatePriceRequest,
 } from "./prices.types.js";
 
 function requireTenantContext(authContext: AuthContext): string {
-  if (!authContext.tenantId) {
-    throw new TenantPricesError(
-      "TENANT_CONTEXT_REQUIRED",
-      "Tenant context is required for price book APIs.",
-      403,
-    );
-  }
+  assertTenantContext(authContext);
 
-  if (authContext.role !== "owner" && authContext.role !== "manager") {
-    throw new AuthError("FORBIDDEN", "User cannot access tenant prices.");
-  }
-
-  return authContext.tenantId;
-}
-
-function isBusinessLineEnabled(
-  businessLine: PriceBusinessLine,
-  flags: {
-    laundryEnabled: boolean | null;
-    carWashEnabled: boolean | null;
-    retailProductsEnabled: boolean | null;
-  },
-): boolean {
-  if (
-    businessLine === "laundry" ||
-    businessLine === "dry_cleaning" ||
-    businessLine === "pressing"
-  ) {
-    return flags.laundryEnabled ?? true;
-  }
-
-  if (businessLine === "car_wash") {
-    return flags.carWashEnabled ?? false;
-  }
-
-  return flags.retailProductsEnabled ?? false;
+  return authContext.tenantId!;
 }
 
 async function requireTenantReadyForPrices(
+  authContext: AuthContext,
   db: Database,
-  tenantId: string,
-  businessLine?: PriceBusinessLine,
+  businessLine?: PriceListInput["businessLine"],
 ): Promise<void> {
-  const tenant = await findTenantAccessById(db, tenantId);
+  await assertActiveTenant(authContext, db);
 
-  if (!tenant || tenant.status !== "active") {
-    throw new TenantPricesError(
-      "TENANT_NOT_ACTIVE",
-      "Tenant is not active.",
-      403,
-    );
-  }
-
-  if (businessLine && !isBusinessLineEnabled(businessLine, tenant)) {
-    throw new TenantPricesError(
-      "FEATURE_DISABLED",
-      "This business line is not enabled for the tenant.",
-      403,
-    );
+  if (businessLine) {
+    await requireFeatureEnabled(authContext, businessLine, db);
   }
 }
 
-export async function listTenantPriceBooks(
+export async function listTenantPrices(
   authContext: AuthContext,
-  input: PriceBookListInput,
+  input: PriceListInput,
   db: Database = getDb(),
-): Promise<PriceBookSummary[]> {
+): Promise<PriceSummary[]> {
   const tenantId = requireTenantContext(authContext);
 
-  await requireTenantReadyForPrices(db, tenantId, input.businessLine);
+  await requireTenantReadyForPrices(authContext, db, input.businessLine);
 
-  return findPriceBooks(db, {
+  return findPrices(db, {
     ...input,
     tenantId,
   });
 }
 
-export async function createTenantPriceBook(
+export async function updateTenantPrice(
   authContext: AuthContext,
-  data: CreatePriceBookRequest,
+  priceId: string,
+  data: UpdatePriceRequest,
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
-): Promise<PriceBookSummary> {
+): Promise<PriceSummary> {
   const tenantId = requireTenantContext(authContext);
 
-  await requireTenantReadyForPrices(db, tenantId, data.businessLine);
-
-  const duplicate = await findPriceBookByName(db, {
-    tenantId,
-    name: data.name,
-  });
-
-  if (duplicate) {
-    throw new TenantPricesError(
-      "PRICE_BOOK_NAME_DUPLICATE",
-      "Price book name already exists in this tenant.",
-      409,
-    );
-  }
+  await requireTenantReadyForPrices(authContext, db);
 
   return db.transaction(async (tx) => {
-    const priceBook = await createPriceBookRecord(tx, {
-      ...data,
+    const before = await findPriceAuditSnapshotById(tx, {
       tenantId,
-      actorUserId: authContext.userId,
-    });
-
-    await writeAuditLog(tx, {
-      actorUserId: authContext.userId,
-      tenantId,
-      eventCategory: "tenant_price",
-      eventType: "price.created",
-      entityType: "price",
-      entityId: priceBook.id,
-      after: priceBook,
-      ipAddress: requestMeta.ipAddress,
-      userAgent: requestMeta.userAgent,
-    });
-
-    return priceBook;
-  });
-}
-
-export async function updateTenantPriceBook(
-  authContext: AuthContext,
-  priceBookId: string,
-  data: UpdatePriceBookRequest,
-  requestMeta: AuthRequestMeta = {},
-  db: Database = getDb(),
-): Promise<PriceBookSummary> {
-  const tenantId = requireTenantContext(authContext);
-
-  await requireTenantReadyForPrices(db, tenantId);
-
-  if (data.name) {
-    const duplicate = await findPriceBookByName(db, {
-      tenantId,
-      name: data.name,
-      excludePriceBookId: priceBookId,
-    });
-
-    if (duplicate) {
-      throw new TenantPricesError(
-        "PRICE_BOOK_NAME_DUPLICATE",
-        "Price book name already exists in this tenant.",
-        409,
-      );
-    }
-  }
-
-  return db.transaction(async (tx) => {
-    const before = await findPriceBookAuditSnapshotById(tx, {
-      tenantId,
-      priceBookId,
+      priceId,
     });
 
     if (!before) {
       throw new TenantPricesError(
-        "PRICE_BOOK_NOT_FOUND",
-        "Price book was not found.",
+        "PRICE_NOT_FOUND",
+        "Price was not found.",
         404,
       );
     }
 
-    await requireTenantReadyForPrices(
-      tx,
-      tenantId,
-      data.businessLine ?? before.businessLine,
-    );
+    await requireTenantReadyForPrices(authContext, tx, before.businessLine);
 
-    const priceBook = await updatePriceBookRecord(tx, {
+    const price = await updatePriceRecord(tx, {
       ...data,
       tenantId,
-      priceBookId,
+      priceId,
       actorUserId: authContext.userId,
     });
 
-    if (!priceBook) {
+    if (!price) {
       throw new TenantPricesError(
-        "PRICE_BOOK_NOT_FOUND",
-        "Price book was not found.",
+        "PRICE_NOT_FOUND",
+        "Price was not found.",
         404,
       );
     }
@@ -213,70 +101,40 @@ export async function updateTenantPriceBook(
       eventCategory: "tenant_price",
       eventType: "price.updated",
       entityType: "price",
-      entityId: priceBookId,
+      entityId: priceId,
       before,
-      after: priceBook,
+      after: price,
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
     });
 
-    return priceBook;
+    return price;
   });
 }
 
-export async function deleteTenantPriceBook(
+export async function getTenantPriceDetail(
   authContext: AuthContext,
-  priceBookId: string,
-  requestMeta: AuthRequestMeta = {},
+  priceId: string,
   db: Database = getDb(),
-): Promise<void> {
+): Promise<PriceSummary> {
   const tenantId = requireTenantContext(authContext);
 
-  await requireTenantReadyForPrices(db, tenantId);
+  await requireTenantReadyForPrices(authContext, db);
 
-  await db.transaction(async (tx) => {
-    const before = await findPriceBookAuditSnapshotById(tx, {
-      tenantId,
-      priceBookId,
-    });
-
-    if (!before) {
-      throw new TenantPricesError(
-        "PRICE_BOOK_NOT_FOUND",
-        "Price book was not found.",
-        404,
-      );
-    }
-
-    await requireTenantReadyForPrices(tx, tenantId, before.businessLine);
-
-    const deleted = await softDeletePriceBookRecord(tx, {
-      tenantId,
-      priceBookId,
-      actorUserId: authContext.userId,
-    });
-
-    if (!deleted) {
-      throw new TenantPricesError(
-        "PRICE_BOOK_NOT_FOUND",
-        "Price book was not found.",
-        404,
-      );
-    }
-
-    await writeAuditLog(tx, {
-      actorUserId: authContext.userId,
-      tenantId,
-      eventCategory: "tenant_price",
-      eventType: "price.deleted",
-      entityType: "price",
-      entityId: priceBookId,
-      before,
-      after: {
-        deleted: true,
-      },
-      ipAddress: requestMeta.ipAddress,
-      userAgent: requestMeta.userAgent,
-    });
+  const price = await findPriceById(db, {
+    tenantId,
+    priceId,
   });
+
+  if (!price) {
+    throw new TenantPricesError(
+      "PRICE_NOT_FOUND",
+      "Price was not found.",
+      404,
+    );
+  }
+
+  await requireTenantReadyForPrices(authContext, db, price.businessLine);
+
+  return price;
 }
