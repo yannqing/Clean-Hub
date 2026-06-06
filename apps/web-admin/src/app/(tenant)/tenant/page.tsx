@@ -16,7 +16,7 @@ export default async function TenantHomePage() {
   return (
     <TenantOverviewView
       initialBranchCount={branches?.length}
-      initialBranchCountIsLimited={branches?.length === BRANCH_LIST_LIMIT}
+      initialBranchCountReachedLimit={branches?.length === BRANCH_LIST_LIMIT}
       initialOverview={overview}
     />
   );

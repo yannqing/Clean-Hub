@@ -14,7 +14,7 @@ import {
   toast,
 } from "@cleanhub/ui";
 import Link from "next/link";
-import { useState } from "react";
+import { type FormEvent, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 
@@ -113,7 +113,8 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
     setMessage(null);
   }
 
-  async function handleSave() {
+  async function handleSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     setSaving(true);
     setMessage(null);
 
@@ -169,7 +170,11 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
       }
 
       setBranch(result.data);
-      setFormValues(toFormValues(result.data));
+      setFormValues((current) => ({
+        ...current,
+        status: result.data.status,
+        version: result.data.version,
+      }));
       toast.success("Branch status updated.");
     } catch (statusError) {
       const nextMessage = getErrorMessage(statusError);
@@ -201,7 +206,10 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">
-        <div className="grid gap-5 rounded-md border bg-background p-5">
+        <form
+          className="grid gap-5 rounded-md border bg-background p-5"
+          onSubmit={handleSave}
+        >
           <div className="grid gap-4 lg:grid-cols-[1fr_180px_160px]">
             <div className="grid gap-2">
               <Label htmlFor="branch-detail-name">Name</Label>
@@ -374,7 +382,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
           ) : null}
 
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center">
-            <Button disabled={saving} onClick={handleSave} type="button">
+            <Button disabled={saving} type="submit">
               {saving ? "Saving..." : "Save branch"}
             </Button>
             <Button
@@ -397,7 +405,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
               <Link href={webAdminRoutes.tenant.branches}>Back to list</Link>
             </Button>
           </div>
-        </div>
+        </form>
 
         <aside className="h-fit rounded-md border bg-background p-5">
           <div className="border-b pb-3">

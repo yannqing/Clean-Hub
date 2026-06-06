@@ -1,4 +1,4 @@
-import type { ApiClient, ApiRequestOptions, QueryParams } from "../types";
+import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   BranchDetail,
   BranchListQuery,
@@ -12,7 +12,7 @@ type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
 
 export function createTenantBranchesApi(client: ApiClient) {
   return {
-    list: (query?: BranchListQuery | QueryParams, options?: RequestOptions) =>
+    list: (query?: BranchListQuery, options?: RequestOptions) =>
       client.get<BranchSummary[]>("/tenant/branches", { ...options, query }),
     get: (branchId: string, options?: RequestOptions) =>
       client.get<BranchDetail>(

@@ -149,7 +149,7 @@ export function BranchListView({
             </Link>
           </Button>
           <Button onClick={loadBranches} type="button" variant="outline">
-            Refresh
+            {loading ? "Refreshing..." : "Refresh"}
           </Button>
         </div>
       </div>
@@ -159,6 +159,7 @@ export function BranchListView({
           <Label htmlFor="branch-search">Search</Label>
           <Input
             id="branch-search"
+            maxLength={120}
             onChange={(event) => {
               setLoading(true);
               setQuery(event.target.value);
@@ -190,8 +191,16 @@ export function BranchListView({
 
       <div className="p-5">
         {error ? (
-          <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-            {error}
+          <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+            <span>{error}</span>
+            <Button
+              onClick={loadBranches}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              Retry
+            </Button>
           </div>
         ) : null}
         {!error && loading ? (
@@ -201,8 +210,9 @@ export function BranchListView({
           <>
             {branches.length === BRANCH_LIST_LIMIT ? (
               <div className="mb-3 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-                Only showing the first {BRANCH_LIST_LIMIT} branches. Use search
-                or filters to narrow the list.
+                The response reached the {BRANCH_LIST_LIMIT}-branch limit.
+                There may be more branches; use search or filters to narrow the
+                list.
               </div>
             ) : null}
             <Table>

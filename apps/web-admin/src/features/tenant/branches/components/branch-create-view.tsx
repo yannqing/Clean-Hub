@@ -31,9 +31,25 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Branch could not be created.";
 }
 
-export function BranchCreateView() {
+export type BranchCreateViewProps = {
+  defaultsWarning?: string;
+  initialDefaultCurrency?: string;
+  initialDefaultLanguage?: BranchLanguage;
+};
+
+export function BranchCreateView({
+  defaultsWarning,
+  initialDefaultCurrency,
+  initialDefaultLanguage,
+}: BranchCreateViewProps = {}) {
   const router = useRouter();
-  const [form, setForm] = useState<BranchFormValues>(emptyBranchFormValues);
+  const [form, setForm] = useState<BranchFormValues>(() => ({
+    ...emptyBranchFormValues,
+    defaultCurrency:
+      initialDefaultCurrency ?? emptyBranchFormValues.defaultCurrency,
+    defaultLanguage:
+      initialDefaultLanguage ?? emptyBranchFormValues.defaultLanguage,
+  }));
   const [errors, setErrors] = useState<
     Partial<Record<keyof BranchFormValues, string>>
   >({});
@@ -103,6 +119,12 @@ export function BranchCreateView() {
         className="grid gap-5 rounded-md border bg-background p-5"
         onSubmit={handleSubmit}
       >
+        {defaultsWarning ? (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
+            {defaultsWarning}
+          </div>
+        ) : null}
+
         <div className="grid gap-4 lg:grid-cols-[1fr_180px_160px]">
           <div className="grid gap-2">
             <Label htmlFor="branch-create-name">Name</Label>
