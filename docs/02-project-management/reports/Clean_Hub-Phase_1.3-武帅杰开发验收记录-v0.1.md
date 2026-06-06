@@ -2,12 +2,12 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 文档状态 | 待执行 |
+| 文档状态 | 静态门禁通过；运行时待验收 |
 | 负责人 | 武帅杰 |
-| 验收日期 | 待填写 |
-| 基线 commit | 待填写 |
-| 开发分支 | 待填写 |
-| 最终 commit | 待填写 |
+| 验收日期 | 2026-06-06（静态检查） |
+| 基线 commit | `c416093` |
+| 开发分支 | `fix/tenant-branches-manager-scope-wsj-20260606` |
+| 最终 commit | `dd5ebf4` |
 | PR | 待填写 |
 | 审核人 | 李龙杰 / 杨序 / 赵付杰 |
 
@@ -20,21 +20,24 @@
 ### 1.1 计划修改
 
 ```text
-待填写
+apps/api/src/modules/tenant-branches/branches.service.ts
+apps/api/src/modules/tenant-branches/branches.repository.ts
 ```
 
 ### 1.2 明确未修改
 
-- [ ] `apps/api/src/app.ts`
-- [ ] `packages/api-client/src/tenant/index.ts`
-- [ ] `apps/web-admin/src/features/tenant/branches/**`
-- [ ] 数据库 schema / migration
-- [ ] 其他人员负责的业务目录
+- [x] `apps/api/src/app.ts`
+- [x] `packages/api-client/src/tenant/index.ts`
+- [x] `apps/web-admin/src/features/tenant/branches/**`
+- [x] 数据库 schema / migration
+- [x] 其他人员负责的业务目录
 
 ### 1.3 接口或权限契约变化
 
 ```text
-无 / 待填写
+Manager 列表仅返回 user_branches 授权门店；未授权门店读写返回 404；
+POST /tenant/branches 收紧为仅 Owner，Manager 返回 403；
+停用仅修改 status=inactive，不修改 deletedAt。
 ```
 
 ---
@@ -43,13 +46,14 @@
 
 | 交付项 | 状态 | 说明 |
 | --- | --- | --- |
-| Manager 门店列表过滤 | 待执行 | |
-| Manager 详情越权 404 | 待执行 | |
-| Manager 更新越权 404 | 待执行 | |
-| Manager 状态变更越权 404 | 待执行 | |
-| 租户隔离 | 待执行 | |
-| 门店审计 | 待执行 | |
-| 通知配置回归 | 待执行 | |
+| Manager 门店列表过滤 | 已实现，待运行时验收 | `resolveAllowedBranchIds` + repository `inArray` |
+| Manager 详情越权 404 | 已实现，待运行时验收 | `BranchScopeError` 转 `BRANCH_NOT_FOUND` |
+| Manager 更新越权 404 | 已实现，待运行时验收 | 事务内校验 |
+| Manager 状态变更越权 404 | 已实现，待运行时验收 | 事务内校验 |
+| Manager 创建门店 403 | 已实现，待运行时验收 | 创建接口仅允许 Owner |
+| 租户隔离 | 静态复核通过，待运行时验收 | 继续使用 `authContext.tenantId` |
+| 门店审计 | 未改动，待运行时回归 | |
+| 通知配置回归 | 未执行 | 不属于首个代码 PR |
 
 ---
 
@@ -80,9 +84,10 @@
 | 5 | Manager T1 | `GET /tenant/branches/{B}` | 404 | 待填写 | 待执行 | |
 | 6 | Manager T1 | `PATCH /tenant/branches/{B}` | 404 | 待填写 | 待执行 | |
 | 7 | Manager T1 | `PATCH /tenant/branches/{B}/status` | 404 | 待填写 | 待执行 | |
-| 8 | Owner T1 | 访问 Branch T2 | 404 | 待填写 | 待执行 | |
-| 9 | Owner T1 | 使用旧 `version` 更新 | 409 | 待填写 | 待执行 | |
-| 10 | Owner T1 | 创建、更新、状态变更 | 均成功 | 待填写 | 待执行 | |
+| 8 | Manager T1 | `POST /tenant/branches` | 403 | 待填写 | 待执行 | |
+| 9 | Owner T1 | 访问 Branch T2 | 404 | 待填写 | 待执行 | |
+| 10 | Owner T1 | 使用旧 `version` 更新 | 409 | 待填写 | 待执行 | |
+| 11 | Owner T1 | 创建、更新、状态变更 | 均成功 | 待填写 | 待执行 | |
 
 ### 3.3 审计
 
@@ -107,12 +112,12 @@
 
 | 命令 | 结果 | 关键输出 / 警告 |
 | --- | --- | --- |
-| `pnpm --filter @cleanhub/api typecheck` | 待执行 | |
-| `pnpm --filter @cleanhub/api lint` | 待执行 | |
-| `pnpm --filter @cleanhub/api build` | 待执行 | |
-| `pnpm --filter @cleanhub/api-client typecheck` | 待执行 | |
-| `pnpm --filter @cleanhub/web-admin typecheck` | 待执行 | |
-| `git diff --check` | 待执行 | |
+| `pnpm --filter @cleanhub/api typecheck` | 通过 | |
+| `pnpm --filter @cleanhub/api lint` | 通过，有基线 warning | `apps/api/src/modules/users/users.repository.ts` 未使用 `userBranches` |
+| `pnpm --filter @cleanhub/api build` | 通过 | |
+| `pnpm --filter @cleanhub/api-client typecheck` | 通过 | |
+| `pnpm --filter @cleanhub/web-admin typecheck` | 通过 | |
+| `git diff --check` | 通过 | |
 
 ---
 
@@ -127,10 +132,10 @@ git diff --exit-code dev -- apps/web-admin/src/features/tenant/branches
 
 | 检查 | 结果 | 说明 |
 | --- | --- | --- |
-| PR 只包含计划范围文件 | 待执行 | |
-| `app.ts` 无改动 | 待执行 | |
-| API Client 聚合无改动 | 待执行 | |
-| branches 前端无改动 | 待执行 | |
+| PR 只包含计划范围文件 | 通过 | 仅两个 `tenant-branches` 后端文件 |
+| `app.ts` 无改动 | 通过 | |
+| API Client 聚合无改动 | 通过 | |
+| branches 前端无改动 | 通过 | |
 
 ---
 
@@ -138,14 +143,16 @@ git diff --exit-code dev -- apps/web-admin/src/features/tenant/branches
 
 | 类型 | 内容 | 负责人 | 处理阶段 | 状态 |
 | --- | --- | --- | --- | --- |
-| 决策 | Manager 是否允许创建门店 | 李龙杰 | Phase 1.3 / Phase 1.4 | 待确认 |
-| 决策 | inactive 与 `deletedAt` 的语义 | 李龙杰 | Phase 1.3 | 待确认 |
-| 风险 | branches / notifications 尚无自动化测试 | 待指定 | 后续测试建设 | 待处理 |
+| 决策 | Manager 不允许创建门店 | 已确认 | Phase 1.3 | 已落实 |
+| 决策 | inactive 只改 `status`，不改 `deletedAt` | 已确认 | Phase 1.3 | 已落实 |
+| 风险 | branches / notifications 尚无自动化测试 | 武帅杰 | 独立测试基建 PR | 待处理 |
+| 阻塞 | Docker daemon 未运行，`.env` 数据库端口拒绝连接 | 环境负责人 | 运行时验收前 | 待处理 |
 
 新增遗留项：
 
 ```text
-无 / 待填写
+运行时 API 验收未执行：Docker daemon 不可用，且 DATABASE_URL 对应端口连接被拒绝。
+待数据库恢复后执行本文档 §3.2、§3.3 的全部场景。
 ```
 
 ---
@@ -153,11 +160,13 @@ git diff --exit-code dev -- apps/web-admin/src/features/tenant/branches
 ## 7. 验收结论
 
 ```text
-待填写：通过 / 有条件通过 / 不通过
+有条件通过：代码实现与静态质量门禁通过，运行时 API 验收待数据库环境恢复后完成。
 ```
 
 未通过项及下一步：
 
 ```text
-待填写
+1. 恢复 PostgreSQL 环境后完成 Owner / Manager / 跨租户 / 409 / 审计验收。
+2. 单独建立 API 权限测试基建 PR。
+3. 赵付杰后续隐藏 Manager 的创建门店表单。
 ```
