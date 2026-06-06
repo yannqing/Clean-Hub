@@ -8,7 +8,7 @@
 | 基线 commit | `c416093` |
 | 开发分支 | `fix/tenant-branches-manager-scope-wsj-20260606` |
 | 最终 commit | `dd5ebf4` |
-| PR | 待填写 |
+| PR | [#51 fix(tenant-branches): enforce manager branch scope](https://github.com/yannqing/Clean-Hub/pull/51) |
 | 审核人 | 李龙杰 / 杨序 / 赵付杰 |
 
 > 本文档只记录实际执行结果。未执行的检查不得填写为“通过”。
