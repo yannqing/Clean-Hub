@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull, or, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 
 import { branches, type Database } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
@@ -54,12 +54,23 @@ function toAuditSnapshot(branch: BranchSummary): BranchAuditSnapshot {
 
 export async function findBranches(
   db: Database,
-  input: BranchListInput & { tenantId: string },
+  input: BranchListInput & {
+    tenantId: string;
+    allowedBranchIds?: string[];
+  },
 ): Promise<BranchSummary[]> {
+  if (input.allowedBranchIds?.length === 0) {
+    return [];
+  }
+
   const filters: SQL[] = [
     eq(branches.tenantId, input.tenantId),
     isNull(branches.deletedAt),
   ];
+
+  if (input.allowedBranchIds) {
+    filters.push(inArray(branches.id, input.allowedBranchIds));
+  }
 
   if (input.status) {
     filters.push(eq(branches.status, input.status));

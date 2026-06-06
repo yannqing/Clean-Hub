@@ -1,5 +1,10 @@
 import { getDb, type Database } from "@cleanhub/db";
 
+import { BranchScopeError } from "../auth/branch-scope.errors.js";
+import {
+  assertBranchAccess,
+  resolveAllowedBranchIds,
+} from "../auth/branch-scope.helper.js";
 import {
   assertActiveTenant,
   requireTenantRole,
@@ -34,6 +39,26 @@ async function assertBranchManagementAccess(
   return authContext.tenantId!;
 }
 
+async function assertAuthorizedBranch(
+  authContext: BranchRequestInput<unknown>["authContext"],
+  branchId: string,
+  db: Database,
+): Promise<void> {
+  try {
+    await assertBranchAccess(authContext, branchId, db);
+  } catch (error) {
+    if (error instanceof BranchScopeError) {
+      throw new TenantBranchesError(
+        "BRANCH_NOT_FOUND",
+        "Branch was not found.",
+        404,
+      );
+    }
+
+    throw error;
+  }
+}
+
 async function requireBranch(
   db: Database,
   input: { tenantId: string; branchId: string },
@@ -57,10 +82,12 @@ export async function listTenantBranches(
   db: Database = getDb(),
 ): Promise<BranchSummary[]> {
   const tenantId = await assertBranchManagementAccess(authContext, db);
+  const branchScope = await resolveAllowedBranchIds(authContext, db);
 
   return findBranches(db, {
     ...input,
     tenantId,
+    allowedBranchIds: branchScope === "all" ? undefined : branchScope,
   });
 }
 
@@ -70,6 +97,7 @@ export async function getTenantBranchDetail(
   db: Database = getDb(),
 ): Promise<BranchSummary> {
   const tenantId = await assertBranchManagementAccess(authContext, db);
+  await assertAuthorizedBranch(authContext, branchId, db);
 
   return requireBranch(db, {
     tenantId,
@@ -110,6 +138,7 @@ export async function updateTenantBranch(
   const tenantId = await assertBranchManagementAccess(input.authContext, db);
 
   return db.transaction(async (tx) => {
+    await assertAuthorizedBranch(input.authContext, branchId, tx);
     const before = await requireBranch(tx, {
       tenantId,
       branchId,
@@ -151,6 +180,7 @@ export async function updateTenantBranchStatus(
   const tenantId = await assertBranchManagementAccess(input.authContext, db);
 
   return db.transaction(async (tx) => {
+    await assertAuthorizedBranch(input.authContext, branchId, tx);
     const before = await requireBranch(tx, {
       tenantId,
       branchId,
