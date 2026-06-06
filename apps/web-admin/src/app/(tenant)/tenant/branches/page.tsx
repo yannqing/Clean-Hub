@@ -1,4 +1,4 @@
-import { BranchManagementView } from "@/features/tenant/branches/components";
+import { BranchListView } from "@/features/tenant/branches/components";
 import { getBranchListQuery } from "@/features/tenant/branches/queries";
 import type {
   BranchListFilters,
@@ -42,7 +42,7 @@ export default async function BranchesPage({
     }));
 
   return (
-    <BranchManagementView
+    <BranchListView
       initialBranches={result.branches}
       initialError={result.error}
       initialFilters={filters}

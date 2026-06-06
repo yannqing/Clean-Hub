@@ -248,7 +248,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-4 lg:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="branch-detail-language">Default language</Label>
               <Select
@@ -266,24 +266,6 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
                       {option.label}
                     </SelectItem>
                   ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label htmlFor="branch-detail-status">Status</Label>
-              <Select
-                onValueChange={(value) =>
-                  updateForm("status", value as BranchStatus)
-                }
-                value={formValues.status}
-              >
-                <SelectTrigger id="branch-detail-status">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
                 </SelectContent>
               </Select>
             </div>

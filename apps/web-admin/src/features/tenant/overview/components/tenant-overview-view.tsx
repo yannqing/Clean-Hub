@@ -18,6 +18,7 @@ const metricLabels = [
 ] as const;
 
 const quickLinks = [
+  ["Create branch", `${webAdminRoutes.tenant.branches}/new`],
   ["Settings", webAdminRoutes.tenant.system.settings],
   ["Branches", webAdminRoutes.tenant.branches],
   ["Users", webAdminRoutes.tenant.users],
@@ -31,10 +32,14 @@ function getErrorMessage(error: unknown): string {
 }
 
 export type TenantOverviewViewProps = {
+  initialBranchCount?: number;
+  initialBranchCountIsLimited?: boolean;
   initialOverview?: TenantOverview;
 };
 
 export function TenantOverviewView({
+  initialBranchCount,
+  initialBranchCountIsLimited,
   initialOverview,
 }: TenantOverviewViewProps = {}) {
   const [overview, setOverview] = useState<TenantOverview | null>(
@@ -126,7 +131,15 @@ export function TenantOverviewView({
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+        <div className="rounded-md border bg-background p-4">
+          <p className="text-sm text-muted-foreground">Visible branches</p>
+          <p className="mt-3 text-2xl font-semibold">
+            {initialBranchCountIsLimited
+              ? `${initialBranchCount}+`
+              : (initialBranchCount?.toLocaleString() ?? "Unavailable")}
+          </p>
+        </div>
         {metricLabels.map(([key, label]) => (
           <div key={key} className="rounded-md border bg-background p-4">
             <p className="text-sm text-muted-foreground">{label}</p>
