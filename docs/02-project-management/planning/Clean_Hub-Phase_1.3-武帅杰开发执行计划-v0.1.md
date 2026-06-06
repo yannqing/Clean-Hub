@@ -2,7 +2,7 @@
 
 | 项 | 内容 |
 | --- | --- |
-| 文档状态 | In Progress：代码已实现，待运行时验收 |
+| 文档状态 | Runtime Verified：门店与通知运行时验收通过，待 PR 审核合入 |
 | 编制日期 | 2026-06-06 |
 | 负责人 | 武帅杰 |
 | 对齐基线 | `origin/dev` @ `c416093` |
@@ -24,7 +24,7 @@
    - 仅配置占位，不发送真实短信、WhatsApp 或邮件。
    - 当前仓库已存在后端、API Client 与租户后台页面，后续以回归验收和必要修复为主。
 
-截至 2026-06-06，以上两块均已有代码合入 `dev`，但 `tenant-branches` **尚未接入 `branchScope`**。因此本次开工重点不是重新搭建模块，而是完成 **P0 权限补缺、回归验证、验收证据和文档闭环**。
+截至 2026-06-06，通知配置主体已合入 `dev`；`tenant-branches` 权限补缺已在 PR #51 实现并完成运行时验收。本轮已完成 **P0 权限补缺、门店与通知回归验证、验收证据和正式 TRD 对齐**。
 
 ---
 
@@ -49,17 +49,17 @@
 | 项目 | 当前状态 | 结论 |
 | --- | --- | --- |
 | 本地 `dev` | 已快进到 `origin/dev@c416093` | 已对齐 |
-| `tenant-branches` | PR #39 已合入；路由已挂载 | 已实现主体，仍有 P0 权限缺口 |
-| `tenant-notifications` | PR #33 已合入；端到端页面与 API 已存在 | 转为回归验收 |
+| `tenant-branches` | PR #39 已合入；权限补缺见 PR #51 | 运行时验收通过，待 PR #51 审核合入 |
+| `tenant-notifications` | PR #33 已合入；端到端页面与 API 已存在 | 运行时回归通过 |
 | `branch-scope.helper.ts` | 已存在 | 可直接调用，不重复实现 |
 | `tenant-users` / `tenant-audit` | 已接入部分门店范围能力 | 联调依赖，不属于武帅杰目录 |
 | 自动化测试 | 未发现 branches / notifications 测试文件 | 必须补验收证据；测试框架另行评审 |
 
-本次基线检查未启动 PostgreSQL、API 或 Web Admin，因此接口验收矩阵当前仍为“待执行”，不能以 typecheck/build 通过代替功能验收。
+本轮已恢复 PostgreSQL、执行迁移并启动 API，以真实 HTTP 请求完成 Owner、Manager、跨租户、乐观锁、审计与通知配置验收。详细证据见验收记录。
 
-### 2.3 已发现的 P0 缺口
+### 2.3 开发前发现并已修复的 P0 缺口
 
-当前 `apps/api/src/modules/tenant-branches/branches.service.ts` 只校验了 Owner/Manager 角色和租户状态，没有调用：
+PR #51 修改前，`apps/api/src/modules/tenant-branches/branches.service.ts` 只校验了 Owner/Manager 角色和租户状态，没有调用：
 
 - `resolveAllowedBranchIds`
 - `assertBranchAccess`
@@ -68,7 +68,7 @@
 
 - Manager 调用 `GET /tenant/branches` 时可能看到租户下全部门店。
 - Manager 可能读取、编辑或停用未绑定门店。
-- Phase 1.3 验收要求“Manager 仅见绑定店、越权详情返回 404”尚未满足。
+- Phase 1.3 验收要求“Manager 仅见绑定店、越权详情返回 404”在开发前尚未满足，现已由 PR #51 修复并通过运行时验收。
 
 ---
 
@@ -182,9 +182,9 @@ tenantId: authContext.tenantId
 | 阶段 | 工作 | 交付门禁 |
 | --- | --- | --- |
 | Day 0：基线确认 | 同步 `dev`；确认决策；创建修复分支；记录基线 commit | 已完成：`dev@c416093` |
-| Day 1：P0 修复 | branches 列表过滤；详情/更新/状态权限校验；Owner-only 创建 | 已实现并通过静态门禁；运行时待验收 |
-| Day 2：联调与 PR | 与赵付杰、杨序联调；验证审计、租户隔离、乐观锁；提交 PR | P0 验收矩阵有证据；PR 不越权改文件 |
-| Day 3：P1 与收尾 | notifications 回归；修复必要问题；更新验收记录 | P1 结果明确；遗留项有负责人和后续阶段 |
+| Day 1：P0 修复 | branches 列表过滤；详情/更新/状态权限校验；Owner-only 创建 | 已实现并通过静态与运行时门禁 |
+| Day 2：联调与 PR | 与赵付杰、杨序联调；验证审计、租户隔离、乐观锁；提交 PR | 已完成；P0 验收矩阵有证据；PR 不越权改文件 |
+| Day 3：P1 与收尾 | notifications 回归；修复必要问题；更新验收记录 | 已完成；未发现需单开通知修复 PR 的缺陷 |
 
 P0 未通过时，不开始通知配置扩展。
 
