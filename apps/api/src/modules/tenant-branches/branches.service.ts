@@ -39,6 +39,16 @@ async function assertBranchManagementAccess(
   return authContext.tenantId!;
 }
 
+async function assertBranchCreationAccess(
+  authContext: BranchRequestInput<unknown>["authContext"],
+  db: Database,
+): Promise<string> {
+  requireTenantRole(authContext, ["owner"]);
+  await assertActiveTenant(authContext, db);
+
+  return authContext.tenantId!;
+}
+
 async function assertAuthorizedBranch(
   authContext: BranchRequestInput<unknown>["authContext"],
   branchId: string,
@@ -109,7 +119,7 @@ export async function createTenantBranch(
   input: BranchRequestInput<CreateBranchRequest>,
   db: Database = getDb(),
 ): Promise<BranchSummary> {
-  const tenantId = await assertBranchManagementAccess(input.authContext, db);
+  const tenantId = await assertBranchCreationAccess(input.authContext, db);
 
   return db.transaction(async (tx) => {
     const branch = await createBranchRecord(tx, {
