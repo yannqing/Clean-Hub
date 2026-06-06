@@ -58,6 +58,8 @@ docs/
 | TRD 模板 | `docs/00-overview/templates/TRD模板.md` | 技术需求/技术设计文档模板 |
 | Web Admin Phase 1 基础模块 TRD | `docs/04-technical/trd/Clean_Hub-Phase_1-Web_Admin基础模块-TRD-v0.1.md` | Web Admin 基础模块技术方案 |
 | Phase 1.2 PDF 对齐补丁（SaaS 租户与账号边界） | `docs/04-technical/trd/Clean_Hub-Phase_1.2-PDF对齐-SaaS租户管理与账号边界补丁-v0.1.md` | 开户、账号边界、**§6.2 订阅详细开发步骤**、P0/P1 改造清单（v0.3） |
+| Phase 1.3 武帅杰开发执行计划 | `docs/02-project-management/planning/Clean_Hub-Phase_1.3-武帅杰开发执行计划-v0.1.md` | 武帅杰负责模块、现状缺口、分支策略、开发与验收门禁 |
+| Phase 1.3 武帅杰开发验收记录 | `docs/02-project-management/reports/Clean_Hub-Phase_1.3-武帅杰开发验收记录-v0.1.md` | 门店权限与通知配置的开发结果、验证证据和遗留项模板 |
 | API Client 使用说明 | `docs/04-technical/api/Clean_Hub-API_Client使用说明.md` | 共享 API Client 的定位、用法和开发约束 |
 | Drizzle 数据库迁移操作详解 | `docs/04-technical/database/Clean_Hub-Drizzle数据库迁移操作详解.md` | Drizzle/PostgreSQL migration 概念、命令和团队协作规范 |
 
