@@ -101,12 +101,8 @@ function validateBase(input: BranchFormValues) {
     errors.receiptAddress = "Receipt address must be 500 characters or fewer.";
   }
 
-  if (logoUrl) {
-    try {
-      new URL(logoUrl);
-    } catch {
-      errors.logoUrl = "Logo URL must be a valid absolute URL.";
-    }
+  if (logoUrl && logoUrl.length > 2048) {
+    errors.logoUrl = "Logo URL must be 2048 characters or fewer.";
   }
 
   if (!businessHours.ok) {
