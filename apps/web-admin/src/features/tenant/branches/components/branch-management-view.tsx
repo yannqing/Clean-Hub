@@ -16,19 +16,17 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-  Textarea,
   toast,
 } from "@cleanhub/ui";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 
-import { createBranchAction, updateBranchStatusAction } from "../actions";
-import { branchLanguageOptions, emptyBranchFormValues } from "../constants";
-import { getBranchListQuery } from "../queries";
+import { updateBranchStatusAction } from "../actions";
+import { BRANCH_LIST_LIMIT, getBranchListQuery } from "../queries";
 import type {
-  BranchFormValues,
   BranchLanguage,
   BranchListFilters,
   BranchStatus,
@@ -77,6 +75,22 @@ function branchDetailHref(branchId: string): string {
   return `${webAdminRoutes.tenant.branches}/${branchId}`;
 }
 
+function buildBranchListUrl(pathname: string, filters: BranchListFilters) {
+  const params = new URLSearchParams();
+
+  if (filters.q) {
+    params.set("q", filters.q);
+  }
+
+  if (filters.status) {
+    params.set("status", filters.status);
+  }
+
+  const queryString = params.toString();
+
+  return queryString ? `${pathname}?${queryString}` : pathname;
+}
+
 export type BranchManagementViewProps = {
   initialBranches?: BranchSummary[];
   initialError?: string;
@@ -88,6 +102,8 @@ export function BranchManagementView({
   initialError,
   initialFilters,
 }: BranchManagementViewProps = {}) {
+  const pathname = usePathname();
+  const router = useRouter();
   const [branches, setBranches] = useState<BranchSummary[]>(
     initialBranches ?? [],
   );
@@ -95,15 +111,10 @@ export function BranchManagementView({
     initialFilters?.status ?? "all",
   );
   const [query, setQuery] = useState(initialFilters?.q ?? "");
-  const [formValues, setFormValues] =
-    useState<BranchFormValues>(emptyBranchFormValues);
-  const [errors, setErrors] = useState<
-    Partial<Record<keyof BranchFormValues, string>>
-  >({});
   const [loading, setLoading] = useState(!initialBranches && !initialError);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(initialError ?? null);
-  const [formError, setFormError] = useState<string | null>(null);
+  const didUseInitialResult = useRef(Boolean(initialBranches || initialError));
 
   const filters: BranchListFilters = useMemo(
     () => ({
@@ -118,85 +129,54 @@ export function BranchManagementView({
     setError(null);
 
     try {
+      router.replace(buildBranchListUrl(pathname, filters), { scroll: false });
       setBranches(await getBranchListQuery(filters));
     } catch (loadError) {
       setError(getErrorMessage(loadError));
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, pathname, router]);
 
   useEffect(() => {
-    let isCurrent = true;
+    if (didUseInitialResult.current) {
+      didUseInitialResult.current = false;
+      return;
+    }
 
-    getBranchListQuery(filters)
-      .then((items) => {
-        if (isCurrent) {
-          setBranches(items);
-          setError(null);
-        }
-      })
-      .catch((loadError: unknown) => {
-        if (isCurrent) {
-          setError(getErrorMessage(loadError));
-        }
-      })
-      .finally(() => {
-        if (isCurrent) {
-          setLoading(false);
-        }
-      });
+    let isCurrent = true;
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      router.replace(buildBranchListUrl(pathname, filters), { scroll: false });
+
+      getBranchListQuery(filters, { signal: controller.signal })
+        .then((items) => {
+          if (isCurrent) {
+            setBranches(items);
+            setError(null);
+          }
+        })
+        .catch((loadError: unknown) => {
+          if (isCurrent && !controller.signal.aborted) {
+            setError(getErrorMessage(loadError));
+          }
+        })
+        .finally(() => {
+          if (isCurrent) {
+            setLoading(false);
+          }
+        });
+    }, 250);
 
     return () => {
       isCurrent = false;
+      controller.abort();
+      window.clearTimeout(timeoutId);
     };
-  }, [filters]);
-
-  function updateForm<K extends keyof BranchFormValues>(
-    key: K,
-    value: BranchFormValues[K],
-  ): void {
-    setFormValues((current) => ({
-      ...current,
-      [key]: value,
-    }));
-    setErrors((current) => ({
-      ...current,
-      [key]: undefined,
-    }));
-    setFormError(null);
-  }
-
-  async function handleCreate() {
-    setSaving(true);
-    setFormError(null);
-
-    try {
-      const result = await createBranchAction(formValues);
-
-      if (!result.ok) {
-        setErrors(result.errors);
-        setFormError(result.message);
-        toast.error(result.message);
-        return;
-      }
-
-      setFormValues(emptyBranchFormValues);
-      setErrors({});
-      toast.success("Branch created.");
-      await loadBranches();
-    } catch (submitError) {
-      const message = getErrorMessage(submitError);
-      setFormError(message);
-      toast.error(message);
-    } finally {
-      setSaving(false);
-    }
-  }
+  }, [filters, pathname, router]);
 
   async function handleStatusChange(branch: BranchSummary) {
     setSaving(true);
-    setFormError(null);
 
     try {
       const nextStatus: BranchStatus =
@@ -208,7 +188,6 @@ export function BranchManagementView({
       );
 
       if (!result.ok) {
-        setFormError(result.message);
         toast.error(result.message);
         return;
       }
@@ -217,7 +196,6 @@ export function BranchManagementView({
       await loadBranches();
     } catch (statusError) {
       const message = getErrorMessage(statusError);
-      setFormError(message);
       toast.error(message);
     } finally {
       setSaving(false);
@@ -238,14 +216,21 @@ export function BranchManagementView({
           </p>
         </div>
 
-        <Button
-          disabled={loading}
-          onClick={loadBranches}
-          type="button"
-          variant="outline"
-        >
-          Refresh
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild type="button">
+            <Link href={`${webAdminRoutes.tenant.branches}/new`}>
+              New branch
+            </Link>
+          </Button>
+          <Button
+            disabled={loading}
+            onClick={loadBranches}
+            type="button"
+            variant="outline"
+          >
+            Refresh
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-3 border-b p-5 lg:grid-cols-[1fr_180px]">
@@ -283,185 +268,6 @@ export function BranchManagementView({
         </div>
       </div>
 
-      <div className="grid gap-4 border-b p-5 lg:grid-cols-[1fr_180px_160px]">
-        <div className="grid gap-2">
-          <Label htmlFor="branch-name">Name</Label>
-          <Input
-            aria-invalid={Boolean(errors.name)}
-            id="branch-name"
-            onChange={(event) => updateForm("name", event.target.value)}
-            value={formValues.name}
-          />
-          {errors.name ? (
-            <p className="text-xs text-destructive">{errors.name}</p>
-          ) : null}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="branch-phone">Phone</Label>
-          <Input
-            aria-invalid={Boolean(errors.phone)}
-            id="branch-phone"
-            onChange={(event) => updateForm("phone", event.target.value)}
-            value={formValues.phone}
-          />
-          {errors.phone ? (
-            <p className="text-xs text-destructive">{errors.phone}</p>
-          ) : null}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="branch-currency">Currency</Label>
-          <Input
-            aria-invalid={Boolean(errors.defaultCurrency)}
-            id="branch-currency"
-            maxLength={3}
-            onChange={(event) =>
-              updateForm("defaultCurrency", event.target.value.toUpperCase())
-            }
-            value={formValues.defaultCurrency}
-          />
-          {errors.defaultCurrency ? (
-            <p className="text-xs text-destructive">
-              {errors.defaultCurrency}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="branch-language">Default language</Label>
-          <Select
-            onValueChange={(value) =>
-              updateForm("defaultLanguage", value as BranchLanguage)
-            }
-            value={formValues.defaultLanguage}
-          >
-            <SelectTrigger id="branch-language">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {branchLanguageOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="branch-form-status">Status</Label>
-          <Select
-            onValueChange={(value) =>
-              updateForm("status", value as BranchStatus)
-            }
-            value={formValues.status}
-          >
-            <SelectTrigger id="branch-form-status">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="branch-receipt-name">Receipt name</Label>
-          <Input
-            aria-invalid={Boolean(errors.receiptName)}
-            id="branch-receipt-name"
-            onChange={(event) => updateForm("receiptName", event.target.value)}
-            value={formValues.receiptName}
-          />
-          {errors.receiptName ? (
-            <p className="text-xs text-destructive">{errors.receiptName}</p>
-          ) : null}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="branch-receipt-phone">Receipt phone</Label>
-          <Input
-            aria-invalid={Boolean(errors.receiptPhone)}
-            id="branch-receipt-phone"
-            onChange={(event) => updateForm("receiptPhone", event.target.value)}
-            value={formValues.receiptPhone}
-          />
-          {errors.receiptPhone ? (
-            <p className="text-xs text-destructive">{errors.receiptPhone}</p>
-          ) : null}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="branch-logo-url">Logo URL</Label>
-          <Input
-            aria-invalid={Boolean(errors.logoUrl)}
-            id="branch-logo-url"
-            onChange={(event) => updateForm("logoUrl", event.target.value)}
-            value={formValues.logoUrl}
-          />
-          {errors.logoUrl ? (
-            <p className="text-xs text-destructive">{errors.logoUrl}</p>
-          ) : null}
-        </div>
-
-        <div className="grid gap-2 lg:col-span-3">
-          <Label htmlFor="branch-address">Address</Label>
-          <Textarea
-            aria-invalid={Boolean(errors.address)}
-            id="branch-address"
-            onChange={(event) => updateForm("address", event.target.value)}
-            value={formValues.address}
-          />
-          {errors.address ? (
-            <p className="text-xs text-destructive">{errors.address}</p>
-          ) : null}
-        </div>
-
-        <div className="grid gap-2 lg:col-span-3">
-          <Label htmlFor="branch-receipt-address">Receipt address</Label>
-          <Textarea
-            aria-invalid={Boolean(errors.receiptAddress)}
-            id="branch-receipt-address"
-            onChange={(event) =>
-              updateForm("receiptAddress", event.target.value)
-            }
-            value={formValues.receiptAddress}
-          />
-          {errors.receiptAddress ? (
-            <p className="text-xs text-destructive">{errors.receiptAddress}</p>
-          ) : null}
-        </div>
-
-        <div className="grid gap-2 lg:col-span-3">
-          <Label htmlFor="branch-business-hours">Business hours JSON</Label>
-          <Textarea
-            aria-invalid={Boolean(errors.businessHoursJson)}
-            id="branch-business-hours"
-            onChange={(event) =>
-              updateForm("businessHoursJson", event.target.value)
-            }
-            placeholder='{"mon":"08:00-18:00"}'
-            value={formValues.businessHoursJson}
-          />
-          {errors.businessHoursJson ? (
-            <p className="text-xs text-destructive">
-              {errors.businessHoursJson}
-            </p>
-          ) : null}
-        </div>
-
-        <div className="flex flex-col gap-3 lg:col-span-3 lg:flex-row lg:items-center">
-          <Button disabled={saving} onClick={handleCreate} type="button">
-            {saving ? "Saving..." : "Create branch"}
-          </Button>
-          {formError ? (
-            <p className="text-sm text-destructive">{formError}</p>
-          ) : null}
-        </div>
-      </div>
-
       {loading ? (
         <div className="grid gap-3 p-5">
           {[0, 1, 2].map((item) => (
@@ -481,55 +287,63 @@ export function BranchManagementView({
           </div>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Branch</TableHead>
-              <TableHead>Contact</TableHead>
-              <TableHead>Defaults</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Updated</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {branches.map((branch) => (
-              <TableRow key={branch.id}>
-                <TableCell>
-                  <div className="font-medium">{branch.name}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {branch.address ?? "No address"}
-                  </div>
-                </TableCell>
-                <TableCell>{branch.phone ?? "No phone"}</TableCell>
-                <TableCell>
-                  {languageLabels[branch.defaultLanguage]} /{" "}
-                  {branch.defaultCurrency}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={getBranchStatusVariant(branch.status)}>
-                    {branchStatusLabels[branch.status]}
-                  </Badge>
-                </TableCell>
-                <TableCell>{formatDate(branch.updatedAt)}</TableCell>
-                <TableCell className="space-x-2 text-right">
-                  <Button asChild size="sm" type="button" variant="outline">
-                    <Link href={branchDetailHref(branch.id)}>Open</Link>
-                  </Button>
-                  <Button
-                    disabled={saving}
-                    onClick={() => void handleStatusChange(branch)}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {branch.status === "active" ? "Disable" : "Enable"}
-                  </Button>
-                </TableCell>
+        <div className="p-5">
+          {branches.length === BRANCH_LIST_LIMIT ? (
+            <div className="mb-3 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+              Only showing the first {BRANCH_LIST_LIMIT} branches. Use search or
+              filters to narrow the list.
+            </div>
+          ) : null}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Branch</TableHead>
+                <TableHead>Contact</TableHead>
+                <TableHead>Defaults</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Updated</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {branches.map((branch) => (
+                <TableRow key={branch.id}>
+                  <TableCell>
+                    <div className="font-medium">{branch.name}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {branch.address ?? "No address"}
+                    </div>
+                  </TableCell>
+                  <TableCell>{branch.phone ?? "No phone"}</TableCell>
+                  <TableCell>
+                    {languageLabels[branch.defaultLanguage]} /{" "}
+                    {branch.defaultCurrency}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getBranchStatusVariant(branch.status)}>
+                      {branchStatusLabels[branch.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{formatDate(branch.updatedAt)}</TableCell>
+                  <TableCell className="space-x-2 text-right">
+                    <Button asChild size="sm" type="button" variant="outline">
+                      <Link href={branchDetailHref(branch.id)}>Open</Link>
+                    </Button>
+                    <Button
+                      disabled={saving}
+                      onClick={() => void handleStatusChange(branch)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {branch.status === "active" ? "Disable" : "Enable"}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </section>
   );
