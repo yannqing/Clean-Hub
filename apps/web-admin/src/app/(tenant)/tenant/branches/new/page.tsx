@@ -3,6 +3,7 @@ import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-r
 import { getTenantSettingsQuery } from "@/features/tenant/settings/queries";
 
 export default async function NewBranchPage() {
+  // 使用你的分支逻辑：尝试获取租户默认设置，如果失败则提供警告信息
   const result = await getTenantSettingsQuery(
     await getTenantServerApiRequestOptions(),
   )

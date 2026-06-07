@@ -1,11 +1,17 @@
 import { getDb, type Database } from "@cleanhub/db";
 
 import {
+  assertBranchAccess,
+  resolveAllowedBranchIds,
+} from "../auth/branch-scope.helper.js";
+import { BranchScopeError } from "../auth/branch-scope.errors.js";
+import {
   assertActiveTenant,
   requireTenantRole,
 } from "../auth/permission.helper.js";
 import { TenantBranchesError } from "./branches.errors.js";
 import {
+  assignBranchToUser,
   createBranchRecord,
   findBranchById,
   findBranches,
@@ -51,15 +57,37 @@ async function requireBranch(
   return branch;
 }
 
+async function requireScopedBranchAccess(
+  authContext: BranchRequestInput<unknown>["authContext"],
+  branchId: string,
+  db: Database,
+): Promise<void> {
+  try {
+    await assertBranchAccess(authContext, branchId, db);
+  } catch (error) {
+    if (error instanceof BranchScopeError) {
+      throw new TenantBranchesError(
+        "BRANCH_NOT_FOUND",
+        "Branch was not found.",
+        404,
+      );
+    }
+
+    throw error;
+  }
+}
+
 export async function listTenantBranches(
   authContext: BranchRequestInput<unknown>["authContext"],
   input: BranchListInput,
   db: Database = getDb(),
 ): Promise<BranchSummary[]> {
   const tenantId = await assertBranchManagementAccess(authContext, db);
+  const branchScope = await resolveAllowedBranchIds(authContext, db);
 
   return findBranches(db, {
     ...input,
+    allowedBranchIds: branchScope === "all" ? undefined : branchScope,
     tenantId,
   });
 }
@@ -70,6 +98,7 @@ export async function getTenantBranchDetail(
   db: Database = getDb(),
 ): Promise<BranchSummary> {
   const tenantId = await assertBranchManagementAccess(authContext, db);
+  await requireScopedBranchAccess(authContext, branchId, db);
 
   return requireBranch(db, {
     tenantId,
@@ -89,6 +118,14 @@ export async function createTenantBranch(
       tenantId,
       actorUserId: input.authContext.userId,
     });
+
+    if (input.authContext.role === "manager") {
+      await assignBranchToUser(tx, {
+        tenantId,
+        branchId: branch.id,
+        userId: input.authContext.userId,
+      });
+    }
 
     await writeBranchCreatedAuditLog(tx, {
       actorUserId: input.authContext.userId,
@@ -110,6 +147,8 @@ export async function updateTenantBranch(
   const tenantId = await assertBranchManagementAccess(input.authContext, db);
 
   return db.transaction(async (tx) => {
+    await requireScopedBranchAccess(input.authContext, branchId, tx);
+
     const before = await requireBranch(tx, {
       tenantId,
       branchId,
@@ -151,6 +190,8 @@ export async function updateTenantBranchStatus(
   const tenantId = await assertBranchManagementAccess(input.authContext, db);
 
   return db.transaction(async (tx) => {
+    await requireScopedBranchAccess(input.authContext, branchId, tx);
+
     const before = await requireBranch(tx, {
       tenantId,
       branchId,

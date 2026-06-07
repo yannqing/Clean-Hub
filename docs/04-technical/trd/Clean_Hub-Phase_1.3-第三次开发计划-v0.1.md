@@ -4,6 +4,7 @@
 | ---- | ---- | ---- | ---- |
 | v0.1 | 2026-05-31 | Draft | 门店管理闭环、店长单店权限、租户 API 收口、POS 平板壳层与终端架构说明 |
 | v0.2 | 2026-06-01 | Draft | 任务整合 |
+| v0.3 | 2026-06-06 | In Review | 锁定仅 Owner 创建门店、停用不写 `deletedAt`，同步门店与通知运行时验收口径 |
 
 ---
 
@@ -131,7 +132,7 @@ Mobile（Capacitor）             → 客户/配送；Owner 手机看店（后�
 
 ### 4.1 P0 目标
 
-1. **门店管理**：Owner / Manager 在 `/tenant/branches` 完成列表、创建、详情、编辑、启用/停用。
+1. **门店管理**：Owner 在 `/tenant/branches` 完成创建；Owner / Manager 完成列表、详情、编辑、启用/停用，其中 Manager 仅能操作绑定门店。
 2. **店长单店权限**：Manager 仅能见、能改**绑定门店**；Owner 见全租户门店。
 3. **员工门店绑定**：创建/更新员工时写入 `user_branches`；列表与审计支持按店筛选。
 4. **API 集成收口**：`apps/api/src/app.ts` 与 `packages/api-client/src/tenant/index.ts` 由**李龙杰**挂载/聚合本阶段 `/tenant/**` 路由（见 §11.2、§11.3）；业务模块 PR **不得**修改 `app.ts`。
@@ -152,7 +153,7 @@ Mobile（Capacitor）             → 客户/配送；Owner 手机看店（后�
 - 离线同步生产可用、断电恢复。
 - Owner 手机 App 全功能。
 - 客户/配送 Mobile 业务页。
-- 仅 Owner 可「开新店」的硬规则（可 P1；时间紧则第四次）。
+- 门店删除能力；本波次停用只修改 `status=inactive`，不写 `deletedAt`。
 
 ---
 
@@ -211,7 +212,7 @@ docs/04-technical/trd/
 | ----------- | ----- | ------- | ------- |
 | 进入 `/tenant/**` | ✅ | ✅ | ❌ |
 | 门店列表/详情 | 全租户 | **仅绑定门店** | ❌ |
-| 创建门店 `POST /tenant/branches` | ✅ | ✅（P1 可改为仅 Owner；**当前版本 Owner+Manager 均可**，第四次可收紧） | ❌ |
+| 创建门店 `POST /tenant/branches` | ✅ | ❌（返回 403） | ❌ |
 | 编辑/停用门店 | 全租户 | **仅绑定门店** | ❌ |
 | 员工 CRUD | 全租户 | 全租户员工列表 **建议本波次仍全租户**；创建时 `branchIds` 限 Manager 授权店内 | ❌ |
 | `PATCH /tenant/settings` | ✅ | ❌ | ❌ |
@@ -273,10 +274,10 @@ docs/04-technical/trd/
 | 编号 | 功能点 | 说明 |
 | ---- | ------ | ---- |
 | B-01 | 门店列表 API | `GET /tenant/branches`；名称/电话搜索；状态筛选；接 `branchScope` |
-| B-02 | 创建门店 API | `POST`；字段见 §11.1 |
+| B-02 | 创建门店 API | `POST`；仅 Owner；字段见 §11.1 |
 | B-03 | 门店详情 API | `GET /tenant/branches/:branchId` |
 | B-04 | 编辑门店 API | `PATCH` 更新 |
-| B-05 | 启用/停用 API | `PATCH .../status`；`deletedAt` 软删策略与 1.2 schema 一致 |
+| B-05 | 启用/停用 API | `PATCH .../status`；只修改 `status`，不修改 `deletedAt` |
 | B-06 | 审计 | `branch.created` / `branch.updated` / `branch.status_changed` |
 | B-07 | 租户隔离 | `tenantId` 仅来自 `authContext` |
 | B-08 | Manager 过滤 | 列表/详情/写操作接 `branchScope`（李龙杰 helper · §8.2.1） |
@@ -373,7 +374,7 @@ docs/04-technical/trd/
 | 方法 | 路径 | 说明 | 角色 |
 | ---- | ---- | ---- | ---- |
 | GET | `/tenant/branches` | 列表；Manager 过滤 | Owner、Manager |
-| POST | `/tenant/branches` | 创建 | Owner、Manager |
+| POST | `/tenant/branches` | 创建 | 仅 Owner |
 | GET | `/tenant/branches/:branchId` | 详情 | Owner、Manager（须有权） |
 | PATCH | `/tenant/branches/:branchId` | 更新 | Owner、Manager（须有权） |
 | PATCH | `/tenant/branches/:branchId/status` | 启用/停用 | Owner、Manager（须有权） |
@@ -556,7 +557,7 @@ routes → controller → service → repository → validation → types → er
 **Day 1**
 
 1. **等李龙杰 §8.2.1 `branchScope` 合并后**，搭建模块骨架；`GET/POST` 列表与创建（调用 `resolveAllowedBranchIds` / `assertBranchAccess`）。
-2. 写审计；`requireTenantRole(['owner','manager'])`。
+2. 写审计；列表/详情/更新/状态允许 Owner、Manager，创建仅允许 Owner。
 3. **PR 不含 `app.ts`**。
 
 **Day 2**
@@ -577,7 +578,7 @@ routes → controller → service → repository → validation → types → er
 **重点**：
 
 - `tenant_id` 禁止来自 body。
-- 停用 = 状态变更 + 软删字段，不物理 DELETE。
+- 停用只修改 `status=inactive`，不修改 `deletedAt`；删除能力后续单独设计。
 - 错误码：越权店 **404**（防枚举）。
 - **不修改** `features/tenant/branches/**` 与 `packages/api-client/**/branches*`（赵付杰负责）。
 
@@ -671,6 +672,9 @@ routes → controller → service → repository → validation → types → er
 | 4 | 租户隔离 | 租户 T1 不能访问 T2 的 `branchId` |
 | 5 | api-client | 前端门店页走 api-client，无散落 fetch |
 | 6 | 路由挂载 | Postman/curl 可访问 §11.2 **Batch A + B** 已挂载接口（含 `/tenant/branches`） |
+| 7 | Manager 创建门店 | 返回 403，不自动写入 `user_branches` |
+| 8 | Manager 无绑定门店 | 列表返回空数组 |
+| 9 | 门店停用 | `status=inactive`，`deletedAt` 保持为空 |
 
 ### 15.2 P1 验收（尽量）
 
@@ -680,6 +684,8 @@ routes → controller → service → repository → validation → types → er
 | 8 | desktop | 能打开 pos-web 开发页 |
 | 9 | 终端架构文档 | 含 §22 硬件映射与 WebView/SDK 决策；评审通过并入库 |
 | 10 | Cashier 403（可选） | 若临时手工建 cashier 用户：任意 `/tenant/**` → 403；**无预设 seed 要求** |
+| 11 | 通知配置 | 功能开关关闭时返回 403；启用后可读取、初始化和更新配置 |
+| 12 | 通知审计与占位语义 | 更新写 `tenant_notification` 审计；`deliveryMode=not_connected`；不发送真实消息 |
 
 ### 15.3 代码质量
 
@@ -697,7 +703,9 @@ pnpm --filter @cleanhub/api-client typecheck
 ### 16.1 门店 API
 
 - Owner：`POST /tenant/branches` 成功 → `GET` 列表含新店 → `PATCH` 更新 → `PATCH status` 停用。
-- Manager：仅绑定店出现在列表；`GET` 未绑定 `branchId` → 404。
+- Manager：仅绑定店出现在列表；无绑定时返回空数组；未绑定店详情、更新、状态变更均 → 404；创建门店 → 403。
+- 租户隔离：T1 用户访问 T2 门店 → 404。
+- 乐观锁：旧 `version` 更新 → 409。
 - 未登录：→ 401。
 
 ### 16.2 审计
@@ -707,6 +715,13 @@ pnpm --filter @cleanhub/api-client typecheck
 ### 16.3 集成
 
 - `pnpm db:migrate` 后全员本地可启动 api + web-admin。
+
+### 16.4 通知配置
+
+- 功能开关关闭：`GET/PATCH /tenant/notification-settings` → 403。
+- 功能开关启用：首次 `GET` 初始化单条租户配置；重复 `GET` 不重复创建。
+- Owner / Manager：`PATCH` 成功并写 `tenant_notification` / `notification_settings.updated` 审计。
+- 关闭后重新启用：已有配置保持；`deliveryMode` 仍为 `not_connected`，不触发真实消息发送。
 
 ---
 
@@ -782,7 +797,7 @@ pnpm --filter @cleanhub/api-client typecheck
 | POS 与 web-admin 混用 | Mobile 后续返工 | 第四天必须产出架构说明 |
 | POS-T1101 原生 SDK vs `pos-web` Next.js | 第四次打印/扫码返工 | 架构说明 T-06 写清 WebView 桥接 vs 原生；壳层按 1280×800 设计，不假设 PC 浏览器 |
 | 误把 `apps/mobile` 当 POS | 打包与权限错误 | §3.4 / §22 明确：收银 APK = `pos-web`，`mobile` = 客户/配送 |
-| 仅 Owner 可开店未做 | Manager 误开新店 | P1 或第四次；文档写清当前允许双方 |
+| Manager 前端仍可能显示创建入口 | 用户提交后收到 403 | API 已限制仅 Owner；赵付杰后续隐藏 Manager 创建表单 |
 
 ---
 
@@ -847,4 +862,3 @@ pnpm --filter @cleanhub/api-client typecheck
 2. `pos-web` 构建产物形态：`standalone` server vs **static export**（影响 APK 内嵌）。
 3. 内置打印机纸宽 80 vs 58mm 与小票模板字段。
 4. `device_id` 与门店绑定策略（与 `branches` / 终端注册表）。
-
