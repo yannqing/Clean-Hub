@@ -101,12 +101,8 @@ function validateBase(input: BranchFormValues) {
     errors.receiptAddress = "Receipt address must be 500 characters or fewer.";
   }
 
-  if (logoUrl) {
-    try {
-      new URL(logoUrl);
-    } catch {
-      errors.logoUrl = "Logo URL must be a valid absolute URL.";
-    }
+  if (logoUrl && logoUrl.length > 2048) {
+    errors.logoUrl = "Logo URL must be 2048 characters or fewer.";
   }
 
   if (!businessHours.ok) {
@@ -188,6 +184,36 @@ export function validateBranchUpdateForm(
       receiptAddress: result.data.receiptAddress,
       logoUrl: result.data.logoUrl,
       version: input.version,
+    },
+  };
+}
+
+export function validateBranchStatusUpdate(
+  status: BranchStatus,
+  version: number,
+): BranchFormValidationResult<{ status: BranchStatus; version: number }> {
+  const errors: Partial<Record<keyof BranchFormValues, string>> = {};
+
+  if (!statuses.includes(status)) {
+    errors.status = "Choose a supported status.";
+  }
+
+  if (!Number.isInteger(version) || version < 1) {
+    errors.version = "Branch version is required. Refresh and try again.";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return {
+      ok: false,
+      errors,
+    };
+  }
+
+  return {
+    ok: true,
+    data: {
+      status,
+      version,
     },
   };
 }

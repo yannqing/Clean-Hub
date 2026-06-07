@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 
+import { BRANCH_LIST_LIMIT, getBranchListQuery } from "../../branches/queries";
 import { getTenantOverviewQuery } from "../queries";
 import type { TenantOverview } from "../types";
 
@@ -18,6 +19,7 @@ const metricLabels = [
 ] as const;
 
 const quickLinks = [
+  ["Create branch", `${webAdminRoutes.tenant.branches}/new`],
   ["Settings", webAdminRoutes.tenant.system.settings],
   ["Branches", webAdminRoutes.tenant.branches],
   ["Users", webAdminRoutes.tenant.users],
@@ -31,14 +33,22 @@ function getErrorMessage(error: unknown): string {
 }
 
 export type TenantOverviewViewProps = {
+  initialBranchCount?: number;
+  initialBranchCountReachedLimit?: boolean;
   initialOverview?: TenantOverview;
 };
 
 export function TenantOverviewView({
+  initialBranchCount,
+  initialBranchCountReachedLimit,
   initialOverview,
 }: TenantOverviewViewProps = {}) {
   const [overview, setOverview] = useState<TenantOverview | null>(
     initialOverview ?? null,
+  );
+  const [branchCount, setBranchCount] = useState(initialBranchCount);
+  const [branchCountReachedLimit, setBranchCountReachedLimit] = useState(
+    initialBranchCountReachedLimit ?? false,
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(!initialOverview);
@@ -50,6 +60,38 @@ export function TenantOverviewView({
     return Object.values(overview.featureFlags).filter(Boolean).length;
   }, [overview]);
 
+  async function loadOverview() {
+    setLoading(true);
+    setErrorMessage(null);
+
+    try {
+      const [overviewResult, branchesResult] = await Promise.allSettled([
+        getTenantOverviewQuery(),
+        getBranchListQuery(),
+      ]);
+
+      if (overviewResult.status === "rejected") {
+        throw overviewResult.reason;
+      }
+
+      setOverview(overviewResult.value);
+      setBranchCount(
+        branchesResult.status === "fulfilled"
+          ? branchesResult.value.length
+          : undefined,
+      );
+      setBranchCountReachedLimit(
+        branchesResult.status === "fulfilled" &&
+          branchesResult.value.length === BRANCH_LIST_LIMIT,
+      );
+    } catch (error) {
+      setOverview(null);
+      setErrorMessage(getErrorMessage(error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (initialOverview) {
       return;
@@ -57,13 +99,26 @@ export function TenantOverviewView({
 
     let isCurrent = true;
 
-    getTenantOverviewQuery()
-      .then((data) => {
+    Promise.allSettled([getTenantOverviewQuery(), getBranchListQuery()])
+      .then(([overviewResult, branchesResult]) => {
         if (!isCurrent) {
           return;
         }
 
-        setOverview(data);
+        if (overviewResult.status === "rejected") {
+          throw overviewResult.reason;
+        }
+
+        setOverview(overviewResult.value);
+        setBranchCount(
+          branchesResult.status === "fulfilled"
+            ? branchesResult.value.length
+            : undefined,
+        );
+        setBranchCountReachedLimit(
+          branchesResult.status === "fulfilled" &&
+            branchesResult.value.length === BRANCH_LIST_LIMIT,
+        );
         setErrorMessage(null);
       })
       .catch((error: unknown) => {
@@ -101,8 +156,16 @@ export function TenantOverviewView({
   if (errorMessage || !overview) {
     return (
       <section className="p-5">
-        <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-          {errorMessage ?? "Tenant overview is unavailable."}
+        <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+          <span>{errorMessage ?? "Tenant overview is unavailable."}</span>
+          <Button
+            onClick={loadOverview}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Retry
+          </Button>
         </div>
       </section>
     );
@@ -126,7 +189,15 @@ export function TenantOverviewView({
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-5">
+      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
+        <div className="rounded-md border bg-background p-4">
+          <p className="text-sm text-muted-foreground">Visible branches</p>
+          <p className="mt-3 text-2xl font-semibold">
+            {branchCountReachedLimit
+              ? `${branchCount} shown`
+              : (branchCount?.toLocaleString() ?? "Unavailable")}
+          </p>
+        </div>
         {metricLabels.map(([key, label]) => (
           <div key={key} className="rounded-md border bg-background p-4">
             <p className="text-sm text-muted-foreground">{label}</p>
@@ -135,6 +206,11 @@ export function TenantOverviewView({
             </p>
           </div>
         ))}
+      </div>
+
+      <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+        Order, revenue, pickup, progress, and task metrics are placeholders
+        until the order API is connected.
       </div>
 
       <div className="grid gap-3">

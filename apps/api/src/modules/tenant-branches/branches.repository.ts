@@ -1,6 +1,15 @@
-import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  eq,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
-import { branches, type Database } from "@cleanhub/db";
+import { branches, type Database, userBranches } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
 
 import { writeAuditLog } from "../audit/audit.helper.js";
@@ -16,7 +25,6 @@ import type {
 
 function normalizeNullable(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
-
   return trimmed ? trimmed : null;
 }
 
@@ -48,16 +56,12 @@ function toBranchSummary(row: typeof branches.$inferSelect): BranchSummary {
 
 function toAuditSnapshot(branch: BranchSummary): BranchAuditSnapshot {
   const { updatedAt: _updatedAt, ...snapshot } = branch;
-
   return snapshot;
 }
 
 export async function findBranches(
   db: Database,
-  input: BranchListInput & {
-    tenantId: string;
-    allowedBranchIds?: string[];
-  },
+  input: BranchListInput & { tenantId: string; allowedBranchIds?: string[] },
 ): Promise<BranchSummary[]> {
   if (input.allowedBranchIds?.length === 0) {
     return [];
@@ -147,6 +151,17 @@ export async function createBranchRecord(
   }))!;
 }
 
+export async function assignBranchToUser(
+  db: Database,
+  input: { tenantId: string; branchId: string; userId: string },
+): Promise<void> {
+  await db.insert(userBranches).values({
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    userId: input.userId,
+  });
+}
+
 export async function updateBranchRecord(
   db: Database,
   input: {
@@ -212,26 +227,13 @@ export async function updateBranchRecord(
       tenantId: input.tenantId,
       branchId: input.branchId,
     });
-
     if (!existing) {
-      throw new TenantBranchesError(
-        "BRANCH_NOT_FOUND",
-        "Branch was not found.",
-        404,
-      );
+      throw new TenantBranchesError("BRANCH_NOT_FOUND", "Branch was not found.", 404);
     }
-
-    throw new TenantBranchesError(
-      "BRANCH_VERSION_CONFLICT",
-      "Branch has been modified. Refresh and try again.",
-      409,
-    );
+    throw new TenantBranchesError("BRANCH_VERSION_CONFLICT", "Branch has been modified. Refresh and try again.", 409);
   }
 
-  return findBranchById(db, {
-    tenantId: input.tenantId,
-    branchId: input.branchId,
-  });
+  return findBranchById(db, { tenantId: input.tenantId, branchId: input.branchId });
 }
 
 export async function updateBranchStatusRecord(
@@ -267,26 +269,13 @@ export async function updateBranchStatusRecord(
       tenantId: input.tenantId,
       branchId: input.branchId,
     });
-
     if (!existing) {
-      throw new TenantBranchesError(
-        "BRANCH_NOT_FOUND",
-        "Branch was not found.",
-        404,
-      );
+      throw new TenantBranchesError("BRANCH_NOT_FOUND", "Branch was not found.", 404);
     }
-
-    throw new TenantBranchesError(
-      "BRANCH_VERSION_CONFLICT",
-      "Branch has been modified. Refresh and try again.",
-      409,
-    );
+    throw new TenantBranchesError("BRANCH_VERSION_CONFLICT", "Branch has been modified. Refresh and try again.", 409);
   }
 
-  return findBranchById(db, {
-    tenantId: input.tenantId,
-    branchId: input.branchId,
-  });
+  return findBranchById(db, { tenantId: input.tenantId, branchId: input.branchId });
 }
 
 export async function writeBranchCreatedAuditLog(
@@ -358,12 +347,8 @@ export async function writeBranchStatusChangedAuditLog(
     eventType: "branch.status_changed",
     entityType: "branch",
     entityId: input.after.id,
-    before: {
-      status: input.before.status,
-    },
-    after: {
-      status: input.after.status,
-    },
+    before: { status: input.before.status },
+    after: { status: input.after.status },
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
   });

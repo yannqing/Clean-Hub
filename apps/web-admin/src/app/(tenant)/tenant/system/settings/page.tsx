@@ -11,7 +11,7 @@ export default async function TenantSystemSettingsPage() {
     getTenantSettingsQuery(requestOptions).catch(() => undefined),
     webAdminApi.http
       .get<AuthContext>("/auth/me", requestOptions)
-      .catch(() => null),
+      .catch(() => undefined),
   ]);
 
   return (
