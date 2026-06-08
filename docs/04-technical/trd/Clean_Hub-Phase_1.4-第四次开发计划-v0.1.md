@@ -1,8 +1,10 @@
-# CleanHub Phase 1.4 第四次开发计划 v0.1
+# CleanHub Phase 1.4 第四次开发计划 v0.3
 
 | 版本 | 日期       | 状态  | 说明                                    |
 | ---- | ---------- | ----- | --------------------------------------- |
 | v0.1 | 2026-06-08 | Draft | POS 订单与客户闭环；支付与硬件 SDK 后置 |
+
+前序波次见 `Clean_Hub-Phase_1.3-第三次开发计划-v0.1.md`。
 
 ---
 
@@ -14,7 +16,7 @@ Cashier 登录 POS → 搜索或新建客户 → 创建订单 → 计价 → 确
 
 开发重心在 `apps/pos-web` 与订单/客户 API；租户后台以订单查询、统计为主；SaaS 平台不在本波次改动范围内。
 
-**本波次包含**：客户与订单、Cashier PIN 登录、POS 界面、状态流转、计价快照、审计、工作台/报表接入真实订单数据。
+**本波次包含**：客户与订单、POS PIN 登录（Owner/Manager/Cashier）、POS 界面、状态流转、计价快照、审计、工作台/报表接入真实订单数据。
 
 **本波次不包含**：支付、Wave/Orange Money、钱箱、打印 SDK、offline 生产同步、Mobile。（支付与硬件见 §20）
 
@@ -55,28 +57,40 @@ docs/04-technical/trd/Clean_Hub-Phase_1.2-PDF对齐-SaaS租户管理与账号边
 
 ```text
 SaaS 平台（/saas）           → 本波次不改动
-租户后台（/tenant）          → Owner / Manager：订单查询、报表/工作台接真实数据（次要）
-POS（pos-web + desktop）     → Cashier：登录、下单、查单、改状态（主要）
+租户后台（/tenant）          → Owner / Manager：password 登录；订单查询、报表/工作台（次要）
+POS（pos-web + desktop）     → Owner / Manager / Cashier：PIN 登录；下单、查单、改状态（主要）
 Mobile                       → 本波次不做
 ```
 
-| 角色            | Back Office | POS          | 本波次                            |
-| --------------- | ----------- | ------------ | --------------------------------- |
-| Owner / Manager | `/tenant`   | 可选         | 报表/概览接订单数；可选订单查询页 |
-| **Cashier**     | **禁止**    | **唯一入口** | PIN 登录 + 全流程                 |
+**双凭证模型**（对齐 `Clean_Hub-Phase_1.2-PDF对齐-SaaS租户管理与账号边界补丁-v0.1.md` §3.2）：
 
-Cashier **不得**调用 `/tenant/**` 写接口；订单写操作走 POS 专用 API（§12.1）。
+| 凭证 | 入口 | 适用角色 |
+| ---- | ---- | -------- |
+| **password** | `/auth/login` → web-admin `/tenant` | Owner、Manager |
+| **PIN** | `/pos/auth/login` → `pos-web` | Owner、Manager、Cashier |
 
-### 3.3 当前仓库缺口
+| 角色            | Back Office（password） | POS（PIN）   | 本波次                                      |
+| --------------- | ----------------------- | ------------ | ------------------------------------------- |
+| **Owner**       | `/tenant` ✅ 主入口      | ✅ 可选顶班   | 报表/概览；可 PIN 登 POS 下单/查单           |
+| **Manager**     | `/tenant` ✅ 主入口      | ✅ 可选顶班   | 绑定店报表/订单查询；可 PIN 登 POS           |
+| **Cashier**     | **禁止** `/tenant`      | ✅ **主入口** | 日常收银全流程；**不得**进租户后台         |
 
-| 项                                        | 现状                   | 本波次                     |
-| ----------------------------------------- | ---------------------- | -------------------------- |
-| `customers` / `orders` 表                 | 不存在                 | 李龙杰 Day 1 初始 schema   |
-| `tenant-customers` / `tenant-orders` 模块 | 不存在                 | 武帅杰 / 赵付杰 分模块交付 |
-| `pos-auth` 模块                           | 不存在                 | 杨序 独立交付              |
-| `AdminRole` 含 `cashier`                  | 未纳入 TypeScript 类型 | 李龙杰 Day 1 扩展          |
-| `pos-web`                                 | 占位页                 | 杨序 交付收银 UI           |
-| `GET /tenant/overview` 订单指标           | 硬编码 `0`             | 赵付杰 接真实统计          |
+Cashier **不得**访问 `/tenant/**`（`proxy.ts` 与 API 均拒绝）。Owner/Manager 订单后台查询走 `/tenant/orders`；**营业写操作**（建单、确认、状态流转）走 `/pos/**`（与 Cashier 共用 POS API，权限按角色区分，见 §8.1）。
+
+### 3.3 仓库状态与待交付项
+
+Day 1 阻塞项完成后，下表按「已完成 / 待交付」维护，避免重复开工。
+
+| 项 | 状态（截至 v0.3） | 本波次剩余工作 |
+| --- | --- | --- |
+| `commerce.ts`（customers / orders / order_items） | ✅ Day 1 已定稿 | 字段变更仍走李龙杰 |
+| `AdminRole` + `permission.helper` POS 守卫 | ✅ Day 1 已扩展 | `proxy.ts` Cashier 拦截（§8.4） |
+| 审计命名表 `tenant_customer` / `tenant_order` | ✅ 已补充 | 实现侧按 §16 写入 |
+| `tenant-customers` / `tenant-orders` 模块 | ❌ 待交付 | 武帅杰 / 赵付杰 Day 2 起 |
+| `pos-auth` + `pos-web` 主流程 | ❌ 待交付 | 杨序 Day 1 起 |
+| `proxy.ts` 拒绝 Cashier 进 `/tenant` | ❌ 待交付 | 李龙杰 Day 1–2（§14.1） |
+| `GET /tenant/overview` 订单指标 | 硬编码 `0` | 赵付杰 接真实统计 |
+| Cashier 验收账号 | 视 seed 而定 | Owner/Manager 在 `/tenant/users` 建 Cashier（现网 API 已支持 `cashier` 角色） |
 
 ---
 
@@ -87,17 +101,17 @@ Cashier **不得**调用 `/tenant/**` 写接口；订单写操作走 POS 专用 
 1. **数据库**：新增 `customers`、`orders`、`order_items` 及必要索引；字段含 `tenant_id`、`branch_id`、ULID 主键、审计元数据。
 2. **客户模块**（武帅杰）：租户范围内客户 CRUD、按手机/姓名搜索、同手机号候选列表。
 3. **订单模块**（赵付杰）：创建草稿、添加行项目、自动计价、确认订单（生成订单号、状态 `received`）、列表/详情、状态流转、改价（权限 + 审计）。
-4. **Cashier 认证**（杨序）：Pressing Code + PIN 登录；选店；会话写入 `branchId`；`device_id` 本地持久化（POS 端）。
+4. **POS 认证**（杨序）：Pressing Code + PIN 登录（**Owner / Manager / Cashier**）；选店；会话写入 `branchId`；`device_id` 本地持久化（POS 端）。
 5. **POS 收银 UI**（杨序）：登录 → 选店 → 搜索或新建客户 → 下单 → 确认 → 列表/详情/改状态；布局适配 **1280×800** 横屏。
-6. **权限**：`assertPosContext` / Cashier 仅访问 `/pos/**` 与只读 catalog；Owner/Manager 经 `/tenant/orders` 查询。
+6. **权限**：`assertPosContext` 允许 `owner` / `manager` / `cashier` 访问 `/pos/**`；Cashier **禁止** `/tenant/**`；Owner/Manager 订单后台查询经 `/tenant/orders`。
 7. **路由挂载**：李龙杰 单点更新 `app.ts`、`packages/api-client` 聚合（§13）。
 8. **审计**：客户与订单写操作写入 `audit_logs`（§17）。
 9. **端到端**：SaaS 建租户 → Owner 配服务/价格/员工(Cashier) → Cashier POS 登录 → 建单 → Owner 工作台见今日订单数。
 
 ### 4.2 P1 目标
 
-10. **租户订单查询页**（孙蕊蕊）：`/tenant/orders` 列表 + 详情（只读），Owner/Manager 按 `branchScope` 过滤。
-11. **`GET /tenant/reports`**：今日订单数、待取/进行中数量接真实数据（营收可先为订单金额汇总，不含支付渠道）。
+10. **租户订单页**（孙蕊蕊）：`/tenant/orders` 列表 + 详情；P1 在详情提供改价/取消（须 `reason`）；Owner/Manager 按 `branchScope` 过滤。
+11. **`GET /tenant/reports/summary`**：今日订单数、待取/进行中数量接真实数据（营收可先为订单金额汇总，不含支付渠道）。概览卡片走 `GET /tenant/overview`。
 12. **`apps/desktop`**：开发态加载 `pos-web` URL，不含硬件桥接。
 13. **扫码查单**：POS 订单搜索框支持 HID 扫码枪键盘输入（不集成厂商 SDK）。
 14. **租户后台 i18n**（赵付杰）：`/tenant` 业务页文案接入与 SaaS 侧一致的 i18n 体系（见 §10.1）。
@@ -111,7 +125,9 @@ Cashier **不得**调用 `/tenant/**` 写接口；订单写操作走 POS 专用 
 - `packages/offline` 同步队列生产可用。
 - 会员、积分、营销、库存、洗车完整流程。
 - Tenant Admin 内下单（下单仅在 POS）。
-- 订单删除（本波次仅 `cancelled` 状态 + 权限控制）。
+- POS 端折扣/改价 UI（确认后改价走租户后台 P1）。
+- 订单物理删除（本波次仅 `cancelled` + 权限控制）。
+- `order_status_events` 独立表（用 `audit_logs` 即可）。
 
 ---
 
@@ -130,7 +146,7 @@ Cashier **不得**调用 `/tenant/**` 写接口；订单写操作走 POS 专用 
 
 | 姓名       | 本波次分工原则                                               |
 | ---------- | ------------------------------------------------------------ |
-| **李龙杰** | Day 1：**订单域 schema 初始定稿**、`permission.helper` 扩展 Cashier/POS 守卫；**`app.ts` 与 `api-client` 单点挂载**；代码审核、验收统筹 |
+| **李龙杰** | Day 1：schema、`permission.helper`、`domain/pin` 骨架；Day 2：`proxy.ts` Cashier 拦截；**`app.ts` 与 api-client 单点挂载**；代码审核、验收统筹 |
 | **武帅杰** | **独立模块** `tenant-customers` 全栈后端；不修改 orders、pos、auth 核心文件 |
 | **杨序**   | **独立模块** `pos-auth` 后端 + **`apps/pos-web/**` 全部** + `apps/desktop` 开发加载 + `packages/api-client/src/pos/**`；不修改 tenant-orders、web-admin |
 | **赵付杰** | **`tenant-orders` 后端**；`tenant-overview` / `tenant-reports` 接真实订单统计；**租户侧 i18n**（参考 SaaS）；`packages/api-client` tenant orders 导出 |
@@ -156,7 +172,7 @@ packages/db/src/schema/
 apps/api/src/modules/
   tenant-customers/        # 武帅杰
   tenant-orders/           # 赵付杰
-  pos-auth/                # 杨序（Cashier PIN 登录、选店会话）
+  pos-auth/                # 杨序（PIN 登录：owner/manager/cashier、选店会话）
 
 apps/pos-web/src/
   app/                     # 杨序：login, branch-select, orders/*
@@ -184,35 +200,64 @@ packages/api-client/src/
 
 | 模块 / 操作                    | Owner    | Manager       | Cashier               |
 | ------------------------------ | -------- | ------------- | --------------------- |
-| `/tenant/**` 写接口            | ✅        | 部分          | ❌                     |
+| `/auth/login`（password）→ `/tenant` | ✅ | ✅ | ❌ |
+| `/tenant/**` 写接口            | ✅        | ✅（见下表）   | ❌                     |
 | `GET /tenant/orders`           | ✅ 全租户 | ✅ 绑定店      | ❌                     |
-| `POST /tenant/orders`          | ❌        | ❌             | ❌                     |
-| `POST /pos/auth/login`         | ❌        | ❌             | ✅                     |
-| `POST /pos/orders`             | ❌        | ❌             | ✅                     |
-| `PATCH /pos/orders/:id/status` | ❌        | ❌             | ✅                     |
-| 订单改价                       | —        | ✅（须审计）   | ❌                     |
-| 订单取消                       | —        | Owner/Manager | ❌（Cashier 无取消权） |
+| `POST /pos/auth/login`（PIN）  | ✅        | ✅             | ✅                     |
+| `POST /pos/orders`             | ✅        | ✅             | ✅                     |
+| `PATCH /pos/orders/:id/status` | ✅        | ✅             | ✅（正向流转）         |
+| 订单改价                       | ✅ P1（须审计） | ✅ P1（须审计） | ❌                     |
+| 订单取消                       | ✅ P1          | ✅ P1          | ❌（Cashier 无取消权） |
 
-租户后台 **不提供** 创建订单入口；改价/取消若需 Manager 操作，经 `/tenant/orders/:id` PATCH（P1 可仅 API，POS 不做 Manager 界面）。
+> **租户后台不提供建单**：没有 `POST /tenant/orders`，建单统一走 `POST /pos/orders`。
+>
+> **改价 / 取消（P1）**：API 为 `PATCH /tenant/orders/:id/price` 与 `PATCH /tenant/orders/:id/status`（取消时 `status=cancelled`）。Owner 与 Manager 权限相同；请求体须带 `reason`（见 §9）；审计 eventType 为 `order.price_overridden`、`order.cancelled`。本波次不做 POS 改价页，顶班改价走租户后台订单详情（§14.5）或 API 手测。
+>
+> **Manager 写权限**：与 Phase 1.2 §8.1 一致——客户、员工、服务、价格、门店（在授权范围内）等主数据可写；**订单营业写操作**（建单、确认、正向状态）走 `/pos/**`，不在 `/tenant` 里下单。
+
+| Manager 可写的 `/tenant` 模块（本波次相关） | 说明 |
+| --- | --- |
+| customers、users、services、prices、branches（授权店） | 沿用 1.2 |
+| orders | **仅** P1 的改价/取消 PATCH；无建单 |
 
 ### 8.2 POS 上下文守卫（李龙杰 · Day 1）
 
 新增 helper（`apps/api/src/modules/auth/permission.helper.ts` 或 `pos-context.helper.ts`）：
 
-| 函数                                        | 行为                                                         |
-| ------------------------------------------- | ------------------------------------------------------------ |
-| `assertPosContext(authContext)`             | 要求 `role === cashier` 且 `tenantId` 非空                   |
-| `requirePosBranchId(authContext, branchId)` | 校验 Cashier 绑定门店（`user_branches`）或会话当前店         |
-| `assertPosCatalogRead(authContext)`         | Cashier 可读 `/pos/catalog/services`（只读 services/prices） |
-
-`web-admin` 的 `proxy.ts` 保持 `/tenant` 仅 `owner`、`manager`；Cashier 登录后跳转 POS 基址，不进 `/tenant`。
+| 函数                                        | 行为                                                                 |
+| ------------------------------------------- | -------------------------------------------------------------------- |
+| `assertPosContext(authContext)`             | 要求 `role ∈ { owner, manager, cashier }` 且 `tenantId` 非空         |
+| `requirePosBranchId(authContext, branchId)` | **Owner**：租户内任意门店；**Manager/Cashier**：`user_branches` 绑定店或会话 `branchIds` |
+| `assertPosCatalogRead(authContext)`         | 上述 POS 角色可读 `/pos/catalog/services`（只读 services/prices）    |
 
 ### 8.3 门店数据范围
 
 订单列表/详情/写入均须：
 
 - `tenantId` 来自 `authContext`，禁止 body 覆盖。
-- `branchId` 来自 POS 会话或 Cashier 绑定店；Manager 查询订单时走既有 `branchScope`（李龙杰 helper，1.3 已交付）。
+- `branchId` 来自 POS 会话当前店：Owner 可选租户内任意店；Manager/Cashier 须在绑定店范围内。`/tenant/orders` 查询仍走既有 `branchScope`（1.3 已交付）。
+
+### 8.4 路由守卫与会话（李龙杰 · Day 1–2）
+
+Cashier 不能进租户后台，需要 **前端 + API 两层** 一起拦，不能只做一边。
+
+**`apps/web-admin/src/proxy.ts`**
+
+- `AdminRole` 扩展为含 `cashier`。
+- 访问 `/tenant/**` 时：仅 `owner`、`manager` 放行；`cashier` 重定向到 POS 基址（环境变量 `NEXT_PUBLIC_POS_WEB_URL`，本地默认 `http://localhost:3001`）或返回 403。
+- `cashier` 登录后默认落地页为 POS，**不得**落到 `/tenant`。
+
+**`apps/api`**
+
+- `/tenant/**` 继续用 `assertTenantContext`（已排除 `cashier`）。
+- `/pos/**` 用 `assertPosContext`。
+
+**Cookie 与双会话**
+
+POS 与 web-admin **共用** 同一套 HttpOnly cookie 名（与现网 `/auth/login` 一致）。因此：
+
+- Cashier 只应通过 `/pos/auth/login` 拿会话；即使手动打开 web-admin，也会被 `proxy.ts` 拦下。
+- Owner/Manager **password 会话**与 **PIN 会话**互斥：后登录的会覆盖 cookie。顶班收银前如需保留后台会话，应使用不同浏览器/无痕窗口，或先登出再 PIN 登录。验收场景 E.3 按此口径执行。
 
 ---
 
@@ -238,15 +283,31 @@ draft → received → in_progress → ready → delivered
 
 **状态变更规则**：
 
-- Cashier 可：`draft→received`，以及 `received/in_progress/ready/delivered` 正向流转（不允许跳过未授权跳转）。
-- 改价仅 `draft` 或需 Manager 权限的 `price_override` 审计事件。
-- 每次状态变更写 `audit_logs` + 可选 `order_status_events` 表（若李龙杰 schema 纳入）。
+- Owner / Manager / Cashier 在 POS 均可：`draft→received`，以及 `received → in_progress → ready → delivered` 正向流转（不允许跳步）。
+- 改价、取消仅 Owner/Manager，走 `PATCH /tenant/orders/:id/*`（P1）；Cashier 在 POS 与租户后台均不可操作。
+- 每次状态变更写 `audit_logs`，eventType 为 `order.status_changed`（取消用 `order.cancelled`）。
+
+**敏感操作须带原因**（对齐 Phase 1 §3.6 / §3.7 / 场景 11）：
+
+| 操作 | API | 请求体 | 审计 |
+| --- | --- | --- | --- |
+| 改价 | `PATCH /tenant/orders/:id/price` | `reason` 必填（1–500 字）；金额字段见 §12.2 | `order.price_overridden`，`reason` 写入 `audit_logs.reason` |
+| 取消 | `PATCH /tenant/orders/:id/status` | `status: "cancelled"` + `reason` 必填 | `order.cancelled` |
+| 正向改状态（POS） | `PATCH /pos/orders/:id/status` | `status` 必填；`reason` 本波次可选 | `order.status_changed` |
+
+**折扣与下单时改价（本波次范围）**：
+
+- **P0**：POS 下单按服务价格自动计价；`orders.discount_amount` 默认 `0`，不在 POS 做折扣 UI。
+- **P1**：确认后改价走 `PATCH .../price`（可调 `total_amount` / `discount_amount` / 行级金额，赵付杰与杨序对齐 DTO）。
+- Phase 1 产品里的「下单时手动改价/折扣」完整体验，本波次不单独做 POS 入口；若验收需要，用租户后台 P1 改价 API 覆盖。
+
+**`order_status_events` 表**：本波次 **不建**，状态历史以 `audit_logs` + 订单当前 `status` 为准。
 
 ---
 
 ## 10. P1 配套任务
 
-以下任务与 P0 主路径并行，安排在 D4–D5，不阻塞 Day 1–3 的 schema 与客户/订单开发。PIN 规则统一建议孙蕊蕊在 D4 先合并 `packages/domain`，便于杨序开发 `pos-auth` 时直接引用。
+以下任务与 P0 主路径并行。其中 **PIN 6 位规则**建议李龙杰 Day 1 先在 `packages/domain` 落骨架（`PIN_DIGIT_PATTERN`），杨序 `pos-auth` 直接引用；孙蕊蕊 D4 再统一 API 表单与 seed，避免两套正则。
 
 ### 10.1 租户后台 i18n（赵付杰）
 
@@ -289,7 +350,7 @@ Zod 负责拦截明显过短；动态策略校验仍由 service 层处理。
 
 Changelog PDF 中的 4 位 PIN 指锁屏、换班等场景；本波次 Cashier 使用 Pressing Code + PIN 登录，仍写入 `users.pin_hash`，格式统一为 6 位。PR 说明中注明与 PDF 原文的差异即可。
 
-**分工**：孙蕊蕊负责规则定义及 API、表单、seed 对齐；杨序在 `pos-auth` 中引用 `@cleanhub/domain`，不单独定义正则。
+**分工**：李龙杰 Day 1 提交 `packages/domain/src/pin.ts` 骨架；杨序 `pos-auth` 直接引用；孙蕊蕊 D4 统一 API 表单、seed 与其余 `^\d{4,6}$` 扫尾，不单独再定义正则。
 
 **产品规则**
 
@@ -333,7 +394,7 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 响应与审计均不得包含 PIN 明文
 ```
 
-**孙蕊蕊负责范围**：`packages/domain/**`、上述 validation 文件、SaaS/租户 PIN 相关表单、`messages/saas` 中 Owner PIN 文案、seed SQL。
+**孙蕊蕊负责范围**（domain 骨架除外）：上述 validation 文件、SaaS/租户 PIN 相关表单、`messages/saas` 中 Owner PIN 文案、seed SQL。
 
 **不在孙蕊蕊范围内**：`tenant-users.service`（重置逻辑已为 6 位）、`auth.service`、`pos-auth/**`（杨序）、`hashPin` 实现。
 
@@ -408,21 +469,23 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 
 ## 12. API 接口清单
 
-### 12.1 POS 路由（Cashier · 杨序挂载请求 / 李龙杰注册）
+### 12.1 POS 路由（Owner/Manager/Cashier · 杨序挂载请求 / 李龙杰注册）
 
 前缀建议：`/pos`（与 `/tenant` 分离，便于守卫）。
 
 | 方法  | 路径                      | 说明                                       | 负责人                         |
 | ----- | ------------------------- | ------------------------------------------ | ------------------------------ |
 | POST  | `/pos/auth/login`         | Pressing Code + PIN；返回 session / cookie | 杨序                           |
-| POST  | `/pos/auth/select-branch` | 多店 Cashier 选当前店                      | 杨序                           |
-| GET   | `/pos/auth/me`            | 当前 Cashier 上下文                        | 杨序                           |
+| POST  | `/pos/auth/select-branch` | 多店用户选当前店（Owner 全店 / 他角色绑定店） | 杨序                           |
+| GET   | `/pos/auth/me`            | 当前 POS 会话上下文                        | 杨序                           |
 | POST  | `/pos/auth/logout`        | 登出                                       | 杨序                           |
-| GET   | `/pos/catalog/services`   | 只读服务+价格（下单用）                    | 赵付杰 或 杨序 只读封装        |
-| GET   | `/pos/customers`          | 搜索客户                                   | 代理 tenant-customers 或薄封装 |
-| POST  | `/pos/customers`          | 快速新建客户                               | 同上                           |
+| GET   | `/pos/catalog/services`   | 只读服务+价格（下单用）                    | 业务：赵付杰；路由：`pos-catalog.routes.ts` 薄转发（杨序） |
+| GET   | `/pos/customers`          | 搜索客户                                   | 武帅杰 service；杨序 `pos-customers.routes.ts` 转发 |
+| POST  | `/pos/customers`          | 快速新建客户                               | 同上；守卫 `assertPosContext` |
 | POST  | `/pos/orders`             | 创建草稿订单                               | 赵付杰                         |
-| POST  | `/pos/orders/:id/items`   | 添加/更新行项目                            | 赵付杰                         |
+| POST  | `/pos/orders/:id/items`   | 新增行项目                                 | 赵付杰                         |
+| PATCH | `/pos/orders/:id/items/:itemId` | 更新行（数量、备注等，仅 `draft`）   | 赵付杰                         |
+| DELETE | `/pos/orders/:id/items/:itemId` | 删除行（仅 `draft`）              | 赵付杰                         |
 | POST  | `/pos/orders/:id/confirm` | 确认 → received + order_number             | 赵付杰                         |
 | PATCH | `/pos/orders/:id/status`  | 状态流转                                   | 赵付杰                         |
 | GET   | `/pos/orders`             | 列表（本店、日期、状态筛选）               | 赵付杰                         |
@@ -441,8 +504,20 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 | PATCH | `/tenant/customers/:id`     | 更新                | 武帅杰    |
 | GET   | `/tenant/orders`            | 列表（branchScope） | 赵付杰    |
 | GET   | `/tenant/orders/:id`        | 详情                | 赵付杰    |
-| PATCH | `/tenant/orders/:id/status` | Manager 改状态/取消 | 赵付杰 P1 |
-| PATCH | `/tenant/orders/:id/price`  | 改价（审计）        | 赵付杰 P1 |
+| PATCH | `/tenant/orders/:id/status` | Owner/Manager 取消或后台改状态（P1） | 赵付杰 P1 |
+| PATCH | `/tenant/orders/:id/price`  | Owner/Manager 改价（P1）            | 赵付杰 P1 |
+
+**P1 PATCH 请求体约定**（赵付杰 实现，写入 validation）：
+
+```typescript
+// PATCH /tenant/orders/:id/status — 取消
+{ status: "cancelled"; reason: string }  // reason 必填
+
+// PATCH /tenant/orders/:id/price — 改价（字段以实现为准，至少含 reason）
+{ reason: string; totalAmount?: string; discountAmount?: string; items?: ... }
+```
+
+正向状态流转以 POS `PATCH /pos/orders/:id/status` 为主；租户后台除取消外，本波次可不单独做「改状态」UI。
 
 ### 12.3 概览与报表（赵付杰）
 
@@ -457,7 +532,7 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 | ----------- | ---------- | ------------------------------------------------------------ |
 | **Batch A** | Day 1 下午 | 无（仅 schema + helper）                                     |
 | **Batch B** | Day 2      | `/tenant/customers`（武帅杰模块合并后）                      |
-| **Batch C** | Day 3      | `/tenant/orders` + `/pos/auth` + `/pos/orders` + `/pos/catalog` |
+| **Batch C** | Day 3      | `/tenant/orders` + `/pos/auth` + `/pos/orders` + `/pos/catalog` + `/pos/customers` |
 
 业务 PR **不得** 修改 `apps/api/src/app.ts`。合并后由模块负责人做 curl/前端联调验证。
 
@@ -467,11 +542,11 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 
 | 负责人     | 后端                                                         | 前端                                                      | api-client                           |
 | ---------- | ------------------------------------------------------------ | --------------------------------------------------------- | ------------------------------------ |
-| **李龙杰** | `schema/commerce.ts`；`permission.helper` Cashier/POS；**`app.ts`**；**`packages/api-client/src/tenant/index.ts`**、**`pos/index.ts` 聚合** | —                                                         | 审核导出                             |
+| **李龙杰** | `schema/commerce.ts`；`permission.helper`；**`proxy.ts` Cashier 拦截**；**`app.ts`**；**`packages/api-client` 聚合**；Day 1 可落 `packages/domain/pin.ts` 骨架 | — | 审核导出 |
 | **武帅杰** | **`tenant-customers/**`**                                    | —                                                         | **`tenant/customers.ts`**            |
 | **杨序**   | **`pos-auth/**`**；`/pos/*` 路由文件（薄层，调 orders/customers service） | **`apps/pos-web/**`**；**`apps/desktop/**`**              | **`packages/api-client/src/pos/**`** |
 | **赵付杰** | **`tenant-orders/**`**；`tenant-overview`；`tenant-reports`  | **`features/tenant/**` i18n（§10.1）**；overview 数据对接 | **`tenant/orders.ts`**               |
-| **孙蕊蕊** | domain PIN、validation、seed；`saas-users.validation`        | 订单查询页；security 可见性；PIN 表单                     | —                                    |
+| **孙蕊蕊** | validation、seed；`saas-users.validation`（PIN 规则引用 domain） | 订单查询页 + P1 改价/取消入口；security 可见性；PIN 表单 | — |
 | **许婧姝** | —                                                            | —                                                         | 测试与验收文档                       |
 
 **隔离约束（武帅杰 / 杨序）**：
@@ -494,15 +569,17 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 **Day 1（阻塞）**
 
 1. 定稿 §11 schema，执行 `db:generate`、`db:migrate`。
-2. 扩展 `AdminRole` 含 `cashier`；实现 `assertPosContext`、`requirePosBranchId`。
-3. 更新审计命名表 PR 或 §17 补充 `tenant_customer`、`tenant_order`。
-4. `pnpm --filter @cleanhub/db typecheck`、`pnpm --filter @cleanhub/api typecheck`。
+2. 扩展 API 侧 `AdminRole` 与 `assertPosContext`、`requirePosBranchId`（Owner 全店、他角色绑定店）。
+3. 审计命名表补充 `tenant_customer`、`tenant_order`（§16）。
+4. **`packages/domain/src/pin.ts` 骨架**（`PIN_DIGIT_LENGTH`、`PIN_DIGIT_PATTERN`），供杨序 `pos-auth` 与后续孙蕊蕊统一引用。
+5. `pnpm --filter @cleanhub/db typecheck`、`pnpm --filter @cleanhub/api typecheck`。
 
 **Day 2–5**
 
-5. 按 §12.4 挂载 Batch B/C。
-6. 维护 `packages/api-client/src/tenant/index.ts`、`pos/index.ts` 导出。
-7. Code review、验收脚本、Phase 1 场景 1/2/7/8 组织（不含支付/打印）。
+6. **`apps/web-admin/src/proxy.ts`**：Cashier 禁止 `/tenant/**`，默认跳转 POS（§8.4）。
+7. 按 §12.4 挂载 Batch B/C。
+8. 维护 `packages/api-client/src/tenant/index.ts`、`pos/index.ts` 导出。
+9. Code review、验收脚本、Phase 1 场景 1/2/7/8/11 组织（不含支付/打印）。
 
 ### 14.2 武帅杰 — `tenant-customers`（独立模块）
 
@@ -529,8 +606,8 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 
 **Day 1–2**
 
-1. **`pos-auth`**：实现 `POST /pos/auth/login`（Pressing Code + PIN）；`pin` 校验引用 `@cleanhub/domain`（孙蕊蕊 D4 合入后）；校验 Cashier 角色与 `user_branches`。
-2. `select-branch`、`/pos/auth/me`、`logout`；Cookie 策略与 web-admin 一致（HttpOnly）。
+1. **`pos-auth`**：`POST /pos/auth/login`（Pressing Code + PIN）；`pin` 校验引用 `@cleanhub/domain`（李龙杰 Day 1 骨架）；角色 **`owner` / `manager` / `cashier`**；Manager/Cashier 校验 `user_branches`，Owner 可选全租户门店。
+2. `select-branch`、`/pos/auth/me`、`logout`；Cookie 与 web-admin **同名** HttpOnly（§8.4）；登录成功跳转 `pos-web`，不写 `/tenant`。
 3. **`pos-web` 壳层**：1280×800 Layout、顶栏（店名、收银员、登出）、主导航（新单、订单列表、设置占位）。
 4. **`device_id`**：`localStorage` 生成 ULID 并持久化，创建订单时带给 API。
 5. 登录页 + 选店页 UI；`apps/desktop` 开发模式加载 `pos-web` dev URL。
@@ -546,7 +623,7 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 
 10. 与赵付杰 订单 API 全链路联调；修复 POS 侧问题；**不修改** `tenant-orders` 内部实现。
 
-**交付标准**：Cashier 可独立完成 §18.1 场景；PR 仅限 pos 相关目录。
+**交付标准**：Cashier 可独立完成 §17.1 场景 A–E；Owner/Manager 可用 PIN 登 POS 顶班收银（P1 手测即可）；PR 仅限 pos 相关目录。
 
 ### 14.4 赵付杰 — `tenant-orders` + 概览/报表 + 租户 i18n
 
@@ -558,18 +635,19 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 
 **Day 2–5（订单，P0）**
 
-1. Orders service：创建 draft、items CRUD、计价（读 `services`/`prices`）、confirm 生成 `order_number`。
+1. Orders service：创建 draft、行项目增删改（§12.1，仅 `draft`）、计价（读 `services`/`prices`）、confirm 生成 `order_number`。
 2. `GET /tenant/orders`、`GET /tenant/orders/:id`（branchScope）。
-3. `POST/PATCH` POS 侧订单路由所需 service 方法；状态机校验 §9。
-4. 改价/取消 API（P1，须审计 `order.price_overridden`、`order.cancelled`）。
-5. 更新 `getTenantOverview` 聚合查询，移除硬编码 `0`；`tenant-reports` 摘要接订单表。
-6. 与杨序 POS、武帅杰 客户 API 联调。
+3. POS 订单路由所需 service；状态机校验 §9。
+4. P1：`PATCH .../price`、`PATCH .../status`（取消），**`reason` 必填**，审计见 §9。
+5. `GET /pos/catalog/services` 只读封装（或提供 service 供杨序转发）。
+6. 更新 `getTenantOverview` 聚合；`GET /tenant/reports/summary` 接订单表。
+7. 与杨序 POS、武帅杰 客户 API 联调。
 
 **Day 4–5（i18n，P1，可与订单并行）**
 
-7. 按 §10.1 完成 `messages/tenant` 结构与 `useTenantI18n`。
-8. 优先迁移：**overview、branches、users、services、prices、settings**（与日常联调页面一致）。
-9. 孙蕊蕊 订单查询页、本波次改动的 overview 卡片 copy 由赵付杰 提供 `messages/tenant` 键值或协助迁移，避免孙蕊蕊 硬编码。
+8. 按 §10.1 完成 `messages/tenant` 结构与 `useTenantI18n`。
+9. 优先迁移：**overview、branches、users、services、prices、settings**（与日常联调页面一致）。
+10. 为孙蕊蕊订单页提供 `messages/tenant.orders` 文案键（含改价/取消相关 copy）。
 
 **i18n 约束**：参照 SaaS 模块命名与文件分层；**不修改** `messages/saas/**`、**不修改** `features/saas/**`（孙蕊蕊 负责 security 页见 §14.5）。
 
@@ -577,20 +655,20 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 
 任务细节见 §10.2–10.4，建议按以下顺序推进：
 
-1. **订单查询页**：`/tenant/orders` 只读列表与详情，按 `branchScope` 过滤；文案使用 `useTenantI18n`（依赖赵付杰 §10.1）。
-2. **安全页可见性**：扩展 `feature-visibility`，移除 security 组件中的注释隐藏逻辑（§10.2）。
-3. **password 校验**：`createSaasUserBodySchema.password` 最小长度对齐 8（§10.3）。
-4. **PIN 6 位统一**：建议 D4 优先完成 domain 规则及 API/表单/seed（§10.4）；合并后通知杨序在 `pos-auth` 中引用。
+1. **订单页（P1）**：`/tenant/orders` 列表 + 详情；Owner/Manager 在详情页提供 **改价、取消** 入口（弹窗填 `reason`，调 §12.2 PATCH）。列表与只读字段用 `useTenantI18n`（依赖赵付杰 §10.1）。
+2. **安全页可见性**：`feature-visibility` 替代注释隐藏（§10.2）。
+3. **password 校验**：`createSaasUserBodySchema.password` 最小长度 8（§10.3）。
+4. **PIN 6 位统一**：D4 对齐 API 表单与 seed（§10.4）；`pos-auth` 已在 Day 1 引用 domain 骨架，此处做全仓扫尾。
 
-**负责范围**：`packages/domain/**`、`feature-visibility.ts`、`features/saas/security/**`、`features/saas/tenants/**`（PIN 相关）、`features/tenant/users/**`（仅 PIN 表单）、相关 validation、seed、`messages/saas`（Owner PIN 文案）。
+**负责范围**：`feature-visibility.ts`、`features/tenant/orders/**`（含 P1 改价/取消 UI）、`features/saas/security/**`、`features/saas/tenants/**`（PIN 相关）、`features/tenant/users/**`（PIN 表单）、相关 validation、seed、`messages/saas`（Owner PIN 文案）。
 
 **禁止修改**：`features/tenant/**` 其余 i18n（赵付杰）、`tenant-orders`、`pos-auth/**`、`hashPin` 实现。
 
 ### 14.6 许婧姝
 
-1. 第四次测试用例：客户、订单、POS 登录、状态流转、Cashier 不能进 `/tenant`。
-2. P1：语言切换、password 过短 422、security 开关、PIN 6 位（§10.4）。
-3. 更新验收记录；对照 Phase 1 §6.3 场景 1、2、3、7、8。
+1. P0：客户、订单、POS PIN（Cashier 主路径）、状态流转、**Cashier 访问 `/tenant` 被拦**（proxy + API）。
+2. P1：订单详情改价/取消（含 `reason` + 审计）、语言切换、password 422、security 开关、PIN 6 位。
+3. 对照 Phase 1 §6.3 场景 1、2、3、7、8、**11**（权限与敏感操作原因）。
 
 ---
 
@@ -604,7 +682,7 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 | D4   | review                   | 联调缓冲               | 列表/状态/扫码                    | 报表、改价 P1；tenant i18n 结构 |
 | D5   | 验收                     | 联调缓冲               | 全链路                            | 全链路；i18n 迁移收尾           |
 
-**并行（D4–D5）**：孙蕊蕊 — PIN 统一（优先）、订单查询页、security 可见性、password 校验；许婧姝 — D3 起编写用例，D5 验收。
+**并行（D4–D5）**：孙蕊蕊 — 订单页（含改价/取消）、PIN 表单与 seed 扫尾、security 可见性、password 校验；许婧姝 — D3 起编写用例，D5 验收。
 
 ---
 
@@ -651,11 +729,14 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 **场景 E — 权限**
 
 1. Cashier 访问 `/tenant` 返回 403 或重定向。
-2. Cashier 不能改价、不能取消（若未授予）。
+2. Cashier 在 POS 不能改价、不能取消。
+3. Owner/Manager 用 password 可进 `/tenant`；PIN 与 password 会话互斥规则见 §8.4。
 
 ### 17.2 P1
 
-- Manager 在 `/tenant/orders` 查看本店订单列表。
+- Owner/Manager PIN 登录 POS，完成选店并建单、确认（顶班收银）。
+- Manager 在 `/tenant/orders` 查看本店订单；Owner 可看全租户。
+- Owner 或 Manager 在订单详情执行 **改价、取消**，填写 `reason`，审计可查。
 - `GET /tenant/reports/summary` 返回真实订单计数。
 - 租户后台切换 en / zh-CN 后，已迁移页面无硬编码英文（§10.1）。
 - `feature-visibility` 控制安全页区块显示，无注释块隐藏逻辑（§10.2）。
@@ -675,7 +756,9 @@ seed 更新：使用 `hashPin('123456')` 生成 hash，替换 SQL 中各账号�
 | 客户/订单 API 契约延迟 | POS 界面无法联调    | Day 1 晚对齐 DTO；杨序 阶段内使用 mock                   |
 | 多人改 `app.ts`        | 合并冲突            | 仅李龙杰 修改；Batch 挂载                                |
 | 计价与价格快照不一致   | 财务纠纷            | 确认订单时写快照；单测覆盖                               |
-| Cashier 种子账号缺失   | 无法验 POS          | 李龙杰 Day 1 补充 seed 或文档说明 Owner 建 Cashier       |
+| Cashier 验收账号缺失   | 无法验 POS          | Owner/Manager 在 `/tenant/users` 建 Cashier；§10.4 更新 seed `pin_hash` |
+| `proxy.ts` 未拦 Cashier | Cashier 误入后台 | 李龙杰 Day 2 必交付 §8.4 |
+| 改价仅有 API 无 UI     | 场景 11 难验收      | 孙蕊蕊 订单详情 P1 入口（§14.5） |
 | 武帅杰/杨序 目录互侵   | 进度互相阻塞        | §13 隔离约束 + review 拒绝交叉文件                       |
 | 租户 i18n 未就绪       | 孙蕊蕊 订单页硬编码 | 赵付杰 D4 先交付 `useTenantI18n` 骨架与 orders 模块 copy |
 

@@ -15,6 +15,8 @@
 | `tenant_notification` | 通知配置 | notification_settings |
 | `tenant_settings` | 租户设置 | tenant_settings |
 | `tenant_backup` | 备份与恢复 | backup_jobs、restore_requests |
+| `tenant_customer` | 客户 | customers CRUD |
+| `tenant_order` | 订单 | orders 创建、确认、状态、改价、取消 |
 
 ## eventType 建议（按模块）
 
@@ -74,6 +76,23 @@
 | --------- | ---- |
 | `backup_job.created` | 创建备份任务记录 |
 | `restore_request.created` | 提交恢复申请 |
+
+### tenant_customer
+
+| eventType | 说明 |
+| --------- | ---- |
+| `customer.created` | 创建客户 |
+| `customer.updated` | 更新客户 |
+
+### tenant_order
+
+| eventType | 说明 |
+| --------- | ---- |
+| `order.created` | 创建草稿订单 |
+| `order.confirmed` | 确认收件（生成 `order_number`） |
+| `order.status_changed` | 状态流转 |
+| `order.price_overridden` | 改价（`before`/`after` 含金额） |
+| `order.cancelled` | 取消订单 |
 
 ## 写入约定
 

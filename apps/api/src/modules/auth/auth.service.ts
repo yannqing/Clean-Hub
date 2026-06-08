@@ -53,7 +53,7 @@ function resolvePrimaryRole(user: AuthenticatedUser, access: UserAccess): AdminR
   const rolePriority: AdminRole[] =
     user.userType === "saas"
       ? ["super_admin", "support"]
-      : ["owner", "manager"];
+      : ["owner", "manager", "cashier"];
 
   const role = rolePriority.find((candidate) =>
     access.roles.includes(candidate),

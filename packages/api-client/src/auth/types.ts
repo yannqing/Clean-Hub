@@ -1,4 +1,9 @@
-export type AdminRole = "super_admin" | "support" | "owner" | "manager";
+export type AdminRole =
+  | "super_admin"
+  | "support"
+  | "owner"
+  | "manager"
+  | "cashier";
 
 export type AuthContext = {
   userId: string;

@@ -812,7 +812,7 @@ pnpm --filter @cleanhub/api-client typecheck
 - **硬件**：`packages/hardware` 对接 POS-T1101 内置打印/扫码（或 OCPP 外接小票机）；钱箱脉冲；标签机 OCBP-M810 可后置
 - `GET /tenant/overview` 接真实订单统计
 
-详见后续 `Clean_Hub-Phase_1.3-第四次开发计划-v0.1.md`（待编写）。
+详见 `Clean_Hub-Phase_1.4-第四次开发计划-v0.1.md`。
 
 ---
 

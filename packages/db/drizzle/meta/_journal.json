@@ -43,6 +43,13 @@
       "when": 1780451917236,
       "tag": "0005_cloudy_absorbing_man",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1780887248397,
+      "tag": "0006_ancient_boomer",
+      "breakpoints": true
     }
   ]
 }
