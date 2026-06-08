@@ -16,51 +16,68 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  toast,
 } from "@cleanhub/ui";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+
+import { createBranchAction } from "../actions";
+import { branchLanguageOptions, emptyBranchFormValues } from "../constants";
 import { BRANCH_LIST_LIMIT, getBranchListQuery } from "../queries";
 import type {
-  BranchListFilters,
+  BranchFormValues,
+  BranchLanguage,
   BranchStatus,
   BranchSummary,
 } from "../types";
 
 type StatusFilter = "all" | BranchStatus;
+type BranchActionFailure = {
+  ok: false;
+  errors?: Partial<Record<keyof BranchFormValues, string>>;
+  message?: string;
+};
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Branch request failed.";
 }
 
 function formatDate(value?: string | null): string {
-  if (!value) return "Not updated";
+  if (!value) {
+    return "Not updated";
+  }
+
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "Invalid date";
+
+  if (Number.isNaN(date.getTime())) {
+    return "Invalid date";
+  }
+
   return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 }
 
-export type BranchListViewProps = {
-  initialBranches?: BranchSummary[];
-  initialError?: string;
-  initialFilters?: BranchListFilters;
-};
+function getActionFailureMessage(result: BranchActionFailure): string {
+  return (
+    (result.errors ? Object.values(result.errors)[0] : undefined) ??
+    result.message ??
+    "Branch request failed."
+  );
+}
 
-export function BranchListView({
-  initialBranches,
-  initialError,
-  initialFilters,
-}: BranchListViewProps = {}) {
-  const [branches, setBranches] = useState<BranchSummary[]>(initialBranches ?? []);
-  const [query, setQuery] = useState(initialFilters?.q ?? "");
-  const [status, setStatus] = useState<StatusFilter>(initialFilters?.status ?? "all");
-  const [loading, setLoading] = useState(!initialBranches && !initialError);
-  const [error, setError] = useState<string | null>(initialError ?? null);
-  const isFirstFilterEffect = useRef(true);
+export function BranchListView() {
+  const [branches, setBranches] = useState<BranchSummary[]>([]);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<StatusFilter>("all");
+  const [form, setForm] = useState<BranchFormValues>(emptyBranchFormValues);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const filters = useMemo(
     () => ({
@@ -73,6 +90,7 @@ export function BranchListView({
   const loadBranches = useCallback(async () => {
     setLoading(true);
     setError(null);
+
     try {
       setBranches(await getBranchListQuery(filters));
     } catch (loadError) {
@@ -83,14 +101,8 @@ export function BranchListView({
   }, [filters]);
 
   useEffect(() => {
-    if (isFirstFilterEffect.current && (initialBranches !== undefined || initialError !== undefined)) {
-      isFirstFilterEffect.current = false;
-      return;
-    }
-    isFirstFilterEffect.current = false;
     let isCurrent = true;
 
-    setLoading(true);
     getBranchListQuery(filters)
       .then((items) => {
         if (isCurrent) {
@@ -99,33 +111,73 @@ export function BranchListView({
         }
       })
       .catch((loadError: unknown) => {
-        if (isCurrent) setError(getErrorMessage(loadError));
+        if (isCurrent) {
+          setError(getErrorMessage(loadError));
+        }
       })
       .finally(() => {
-        if (isCurrent) setLoading(false);
+        if (isCurrent) {
+          setLoading(false);
+        }
       });
 
-    return () => { isCurrent = false; };
-  }, [filters, initialBranches, initialError]);
+    return () => {
+      isCurrent = false;
+    };
+  }, [filters]);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSaving(true);
+    setFormError(null);
+
+    try {
+      const result = await createBranchAction(form);
+
+      if (!result.ok) {
+        const message = getActionFailureMessage(result);
+        setFormError(message);
+        toast.error(message);
+        return;
+      }
+
+      setForm(emptyBranchFormValues);
+      toast.success("Branch created.");
+      await loadBranches();
+    } catch (submitError) {
+      const message = getErrorMessage(submitError);
+      setFormError(message);
+      toast.error(message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function updateForm<K extends keyof BranchFormValues>(
+    key: K,
+    value: BranchFormValues[K],
+  ) {
+    setForm((current) => ({
+      ...current,
+      [key]: value,
+    }));
+  }
 
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <Badge variant="secondary">Tenant operations</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">Branches</h1>
+          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
+            Branches
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Maintain branch profiles and operating status for this tenant.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild>
-            <Link href={`${webAdminRoutes.tenant.branches}/new`}>Create branch</Link>
-          </Button>
-          <Button onClick={loadBranches} type="button" variant="outline">
-            {loading ? "Refreshing..." : "Refresh"}
-          </Button>
-        </div>
+        <Button onClick={loadBranches} type="button" variant="outline">
+          Refresh
+        </Button>
       </div>
 
       <div className="grid gap-3 border-b p-5 lg:grid-cols-[1fr_220px]">
@@ -133,16 +185,26 @@ export function BranchListView({
           <Label htmlFor="branch-search">Search</Label>
           <Input
             id="branch-search"
-            maxLength={120}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(event) => {
+              setLoading(true);
+              setQuery(event.target.value);
+            }}
             placeholder="Name, address, or phone"
             value={query}
           />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="branch-status-filter">Status</Label>
-          <Select onValueChange={(v) => setStatus(v as StatusFilter)} value={status}>
-            <SelectTrigger id="branch-status-filter"><SelectValue /></SelectTrigger>
+          <Select
+            onValueChange={(value) => {
+              setLoading(true);
+              setStatus(value as StatusFilter);
+            }}
+            value={status}
+          >
+            <SelectTrigger id="branch-status-filter">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               <SelectItem value="active">Active</SelectItem>
@@ -152,17 +214,157 @@ export function BranchListView({
         </div>
       </div>
 
+      <form className="grid gap-4 border-b p-5" onSubmit={handleSubmit}>
+        <div>
+          <h2 className="font-semibold">Create a branch</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Start with the operating profile, then complete receipt and schedule
+            settings from the detail page.
+          </p>
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="grid gap-2">
+            <Label htmlFor="branch-name">Name</Label>
+            <Input
+              id="branch-name"
+              onChange={(event) => updateForm("name", event.target.value)}
+              placeholder="Downtown branch"
+              value={form.name}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="branch-phone">Phone</Label>
+            <Input
+              id="branch-phone"
+              onChange={(event) => updateForm("phone", event.target.value)}
+              placeholder="+225 ..."
+              value={form.phone}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="branch-address">Address</Label>
+            <Input
+              id="branch-address"
+              onChange={(event) => updateForm("address", event.target.value)}
+              placeholder="Street and city"
+              value={form.address}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="branch-language">Default language</Label>
+            <Select
+              onValueChange={(value) =>
+                updateForm("defaultLanguage", value as BranchLanguage)
+              }
+              value={form.defaultLanguage}
+            >
+              <SelectTrigger id="branch-language">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {branchLanguageOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="branch-currency">Default currency</Label>
+            <Input
+              id="branch-currency"
+              maxLength={3}
+              onChange={(event) =>
+                updateForm("defaultCurrency", event.target.value.toUpperCase())
+              }
+              value={form.defaultCurrency}
+            />
+          </div>
+        </div>
+        {formError ? (
+          <p className="text-sm text-destructive">{formError}</p>
+        ) : null}
+        <Button className="w-fit" disabled={saving} type="submit">
+          {saving ? "Creating..." : "Create branch"}
+        </Button>
+      </form>
+
       <div className="p-5">
         {error ? (
-          <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
-            <span>{error}</span>
-            <Button onClick={loadBranches} size="sm" type="button" variant="outline">Retry</Button>
+          <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
+            {error}
           </div>
         ) : null}
-        
-        {loading && !error ? <div className="h-44 animate-pulse rounded-md bg-muted" /> : null}
-
+        {!error && loading ? (
+          <div className="h-44 animate-pulse rounded-md bg-muted" />
+        ) : null}
         {!error && !loading ? (
           <>
             {branches.length === BRANCH_LIST_LIMIT ? (
-              <div className="mb-3 rounded-md border bg-muted/30 p-3 text-sm text-muted
+              <div className="mb-3 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+                Only showing the first {BRANCH_LIST_LIMIT} branches. Use search
+                or filters to narrow the list.
+              </div>
+            ) : null}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Currency</TableHead>
+                  <TableHead>Updated</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {branches.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      className="py-10 text-center text-muted-foreground"
+                      colSpan={6}
+                    >
+                      No branches match the current filters.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  branches.map((branch) => (
+                    <TableRow key={branch.id}>
+                      <TableCell>
+                        <p className="font-medium">{branch.name}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {branch.address ?? "No address"}
+                        </p>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            branch.status === "active" ? "secondary" : "outline"
+                          }
+                        >
+                          {branch.status === "active" ? "Active" : "Inactive"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{branch.phone ?? "No phone"}</TableCell>
+                      <TableCell>{branch.defaultCurrency}</TableCell>
+                      <TableCell>{formatDate(branch.updatedAt)}</TableCell>
+                      <TableCell className="text-right">
+                        <Link
+                          className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+                          href={`${webAdminRoutes.tenant.branches}/${branch.id}`}
+                        >
+                          View details
+                        </Link>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </>
+        ) : null}
+      </div>
+    </section>
+  );
+}
