@@ -1,27 +1,28 @@
-export type ServicePricingMode = "per_item" | "per_kg";
-export type ServiceStatus = "active" | "disabled";
-export type ServiceBusinessLine = "laundry" | "dry_cleaning" | "pressing" | "car_wash" | "retail_products";
+export type ServicePricingUnit = "per_item" | "per_kg";
+export type ServiceStatus = "active" | "inactive";
+export type ServiceBusinessLine =
+  | "laundry"
+  | "car_wash"
+  | "retail"
+  | "delivery";
 
 export type ServiceSummary = {
   id: string;
   businessLine: ServiceBusinessLine;
   name: string;
-  category: string | null;
-  description: string | null;
-  pricingMode: ServicePricingMode;
+  categoryId: string | null;
+  pricingUnit: ServicePricingUnit;
   status: ServiceStatus;
-  sortOrder: number;
   updatedAt: string;
+  version: number;
 };
 
 export type CreateServiceRequest = {
   businessLine: ServiceBusinessLine;
   name: string;
-  category?: string | null;
-  description?: string | null;
-  pricingMode: ServicePricingMode;
+  categoryId?: string | null;
+  pricingUnit: ServicePricingUnit;
   status?: ServiceStatus;
-  sortOrder?: number;
 };
 
 export type UpdateServiceRequest = Partial<CreateServiceRequest>;

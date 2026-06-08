@@ -1,2 +1,2 @@
-export * from "./price-book-catalog-view";
-export * from "./price-book-table-placeholder";
+export * from "./price-catalog-view";
+export * from "./price-table-placeholder";

@@ -2,50 +2,39 @@ import type { AuthContext, AuthRequestMeta } from "../auth/auth.types.js";
 
 export type PriceBusinessLine =
   | "laundry"
-  | "dry_cleaning"
-  | "pressing"
   | "car_wash"
-  | "retail_products";
+  | "retail"
+  | "delivery";
 
-export type PriceBookStatus = "active" | "disabled" | "draft";
+export type PriceStatus = "active" | "inactive";
 
-export type PriceBookListInput = {
+export type PriceListInput = {
   businessLine?: PriceBusinessLine;
-  status?: PriceBookStatus;
-  branchId?: string;
+  status?: PriceStatus;
   q?: string;
   limit: number;
   offset: number;
 };
 
-export type PriceBookSummary = {
+export type PriceSummary = {
   id: string;
   tenantId: string;
+  serviceId: string;
+  serviceName: string;
   businessLine: PriceBusinessLine;
-  name: string;
+  amount: string;
   currency: string;
-  status: PriceBookStatus;
-  branchId: string | null;
-  effectiveFrom: string | null;
-  effectiveTo: string | null;
-  sortOrder: number;
+  status: PriceStatus;
   createdAt: string;
   updatedAt: string;
   version: number;
 };
 
-export type CreatePriceBookRequest = {
-  businessLine: PriceBusinessLine;
-  name: string;
-  currency: string;
-  status?: PriceBookStatus;
-  branchId?: string | null;
-  effectiveFrom?: string | null;
-  effectiveTo?: string | null;
-  sortOrder?: number;
+export type UpdatePriceRequest = {
+  amount?: string;
+  currency?: string;
+  status?: PriceStatus;
 };
-
-export type UpdatePriceBookRequest = Partial<CreatePriceBookRequest>;
 
 export type TenantPriceInput<TData> = {
   authContext: AuthContext;
@@ -53,14 +42,12 @@ export type TenantPriceInput<TData> = {
   data: TData;
 };
 
-export type PriceBookAuditSnapshot = {
+export type PriceAuditSnapshot = {
   tenantId: string;
+  serviceId: string;
+  serviceName: string;
   businessLine: PriceBusinessLine;
-  name: string;
+  amount: string;
   currency: string;
-  status: PriceBookStatus;
-  branchId: string | null;
-  effectiveFrom: string | null;
-  effectiveTo: string | null;
-  sortOrder: number;
+  status: PriceStatus;
 };

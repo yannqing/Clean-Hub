@@ -1,33 +1,29 @@
 export type ServiceBusinessLine =
   | "laundry"
-  | "dry_cleaning"
-  | "pressing"
   | "car_wash"
-  | "retail_products";
+  | "retail"
+  | "delivery";
 
-export type ServicePricingMode = "per_item" | "per_kg";
-export type ServiceStatus = "active" | "disabled";
+export type ServicePricingUnit = "per_item" | "per_kg";
+export type ServiceStatus = "active" | "inactive";
 
 export type ServiceSummary = {
   id: string;
   businessLine: ServiceBusinessLine;
   name: string;
-  category: string | null;
-  description: string | null;
-  pricingMode: ServicePricingMode;
+  categoryId: string | null;
+  pricingUnit: ServicePricingUnit;
   status: ServiceStatus;
-  sortOrder: number;
   updatedAt: string;
+  version: number;
 };
 
 export type ServiceFormValues = {
   businessLine: ServiceBusinessLine;
   name: string;
-  category: string;
-  description: string;
-  pricingMode: ServicePricingMode;
+  categoryId: string;
+  pricingUnit: ServicePricingUnit;
   status: ServiceStatus;
-  sortOrder: number;
 };
 
 export type ServiceListFilters = {

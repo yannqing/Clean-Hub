@@ -2,8 +2,7 @@ export type TenantPricesErrorCode =
   | "TENANT_CONTEXT_REQUIRED"
   | "TENANT_NOT_ACTIVE"
   | "FEATURE_DISABLED"
-  | "PRICE_BOOK_NOT_FOUND"
-  | "PRICE_BOOK_NAME_DUPLICATE";
+  | "PRICE_NOT_FOUND";
 
 export class TenantPricesError extends Error {
   constructor(

@@ -4,48 +4,41 @@ const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 export const priceBusinessLineSchema = z.enum([
   "laundry",
-  "dry_cleaning",
-  "pressing",
   "car_wash",
-  "retail_products",
+  "retail",
+  "delivery",
 ]);
 
-export const priceBookStatusSchema = z.enum(["active", "disabled", "draft"]);
+export const priceStatusSchema = z.enum(["active", "inactive"]);
 
-const nullableDateSchema = z
-  .string()
-  .trim()
-  .date()
-  .nullable()
-  .optional();
-
-export const priceBookListQuerySchema = z.object({
+export const priceListQuerySchema = z.object({
   businessLine: priceBusinessLineSchema.optional(),
-  status: priceBookStatusSchema.optional(),
-  branchId: z.string().regex(ULID_PATTERN).optional(),
+  status: priceStatusSchema.optional(),
   q: z.string().trim().min(1).max(120).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-export const priceBookParamsSchema = z.object({
-  priceBookId: z.string().regex(ULID_PATTERN),
+export const priceParamsSchema = z.object({
+  priceId: z.string().regex(ULID_PATTERN),
 });
 
-export const createPriceBookBodySchema = z.object({
-  businessLine: priceBusinessLineSchema,
-  name: z.string().trim().min(1).max(120),
-  currency: z.string().trim().length(3).toUpperCase(),
-  status: priceBookStatusSchema.default("draft"),
-  branchId: z.string().regex(ULID_PATTERN).nullable().optional(),
-  effectiveFrom: nullableDateSchema,
-  effectiveTo: nullableDateSchema,
-  sortOrder: z.number().int().min(0).max(9999).default(0),
-});
-
-export const updatePriceBookBodySchema = createPriceBookBodySchema
-  .partial()
+export const updatePriceBodySchema = z
+  .object({
+    amount: z
+      .union([z.string(), z.number()])
+      .transform((value) => String(value).trim())
+      .refine((value) => /^\d+(\.\d{1,2})?$/.test(value), {
+        message: "Amount must be a positive decimal with up to 2 decimals.",
+      })
+      .refine((value) => Number(value) > 0, {
+        message: "Amount must be greater than 0.",
+      })
+      .optional(),
+    currency: z.string().trim().length(3).toUpperCase().optional(),
+    status: priceStatusSchema.optional(),
+  })
   .refine(
     (value) => Object.keys(value).length > 0,
-    "At least one price book field must be provided.",
+    "At least one price field must be provided.",
   );

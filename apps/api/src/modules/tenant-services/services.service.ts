@@ -1,6 +1,10 @@
 import { getDb, type Database } from "@cleanhub/db";
 
-import { AuthError } from "../auth/auth.errors.js";
+import {
+  assertActiveTenant,
+  assertTenantContext,
+  requireFeatureEnabled,
+} from "../auth/permission.helper.js";
 import type { AuthContext, AuthRequestMeta } from "../auth/auth.types.js";
 import { writeAuditLog } from "../audit/audit.helper.js";
 import { TenantServicesError } from "./services.errors.js";
@@ -10,14 +14,12 @@ import {
   findServiceById,
   findServiceByName,
   findServices,
-  findTenantAccessById,
   softDeleteServiceRecord,
   updateServiceRecord,
   updateServiceStatusRecord,
 } from "./services.repository.js";
 import type {
   CreateServiceRequest,
-  ServiceBusinessLine,
   ServiceListInput,
   ServiceStatus,
   ServiceSummary,
@@ -25,65 +27,20 @@ import type {
 } from "./services.types.js";
 
 function requireTenantContext(authContext: AuthContext): string {
-  if (!authContext.tenantId) {
-    throw new TenantServicesError(
-      "TENANT_CONTEXT_REQUIRED",
-      "Tenant context is required for service catalog APIs.",
-      403,
-    );
-  }
+  assertTenantContext(authContext);
 
-  if (authContext.role !== "owner" && authContext.role !== "manager") {
-    throw new AuthError("FORBIDDEN", "User cannot access tenant services.");
-  }
-
-  return authContext.tenantId;
-}
-
-function isBusinessLineEnabled(
-  businessLine: ServiceBusinessLine,
-  flags: {
-    laundryEnabled: boolean | null;
-    carWashEnabled: boolean | null;
-    retailProductsEnabled: boolean | null;
-  },
-): boolean {
-  if (
-    businessLine === "laundry" ||
-    businessLine === "dry_cleaning" ||
-    businessLine === "pressing"
-  ) {
-    return flags.laundryEnabled ?? true;
-  }
-
-  if (businessLine === "car_wash") {
-    return flags.carWashEnabled ?? false;
-  }
-
-  return flags.retailProductsEnabled ?? false;
+  return authContext.tenantId!;
 }
 
 async function requireTenantReadyForServices(
+  authContext: AuthContext,
   db: Database,
-  tenantId: string,
-  businessLine?: ServiceBusinessLine,
+  businessLine?: ServiceListInput["businessLine"],
 ): Promise<void> {
-  const tenant = await findTenantAccessById(db, tenantId);
+  await assertActiveTenant(authContext, db);
 
-  if (!tenant || tenant.status !== "active") {
-    throw new TenantServicesError(
-      "TENANT_NOT_ACTIVE",
-      "Tenant is not active.",
-      403,
-    );
-  }
-
-  if (businessLine && !isBusinessLineEnabled(businessLine, tenant)) {
-    throw new TenantServicesError(
-      "FEATURE_DISABLED",
-      "This business line is not enabled for the tenant.",
-      403,
-    );
+  if (businessLine) {
+    await requireFeatureEnabled(authContext, businessLine, db);
   }
 }
 
@@ -94,7 +51,7 @@ export async function listTenantServices(
 ): Promise<ServiceSummary[]> {
   const tenantId = requireTenantContext(authContext);
 
-  await requireTenantReadyForServices(db, tenantId, input.businessLine);
+  await requireTenantReadyForServices(authContext, db, input.businessLine);
 
   return findServices(db, {
     ...input,
@@ -109,7 +66,7 @@ export async function getTenantServiceDetail(
 ): Promise<ServiceSummary> {
   const tenantId = requireTenantContext(authContext);
 
-  await requireTenantReadyForServices(db, tenantId);
+  await requireTenantReadyForServices(authContext, db);
 
   const service = await findServiceById(db, {
     tenantId,
@@ -124,7 +81,7 @@ export async function getTenantServiceDetail(
     );
   }
 
-  await requireTenantReadyForServices(db, tenantId, service.businessLine);
+  await requireTenantReadyForServices(authContext, db, service.businessLine);
 
   return service;
 }
@@ -137,7 +94,7 @@ export async function createTenantService(
 ): Promise<ServiceSummary> {
   const tenantId = requireTenantContext(authContext);
 
-  await requireTenantReadyForServices(db, tenantId, data.businessLine);
+  await requireTenantReadyForServices(authContext, db, data.businessLine);
 
   const duplicate = await findServiceByName(db, {
     tenantId,
@@ -184,7 +141,7 @@ export async function updateTenantService(
 ): Promise<ServiceSummary> {
   const tenantId = requireTenantContext(authContext);
 
-  await requireTenantReadyForServices(db, tenantId);
+  await requireTenantReadyForServices(authContext, db);
 
   if (data.name) {
     const duplicate = await findServiceByName(db, {
@@ -217,8 +174,8 @@ export async function updateTenantService(
     }
 
     await requireTenantReadyForServices(
+      authContext,
       tx,
-      tenantId,
       data.businessLine ?? before.businessLine,
     );
 
@@ -263,7 +220,7 @@ export async function updateTenantServiceStatus(
 ): Promise<ServiceSummary> {
   const tenantId = requireTenantContext(authContext);
 
-  await requireTenantReadyForServices(db, tenantId);
+  await requireTenantReadyForServices(authContext, db);
 
   return db.transaction(async (tx) => {
     const before = await findServiceAuditSnapshotById(tx, {
@@ -279,7 +236,7 @@ export async function updateTenantServiceStatus(
       );
     }
 
-    await requireTenantReadyForServices(tx, tenantId, before.businessLine);
+    await requireTenantReadyForServices(authContext, tx, before.businessLine);
 
     const service = await updateServiceStatusRecord(tx, {
       tenantId,
@@ -325,7 +282,7 @@ export async function deleteTenantService(
 ): Promise<void> {
   const tenantId = requireTenantContext(authContext);
 
-  await requireTenantReadyForServices(db, tenantId);
+  await requireTenantReadyForServices(authContext, db);
 
   await db.transaction(async (tx) => {
     const before = await findServiceAuditSnapshotById(tx, {
@@ -341,7 +298,7 @@ export async function deleteTenantService(
       );
     }
 
-    await requireTenantReadyForServices(tx, tenantId, before.businessLine);
+    await requireTenantReadyForServices(authContext, tx, before.businessLine);
 
     const deleted = await softDeleteServiceRecord(tx, {
       tenantId,

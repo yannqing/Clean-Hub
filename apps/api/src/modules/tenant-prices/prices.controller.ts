@@ -3,16 +3,13 @@ import type { Context } from "hono";
 import type { AppBindings } from "../../http/types.js";
 import { TenantPricesError } from "./prices.errors.js";
 import {
-  createTenantPriceBook,
-  deleteTenantPriceBook,
-  listTenantPriceBooks,
-  updateTenantPriceBook,
+  listTenantPrices,
+  updateTenantPrice,
 } from "./prices.service.js";
 import {
-  createPriceBookBodySchema,
-  priceBookListQuerySchema,
-  priceBookParamsSchema,
-  updatePriceBookBodySchema,
+  priceListQuerySchema,
+  priceParamsSchema,
+  updatePriceBodySchema,
 } from "./prices.validation.js";
 
 function getClientIp(c: Context<AppBindings>): string | undefined {
@@ -36,42 +33,22 @@ function createTenantPricesErrorResponse(
   );
 }
 
-export async function listTenantPriceBooksController(c: Context<AppBindings>) {
-  const query = priceBookListQuerySchema.parse(c.req.query());
-  const priceBooks = await listTenantPriceBooks(c.get("authContext"), query);
+export async function listTenantPricesController(c: Context<AppBindings>) {
+  const query = priceListQuerySchema.parse(c.req.query());
+  const prices = await listTenantPrices(c.get("authContext"), query);
 
-  return c.json(priceBooks);
+  return c.json(prices);
 }
 
-export async function createTenantPriceBookController(c: Context<AppBindings>) {
+export async function updateTenantPriceController(c: Context<AppBindings>) {
+  const params = priceParamsSchema.parse(c.req.param());
   const rawBody = await c.req.json().catch(() => ({}));
-  const data = createPriceBookBodySchema.parse(rawBody);
+  const data = updatePriceBodySchema.parse(rawBody);
 
   try {
-    const priceBook = await createTenantPriceBook(c.get("authContext"), data, {
-      ipAddress: getClientIp(c),
-      userAgent: c.req.header("user-agent"),
-    });
-
-    return c.json(priceBook, 201);
-  } catch (error) {
-    if (error instanceof TenantPricesError) {
-      return createTenantPricesErrorResponse(c, error);
-    }
-
-    throw error;
-  }
-}
-
-export async function updateTenantPriceBookController(c: Context<AppBindings>) {
-  const params = priceBookParamsSchema.parse(c.req.param());
-  const rawBody = await c.req.json().catch(() => ({}));
-  const data = updatePriceBookBodySchema.parse(rawBody);
-
-  try {
-    const priceBook = await updateTenantPriceBook(
+    const price = await updateTenantPrice(
       c.get("authContext"),
-      params.priceBookId,
+      params.priceId,
       data,
       {
         ipAddress: getClientIp(c),
@@ -79,26 +56,7 @@ export async function updateTenantPriceBookController(c: Context<AppBindings>) {
       },
     );
 
-    return c.json(priceBook);
-  } catch (error) {
-    if (error instanceof TenantPricesError) {
-      return createTenantPricesErrorResponse(c, error);
-    }
-
-    throw error;
-  }
-}
-
-export async function deleteTenantPriceBookController(c: Context<AppBindings>) {
-  const params = priceBookParamsSchema.parse(c.req.param());
-
-  try {
-    await deleteTenantPriceBook(c.get("authContext"), params.priceBookId, {
-      ipAddress: getClientIp(c),
-      userAgent: c.req.header("user-agent"),
-    });
-
-    return c.body(null, 204);
+    return c.json(price);
   } catch (error) {
     if (error instanceof TenantPricesError) {
       return createTenantPricesErrorResponse(c, error);

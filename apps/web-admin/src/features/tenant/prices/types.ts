@@ -1,38 +1,31 @@
 export type PriceBusinessLine =
   | "laundry"
-  | "dry_cleaning"
-  | "pressing"
   | "car_wash"
-  | "retail_products";
+  | "retail"
+  | "delivery";
 
-export type PriceBookStatus = "active" | "disabled" | "draft";
+export type PriceStatus = "active" | "inactive";
 
-export type PriceBookSummary = {
+export type PriceSummary = {
   id: string;
+  serviceId: string;
+  serviceName: string;
   businessLine: PriceBusinessLine;
-  name: string;
+  amount: string;
   currency: string;
-  status: PriceBookStatus;
-  branchId: string | null;
-  effectiveFrom: string | null;
-  effectiveTo: string | null;
-  sortOrder: number;
+  status: PriceStatus;
   updatedAt: string;
+  version: number;
 };
 
-export type PriceBookFormValues = {
-  businessLine: PriceBusinessLine;
-  name: string;
+export type PriceFormValues = {
+  amount: string;
   currency: string;
-  status: PriceBookStatus;
-  branchId: string;
-  effectiveFrom: string;
-  effectiveTo: string;
-  sortOrder: number;
+  status: PriceStatus;
 };
 
-export type PriceBookListFilters = {
+export type PriceListFilters = {
   businessLine?: PriceBusinessLine;
-  status?: PriceBookStatus;
+  status?: PriceStatus;
   q?: string;
 };
