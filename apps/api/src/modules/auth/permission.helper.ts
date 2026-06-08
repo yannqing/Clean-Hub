@@ -1,9 +1,10 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import {
   getDb,
   tenantFeatureFlags,
   tenants,
+  userBranches,
   type Database,
 } from "@cleanhub/db";
 
@@ -12,6 +13,7 @@ import type { AdminRole, AuthContext } from "./auth.types.js";
 
 export type SaasRole = Extract<AdminRole, "super_admin" | "support">;
 export type TenantRole = Extract<AdminRole, "owner" | "manager">;
+export type PosRole = Extract<AdminRole, "owner" | "manager" | "cashier">;
 export type TenantFeature =
   | "laundry"
   | "car_wash"
@@ -21,6 +23,7 @@ export type TenantFeature =
 
 const SAAS_ROLES: SaasRole[] = ["super_admin", "support"];
 const TENANT_ROLES: TenantRole[] = ["owner", "manager"];
+const POS_ROLES: PosRole[] = ["owner", "manager", "cashier"];
 
 const TENANT_FEATURE_COLUMNS: Record<
   TenantFeature,
@@ -124,6 +127,54 @@ export async function assertActiveTenant(
   if (!tenant || tenant.status !== "active") {
     throw new AuthError("FORBIDDEN", "Tenant is not active.");
   }
+}
+
+export function assertPosContext(authContext: AuthContext): void {
+  if (!authContext.tenantId) {
+    throw new AuthError("FORBIDDEN", "User cannot access POS resources.");
+  }
+
+  if (!POS_ROLES.includes(authContext.role as PosRole)) {
+    throw new AuthError("FORBIDDEN", "User cannot access POS resources.");
+  }
+}
+
+export async function requirePosBranchId(
+  authContext: AuthContext,
+  branchId: string,
+  db: Database = getDb(),
+): Promise<void> {
+  assertPosContext(authContext);
+
+  if (authContext.role === "owner") {
+    return;
+  }
+
+  const rows = await db
+    .select({ branchId: userBranches.branchId })
+    .from(userBranches)
+    .where(
+      and(
+        eq(userBranches.userId, authContext.userId),
+        eq(userBranches.tenantId, authContext.tenantId!),
+      ),
+    );
+
+  const allowedBranchIds = new Set([
+    ...rows.map((row) => row.branchId),
+    ...authContext.branchIds,
+  ]);
+
+  if (!allowedBranchIds.has(branchId)) {
+    throw new AuthError(
+      "FORBIDDEN",
+      "User is not assigned to this branch.",
+    );
+  }
+}
+
+export function assertPosCatalogRead(authContext: AuthContext): void {
+  assertPosContext(authContext);
 }
 
 export async function requireFeatureEnabled(

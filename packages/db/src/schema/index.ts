@@ -1,5 +1,6 @@
 export * from "./audit.js";
 export * from "./auth.js";
+export * from "./commerce.js";
 export * from "./id.js";
 export * from "./rbac.js";
 export * from "./saas.js";

@@ -1,6 +1,11 @@
 import type { Database } from "@cleanhub/db";
 
-export type AdminRole = "super_admin" | "support" | "owner" | "manager";
+export type AdminRole =
+  | "super_admin"
+  | "support"
+  | "owner"
+  | "manager"
+  | "cashier";
 
 export type AuthRequestMeta = {
   ipAddress?: string;
