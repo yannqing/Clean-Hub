@@ -7,6 +7,7 @@ import { webAdminApi } from "@/lib/api-client";
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
 import type { BranchFormValues, BranchSummary } from "../types";
 import { validateBranchForm } from "../validators";
+import { getBranchActionError } from "./branch-action-errors";
 
 type BranchActionResult =
   | {
@@ -20,24 +21,6 @@ type BranchActionResult =
       code?: string;
       status?: number;
     };
-
-function getActionError(error: unknown) {
-  const status =
-    typeof (error as { status?: unknown }).status === "number"
-      ? (error as { status: number }).status
-      : undefined;
-  const code =
-    typeof (error as { code?: unknown }).code === "string"
-      ? (error as { code: string }).code
-      : undefined;
-
-  return {
-    message:
-      error instanceof Error ? error.message : "Branch could not be created.",
-    code,
-    status,
-  };
-}
 
 export async function createBranchAction(
   input: BranchFormValues,
@@ -67,8 +50,7 @@ export async function createBranchAction(
   } catch (error) {
     return {
       ok: false,
-      errors: {},
-      ...getActionError(error),
+      ...getBranchActionError(error, "Branch could not be created."),
     };
   }
 }

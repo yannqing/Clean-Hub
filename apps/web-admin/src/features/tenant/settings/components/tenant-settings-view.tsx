@@ -117,6 +117,7 @@ export function TenantSettingsView({
   const [loading, setLoading] = useState(!initialSettings);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const enabledFeatureCount = useMemo(() => {
     if (!settings) {
@@ -131,6 +132,39 @@ export function TenantSettingsView({
     authContext?.role === "owner" &&
     authContext.tenantId === settings?.tenantId;
   const formDisabled = saving || !authLoaded || !canUpdateSettings;
+
+  async function loadSettings() {
+    setLoading(true);
+    setLoadError(null);
+    setSaveError(null);
+
+    const [settingsResult, authResult] = await Promise.allSettled([
+      getTenantSettingsQuery(),
+      webAdminApi.auth.me(),
+    ]);
+
+    setAuthContext(
+      authResult.status === "fulfilled" ? authResult.value : null,
+    );
+    setAuthError(
+      authResult.status === "fulfilled"
+        ? null
+        : "Permission could not be verified. Settings remain read-only.",
+    );
+    setAuthLoaded(true);
+
+    if (settingsResult.status === "fulfilled") {
+      setSettings(settingsResult.value);
+      setForm(toFormValues(settingsResult.value));
+      setErrors({});
+      setLoadError(null);
+    } else {
+      setSettings(null);
+      setLoadError(getErrorMessage(settingsResult.reason));
+    }
+
+    setLoading(false);
+  }
 
   useEffect(() => {
     let isCurrent = true;
@@ -148,22 +182,24 @@ export function TenantSettingsView({
           return;
         }
 
-        if (authResult.status === "fulfilled") {
-          setAuthContext(authResult.value);
-        } else {
-          setAuthContext(null);
-        }
+        setAuthContext(
+          authResult.status === "fulfilled" ? authResult.value : null,
+        );
+        setAuthError(
+          authResult.status === "fulfilled"
+            ? null
+            : "Permission could not be verified. Settings remain read-only.",
+        );
         setAuthLoaded(true);
 
         if (settingsResult.status === "fulfilled") {
           setSettings(settingsResult.value);
           setForm(toFormValues(settingsResult.value));
           setLoadError(null);
-          return;
+        } else {
+          setSettings(null);
+          setLoadError(getErrorMessage(settingsResult.reason));
         }
-
-        setSettings(null);
-        setLoadError(getErrorMessage(settingsResult.reason));
       })
       .finally(() => {
         if (isCurrent) {
@@ -256,8 +292,16 @@ export function TenantSettingsView({
   if (loadError || !settings) {
     return (
       <section className="p-5">
-        <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-          {loadError ?? "Tenant settings are unavailable."}
+        <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+          <span>{loadError ?? "Tenant settings are unavailable."}</span>
+          <Button
+            onClick={loadSettings}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            Retry
+          </Button>
         </div>
       </section>
     );
@@ -368,8 +412,8 @@ export function TenantSettingsView({
 
           {authLoaded && !canUpdateSettings ? (
             <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-              Only tenant owners can update these defaults. Managers can view
-              settings and feature flags.
+              {authError ??
+                "Only tenant owners can update these defaults. Managers can view settings and feature flags."}
             </div>
           ) : null}
 
@@ -384,7 +428,7 @@ export function TenantSettingsView({
               </Badge>
             ) : (
               <Badge className="w-fit" variant="outline">
-                Read-only
+                {authError ? "Permission unavailable" : "Read-only"}
               </Badge>
             )}
             <p className="text-xs text-muted-foreground">
