@@ -22,6 +22,10 @@ export type TenantFeature =
   | "notifications";
 
 const SAAS_ROLES: SaasRole[] = ["super_admin", "support"];
+// Tenant management routes (/tenant/**) are for owner/manager only.
+// Cashiers authenticate and operate exclusively through POS routes; use assertPosContext()
+// for any cashier-accessible endpoint. This is intentional — cashiers should never
+// reach back-office management APIs.
 const TENANT_ROLES: TenantRole[] = ["owner", "manager"];
 const POS_ROLES: PosRole[] = ["owner", "manager", "cashier"];
 

@@ -193,23 +193,18 @@ export function TenantUserListView({
       offset,
       q: search.trim() || undefined,
       status: statusFilter || undefined,
+      role: roleFilter || undefined,
+      branchId: branchFilter || undefined,
     }),
-    [offset, search, statusFilter],
+    [offset, search, statusFilter, roleFilter, branchFilter],
   );
 
   const loadUsers = useCallback(() => {
     return getTenantUserListQuery(listQuery)
       .then((result) => {
         if (!isCurrent.current) return;
-
-        const filtered = result.filter((u) => {
-          if (roleFilter && u.role !== roleFilter) return false;
-          if (branchFilter && !u.branchIds.includes(branchFilter)) return false;
-          return true;
-        });
-
         setError(null);
-        setUsers(filtered);
+        setUsers(result);
       })
       .catch((err: unknown) => {
         if (!isCurrent.current) return;
@@ -218,7 +213,7 @@ export function TenantUserListView({
       .finally(() => {
         if (isCurrent.current) setLoading(false);
       });
-  }, [listQuery, roleFilter, branchFilter]);
+  }, [listQuery]);
 
   useEffect(() => {
     void loadUsers();
@@ -278,9 +273,19 @@ export function TenantUserListView({
     setEditForm({
       displayName: user.displayName,
       branchIds: user.branchIds,
+      roleCode: user.role as TenantUserRoleCode,
     });
     setEditError(null);
     setEditOpen(true);
+
+    getTenantUserDetailQuery(user.id)
+      .then((detail) => {
+        if (!isCurrent.current) return;
+        setEditForm((prev) => ({ ...prev, phone: detail.phone ?? undefined }));
+      })
+      .catch(() => {
+        // phone stays empty; user can fill manually
+      });
   }, []);
 
   const handleEdit = useCallback(async () => {

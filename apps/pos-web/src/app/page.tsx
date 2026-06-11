@@ -1,10 +1,9 @@
 export default function PosHome() {
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-semibold">CleanHub POS</h1>
-      <p className="mt-4 text-sm text-gray-600">
-        Offline-first order intake, payments, labels, scanning, and delivery handoff.
+    <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
+      <p className="text-sm text-muted-foreground">
+        收银台（待实现 — 离线订单录入、支付、标签打印）
       </p>
-    </main>
+    </div>
   );
 }

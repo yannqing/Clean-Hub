@@ -6,9 +6,9 @@ const roleCodeSchema = z.enum(["owner", "manager", "cashier"]);
 
 export const listTenantUsersQuerySchema = z.object({
   q: z.string().trim().max(200).optional(),
-  status: z
-    .enum(["invited", "active", "disabled", "suspended"])
-    .optional(),
+  status: z.enum(["invited", "active", "disabled", "suspended"]).optional(),
+  role: z.enum(["owner", "manager", "cashier"]).optional(),
+  branchId: ulidSchema.optional(),
   limit: z.coerce.number().int().positive().max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });

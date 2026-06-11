@@ -1,3 +1,6 @@
+// DEPRECATED: These routes are superseded by modules/tenant-users (tenant staff CRUD)
+// and modules/saas-users (SaaS platform user management). Neither createTenantUserRoutes
+// nor createSaasUserRoutes is mounted in app.ts. Do not add new functionality here.
 import { Hono } from "hono";
 
 import type { AppBindings } from "../../http/types.js";

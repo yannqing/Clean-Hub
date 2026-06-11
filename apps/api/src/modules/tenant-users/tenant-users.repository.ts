@@ -261,6 +261,37 @@ export async function findTenantUsers(
 ): Promise<TenantUserListItem[]> {
   const searchQuery = normalizeSearchQuery(query.q);
 
+  const roleSubquery = query.role
+    ? db
+        .select({ userId: userRoles.userId })
+        .from(userRoles)
+        .innerJoin(roles, eq(roles.id, userRoles.roleId))
+        .where(
+          and(
+            eq(userRoles.tenantId, tenantId),
+            isNull(userRoles.branchId),
+            isNull(userRoles.revokedAt),
+            eq(roles.code, query.role),
+            eq(roles.scope, "tenant"),
+            eq(roles.tenantId, tenantId),
+            eq(roles.status, "active"),
+            isNull(roles.deletedAt),
+          ),
+        )
+    : undefined;
+
+  const branchSubquery = query.branchId
+    ? db
+        .select({ userId: userBranches.userId })
+        .from(userBranches)
+        .where(
+          and(
+            eq(userBranches.tenantId, tenantId),
+            eq(userBranches.branchId, query.branchId),
+          ),
+        )
+    : undefined;
+
   const rows = await db
     .select({
       id: users.id,
@@ -286,6 +317,8 @@ export async function findTenantUsers(
               ilike(userProfiles.displayName, searchQuery),
             )
           : undefined,
+        roleSubquery ? inArray(users.id, roleSubquery) : undefined,
+        branchSubquery ? inArray(users.id, branchSubquery) : undefined,
       ),
     )
     .orderBy(desc(users.createdAt))

@@ -89,7 +89,7 @@ export async function createTenantUser(
   ]);
 
   return db.transaction(async (tx) => {
-    const role = await findActiveTenantRoleByCode(tx, input.data.roleCode);
+    const role = await findActiveTenantRoleByCode(tx, tenantId, input.data.roleCode);
 
     if (!role) {
       throw new UserError(
@@ -274,7 +274,7 @@ export async function createTenantOwnerUser(
   ]);
 
   return db.transaction(async (tx) => {
-    const role = await findActiveTenantRoleByCode(tx, "owner");
+    const role = await findActiveTenantRoleByCode(tx, input.tenantId, "owner");
 
     if (!role) {
       throw new AuthError(

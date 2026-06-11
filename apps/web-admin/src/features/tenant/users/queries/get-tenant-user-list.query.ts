@@ -8,6 +8,8 @@ export type TenantUserListQuery = {
   offset?: number;
   q?: string;
   status?: string;
+  role?: string;
+  branchId?: string;
 };
 
 export async function getTenantUserListQuery(

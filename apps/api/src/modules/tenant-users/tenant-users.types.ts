@@ -6,6 +6,8 @@ export type TenantUserRoleCode = "owner" | "manager" | "cashier";
 export type ListTenantUsersQuery = {
   q?: string;
   status?: TenantUserStatus;
+  role?: TenantUserRoleCode;
+  branchId?: string;
   limit: number;
   offset: number;
 };

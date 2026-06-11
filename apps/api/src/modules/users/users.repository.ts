@@ -261,6 +261,7 @@ export type FindActiveTenantRoleResult = { id: string; code: string };
 
 export async function findActiveTenantRoleByCode(
   db: Database,
+  tenantId: string,
   roleCode: string,
 ): Promise<FindActiveTenantRoleResult | null> {
   const rows = await db
@@ -269,7 +270,7 @@ export async function findActiveTenantRoleByCode(
     .where(
       and(
         eq(roles.scope, "tenant"),
-        isNull(roles.tenantId),
+        eq(roles.tenantId, tenantId),
         eq(roles.code, roleCode),
         eq(roles.status, "active"),
         isNull(roles.deletedAt),
@@ -327,26 +328,23 @@ export async function insertTenantUserRecord(
     displayName: input.displayName,
   });
 
+  await db.insert(userRoles).values({
+    id: createId(),
+    userId,
+    roleId: input.role.id,
+    tenantId: input.tenantId,
+    branchId: null,
+    assignedBy: input.actorUserId,
+  });
+
   if (input.branchIds && input.branchIds.length > 0) {
-    await db.insert(userRoles).values(
+    await db.insert(userBranches).values(
       input.branchIds.map((branchId) => ({
-        id: createId(),
         userId,
-        roleId: input.role.id,
-        tenantId: input.tenantId,
         branchId,
-        assignedBy: input.actorUserId,
+        tenantId: input.tenantId,
       })),
     );
-  } else {
-    await db.insert(userRoles).values({
-      id: createId(),
-      userId,
-      roleId: input.role.id,
-      tenantId: input.tenantId,
-      branchId: null,
-      assignedBy: input.actorUserId,
-    });
   }
 
   return {
