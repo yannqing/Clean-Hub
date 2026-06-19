@@ -7,6 +7,7 @@ export type AdminRole =
 
 export type AuthContext = {
   userId: string;
+  displayName: string;
   tenantId: string | null;
   branchIds: string[];
   role: AdminRole;

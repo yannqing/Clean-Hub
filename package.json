@@ -20,6 +20,7 @@
     "db:generate": "pnpm --filter @cleanhub/db db:generate",
     "db:migrate": "pnpm --filter @cleanhub/db db:migrate",
     "db:push": "pnpm --filter @cleanhub/db db:push",
+    "db:seed": "pnpm --filter @cleanhub/db db:seed",
     "db:studio": "pnpm --filter @cleanhub/db db:studio",
     "openapi:generate": "node scripts/generate-openapi-from-routes.mjs",
     "release:build": "node scripts/build-release.mjs",

@@ -356,6 +356,7 @@ export class AuthService {
   ): Omit<AuthContext, "accessTokenExpiresAt"> {
     return {
       userId: user.id,
+      displayName: access.displayName,
       tenantId: user.tenantId,
       branchIds: access.branchIds,
       role: resolvePrimaryRole(user, access),

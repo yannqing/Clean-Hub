@@ -12,6 +12,7 @@ import {
   rolePermissions,
   roles,
   tenants,
+  userProfiles,
   userRoles,
   users,
   type Database,
@@ -99,6 +100,14 @@ export class AuthRepository {
         ),
       );
 
+    const profileRows = await this.db
+      .select({ displayName: userProfiles.displayName })
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, userId))
+      .limit(1);
+
+    const displayName = profileRows[0]?.displayName ?? userId;
+
     return {
       roles: [...new Set(rows.map((row) => row.roleCode))],
       permissions: [
@@ -115,6 +124,7 @@ export class AuthRepository {
             .filter((branchId): branchId is string => Boolean(branchId)),
         ),
       ],
+      displayName,
     };
   }
 

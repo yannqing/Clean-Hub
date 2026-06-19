@@ -143,6 +143,34 @@ pnpm db:migrate
 
 如果项目里已经有 migration 文件，这一步会把本地数据库升级到当前项目需要的结构。
 
+### 5.5 灌入开发种子数据
+
+```bash
+pnpm db:seed
+```
+
+这一步会写入本地开发用的初始数据（演示租户、角色、SaaS / 租户管理员账号等），方便直接登录联调。种子内容来自 `packages/db/src/seeds/`，可重复执行（基于 `ON CONFLICT DO UPDATE` 幂等）。
+
+开发账号（全部）：
+
+- 密码：`123456`
+- PIN：`1234`
+- SaaS：`saas.admin1@cleanhub.local`、`saas.admin2@cleanhub.local`、`saas.support1@cleanhub.local`
+- 租户管理员：`tenant.admin1@cleanhub.local`（CLEAN-001）、`tenant.admin2@cleanhub.local`（CLEAN-002）、`tenant.admin3@cleanhub.local`（CLEAN-003）
+
+### 5.6 重置本地数据库（清空重建）
+
+当迁移基线被重建、或本地数据结构错乱时，需要把本地数据库彻底清空后重新初始化：
+
+```bash
+docker compose down -v   # 注意 -v：删除数据卷，真正清空数据库
+pnpm db:up               # 重新启动空的 PostgreSQL
+pnpm db:migrate          # 应用迁移，重建表结构
+pnpm db:seed             # 重新灌入开发种子数据
+```
+
+> **关键提醒：`pnpm db:down`（即 `docker compose down`）不会删除数据卷**，旧表和旧的迁移记录会保留下来。此时直接 `pnpm db:migrate` 会因为"类型/表已存在"而报错。**只有 `docker compose down -v` 才会删除数据卷、真正清空数据库。**
+
 ## 6. 日常开发如何改表
 
 标准流程是：
@@ -514,7 +542,7 @@ PostgreSQL enum 和普通字符串不同，修改 enum 可能影响历史数据�
 - Migration：数据库结构变化，例如建表、加字段、建索引。
 - Seed：初始化业务数据，例如默认角色、默认权限、测试租户。
 
-后续项目可以单独增加 `db:seed`，但不要把大量测试数据混进结构迁移里。
+本项目已提供 `pnpm db:seed`（种子文件在 `packages/db/src/seeds/`），用于灌入开发初始数据。请保持结构归 migration、数据归 seed，不要把大量测试数据混进结构迁移里。
 
 ## 15. Clean Hub 当前推荐规则
 
@@ -538,11 +566,18 @@ Clean Hub 团队建议先按以下规则执行：
 cp .env.example .env
 pnpm db:up
 pnpm db:migrate
+pnpm db:seed
 
 # 修改表结构后
 pnpm db:generate
 pnpm db:migrate
 pnpm --filter @cleanhub/db typecheck
+
+# 重置本地数据库（清空重建）
+docker compose down -v
+pnpm db:up
+pnpm db:migrate
+pnpm db:seed
 
 # 查看数据库
 pnpm db:studio

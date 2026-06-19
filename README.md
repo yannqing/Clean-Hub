@@ -170,6 +170,36 @@ URL:
 http://localhost:3001
 ```
 
+POS Web uses dual-token (access + refresh) authentication shared with Web Admin.
+The terminal is single-store, so the tenant binding is read from env, not entered
+per login. After seeding the database, sign in with a cashier account.
+
+Seed cashier accounts (requires `pnpm db:up` + `pnpm db:migrate` first):
+
+```bash
+pnpm db:seed
+```
+
+Sign-in credentials (all four accounts share the same password):
+
+```text
+Email:    pos.cashier1@cleanhub.local   (also cashier2 / cashier3 / cashier4)
+Password: 123456
+Tenant:   CLEAN-001  (configured via POS_TENANT_CODE, see below)
+```
+
+Required env (set in the repo-root `.env`, already in `.env.example`):
+
+```text
+POS_TENANT_CODE=CLEAN-001
+NEXT_PUBLIC_POS_TENANT_CODE=CLEAN-001
+NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+```
+
+> Note: `NEXT_PUBLIC_*` values are injected at build/dev start. Restart the
+> POS Web dev server after changing them.
+
 ### API
 
 ```bash

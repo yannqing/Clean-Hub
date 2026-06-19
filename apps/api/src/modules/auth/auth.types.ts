@@ -30,6 +30,7 @@ export type LogoutInput = AuthRequestMeta & {
 
 export type AuthContext = {
   userId: string;
+  displayName: string;
   tenantId: string | null;
   branchIds: string[];
   role: AdminRole;
@@ -75,4 +76,5 @@ export type UserAccess = {
   roles: string[];
   permissions: string[];
   branchIds: string[];
+  displayName: string;
 };

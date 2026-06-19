@@ -170,6 +170,34 @@ pnpm --filter @cleanhub/pos-web dev
 http://localhost:3001
 ```
 
+POS Web 采用与 Web Admin 一致的双 Token（access + refresh）登录。POS 终端为单店设备，
+门店编码（tenantCode）从环境变量读取，无需在登录页输入。完成数据库 seed 后即可使用收银员账号登录。
+
+初始化收银员 seed 数据（需先执行 `pnpm db:up` + `pnpm db:migrate`）：
+
+```bash
+pnpm db:seed
+```
+
+登录账号（四个账号密码相同）：
+
+```text
+邮箱：    pos.cashier1@cleanhub.local   （以及 cashier2 / cashier3 / cashier4）
+密码：    123456
+门店编码：CLEAN-001  （通过 POS_TENANT_CODE 配置，见下）
+```
+
+所需环境变量（配置在仓库根 `.env`，`.env.example` 已包含）：
+
+```text
+POS_TENANT_CODE=CLEAN-001
+NEXT_PUBLIC_POS_TENANT_CODE=CLEAN-001
+NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+```
+
+> 注意：`NEXT_PUBLIC_*` 变量在 dev server 启动时注入，修改后需重启 POS Web。
+
 ### 启动 API
 
 ```bash
