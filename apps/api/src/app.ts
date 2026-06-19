@@ -9,31 +9,32 @@ import { createRequestContextMiddleware } from "./http/request-context.middlewar
 import type { AppBindings } from "./http/types.js";
 import { createAuthServiceFromEnv } from "./modules/auth/auth.factory.js";
 import { createAuthRoutes } from "./modules/auth/auth.routes.js";
-import { createSaasAuditRoutes } from "./modules/saas-audit/audit.routes.js";
+import { createSaasAuditRoutes } from "./modules/saas/audit/audit.routes.js";
 import {
   createSaasBackupRoutes,
   createSaasRestoreRequestRoutes,
-} from "./modules/saas-backups/backups.routes.js";
-import { createSaasFeedbackTicketRoutes } from "./modules/saas-feedback/feedback-tickets.routes.js";
-import { createSaasOperationLogRoutes } from "./modules/saas-ops/operation-logs.routes.js";
-import { createSaasOverviewRoutes } from "./modules/saas-overview/overview.routes.js";
-import { createSaasPlatformSettingsRoutes } from "./modules/saas-platform-settings/platform-settings.routes.js";
-import { createSaaSTestRoutes } from "./modules/saas/saas.routes.js";
-import { createSaasSecurityRoutes } from "./modules/saas-security/security.routes.js";
-import { createSaasTenantsRoutes } from "./modules/saas-tenants/tenants.routes.js";
-import { createSaasRolesRoutes } from "./modules/saas-users/saas-roles.routes.js";
-import { createSaasUsersRoutes } from "./modules/saas-users/saas-users.routes.js";
-import { createTenantAuditRoutes } from "./modules/tenant-audit/audit.routes.js";
-import { createTenantBackupRoutes } from "./modules/tenant-backups/backups.routes.js";
-import { createTenantHardwareRoutes } from "./modules/tenant-hardware/hardware.routes.js";
-import { createTenantBranchRoutes } from "./modules/tenant-branches/branches.routes.js";
-import { createTenantNotificationRoutes } from "./modules/tenant-notifications/notifications.routes.js";
-import { createTenantOverviewRoutes } from "./modules/tenant-overview/overview.routes.js";
-import { createTenantPriceRoutes } from "./modules/tenant-prices/prices.routes.js";
-import { createTenantReportRoutes } from "./modules/tenant-reports/reports.routes.js";
-import { createTenantServiceRoutes } from "./modules/tenant-services/services.routes.js";
-import { createTenantSettingsRoutes } from "./modules/tenant-settings/settings.routes.js";
-import { createTenantUsersRoutes } from "./modules/tenant-users/index.js";
+} from "./modules/saas/backups/backups.routes.js";
+import { createSaasFeedbackTicketRoutes } from "./modules/saas/feedback/feedback-tickets.routes.js";
+import { createSaasOperationLogRoutes } from "./modules/saas/ops/operation-logs.routes.js";
+import { createSaasOverviewRoutes } from "./modules/saas/overview/overview.routes.js";
+import { createSaasPlatformSettingsRoutes } from "./modules/saas/platform-settings/platform-settings.routes.js";
+import { createSaaSTestRoutes } from "./modules/saas/test/saas.routes.js";
+import { createSaasSecurityRoutes } from "./modules/saas/security/security.routes.js";
+import { createSaasTenantsRoutes } from "./modules/saas/tenants/tenants.routes.js";
+import { createSaasRolesRoutes } from "./modules/saas/users/saas-roles.routes.js";
+import { createSaasUsersRoutes } from "./modules/saas/users/saas-users.routes.js";
+import { createTenantAuditRoutes } from "./modules/tenant/audit/audit.routes.js";
+import { createTenantBackupRoutes } from "./modules/tenant/backups/backups.routes.js";
+import { createTenantHardwareRoutes } from "./modules/tenant/hardware/hardware.routes.js";
+import { createTenantBranchRoutes } from "./modules/tenant/branches/branches.routes.js";
+import { createTenantNotificationRoutes } from "./modules/tenant/notifications/notifications.routes.js";
+import { createTenantOverviewRoutes } from "./modules/tenant/overview/overview.routes.js";
+import { createTenantPriceRoutes } from "./modules/tenant/prices/prices.routes.js";
+import { createTenantReportRoutes } from "./modules/tenant/reports/reports.routes.js";
+import { createTenantServiceRoutes } from "./modules/tenant/services/services.routes.js";
+import { createTenantSettingsRoutes } from "./modules/tenant/settings/settings.routes.js";
+import { createTenantUsersRoutes } from "./modules/tenant/users/index.js";
+import { createPosRoutes } from "./modules/pos/pos.routes.js";
 
 export type CreateApiAppOptions = {
   env?: NodeJS.ProcessEnv;
@@ -82,6 +83,7 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
 
   app.use("/saas/*", createRequireAuthMiddleware(authService));
   app.use("/tenant/*", createRequireAuthMiddleware(authService));
+  app.use("/pos/*", createRequireAuthMiddleware(authService));
 
   // SaaS 平台 - 公共模块
   app.route("/saas/overview", createSaasOverviewRoutes());
@@ -114,6 +116,9 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.route("/tenant/backups", createTenantBackupRoutes());
   app.route("/tenant/reports", createTenantReportRoutes());
   app.route("/tenant/notification-settings", createTenantNotificationRoutes());
+
+  // POS 终端侧（收银员 / 店长 / 店主）
+  app.route("/pos", createPosRoutes());
 
   // 测试路由
   app.route("/saas/test/user", createSaaSTestRoutes());

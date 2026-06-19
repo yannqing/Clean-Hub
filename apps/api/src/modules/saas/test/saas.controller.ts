@@ -1,4 +1,4 @@
-import {AppBindings} from "../../http/types.js";
+import {AppBindings} from "../../../http/types.js";
 import {getUserService} from "./saas.service.js";
 
 export async function getUserController(c: import("hono").Context<AppBindings>) {

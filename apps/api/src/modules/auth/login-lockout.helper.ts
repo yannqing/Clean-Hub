@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { authLoginLockouts, type Database } from "@cleanhub/db";
 
 import { AuthError } from "./auth.errors.js";
-import type { EffectiveSecurityPolicy } from "../saas-security/security-policy.js";
+import type { EffectiveSecurityPolicy } from "../saas/security/security-policy.js";
 
 export function buildLoginLockKey(
   normalizedIdentifier: string,

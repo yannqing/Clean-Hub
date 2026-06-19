@@ -3,7 +3,7 @@ import type { Database } from "@cleanhub/db";
 import {
   getRefreshTokenTtlSeconds,
   resolveEffectiveSecurityPolicy,
-} from "../saas-security/security-policy.js";
+} from "../saas/security/security-policy.js";
 import { AuthError, invalidCredentials } from "./auth.errors.js";
 import { AuthRepository } from "./auth.repository.js";
 import type {

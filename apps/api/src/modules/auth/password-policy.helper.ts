@@ -1,5 +1,5 @@
 import { AuthError } from "./auth.errors.js";
-import type { EffectiveSecurityPolicy } from "../saas-security/security-policy.js";
+import type { EffectiveSecurityPolicy } from "../saas/security/security-policy.js";
 
 export function validatePasswordAgainstPolicy(
   password: string,

@@ -19,7 +19,7 @@ import {
 } from "@cleanhub/db";
 
 import { writeAuditLog } from "../audit/audit.helper.js";
-import { writeSecurityEvent } from "../saas-security/security-events.helper.js";
+import { writeSecurityEvent } from "../saas/security/security-events.helper.js";
 import type {
   AuthRequestMeta,
   AuthenticatedUser,
