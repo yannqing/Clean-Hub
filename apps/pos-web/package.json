@@ -10,9 +10,11 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cleanhub/api-client": "workspace:*",
     "@cleanhub/domain": "workspace:*",
     "@cleanhub/hardware": "workspace:*",
     "@cleanhub/i18n": "workspace:*",
+    "@cleanhub/id": "workspace:*",
     "@cleanhub/offline": "workspace:*",
     "@cleanhub/ui": "workspace:*",
     "next": "16.2.6",

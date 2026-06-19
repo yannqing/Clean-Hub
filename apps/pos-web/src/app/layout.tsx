@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import { Toaster } from "@cleanhub/ui";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "CleanHub POS",
-  description: "CleanHub point-of-sale interface",
+  description: "CleanHub 门店收银系统",
 };
 
 export default function RootLayout({
@@ -12,8 +14,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr">
-      <body>{children}</body>
+    <html lang="zh-CN">
+      <body>
+        {children}
+        <Toaster />
+      </body>
     </html>
   );
 }

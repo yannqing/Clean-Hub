@@ -1,0 +1,15 @@
+export const posRoutes = {
+  home: "/",
+  login: "/login",
+  workspace: "/",
+  newIntake: "/new-intake",
+  scan: "/scan",
+  customers: "/customers",
+  tickets: "/tickets",
+  orders: "/orders",
+  statistics: "/statistics",
+  garments: "/garments",
+  shiftHandover: "/shift-handover",
+  notifications: "/notifications",
+  settings: "/settings",
+} as const;

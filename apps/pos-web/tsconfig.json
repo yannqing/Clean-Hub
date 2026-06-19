@@ -2,6 +2,8 @@
   "extends": "../../packages/config/tsconfig.next.json",
   "compilerOptions": {
     "paths": {
+      "@/components/ui/*": ["../../packages/ui/src/components/ui/*"],
+      "@/lib/utils": ["../../packages/ui/src/lib/utils.ts"],
       "@/*": ["./src/*"]
     }
   },
