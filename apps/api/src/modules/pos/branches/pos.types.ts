@@ -1,5 +1,5 @@
-import type { AuthContext, AuthRequestMeta } from "../auth/auth.types.js";
-import type { BranchSummary } from "../tenant/branches/branches.types.js";
+import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
+import type { BranchSummary } from "../../tenant/branches/branches.types.js";
 
 /**
  * POS-facing DTOs. The POS terminal is read-mostly for store context, so these

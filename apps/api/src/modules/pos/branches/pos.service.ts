@@ -1,7 +1,7 @@
 import { getDb, type Database } from "@cleanhub/db";
 
-import { assertPosContext } from "../auth/permission.helper.js";
-import { findBranchById } from "../tenant/branches/branches.repository.js";
+import { assertPosContext } from "../../auth/permission.helper.js";
+import { findBranchById } from "../../tenant/branches/branches.repository.js";
 import type { PosBranchMeInput, PosBranchSummary } from "./pos.types.js";
 
 /**
