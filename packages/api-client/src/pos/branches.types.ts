@@ -1,4 +1,4 @@
-import type { BranchSummary } from "../tenant/branches.types";
+import type { BranchSummary } from "../tenant/branches/branches.types";
 
 /**
  * POS-facing branch DTO. The POS terminal only reads its own branch context,
