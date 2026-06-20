@@ -1,4 +1,4 @@
-import type { ApiClient } from "../types";
+import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   AuthContext,
   LoginRequest,
@@ -6,21 +6,26 @@ import type {
   RefreshResponse,
 } from "./types";
 
+type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
+
 export function createAuthSessionApi(client: ApiClient) {
   return {
-    login: (input: LoginRequest) =>
+    login: (input: LoginRequest, options: RequestOptions = {}) =>
       client.post<LoginResponse>("/auth/login", input, {
         skipAuthRefresh: true,
+        ...options,
       }),
-    refresh: () =>
+    refresh: (options: RequestOptions = {}) =>
       client.post<RefreshResponse>("/auth/refresh", undefined, {
         skipAuthRefresh: true,
+        ...options,
       }),
-    logout: () =>
+    logout: (options: RequestOptions = {}) =>
       client.post<void>("/auth/logout", undefined, {
         skipAuthRefresh: true,
         parseAs: "void",
+        ...options,
       }),
-    me: () => client.get<AuthContext>("/auth/me"),
+    me: (options: RequestOptions = {}) => client.get<AuthContext>("/auth/me", options),
   };
 }

@@ -1,8 +1,8 @@
 "use server";
 
-import type { AuthContext } from "@cleanhub/api-client";
 import { revalidatePath } from "next/cache";
 
+import { getAuthSessionQuery } from "@/features/auth/queries";
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
@@ -35,20 +35,9 @@ export async function updateTenantSettingsAction(
 ): Promise<TenantSettingsActionResult> {
   const requestOptions = await getTenantServerApiRequestOptions();
 
-  try {
-    const authContext = await webAdminApi.http.get<AuthContext>(
-      "/auth/me",
-      requestOptions,
-    );
+  const authContext = await getAuthSessionQuery(requestOptions);
 
-    if (authContext.role !== "owner" || !authContext.tenantId) {
-      return {
-        ok: false,
-        errors: {},
-        message: OWNER_ONLY_MESSAGE,
-      };
-    }
-  } catch {
+  if (!authContext || authContext.role !== "owner" || !authContext.tenantId) {
     return {
       ok: false,
       errors: {},

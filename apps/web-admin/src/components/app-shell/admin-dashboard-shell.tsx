@@ -11,8 +11,8 @@ import { filterSidebarSections } from "@/config/feature-visibility";
 import { webAdminWorkspaceTabs } from "@/config/navigation";
 import { webAdminRoutes } from "@/config/routes";
 import { LogoutButton } from "@/features/auth/components";
+import { getAuthSessionQuery } from "@/features/auth/queries";
 import { useWebAdminLocale } from "@/i18n";
-import { webAdminApi } from "@/lib/api-client";
 
 type AdminDashboardShellProps = {
   children: React.ReactNode;
@@ -85,19 +85,15 @@ export function AdminDashboardShell({
     let active = true;
 
     async function loadSession() {
-      try {
-        const session = await webAdminApi.auth.me();
+      const session = await getAuthSessionQuery();
 
-        if (!active) {
-          return;
-        }
+      if (!active) {
+        return;
+      }
 
+      if (session) {
         setAuthContext(session);
-      } catch {
-        if (!active) {
-          return;
-        }
-
+      } else {
         router.replace(webAdminRoutes.login);
       }
     }

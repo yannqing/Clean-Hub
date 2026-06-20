@@ -4,8 +4,8 @@ import { Button, Input, Label, cn, toast } from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { loginAction } from "../actions";
 import { webAdminRoutes } from "@/config/routes";
-import { webAdminApi } from "@/lib/api-client";
 
 import { getOrCreateWebAdminDeviceId } from "../utils";
 import {
@@ -94,6 +94,7 @@ export function LoginForm() {
     event.preventDefault();
     setErrorMessage(null);
 
+    // Quick client-side validation for instant field feedback.
     const validationErrors = validateLoginForm(formState);
     if (validationErrors) {
       setFieldErrors(validationErrors);
@@ -103,29 +104,23 @@ export function LoginForm() {
     setFieldErrors({});
     setSubmitting(true);
 
-    try {
-      const tenantCode = isTenantLogin
-        ? formState.tenantCode.trim()
-        : undefined;
+    const result = await loginAction({
+      ...formState,
+      deviceId: getOrCreateWebAdminDeviceId(),
+    });
 
-      const result = await webAdminApi.auth.login({
-        identifier: formState.identifier,
-        password: formState.password,
-        tenantCode,
-        deviceId: getOrCreateWebAdminDeviceId(),
-      });
-
-      toast.success("Signed in successfully.");
-      router.replace(resolvePostLoginPath(result.authContext.role));
-      router.refresh();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to sign in.";
-      setErrorMessage(message);
-      toast.error(message);
-    } finally {
+    if (!result.ok) {
+      setFieldErrors(result.errors);
+      setErrorMessage(result.message);
+      toast.error(result.message);
       setSubmitting(false);
+      return;
     }
+
+    toast.success("Signed in successfully.");
+    router.replace(resolvePostLoginPath(result.data.role));
+    router.refresh();
+    setSubmitting(false);
   }
 
   function updateField<K extends keyof LoginFormValues>(
