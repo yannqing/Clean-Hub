@@ -9,7 +9,11 @@ import { createDbConnection, getDatabaseUrl } from "../client.js";
 // Load the repo-root .env the same way drizzle.config.ts does.
 config({ path: join(dirname(fileURLToPath(import.meta.url)), "../../../../.env") });
 
-const SEED_FILES = ["dev-accounts.sql", "pos-cashiers.sql"] as const;
+const SEED_FILES = [
+  "dev-accounts.sql",
+  "pos-cashiers.sql",
+  "pos-business-data.sql",
+] as const;
 
 async function runSeeds(): Promise<void> {
   const seedsDir = dirname(fileURLToPath(import.meta.url));

@@ -8,8 +8,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { ulidColumn, ulidPrimaryKey } from "./id.js";
-import { tenants } from "./tenants.js";
+import { ulidColumn, ulidPrimaryKey } from "../id.js";
+import { tenants } from "../tenancy/tenants.js";
 import { users } from "./users.js";
 
 export const authRefreshTokens = pgTable(

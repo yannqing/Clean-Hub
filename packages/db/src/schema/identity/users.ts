@@ -10,8 +10,8 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { ulidColumn, ulidPrimaryKey } from "./id.js";
-import { tenants } from "./tenants.js";
+import { ulidColumn, ulidPrimaryKey } from "../id.js";
+import { tenants } from "../tenancy/tenants.js";
 
 export const userTypeEnum = pgEnum("user_type", ["saas", "tenant"]);
 export const userStatusEnum = pgEnum("user_status", [
