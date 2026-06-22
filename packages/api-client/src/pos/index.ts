@@ -6,8 +6,8 @@ import { createPosNotificationsApi } from "./notifications";
 import { createPosOrdersApi } from "./orders";
 import { createPosOverviewApi } from "./overview";
 import { createPosReceptionApi } from "./reception";
+import { createPosServiceTicketsApi } from "./service-tickets";
 import { createPosStaffApi } from "./staff";
-import { createPosTicketsApi } from "./tickets";
 
 export * from "./auth";
 export * from "./auth.types";
@@ -23,16 +23,16 @@ export * from "./overview";
 export * from "./overview.types";
 export * from "./reception";
 export * from "./reception.types";
+export * from "./service-tickets";
+export * from "./service-tickets.types";
 export * from "./staff";
 export * from "./staff.types";
-export * from "./tickets";
-export * from "./tickets.types";
 
 export function createPosApi(client: ApiClient) {
   return {
     branches: createPosBranchesApi(client),
     customers: createPosCustomersApi(client),
-    tickets: createPosTicketsApi(client),
+    serviceTickets: createPosServiceTicketsApi(client),
     orders: createPosOrdersApi(client),
     overview: createPosOverviewApi(client),
     staff: createPosStaffApi(client),

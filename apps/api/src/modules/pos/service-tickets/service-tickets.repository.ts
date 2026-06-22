@@ -1,0 +1,710 @@
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNull,
+  lte,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
+
+import {
+  customers,
+  orders,
+  orderItems,
+  serviceTickets,
+  ticketItems,
+  type Database,
+} from "@cleanhub/db";
+import { createId } from "@cleanhub/id";
+
+import type {
+  CreateServiceTicketRequest,
+  ServiceTicketAuditSnapshot,
+  ServiceTicketDetail,
+  ServiceTicketItem,
+  ServiceTicketListInput,
+  ServiceTicketOverview,
+  ServiceTicketStatus,
+  ServiceTicketSummary,
+  UpdateServiceTicketRequest,
+} from "./service-tickets.types.js";
+
+function normalizeNullable(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function escapeLikePattern(value: string): string {
+  return value.replace(/[\\%_]/g, (character) => `\\${character}`);
+}
+
+export function toTicketItem(
+  row: typeof ticketItems.$inferSelect,
+): ServiceTicketItem {
+  return {
+    id: row.id,
+    ticketId: row.ticketId,
+    itemType: row.itemType,
+    itemName: row.itemName,
+    itemCategory: row.itemCategory,
+    itemStatus: row.itemStatus,
+    itemColor: row.itemColor,
+    itemBrand: row.itemBrand,
+    itemMaterial: row.itemMaterial,
+    quantity: row.quantity,
+    unitAmount: row.unitAmount,
+    lineAmount: row.lineAmount,
+    serviceId: row.serviceId,
+    labelCode: row.labelCode,
+    defectNotes: row.defectNotes,
+    specialRequest: row.specialRequest,
+    remark: row.remark,
+    sortOrder: row.sortOrder,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    version: row.version,
+  };
+}
+
+type TicketJoinedRow = typeof serviceTickets.$inferSelect & {
+  customerName: string | null;
+  itemCount: string | number | null;
+  totalAmount: string | null;
+};
+
+function toTicketSummary(row: TicketJoinedRow): ServiceTicketSummary {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    branchId: row.branchId,
+    customerId: row.customerId,
+    customerName: row.customerName ?? "",
+    assistantId: row.assistantId,
+    ticketNo: row.ticketNo,
+    ticketType: row.ticketType,
+    ticketStatus: row.ticketStatus,
+    priority: row.priority,
+    sourceChannel: row.sourceChannel,
+    expectedPickupAt: row.expectedPickupAt
+      ? row.expectedPickupAt.toISOString()
+      : null,
+    completedAt: row.completedAt ? row.completedAt.toISOString() : null,
+    cancelledAt: row.cancelledAt ? row.cancelledAt.toISOString() : null,
+    itemCount: Number(row.itemCount ?? 0),
+    totalAmount: row.totalAmount ?? "0",
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    version: row.version,
+  };
+}
+
+function toTicketAuditSnapshot(
+  ticket: typeof serviceTickets.$inferSelect,
+): ServiceTicketAuditSnapshot {
+  return {
+    tenantId: ticket.tenantId,
+    branchId: ticket.branchId,
+    customerId: ticket.customerId,
+    ticketType: ticket.ticketType,
+    ticketStatus: ticket.ticketStatus,
+    priority: ticket.priority,
+    sourceChannel: ticket.sourceChannel,
+    expectedPickupAt: ticket.expectedPickupAt
+      ? ticket.expectedPickupAt.toISOString()
+      : null,
+    remark: ticket.remark,
+  };
+}
+
+/**
+ * Generate a tenant-unique, human-readable ticket number.
+ *
+ * Format: `TK-YYMMDD-{branchDailySeq:04d}`, e.g. `TK-260622-0007`.
+ *
+ * The sequence is the count of tickets already created for this branch on the
+ * same calendar day (resolved within the caller's transaction so concurrent
+ * inserts serialize through the `(tenant_id, ticket_no)` unique index). The
+ * index is the final guarantee of tenant uniqueness; if two requests race to
+ * the same sequence number, the second insert fails and the service layer can
+ * retry.
+ */
+async function generateTicketNo(
+  db: Database,
+  input: { tenantId: string; branchId: string; now: Date },
+): Promise<string> {
+  const yy = String(input.now.getUTCFullYear()).slice(-2);
+  const mm = String(input.now.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(input.now.getUTCDate()).padStart(2, "0");
+  const datePrefix = `${yy}${mm}${dd}`;
+
+  const countRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(serviceTickets)
+    .where(
+      and(
+        eq(serviceTickets.tenantId, input.tenantId),
+        eq(serviceTickets.branchId, input.branchId),
+        sql`to_char(${serviceTickets.createdAt} AT TIME ZONE 'UTC', 'YYMMDD') = ${datePrefix}`,
+      ),
+    );
+
+  const seq = (countRows[0]?.count ?? 0) + 1;
+
+  return `TK-${datePrefix}-${String(seq).padStart(4, "0")}`;
+}
+
+/**
+ * Generate a tenant-unique label code for a ticket item.
+ *
+ * Format: `{ticketNo}-{itemSeq:03d}`, e.g. `TK-260622-0007-003`. The sequence
+ * is the 1-based position of the item within its ticket (resolved within the
+ * caller's transaction).
+ */
+export async function generateLabelCode(
+  db: Database,
+  input: { tenantId: string; ticketId: string; ticketNo: string | null },
+): Promise<string> {
+  const countRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(ticketItems)
+    .where(
+      and(
+        eq(ticketItems.tenantId, input.tenantId),
+        eq(ticketItems.ticketId, input.ticketId),
+        isNull(ticketItems.deletedAt),
+      ),
+    );
+
+  const seq = (countRows[0]?.count ?? 0) + 1;
+  const ticketPart = input.ticketNo ?? input.ticketId.slice(-12).toUpperCase();
+
+  return `${ticketPart}-${String(seq).padStart(3, "0")}`;
+}
+
+// ---------------------------------------------------------------------------
+// List / detail
+// ---------------------------------------------------------------------------
+
+export async function findServiceTickets(
+  db: Database,
+  input: ServiceTicketListInput,
+): Promise<ServiceTicketSummary[]> {
+  const filters: SQL[] = [
+    eq(serviceTickets.tenantId, input.tenantId),
+    isNull(serviceTickets.deletedAt),
+  ];
+
+  if (input.allowedBranchIds !== undefined) {
+    if (input.allowedBranchIds.length === 0) {
+      return [];
+    }
+    filters.push(inArray(serviceTickets.branchId, input.allowedBranchIds));
+  }
+
+  if (input.branchId) {
+    filters.push(eq(serviceTickets.branchId, input.branchId));
+  }
+
+  if (input.status && input.status.length > 0) {
+    filters.push(inArray(serviceTickets.ticketStatus, input.status));
+  }
+
+  if (input.priority) {
+    filters.push(eq(serviceTickets.priority, input.priority));
+  }
+
+  if (input.ticketType) {
+    filters.push(eq(serviceTickets.ticketType, input.ticketType));
+  }
+
+  if (input.sourceChannel) {
+    filters.push(eq(serviceTickets.sourceChannel, input.sourceChannel));
+  }
+
+  if (input.customerId) {
+    filters.push(eq(serviceTickets.customerId, input.customerId));
+  }
+
+  if (input.assistantId) {
+    filters.push(eq(serviceTickets.assistantId, input.assistantId));
+  }
+
+  if (input.q) {
+    const query = `%${escapeLikePattern(input.q)}%`;
+    filters.push(
+      or(
+        sql`${serviceTickets.ticketNo} ilike ${query} escape '\\'`,
+        sql`${customers.fullName} ilike ${query} escape '\\'`,
+      )!,
+    );
+  }
+
+  if (input.expectedPickupBefore) {
+    filters.push(
+      lte(serviceTickets.expectedPickupAt, new Date(input.expectedPickupBefore)),
+    );
+  }
+
+  if (input.expectedPickupAfter) {
+    filters.push(
+      gt(serviceTickets.expectedPickupAt, new Date(input.expectedPickupAfter)),
+    );
+  }
+
+  const rows = await db
+    .select({
+      ticket: serviceTickets,
+      customerName: customers.fullName,
+      itemCount: sql<number>`(
+        select count(*)::int from ${ticketItems}
+        where ${ticketItems.ticketId} = ${serviceTickets.id}
+          and ${ticketItems.deletedAt} is null
+      )`,
+      totalAmount: sql<string>`coalesce((
+        select sum(${ticketItems.lineAmount}) from ${ticketItems}
+        where ${ticketItems.ticketId} = ${serviceTickets.id}
+          and ${ticketItems.deletedAt} is null
+      ), 0)`,
+    })
+    .from(serviceTickets)
+    .leftJoin(customers, eq(customers.id, serviceTickets.customerId))
+    .where(and(...filters))
+    .orderBy(desc(serviceTickets.createdAt))
+    .limit(input.limit)
+    .offset(input.offset);
+
+  return rows.map((row) => toTicketSummary({ ...row.ticket, ...row }));
+}
+
+export async function findServiceTicketById(
+  db: Database,
+  input: { tenantId: string; ticketId: string },
+): Promise<ServiceTicketSummary | null> {
+  const rows = await db
+    .select({
+      ticket: serviceTickets,
+      customerName: customers.fullName,
+      itemCount: sql<number>`(
+        select count(*)::int from ${ticketItems}
+        where ${ticketItems.ticketId} = ${serviceTickets.id}
+          and ${ticketItems.deletedAt} is null
+      )`,
+      totalAmount: sql<string>`coalesce((
+        select sum(${ticketItems.lineAmount}) from ${ticketItems}
+        where ${ticketItems.ticketId} = ${serviceTickets.id}
+          and ${ticketItems.deletedAt} is null
+      ), 0)`,
+    })
+    .from(serviceTickets)
+    .leftJoin(customers, eq(customers.id, serviceTickets.customerId))
+    .where(
+      and(
+        eq(serviceTickets.id, input.ticketId),
+        eq(serviceTickets.tenantId, input.tenantId),
+        isNull(serviceTickets.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  const row = rows[0];
+  return row ? toTicketSummary({ ...row.ticket, ...row }) : null;
+}
+
+export async function findServiceTicketDetail(
+  db: Database,
+  input: { tenantId: string; ticketId: string },
+): Promise<ServiceTicketDetail | null> {
+  const summary = await findServiceTicketById(db, input);
+  if (!summary) {
+    return null;
+  }
+
+  const itemRows = await db
+    .select()
+    .from(ticketItems)
+    .where(
+      and(
+        eq(ticketItems.ticketId, input.ticketId),
+        eq(ticketItems.tenantId, input.tenantId),
+        isNull(ticketItems.deletedAt),
+      ),
+    )
+    .orderBy(asc(ticketItems.sortOrder), asc(ticketItems.createdAt));
+
+  // Fetch the ticket remark (not present on summary).
+  const ticketRows = await db
+    .select({ remark: serviceTickets.remark })
+    .from(serviceTickets)
+    .where(eq(serviceTickets.id, input.ticketId))
+    .limit(1);
+
+  return {
+    ...summary,
+    remark: ticketRows[0]?.remark ?? null,
+    items: itemRows.map(toTicketItem),
+  };
+}
+
+export async function findServiceTicketRaw(
+  db: Database,
+  input: { tenantId: string; ticketId: string },
+): Promise<(typeof serviceTickets.$inferSelect) | null> {
+  const rows = await db
+    .select()
+    .from(serviceTickets)
+    .where(
+      and(
+        eq(serviceTickets.id, input.ticketId),
+        eq(serviceTickets.tenantId, input.tenantId),
+        isNull(serviceTickets.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
+export async function findServiceTicketAuditSnapshot(
+  db: Database,
+  input: { tenantId: string; ticketId: string },
+): Promise<ServiceTicketAuditSnapshot | null> {
+  const ticket = await findServiceTicketRaw(db, input);
+  return ticket ? toTicketAuditSnapshot(ticket) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Create / update / delete
+// ---------------------------------------------------------------------------
+
+export async function createServiceTicketRecord(
+  db: Database,
+  input: CreateServiceTicketRequest & {
+    tenantId: string;
+    actorUserId: string;
+  },
+): Promise<ServiceTicketSummary> {
+  const ticketId = createId();
+  const now = new Date();
+  const ticketNo = await generateTicketNo(db, {
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    now,
+  });
+
+  await db.insert(serviceTickets).values({
+    id: ticketId,
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    customerId: input.customerId,
+    assistantId: normalizeNullable(input.assistantId ?? null),
+    ticketNo,
+    ticketType: input.ticketType,
+    ticketStatus: "draft",
+    priority: input.priority ?? "normal",
+    sourceChannel: input.sourceChannel ?? "pos",
+    expectedPickupAt: input.expectedPickupAt
+      ? new Date(input.expectedPickupAt)
+      : null,
+    remark: input.remark ?? null,
+    createdBy: input.actorUserId,
+    updatedBy: input.actorUserId,
+  });
+
+  const ticket = await findServiceTicketById(db, {
+    tenantId: input.tenantId,
+    ticketId,
+  });
+
+  if (!ticket) {
+    throw new Error("Created service ticket could not be loaded.");
+  }
+
+  return ticket;
+}
+
+export async function updateServiceTicketRecord(
+  db: Database,
+  input: UpdateServiceTicketRequest & {
+    tenantId: string;
+    ticketId: string;
+    actorUserId: string;
+  },
+): Promise<ServiceTicketSummary | null> {
+  const existing = await findServiceTicketRaw(db, input);
+  if (!existing) {
+    return null;
+  }
+
+  await db
+    .update(serviceTickets)
+    .set({
+      ticketType: input.ticketType ?? existing.ticketType,
+      priority: input.priority ?? existing.priority,
+      sourceChannel: input.sourceChannel ?? existing.sourceChannel,
+      assistantId:
+        input.assistantId === undefined
+          ? existing.assistantId
+          : normalizeNullable(input.assistantId),
+      expectedPickupAt:
+        input.expectedPickupAt === undefined
+          ? existing.expectedPickupAt
+          : input.expectedPickupAt
+            ? new Date(input.expectedPickupAt)
+            : null,
+      remark:
+        input.remark === undefined ? existing.remark : input.remark ?? null,
+      updatedAt: new Date(),
+      updatedBy: input.actorUserId,
+      version: sql`${serviceTickets.version} + 1`,
+    })
+    .where(
+      and(
+        eq(serviceTickets.id, input.ticketId),
+        eq(serviceTickets.tenantId, input.tenantId),
+        isNull(serviceTickets.deletedAt),
+      ),
+    );
+
+  return findServiceTicketById(db, input);
+}
+
+export async function changeServiceTicketStatusRecord(
+  db: Database,
+  input: {
+    tenantId: string;
+    ticketId: string;
+    actorUserId: string;
+    version: number;
+    to: ServiceTicketStatus;
+  },
+): Promise<{ updated: boolean; exists: boolean }> {
+  const updatedRows = await db
+    .update(serviceTickets)
+    .set({
+      ticketStatus: input.to,
+      completedAt:
+        input.to === "picked_up"
+          ? new Date()
+          : sql`completed_at`,
+      cancelledAt:
+        input.to === "cancelled"
+          ? new Date()
+          : sql`cancelled_at`,
+      updatedAt: new Date(),
+      updatedBy: input.actorUserId,
+      version: sql`${serviceTickets.version} + 1`,
+    })
+    .where(
+      and(
+        eq(serviceTickets.id, input.ticketId),
+        eq(serviceTickets.tenantId, input.tenantId),
+        eq(serviceTickets.version, input.version),
+        isNull(serviceTickets.deletedAt),
+      ),
+    )
+    .returning({ id: serviceTickets.id });
+
+  if (updatedRows[0]) {
+    return { updated: true, exists: true };
+  }
+
+  const existing = await findServiceTicketRaw(db, input);
+  return { updated: false, exists: Boolean(existing) };
+}
+
+export async function softDeleteServiceTicketRecord(
+  db: Database,
+  input: { tenantId: string; ticketId: string; actorUserId: string },
+): Promise<boolean> {
+  const updatedRows = await db
+    .update(serviceTickets)
+    .set({
+      deletedAt: new Date(),
+      deletedBy: input.actorUserId,
+      updatedAt: new Date(),
+      updatedBy: input.actorUserId,
+      version: sql`${serviceTickets.version} + 1`,
+    })
+    .where(
+      and(
+        eq(serviceTickets.id, input.ticketId),
+        eq(serviceTickets.tenantId, input.tenantId),
+        isNull(serviceTickets.deletedAt),
+      ),
+    )
+    .returning({ id: serviceTickets.id });
+
+  return Boolean(updatedRows[0]);
+}
+
+// ---------------------------------------------------------------------------
+// Status-change settlement check (ready_to_pick → picked_up)
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether all orders linked to the ticket are settled.
+ *
+ * A linked order is any `orders` row whose `order_items` reference this ticket
+ * (the `order_items.ticket_id` back-pointer). The milestone rule: a ticket may
+ * only move to `picked_up` once every linked order is paid (`payment_status`
+ * in `paid`/`refunded`). If no orders are linked yet, the ticket is considered
+ * settled (no outstanding obligation).
+ */
+export async function areLinkedOrdersSettled(
+  db: Database,
+  input: { tenantId: string; ticketId: string },
+): Promise<boolean> {
+  const rows = await db
+    .select({
+      paymentStatus: orders.paymentStatus,
+    })
+    .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+    .where(
+      and(
+        eq(orders.tenantId, input.tenantId),
+        eq(orderItems.ticketId, input.ticketId),
+        isNull(orders.deletedAt),
+      ),
+    )
+    .groupBy(orders.id, orders.paymentStatus);
+
+  if (rows.length === 0) {
+    return true;
+  }
+
+  return rows.every((row) => row.paymentStatus === "paid");
+}
+
+// ---------------------------------------------------------------------------
+// Related orders
+// ---------------------------------------------------------------------------
+
+export async function findRelatedOrders(
+  db: Database,
+  input: { tenantId: string; ticketId: string },
+) {
+  const rows = await db
+    .select({
+      id: orders.id,
+      orderType: orders.orderType,
+      status: orders.status,
+      paymentStatus: orders.paymentStatus,
+      totalAmount: orders.totalAmount,
+      paidAmount: orders.paidAmount,
+      createdAt: orders.createdAt,
+    })
+    .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+    .where(
+      and(
+        eq(orders.tenantId, input.tenantId),
+        eq(orderItems.ticketId, input.ticketId),
+        isNull(orders.deletedAt),
+      ),
+    )
+    .groupBy(orders.id)
+    .orderBy(desc(orders.createdAt));
+
+  return rows.map((row) => ({
+    id: row.id,
+    orderType: row.orderType,
+    status: row.status,
+    paymentStatus: row.paymentStatus,
+    totalAmount: row.totalAmount,
+    paidAmount: row.paidAmount,
+    createdAt: row.createdAt.toISOString(),
+  }));
+}
+
+// ---------------------------------------------------------------------------
+// Overview
+// ---------------------------------------------------------------------------
+
+export async function findServiceTicketOverview(
+  db: Database,
+  input: { tenantId: string; allowedBranchIds?: string[]; branchId?: string },
+): Promise<ServiceTicketOverview> {
+  const baseFilters: SQL[] = [
+    eq(serviceTickets.tenantId, input.tenantId),
+    isNull(serviceTickets.deletedAt),
+  ];
+
+  if (input.allowedBranchIds !== undefined) {
+    if (input.allowedBranchIds.length === 0) {
+      return {
+        tenantId: input.tenantId,
+        branchId: input.branchId ?? null,
+        byStatus: {},
+        overdueCount: 0,
+        todayCreatedCount: 0,
+        todayPickedUpCount: 0,
+      };
+    }
+    baseFilters.push(inArray(serviceTickets.branchId, input.allowedBranchIds));
+  }
+
+  if (input.branchId) {
+    baseFilters.push(eq(serviceTickets.branchId, input.branchId));
+  }
+
+  const statusRows = await db
+    .select({
+      status: serviceTickets.ticketStatus,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(serviceTickets)
+    .where(and(...baseFilters))
+    .groupBy(serviceTickets.ticketStatus);
+
+  const byStatus: Partial<Record<ServiceTicketStatus, number>> = {};
+  for (const row of statusRows) {
+    byStatus[row.status] = row.count;
+  }
+
+  const overdueRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(serviceTickets)
+    .where(
+      and(
+        ...baseFilters,
+        inArray(serviceTickets.ticketStatus, [
+          "pending",
+          "in_progress",
+          "ready_to_pick",
+        ]),
+        lte(serviceTickets.expectedPickupAt, new Date()),
+      ),
+    );
+
+  const todayUtcStart = sql`date_trunc('day', now() AT TIME ZONE 'UTC')`;
+  const todayCreatedRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(serviceTickets)
+    .where(and(...baseFilters, sql`${serviceTickets.createdAt} >= ${todayUtcStart}`));
+
+  const todayPickedUpRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(serviceTickets)
+    .where(
+      and(
+        ...baseFilters,
+        eq(serviceTickets.ticketStatus, "picked_up"),
+        sql`${serviceTickets.completedAt} >= ${todayUtcStart}`,
+      ),
+    );
+
+  return {
+    tenantId: input.tenantId,
+    branchId: input.branchId ?? null,
+    byStatus,
+    overdueCount: overdueRows[0]?.count ?? 0,
+    todayCreatedCount: todayCreatedRows[0]?.count ?? 0,
+    todayPickedUpCount: todayPickedUpRows[0]?.count ?? 0,
+  };
+}
