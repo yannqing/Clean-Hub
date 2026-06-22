@@ -83,7 +83,7 @@
         <nav class="scrollbar flex-1 overflow-y-auto overflow-x-hidden px-3 py-4"><div class="space-y-6">
           ${navGroup("Operate", [["layout-dashboard", "Workspace", false, "./cleanhub-pos-home.html"], ["user-plus", "New Intake", true, "./cleanhub-pos-new-intake.html"], ["search", "Find Customer", false, "./cleanhub-pos-customers.html"], ["scan-line", "Scan Label", false, "#"], ["wallet-cards", "Take Payment", false, "#"]])}
           ${navGroup("Records", [["users", "Customers", false, "./cleanhub-pos-customers.html"], ["clipboard-list", "Tickets", false, "./cleanhub-pos-tickets.html"], ["receipt", "Orders", false, "./cleanhub-pos-orders.html"], ["chart", "Statistics", false, "./cleanhub-pos-statistics.html"], ["shirt", "Garments", false, "#"]])}
-          ${navGroup("Store", [["replace", "Shift Handover", false, "#"], ["bell", "Notifications", false, "#"], ["settings", "Settings", false, "#"]])}
+          ${navGroup("Store", [["replace", "Shift Handover", false, "#"], ["bell", "Notifications", false, "./cleanhub-pos-notifications.html"], ["settings", "Settings", false, "#"]])}
         </div></nav>
         <div class="border-t border-slate-100 p-4"><div class="flex items-center gap-3 rounded-lg bg-slate-50 p-3"><div class="brand-gradient flex h-9 w-9 items-center justify-center rounded-lg text-xs font-bold text-white">MC</div><div><div class="text-sm font-semibold text-slate-900">Maya C.</div><div class="text-xs text-slate-500">Cashier</div></div></div></div>
       </aside>`;
