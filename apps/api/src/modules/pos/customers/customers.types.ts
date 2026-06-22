@@ -2,7 +2,7 @@
  * POS customer management — DTOs.
  *
  * NOTE: this module is a scaffold. Field shapes are placeholders and will be
- * aligned with the `customers` table (packages/db/src/schema/commerce.ts) once
+ * aligned with the `customers` table (packages/db/src/schema/commerce/customer.ts) once
  * the repository/service layer is implemented.
  */
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";

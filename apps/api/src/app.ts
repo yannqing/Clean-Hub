@@ -27,7 +27,6 @@ import { createTenantAuditRoutes } from "./modules/tenant/audit/audit.routes.js"
 import { createTenantBackupRoutes } from "./modules/tenant/backups/backups.routes.js";
 import { createTenantHardwareRoutes } from "./modules/tenant/hardware/hardware.routes.js";
 import { createTenantBranchRoutes } from "./modules/tenant/branches/branches.routes.js";
-import { createTenantNotificationRoutes } from "./modules/tenant/notifications/notifications.routes.js";
 import { createTenantOverviewRoutes } from "./modules/tenant/overview/overview.routes.js";
 import { createTenantPriceRoutes } from "./modules/tenant/prices/prices.routes.js";
 import { createTenantReportRoutes } from "./modules/tenant/reports/reports.routes.js";
@@ -115,7 +114,6 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.route("/tenant/prices", createTenantPriceRoutes());
   app.route("/tenant/backups", createTenantBackupRoutes());
   app.route("/tenant/reports", createTenantReportRoutes());
-  app.route("/tenant/notification-settings", createTenantNotificationRoutes());
 
   // POS 终端侧（收银员 / 店长 / 店主）
   app.route("/pos", createPosRoutes());

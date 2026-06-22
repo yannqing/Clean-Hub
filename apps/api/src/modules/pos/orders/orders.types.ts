@@ -2,7 +2,7 @@
  * POS order management — DTOs.
  *
  * NOTE: scaffold only. Field shapes mirror the `orders` / `order_items` tables
- * (packages/db/src/schema/commerce.ts) but no repository is wired up yet.
+ * (packages/db/src/schema/commerce/orders.ts) but no repository is wired up yet.
  */
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 
