@@ -48,7 +48,8 @@ function createErrorResponse(c: Context<AppBindings>, error: ServiceTicketError)
 export async function listServiceTicketsController(c: Context<AppBindings>) {
   const query = serviceTicketListQuerySchema.parse(c.req.query());
   const result = await listPosServiceTickets(c.get("authContext"), query);
-  return c.json({ data: result });
+  // result is { data, total }; flatten so the wire shape is { data, total }.
+  return c.json(result);
 }
 
 export async function getServiceTicketOverviewController(

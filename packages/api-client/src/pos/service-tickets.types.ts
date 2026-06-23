@@ -94,6 +94,8 @@ export type ServiceTicketListQuery = {
 
 export type ServiceTicketListResponse = {
   data: ServiceTicketSummary[];
+  /** Total matching rows (ignores limit/offset), for pagination UI. */
+  total: number;
 };
 
 export type ServiceTicketOverview = {

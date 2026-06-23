@@ -194,6 +194,59 @@ export async function findServiceTickets(
   db: Database,
   input: ServiceTicketListInput,
 ): Promise<ServiceTicketSummary[]> {
+  const filters = buildServiceTicketFilters(input);
+
+  const rows = await db
+    .select({
+      ticket: serviceTickets,
+      customerName: customers.fullName,
+      itemCount: sql<number>`(
+        select count(*)::int from ${ticketItems}
+        where ${ticketItems.ticketId} = ${serviceTickets.id}
+          and ${ticketItems.deletedAt} is null
+      )`,
+      totalAmount: sql<string>`coalesce((
+        select sum(${ticketItems.lineAmount}) from ${ticketItems}
+        where ${ticketItems.ticketId} = ${serviceTickets.id}
+          and ${ticketItems.deletedAt} is null
+      ), 0)`,
+    })
+    .from(serviceTickets)
+    .leftJoin(customers, eq(customers.id, serviceTickets.customerId))
+    .where(and(...filters))
+    .orderBy(desc(serviceTickets.createdAt))
+    .limit(input.limit)
+    .offset(input.offset);
+
+  return rows.map((row) => toTicketSummary({ ...row.ticket, ...row }));
+}
+
+/**
+ * Count tickets matching the SAME filter set as `findServiceTickets` (minus
+ * limit/offset), so the list endpoint can return a total for pagination.
+ * The customer-name `q` filter forces the same LEFT JOIN as the list query so
+ * the two counts agree.
+ */
+export async function countServiceTickets(
+  db: Database,
+  input: ServiceTicketListInput,
+): Promise<number> {
+  const filters = buildServiceTicketFilters(input);
+
+  const rows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(serviceTickets)
+    .leftJoin(customers, eq(customers.id, serviceTickets.customerId))
+    .where(and(...filters));
+
+  return rows[0]?.count ?? 0;
+}
+
+/**
+ * Build the WHERE filter array shared by list and count. Centralized so the
+ * total returned for pagination always matches the rows returned.
+ */
+function buildServiceTicketFilters(input: ServiceTicketListInput): SQL[] {
   const filters: SQL[] = [
     eq(serviceTickets.tenantId, input.tenantId),
     isNull(serviceTickets.deletedAt),
@@ -201,7 +254,10 @@ export async function findServiceTickets(
 
   if (input.allowedBranchIds !== undefined) {
     if (input.allowedBranchIds.length === 0) {
-      return [];
+      // Sentinel: caller is branch-scoped to an empty set. Push a clause that
+      // matches nothing so both list and count short-circuit consistently.
+      filters.push(sql`false`);
+      return filters;
     }
     filters.push(inArray(serviceTickets.branchId, input.allowedBranchIds));
   }
@@ -256,29 +312,7 @@ export async function findServiceTickets(
     );
   }
 
-  const rows = await db
-    .select({
-      ticket: serviceTickets,
-      customerName: customers.fullName,
-      itemCount: sql<number>`(
-        select count(*)::int from ${ticketItems}
-        where ${ticketItems.ticketId} = ${serviceTickets.id}
-          and ${ticketItems.deletedAt} is null
-      )`,
-      totalAmount: sql<string>`coalesce((
-        select sum(${ticketItems.lineAmount}) from ${ticketItems}
-        where ${ticketItems.ticketId} = ${serviceTickets.id}
-          and ${ticketItems.deletedAt} is null
-      ), 0)`,
-    })
-    .from(serviceTickets)
-    .leftJoin(customers, eq(customers.id, serviceTickets.customerId))
-    .where(and(...filters))
-    .orderBy(desc(serviceTickets.createdAt))
-    .limit(input.limit)
-    .offset(input.offset);
-
-  return rows.map((row) => toTicketSummary({ ...row.ticket, ...row }));
+  return filters;
 }
 
 export async function findServiceTicketById(

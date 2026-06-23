@@ -9,6 +9,7 @@ import { ServiceTicketError } from "./service-tickets.errors.js";
 import {
   areLinkedOrdersSettled,
   changeServiceTicketStatusRecord,
+  countServiceTickets,
   createServiceTicketRecord,
   findRelatedOrders,
   findServiceTicketById,
@@ -139,12 +140,12 @@ export async function listPosServiceTickets(
   authContext: AuthContext,
   query: ServiceTicketListQuery,
   db: Database = getDb(),
-): Promise<ServiceTicketSummary[]> {
+): Promise<{ data: ServiceTicketSummary[]; total: number }> {
   const tenantId = requirePosContext(authContext);
 
   await requireTicketFeature(authContext, query.ticketType, db);
 
-  return findServiceTickets(db, {
+  const listInput = {
     tenantId,
     allowedBranchIds: resolveListBranchScope(authContext),
     status: query.status ? (Array.isArray(query.status) ? query.status : [query.status]) : undefined,
@@ -159,7 +160,15 @@ export async function listPosServiceTickets(
     expectedPickupAfter: query.expectedPickupAfter,
     limit: query.limit ?? 50,
     offset: query.offset ?? 0,
-  });
+  };
+
+  // Run row fetch + total count in parallel; both share the same filter set.
+  const [data, total] = await Promise.all([
+    findServiceTickets(db, listInput),
+    countServiceTickets(db, listInput),
+  ]);
+
+  return { data, total };
 }
 
 export async function getPosServiceTicketDetail(
