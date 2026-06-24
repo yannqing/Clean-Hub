@@ -9,6 +9,7 @@
 -- IDs are fixed readable ULIDs (prefix 01SEED01...) so cross-table references stay stable.
 --
 -- Coverage:
+--   tenant_feature_flags (1) — enables the business lines seeded below
 --   services (8) + prices (8)
 --   customer_accounts (5) + customers (8)
 --   service_tickets (8) + ticket_items (~20)
@@ -23,6 +24,30 @@
 -- branch_id : 01KRERJN8G0000000000000040
 -- cashier1  : 01KRERJN8F0000000000000031
 -- cashier2  : 01KRERJN8F0000000000000032
+
+-- ─────────────────────────────────────────────--
+-- 0.5) Tenant feature flags
+-- The API gates ticket detail/create on the tenant's feature flags
+-- (requireFeatureEnabled). The services/tickets below span laundry and
+-- car_wash, so both must be enabled or the seeded tickets can't be opened.
+-- retail/delivery stay off (no seeded data for those lines).
+-- ─────────────────────────────────────────────--
+INSERT INTO tenant_feature_flags (
+  id, tenant_id,
+  laundry_enabled, car_wash_enabled, retail_products_enabled, delivery_enabled, notifications_enabled,
+  version
+) VALUES (
+  '01SEED0100FLG0000000000001', '01KRERJN800000000000000001',
+  TRUE, TRUE, FALSE, FALSE, TRUE,
+  1
+)
+ON CONFLICT (tenant_id) DO UPDATE SET
+  laundry_enabled        = EXCLUDED.laundry_enabled,
+  car_wash_enabled       = EXCLUDED.car_wash_enabled,
+  retail_products_enabled = EXCLUDED.retail_products_enabled,
+  delivery_enabled       = EXCLUDED.delivery_enabled,
+  notifications_enabled  = EXCLUDED.notifications_enabled,
+  updated_at             = now();
 
 -- ───────────────────────────────────────────────
 -- 1) Services catalog (8 items across business lines)

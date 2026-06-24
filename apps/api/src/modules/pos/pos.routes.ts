@@ -9,7 +9,7 @@ import { createPosOrdersRoutes } from "./orders/orders.routes.js";
 import { createPosOverviewRoutes } from "./overview/overview.routes.js";
 import { createPosReceptionRoutes } from "./reception/reception.routes.js";
 import { createPosStaffRoutes } from "./staff/staff.routes.js";
-import { createPosTicketsRoutes } from "./tickets/tickets.routes.js";
+import { createPosServiceTicketsRoutes } from "./service-tickets/service-tickets.routes.js";
 
 export function createPosRoutes() {
   const routes = new Hono<AppBindings>();
@@ -21,7 +21,7 @@ export function createPosRoutes() {
   // the repository implementations land.
   routes.route("/auth", createPosAuthRoutes());
   routes.route("/customers", createPosCustomersRoutes());
-  routes.route("/tickets", createPosTicketsRoutes());
+  routes.route("/service-tickets", createPosServiceTicketsRoutes());
   routes.route("/orders", createPosOrdersRoutes());
   routes.route("/overview", createPosOverviewRoutes());
   routes.route("/staff", createPosStaffRoutes());
