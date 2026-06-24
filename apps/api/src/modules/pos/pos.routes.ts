@@ -3,7 +3,10 @@ import { Hono } from "hono";
 import type { AppBindings } from "../../http/types.js";
 import { createPosAuthRoutes } from "./auth/auth.routes.js";
 import { getMyPosBranchController } from "./branches/pos.controller.js";
-import { createPosCustomersRoutes } from "./customers/customers.routes.js";
+import {
+  createPosAccountsRoutes,
+  createPosCustomersRoutes,
+} from "./customers/customers.routes.js";
 import { createPosNotificationsRoutes } from "./notifications/notifications.routes.js";
 import { createPosOrdersRoutes } from "./orders/orders.routes.js";
 import { createPosOverviewRoutes } from "./overview/overview.routes.js";
@@ -22,6 +25,8 @@ export function createPosRoutes() {
   routes.route("/auth", createPosAuthRoutes());
   routes.route("/customers", createPosCustomersRoutes());
   routes.route("/service-tickets", createPosServiceTicketsRoutes());
+  routes.route("/accounts", createPosAccountsRoutes());
+  routes.route("/tickets", createPosTicketsRoutes());
   routes.route("/orders", createPosOrdersRoutes());
   routes.route("/overview", createPosOverviewRoutes());
   routes.route("/staff", createPosStaffRoutes());
