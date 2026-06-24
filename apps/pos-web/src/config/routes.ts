@@ -6,6 +6,7 @@ export const posRoutes = {
   scan: "/scan",
   customers: "/customers",
   tickets: "/tickets",
+  ticketDetail: (ticketId: string) => `/tickets/${ticketId}`,
   orders: "/orders",
   statistics: "/statistics",
   garments: "/garments",

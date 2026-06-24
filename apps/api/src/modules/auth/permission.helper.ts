@@ -182,7 +182,12 @@ export async function requireFeatureEnabled(
   feature: TenantFeature,
   db: Database = getDb(),
 ): Promise<void> {
-  assertTenantContext(authContext);
+  // Feature flags are tenant-scoped, not role-scoped: any authenticated user
+  // who belongs to the tenant (owner/manager via tenant context, or
+  // owner/manager/cashier via POS context) is allowed to read them. Asserting
+  // tenant-only context here would wrongly reject cashiers reading a ticket
+  // detail (whose type triggers a feature check). SaaS roles are rejected.
+  assertTenantOrPosContext(authContext);
 
   const rows = await db
     .select({
@@ -203,5 +208,25 @@ export async function requireFeatureEnabled(
       "FEATURE_DISABLED",
       `Feature "${feature}" is not enabled for this tenant.`,
     );
+  }
+}
+
+/**
+ * Accept any authenticated non-SaaS user: tenant roles (owner/manager) and POS
+ * roles (owner/manager/cashier). SaaS-only roles and users without a tenant
+ * are rejected. Used by tenant-scoped reads that must not exclude cashiers
+ * (e.g. feature-flag checks reached from POS flows).
+ */
+export function assertTenantOrPosContext(authContext: AuthContext): void {
+  if (!authContext.tenantId) {
+    throw new AuthError("FORBIDDEN", "User cannot access tenant resources.");
+  }
+
+  const role = authContext.role as AdminRole;
+  const allowed =
+    TENANT_ROLES.includes(role as TenantRole) ||
+    POS_ROLES.includes(role as PosRole);
+  if (!allowed) {
+    throw new AuthError("FORBIDDEN", "User cannot access tenant resources.");
   }
 }
