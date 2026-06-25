@@ -4,16 +4,27 @@ import { createId } from "@cleanhub/id";
 import { jwtVerify, SignJWT } from "jose";
 
 import { AuthError } from "./auth.errors.js";
-import type { AuthContext, AuthTokenPair } from "./auth.types.js";
+import type { AuthTokenPair } from "./auth.types.js";
 
 export type AccessTokenClaims = {
   sub: string;
+  subjectType: string;
   tenantId: string | null;
   role: string;
   roles: string[];
   permissions: string[];
   branchIds: string[];
   expiresAt: Date;
+};
+
+export type TokenIssueContext = {
+  userId: string;
+  subjectType?: string;
+  tenantId: string | null;
+  role: string;
+  roles: string[];
+  permissions: string[];
+  branchIds: string[];
 };
 
 export type TokenServiceOptions = {
@@ -68,7 +79,7 @@ export class TokenService {
   }
 
   async issueTokenPair(
-    context: Omit<AuthContext, "accessTokenExpiresAt">,
+    context: TokenIssueContext,
     options?: { refreshTokenTtlSeconds?: number },
   ): Promise<AuthTokenPair> {
     const now = Math.floor(Date.now() / 1000);
@@ -82,6 +93,7 @@ export class TokenService {
     );
 
     const accessToken = await new SignJWT({
+      subjectType: context.subjectType ?? "user",
       tenantId: context.tenantId,
       role: context.role,
       roles: context.roles,
@@ -115,6 +127,10 @@ export class TokenService {
 
       return {
         sub: result.payload.sub ?? "",
+        subjectType:
+          typeof result.payload.subjectType === "string"
+            ? result.payload.subjectType
+            : "user",
         tenantId:
           typeof result.payload.tenantId === "string"
             ? result.payload.tenantId

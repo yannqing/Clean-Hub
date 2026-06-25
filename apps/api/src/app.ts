@@ -5,10 +5,13 @@ import { cors } from "hono/cors";
 import { loadApiEnv } from "./config/env.js";
 import { handleApiError } from "./http/error-handler.js";
 import { createRequireAuthMiddleware } from "./http/auth.middleware.js";
+import { createMobileAuthMiddleware } from "./http/mobile-auth.middleware.js";
 import { createRequestContextMiddleware } from "./http/request-context.middleware.js";
 import type { AppBindings } from "./http/types.js";
 import { createAuthServiceFromEnv } from "./modules/auth/auth.factory.js";
 import { createAuthRoutes } from "./modules/auth/auth.routes.js";
+import { createMobileAuthRoutes } from "./modules/mobile/auth/auth.routes.js";
+import { createMobileAuthServiceFromEnv } from "./modules/mobile/auth/auth.service.js";
 import { createSaasAuditRoutes } from "./modules/saas/audit/audit.routes.js";
 import {
   createSaasBackupRoutes,
@@ -46,6 +49,7 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
     service: "cleanhub-api",
   });
   const authService = createAuthServiceFromEnv({ env });
+  const mobileAuthService = createMobileAuthServiceFromEnv({ env });
   const app = new Hono<AppBindings>();
 
   app.use("*", async (c, next) => {
@@ -79,10 +83,12 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   );
 
   app.route("/auth", createAuthRoutes({ authService }));
+  app.route("/mobile/auth", createMobileAuthRoutes({ mobileAuthService }));
 
   app.use("/saas/*", createRequireAuthMiddleware(authService));
   app.use("/tenant/*", createRequireAuthMiddleware(authService));
   app.use("/pos/*", createRequireAuthMiddleware(authService));
+  app.use("/mobile/*", createMobileAuthMiddleware(mobileAuthService));
 
   // SaaS 平台 - 公共模块
   app.route("/saas/overview", createSaasOverviewRoutes());

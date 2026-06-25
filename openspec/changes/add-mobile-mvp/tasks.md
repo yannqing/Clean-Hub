@@ -18,13 +18,13 @@
 
 ## 3. 后端：移动认证模块（mobile-auth）
 
-- [ ] 3.1 在 `apps/api/src/modules/mobile/auth` 建 `auth.{routes,controller,service,repository,types}.ts`
-- [ ] 3.2 实现客户手机号验证码登录：请求 OTP（写 `customer_auth_otps`）+ 校验 OTP 登录；提供测试通道获取验证码（无真实 SMS）
-- [ ] 3.3 实现客户账号密码登录：校验 `customer_credentials`，复用密码哈希与失败锁定策略
-- [ ] 3.4 实现配送员密码登录：复用 `users` + 校验 `driver` 角色，返回含 tenant/branch/role 的令牌上下文
-- [ ] 3.5 实现 Owner 密码登录：复用 `users` + 校验 `owner` 角色，返回只读看店上下文
-- [ ] 3.6 令牌签发与刷新：复用 `token.service` 在响应体下发 access/refresh；客户写 `customer_auth_refresh_tokens`，员工复用 `authRefreshTokens`，实现刷新轮换与登出吊销
-- [ ] 3.7 新增移动鉴权中间件 `mobile-auth.middleware`（读取 `Authorization: Bearer`，解析主体类型/tenant/role），仅供 `/mobile/*` 使用
+- [x] 3.1 在 `apps/api/src/modules/mobile/auth` 建 `auth.{routes,controller,service,repository,types}.ts`
+- [x] 3.2 实现客户手机号验证码登录：请求 OTP（写 `customer_auth_otps`）+ 校验 OTP 登录；提供测试通道获取验证码（无真实 SMS）
+- [x] 3.3 实现客户账号密码登录：校验 `customer_credentials`，复用密码哈希与失败锁定策略
+- [x] 3.4 实现配送员密码登录：复用 `users` + 校验 `driver` 角色，返回含 tenant/branch/role 的令牌上下文
+- [x] 3.5 实现 Owner 密码登录：复用 `users` + 校验 `owner` 角色，返回只读看店上下文
+- [x] 3.6 令牌签发与刷新：复用 `token.service` 在响应体下发 access/refresh；客户写 `customer_auth_refresh_tokens`，员工复用 `authRefreshTokens`，实现刷新轮换与登出吊销
+- [x] 3.7 新增移动鉴权中间件 `mobile-auth.middleware`（读取 `Authorization: Bearer`，解析主体类型/tenant/role），仅供 `/mobile/*` 使用
 - [ ] 3.8 编写认证隔离与登录用例（客户/配送/Owner/跨租户/错误 OTP/错误密码锁定）
 
 ## 4. 后端：客户业务模块（customer-mobile）
