@@ -1,5 +1,6 @@
 import type { ApiClient } from "../types";
 import { createPosTerminalAuthApi } from "./auth";
+import { createPosAccountsApi } from "./accounts";
 import { createPosBranchesApi } from "./branches";
 import { createPosCustomersApi } from "./customers";
 import { createPosNotificationsApi } from "./notifications";
@@ -11,6 +12,8 @@ import { createPosStaffApi } from "./staff";
 
 export * from "./auth";
 export * from "./auth.types";
+export * from "./accounts";
+export * from "./accounts.types";
 export * from "./branches";
 export * from "./branches.types";
 export * from "./customers";
@@ -33,6 +36,8 @@ export function createPosApi(client: ApiClient) {
     branches: createPosBranchesApi(client),
     customers: createPosCustomersApi(client),
     serviceTickets: createPosServiceTicketsApi(client),
+    accounts: createPosAccountsApi(client),
+    tickets: createPosTicketsApi(client),
     orders: createPosOrdersApi(client),
     overview: createPosOverviewApi(client),
     staff: createPosStaffApi(client),

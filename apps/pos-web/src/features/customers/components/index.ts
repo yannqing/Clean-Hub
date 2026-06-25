@@ -1,4 +1,9 @@
-// 客户管理 — UI components.
-// Add named exports here as you create them, e.g.:
-//   export { CustomersListView } from "./customers-list-view";
-export {};
+export { CustomersView } from "./customers-view";
+export { CustomerDetailView } from "./customer-detail-view";
+export { CustomerSearchBar } from "./customer-search-bar";
+export { CustomerTable } from "./customer-table";
+export { CustomerPagination } from "./customer-pagination";
+export { CustomerStatusSwitch } from "./customer-status-switch";
+export { AccountFormDialog } from "./account-form-dialog";
+export { ProfileFormDialog } from "./profile-form-dialog";
+export { CustomerDeleteDialog } from "./customer-delete-dialog";

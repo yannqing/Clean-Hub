@@ -14,3 +14,12 @@ export const posRoutes = {
   notifications: "/notifications",
   settings: "/settings",
 } as const;
+
+/**
+ * Build the customer service detail URL for a profile.
+ * Kept as a helper (not inside the `as const` object) so the static route
+ * map stays a plain string record.
+ */
+export function customerDetailPath(customerId: string): string {
+  return `/customers/${customerId}`;
+}
