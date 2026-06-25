@@ -15,11 +15,8 @@ VALUES
     'active',
     true
   )
-ON CONFLICT (id) DO UPDATE
+ON CONFLICT (tenant_id, scope, code) DO UPDATE
 SET
-  tenant_id = EXCLUDED.tenant_id,
-  scope = EXCLUDED.scope,
-  code = EXCLUDED.code,
   name = EXCLUDED.name,
   description = EXCLUDED.description,
   status = EXCLUDED.status,
@@ -49,16 +46,23 @@ VALUES
     'Upload mobile delivery proof',
     'Allows a driver to upload pickup, dropoff, and signature proofs.'
   )
-ON CONFLICT (id) DO UPDATE
+ON CONFLICT (code) DO UPDATE
 SET
   scope = EXCLUDED.scope,
-  code = EXCLUDED.code,
   name = EXCLUDED.name,
   description = EXCLUDED.description;
 
 INSERT INTO role_permissions (role_id, permission_id)
-VALUES
-  ('01KRERJN8M0000000000000050', '01KRERJN8M0000000000000051'),
-  ('01KRERJN8M0000000000000050', '01KRERJN8M0000000000000052'),
-  ('01KRERJN8M0000000000000050', '01KRERJN8M0000000000000053')
+SELECT role.id, permission.id
+FROM roles role
+CROSS JOIN permissions permission
+WHERE
+  role.tenant_id = '01KRERJN800000000000000001'
+  AND role.scope = 'tenant'
+  AND role.code = 'driver'
+  AND permission.code IN (
+    'mobile.delivery.read',
+    'mobile.delivery.update_status',
+    'mobile.delivery.upload_proof'
+  )
 ON CONFLICT DO NOTHING;
