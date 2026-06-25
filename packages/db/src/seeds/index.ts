@@ -11,6 +11,7 @@ config({ path: join(dirname(fileURLToPath(import.meta.url)), "../../../../.env")
 
 const SEED_FILES = [
   "dev-accounts.sql",
+  "mobile-rbac.sql",
   "pos-cashiers.sql",
   "pos-business-data.sql",
 ] as const;
