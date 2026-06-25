@@ -30,7 +30,7 @@
 |---|---|
 | Base URL | `http://localhost:4000`(本地开发) |
 | Content-Type | `application/json` |
-| 主键 ID | ULID 字符串,长度 26,如 `01KVWB69ZS14Y3X6EJ8X2CMYC4` |
+| 主键 ID | ULID 字符串,长度 26,如 `01EXAMPLE0000000000000AC01` |
 | 时间格式 | ISO 8601 UTC,如 `2026-06-24T08:15:51.291Z` |
 | 金额/统计字段 | 会员等级(tier)、余额(balance)、订单数、最后到店时间本期不实现 |
 
@@ -108,7 +108,7 @@ POST /auth/login
 {
   "message": "错误描述",
   "code": "ERROR_CODE",
-  "requestId": "01KVWAN27KE1N3Y93NV1Y6CARB"
+  "requestId": "01EXAMPLE0RQT00000000000A"
 }
 ```
 
@@ -161,9 +161,9 @@ POST /pos/accounts
 Content-Type: application/json
 
 {
-  "accountName": "文档演示账户",
-  "phone": "13720260624001",
-  "email": "demo20260624001@cleanhub.local"
+  "accountName": "张伟家庭账户",
+  "phone": "13800000001",
+  "email": "zhang.wei@example.com"
 }
 ```
 
@@ -171,10 +171,10 @@ Content-Type: application/json
 
 ```json
 {
-  "id": "01KVWB69ZS14Y3X6EJ8X2CMYC4",
-  "accountName": "文档演示账户",
-  "phone": "13720260624001",
-  "email": "demo20260624001@cleanhub.local",
+  "id": "01EXAMPLE0000000000000AC01",
+  "accountName": "张伟家庭账户",
+  "phone": "13800000001",
+  "email": "zhang.wei@example.com",
   "status": "active",
   "createdAt": "2026-06-24T08:15:51.291Z",
   "updatedAt": "2026-06-24T08:15:51.291Z",
@@ -188,7 +188,7 @@ Content-Type: application/json
 {
   "message": "A customer account with this phone already exists.",
   "code": "POS_PHONE_CONFLICT",
-  "requestId": "01KVWAN27KE1N3Y93NV1Y6CARB"
+  "requestId": "01EXAMPLE0RQT00000000000A"
 }
 ```
 
@@ -232,13 +232,13 @@ Content-Type: application/json
 **请求示例**:
 
 ```http
-POST /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4/customers
+POST /pos/accounts/01EXAMPLE0000000000000AC01/customers
 Content-Type: application/json
 
 {
-  "fullName": "李四",
-  "phone": "13820260624002",
-  "email": "lisi20260624@cleanhub.local",
+  "fullName": "张伟",
+  "phone": "13800000001",
+  "email": "zhang.wei@example.com",
   "relationship": "本人",
   "address": "上海市浦东新区",
   "notes": "VIP客户"
@@ -249,11 +249,11 @@ Content-Type: application/json
 
 ```json
 {
-  "id": "01KVWB6P2B154M3CGD39ZZ6SND",
-  "customerAccountId": "01KVWB69ZS14Y3X6EJ8X2CMYC4",
-  "fullName": "李四",
-  "phone": "13820260624002",
-  "email": "lisi20260624@cleanhub.local",
+  "id": "01EXAMPLE0000000000000CU01",
+  "customerAccountId": "01EXAMPLE0000000000000AC01",
+  "fullName": "张伟",
+  "phone": "13800000001",
+  "email": "zhang.wei@example.com",
   "relationship": "本人",
   "address": "上海市浦东新区",
   "notes": "VIP客户",
@@ -292,7 +292,7 @@ Content-Type: application/json
 **请求示例**:
 
 ```http
-GET /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4/customers
+GET /pos/accounts/01EXAMPLE0000000000000AC01/customers
 ```
 
 **响应示例**(200 OK):
@@ -301,11 +301,11 @@ GET /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4/customers
 {
   "data": [
     {
-      "id": "01KVWB6P2B154M3CGD39ZZ6SND",
-      "customerAccountId": "01KVWB69ZS14Y3X6EJ8X2CMYC4",
-      "fullName": "李四",
-      "phone": "13820260624002",
-      "email": "lisi20260624@cleanhub.local",
+      "id": "01EXAMPLE0000000000000CU01",
+      "customerAccountId": "01EXAMPLE0000000000000AC01",
+      "fullName": "张伟",
+      "phone": "13800000001",
+      "email": "zhang.wei@example.com",
       "status": "active",
       "createdAt": "2026-06-24T08:16:03.662Z"
     }
@@ -333,7 +333,24 @@ GET /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4/customers
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
-| `data` | array | 混合列表,每项含 `kind`(`account`/`profile`) |
+| `data` | array | 混合列表,每项含 `kind`(`account`/`profile`)区分类型 |
+| `data[].kind` | `"account"` \| `"profile"` | 该项类型 |
+| `data[].account` | object | `kind=account` 时存在,字段见下 |
+| `data[].account.id` | string(ULID) | 账户 ID |
+| `data[].account.accountName` | string | 账户名 |
+| `data[].account.phone` | string \| null | 手机号 |
+| `data[].account.email` | string \| null | 邮箱 |
+| `data[].account.status` | `"active"` \| `"disabled"` | 状态 |
+| `data[].account.createdAt` | string(ISO) | 创建时间 |
+| `data[].profile` | object | `kind=profile` 时存在,字段见下 |
+| `data[].profile.id` | string(ULID) | 档案 ID |
+| `data[].profile.customerAccountId` | string(ULID) | 所属账户 ID |
+| `data[].profile.accountName` | string | 所属账户名(冗余,便于展示) |
+| `data[].profile.fullName` | string | 档案姓名 |
+| `data[].profile.phone` | string \| null | 手机号 |
+| `data[].profile.email` | string \| null | 邮箱 |
+| `data[].profile.status` | `"active"` \| `"disabled"` | 状态 |
+| `data[].profile.createdAt` | string(ISO) | 创建时间 |
 | `total` | number | 符合条件的总条数(用于分页) |
 | `limit` | number | 当前每页条数 |
 | `offset` | number | 当前偏移量 |
@@ -343,7 +360,7 @@ GET /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4/customers
 **请求示例**:
 
 ```http
-GET /pos/customers?q=李&limit=5&offset=0
+GET /pos/customers?q=张&limit=5&offset=0
 ```
 
 **响应示例**(200 OK):
@@ -354,12 +371,12 @@ GET /pos/customers?q=李&limit=5&offset=0
     {
       "kind": "profile",
       "profile": {
-        "id": "01KVWB6P2B154M3CGD39ZZ6SND",
-        "customerAccountId": "01KVWB69ZS14Y3X6EJ8X2CMYC4",
-        "accountName": "文档演示账户",
-        "fullName": "李四",
-        "phone": "13820260624002",
-        "email": "lisi20260624@cleanhub.local",
+        "id": "01EXAMPLE0000000000000CU01",
+        "customerAccountId": "01EXAMPLE0000000000000AC01",
+        "accountName": "张伟家庭账户",
+        "fullName": "张伟",
+        "phone": "13800000001",
+        "email": "zhang.wei@example.com",
         "status": "active",
         "createdAt": "2026-06-24T08:16:03.662Z"
       }
@@ -385,10 +402,10 @@ GET /pos/customers?resultType=account&limit=5
     {
       "kind": "account",
       "account": {
-        "id": "01KVWB69ZS14Y3X6EJ8X2CMYC4",
-        "accountName": "文档演示账户",
-        "phone": "13720260624001",
-        "email": "demo20260624001@cleanhub.local",
+        "id": "01EXAMPLE0000000000000AC01",
+        "accountName": "张伟家庭账户",
+        "phone": "13800000001",
+        "email": "zhang.wei@example.com",
         "status": "active",
         "createdAt": "2026-06-24T08:15:51.291Z"
       }
@@ -428,17 +445,17 @@ GET /pos/customers?resultType=account&limit=5
 **请求示例**:
 
 ```http
-GET /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4
+GET /pos/accounts/01EXAMPLE0000000000000AC01
 ```
 
 **响应示例**(200 OK):
 
 ```json
 {
-  "id": "01KVWB69ZS14Y3X6EJ8X2CMYC4",
-  "accountName": "文档演示账户",
-  "phone": "13720260624001",
-  "email": "demo20260624001@cleanhub.local",
+  "id": "01EXAMPLE0000000000000AC01",
+  "accountName": "张伟家庭账户",
+  "phone": "13800000001",
+  "email": "zhang.wei@example.com",
   "status": "active",
   "createdAt": "2026-06-24T08:15:51.291Z",
   "updatedAt": "2026-06-24T08:15:51.291Z",
@@ -478,18 +495,18 @@ GET /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4
 **请求示例**:
 
 ```http
-GET /pos/customers/01KVWB6P2B154M3CGD39ZZ6SND
+GET /pos/customers/01EXAMPLE0000000000000CU01
 ```
 
 **响应示例**(200 OK):
 
 ```json
 {
-  "id": "01KVWB6P2B154M3CGD39ZZ6SJ75",
-  "customerAccountId": "01KVWB69ZS14Y3X6EJ8X2CMYC4",
-  "fullName": "李四",
-  "phone": "13820260624002",
-  "email": "lisi20260624@cleanhub.local",
+  "id": "01EXAMPLE0000000000000CU01",
+  "customerAccountId": "01EXAMPLE0000000000000AC01",
+  "fullName": "张伟",
+  "phone": "13800000001",
+  "email": "zhang.wei@example.com",
   "relationship": "本人",
   "address": "上海市浦东新区",
   "notes": "VIP客户",
@@ -522,11 +539,11 @@ GET /pos/customers/01KVWB6P2B154M3CGD39ZZ6SND
 **请求示例**:
 
 ```http
-PATCH /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4
+PATCH /pos/accounts/01EXAMPLE0000000000000AC01
 Content-Type: application/json
 
 {
-  "accountName": "文档演示账户-已更新"
+  "accountName": "张伟家庭账户"
 }
 ```
 
@@ -534,10 +551,10 @@ Content-Type: application/json
 
 ```json
 {
-  "id": "01KVWB69ZS14Y3X6EJ8X2CMYC4",
-  "accountName": "文档演示账户-已更新",
-  "phone": "13720260624001",
-  "email": "demo20260624001@cleanhub.local",
+  "id": "01EXAMPLE0000000000000AC01",
+  "accountName": "张伟家庭账户",
+  "phone": "13800000001",
+  "email": "zhang.wei@example.com",
   "status": "active",
   "createdAt": "2026-06-24T08:15:51.291Z",
   "updatedAt": "2026-06-24T08:20:00.000Z",
@@ -568,11 +585,11 @@ Content-Type: application/json
 **请求示例**:
 
 ```http
-PATCH /pos/customers/01KVWB6P2B154M3CGD39ZZ6SND
+PATCH /pos/customers/01EXAMPLE0000000000000CU01
 Content-Type: application/json
 
 {
-  "fullName": "李四-已更新",
+  "fullName": "张伟",
   "notes": "Super VIP"
 }
 ```
@@ -581,11 +598,11 @@ Content-Type: application/json
 
 ```json
 {
-  "id": "01KVWB6P2B154M3CGD39ZZ6SND",
-  "customerAccountId": "01KVWB69ZS14Y3X6EJ8X2CMYC4",
-  "fullName": "李四-已更新",
-  "phone": "13820260624002",
-  "email": "lisi20260624@cleanhub.local",
+  "id": "01EXAMPLE0000000000000CU01",
+  "customerAccountId": "01EXAMPLE0000000000000AC01",
+  "fullName": "张伟",
+  "phone": "13800000001",
+  "email": "zhang.wei@example.com",
   "relationship": "本人",
   "address": "上海市浦东新区",
   "notes": "Super VIP",
@@ -617,7 +634,7 @@ Content-Type: application/json
 **请求示例**(停用):
 
 ```http
-POST /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4/status-changes
+POST /pos/accounts/01EXAMPLE0000000000000AC01/status-changes
 Content-Type: application/json
 
 {
@@ -630,10 +647,10 @@ Content-Type: application/json
 
 ```json
 {
-  "id": "01KVWB69ZS14Y3X6EJ8X2CMYC4",
-  "accountName": "文档演示账户-已更新",
-  "phone": "13720260624001",
-  "email": "demo20260624001@cleanhub.local",
+  "id": "01EXAMPLE0000000000000AC01",
+  "accountName": "张伟家庭账户",
+  "phone": "13800000001",
+  "email": "zhang.wei@example.com",
   "status": "disabled",
   "createdAt": "2026-06-24T08:15:51.291Z",
   "updatedAt": "2026-06-24T08:21:00.000Z",
@@ -666,7 +683,7 @@ Content-Type: application/json
 **请求示例**:
 
 ```http
-POST /pos/customers/01KVWB6P2B154M3CGD39ZZ6SND/status-changes
+POST /pos/customers/01EXAMPLE0000000000000CU01/status-changes
 Content-Type: application/json
 
 {
@@ -679,11 +696,11 @@ Content-Type: application/json
 
 ```json
 {
-  "id": "01KVWB6P2B154M3CGD39ZZ6SND",
-  "customerAccountId": "01KVWB69ZS14Y3X6EJ8X2CMYC4",
-  "fullName": "李四-已更新",
-  "phone": "13820260624002",
-  "email": "lisi20260624@cleanhub.local",
+  "id": "01EXAMPLE0000000000000CU01",
+  "customerAccountId": "01EXAMPLE0000000000000AC01",
+  "fullName": "张伟",
+  "phone": "13800000001",
+  "email": "zhang.wei@example.com",
   "relationship": "本人",
   "address": "上海市浦东新区",
   "notes": "Super VIP",
@@ -713,7 +730,7 @@ Content-Type: application/json
 **请求示例**:
 
 ```http
-DELETE /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4
+DELETE /pos/accounts/01EXAMPLE0000000000000AC01
 ```
 
 **响应**(204 No Content):
@@ -725,14 +742,14 @@ DELETE /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4
 **删除后查询**(验证级联):
 
 ```http
-GET /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4
+GET /pos/accounts/01EXAMPLE0000000000000AC01
 ```
 
 ```json
 {
   "message": "Customer account was not found.",
   "code": "POS_ACCOUNT_NOT_FOUND",
-  "requestId": "01KVWBJF6RKCJRVHTA3GVMGXBT"
+  "requestId": "01EXAMPLE0RQT00000000000B"
 }
 ```
 
@@ -755,7 +772,7 @@ GET /pos/accounts/01KVWB69ZS14Y3X6EJ8X2CMYC4
 **请求示例**:
 
 ```http
-DELETE /pos/customers/01KVWB6P2B154M3CGD39ZZ6SND
+DELETE /pos/customers/01EXAMPLE0000000000000CU01
 ```
 
 **响应**(204 No Content):
