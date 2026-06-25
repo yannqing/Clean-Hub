@@ -18,14 +18,14 @@ export default async function TicketDetailPage({
   const [ticket, relatedOrders] = await Promise.all([
     getTicketDetailQuery(ticketId),
     // Related orders are best-effort: a failure here must not break the page.
-    getRelatedOrdersQuery(ticketId).catch(() => ({ data: [] })),
+    getRelatedOrdersQuery(ticketId).catch(() => ({ data: [] as const })),
   ]);
 
   if (!ticket) {
     notFound();
   }
 
-  return <TicketDetailView relatedOrders={relatedOrders.data} ticket={ticket} />;
+  return <TicketDetailView relatedOrders={relatedOrders?.data ?? []} ticket={ticket} />;
 }
 
 export function generateMetadata() {

@@ -260,26 +260,32 @@ export const TICKET_ITEM_STATUS_LABELS: Record<
   ServiceTicketItemStatus,
   string
 > = {
+  pending_wash: "待清洗",
   washing: "清洗中",
   done: "已完成",
   ready_to_pick: "待取件",
+  exception: "清洗异常",
 };
 
 export const TICKET_ITEM_STATUS_TONES: Record<
   ServiceTicketItemStatus,
   BadgeTone
 > = {
+  pending_wash: "slate",
   washing: "blue",
   done: "emerald",
   ready_to_pick: "violet",
+  exception: "red",
 };
 
 export const TICKET_ITEM_STATUS_TRANSITIONS: Record<
   ServiceTicketItemStatus,
   ServiceTicketItemStatus[]
 > = {
-  washing: ["done"],
+  pending_wash: ["washing"],
+  washing: ["done", "exception"],
   done: ["ready_to_pick", "washing"],
+  exception: ["washing"],
   ready_to_pick: [],
 };
 

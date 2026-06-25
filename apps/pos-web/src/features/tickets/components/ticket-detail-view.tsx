@@ -130,7 +130,7 @@ export function TicketDetailView({
           <HeaderMetric
             label="项目数量"
             value={`${ticket.itemCount} 件`}
-            note={`${ticket.items.length} 个工单项目`}
+            note={`${ticket.items?.length ?? 0} 个工单项目`}
           />
           <HeaderMetric
             label="预计取件"
@@ -188,7 +188,7 @@ export function TicketDetailView({
             </section>
           )}
 
-          <TicketItemEditor items={ticket.items} ticketId={ticket.id} />
+          <TicketItemEditor items={ticket.items ?? []} ticketId={ticket.id} />
         </div>
 
         {/* Right column: customer, related orders, status meta */}
@@ -208,7 +208,7 @@ export function TicketDetailView({
             </dl>
           </section>
 
-          <TicketRelatedOrders orders={relatedOrders} />
+          <TicketRelatedOrders orders={relatedOrders ?? []} />
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <h2 className="font-semibold text-slate-950">状态与时间</h2>

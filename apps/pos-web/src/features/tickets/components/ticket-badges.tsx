@@ -78,8 +78,8 @@ export function TicketItemStatusBadge({
   status: ServiceTicketItemStatus;
 }) {
   return (
-    <TicketBadge tone={TICKET_ITEM_STATUS_TONES[status]}>
-      {TICKET_ITEM_STATUS_LABELS[status]}
+    <TicketBadge tone={TICKET_ITEM_STATUS_TONES[status] ?? "slate"}>
+      {TICKET_ITEM_STATUS_LABELS[status] ?? status}
     </TicketBadge>
   );
 }

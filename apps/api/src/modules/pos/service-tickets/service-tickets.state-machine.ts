@@ -57,14 +57,20 @@ export function requiresSettlementCheck(
 }
 
 /**
- * Ticket item status transitions. Items track physical processing
- * (washing → done → ready_to_pick). An item can be reset back to washing
- * from `done` when rework is needed.
+ * Ticket item status transitions. Items track physical processing:
+ *
+ *   pending_wash  → washing
+ *   washing       → done | exception
+ *   done          → ready_to_pick | washing  (rework)
+ *   exception     → washing                  (retry)
+ *   ready_to_pick → (terminal)
  */
 const ITEM_TRANSITIONS: Record<ServiceTicketItemStatus, ServiceTicketItemStatus[]> =
   {
-    washing: ["done"],
+    pending_wash: ["washing"],
+    washing: ["done", "exception"],
     done: ["ready_to_pick", "washing"],
+    exception: ["washing"],
     ready_to_pick: [],
   };
 

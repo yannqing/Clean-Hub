@@ -193,7 +193,7 @@ function ItemRow({
     });
   }
 
-  const reachable = TICKET_ITEM_STATUS_TRANSITIONS[item.itemStatus];
+  const reachable = TICKET_ITEM_STATUS_TRANSITIONS[item.itemStatus] ?? [];
   const details = [item.itemCategory, item.itemColor, item.itemBrand, item.itemMaterial]
     .filter(Boolean)
     .join(" · ");
