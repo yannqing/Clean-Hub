@@ -37,14 +37,14 @@
 
 ## 5. 后端：配送业务模块（delivery-mobile / mobile-offline-sync）
 
-- [ ] 5.1 在 `apps/api/src/modules/mobile/delivery` 建模块文件，强制 `tenantId` + `assignee == 当前 driver` 过滤
-- [ ] 5.2 实现今日任务列表与任务详情（仅本人任务；越权返回 403/404）
-- [ ] 5.3 实现配送任务状态机（集中转移表）：合法转移写 `delivery_task_events`（含 lat/lng），非法/过旧转移返回 409 + 当前态
-- [ ] 5.4 实现拍照凭证上传接口（multipart/base64 → 存储抽象 → `delivery_proofs`），关联任务与类型
-- [ ] 5.5 实现客户签收并置终态（写签收 `delivery_proofs` + 终态事件）
-- [ ] 5.6 全部写操作接受 `idempotencyKey` 并按唯一约束去重；终态保护（已完成不被旧态覆盖）
-- [ ] 5.7 （按 Open Question）支持最简任务指派/种子数据，保证配送链路可端到端验收
-- [ ] 5.8 编写配送权限隔离、状态机非法转移、幂等回放、终态冲突用例
+- [x] 5.1 在 `apps/api/src/modules/mobile/delivery` 建模块文件，强制 `tenantId` + `assignee == 当前 driver` 过滤
+- [x] 5.2 实现今日任务列表与任务详情（仅本人任务；越权返回 403/404）
+- [x] 5.3 实现配送任务状态机（集中转移表）：合法转移写 `delivery_task_events`（含 lat/lng），非法/过旧转移返回 409 + 当前态
+- [x] 5.4 实现拍照凭证上传接口（multipart/base64 → 存储抽象 → `delivery_proofs`），关联任务与类型
+- [x] 5.5 实现客户签收并置终态（写签收 `delivery_proofs` + 终态事件）
+- [x] 5.6 全部写操作接受 `idempotencyKey` 并按唯一约束去重；终态保护（已完成不被旧态覆盖）
+- [x] 5.7 （按 Open Question）支持最简任务指派/种子数据，保证配送链路可端到端验收
+- [x] 5.8 编写配送权限隔离、状态机非法转移、幂等回放、终态冲突用例
 
 ## 6. 后端：Owner 看店模块（owner-mobile）
 
