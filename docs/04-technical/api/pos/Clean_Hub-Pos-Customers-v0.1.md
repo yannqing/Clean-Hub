@@ -120,7 +120,7 @@ POST /auth/login
 | `POS_EMAIL_CONFLICT` | 409 | 邮箱已被占用 |
 | `POS_ACCOUNT_DISABLED` | 403 | 账户已停用,不能新建档案 |
 | `POS_CUSTOMER_ALREADY_DISABLED` | 409 | 客户已停用,不能重复停用 |
-| `POS_CUSTOMER_NOT_DISABLED` | 409 | 客户未停用,不能启用 |
+| `POS_CUSTOMER_NOT_DISABLED` | 409 | 当前已是启用状态,不能重复启用 |
 | `POS_PHONE_OR_EMAIL_REQUIRED` | 400 | 手机号和邮箱至少填一个 |
 
 ---
@@ -579,6 +579,8 @@ Content-Type: application/json
 | `relationship` | body | string \| null | 否 | 关系 |
 | `address` | body | string \| null | 否 | 地址 |
 | `notes` | body | string \| null | 否 | 备注 |
+
+> 至少传一个字段,否则报错。
 
 **出参**:返回更新后的档案完整对象(同[接口 6 出参](#6-查询档案详情)),`updatedAt` 刷新、`version` 自增。
 
