@@ -48,9 +48,11 @@ export const ticketItemTypeEnum = pgEnum("ticket_item_type", [
 ]);
 
 export const ticketItemStatusEnum = pgEnum("ticket_item_status", [
+  "pending_wash",
   "washing",
   "done",
   "ready_to_pick",
+  "exception",
 ]);
 
 export const serviceTickets = pgTable(
@@ -133,7 +135,7 @@ export const ticketItems = pgTable(
     itemType: ticketItemTypeEnum("item_type"),
     itemName: varchar("item_name", { length: 200 }).notNull(),
     itemCategory: varchar("item_category", { length: 80 }),
-    itemStatus: ticketItemStatusEnum("item_status").notNull().default("washing"),
+    itemStatus: ticketItemStatusEnum("item_status").notNull().default("pending_wash"),
     itemColor: varchar("item_color", { length: 40 }),
     itemBrand: varchar("item_brand", { length: 80 }),
     itemMaterial: varchar("item_material", { length: 80 }),

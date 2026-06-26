@@ -1,6 +1,6 @@
 "use client";
 
-import { toast } from "@cleanhub/ui";
+import { toast, Combobox } from "@cleanhub/ui";
 import { useState, useTransition } from "react";
 
 import { Icon } from "@/components/app-shell";
@@ -12,6 +12,9 @@ import {
   updateTicketItemAction,
 } from "../actions";
 import {
+  ITEM_BRAND_OPTIONS,
+  ITEM_COLOR_OPTIONS,
+  ITEM_MATERIAL_OPTIONS,
   TICKET_ITEM_STATUS_LABELS,
   TICKET_ITEM_STATUS_TRANSITIONS,
   TICKET_ITEM_TYPE_OPTIONS,
@@ -190,7 +193,7 @@ function ItemRow({
     });
   }
 
-  const reachable = TICKET_ITEM_STATUS_TRANSITIONS[item.itemStatus];
+  const reachable = TICKET_ITEM_STATUS_TRANSITIONS[item.itemStatus] ?? [];
   const details = [item.itemCategory, item.itemColor, item.itemBrand, item.itemMaterial]
     .filter(Boolean)
     .join(" · ");
@@ -376,24 +379,33 @@ function ItemForm({
           />
         </Field>
         <Field label="颜色">
-          <input
-            className={inputClass}
-            onChange={(event) => update("itemColor", event.target.value)}
+          <Combobox
+            options={ITEM_COLOR_OPTIONS}
             value={form.itemColor}
+            onValueChange={(v) => update("itemColor", v)}
+            placeholder="选择颜色…"
+            searchPlaceholder="搜索颜色…"
+            emptyText="无匹配颜色，按回车自定义"
           />
         </Field>
         <Field label="品牌">
-          <input
-            className={inputClass}
-            onChange={(event) => update("itemBrand", event.target.value)}
+          <Combobox
+            options={ITEM_BRAND_OPTIONS}
             value={form.itemBrand}
+            onValueChange={(v) => update("itemBrand", v)}
+            placeholder="选择品牌…"
+            searchPlaceholder="搜索品牌…"
+            emptyText="无匹配品牌，按回车自定义"
           />
         </Field>
         <Field label="材质">
-          <input
-            className={inputClass}
-            onChange={(event) => update("itemMaterial", event.target.value)}
+          <Combobox
+            options={ITEM_MATERIAL_OPTIONS}
             value={form.itemMaterial}
+            onValueChange={(v) => update("itemMaterial", v)}
+            placeholder="选择材质…"
+            searchPlaceholder="搜索材质…"
+            emptyText="无匹配材质，按回车自定义"
           />
         </Field>
         <Field label="数量">

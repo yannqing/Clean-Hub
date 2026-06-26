@@ -29,7 +29,7 @@ export type ServiceTicketSourceChannel = "pos" | "app" | "phone" | "whatsapp";
 
 export type ServiceTicketItemType = "cloth" | "car" | "shoe" | "carpet";
 
-export type ServiceTicketItemStatus = "washing" | "done" | "ready_to_pick";
+export type ServiceTicketItemStatus = "pending_wash" | "washing" | "done" | "ready_to_pick" | "exception";
 
 export type ServiceTicketItem = {
   id: string;

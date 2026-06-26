@@ -113,7 +113,7 @@ export async function createServiceTicketItemRecord(
     itemType: input.itemType ?? null,
     itemName: input.itemName.trim(),
     itemCategory: normalizeNullable(input.itemCategory ?? null),
-    itemStatus: "washing",
+    itemStatus: "pending_wash",
     itemColor: normalizeNullable(input.itemColor ?? null),
     itemBrand: normalizeNullable(input.itemBrand ?? null),
     itemMaterial: normalizeNullable(input.itemMaterial ?? null),

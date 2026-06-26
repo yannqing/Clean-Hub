@@ -40,9 +40,11 @@ export const serviceTicketItemTypeSchema = z.enum([
 ]);
 
 export const serviceTicketItemStatusSchema = z.enum([
+  "pending_wash",
   "washing",
   "done",
   "ready_to_pick",
+  "exception",
 ]);
 
 /**
