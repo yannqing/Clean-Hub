@@ -8,6 +8,10 @@ type CustomerTableProps = {
   rows: CustomerListRow[];
   accountContext: boolean;
   loading: boolean;
+  /** Total matching accounts across all pages. */
+  totalAccounts: number;
+  /** Total matching profiles across all pages. */
+  totalProfiles: number;
   onToggleStatus: (row: CustomerListRow) => void;
   onViewProfiles: (accountId: string) => void;
   onEdit: (row: CustomerListRow) => void;
@@ -27,6 +31,8 @@ export function CustomerTable({
   rows,
   accountContext,
   loading,
+  totalAccounts,
+  totalProfiles,
   onToggleStatus,
   onViewProfiles,
   onEdit,
@@ -35,7 +41,7 @@ export function CustomerTable({
 }: CustomerTableProps) {
   const countLabel = accountContext
     ? ""
-    : `账户 ${rows.filter((row) => row.kind === "account").length} 条 · 档案 ${rows.filter((row) => row.kind === "profile").length} 条`;
+    : `账户 ${totalAccounts} 条 · 档案 ${totalProfiles} 条`;
 
   return (
     <div className="overflow-x-auto">
@@ -204,9 +210,13 @@ function ProfileRow({
           <span className="rounded-md bg-violet-50 px-2 py-1 text-[11px] font-semibold text-violet-700">
             档案
           </span>
-          <span className="truncate font-semibold text-slate-900">
+          <button
+            className="truncate font-semibold text-slate-900 hover:text-blue-700 hover:underline"
+            type="button"
+            onClick={onService}
+          >
             {row.fullName}
-          </span>
+          </button>
         </div>
         <div className="mt-1 text-xs text-slate-500">
           {CUSTOMER_STAT_PLACEHOLDER} · 余额 {CUSTOMER_STAT_PLACEHOLDER}

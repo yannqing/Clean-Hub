@@ -6,6 +6,7 @@
  * filter state to the wire query shape.
  */
 import type {
+  PosCustomerAccountSummary,
   PosCustomerListResult,
   PosCustomerProfileSummary,
 } from "@cleanhub/api-client";
@@ -56,10 +57,22 @@ function toRow(
   };
 }
 
+/** Fetch all accounts for the profile form dropdown (not paginated). */
+export async function fetchAccountOptions(): Promise<PosCustomerAccountSummary[]> {
+  const result = await posApi.pos.customers.list({
+    resultType: "account",
+    limit: 100,
+    offset: 0,
+  });
+  return result.data
+    .filter((entry) => entry.kind === "account")
+    .map((entry) => entry.account);
+}
+
 /** Fetch the hybrid customer list, flattening the wire rows for rendering. */
 export async function fetchCustomerList(
   filters: CustomerFilterState,
-): Promise<{ rows: CustomerListRow[]; total: number }> {
+): Promise<{ rows: CustomerListRow[]; total: number; totalAccounts: number; totalProfiles: number }> {
   const result = await posApi.pos.customers.list({
     q: filters.query.trim() || undefined,
     resultType: filters.resultType === "all" ? undefined : filters.resultType,
@@ -67,7 +80,12 @@ export async function fetchCustomerList(
     offset: toOffset(filters.page, filters.pageSize),
   });
 
-  return { rows: result.data.map(toRow), total: result.total };
+  return {
+    rows: result.data.map(toRow),
+    total: result.total,
+    totalAccounts: result.totalAccounts,
+    totalProfiles: result.totalProfiles,
+  };
 }
 
 /** Fetch profiles nested under a specific account. */
