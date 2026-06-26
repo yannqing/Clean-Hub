@@ -1,3 +1,5 @@
+import type { PosPaymentMethod } from "./terminal-settings.types";
+
 export type PosOrderType = "ticket" | "manual";
 
 export type PosOrderStatus =
@@ -14,8 +16,6 @@ export type PosOrderItemSourceType =
   | "subscription"
   | "delivery_fee"
   | "product";
-
-export type PosPaymentMethod = "cash" | "card" | "app";
 
 export type PosPaymentTransactionStatus =
   | "pending"
