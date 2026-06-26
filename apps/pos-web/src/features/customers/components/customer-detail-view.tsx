@@ -48,6 +48,7 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
   const [profile, setProfile] = useState<PosCustomerProfileDetail | null>(null);
   const [account, setAccount] = useState<PosCustomerAccountDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [activeTicketCount, setActiveTicketCount] = useState(0);
   const [tab, setTab] = useState<DetailTab>("overview");
   const [dialog, setDialog] = useState<CustomerDialogState>({ type: "none" });
   const [notesDraft, setNotesDraft] = useState("");
@@ -65,14 +66,20 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
       setProfile(detail);
       setNotesDraft(detail.notes ?? "");
 
-      try {
-        const accountDetail = await posApi.pos.accounts.get(
-          detail.customerAccountId,
-        );
-        setAccount(accountDetail);
-      } catch {
-        setAccount(null);
-      }
+      const [accountDetail, ticketsResult] = await Promise.allSettled([
+        posApi.pos.accounts.get(detail.customerAccountId),
+        posApi.pos.serviceTickets.list({
+          customerId,
+          status: ["draft", "pending", "in_progress", "ready_to_pick"],
+          limit: 1,
+          offset: 0,
+        }),
+      ]);
+
+      setAccount(accountDetail.status === "fulfilled" ? accountDetail.value : null);
+      setActiveTicketCount(
+        ticketsResult.status === "fulfilled" ? ticketsResult.value.total : 0,
+      );
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "加载客户档案失败，请重试。",
@@ -117,6 +124,10 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
     } finally {
       setSavingNotes(false);
     }
+  }
+
+  function handleCreateServiceTicket() {
+    toast.info("新建服务工单功能尚在开发中，尽情期待");
   }
 
   if (loading) {
@@ -185,7 +196,7 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
               type="button"
@@ -193,15 +204,23 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
             >
               编辑档案
             </button>
+            <button
+              className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+              type="button"
+              onClick={handleCreateServiceTicket}
+            >
+              <span className="text-lg leading-none">+</span>
+              <span>新建服务工单</span>
+            </button>
           </div>
         </div>
 
         <div className="grid grid-cols-2 border-t border-slate-200 sm:grid-cols-4">
           {[
-            { label: "账户余额", value: "-" },
-            { label: "进行中工单", value: "-" },
-            { label: "历史订单", value: "-" },
-            { label: "最近到店", value: "-" },
+            { label: "账户余额", value: "XOF 0", hint: "可用余额" },
+            { label: "进行中工单", value: String(activeTicketCount), hint: "未完成工单" },
+            { label: "历史订单", value: "-", hint: "本期不实现" },
+            { label: "最近到店", value: "-", hint: "本期不实现" },
           ].map((metric) => (
             <div
               className="border-r border-slate-100 px-5 py-4 last:border-r-0"
@@ -213,7 +232,7 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
               <div className="mt-1 text-lg font-semibold text-slate-950">
                 {metric.value}
               </div>
-              <div className="mt-0.5 text-xs text-slate-400">本期不实现</div>
+              <div className="mt-0.5 text-xs text-slate-400">{metric.hint}</div>
             </div>
           ))}
         </div>
@@ -251,6 +270,11 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
 
       {tab === "overview" ? (
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="rounded-xl border border-slate-200 bg-white p-10 text-center shadow-sm">
+            <div className="text-sm font-medium text-slate-500">
+              功能正在开发中，尽情期待
+            </div>
+          </section>
           <aside className="space-y-5 lg:col-start-2">
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="font-semibold text-slate-950">档案信息</h2>

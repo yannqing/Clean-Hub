@@ -21,14 +21,9 @@ export function CustomerPagination({
   onPageChange,
 }: CustomerPaginationProps) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const start = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const end = Math.min(page * pageSize, total);
 
   return (
-    <div className="flex items-center justify-between border-t border-slate-200 px-5 py-4">
-      <div className="text-sm text-slate-500">
-        正在显示第 {start}-{end} 条，共 {total} 条
-      </div>
+    <div className="flex items-center justify-end border-t border-slate-200 px-5 py-4">
       <div className="flex items-center gap-1">
         <select
           className="mr-2 h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm"
