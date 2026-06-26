@@ -1,3 +1,4 @@
+import type { RelatedOrderSummary } from "@cleanhub/api-client";
 import { notFound } from "next/navigation";
 
 import { TicketDetailView } from "@/features/tickets/components/ticket-detail-view";
@@ -18,7 +19,7 @@ export default async function TicketDetailPage({
   const [ticket, relatedOrders] = await Promise.all([
     getTicketDetailQuery(ticketId),
     // Related orders are best-effort: a failure here must not break the page.
-    getRelatedOrdersQuery(ticketId).catch(() => ({ data: [] as const })),
+    getRelatedOrdersQuery(ticketId).catch(() => ({ data: [] as RelatedOrderSummary[] })),
   ]);
 
   if (!ticket) {
