@@ -16,17 +16,20 @@ export default async function OrderDetailPage({
 }: OrderDetailPageProps) {
   const { orderId } = await params;
 
+  let order;
+  let payments;
+
   try {
-    const [order, payments] = await Promise.all([
+    [order, payments] = await Promise.all([
       getOrderDetailQuery(orderId),
       getOrderPaymentsQuery(orderId),
     ]);
-
-    return <OrderDetailView order={order} payments={payments.data} />;
   } catch (error) {
     if (error instanceof ApiHttpError && error.status === 404) {
       notFound();
     }
     throw error;
   }
+
+  return <OrderDetailView order={order} payments={payments.data} />;
 }

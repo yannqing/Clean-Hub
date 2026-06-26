@@ -1,4 +1,6 @@
-export type PosPaymentMethod = "cash" | "card" | "app";
+import type { PosPaymentMethod } from "./orders.types";
+
+export type { PosPaymentMethod };
 export type PosRoundingRule = "none" | "round_yuan" | "round_jiao";
 export type PosTerminalSettingsStatus = "active" | "inactive";
 
