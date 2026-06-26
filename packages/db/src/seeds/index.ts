@@ -13,6 +13,7 @@ const SEED_FILES = [
   "dev-accounts.sql",
   "pos-cashiers.sql",
   "pos-business-data.sql",
+  "pos-terminal-settings.sql",
 ] as const;
 
 async function runSeeds(): Promise<void> {

@@ -1,4 +1,4 @@
-// 设置 — UI components.
-// Add named exports here as you create them, e.g.:
-//   export { SettingsListView } from "./settings-list-view";
-export {};
+export { GeneralSettingsCard } from "./general-settings-card";
+export { HardwareSettingsCard } from "./hardware-settings-card";
+export { SettingsView } from "./settings-view";
+export { TerminalSettingsCard } from "./terminal-settings-card";

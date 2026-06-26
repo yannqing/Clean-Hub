@@ -9,6 +9,8 @@ import { createPosOverviewApi } from "./overview";
 import { createPosReceptionApi } from "./reception";
 import { createPosServiceTicketsApi } from "./service-tickets";
 import { createPosStaffApi } from "./staff";
+import { createPosTerminalSettingsApi } from "./terminal-settings";
+import { createPosHardwareApi } from "./hardware";
 
 export * from "./auth";
 export * from "./auth.types";
@@ -30,6 +32,10 @@ export * from "./service-tickets";
 export * from "./service-tickets.types";
 export * from "./staff";
 export * from "./staff.types";
+export * from "./terminal-settings";
+export * from "./terminal-settings.types";
+export * from "./hardware";
+export * from "./hardware.types";
 
 export function createPosApi(client: ApiClient) {
   return {
@@ -48,6 +54,8 @@ export function createPosApi(client: ApiClient) {
      */
     terminalAuth: createPosTerminalAuthApi(client),
     notifications: createPosNotificationsApi(client),
+    terminalSettings: createPosTerminalSettingsApi(client),
+    hardware: createPosHardwareApi(client),
   };
 }
 
