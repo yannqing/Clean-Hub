@@ -8,6 +8,7 @@ export const posRoutes = {
   tickets: "/tickets",
   ticketDetail: (ticketId: string) => `/tickets/${ticketId}`,
   orders: "/orders",
+  orderDetail: (orderId: string) => `/orders/${orderId}`,
   statistics: "/statistics",
   garments: "/garments",
   shiftHandover: "/shift-handover",
