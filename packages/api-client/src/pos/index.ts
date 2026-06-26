@@ -37,7 +37,6 @@ export function createPosApi(client: ApiClient) {
     customers: createPosCustomersApi(client),
     serviceTickets: createPosServiceTicketsApi(client),
     accounts: createPosAccountsApi(client),
-    tickets: createPosTicketsApi(client),
     orders: createPosOrdersApi(client),
     overview: createPosOverviewApi(client),
     staff: createPosStaffApi(client),

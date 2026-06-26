@@ -12,6 +12,7 @@ import { CUSTOMER_DEFAULT_FILTERS } from "../constants";
 import {
   changeAccountStatus,
   changeProfileStatus,
+  fetchAccountOptions,
   fetchAccountProfiles,
   fetchCustomerList,
 } from "../queries";
@@ -49,37 +50,42 @@ export function CustomersView() {
 
   const [rows, setRows] = useState<CustomerListRow[]>([]);
   const [total, setTotal] = useState(0);
+  const [totalAccounts, setTotalAccounts] = useState(0);
+  const [totalProfiles, setTotalProfiles] = useState(0);
   const [loading, setLoading] = useState(false);
 
   const [accounts, setAccounts] = useState<PosCustomerAccountSummary[]>([]);
   const [dialog, setDialog] = useState<CustomerDialogState>({ type: "none" });
 
+  // Load account options independently so the profile form dropdown is always
+  // populated, regardless of which page/filter the list is showing.
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAccountOptions().then((result) => {
+      if (!cancelled) setAccounts(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const data =
-        viewMode === "account" && accountContext
-          ? await fetchAccountProfiles(accountContext.accountId, filters)
-          : await fetchCustomerList(filters);
-      setRows(data.rows);
-      setTotal(data.total);
-
-      // Cache the account list for the profile form's owner dropdown. Only in
-      // list view (where accounts are visible). In account view, the owner is
-      // locked to the drilled-into account.
-      if (viewMode === "list") {
-        setAccounts(
-          data.rows
-            .filter((row): row is Extract<CustomerListRow, { kind: "account" }> => row.kind === "account")
-            .map((row) => ({
-              id: row.id,
-              accountName: row.accountName,
-              phone: row.phone,
-              email: row.email,
-              status: row.status,
-              createdAt: row.createdAt,
-            })),
-        );
+      let data: { rows: CustomerListRow[]; total: number };
+      if (viewMode === "account" && accountContext) {
+        data = await fetchAccountProfiles(accountContext.accountId, filters);
+        setRows(data.rows);
+        setTotal(data.total);
+        setTotalAccounts(0);
+        setTotalProfiles(0);
+      } else {
+        const listData = await fetchCustomerList(filters);
+        data = listData;
+        setRows(listData.rows);
+        setTotal(listData.total);
+        setTotalAccounts(listData.totalAccounts);
+        setTotalProfiles(listData.totalProfiles);
       }
     } catch (error) {
       toast.error(
@@ -292,6 +298,8 @@ export function CustomersView() {
           accountContext={viewMode === "account"}
           loading={loading}
           rows={rows}
+          totalAccounts={totalAccounts}
+          totalProfiles={totalProfiles}
           onDelete={openDelete}
           onEdit={openEdit}
           onService={(row) => router.push(customerDetailPath(row.id))}

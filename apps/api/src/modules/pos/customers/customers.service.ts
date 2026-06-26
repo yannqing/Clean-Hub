@@ -4,6 +4,8 @@ import { assertPosContext } from "../../auth/permission.helper.js";
 import { PosCustomerError } from "./customers.errors.js";
 import {
   cascadeSoftDeleteProfilesByAccount,
+  countPosAccounts,
+  countPosProfiles,
   findPosAccountByEmail,
   findPosAccountById,
   findPosAccountByPhone,
@@ -87,20 +89,30 @@ export async function listPosCustomers(
   const { query } = input;
 
   if (query.resultType === "account") {
-    const { items, total } = await searchPosAccounts(db, tenantId, query);
+    const [{ items, total }, totalProfiles] = await Promise.all([
+      searchPosAccounts(db, tenantId, query),
+      countPosProfiles(db, tenantId, query),
+    ]);
     return {
       data: items.map((account) => ({ kind: "account" as const, account })),
       total,
+      totalAccounts: total,
+      totalProfiles,
       limit: query.limit,
       offset: query.offset,
     };
   }
 
   if (query.resultType === "profile") {
-    const { items, total } = await searchPosProfiles(db, tenantId, query);
+    const [{ items, total }, totalAccounts] = await Promise.all([
+      searchPosProfiles(db, tenantId, query),
+      countPosAccounts(db, tenantId, query),
+    ]);
     return {
       data: items.map((profile) => ({ kind: "profile" as const, profile })),
       total,
+      totalAccounts,
+      totalProfiles: total,
       limit: query.limit,
       offset: query.offset,
     };
@@ -110,8 +122,8 @@ export async function listPosCustomers(
   // limit/offset over the combined set ordered by createdAt desc. Counts are
   // still computed independently so total reflects both tables.
   const [accountsResult, profilesResult] = await Promise.all([
-    searchPosAccounts(db, tenantId, { ...query, limit: query.limit, offset: 0 }),
-    searchPosProfiles(db, tenantId, { ...query, limit: query.limit, offset: 0 }),
+    searchPosAccounts(db, tenantId, { ...query, limit: query.offset + query.limit, offset: 0 }),
+    searchPosProfiles(db, tenantId, { ...query, limit: query.offset + query.limit, offset: 0 }),
   ]);
 
   type AccountEntry = { kind: "account"; account: PosCustomerAccountSummary; createdAt: string };
@@ -144,6 +156,8 @@ export async function listPosCustomers(
         : { kind: "profile", profile: entry.profile },
     ),
     total,
+    totalAccounts: accountsResult.total,
+    totalProfiles: profilesResult.total,
     limit: query.limit,
     offset: query.offset,
   };

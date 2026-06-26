@@ -78,6 +78,10 @@ export type PosCustomerListResult = {
     | { kind: "profile"; profile: PosCustomerProfileWithAccount }
   >;
   total: number;
+  /** Total matching accounts across all pages (unaffected by resultType filter). */
+  totalAccounts: number;
+  /** Total matching profiles across all pages (unaffected by resultType filter). */
+  totalProfiles: number;
   limit: number;
   offset: number;
 };

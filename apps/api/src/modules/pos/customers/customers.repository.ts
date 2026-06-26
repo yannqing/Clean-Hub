@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import {
   and,
   count,
+  desc,
   eq,
   ilike,
   isNull,
@@ -285,7 +286,7 @@ export async function searchPosAccounts(
       })
       .from(customerAccounts)
       .where(where)
-      .orderBy(customerAccounts.createdAt)
+      .orderBy(desc(customerAccounts.createdAt))
       .limit(query.limit)
       .offset(query.offset),
     db
@@ -352,7 +353,7 @@ export async function searchPosProfiles(
         ),
       )
       .where(where)
-      .orderBy(customers.createdAt)
+      .orderBy(desc(customers.createdAt))
       .limit(query.limit)
       .offset(query.offset),
     db
@@ -374,6 +375,66 @@ export async function searchPosProfiles(
     })),
     total: countRows[0]?.value ?? 0,
   };
+}
+
+/**
+ * Lightweight count-only query for accounts. Used to report the total account
+ * count when the list is filtered to profiles (so the UI always shows both
+ * totals).
+ */
+export async function countPosAccounts(
+  db: Database,
+  tenantId: string,
+  query: Pick<ListPosCustomersQuery, "q" | "status">,
+): Promise<number> {
+  const searchQuery = normalizeSearchQuery(query.q);
+  const where = and(
+    eq(customerAccounts.tenantId, tenantId),
+    isNull(customerAccounts.deletedAt),
+    query.status ? eq(customerAccounts.status, query.status) : undefined,
+    searchQuery
+      ? or(
+          ilike(customerAccounts.accountName, searchQuery),
+          ilike(customerAccounts.phone, searchQuery),
+          ilike(customerAccounts.email, searchQuery),
+        )
+      : undefined,
+  );
+  const rows = await db
+    .select({ value: count() })
+    .from(customerAccounts)
+    .where(where);
+  return rows[0]?.value ?? 0;
+}
+
+/**
+ * Lightweight count-only query for profiles. Used to report the total profile
+ * count when the list is filtered to accounts (so the UI always shows both
+ * totals).
+ */
+export async function countPosProfiles(
+  db: Database,
+  tenantId: string,
+  query: Pick<ListPosCustomersQuery, "q" | "status">,
+): Promise<number> {
+  const searchQuery = normalizeSearchQuery(query.q);
+  const where = and(
+    eq(customers.tenantId, tenantId),
+    isNull(customers.deletedAt),
+    query.status ? eq(customers.status, query.status) : undefined,
+    searchQuery
+      ? or(
+          ilike(customers.fullName, searchQuery),
+          ilike(customers.phone, searchQuery),
+          ilike(customers.email, searchQuery),
+        )
+      : undefined,
+  );
+  const rows = await db
+    .select({ value: count() })
+    .from(customers)
+    .where(where);
+  return rows[0]?.value ?? 0;
 }
 
 // ---- writes: accounts -----------------------------------------------------
