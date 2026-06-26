@@ -26,7 +26,6 @@ export function createPosRoutes() {
   routes.route("/customers", createPosCustomersRoutes());
   routes.route("/service-tickets", createPosServiceTicketsRoutes());
   routes.route("/accounts", createPosAccountsRoutes());
-  routes.route("/tickets", createPosTicketsRoutes());
   routes.route("/orders", createPosOrdersRoutes());
   routes.route("/overview", createPosOverviewRoutes());
   routes.route("/staff", createPosStaffRoutes());

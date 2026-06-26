@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1781904865266,
-      "tag": "0000_rare_randall_flagg",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1782398648154,
-      "tag": "0001_add_pending_wash_and_exception_to_ticket_item_status",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1782399200000,
-      "tag": "0002_set_ticket_item_default_to_pending_wash",
+      "when": 1782439618079,
+      "tag": "0000_abandoned_talon",
       "breakpoints": true
     }
   ]
