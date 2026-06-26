@@ -29,11 +29,11 @@
 
 ## 4. 后端：客户业务模块（customer-mobile）
 
-- [ ] 4.1 在 `apps/api/src/modules/mobile/customer` 建模块文件，统一强制按令牌 `tenantId` + 客户身份过滤
-- [ ] 4.2 实现查看本人资料与地址（基于 `customer_accounts`/`customers`），拒绝越权读取
-- [ ] 4.3 实现查看本人订单/工单列表与详情（读取 `orders`/`service_tickets`，归属校验）
-- [ ] 4.4 实现创建上门取衣/送洗预约（写 `appointments`，状态 pending）
-- [ ] 4.5 实现查看预约列表与取消未处理预约（pending→cancelled；已处理拒绝取消）
+- [x] 4.1 在 `apps/api/src/modules/mobile/customer` 建模块文件，统一强制按令牌 `tenantId` + 客户身份过滤
+- [x] 4.2 实现查看本人资料与地址（基于 `customer_accounts`/`customers`），拒绝越权读取
+- [x] 4.3 实现查看本人订单/工单列表与详情（读取 `orders`/`service_tickets`，归属校验）
+- [x] 4.4 实现创建上门取衣/送洗预约（写 `appointments`，状态 pending）
+- [x] 4.5 实现查看预约列表与取消未处理预约（pending→cancelled；已处理拒绝取消）
 
 ## 5. 后端：配送业务模块（delivery-mobile / mobile-offline-sync）
 
