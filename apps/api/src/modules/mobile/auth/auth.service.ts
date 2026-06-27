@@ -4,6 +4,7 @@ import { getDb, type Database } from "@cleanhub/db";
 
 import { AuthError, invalidCredentials } from "../../auth/auth.errors.js";
 import {
+  type EffectiveSecurityPolicy,
   getRefreshTokenTtlSeconds,
   resolveEffectiveSecurityPolicy,
 } from "../../saas/security/security-policy.js";
@@ -35,6 +36,8 @@ import type {
 
 export type MobileAuthServiceOptions = {
   db: Database;
+  repository?: MobileAuthRepositoryLike;
+  securityPolicy?: EffectiveSecurityPolicy;
   accessTokenSecret: string;
   accessTokenTtlSeconds?: number;
   refreshTokenTtlSeconds?: number;
@@ -49,6 +52,35 @@ const CUSTOMER_REFRESH_PREFIX = "cust_";
 const STAFF_REFRESH_PREFIX = "staff_";
 const OTP_TTL_MINUTES = 10;
 const OTP_CODE_MAX = 1_000_000;
+
+export type MobileAuthRepositoryLike = Pick<
+  MobileAuthRepository,
+  | "findActiveTenantByCode"
+  | "findCustomerByPhone"
+  | "findCustomerByIdentifier"
+  | "findCustomerById"
+  | "findCustomerCredential"
+  | "createCustomerOtp"
+  | "findLatestCustomerOtp"
+  | "incrementCustomerOtpAttempts"
+  | "consumeCustomerOtp"
+  | "recordCustomerPasswordFailure"
+  | "clearCustomerPasswordFailures"
+  | "createCustomerRefreshToken"
+  | "findCustomerRefreshTokenByHash"
+  | "revokeCustomerRefreshToken"
+  | "revokeCustomerRefreshTokenFamily"
+  | "revokeCustomerRefreshTokenByHash"
+  | "findStaffLoginUser"
+  | "findStaffUserById"
+  | "getStaffAccess"
+  | "updateStaffLastLoginAt"
+  | "createStaffRefreshToken"
+  | "findStaffRefreshTokenByHash"
+  | "revokeStaffRefreshToken"
+  | "revokeStaffRefreshTokenFamily"
+  | "revokeStaffRefreshTokenByHash"
+>;
 
 function normalizeIdentifier(identifier: string): string {
   return identifier.trim().toLowerCase();
@@ -154,18 +186,22 @@ export function createMobileAuthServiceFromEnv({
 
 export class MobileAuthService {
   private readonly db: Database;
-  private readonly repository: MobileAuthRepository;
+  private readonly repository: MobileAuthRepositoryLike;
   private readonly tokenService: TokenService;
   private readonly envRefreshTokenTtlSeconds: number;
+  private readonly securityPolicy?: EffectiveSecurityPolicy;
 
   constructor({
     db,
+    repository,
+    securityPolicy,
     accessTokenSecret,
     accessTokenTtlSeconds,
     refreshTokenTtlSeconds,
   }: MobileAuthServiceOptions) {
     this.db = db;
-    this.repository = new MobileAuthRepository(db);
+    this.repository = repository ?? new MobileAuthRepository(db);
+    this.securityPolicy = securityPolicy;
     this.envRefreshTokenTtlSeconds =
       refreshTokenTtlSeconds ?? 30 * 24 * 60 * 60;
     this.tokenService = new TokenService({
@@ -321,7 +357,7 @@ export class MobileAuthService {
     );
 
     if (!passwordValid) {
-      const policy = await resolveEffectiveSecurityPolicy(this.db);
+      const policy = await this.resolveSecurityPolicy();
       const failedAttempts =
         credential.lockedUntil && credential.lockedUntil.getTime() <= now
           ? 1
@@ -361,7 +397,7 @@ export class MobileAuthService {
       `mobile:${input.role}:${identifier}`,
       normalizeTenantCode(input.tenantCode),
     );
-    const policy = await resolveEffectiveSecurityPolicy(this.db);
+    const policy = await this.resolveSecurityPolicy();
 
     await assertLoginNotLocked(this.db, lockKey);
 
@@ -689,9 +725,13 @@ export class MobileAuthService {
   }
 
   private async getRefreshTokenTtlSeconds(): Promise<number> {
-    const policy = await resolveEffectiveSecurityPolicy(this.db);
+    const policy = await this.resolveSecurityPolicy();
 
     return getRefreshTokenTtlSeconds(policy);
+  }
+
+  private async resolveSecurityPolicy(): Promise<EffectiveSecurityPolicy> {
+    return this.securityPolicy ?? resolveEffectiveSecurityPolicy(this.db);
   }
 
   private async getCustomerContextFromClaims(
