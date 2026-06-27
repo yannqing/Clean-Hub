@@ -125,12 +125,19 @@ function mergeHeaders(...headersList: (HeadersInit | undefined)[]): Headers {
 
 async function resolveHeaders(
   defaultHeaders: ApiClientConfig["defaultHeaders"],
+  tokenProvider: ApiClientConfig["tokenProvider"],
   requestHeaders?: HeadersInit,
 ): Promise<Headers> {
   const resolvedDefaultHeaders =
     typeof defaultHeaders === "function" ? await defaultHeaders() : defaultHeaders;
+  const headers = mergeHeaders(resolvedDefaultHeaders, requestHeaders);
+  const token = await tokenProvider?.();
 
-  return mergeHeaders(resolvedDefaultHeaders, requestHeaders);
+  if (token && !headers.has("authorization")) {
+    headers.set("authorization", `Bearer ${token}`);
+  }
+
+  return headers;
 }
 
 function prepareBody(body: ApiRequestBody, headers: Headers): BodyInit | undefined {
@@ -330,7 +337,11 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
         attempt,
         metadata: options.metadata,
       };
-      const headers = await resolveHeaders(config.defaultHeaders, options.headers);
+      const headers = await resolveHeaders(
+        config.defaultHeaders,
+        config.tokenProvider,
+        options.headers,
+      );
 
       if (options.idempotencyKey) {
         headers.set("idempotency-key", options.idempotencyKey);

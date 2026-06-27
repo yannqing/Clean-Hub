@@ -1,5 +1,6 @@
 import { createAuthApi } from "./auth";
 import { createApiClient } from "./http-client";
+import { createMobileApi } from "./mobile";
 import { createPosApi } from "./pos";
 import { createSaasApi } from "./saas";
 import { createTenantApi } from "./tenant";
@@ -14,6 +15,7 @@ export function createCleanHubApiClient(config: ApiClientConfig) {
     saas: createSaasApi(http),
     tenant: createTenantApi(http),
     pos: createPosApi(http),
+    mobile: createMobileApi(http),
   };
 }
 

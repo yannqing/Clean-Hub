@@ -60,9 +60,9 @@
 
 ## 8. API Client：移动客户端（全部能力）
 
-- [ ] 8.1 在 `packages/api-client` 的 HTTP 层支持注入式 token provider（`Authorization: Bearer`），替代 cookie `credentials: include`
-- [ ] 8.2 新增 `src/mobile-client.ts` 与 `src/mobile/{auth,customer,delivery,owner}.ts(+ .types.ts)`，按域组织、避免大文件
-- [ ] 8.3 在 `src/index.ts` 导出 mobile client；`pnpm --filter @cleanhub/api-client typecheck`、`build` 通过
+- [x] 8.1 在 `packages/api-client` 的 HTTP 层支持注入式 token provider（`Authorization: Bearer`），替代 cookie `credentials: include`
+- [x] 8.2 新增 `src/mobile-client.ts` 与 `src/mobile/{auth,customer,delivery,owner}.ts(+ .types.ts)`，按域组织、避免大文件
+- [x] 8.3 在 `src/index.ts` 导出 mobile client；`pnpm --filter @cleanhub/api-client typecheck`、`build` 通过
 
 ## 9. 前端：mobile-web 基座与认证（mobile-shell / mobile-auth）
 
