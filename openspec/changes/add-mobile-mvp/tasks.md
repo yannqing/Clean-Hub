@@ -25,7 +25,7 @@
 - [x] 3.5 实现 Owner 密码登录：复用 `users` + 校验 `owner` 角色，返回只读看店上下文
 - [x] 3.6 令牌签发与刷新：复用 `token.service` 在响应体下发 access/refresh；客户写 `customer_auth_refresh_tokens`，员工复用 `authRefreshTokens`，实现刷新轮换与登出吊销
 - [x] 3.7 新增移动鉴权中间件 `mobile-auth.middleware`（读取 `Authorization: Bearer`，解析主体类型/tenant/role），仅供 `/mobile/*` 使用
-- [ ] 3.8 编写认证隔离与登录用例（客户/配送/Owner/跨租户/错误 OTP/错误密码锁定）
+- [x] 3.8 编写认证隔离与登录用例（客户/配送/Owner/跨租户/错误 OTP/错误密码锁定）
 
 ## 4. 后端：客户业务模块（customer-mobile）
 
@@ -94,10 +94,10 @@
 
 ## 13. 轻离线能力（mobile-offline-sync）
 
-- [ ] 13.1 在 `packages/offline` 实现最小队列原语：`enqueue/peek/markSynced/replay` + Preferences 持久化
-- [ ] 13.2 为每个离线操作生成 `idempotencyKey`（ULID，经 `@cleanhub/id`）
-- [ ] 13.3 实现配送任务本地缓存（断网可查看已加载任务）
-- [ ] 13.4 实现恢复网络后顺序回放与失败重试；与后端幂等/终态保护联调
+- [x] 13.1 在 `packages/offline` 实现最小队列原语：`enqueue/peek/markSynced/replay` + Preferences 持久化
+- [x] 13.2 为每个离线操作生成 `idempotencyKey`（ULID，经 `@cleanhub/id`）
+- [x] 13.3 实现配送任务本地缓存（断网可查看已加载任务）
+- [x] 13.4 实现恢复网络后顺序回放与失败重试；与后端幂等/终态保护联调
 
 ## 14. Capacitor 壳与打包（mobile-shell）
 
