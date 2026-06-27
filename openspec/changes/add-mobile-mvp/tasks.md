@@ -14,7 +14,7 @@
 - [x] 2.5 新增 `packages/db/src/schema/delivery/delivery-proofs.ts`：`delivery_proofs`（task_id、type=pickup/dropoff/signature、mediaRef、deviceId、idempotencyKey），对 `(task_id, idempotency_key)` 建唯一约束
 - [x] 2.6 为新领域建 `index.ts` 并在 `packages/db/src/schema/index.ts` 注册；`commerce/index.ts` 追加 `customer-auth`
 - [x] 2.7 新增 `driver` 角色种子（`roles.scope='tenant', code='driver'`）与必要权限种子，保证幂等
-- [ ] 2.8 运行 `pnpm db:generate`、`pnpm db:migrate`、`pnpm --filter @cleanhub/db typecheck` 全部通过
+- [x] 2.8 运行 `pnpm db:generate`、`pnpm db:migrate`、`pnpm --filter @cleanhub/db typecheck` 全部通过
 
 ## 3. 后端：移动认证模块（mobile-auth）
 
