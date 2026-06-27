@@ -2,7 +2,7 @@
 
 - [x] 1.1 新建 `apps/mobile-web` Next.js 应用，配置 `next.config` 为 `output: "export"`（禁用 SSR/middleware/proxy），命名 workspace `@cleanhub/mobile-web`
 - [x] 1.2 接入共享配置：`@cleanhub/config`（tsconfig）、eslint、`@cleanhub/ui`、`@cleanhub/i18n`（默认 `fr`）、`@cleanhub/api-client`
-- [ ] 1.3 为 `apps/mobile` 增加 Capacitor 插件依赖：`@capacitor/geolocation`、`@capacitor/camera`、`@capacitor/preferences`
+- [x] 1.3 为 `apps/mobile` 增加 Capacitor 插件依赖：`@capacitor/geolocation`、`@capacitor/camera`、`@capacitor/preferences`
 - [x] 1.4 在 `turbo`/根脚本中登记 mobile-web 的 dev/build/lint/typecheck，确认不把 app 级依赖加到根 `package.json`
 
 ## 2. 数据库 schema 与迁移（mobile-auth / customer-mobile / delivery-mobile）

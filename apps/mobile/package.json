@@ -11,9 +11,12 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.1.0",
+    "@capacitor/camera": "^8.2.0",
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
+    "@capacitor/geolocation": "^8.2.0",
     "@capacitor/ios": "^8.1.0",
+    "@capacitor/preferences": "^8.0.1",
     "@cleanhub/offline": "workspace:*"
   },
   "devDependencies": {
