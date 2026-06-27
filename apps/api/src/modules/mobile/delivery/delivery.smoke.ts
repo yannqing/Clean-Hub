@@ -12,6 +12,10 @@ import type {
   DeliveryTaskStatus,
 } from "./delivery.types.js";
 import type { MobileAuthContext } from "../auth/auth.types.js";
+import type {
+  NotificationEvent,
+  NotificationPublishResult,
+} from "../../notifications/index.js";
 
 const driverContext: MobileAuthContext = {
   subjectType: "staff",
@@ -192,6 +196,8 @@ function createRepository(options?: {
       ticketId: null,
       type: "pickup" as const,
       status,
+      expectedAt: new Date(),
+      customerName: "Customer One",
       version: 1,
     };
   }
@@ -346,6 +352,26 @@ function createMediaService(): DeliveryMediaServiceLike & {
   };
 }
 
+function createNotificationPublisher(): {
+  events: NotificationEvent[];
+  publish(event: NotificationEvent): Promise<NotificationPublishResult>;
+} {
+  const events: NotificationEvent[] = [];
+
+  return {
+    events,
+    async publish(event) {
+      events.push(event);
+      return {
+        matched: 1,
+        enqueued: 1,
+        skipped: 0,
+        idempotent: 0,
+      };
+    },
+  };
+}
+
 export async function runDeliverySmokeChecks(): Promise<void> {
   assert(
     canTransition("pending_dispatch", "en_route"),
@@ -368,9 +394,11 @@ export async function runDeliverySmokeChecks(): Promise<void> {
     "signed must be terminal",
   );
 
+  const notificationPublisher = createNotificationPublisher();
   const service = new DeliveryService({
     repository: createRepository(),
     mediaService: createMediaService(),
+    notificationPublisher,
   });
   const updated = await service.updateStatus({
     authContext: driverContext,
@@ -381,6 +409,14 @@ export async function runDeliverySmokeChecks(): Promise<void> {
 
   assert(updated.task.status === "en_route", "status update should apply");
   assert(!updated.idempotent, "first status update should not be idempotent");
+  assert(
+    notificationPublisher.events[0]?.name === "delivery.status_changed",
+    "status update should publish a delivery notification event",
+  );
+  assert(
+    notificationPublisher.events[0]?.payload?.toStatus === "en_route",
+    "delivery notification event should carry the new status",
+  );
 
   await assertRejectsDelivery(
     () =>

@@ -1,6 +1,12 @@
 import type { Context } from "hono";
 
+import { logger } from "@cleanhub/logger";
+
 import type { AppBindings } from "../../../http/types.js";
+import {
+  orderCreatedEvent,
+  type NotificationPublisher,
+} from "../../notifications/index.js";
 import {
   createPosOrder,
   getPosOrder,
@@ -25,6 +31,10 @@ function notImplementedResponse(c: Context<AppBindings>, error: PosNotImplemente
   );
 }
 
+export type CreatePosOrderControllerOptions = {
+  notificationPublisher?: NotificationPublisher;
+};
+
 export async function listPosOrdersController(c: Context<AppBindings>) {
   const query = c.req.query() as PosOrderListQuery;
   const result = await listPosOrders({
@@ -46,21 +56,47 @@ export async function getPosOrderController(c: Context<AppBindings>) {
   return c.json(order);
 }
 
-export async function createPosOrderController(c: Context<AppBindings>) {
-  const rawBody = await c.req.json().catch(() => ({}));
-  const data = rawBody as CreatePosOrderRequest;
+export function createPosOrderController({
+  notificationPublisher,
+}: CreatePosOrderControllerOptions = {}) {
+  return async (c: Context<AppBindings>) => {
+    const rawBody = await c.req.json().catch(() => ({}));
+    const data = rawBody as CreatePosOrderRequest;
 
-  try {
-    const order = await createPosOrder({
-      authContext: c.get("authContext"),
-      requestMeta: getRequestMeta(c),
-      data,
-    });
-    return c.json(order, 201);
-  } catch (error) {
-    if (error instanceof PosNotImplementedError) {
-      return notImplementedResponse(c, error);
+    try {
+      const order = await createPosOrder({
+        authContext: c.get("authContext"),
+        requestMeta: getRequestMeta(c),
+        data,
+      });
+      const tenantId = c.get("authContext").tenantId;
+
+      if (tenantId) {
+        try {
+          await notificationPublisher?.publish(
+            orderCreatedEvent({
+              tenantId,
+              branchId: order.branchId,
+              customerId: order.customerId,
+              orderId: order.id,
+              orderNo: order.orderNumber,
+              totalAmount: order.totalAmount,
+            }),
+          );
+        } catch (publishError) {
+          logger.error(
+            { error: publishError, tenantId, orderId: order.id },
+            "POS order notification event failed",
+          );
+        }
+      }
+
+      return c.json(order, 201);
+    } catch (error) {
+      if (error instanceof PosNotImplementedError) {
+        return notImplementedResponse(c, error);
+      }
+      throw error;
     }
-    throw error;
-  }
+  };
 }

@@ -1,6 +1,11 @@
 import { getDb, type Database } from "@cleanhub/db";
 import { logger } from "@cleanhub/logger";
 
+import {
+  deliveryStatusChangedEvent,
+  orderCompletedEvent,
+  type NotificationPublisher,
+} from "../../notifications/index.js";
 import type { AppointmentOperationsServiceLike } from "../owner/owner.service.js";
 import { MediaError, MediaService } from "../../media/index.js";
 import { DeliveryRepository } from "./delivery.repository.js";
@@ -31,6 +36,7 @@ export type DeliveryServiceOptions = {
   repository?: DeliveryRepositoryLike;
   mediaService?: DeliveryMediaServiceLike;
   appointmentOperations?: AppointmentOperationsServiceLike;
+  notificationPublisher?: NotificationPublisher;
 };
 
 export type DeliveryMediaServiceLike = Pick<
@@ -49,6 +55,8 @@ type DeliveryTaskRecord = {
   ticketId: string | null;
   type: "pickup" | "dropoff";
   status: DeliveryTaskStatus;
+  expectedAt: Date | null;
+  customerName: string;
   version: number;
 };
 
@@ -308,12 +316,14 @@ export class DeliveryService {
   private readonly repository: DeliveryRepositoryLike;
   private readonly mediaService: DeliveryMediaServiceLike;
   private readonly appointmentOperations?: AppointmentOperationsServiceLike;
+  private readonly notificationPublisher?: NotificationPublisher;
 
   constructor(options: DeliveryServiceOptions = {}) {
     this.repository =
       options.repository ?? new DeliveryRepository(options.db ?? getDb());
     this.mediaService = options.mediaService ?? new MediaService();
     this.appointmentOperations = options.appointmentOperations;
+    this.notificationPublisher = options.notificationPublisher;
   }
 
   async listTodayTasks(
@@ -418,6 +428,12 @@ export class DeliveryService {
       idempotencyKey: input.idempotencyKey,
       note: input.note ?? input.exceptionReason,
       createdBy: driver.subjectId,
+    });
+
+    await this.publishDeliveryStatusChanged({
+      task,
+      fromStatus: task.status,
+      toStatus: input.toStatus,
     });
 
     return {
@@ -561,6 +577,12 @@ export class DeliveryService {
       });
     }
 
+    await this.publishDeliveryStatusChanged({
+      task,
+      fromStatus: task.status,
+      toStatus: "signed",
+    });
+
     return {
       task: await this.getTaskDetail(driver, task.id),
       event: signed.event,
@@ -618,6 +640,12 @@ export class DeliveryService {
     if (!detail) {
       throw taskNotFound();
     }
+
+    await this.publishDeliveryStatusChanged({
+      task: this.detailToTaskRecord(detail),
+      fromStatus: null,
+      toStatus: detail.status,
+    });
 
     return this.attachProofReadLinks(input.tenantId, detail);
   }
@@ -814,6 +842,12 @@ export class DeliveryService {
       });
     }
 
+    await this.publishDeliveryStatusChanged({
+      task,
+      fromStatus: task.status,
+      toStatus: "cancelled",
+    });
+
     logger.info(
       {
         tenantId: owner.tenantId,
@@ -934,6 +968,79 @@ export class DeliveryService {
     } catch (error) {
       throw this.mapMediaError(error);
     }
+  }
+
+  private async publishDeliveryStatusChanged(input: {
+    task: DeliveryTaskRecord;
+    fromStatus: DeliveryTaskStatus | null;
+    toStatus: DeliveryTaskStatus;
+  }): Promise<void> {
+    if (!this.notificationPublisher) {
+      return;
+    }
+
+    try {
+      await this.notificationPublisher.publish(
+        deliveryStatusChangedEvent({
+          tenantId: input.task.tenantId,
+          branchId: input.task.branchId,
+          customerId: input.task.customerId,
+          taskId: input.task.id,
+          type: input.task.type,
+          fromStatus: input.fromStatus,
+          toStatus: input.toStatus,
+          orderId: input.task.orderId,
+          ticketId: input.task.ticketId,
+          customerName: input.task.customerName,
+          expectedAt: input.task.expectedAt?.toISOString() ?? null,
+        }),
+      );
+
+      if (
+        input.toStatus === "signed" &&
+        input.task.type === "dropoff" &&
+        input.task.orderId
+      ) {
+        await this.notificationPublisher.publish(
+          orderCompletedEvent({
+            tenantId: input.task.tenantId,
+            branchId: input.task.branchId,
+            customerId: input.task.customerId,
+            orderId: input.task.orderId,
+            orderNo: input.task.orderId,
+          }),
+        );
+      }
+    } catch (error) {
+      logger.error(
+        {
+          error,
+          tenantId: input.task.tenantId,
+          taskId: input.task.id,
+          fromStatus: input.fromStatus,
+          toStatus: input.toStatus,
+        },
+        "Delivery notification event failed",
+      );
+    }
+  }
+
+  private detailToTaskRecord(detail: DeliveryTaskDetail): DeliveryTaskRecord {
+    return {
+      id: detail.id,
+      tenantId: detail.tenantId,
+      branchId: detail.branchId,
+      assigneeUserId: detail.assigneeUserId,
+      appointmentId: detail.appointmentId,
+      customerId: detail.customerId,
+      orderId: detail.orderId,
+      ticketId: detail.ticketId,
+      type: detail.type,
+      status: detail.status,
+      expectedAt: detail.expectedAt ? new Date(detail.expectedAt) : null,
+      customerName: detail.customerName,
+      version: 0,
+    };
   }
 
   private mapMediaError(error: unknown): DeliveryError {

@@ -8,23 +8,31 @@ import { createCustomerRoutes } from "./customer/index.js";
 import { createDeliveryRoutes } from "./delivery/index.js";
 import { DeliveryService } from "./delivery/index.js";
 import { createMediaRoutes } from "../media/index.js";
+import {
+  NotificationsService,
+  type NotificationPublisher,
+} from "../notifications/index.js";
 import { createOwnerRoutes } from "./owner/index.js";
 import { OwnerService } from "./owner/index.js";
 
 export type CreateMobileRoutesOptions = {
   mobileAuthService: MobileAuthService;
+  notificationPublisher?: NotificationPublisher;
 };
 
 export function createMobileRoutes({
   mobileAuthService,
+  notificationPublisher,
 }: CreateMobileRoutesOptions) {
   const routes = new Hono<AppBindings>();
 
   routes.route("/auth", createMobileAuthRoutes({ mobileAuthService }));
   routes.use("/*", createMobileAuthMiddleware(mobileAuthService));
   const ownerService = new OwnerService();
+  const notificationsService = notificationPublisher ?? new NotificationsService();
   const deliveryService = new DeliveryService({
     appointmentOperations: ownerService,
+    notificationPublisher: notificationsService,
   });
 
   routes.route("/media", createMediaRoutes());

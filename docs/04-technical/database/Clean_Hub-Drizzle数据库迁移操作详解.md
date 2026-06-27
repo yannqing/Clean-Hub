@@ -174,6 +174,30 @@ MEDIA_BACKFILL_BATCH_SIZE="50"
 MEDIA_BACKFILL_LIMIT="500"
 ```
 
+### 5.3.2 Email 通知与本地 SMTP 测试
+
+Email 通知通过独立 cron 发送，不在业务请求路径同步连 SMTP。开发环境可以用 Mailpit 或 MailHog 暴露 SMTP `1025` 端口，再运行：
+
+```bash
+pnpm --filter @cleanhub/api cron:email-delivery
+```
+
+必要环境变量：
+
+```env
+EMAIL_SMTP_HOST="localhost"
+EMAIL_SMTP_PORT="1025"
+EMAIL_SMTP_SECURE="false"
+EMAIL_SMTP_USER=""
+EMAIL_SMTP_PASS=""
+EMAIL_FROM="CleanHub <no-reply@cleanhub.local>"
+EMAIL_DEFAULT_LOCALE="en"
+EMAIL_DELIVERY_INTERVAL_SECONDS="60"
+EMAIL_DELIVERY_BATCH_SIZE="50"
+```
+
+cron 每轮会先扫描逾期取件工单并按配置入队，再领取 `pending` 或到期可重试的 Email 投递。发送成功写入 `external_id`/`sent_at`，失败按指数退避更新 `next_retry_at`。
+
 查看状态：
 
 ```bash
