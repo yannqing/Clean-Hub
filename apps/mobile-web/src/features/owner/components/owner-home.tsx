@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ComponentType } from "react";
 import type { MobileOwnerTodaySummary } from "@cleanhub/api-client";
-import { Button } from "@cleanhub/ui";
+import {
+  Button,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@cleanhub/ui";
 import {
   AlertCircle,
   CalendarDays,
@@ -30,6 +37,7 @@ type MetricItem = {
   label: string;
   value: string;
   detail: string;
+  description: string;
   icon: IconComponent;
   tone: "teal" | "emerald" | "amber" | "sky";
 };
@@ -99,6 +107,7 @@ function createMetrics(summary: MobileOwnerTodaySummary): MetricItem[] {
       label: "Commandes",
       value: formatCount(summary.todayOrderCount),
       detail: "Aujourd'hui",
+      description: "Nombre de commandes ouvertes ou créées pour la date métier.",
       icon: PackageCheck,
       tone: "teal",
     },
@@ -106,6 +115,7 @@ function createMetrics(summary: MobileOwnerTodaySummary): MetricItem[] {
       label: "Chiffre d'affaires",
       value: formatMoney(summary.todayRevenueAmount),
       detail: "Aujourd'hui",
+      description: "Montant encaissé visible dans le résumé propriétaire.",
       icon: TrendingUp,
       tone: "emerald",
     },
@@ -113,6 +123,7 @@ function createMetrics(summary: MobileOwnerTodaySummary): MetricItem[] {
       label: "À récupérer",
       value: formatCount(summary.pendingPickupCount),
       detail: "En attente",
+      description: "Articles et commandes qui nécessitent une récupération.",
       icon: Shirt,
       tone: "amber",
     },
@@ -120,6 +131,7 @@ function createMetrics(summary: MobileOwnerTodaySummary): MetricItem[] {
       label: "En cours",
       value: formatCount(summary.inProgressOrderCount),
       detail: "Traitement",
+      description: "Commandes actuellement prises en charge par l'atelier.",
       icon: Clock3,
       tone: "sky",
     },
@@ -143,11 +155,21 @@ function SummaryRow({
   );
 }
 
-function MetricTile({ metric }: { metric: MetricItem }) {
+function MetricTile({
+  metric,
+  onOpen,
+}: {
+  metric: MetricItem;
+  onOpen: (metric: MetricItem) => void;
+}) {
   const Icon = metric.icon;
 
   return (
-    <div className="min-h-32 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+    <button
+      className="min-h-32 rounded-md border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-teal-300 focus:outline-hidden focus:ring-2 focus:ring-teal-600 focus:ring-offset-2"
+      type="button"
+      onClick={() => onOpen(metric)}
+    >
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-slate-600">{metric.label}</span>
         <span className={`flex size-9 shrink-0 items-center justify-center rounded-md ${toneClasses[metric.tone]}`}>
@@ -160,7 +182,7 @@ function MetricTile({ metric }: { metric: MetricItem }) {
       <p className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
         {metric.detail}
       </p>
-    </div>
+    </button>
   );
 }
 
@@ -172,6 +194,7 @@ function OwnerSummaryContent({
   summary: MobileOwnerTodaySummary;
 }) {
   const metrics = useMemo(() => createMetrics(summary), [summary]);
+  const [selectedMetric, setSelectedMetric] = useState<MetricItem | null>(null);
   const loadTime = formatLoadTime(lastLoadedAt);
 
   return (
@@ -179,7 +202,11 @@ function OwnerSummaryContent({
       <section className="mt-5">
         <div className="grid grid-cols-2 gap-3">
           {metrics.map((metric) => (
-            <MetricTile key={metric.label} metric={metric} />
+            <MetricTile
+              key={metric.label}
+              metric={metric}
+              onOpen={setSelectedMetric}
+            />
           ))}
         </div>
       </section>
@@ -231,6 +258,34 @@ function OwnerSummaryContent({
           Mis à jour à {loadTime}
         </p>
       ) : null}
+
+      <Sheet
+        open={Boolean(selectedMetric)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedMetric(null);
+          }
+        }}
+      >
+        <SheetContent className="max-h-[72dvh]">
+          {selectedMetric ? (
+            <div className="space-y-5">
+              <SheetHeader className="pr-8 text-left">
+                <SheetTitle>{selectedMetric.label}</SheetTitle>
+                <SheetDescription>{selectedMetric.description}</SheetDescription>
+              </SheetHeader>
+              <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  {selectedMetric.detail}
+                </p>
+                <p className="mt-2 break-words text-3xl font-semibold tabular-nums text-slate-950">
+                  {selectedMetric.value}
+                </p>
+              </div>
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
     </>
   );
 }
@@ -303,7 +358,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
   }, [initialSummary]);
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-8 pt-[max(24px,env(safe-area-inset-top))]">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[max(32px,env(safe-area-inset-bottom))] pt-[max(24px,env(safe-area-inset-top))]">
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
