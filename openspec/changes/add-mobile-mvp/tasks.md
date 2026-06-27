@@ -54,9 +54,9 @@
 
 ## 7. 后端：路由挂载与集成（全部能力）
 
-- [ ] 7.1 新增 `apps/api/src/modules/mobile/mobile.routes.ts` 聚合 `auth/customer/delivery/owner`
-- [ ] 7.2 在 `app.ts` 挂载 `/mobile/*`：`/mobile/auth` 公开，其余经 `mobile-auth.middleware` 守护（不复用 cookie 中间件）
-- [ ] 7.3 确认 CORS 允许移动来源与 `Authorization` 头；`pnpm --filter @cleanhub/api typecheck`、`build`、`lint` 通过
+- [x] 7.1 新增 `apps/api/src/modules/mobile/mobile.routes.ts` 聚合 `auth/customer/delivery/owner`
+- [x] 7.2 在 `app.ts` 挂载 `/mobile/*`：`/mobile/auth` 公开，其余经 `mobile-auth.middleware` 守护（不复用 cookie 中间件）
+- [x] 7.3 确认 CORS 允许移动来源与 `Authorization` 头；`pnpm --filter @cleanhub/api typecheck`、`build`、`lint` 通过
 
 ## 8. API Client：移动客户端（全部能力）
 
