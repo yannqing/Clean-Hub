@@ -4,6 +4,7 @@ import { createMobileCustomerApi } from "./customer";
 import { createMobileDeliveryApi } from "./delivery";
 import { createMobileMediaApi } from "./media";
 import { createMobileOwnerApi } from "./owner";
+import { createMobilePaymentApi } from "./payment";
 
 export * from "./auth";
 export * from "./auth.types";
@@ -15,6 +16,8 @@ export * from "./media";
 export * from "./media.types";
 export * from "./owner";
 export * from "./owner.types";
+export * from "./payment";
+export * from "./payment.types";
 
 export function createMobileApi(client: ApiClient) {
   return {
@@ -23,5 +26,6 @@ export function createMobileApi(client: ApiClient) {
     delivery: createMobileDeliveryApi(client),
     media: createMobileMediaApi(client),
     owner: createMobileOwnerApi(client),
+    payment: createMobilePaymentApi(client),
   };
 }

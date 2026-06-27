@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 
 type JsonObject = Record<string, unknown>;
 
@@ -10,6 +11,8 @@ const API_BASE_URL =
 
 const TENANT_CODE = process.env.MOBILE_E2E_TENANT_CODE ?? "CLEAN-001";
 const PASSWORD = process.env.MOBILE_E2E_PASSWORD ?? "123456";
+const PAYMENT_MOCK_SECRET =
+  process.env.PAYMENT_MOCK_SECRET ?? "cleanhub-mock-payment-secret";
 const DEVICE_ID = `mobile-e2e-${Date.now()}`;
 
 const FIXTURES = {
@@ -51,8 +54,68 @@ type MediaUploadTicket = {
   expiresAt: string;
 };
 
+type PaymentInitiationResponse = {
+  transaction: {
+    id: string;
+    orderId: string;
+    amount: string;
+    paymentStatus: "pending" | "paid" | "refunded" | "failed";
+  };
+  gateway: {
+    gateway: "mock";
+    externalId: string;
+    paymentUrl: string;
+    paymentToken: string;
+    expiresAt: string;
+  };
+  idempotent: boolean;
+};
+
+type RefundRequestResponse = {
+  id: string;
+  amount: string;
+  orderId: string;
+  paymentTransactionId: string | null;
+  status: "pending" | "processing" | "rejected" | "refunded" | "failed";
+  externalId: string | null;
+};
+
 function idempotencyKey(label: string): string {
   return `${DEVICE_ID}-${label}`;
+}
+
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") {
+    return JSON.stringify(value);
+  }
+
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(",")}]`;
+  }
+
+  return `{${Object.entries(value as Record<string, unknown>)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, item]) => `${JSON.stringify(key)}:${stableStringify(item)}`)
+    .join(",")}}`;
+}
+
+function signMockPaymentPayload(payload: JsonObject): string {
+  return createHmac("sha256", PAYMENT_MOCK_SECRET)
+    .update(stableStringify(payload))
+    .digest("hex");
+}
+
+async function sendMockPaymentWebhook(
+  payload: JsonObject,
+  expectedStatus: number | number[] = 200,
+): Promise<void> {
+  await request("/mobile/payment/webhooks/mock", {
+    expectedStatus,
+    body: payload,
+    headers: {
+      "X-CleanHub-Mock-Signature": signMockPaymentPayload(payload),
+    },
+  });
 }
 
 async function request<T = JsonObject>(
@@ -61,6 +124,7 @@ async function request<T = JsonObject>(
     method?: string;
     token?: string;
     body?: JsonObject;
+    headers?: Record<string, string>;
     expectedStatus?: number | number[];
   } = {},
 ): Promise<ApiResponse<T>> {
@@ -73,6 +137,7 @@ async function request<T = JsonObject>(
       Accept: "application/json",
       ...(options.body ? { "Content-Type": "application/json" } : {}),
       ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      ...(options.headers ?? {}),
       "X-Device-Id": DEVICE_ID,
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
@@ -496,6 +561,170 @@ async function verifyOwnerFlow(token: MobileTokenResponse): Promise<void> {
   assert.ok(summary.body.deliverySummary.signed >= 1);
 }
 
+async function verifyPaymentFlow(input: {
+  customer: MobileTokenResponse;
+  owner: MobileTokenResponse;
+}): Promise<void> {
+  await request(`/mobile/payment/orders/${FIXTURES.orderId}/payments`, {
+    expectedStatus: 422,
+    token: input.customer.accessToken,
+    body: {
+      amount: "999.00",
+      idempotencyKey: idempotencyKey("payment-over"),
+    },
+  });
+
+  const payment = await request<PaymentInitiationResponse>(
+    `/mobile/payment/orders/${FIXTURES.orderId}/payments`,
+    {
+      expectedStatus: 201,
+      token: input.customer.accessToken,
+      body: {
+        amount: "45.00",
+        idempotencyKey: idempotencyKey("payment-balance"),
+      },
+    },
+  );
+
+  assert.equal(payment.body.transaction.paymentStatus, "pending");
+  assert.equal(payment.body.gateway.gateway, "mock");
+  assert.match(payment.body.gateway.paymentUrl, /\/payments\/mock/);
+
+  const replay = await request<PaymentInitiationResponse>(
+    `/mobile/payment/orders/${FIXTURES.orderId}/payments`,
+    {
+      expectedStatus: 201,
+      token: input.customer.accessToken,
+      body: {
+        amount: "45.00",
+        idempotencyKey: idempotencyKey("payment-balance"),
+      },
+    },
+  );
+  assert.equal(replay.body.idempotent, true);
+  assert.equal(replay.body.transaction.id, payment.body.transaction.id);
+
+  await request(`/mobile/payment/payments/${payment.body.transaction.id}/mock-callback`, {
+    token: input.customer.accessToken,
+    body: {
+      status: "paid",
+    },
+  });
+
+  await sendMockPaymentWebhook({
+    gateway: "mock",
+    action: "pay",
+    tenantId: FIXTURES.tenantId,
+    externalId: payment.body.gateway.externalId,
+    event: `mock.payment.paid.${payment.body.transaction.id}`,
+    status: "paid",
+    amount: "45.00",
+    transactionId: payment.body.transaction.id,
+    occurredAt: new Date().toISOString(),
+  });
+
+  await request("/mobile/payment/webhooks/mock", {
+    expectedStatus: 200,
+    body: {
+      gateway: "mock",
+      action: "pay",
+      tenantId: FIXTURES.tenantId,
+      externalId: `${DEVICE_ID}.invalid`,
+      event: `${DEVICE_ID}.payment.invalid`,
+      status: "paid",
+      amount: "10.00",
+      transactionId: "missing",
+      occurredAt: new Date().toISOString(),
+    },
+    headers: {
+      "X-CleanHub-Mock-Signature": "bad",
+    },
+  });
+
+  const paidStatus = await request<{
+    transaction: { paymentStatus: string; amount: string };
+  }>(`/mobile/payment/payments/${payment.body.transaction.id}`, {
+    token: input.customer.accessToken,
+  });
+
+  assert.equal(paidStatus.body.transaction.paymentStatus, "paid");
+
+  const paidOrder = await request<{ paymentStatus: string; paidAmount: string }>(
+    `/mobile/customer/orders/${FIXTURES.orderId}`,
+    { token: input.customer.accessToken },
+  );
+  assert.equal(paidOrder.body.paymentStatus, "paid");
+  assert.equal(paidOrder.body.paidAmount, "95.00");
+
+  await request(`/mobile/payment/orders/${FIXTURES.orderId}/refund-requests`, {
+    expectedStatus: 422,
+    token: input.customer.accessToken,
+    body: {
+      amount: "999.00",
+      reason: "Too much",
+    },
+  });
+
+  const refund = await request<RefundRequestResponse>(
+    `/mobile/payment/orders/${FIXTURES.orderId}/refund-requests`,
+    {
+      expectedStatus: 201,
+      token: input.customer.accessToken,
+      body: {
+        amount: "10.00",
+        reason: "Mobile E2E refund request",
+      },
+    },
+  );
+  assert.equal(refund.body.status, "pending");
+
+  await request(`/mobile/payment/refund-requests/${refund.body.id}/approve`, {
+    method: "POST",
+    expectedStatus: 403,
+    token: input.customer.accessToken,
+  });
+
+  const approved = await request<{
+    refundRequest: RefundRequestResponse;
+    gateway: { externalId: string };
+  }>(`/mobile/payment/refund-requests/${refund.body.id}/approve`, {
+    method: "POST",
+    token: input.owner.accessToken,
+  });
+
+  assert.equal(approved.body.refundRequest.status, "processing");
+
+  await sendMockPaymentWebhook({
+    gateway: "mock",
+    action: "refund",
+    tenantId: FIXTURES.tenantId,
+    externalId: approved.body.gateway.externalId,
+    event: `${DEVICE_ID}.refund.succeeded`,
+    status: "refunded",
+    amount: "10.00",
+    transactionId: payment.body.transaction.id,
+    refundRequestId: refund.body.id,
+    occurredAt: new Date().toISOString(),
+  });
+
+  const refundList = await request<{
+    data: Array<{ id: string; status: string }>;
+  }>("/mobile/payment/refund-requests", {
+    token: input.customer.accessToken,
+  });
+  assert.ok(
+    refundList.body.data.some(
+      (item) => item.id === refund.body.id && item.status === "refunded",
+    ),
+  );
+
+  const refundedOrder = await request<{ paidAmount: string }>(
+    `/mobile/customer/orders/${FIXTURES.orderId}`,
+    { token: input.customer.accessToken },
+  );
+  assert.equal(refundedOrder.body.paidAmount, "85.00");
+}
+
 async function verifyAccessIsolation(input: {
   customer: MobileTokenResponse;
   driver: MobileTokenResponse;
@@ -569,6 +798,7 @@ async function main(): Promise<void> {
 
   await verifyCustomerFlow(otpCustomer);
   await verifyRefreshAndLogout(passwordCustomer);
+  await verifyPaymentFlow({ customer: otpCustomer, owner });
   await verifyDeliveryFlow(driver);
   await verifyOwnerFlow(owner);
   await verifyAccessIsolation({ customer: otpCustomer, driver, owner });

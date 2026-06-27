@@ -2,7 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ComponentType } from "react";
-import type { MobileDeliveryTaskStatus, MobileOwnerTodaySummary } from "@cleanhub/api-client";
+import type {
+  MobileDeliveryTaskStatus,
+  MobileOwnerTodaySummary,
+  MobileRefundRequest,
+} from "@cleanhub/api-client";
 import {
   Badge,
   Button,
@@ -24,6 +28,7 @@ import {
   PackageCheck,
   RefreshCcw,
   Route,
+  RotateCcw,
   Send,
   Shirt,
   TrendingUp,
@@ -34,12 +39,19 @@ import {
 
 import {
   acceptOwnerAppointment,
+  approveOwnerRefundRequest,
   cancelOwnerTask,
   dispatchOwnerTask,
   reassignOwnerTask,
   rejectOwnerAppointment,
+  rejectOwnerRefundRequest,
 } from "../actions";
-import { getOwnerDispatchBoard, getOwnerTodaySummary, listOwnerAppointments } from "../queries";
+import {
+  getOwnerDispatchBoard,
+  getOwnerTodaySummary,
+  listOwnerAppointments,
+  listOwnerRefundRequests,
+} from "../queries";
 import type {
   OwnerAppointmentListItem,
   OwnerAppointmentStatus,
@@ -64,6 +76,7 @@ type MetricItem = {
 type BoardState = {
   appointments: OwnerAppointmentListItem[];
   dispatchBoard: OwnerDispatchBoard | null;
+  refundRequests: MobileRefundRequest[];
 };
 
 type ActionTarget =
@@ -71,7 +84,9 @@ type ActionTarget =
   | { kind: "reject-appointment"; appointment: OwnerAppointmentListItem }
   | { kind: "dispatch-task"; task: OwnerDispatchTask }
   | { kind: "reassign-task"; task: OwnerDispatchTask }
-  | { kind: "cancel-task"; task: OwnerDispatchTask };
+  | { kind: "cancel-task"; task: OwnerDispatchTask }
+  | { kind: "approve-refund"; refundRequest: MobileRefundRequest }
+  | { kind: "reject-refund"; refundRequest: MobileRefundRequest };
 
 const numberFormatter = new Intl.NumberFormat("fr-FR");
 const moneyFormatter = new Intl.NumberFormat("fr-FR", {
@@ -436,6 +451,57 @@ function DispatchTaskItem({
   );
 }
 
+function RefundRequestItem({
+  onAction,
+  refundRequest,
+}: {
+  onAction: (target: ActionTarget) => void;
+  refundRequest: MobileRefundRequest;
+}) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold text-slate-950">
+            Commande {refundRequest.orderId.slice(-6).toUpperCase()}
+          </p>
+          <p className="mt-1 text-xs text-slate-600">
+            {formatDateTime(refundRequest.createdAt)}
+          </p>
+        </div>
+        <StatusBadge label="À approuver" status={refundRequest.status} />
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className="text-sm text-slate-700">{refundRequest.reason}</p>
+        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-950">
+          {refundRequest.amount}
+        </p>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <Button
+          className="w-full"
+          size="sm"
+          type="button"
+          onClick={() => onAction({ kind: "approve-refund", refundRequest })}
+        >
+          <CheckCircle2 className="size-4" aria-hidden />
+          Approuver
+        </Button>
+        <Button
+          className="w-full"
+          size="sm"
+          type="button"
+          variant="outline"
+          onClick={() => onAction({ kind: "reject-refund", refundRequest })}
+        >
+          <XCircle className="size-4" aria-hidden />
+          Refuser
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-5 text-center text-sm text-slate-600">
@@ -461,6 +527,12 @@ function getActionTitle(target: ActionTarget | null): string {
   if (target.kind === "reassign-task") {
     return "Réassigner la tâche";
   }
+  if (target.kind === "approve-refund") {
+    return "Approuver le remboursement";
+  }
+  if (target.kind === "reject-refund") {
+    return "Refuser le remboursement";
+  }
 
   return "Annuler la tâche";
 }
@@ -475,6 +547,13 @@ function getActionSubject(target: ActionTarget | null): string {
     target.kind === "reject-appointment"
   ) {
     return target.appointment.customerName;
+  }
+
+  if (
+    target.kind === "approve-refund" ||
+    target.kind === "reject-refund"
+  ) {
+    return `${target.refundRequest.amount} - ${target.refundRequest.reason}`;
   }
 
   return target.task.customerName;
@@ -512,7 +591,9 @@ function ActionSheet({
     target?.kind === "dispatch-task" ||
     target?.kind === "reassign-task";
   const needsReason =
-    target?.kind === "reject-appointment" || target?.kind === "cancel-task";
+    target?.kind === "reject-appointment" ||
+    target?.kind === "cancel-task" ||
+    target?.kind === "reject-refund";
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -593,6 +674,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
   const [boardState, setBoardState] = useState<BoardState>({
     appointments: [],
     dispatchBoard: null,
+    refundRequests: [],
   });
   const [branchId, setBranchId] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
@@ -619,6 +701,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
   );
   const visibleAppointments = boardState.appointments.slice(0, 5);
   const visibleTasks = boardState.dispatchBoard?.data.slice(0, 8) ?? [];
+  const visibleRefundRequests = boardState.refundRequests.slice(0, 5);
   const loadTime = formatLoadTime(lastLoadedAt);
 
   const loadSummary = useCallback(async (signal?: AbortSignal) => {
@@ -652,7 +735,29 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
       const cleanBranchId = branchId.trim();
 
       if (!cleanBranchId) {
-        setBoardState({ appointments: [], dispatchBoard: null });
+        setIsBoardLoading(true);
+        setError(null);
+
+        try {
+          const refundRequests = await listOwnerRefundRequests({ signal });
+
+          if (!signal?.aborted) {
+            setBoardState({
+              appointments: [],
+              dispatchBoard: null,
+              refundRequests: refundRequests.data,
+            });
+            setLastLoadedAt(new Date());
+          }
+        } catch (nextError) {
+          if (!signal?.aborted) {
+            setError(getErrorMessage(nextError));
+          }
+        } finally {
+          if (!signal?.aborted) {
+            setIsBoardLoading(false);
+          }
+        }
         return;
       }
 
@@ -660,7 +765,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
       setError(null);
 
       try {
-        const [appointments, dispatchBoard] = await Promise.all([
+        const [appointments, dispatchBoard, refundRequests] = await Promise.all([
           listOwnerAppointments({ branchId: cleanBranchId }, { signal }),
           getOwnerDispatchBoard(
             {
@@ -670,6 +775,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
             },
             { signal },
           ),
+          listOwnerRefundRequests({ signal }),
         ]);
 
         if (signal?.aborted) {
@@ -679,6 +785,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
         setBoardState({
           appointments: appointments.data,
           dispatchBoard,
+          refundRequests: refundRequests.data,
         });
         setLastLoadedAt(new Date());
       } catch (nextError) {
@@ -757,7 +864,9 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
     }
 
     if (
-      ["reject-appointment", "cancel-task"].includes(actionTarget.kind) &&
+      ["reject-appointment", "cancel-task", "reject-refund"].includes(
+        actionTarget.kind,
+      ) &&
       !cleanReason
     ) {
       setActionError("Indiquez le motif.");
@@ -791,9 +900,16 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
           assigneeUserId: cleanAssigneeUserId,
           note,
         });
-      } else {
+      } else if (actionTarget.kind === "cancel-task") {
         await cancelOwnerTask({
           taskId: actionTarget.task.id,
+          reason: cleanReason,
+        });
+      } else if (actionTarget.kind === "approve-refund") {
+        await approveOwnerRefundRequest(actionTarget.refundRequest.id);
+      } else {
+        await rejectOwnerRefundRequest({
+          refundRequestId: actionTarget.refundRequest.id,
           reason: cleanReason,
         });
       }
@@ -984,6 +1100,28 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
                 ))
               ) : (
                 <EmptyState message="Aucune tâche de livraison dans ce filtre." />
+              )}
+            </div>
+          </OperationalCard>
+
+          <OperationalCard
+            icon={RotateCcw}
+            subtitle={`${formatCount(boardState.refundRequests.length)} demandes`}
+            title="Remboursements"
+          >
+            <div className="mt-4 space-y-3">
+              {isBoardLoading && !visibleRefundRequests.length ? (
+                <EmptyState message="Chargement des remboursements..." />
+              ) : visibleRefundRequests.length ? (
+                visibleRefundRequests.map((refundRequest) => (
+                  <RefundRequestItem
+                    key={refundRequest.id}
+                    refundRequest={refundRequest}
+                    onAction={openAction}
+                  />
+                ))
+              ) : (
+                <EmptyState message="Aucune demande de remboursement en attente." />
               )}
             </div>
           </OperationalCard>

@@ -14,6 +14,11 @@ import {
 } from "../notifications/index.js";
 import { createOwnerRoutes } from "./owner/index.js";
 import { OwnerService } from "./owner/index.js";
+import {
+  createPaymentRoutes,
+  createPaymentWebhookRoutes,
+  PaymentService,
+} from "./payment/index.js";
 
 export type CreateMobileRoutesOptions = {
   mobileAuthService: MobileAuthService;
@@ -25,11 +30,16 @@ export function createMobileRoutes({
   notificationPublisher,
 }: CreateMobileRoutesOptions) {
   const routes = new Hono<AppBindings>();
+  const notificationsService = notificationPublisher ?? new NotificationsService();
 
   routes.route("/auth", createMobileAuthRoutes({ mobileAuthService }));
+  const paymentService = new PaymentService({
+    notificationPublisher: notificationsService,
+  });
+
+  routes.route("/payment", createPaymentWebhookRoutes({ paymentService }));
   routes.use("/*", createMobileAuthMiddleware(mobileAuthService));
   const ownerService = new OwnerService();
-  const notificationsService = notificationPublisher ?? new NotificationsService();
   const deliveryService = new DeliveryService({
     appointmentOperations: ownerService,
     notificationPublisher: notificationsService,
@@ -39,6 +49,7 @@ export function createMobileRoutes({
   routes.route("/customer", createCustomerRoutes());
   routes.route("/delivery", createDeliveryRoutes({ deliveryService }));
   routes.route("/owner", createOwnerRoutes({ ownerService }));
+  routes.route("/payment", createPaymentRoutes({ paymentService }));
 
   return routes;
 }

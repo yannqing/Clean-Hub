@@ -33,6 +33,7 @@ import {
   CalendarClock,
   CheckCircle2,
   ChevronRight,
+  CreditCard,
   Home,
   Loader2,
   Mail,
@@ -42,6 +43,7 @@ import {
   Plus,
   ReceiptText,
   RefreshCcw,
+  RotateCcw,
   TicketCheck,
   UserRound,
   XCircle,
@@ -49,7 +51,12 @@ import {
 
 import { getMobileSession } from "@/lib/token-storage";
 
-import { cancelCustomerAppointment, createCustomerAppointment } from "../actions";
+import {
+  cancelCustomerAppointment,
+  createCustomerAppointment,
+  createCustomerPayment,
+  createCustomerRefundRequest,
+} from "../actions";
 import {
   getCustomerActivityDetail,
   getCustomerAppointments,
@@ -103,6 +110,12 @@ type AppointmentFormState = {
   expectedAt: string;
   address: string;
   notes: string;
+};
+
+type RefundFormState = {
+  orderId: string;
+  amount: string;
+  reason: string;
 };
 
 type StatusView = {
@@ -251,6 +264,22 @@ function getErrorMessage(error: unknown): string {
   return "Action impossible pour le moment.";
 }
 
+function amountToCents(value: string): number {
+  const parsed = Number.parseFloat(value);
+
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) : 0;
+}
+
+function formatAmountFromCents(value: number): string {
+  return (Math.max(0, value) / 100).toFixed(2);
+}
+
+function getOrderBalance(order: MobileCustomerOrderDetail): string {
+  return formatAmountFromCents(
+    amountToCents(order.totalAmount) - amountToCents(order.paidAmount),
+  );
+}
+
 function getActivityItems(activity: MobileCustomerActivityList): ActivityListItem[] {
   const orders: ActivityListItem[] = activity.orders.map((order) => ({
     kind: "order",
@@ -347,16 +376,24 @@ export function CustomerHome() {
   const [activityDetail, setActivityDetail] = useState<ActivityDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [appointmentSheetOpen, setAppointmentSheetOpen] = useState(false);
+  const [refundSheetOpen, setRefundSheetOpen] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState<AppointmentFormState>({
     type: "pickup",
     expectedAt: getDefaultExpectedAt(),
     address: "",
     notes: "",
   });
+  const [refundForm, setRefundForm] = useState<RefundFormState>({
+    orderId: "",
+    amount: "",
+    reason: "",
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
   const [cancellingAppointmentId, setCancellingAppointmentId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -448,6 +485,88 @@ export function CustomerHome() {
       setError(getErrorMessage(nextError));
     } finally {
       setIsDetailLoading(false);
+    }
+  }
+
+  async function refreshSelectedOrder(orderId: string) {
+    const [detail, nextActivity] = await Promise.all([
+      getCustomerActivityDetail({ kind: "order", id: orderId }),
+      getCustomerOrdersAndTickets(),
+    ]);
+
+    setActivity(nextActivity.data);
+    setActivityDetail({
+      kind: "order",
+      data: detail as MobileCustomerOrderDetail,
+    });
+  }
+
+  async function handleCreatePayment(order: MobileCustomerOrderDetail) {
+    const amount = getOrderBalance(order);
+
+    if (amountToCents(amount) <= 0) {
+      setError("Commande deja reglee.");
+      return;
+    }
+
+    setError(null);
+    setMessage(null);
+    setIsSubmittingPayment(true);
+
+    try {
+      const result = await createCustomerPayment({
+        orderId: order.id,
+        amount,
+      });
+
+      window.open(result.gateway.paymentUrl, "_blank", "noopener,noreferrer");
+      await refreshSelectedOrder(order.id);
+      setMessage(
+        result.idempotent
+          ? "Paiement deja initie."
+          : "Paiement cree. Finalisez-le dans la fenetre ouverte.",
+      );
+    } catch (nextError) {
+      setError(getErrorMessage(nextError));
+    } finally {
+      setIsSubmittingPayment(false);
+    }
+  }
+
+  function openRefundSheet(order: MobileCustomerOrderDetail) {
+    setError(null);
+    setMessage(null);
+    setRefundForm({
+      orderId: order.id,
+      amount: order.paidAmount,
+      reason: "",
+    });
+    setRefundSheetOpen(true);
+  }
+
+  async function handleCreateRefund(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+    setIsSubmittingRefund(true);
+
+    try {
+      if (!refundForm.reason.trim()) {
+        throw new Error("Motif requis pour la demande.");
+      }
+
+      const refund = await createCustomerRefundRequest(refundForm.orderId, {
+        amount: refundForm.amount,
+        reason: refundForm.reason,
+      });
+
+      await refreshSelectedOrder(refund.orderId);
+      setRefundSheetOpen(false);
+      setMessage("Demande de remboursement envoyee.");
+    } catch (nextError) {
+      setError(getErrorMessage(nextError));
+    } finally {
+      setIsSubmittingRefund(false);
     }
   }
 
@@ -590,11 +709,13 @@ export function CustomerHome() {
 
       <ActivityDetailSheet
         detail={activityDetail}
+        isPaymentSubmitting={isSubmittingPayment}
         isLoading={isDetailLoading}
         item={activityItems.find(
           (item) => item.kind === selectedActivity?.kind && item.id === selectedActivity.id,
         ) ?? null}
         open={detailOpen}
+        onCreatePayment={(order) => void handleCreatePayment(order)}
         onOpenChange={(open) => {
           setDetailOpen(open);
 
@@ -603,6 +724,7 @@ export function CustomerHome() {
             setActivityDetail(null);
           }
         }}
+        onOpenRefund={openRefundSheet}
       />
 
       <AppointmentFormSheet
@@ -619,6 +741,22 @@ export function CustomerHome() {
           }
         }}
         onSubmit={handleCreateAppointment}
+      />
+
+      <RefundRequestSheet
+        error={refundSheetOpen ? error : null}
+        form={refundForm}
+        isSubmitting={isSubmittingRefund}
+        open={refundSheetOpen}
+        onFormChange={setRefundForm}
+        onOpenChange={(open) => {
+          setRefundSheetOpen(open);
+
+          if (!open) {
+            setError(null);
+          }
+        }}
+        onSubmit={handleCreateRefund}
       />
 
       <CustomerTabBar activeTab={activeTab} onChange={setActiveTab} />
@@ -853,16 +991,22 @@ function ActivityView({
 
 function ActivityDetailSheet({
   detail,
+  isPaymentSubmitting,
   isLoading,
   item,
+  onCreatePayment,
   open,
   onOpenChange,
+  onOpenRefund,
 }: {
   detail: ActivityDetail | null;
+  isPaymentSubmitting: boolean;
   isLoading: boolean;
   item: ActivityListItem | null;
+  onCreatePayment: (order: MobileCustomerOrderDetail) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onOpenRefund: (order: MobileCustomerOrderDetail) => void;
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -882,7 +1026,12 @@ function ActivityDetailSheet({
             </div>
           </div>
         ) : detail ? (
-          <ActivityDetailPanel detail={detail} />
+          <ActivityDetailPanel
+            detail={detail}
+            isPaymentSubmitting={isPaymentSubmitting}
+            onCreatePayment={onCreatePayment}
+            onOpenRefund={onOpenRefund}
+          />
         ) : (
           <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
             Selectionnez un suivi pour afficher le detail.
@@ -901,8 +1050,25 @@ function ActivityDetailSheet({
   );
 }
 
-function ActivityDetailPanel({ detail }: { detail: ActivityDetail }) {
+function ActivityDetailPanel({
+  detail,
+  isPaymentSubmitting,
+  onCreatePayment,
+  onOpenRefund,
+}: {
+  detail: ActivityDetail;
+  isPaymentSubmitting: boolean;
+  onCreatePayment: (order: MobileCustomerOrderDetail) => void;
+  onOpenRefund: (order: MobileCustomerOrderDetail) => void;
+}) {
   if (detail.kind === "order") {
+    const balance = getOrderBalance(detail.data);
+    const canPay =
+      amountToCents(balance) > 0 &&
+      detail.data.paymentStatus !== "paid" &&
+      detail.data.paymentStatus !== "refunded";
+    const canRefund = amountToCents(detail.data.paidAmount) > 0;
+
     return (
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-start justify-between gap-3">
@@ -927,6 +1093,32 @@ function ActivityDetailPanel({ detail }: { detail: ActivityDetail }) {
             {detail.data.notes}
           </p>
         ) : null}
+
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Button
+            className="h-11"
+            disabled={!canPay || isPaymentSubmitting}
+            type="button"
+            onClick={() => onCreatePayment(detail.data)}
+          >
+            {isPaymentSubmitting ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <CreditCard className="size-4" aria-hidden="true" />
+            )}
+            Payer
+          </Button>
+          <Button
+            className="h-11"
+            disabled={!canRefund}
+            type="button"
+            variant="outline"
+            onClick={() => onOpenRefund(detail.data)}
+          >
+            <RotateCcw className="size-4" aria-hidden="true" />
+            Rembourser
+          </Button>
+        </div>
 
         <ItemList
           emptyLabel="Aucun article"
@@ -1185,6 +1377,82 @@ function AppointmentForm({
         </Button>
       </SheetFooter>
     </form>
+  );
+}
+
+function RefundRequestSheet({
+  error,
+  form,
+  isSubmitting,
+  open,
+  onFormChange,
+  onOpenChange,
+  onSubmit,
+}: {
+  error: string | null;
+  form: RefundFormState;
+  isSubmitting: boolean;
+  open: boolean;
+  onFormChange: React.Dispatch<React.SetStateAction<RefundFormState>>;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="max-h-[92dvh] p-5">
+        <SheetHeader className="pr-8 text-left">
+          <SheetTitle>Demande de remboursement</SheetTitle>
+          <SheetDescription>Validation par l&apos;owner avant traitement</SheetDescription>
+        </SheetHeader>
+
+        {error ? <AlertMessage tone="error" message={error} /> : null}
+
+        <form className="space-y-4" onSubmit={onSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="refund-amount">Montant</Label>
+            <Input
+              className="h-12 text-base"
+              id="refund-amount"
+              inputMode="decimal"
+              value={form.amount}
+              onChange={(event) =>
+                onFormChange((current) => ({
+                  ...current,
+                  amount: event.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="refund-reason">Motif</Label>
+            <Textarea
+              className="min-h-24 resize-none text-base"
+              id="refund-reason"
+              placeholder="Expliquez la demande"
+              value={form.reason}
+              onChange={(event) =>
+                onFormChange((current) => ({
+                  ...current,
+                  reason: event.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <SheetFooter className="sticky bottom-0 -mx-5 mt-5 border-t border-slate-200 bg-white px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+            <Button className="h-12 w-full" disabled={isSubmitting} type="submit">
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <RotateCcw className="size-4" aria-hidden="true" />
+              )}
+              Envoyer la demande
+            </Button>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
   );
 }
 

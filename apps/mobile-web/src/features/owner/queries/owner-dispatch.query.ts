@@ -4,6 +4,7 @@ import type {
   MobileDeliveryTaskListItem,
   MobileOwnerAppointment,
   MobileOwnerAppointmentListResponse,
+  MobileRefundRequestListResponse,
 } from "@cleanhub/api-client";
 
 import { apiClient } from "@/lib/api-client";
@@ -120,4 +121,13 @@ export async function listOwnerAppointments(
   );
 
   return toAppointmentList(response);
+}
+
+export async function listOwnerRefundRequests(
+  options?: QueryOptions,
+): Promise<MobileRefundRequestListResponse> {
+  return apiClient.mobile.payment.listRefundRequests(
+    { status: "pending" },
+    options,
+  );
 }

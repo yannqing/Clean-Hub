@@ -24,3 +24,18 @@ export async function getCustomerActivityDetail(input: {
 
   return apiClient.mobile.customer.getTicket(input.id);
 }
+
+export async function getCustomerPaymentStatus(paymentId: string) {
+  return apiClient.mobile.payment.getPaymentStatus(paymentId);
+}
+
+export async function simulateCustomerMockPayment(
+  paymentId: string,
+  status: "paid" | "failed",
+) {
+  return apiClient.mobile.payment.simulateMockPayment(paymentId, { status });
+}
+
+export async function getCustomerRefundRequests() {
+  return apiClient.mobile.payment.listRefundRequests();
+}

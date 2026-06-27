@@ -143,3 +143,16 @@ export async function rejectOwnerAppointment(input: {
     ),
   };
 }
+
+export async function approveOwnerRefundRequest(refundRequestId: string) {
+  return apiClient.mobile.payment.approveRefundRequest(refundRequestId);
+}
+
+export async function rejectOwnerRefundRequest(input: {
+  refundRequestId: string;
+  reason: string;
+}) {
+  return apiClient.mobile.payment.rejectRefundRequest(input.refundRequestId, {
+    reason: input.reason,
+  });
+}
