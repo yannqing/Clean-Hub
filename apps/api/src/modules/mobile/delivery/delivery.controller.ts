@@ -10,6 +10,25 @@ const taskIdParamsSchema = z.object({
   taskId: z.string().trim().min(1).max(120),
 });
 
+const dispatchBoardQuerySchema = z.object({
+  branchId: z.string().trim().min(1).max(120),
+  assigneeUserId: z.string().trim().min(1).max(120).optional(),
+  status: z
+    .enum([
+      "pending_dispatch",
+      "en_route",
+      "arrived",
+      "picked_up",
+      "delivering",
+      "signed",
+      "exception",
+      "cancelled",
+    ])
+    .optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+});
+
 const idempotencyKeySchema = z.string().trim().min(1).max(120);
 const coordinateSchema = z
   .union([z.string().trim().min(1).max(32), z.number()])
@@ -62,7 +81,7 @@ const signatureBodySchema = z
 const assignTaskBodySchema = z.object({
   tenantId: z.string().trim().min(1).max(120),
   branchId: z.string().trim().min(1).max(120),
-  assigneeUserId: z.string().trim().min(1).max(120),
+  assigneeUserId: z.string().trim().min(1).max(120).optional(),
   customerId: z.string().trim().min(1).max(120),
   type: z.enum(["pickup", "dropoff"]),
   customerName: z.string().trim().min(1).max(200),
@@ -72,6 +91,17 @@ const assignTaskBodySchema = z.object({
   ticketId: z.string().trim().min(1).max(120).optional(),
   expectedAt: z.string().datetime().optional(),
   notes: z.string().trim().min(1).max(2000).optional(),
+});
+
+const dispatchTaskBodySchema = z.object({
+  assigneeUserId: z.string().trim().min(1).max(120),
+  idempotencyKey: idempotencyKeySchema,
+  note: noteSchema,
+});
+
+const cancelTaskBodySchema = z.object({
+  idempotencyKey: idempotencyKeySchema,
+  reason: z.string().trim().min(1).max(1000),
 });
 
 export type DeliveryControllerOptions = {
@@ -110,6 +140,29 @@ export function createDeliveryController({
   deliveryService,
 }: DeliveryControllerOptions) {
   return {
+    getDispatchBoard: async (c: Context<AppBindings>) => {
+      const query = dispatchBoardQuerySchema.parse(c.req.query());
+
+      try {
+        return c.json(
+          await deliveryService.getDispatchBoard({
+            authContext: c.get("mobileAuthContext"),
+            branchId: query.branchId,
+            assigneeUserId: query.assigneeUserId,
+            status: query.status,
+            from: parseDate(query.from),
+            to: parseDate(query.to),
+          }),
+        );
+      } catch (error) {
+        if (error instanceof DeliveryError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
     listTodayTasks: async (c: Context<AppBindings>) => {
       try {
         const data = await deliveryService.listTodayTasks(
@@ -161,6 +214,74 @@ export function createDeliveryController({
             deviceId: body.deviceId,
             note: body.note,
             exceptionReason: body.exceptionReason,
+          }),
+        );
+      } catch (error) {
+        if (error instanceof DeliveryError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
+    dispatchTask: async (c: Context<AppBindings>) => {
+      const { taskId } = taskIdParamsSchema.parse(c.req.param());
+      const body = dispatchTaskBodySchema.parse(await readBody(c));
+
+      try {
+        return c.json(
+          await deliveryService.dispatchTask({
+            authContext: c.get("mobileAuthContext"),
+            taskId,
+            assigneeUserId: body.assigneeUserId,
+            idempotencyKey: body.idempotencyKey,
+            note: body.note,
+          }),
+        );
+      } catch (error) {
+        if (error instanceof DeliveryError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
+    reassignTask: async (c: Context<AppBindings>) => {
+      const { taskId } = taskIdParamsSchema.parse(c.req.param());
+      const body = dispatchTaskBodySchema.parse(await readBody(c));
+
+      try {
+        return c.json(
+          await deliveryService.reassignTask({
+            authContext: c.get("mobileAuthContext"),
+            taskId,
+            assigneeUserId: body.assigneeUserId,
+            idempotencyKey: body.idempotencyKey,
+            note: body.note,
+          }),
+        );
+      } catch (error) {
+        if (error instanceof DeliveryError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
+    cancelTask: async (c: Context<AppBindings>) => {
+      const { taskId } = taskIdParamsSchema.parse(c.req.param());
+      const body = cancelTaskBodySchema.parse(await readBody(c));
+
+      try {
+        return c.json(
+          await deliveryService.cancelTask({
+            authContext: c.get("mobileAuthContext"),
+            taskId,
+            idempotencyKey: body.idempotencyKey,
+            reason: body.reason,
           }),
         );
       } catch (error) {

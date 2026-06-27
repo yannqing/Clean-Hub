@@ -17,6 +17,8 @@ export type DeliveryTaskListItem = {
   id: string;
   tenantId: string;
   branchId: string;
+  appointmentId: string | null;
+  assigneeUserId: string | null;
   type: DeliveryTaskType;
   status: DeliveryTaskStatus;
   expectedAt: string | null;
@@ -32,6 +34,11 @@ export type DeliveryTaskDetail = DeliveryTaskListItem & {
   customerId: string;
   notes: string | null;
   exceptionReason: string | null;
+  cancellationReason: string | null;
+  dispatchedAt: string | null;
+  dispatchedBy: string | null;
+  cancelledAt: string | null;
+  cancelledBy: string | null;
   timeline: DeliveryTaskEvent[];
   proofs: DeliveryProof[];
   order: DeliveryOrderSummary | null;
@@ -121,7 +128,7 @@ export type DeliveryAssignTaskInput = {
   authContext: MobileAuthContext;
   tenantId: string;
   branchId: string;
-  assigneeUserId: string;
+  assigneeUserId?: string;
   customerId: string;
   type: DeliveryTaskType;
   customerName: string;
@@ -131,6 +138,37 @@ export type DeliveryAssignTaskInput = {
   ticketId?: string;
   expectedAt?: Date;
   notes?: string;
+};
+
+export type DeliveryDispatchTaskInput = {
+  authContext: MobileAuthContext;
+  taskId: string;
+  assigneeUserId: string;
+  idempotencyKey: string;
+  note?: string;
+};
+
+export type DeliveryReassignTaskInput = DeliveryDispatchTaskInput;
+
+export type DeliveryCancelTaskInput = {
+  authContext: MobileAuthContext;
+  taskId: string;
+  idempotencyKey: string;
+  reason: string;
+};
+
+export type DeliveryDispatchBoardQuery = {
+  authContext: MobileAuthContext;
+  branchId: string;
+  assigneeUserId?: string;
+  status?: DeliveryTaskStatus;
+  from?: Date;
+  to?: Date;
+};
+
+export type DeliveryDispatchBoard = {
+  pending: DeliveryTaskListItem[];
+  assigned: DeliveryTaskListItem[];
 };
 
 export type DeliveryMutationResult = {

@@ -1,14 +1,16 @@
 import { getDb, type Database } from "@cleanhub/db";
 
 import type { MobileAuthContext } from "../auth/auth.types.js";
+import { DeliveryRepository } from "../delivery/delivery.repository.js";
 import { OwnerRepository } from "./owner.repository.js";
-import type { OwnerMobileContext, OwnerTodaySummary } from "./owner.types.js";
+import type {
+  OwnerAppointment,
+  OwnerAppointmentAcceptResult,
+  OwnerAppointmentStatus,
+  OwnerMobileContext,
+  OwnerTodaySummary,
+} from "./owner.types.js";
 import { OwnerError } from "./owner.types.js";
-
-export type OwnerServiceOptions = {
-  db?: Database;
-  repository?: OwnerRepositoryLike;
-};
 
 export type OwnerRepositoryLike = {
   findTenantBase(tenantId: string): Promise<Pick<
@@ -37,6 +39,66 @@ export type OwnerRepositoryLike = {
     start: Date;
     end: Date;
   }): Promise<OwnerTodaySummary["deliverySummary"]>;
+  listAppointments(input: {
+    tenantId: string;
+    branchId?: string;
+    status?: OwnerAppointmentStatus;
+  }): Promise<OwnerAppointment[]>;
+  findAppointmentById(input: {
+    tenantId: string;
+    appointmentId: string;
+  }): Promise<OwnerAppointment | null>;
+  acceptAppointmentAndCreateTask(input: {
+    tenantId: string;
+    appointmentId: string;
+    operatorUserId: string;
+    assigneeUserId?: string;
+    notes?: string;
+  }): Promise<{ appointment: OwnerAppointment; taskId: string } | null>;
+  rejectPendingAppointment(input: {
+    tenantId: string;
+    appointmentId: string;
+    operatorUserId: string;
+    reason: string;
+  }): Promise<OwnerAppointment | null>;
+  markAppointmentDoneFromDelivery(input: {
+    tenantId: string;
+    appointmentId: string;
+    taskId: string;
+    operatorUserId: string;
+  }): Promise<void>;
+  reopenAppointmentFromCancelledDelivery(input: {
+    tenantId: string;
+    appointmentId: string;
+    taskId: string;
+    operatorUserId: string;
+  }): Promise<void>;
+};
+
+export type OwnerDeliveryRepositoryLike = Pick<
+  DeliveryRepository,
+  "getTaskDetailById" | "isTenantDriver"
+>;
+
+export type AppointmentOperationsServiceLike = {
+  markDeliveryDone(input: {
+    tenantId: string;
+    appointmentId: string;
+    taskId: string;
+    operatorUserId: string;
+  }): Promise<void>;
+  markDeliveryCancelled(input: {
+    tenantId: string;
+    appointmentId: string;
+    taskId: string;
+    operatorUserId: string;
+  }): Promise<void>;
+};
+
+export type OwnerServiceOptions = {
+  db?: Database;
+  repository?: OwnerRepositoryLike;
+  deliveryRepository?: OwnerDeliveryRepositoryLike;
 };
 
 function forbidden(): OwnerError {
@@ -47,12 +109,35 @@ function forbidden(): OwnerError {
   );
 }
 
+function appointmentNotFound(): OwnerError {
+  return new OwnerError(
+    "OWNER_APPOINTMENT_NOT_FOUND",
+    "Appointment was not found.",
+    404,
+  );
+}
+
+function appointmentConflict(
+  message: string,
+  currentStatus: OwnerAppointmentStatus,
+): OwnerError {
+  return new OwnerError("OWNER_APPOINTMENT_CONFLICT", message, 409, {
+    currentStatus,
+  });
+}
+
 function assertOwnerContext(authContext: MobileAuthContext): OwnerMobileContext {
   if (authContext.subjectType !== "staff" || authContext.role !== "owner") {
     throw forbidden();
   }
 
   return authContext as OwnerMobileContext;
+}
+
+function assertBranchAccess(authContext: OwnerMobileContext, branchId: string): void {
+  if (authContext.branchIds.length > 0 && !authContext.branchIds.includes(branchId)) {
+    throw forbidden();
+  }
 }
 
 function getTodayBounds(now = new Date()): { start: Date; end: Date } {
@@ -67,12 +152,22 @@ function getTodayBounds(now = new Date()): { start: Date; end: Date } {
   return { start, end };
 }
 
-export class OwnerService {
+export class OwnerService implements AppointmentOperationsServiceLike {
   private readonly repository: OwnerRepositoryLike;
+  private readonly deliveryRepository: OwnerDeliveryRepositoryLike;
 
   constructor(options: OwnerServiceOptions = {}) {
-    this.repository =
-      options.repository ?? new OwnerRepository(options.db ?? getDb());
+    if (options.repository && options.deliveryRepository) {
+      this.repository = options.repository;
+      this.deliveryRepository = options.deliveryRepository;
+      return;
+    }
+
+    const db = options.db ?? getDb();
+
+    this.repository = options.repository ?? new OwnerRepository(db);
+    this.deliveryRepository =
+      options.deliveryRepository ?? new DeliveryRepository(db);
   }
 
   async getTodaySummary(
@@ -132,5 +227,172 @@ export class OwnerService {
       appointmentSummary,
       deliverySummary,
     };
+  }
+
+  async listAppointments(input: {
+    authContext: MobileAuthContext;
+    branchId?: string;
+    status?: OwnerAppointmentStatus;
+  }): Promise<OwnerAppointment[]> {
+    const owner = assertOwnerContext(input.authContext);
+
+    if (input.branchId) {
+      assertBranchAccess(owner, input.branchId);
+    }
+
+    return this.repository.listAppointments({
+      tenantId: owner.tenantId,
+      branchId: input.branchId,
+      status: input.status,
+    });
+  }
+
+  async acceptAppointment(input: {
+    authContext: MobileAuthContext;
+    appointmentId: string;
+    idempotencyKey: string;
+    assigneeUserId?: string;
+    notes?: string;
+  }): Promise<OwnerAppointmentAcceptResult> {
+    const owner = assertOwnerContext(input.authContext);
+    const existing = await this.repository.findAppointmentById({
+      tenantId: owner.tenantId,
+      appointmentId: input.appointmentId,
+    });
+
+    if (!existing) {
+      throw appointmentNotFound();
+    }
+
+    assertBranchAccess(owner, existing.branchId);
+
+    if (input.assigneeUserId) {
+      await this.assertTenantDriver(owner.tenantId, input.assigneeUserId);
+    }
+
+    if (existing.deliveryTaskId && existing.status === "accepted") {
+      const task = await this.deliveryRepository.getTaskDetailById({
+        tenantId: owner.tenantId,
+        taskId: existing.deliveryTaskId,
+      });
+
+      if (!task) {
+        throw appointmentConflict(
+          "Linked delivery task was not found.",
+          existing.status,
+        );
+      }
+
+      return { appointment: existing, task, idempotent: true };
+    }
+
+    if (existing.status !== "pending") {
+      throw appointmentConflict(
+        "Only pending appointments can be accepted.",
+        existing.status,
+      );
+    }
+
+    const accepted = await this.repository.acceptAppointmentAndCreateTask({
+      tenantId: owner.tenantId,
+      appointmentId: input.appointmentId,
+      operatorUserId: owner.subjectId,
+      assigneeUserId: input.assigneeUserId,
+      notes: input.notes,
+    });
+
+    if (!accepted) {
+      throw appointmentConflict(
+        "Appointment status changed while processing acceptance.",
+        existing.status,
+      );
+    }
+
+    const task = await this.deliveryRepository.getTaskDetailById({
+      tenantId: owner.tenantId,
+      taskId: accepted.taskId,
+    });
+
+    if (!task) {
+      throw new OwnerError(
+        "OWNER_VALIDATION_ERROR",
+        "Accepted appointment delivery task could not be loaded.",
+        422,
+      );
+    }
+
+    return {
+      appointment: accepted.appointment,
+      task,
+      idempotent: false,
+    };
+  }
+
+  async rejectAppointment(input: {
+    authContext: MobileAuthContext;
+    appointmentId: string;
+    reason: string;
+  }): Promise<OwnerAppointment> {
+    const owner = assertOwnerContext(input.authContext);
+    const existing = await this.repository.findAppointmentById({
+      tenantId: owner.tenantId,
+      appointmentId: input.appointmentId,
+    });
+
+    if (!existing) {
+      throw appointmentNotFound();
+    }
+
+    assertBranchAccess(owner, existing.branchId);
+
+    if (existing.status !== "pending") {
+      throw appointmentConflict(
+        "Only pending appointments can be rejected.",
+        existing.status,
+      );
+    }
+
+    const rejected = await this.repository.rejectPendingAppointment({
+      tenantId: owner.tenantId,
+      appointmentId: input.appointmentId,
+      operatorUserId: owner.subjectId,
+      reason: input.reason,
+    });
+
+    if (!rejected) {
+      throw appointmentConflict(
+        "Appointment status changed while processing rejection.",
+        existing.status,
+      );
+    }
+
+    return rejected;
+  }
+
+  async markDeliveryDone(input: {
+    tenantId: string;
+    appointmentId: string;
+    taskId: string;
+    operatorUserId: string;
+  }): Promise<void> {
+    await this.repository.markAppointmentDoneFromDelivery(input);
+  }
+
+  async markDeliveryCancelled(input: {
+    tenantId: string;
+    appointmentId: string;
+    taskId: string;
+    operatorUserId: string;
+  }): Promise<void> {
+    await this.repository.reopenAppointmentFromCancelledDelivery(input);
+  }
+
+  private async assertTenantDriver(
+    tenantId: string,
+    userId: string,
+  ): Promise<void> {
+    if (!(await this.deliveryRepository.isTenantDriver({ tenantId, userId }))) {
+      throw forbidden();
+    }
   }
 }

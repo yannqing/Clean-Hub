@@ -15,6 +15,9 @@ export function createOwnerRoutes({
   const controller = createOwnerController({ ownerService });
 
   routes.get("/summary/today", controller.getTodaySummary);
+  routes.get("/appointments", controller.listAppointments);
+  routes.post("/appointments/:appointmentId/accept", controller.acceptAppointment);
+  routes.post("/appointments/:appointmentId/reject", controller.rejectAppointment);
 
   return routes;
 }

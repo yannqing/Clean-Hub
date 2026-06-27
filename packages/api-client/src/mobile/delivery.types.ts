@@ -15,6 +15,8 @@ export type MobileDeliveryTaskListItem = {
   id: string;
   tenantId: string;
   branchId: string;
+  appointmentId: string | null;
+  assigneeUserId: string | null;
   type: MobileDeliveryTaskType;
   status: MobileDeliveryTaskStatus;
   expectedAt: string | null;
@@ -70,6 +72,11 @@ export type MobileDeliveryTaskDetail = MobileDeliveryTaskListItem & {
   customerId: string;
   notes: string | null;
   exceptionReason: string | null;
+  dispatchedBy: string | null;
+  dispatchedAt: string | null;
+  cancelledBy: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
   timeline: MobileDeliveryTaskEvent[];
   proofs: MobileDeliveryProof[];
   order: MobileDeliveryOrderSummary | null;
@@ -124,6 +131,33 @@ export type MobileAssignDeliveryTaskRequest = {
   ticketId?: string;
   expectedAt?: string;
   notes?: string;
+};
+
+export type MobileDeliveryDispatchBoardQuery = {
+  branchId?: string;
+  assigneeUserId?: string;
+  status?: MobileDeliveryTaskStatus;
+  from?: string;
+  to?: string;
+};
+
+export type MobileDeliveryDispatchBoardResponse = {
+  pending: MobileDeliveryTaskListItem[];
+  assigned: MobileDeliveryTaskListItem[];
+};
+
+export type MobileDispatchDeliveryTaskRequest = {
+  assigneeUserId: string;
+  idempotencyKey: string;
+  note?: string;
+};
+
+export type MobileReassignDeliveryTaskRequest =
+  MobileDispatchDeliveryTaskRequest;
+
+export type MobileCancelDeliveryTaskRequest = {
+  idempotencyKey: string;
+  reason: string;
 };
 
 export type MobileDeliveryListResponse<T> = {

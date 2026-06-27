@@ -43,9 +43,14 @@ export const appointments = pgTable(
     expectedAt: timestamp("expected_at", { withTimezone: true }).notNull(),
     address: text("address").notNull(),
     notes: text("notes"),
+    deliveryTaskId: ulidColumn("delivery_task_id"),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+    acceptedBy: ulidColumn("accepted_by").references(() => users.id),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    cancelledBy: ulidColumn("cancelled_by").references(() => users.id),
+    cancellationReason: text("cancellation_reason"),
     doneAt: timestamp("done_at", { withTimezone: true }),
+    doneBy: ulidColumn("done_by").references(() => users.id),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -69,6 +74,7 @@ export const appointments = pgTable(
       table.customerId,
     ),
     index("appointments_expected_at_idx").on(table.expectedAt),
+    index("appointments_delivery_task_id_idx").on(table.deliveryTaskId),
     index("appointments_deleted_at_idx").on(table.deletedAt),
   ],
 );

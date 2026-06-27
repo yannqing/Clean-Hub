@@ -1,9 +1,15 @@
 import { getDb, type Database } from "@cleanhub/db";
+import { logger } from "@cleanhub/logger";
 
+import type { AppointmentOperationsServiceLike } from "../owner/owner.service.js";
 import { MediaError, MediaService } from "../../media/index.js";
 import { DeliveryRepository } from "./delivery.repository.js";
 import type {
   DeliveryAssignTaskInput,
+  DeliveryCancelTaskInput,
+  DeliveryDispatchBoard,
+  DeliveryDispatchBoardQuery,
+  DeliveryDispatchTaskInput,
   DeliveryDriverContext,
   DeliveryError,
   DeliveryMutationResult,
@@ -12,6 +18,7 @@ import type {
   DeliveryTaskDetail,
   DeliveryTaskListItem,
   DeliveryTaskStatus,
+  DeliveryReassignTaskInput,
   DeliveryUpdateStatusInput,
   DeliveryUploadProofInput,
   DeliverySignTaskInput,
@@ -23,12 +30,27 @@ export type DeliveryServiceOptions = {
   db?: Database;
   repository?: DeliveryRepositoryLike;
   mediaService?: DeliveryMediaServiceLike;
+  appointmentOperations?: AppointmentOperationsServiceLike;
 };
 
 export type DeliveryMediaServiceLike = Pick<
   MediaService,
   "assertOwnedAndCommit" | "createDownloadLink"
 >;
+
+type DeliveryTaskRecord = {
+  id: string;
+  tenantId: string;
+  branchId: string;
+  assigneeUserId: string | null;
+  appointmentId: string | null;
+  customerId: string;
+  orderId: string | null;
+  ticketId: string | null;
+  type: "pickup" | "dropoff";
+  status: DeliveryTaskStatus;
+  version: number;
+};
 
 export type DeliveryRepositoryLike = {
   listTodayTasks(input: {
@@ -41,22 +63,24 @@ export type DeliveryRepositoryLike = {
     tenantId: string;
     driverUserId: string;
     taskId: string;
-  }): Promise<{
-    id: string;
+  }): Promise<DeliveryTaskRecord | null>;
+  findTaskById(input: {
     tenantId: string;
-    branchId: string;
-    assigneeUserId: string | null;
-    customerId: string;
-    orderId: string | null;
-    ticketId: string | null;
-    type: "pickup" | "dropoff";
-    status: DeliveryTaskStatus;
-  } | null>;
+    taskId: string;
+  }): Promise<DeliveryTaskRecord | null>;
   getOwnedTaskDetail(input: {
     tenantId: string;
     driverUserId: string;
     taskId: string;
   }): Promise<DeliveryTaskDetail | null>;
+  getTaskDetailById(input: {
+    tenantId: string;
+    taskId: string;
+  }): Promise<DeliveryTaskDetail | null>;
+  isTenantDriver(input: {
+    tenantId: string;
+    userId: string;
+  }): Promise<boolean>;
   findTaskEventByIdempotencyKey(input: {
     taskId: string;
     idempotencyKey: string;
@@ -110,11 +134,12 @@ export type DeliveryRepositoryLike = {
   }): Promise<{
     event: DeliveryTaskEvent;
     proof: DeliveryProof;
+    appointmentId: string | null;
   } | null>;
   createAssignedTask(input: {
     tenantId: string;
     branchId: string;
-    assigneeUserId: string;
+    assigneeUserId?: string | null;
     customerId: string;
     type: "pickup" | "dropoff";
     customerName: string;
@@ -125,7 +150,51 @@ export type DeliveryRepositoryLike = {
     ticketId?: string;
     expectedAt?: Date;
     notes?: string;
+    appointmentId?: string;
   }): Promise<string>;
+  listPendingDispatchTasks(input: {
+    tenantId: string;
+    branchId: string;
+  }): Promise<DeliveryTaskListItem[]>;
+  listAssignedDispatchTasks(input: {
+    tenantId: string;
+    branchId: string;
+    assigneeUserId?: string;
+    status?: DeliveryTaskStatus;
+    from?: Date;
+    to?: Date;
+  }): Promise<DeliveryTaskListItem[]>;
+  dispatchTask(input: {
+    tenantId: string;
+    taskId: string;
+    taskVersion: number;
+    assigneeUserId: string;
+    operatorUserId: string;
+    idempotencyKey: string;
+    note?: string;
+  }): Promise<DeliveryTaskEvent | null>;
+  reassignTask(input: {
+    tenantId: string;
+    taskId: string;
+    taskVersion: number;
+    fromStatus: DeliveryTaskStatus;
+    assigneeUserId: string;
+    operatorUserId: string;
+    idempotencyKey: string;
+    note?: string;
+  }): Promise<DeliveryTaskEvent | null>;
+  cancelTask(input: {
+    tenantId: string;
+    taskId: string;
+    taskVersion: number;
+    fromStatus: DeliveryTaskStatus;
+    operatorUserId: string;
+    idempotencyKey: string;
+    reason: string;
+  }): Promise<{
+    event: DeliveryTaskEvent;
+    appointmentId: string | null;
+  } | null>;
 };
 
 const TERMINAL_STATUSES = new Set<DeliveryTaskStatus>([
@@ -158,10 +227,23 @@ function assertDriverContext(
   return authContext as DeliveryDriverContext;
 }
 
+function assertOwnerContext(
+  authContext: MobileAuthContext,
+): MobileAuthContext & { subjectType: "staff"; role: "owner" } {
+  if (authContext.subjectType !== "staff" || authContext.role !== "owner") {
+    throw forbidden();
+  }
+
+  return authContext as MobileAuthContext & {
+    subjectType: "staff";
+    role: "owner";
+  };
+}
+
 function forbidden(): DeliveryError {
   return new MobileDeliveryError(
     "DELIVERY_FORBIDDEN",
-    "Driver access is required.",
+    "Delivery access is required.",
     403,
   );
 }
@@ -225,11 +307,13 @@ function assertValidTransition(
 export class DeliveryService {
   private readonly repository: DeliveryRepositoryLike;
   private readonly mediaService: DeliveryMediaServiceLike;
+  private readonly appointmentOperations?: AppointmentOperationsServiceLike;
 
   constructor(options: DeliveryServiceOptions = {}) {
     this.repository =
       options.repository ?? new DeliveryRepository(options.db ?? getDb());
     this.mediaService = options.mediaService ?? new MediaService();
+    this.appointmentOperations = options.appointmentOperations;
   }
 
   async listTodayTasks(
@@ -468,6 +552,15 @@ export class DeliveryService {
       );
     }
 
+    if (signed.appointmentId) {
+      await this.appointmentOperations?.markDeliveryDone({
+        tenantId: driver.tenantId,
+        appointmentId: signed.appointmentId,
+        taskId: task.id,
+        operatorUserId: driver.subjectId,
+      });
+    }
+
     return {
       task: await this.getTaskDetail(driver, task.id),
       event: signed.event,
@@ -479,12 +572,25 @@ export class DeliveryService {
   async createAssignedTask(
     input: DeliveryAssignTaskInput,
   ): Promise<DeliveryTaskDetail> {
-    const driver = assertDriverContext(input.authContext);
+    if (input.authContext.subjectType !== "staff") {
+      throw forbidden();
+    }
 
-    if (
-      input.tenantId !== driver.tenantId ||
-      input.assigneeUserId !== driver.subjectId
-    ) {
+    if (input.tenantId !== input.authContext.tenantId) {
+      throw forbidden();
+    }
+
+    if (input.authContext.role === "driver") {
+      if (input.assigneeUserId !== input.authContext.subjectId) {
+        throw forbidden();
+      }
+    } else if (input.authContext.role === "owner") {
+      this.assertBranchAccess(input.authContext, input.branchId);
+
+      if (input.assigneeUserId) {
+        await this.assertTenantDriver(input.tenantId, input.assigneeUserId);
+      }
+    } else {
       throw forbidden();
     }
 
@@ -501,10 +607,228 @@ export class DeliveryService {
       ticketId: input.ticketId,
       expectedAt: input.expectedAt,
       notes: input.notes,
-      createdBy: driver.subjectId,
+      createdBy: input.authContext.subjectId,
     });
 
-    return this.getTaskDetail(driver, taskId);
+    const detail = await this.repository.getTaskDetailById({
+      tenantId: input.tenantId,
+      taskId,
+    });
+
+    if (!detail) {
+      throw taskNotFound();
+    }
+
+    return this.attachProofReadLinks(input.tenantId, detail);
+  }
+
+  async getDispatchBoard(
+    input: DeliveryDispatchBoardQuery,
+  ): Promise<DeliveryDispatchBoard> {
+    const owner = assertOwnerContext(input.authContext);
+
+    this.assertBranchAccess(owner, input.branchId);
+
+    const [pending, assigned] = await Promise.all([
+      this.repository.listPendingDispatchTasks({
+        tenantId: owner.tenantId,
+        branchId: input.branchId,
+      }),
+      this.repository.listAssignedDispatchTasks({
+        tenantId: owner.tenantId,
+        branchId: input.branchId,
+        assigneeUserId: input.assigneeUserId,
+        status: input.status,
+        from: input.from,
+        to: input.to,
+      }),
+    ]);
+
+    return { pending, assigned };
+  }
+
+  async dispatchTask(
+    input: DeliveryDispatchTaskInput,
+  ): Promise<DeliveryMutationResult> {
+    const owner = assertOwnerContext(input.authContext);
+    const task = await this.getDispatchableTask(owner.tenantId, input.taskId);
+
+    this.assertBranchAccess(owner, task.branchId);
+    await this.assertTenantDriver(owner.tenantId, input.assigneeUserId);
+
+    const existingEvent = await this.repository.findTaskEventByIdempotencyKey({
+      taskId: task.id,
+      idempotencyKey: input.idempotencyKey,
+    });
+
+    if (existingEvent) {
+      return {
+        task: await this.getTaskDetailForOperator(owner.tenantId, task.id),
+        event: existingEvent,
+        idempotent: true,
+      };
+    }
+
+    if (task.status !== "pending_dispatch" || task.assigneeUserId) {
+      throw conflict(
+        "Only unassigned pending dispatch tasks can be dispatched.",
+        task.status,
+        task.status === "pending_dispatch" ? ["pending_dispatch"] : [],
+      );
+    }
+
+    const event = await this.repository.dispatchTask({
+      tenantId: owner.tenantId,
+      taskId: task.id,
+      taskVersion: task.version,
+      assigneeUserId: input.assigneeUserId,
+      operatorUserId: owner.subjectId,
+      idempotencyKey: input.idempotencyKey,
+      note: input.note,
+    });
+
+    if (!event) {
+      await this.throwTaskChanged(owner.tenantId, task.id, task.status);
+    }
+
+    logger.info(
+      {
+        tenantId: owner.tenantId,
+        branchId: task.branchId,
+        taskId: task.id,
+        assigneeUserId: input.assigneeUserId,
+        operatorUserId: owner.subjectId,
+      },
+      "Mobile delivery task dispatched",
+    );
+
+    return {
+      task: await this.getTaskDetailForOperator(owner.tenantId, task.id),
+      event: event ?? undefined,
+      idempotent: false,
+    };
+  }
+
+  async reassignTask(
+    input: DeliveryReassignTaskInput,
+  ): Promise<DeliveryMutationResult> {
+    const owner = assertOwnerContext(input.authContext);
+    const task = await this.getDispatchableTask(owner.tenantId, input.taskId);
+
+    this.assertBranchAccess(owner, task.branchId);
+    await this.assertTenantDriver(owner.tenantId, input.assigneeUserId);
+
+    const existingEvent = await this.repository.findTaskEventByIdempotencyKey({
+      taskId: task.id,
+      idempotencyKey: input.idempotencyKey,
+    });
+
+    if (existingEvent) {
+      return {
+        task: await this.getTaskDetailForOperator(owner.tenantId, task.id),
+        event: existingEvent,
+        idempotent: true,
+      };
+    }
+
+    if (TERMINAL_STATUSES.has(task.status)) {
+      throw conflict("Terminal delivery tasks cannot be reassigned.", task.status, []);
+    }
+
+    const event = await this.repository.reassignTask({
+      tenantId: owner.tenantId,
+      taskId: task.id,
+      taskVersion: task.version,
+      fromStatus: task.status,
+      assigneeUserId: input.assigneeUserId,
+      operatorUserId: owner.subjectId,
+      idempotencyKey: input.idempotencyKey,
+      note: input.note,
+    });
+
+    if (!event) {
+      await this.throwTaskChanged(owner.tenantId, task.id, task.status);
+    }
+
+    logger.info(
+      {
+        tenantId: owner.tenantId,
+        branchId: task.branchId,
+        taskId: task.id,
+        assigneeUserId: input.assigneeUserId,
+        operatorUserId: owner.subjectId,
+      },
+      "Mobile delivery task reassigned",
+    );
+
+    return {
+      task: await this.getTaskDetailForOperator(owner.tenantId, task.id),
+      event: event ?? undefined,
+      idempotent: false,
+    };
+  }
+
+  async cancelTask(input: DeliveryCancelTaskInput): Promise<DeliveryMutationResult> {
+    const owner = assertOwnerContext(input.authContext);
+    const task = await this.getDispatchableTask(owner.tenantId, input.taskId);
+
+    this.assertBranchAccess(owner, task.branchId);
+
+    const existingEvent = await this.repository.findTaskEventByIdempotencyKey({
+      taskId: task.id,
+      idempotencyKey: input.idempotencyKey,
+    });
+
+    if (existingEvent) {
+      return {
+        task: await this.getTaskDetailForOperator(owner.tenantId, task.id),
+        event: existingEvent,
+        idempotent: true,
+      };
+    }
+
+    if (TERMINAL_STATUSES.has(task.status)) {
+      throw conflict("Terminal delivery tasks cannot be cancelled.", task.status, []);
+    }
+
+    const cancelled = await this.repository.cancelTask({
+      tenantId: owner.tenantId,
+      taskId: task.id,
+      taskVersion: task.version,
+      fromStatus: task.status,
+      operatorUserId: owner.subjectId,
+      idempotencyKey: input.idempotencyKey,
+      reason: input.reason,
+    });
+
+    if (!cancelled) {
+      await this.throwTaskChanged(owner.tenantId, task.id, task.status);
+    }
+
+    if (cancelled?.appointmentId) {
+      await this.appointmentOperations?.markDeliveryCancelled({
+        tenantId: owner.tenantId,
+        appointmentId: cancelled.appointmentId,
+        taskId: task.id,
+        operatorUserId: owner.subjectId,
+      });
+    }
+
+    logger.info(
+      {
+        tenantId: owner.tenantId,
+        branchId: task.branchId,
+        taskId: task.id,
+        operatorUserId: owner.subjectId,
+      },
+      "Mobile delivery task cancelled",
+    );
+
+    return {
+      task: await this.getTaskDetailForOperator(owner.tenantId, task.id),
+      event: cancelled?.event,
+      idempotent: false,
+    };
   }
 
   private async attachProofReadLinks(
@@ -538,6 +862,64 @@ export class DeliveryService {
       ...detail,
       proofs,
     };
+  }
+
+  private assertBranchAccess(
+    authContext: MobileAuthContext,
+    branchId: string,
+  ): void {
+    if (authContext.branchIds.length > 0 && !authContext.branchIds.includes(branchId)) {
+      throw forbidden();
+    }
+  }
+
+  private async assertTenantDriver(
+    tenantId: string,
+    userId: string,
+  ): Promise<void> {
+    if (!(await this.repository.isTenantDriver({ tenantId, userId }))) {
+      throw forbidden();
+    }
+  }
+
+  private async getDispatchableTask(
+    tenantId: string,
+    taskId: string,
+  ): Promise<DeliveryTaskRecord> {
+    const task = await this.repository.findTaskById({ tenantId, taskId });
+
+    if (!task) {
+      throw taskNotFound();
+    }
+
+    return task;
+  }
+
+  private async getTaskDetailForOperator(
+    tenantId: string,
+    taskId: string,
+  ): Promise<DeliveryTaskDetail> {
+    const detail = await this.repository.getTaskDetailById({ tenantId, taskId });
+
+    if (!detail) {
+      throw taskNotFound();
+    }
+
+    return this.attachProofReadLinks(tenantId, detail);
+  }
+
+  private async throwTaskChanged(
+    tenantId: string,
+    taskId: string,
+    fallbackStatus: DeliveryTaskStatus,
+  ): Promise<never> {
+    const currentTask = await this.repository.findTaskById({ tenantId, taskId });
+
+    throw conflict(
+      "Delivery task changed while processing the request.",
+      currentTask?.status ?? fallbackStatus,
+      currentTask ? DELIVERY_STATUS_TRANSITIONS[currentTask.status] : [],
+    );
   }
 
   private async commitMediaRef(input: {

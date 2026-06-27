@@ -1,5 +1,13 @@
-import { OwnerService, type OwnerRepositoryLike } from "./owner.service.js";
-import { OwnerError, type OwnerTodaySummary } from "./owner.types.js";
+import {
+  OwnerService,
+  type OwnerDeliveryRepositoryLike,
+  type OwnerRepositoryLike,
+} from "./owner.service.js";
+import {
+  OwnerError,
+  type OwnerAppointment,
+  type OwnerTodaySummary,
+} from "./owner.types.js";
 import type { MobileAuthContext } from "../auth/auth.types.js";
 
 const ownerContext: MobileAuthContext = {
@@ -19,6 +27,11 @@ const driverContext: MobileAuthContext = {
   subjectId: "driver_1",
   role: "driver",
   roles: ["driver"],
+};
+
+const restrictedOwnerContext: MobileAuthContext = {
+  ...ownerContext,
+  branchIds: ["branch_2"],
 };
 
 function assert(condition: boolean, message: string): void {
@@ -45,9 +58,48 @@ async function assertRejectsOwner(
   throw new Error(`expected action to reject with ${status}`);
 }
 
+function makeAppointment(
+  status: OwnerAppointment["status"] = "pending",
+): OwnerAppointment {
+  const now = new Date().toISOString();
+
+  return {
+    id: "appointment_1",
+    tenantId: "tenant_1",
+    branchId: "branch_1",
+    customerId: "customer_1",
+    type: "pickup",
+    status,
+    expectedAt: now,
+    address: "1 Main St",
+    notes: null,
+    deliveryTaskId: status === "accepted" ? "task_1" : null,
+    acceptedAt: status === "accepted" ? now : null,
+    acceptedBy: status === "accepted" ? "owner_1" : null,
+    cancelledAt: null,
+    cancelledBy: null,
+    cancellationReason: null,
+    doneAt: null,
+    doneBy: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
 function createRepository(options?: {
   missingTenant?: boolean;
+  appointmentStatus?: OwnerAppointment["status"];
+  branchId?: string;
+  deliveryTaskId?: string | null;
 }): OwnerRepositoryLike {
+  let appointment = {
+    ...makeAppointment(options?.appointmentStatus ?? "pending"),
+    branchId: options?.branchId ?? "branch_1",
+    deliveryTaskId:
+      options && "deliveryTaskId" in options
+        ? options.deliveryTaskId ?? null
+        : makeAppointment(options?.appointmentStatus ?? "pending").deliveryTaskId,
+  };
   function assertTenant(tenantId: string): void {
     assert(tenantId === "tenant_1", "summary must be tenant scoped");
   }
@@ -110,11 +162,127 @@ function createRepository(options?: {
         exception: 0,
       };
     },
+    async listAppointments({ tenantId }) {
+      assertTenant(tenantId);
+      return [appointment];
+    },
+    async findAppointmentById({ tenantId, appointmentId }) {
+      assertTenant(tenantId);
+      return appointmentId === "appointment_1" ? appointment : null;
+    },
+    async acceptAppointmentAndCreateTask({ tenantId, appointmentId }) {
+      assertTenant(tenantId);
+
+      if (appointmentId !== "appointment_1" || appointment.status !== "pending") {
+        return null;
+      }
+
+      appointment = {
+        ...appointment,
+        status: "accepted",
+        deliveryTaskId: "task_1",
+        acceptedAt: new Date().toISOString(),
+        acceptedBy: "owner_1",
+      };
+
+      return { appointment, taskId: "task_1" };
+    },
+    async rejectPendingAppointment({ tenantId, appointmentId, reason }) {
+      assertTenant(tenantId);
+
+      if (appointmentId !== "appointment_1" || appointment.status !== "pending") {
+        return null;
+      }
+
+      appointment = {
+        ...appointment,
+        status: "cancelled",
+        cancellationReason: reason,
+        cancelledAt: new Date().toISOString(),
+        cancelledBy: "owner_1",
+      };
+
+      return appointment;
+    },
+    async markAppointmentDoneFromDelivery({ appointmentId, taskId }) {
+      if (appointment.id !== appointmentId || appointment.deliveryTaskId !== taskId) {
+        return;
+      }
+
+      appointment = {
+        ...appointment,
+        status: "done",
+        doneAt: new Date().toISOString(),
+        doneBy: "driver_1",
+      };
+    },
+    async reopenAppointmentFromCancelledDelivery({ appointmentId, taskId }) {
+      if (appointment.id !== appointmentId || appointment.deliveryTaskId !== taskId) {
+        return;
+      }
+
+      appointment = {
+        ...appointment,
+        status: "accepted",
+        deliveryTaskId: null,
+      };
+    },
+  };
+}
+
+function createDeliveryRepository(options?: {
+  driverIds?: string[];
+}): OwnerDeliveryRepositoryLike {
+  const driverIds = new Set(options?.driverIds ?? ["driver_1"]);
+
+  return {
+    async isTenantDriver({ tenantId, userId }) {
+      return tenantId === "tenant_1" && driverIds.has(userId);
+    },
+    async getTaskDetailById({ tenantId, taskId }) {
+      const now = new Date().toISOString();
+
+      if (tenantId !== "tenant_1" || taskId !== "task_1") {
+        return null;
+      }
+
+      return {
+        id: "task_1",
+        tenantId,
+        branchId: "branch_1",
+        appointmentId: "appointment_1",
+        assigneeUserId: "driver_1",
+        type: "pickup",
+        status: "pending_dispatch",
+        expectedAt: now,
+        customerId: "customer_1",
+        customerName: "Customer One",
+        customerPhone: null,
+        address: "1 Main St",
+        notes: null,
+        exceptionReason: null,
+        cancellationReason: null,
+        dispatchedAt: now,
+        dispatchedBy: "owner_1",
+        cancelledAt: null,
+        cancelledBy: null,
+        orderId: null,
+        ticketId: null,
+        updatedAt: now,
+        timeline: [],
+        proofs: [],
+        order: null,
+        ticket: null,
+      };
+    },
   };
 }
 
 export async function runOwnerSmokeChecks(): Promise<void> {
-  const service = new OwnerService({ repository: createRepository() });
+  const service = new OwnerService({
+    repository: createRepository(),
+    deliveryRepository: createDeliveryRepository(),
+  });
   const summary = await service.getTodaySummary(ownerContext);
 
   assert(summary.tenantId === "tenant_1", "summary should use token tenant");
@@ -132,6 +300,122 @@ export async function runOwnerSmokeChecks(): Promise<void> {
     "summary should include deliveries",
   );
 
+  const appointments = await service.listAppointments({
+    authContext: ownerContext,
+    branchId: "branch_1",
+  });
+  assert(appointments.length === 1, "owner should list appointments");
+
+  const accepted = await service.acceptAppointment({
+    authContext: ownerContext,
+    appointmentId: "appointment_1",
+    idempotencyKey: "accept_1",
+    assigneeUserId: "driver_1",
+  });
+  assert(accepted.appointment.status === "accepted", "appointment accepts");
+  assert(accepted.task.id === "task_1", "accepted appointment returns task");
+
+  const replayedAccept = await service.acceptAppointment({
+    authContext: ownerContext,
+    appointmentId: "appointment_1",
+    idempotencyKey: "accept_1",
+    assigneeUserId: "driver_1",
+  });
+  assert(replayedAccept.idempotent, "accepted appointment should replay idempotently");
+  assert(
+    replayedAccept.task.id === "task_1",
+    "accepted appointment replay should return existing task",
+  );
+
+  const rejected = await new OwnerService({
+    repository: createRepository(),
+    deliveryRepository: createDeliveryRepository(),
+  }).rejectAppointment({
+    authContext: ownerContext,
+    appointmentId: "appointment_1",
+    reason: "No slot",
+  });
+  assert(rejected.status === "cancelled", "pending appointment rejects");
+  assert(rejected.cancellationReason === "No slot", "reject should store reason");
+
+  await assertRejectsOwner(
+    () =>
+      new OwnerService({
+        repository: createRepository({ appointmentStatus: "done" }),
+        deliveryRepository: createDeliveryRepository(),
+      }).acceptAppointment({
+        authContext: ownerContext,
+        appointmentId: "appointment_1",
+        idempotencyKey: "accept_done",
+      }),
+    409,
+  );
+
+  await assertRejectsOwner(
+    () =>
+      new OwnerService({
+        repository: createRepository({ branchId: "branch_1" }),
+        deliveryRepository: createDeliveryRepository(),
+      }).listAppointments({
+        authContext: restrictedOwnerContext,
+        branchId: "branch_1",
+      }),
+    403,
+  );
+
+  await assertRejectsOwner(
+    () =>
+      new OwnerService({
+        repository: createRepository(),
+        deliveryRepository: createDeliveryRepository({ driverIds: [] }),
+      }).acceptAppointment({
+        authContext: ownerContext,
+        appointmentId: "appointment_1",
+        idempotencyKey: "accept_bad_driver",
+        assigneeUserId: "driver_1",
+      }),
+    403,
+  );
+
+  const linkageRepository = createRepository({
+    appointmentStatus: "accepted",
+    deliveryTaskId: "task_1",
+  });
+  const linkageService = new OwnerService({
+    repository: linkageRepository,
+    deliveryRepository: createDeliveryRepository(),
+  });
+  await linkageService.markDeliveryDone({
+    tenantId: "tenant_1",
+    appointmentId: "appointment_1",
+    taskId: "task_1",
+    operatorUserId: "driver_1",
+  });
+  const doneAppointment = await linkageService.listAppointments({
+    authContext: ownerContext,
+    branchId: "branch_1",
+  });
+  assert(
+    doneAppointment[0]?.status === "done",
+    "signed delivery should mark appointment done",
+  );
+
+  await linkageService.markDeliveryCancelled({
+    tenantId: "tenant_1",
+    appointmentId: "appointment_1",
+    taskId: "task_1",
+    operatorUserId: "owner_1",
+  });
+  const reopenedAppointment = await linkageService.listAppointments({
+    authContext: ownerContext,
+    branchId: "branch_1",
+  });
+  assert(
+    reopenedAppointment[0]?.status === "accepted" &&
+      reopenedAppointment[0].deliveryTaskId === null,
+    "cancelled delivery should reopen appointment for redispatch",
+  );
+
   await assertRejectsOwner(
     () => service.getTodaySummary(driverContext),
     403,
@@ -141,6 +425,7 @@ export async function runOwnerSmokeChecks(): Promise<void> {
     () =>
       new OwnerService({
         repository: createRepository({ missingTenant: true }),
+        deliveryRepository: createDeliveryRepository(),
       }).getTodaySummary(ownerContext),
     404,
   );

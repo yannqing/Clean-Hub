@@ -1,3 +1,5 @@
+import type { MobileDeliveryTaskDetail } from "./delivery.types";
+
 export type MobileOwnerSummaryFeatureFlags = {
   laundryEnabled: boolean;
   carWashEnabled: boolean;
@@ -28,4 +30,59 @@ export type MobileOwnerTodaySummary = {
     signed: number;
     exception: number;
   };
+};
+
+export type MobileOwnerAppointmentStatus =
+  | "pending"
+  | "accepted"
+  | "cancelled"
+  | "done";
+
+export type MobileOwnerAppointmentType = "pickup" | "dropoff";
+
+export type MobileOwnerAppointment = {
+  id: string;
+  tenantId: string;
+  branchId: string;
+  customerId: string;
+  deliveryTaskId: string | null;
+  type: MobileOwnerAppointmentType;
+  status: MobileOwnerAppointmentStatus;
+  expectedAt: string;
+  address: string;
+  notes: string | null;
+  acceptedBy: string | null;
+  acceptedAt: string | null;
+  cancelledBy: string | null;
+  cancelledAt: string | null;
+  cancellationReason: string | null;
+  doneAt: string | null;
+  doneBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MobileOwnerAppointmentListQuery = {
+  branchId?: string;
+  status?: MobileOwnerAppointmentStatus;
+};
+
+export type MobileOwnerAppointmentListResponse = {
+  data: MobileOwnerAppointment[];
+};
+
+export type MobileAcceptOwnerAppointmentRequest = {
+  idempotencyKey: string;
+  assigneeUserId?: string;
+  notes?: string;
+};
+
+export type MobileAcceptOwnerAppointmentResponse = {
+  appointment: MobileOwnerAppointment;
+  task: MobileDeliveryTaskDetail;
+  idempotent: boolean;
+};
+
+export type MobileRejectOwnerAppointmentRequest = {
+  reason: string;
 };

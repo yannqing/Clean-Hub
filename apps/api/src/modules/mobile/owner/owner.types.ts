@@ -1,4 +1,5 @@
 import type { MobileAuthContext } from "../auth/auth.types.js";
+import type { DeliveryTaskDetail } from "../delivery/delivery.types.js";
 
 export type OwnerMobileContext = MobileAuthContext & {
   subjectType: "staff";
@@ -37,15 +38,49 @@ export type OwnerTodaySummary = {
   };
 };
 
+export type OwnerAppointmentStatus = "pending" | "accepted" | "cancelled" | "done";
+export type OwnerAppointmentType = "pickup" | "dropoff";
+
+export type OwnerAppointment = {
+  id: string;
+  tenantId: string;
+  branchId: string;
+  customerId: string;
+  type: OwnerAppointmentType;
+  status: OwnerAppointmentStatus;
+  expectedAt: string;
+  address: string;
+  notes: string | null;
+  deliveryTaskId: string | null;
+  acceptedAt: string | null;
+  acceptedBy: string | null;
+  cancelledAt: string | null;
+  cancelledBy: string | null;
+  cancellationReason: string | null;
+  doneAt: string | null;
+  doneBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type OwnerAppointmentAcceptResult = {
+  appointment: OwnerAppointment;
+  task: DeliveryTaskDetail;
+  idempotent: boolean;
+};
+
 export type OwnerErrorCode =
   | "OWNER_FORBIDDEN"
-  | "OWNER_SUMMARY_NOT_FOUND";
+  | "OWNER_SUMMARY_NOT_FOUND"
+  | "OWNER_APPOINTMENT_NOT_FOUND"
+  | "OWNER_APPOINTMENT_CONFLICT"
+  | "OWNER_VALIDATION_ERROR";
 
 export class OwnerError extends Error {
   constructor(
     readonly code: OwnerErrorCode,
     message: string,
-    readonly status: 403 | 404,
+    readonly status: 403 | 404 | 409 | 422,
     readonly details?: Record<string, unknown>,
   ) {
     super(message);

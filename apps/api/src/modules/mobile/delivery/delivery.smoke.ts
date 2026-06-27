@@ -33,6 +33,20 @@ const customerContext: MobileAuthContext = {
   roles: ["customer"],
 };
 
+const ownerContext: MobileAuthContext = {
+  ...driverContext,
+  subjectId: "owner_1",
+  displayName: "Owner One",
+  branchIds: ["branch_1"],
+  role: "owner",
+  roles: ["owner"],
+};
+
+const restrictedOwnerContext: MobileAuthContext = {
+  ...ownerContext,
+  branchIds: ["branch_2"],
+};
+
 function assert(condition: boolean, message: string): void {
   if (!condition) {
     throw new Error(message);
@@ -64,13 +78,18 @@ function canTransition(
   return DELIVERY_STATUS_TRANSITIONS[fromStatus].includes(toStatus);
 }
 
-function makeDetail(status: DeliveryTaskStatus): DeliveryTaskDetail {
+function makeDetail(
+  status: DeliveryTaskStatus,
+  overrides: Partial<DeliveryTaskDetail> = {},
+): DeliveryTaskDetail {
   const now = new Date().toISOString();
 
   return {
     id: "task_1",
     tenantId: "tenant_1",
     branchId: "branch_1",
+    appointmentId: null,
+    assigneeUserId: "driver_1",
     type: "pickup",
     status,
     expectedAt: now,
@@ -80,6 +99,11 @@ function makeDetail(status: DeliveryTaskStatus): DeliveryTaskDetail {
     address: "1 Main St",
     notes: null,
     exceptionReason: null,
+    cancellationReason: null,
+    dispatchedAt: null,
+    dispatchedBy: null,
+    cancelledAt: null,
+    cancelledBy: null,
     orderId: null,
     ticketId: null,
     updatedAt: now,
@@ -87,6 +111,7 @@ function makeDetail(status: DeliveryTaskStatus): DeliveryTaskDetail {
     proofs: [],
     order: null,
     ticket: null,
+    ...overrides,
   };
 }
 
@@ -123,41 +148,76 @@ function makeProof(idempotencyKey: string): DeliveryProof {
 
 function createRepository(options?: {
   status?: DeliveryTaskStatus;
+  assigneeUserId?: string | null;
+  appointmentId?: string | null;
+  branchId?: string;
+  tenantDriverIds?: string[];
   existingEvent?: DeliveryTaskEvent | null;
   existingProof?: DeliveryProof | null;
   updateSucceeds?: boolean;
   initialProofs?: DeliveryProof[];
 }): DeliveryRepositoryLike {
   let status = options?.status ?? "pending_dispatch";
+  let assigneeUserId =
+    options && "assigneeUserId" in options
+      ? options.assigneeUserId ?? null
+      : "driver_1";
+  let appointmentId =
+    options && "appointmentId" in options ? options.appointmentId ?? null : null;
+  const branchId = options?.branchId ?? "branch_1";
+  const tenantDriverIds = new Set(options?.tenantDriverIds ?? ["driver_1", "driver_2"]);
   const events: DeliveryTaskEvent[] = [];
   const proofs: DeliveryProof[] = [...(options?.initialProofs ?? [])];
 
+  function currentDetail(): DeliveryTaskDetail {
+    return {
+      ...makeDetail(status, {
+        assigneeUserId,
+        appointmentId,
+        branchId,
+      }),
+      proofs,
+    };
+  }
+
+  function currentTaskRecord() {
+    return {
+      id: "task_1",
+      tenantId: "tenant_1",
+      branchId,
+      assigneeUserId,
+      appointmentId,
+      customerId: "customer_1",
+      orderId: null,
+      ticketId: null,
+      type: "pickup" as const,
+      status,
+      version: 1,
+    };
+  }
+
   return {
     async listTodayTasks() {
-      return [makeDetail(status)];
+      return [currentDetail()];
     },
     async findOwnedTaskById({ driverUserId }) {
-      if (driverUserId !== "driver_1") {
+      if (driverUserId !== assigneeUserId) {
         return null;
       }
 
-      return {
-        id: "task_1",
-        tenantId: "tenant_1",
-        branchId: "branch_1",
-        assigneeUserId: "driver_1",
-        customerId: "customer_1",
-        orderId: null,
-        ticketId: null,
-        type: "pickup",
-        status,
-      };
+      return currentTaskRecord();
+    },
+    async findTaskById() {
+      return currentTaskRecord();
     },
     async getOwnedTaskDetail() {
-      return {
-        ...makeDetail(status),
-        proofs,
-      };
+      return currentDetail();
+    },
+    async getTaskDetailById() {
+      return currentDetail();
+    },
+    async isTenantDriver({ tenantId, userId }) {
+      return tenantId === "tenant_1" && tenantDriverIds.has(userId);
     },
     async findTaskEventByIdempotencyKey() {
       return options?.existingEvent ?? null;
@@ -206,10 +266,47 @@ function createRepository(options?: {
       proofs.push(proof);
       events.push(event);
 
-      return { event, proof };
+      return { event, proof, appointmentId };
     },
-    async createAssignedTask() {
+    async createAssignedTask(input) {
+      assigneeUserId = input.assigneeUserId ?? null;
+      appointmentId = input.appointmentId ?? null;
+      status = "pending_dispatch";
       return "task_1";
+    },
+    async listPendingDispatchTasks() {
+      return assigneeUserId ? [] : [currentDetail()];
+    },
+    async listAssignedDispatchTasks() {
+      return assigneeUserId ? [currentDetail()] : [];
+    },
+    async dispatchTask(input) {
+      if (options?.updateSucceeds === false) {
+        return null;
+      }
+
+      assigneeUserId = input.assigneeUserId;
+      status = "pending_dispatch";
+      return makeEvent("pending_dispatch", input.idempotencyKey);
+    },
+    async reassignTask(input) {
+      if (options?.updateSucceeds === false) {
+        return null;
+      }
+
+      assigneeUserId = input.assigneeUserId;
+      return makeEvent(input.fromStatus, input.idempotencyKey);
+    },
+    async cancelTask(input) {
+      if (options?.updateSucceeds === false) {
+        return null;
+      }
+
+      status = "cancelled";
+      return {
+        event: makeEvent("cancelled", input.idempotencyKey),
+        appointmentId,
+      };
     },
   };
 }
@@ -390,6 +487,168 @@ export async function runDeliverySmokeChecks(): Promise<void> {
         idempotencyKey: "idem_old",
       }),
     409,
+  );
+
+  const dispatchService = new DeliveryService({
+    repository: createRepository({ assigneeUserId: null }),
+    mediaService: createMediaService(),
+  });
+  const dispatched = await dispatchService.dispatchTask({
+    authContext: ownerContext,
+    taskId: "task_1",
+    assigneeUserId: "driver_1",
+    idempotencyKey: "dispatch_1",
+  });
+
+  assert(!dispatched.idempotent, "first dispatch should not be idempotent");
+  assert(
+    dispatched.task.assigneeUserId === "driver_1",
+    "dispatch should assign the task",
+  );
+
+  const board = await dispatchService.getDispatchBoard({
+    authContext: ownerContext,
+    branchId: "branch_1",
+  });
+  assert(board.pending.length === 0, "assigned tasks should leave pending list");
+  assert(board.assigned.length === 1, "assigned board should include dispatch");
+
+  const replayedDispatch = await new DeliveryService({
+    repository: createRepository({
+      assigneeUserId: "driver_1",
+      existingEvent: makeEvent("pending_dispatch", "dispatch_replay"),
+    }),
+    mediaService: createMediaService(),
+  }).dispatchTask({
+    authContext: ownerContext,
+    taskId: "task_1",
+    assigneeUserId: "driver_1",
+    idempotencyKey: "dispatch_replay",
+  });
+  assert(replayedDispatch.idempotent, "replayed dispatch should be idempotent");
+
+  await assertRejectsDelivery(
+    () =>
+      new DeliveryService({
+        repository: createRepository({
+          assigneeUserId: null,
+          updateSucceeds: false,
+        }),
+        mediaService: createMediaService(),
+      }).dispatchTask({
+        authContext: ownerContext,
+        taskId: "task_1",
+        assigneeUserId: "driver_1",
+        idempotencyKey: "dispatch_race",
+      }),
+    409,
+  );
+
+  await assertRejectsDelivery(
+    () =>
+      new DeliveryService({
+        repository: createRepository({ assigneeUserId: null }),
+        mediaService: createMediaService(),
+      }).dispatchTask({
+        authContext: restrictedOwnerContext,
+        taskId: "task_1",
+        assigneeUserId: "driver_1",
+        idempotencyKey: "dispatch_forbidden",
+      }),
+    403,
+  );
+
+  await assertRejectsDelivery(
+    () =>
+      new DeliveryService({
+        repository: createRepository({
+          assigneeUserId: null,
+          tenantDriverIds: [],
+        }),
+        mediaService: createMediaService(),
+      }).dispatchTask({
+        authContext: ownerContext,
+        taskId: "task_1",
+        assigneeUserId: "driver_1",
+        idempotencyKey: "dispatch_bad_driver",
+      }),
+    403,
+  );
+
+  const reassigned = await new DeliveryService({
+    repository: createRepository({ status: "en_route", assigneeUserId: "driver_1" }),
+    mediaService: createMediaService(),
+  }).reassignTask({
+    authContext: ownerContext,
+    taskId: "task_1",
+    assigneeUserId: "driver_2",
+    idempotencyKey: "reassign_1",
+  });
+  assert(
+    reassigned.task.assigneeUserId === "driver_2",
+    "reassign should replace assignee",
+  );
+
+  let cancelledAppointmentId: string | null = null;
+  const cancelled = await new DeliveryService({
+    repository: createRepository({
+      status: "en_route",
+      assigneeUserId: "driver_1",
+      appointmentId: "appointment_1",
+    }),
+    mediaService: createMediaService(),
+    appointmentOperations: {
+      async markDeliveryDone() {},
+      async markDeliveryCancelled({ appointmentId }) {
+        cancelledAppointmentId = appointmentId;
+      },
+    },
+  }).cancelTask({
+    authContext: ownerContext,
+    taskId: "task_1",
+    idempotencyKey: "cancel_1",
+    reason: "Customer unavailable",
+  });
+  assert(cancelled.task.status === "cancelled", "cancel should terminalize task");
+  assert(
+    cancelledAppointmentId === "appointment_1",
+    "cancel should call appointment linkage",
+  );
+
+  const ownerCreated = await new DeliveryService({
+    repository: createRepository({ assigneeUserId: null }),
+    mediaService: createMediaService(),
+  }).createAssignedTask({
+    authContext: ownerContext,
+    tenantId: "tenant_1",
+    branchId: "branch_1",
+    assigneeUserId: "driver_2",
+    customerId: "customer_1",
+    type: "pickup",
+    customerName: "Customer One",
+    address: "1 Main St",
+  });
+  assert(
+    ownerCreated.assigneeUserId === "driver_2",
+    "owner should be able to create an assigned task",
+  );
+
+  await assertRejectsDelivery(
+    () =>
+      new DeliveryService({
+        repository: createRepository({ assigneeUserId: null }),
+        mediaService: createMediaService(),
+      }).createAssignedTask({
+        authContext: driverContext,
+        tenantId: "tenant_1",
+        branchId: "branch_1",
+        assigneeUserId: "driver_2",
+        customerId: "customer_1",
+        type: "pickup",
+        customerName: "Customer One",
+        address: "1 Main St",
+      }),
+    403,
   );
 }
 

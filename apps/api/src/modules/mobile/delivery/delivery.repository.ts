@@ -6,8 +6,10 @@ import {
   eq,
   getTableColumns,
   gte,
+  inArray,
   isNull,
   lt,
+  ne,
   sql,
 } from "drizzle-orm";
 
@@ -15,6 +17,9 @@ import {
   deliveryProofs,
   deliveryTaskEvents,
   deliveryTasks,
+  users,
+  userRoles,
+  roles,
   orders,
   serviceTickets,
   type Database,
@@ -42,6 +47,8 @@ function toTaskListItem(
     id: row.id,
     tenantId: row.tenantId,
     branchId: row.branchId,
+    appointmentId: row.appointmentId,
+    assigneeUserId: row.assigneeUserId,
     type: row.type,
     status: row.status,
     expectedAt: toIsoString(row.expectedAt),
@@ -73,6 +80,11 @@ function toTaskDetail(
     customerId: row.customerId,
     notes: row.notes,
     exceptionReason: row.exceptionReason,
+    cancellationReason: row.cancellationReason,
+    dispatchedAt: toIsoString(row.dispatchedAt),
+    dispatchedBy: row.dispatchedBy,
+    cancelledAt: toIsoString(row.cancelledAt),
+    cancelledBy: row.cancelledBy,
     timeline,
     proofs,
     order,
@@ -122,6 +134,8 @@ function getStatusTimestamps(status: DeliveryTaskStatus, now: Date) {
       return { signedAt: now };
     case "exception":
       return { exceptionAt: now };
+    case "cancelled":
+      return { cancelledAt: now };
     default:
       return {};
   }
@@ -181,6 +195,87 @@ export class DeliveryRepository {
       .limit(1);
 
     return rows[0] ?? null;
+  }
+
+  async findTaskById({
+    tenantId,
+    taskId,
+  }: {
+    tenantId: string;
+    taskId: string;
+  }): Promise<typeof deliveryTasks.$inferSelect | null> {
+    const rows = await this.db
+      .select({ ...getTableColumns(deliveryTasks) })
+      .from(deliveryTasks)
+      .where(
+        and(
+          eq(deliveryTasks.id, taskId),
+          eq(deliveryTasks.tenantId, tenantId),
+          isNull(deliveryTasks.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+
+  async getTaskDetailById({
+    tenantId,
+    taskId,
+  }: {
+    tenantId: string;
+    taskId: string;
+  }): Promise<DeliveryTaskDetail | null> {
+    const task = await this.findTaskById({ tenantId, taskId });
+
+    if (!task) {
+      return null;
+    }
+
+    const [timeline, proofs, order, ticket] = await Promise.all([
+      this.listTaskEvents({ tenantId, taskId }),
+      this.listTaskProofs({ tenantId, taskId }),
+      task.orderId
+        ? this.findOrderSummary({ tenantId, orderId: task.orderId })
+        : Promise.resolve(null),
+      task.ticketId
+        ? this.findTicketSummary({ tenantId, ticketId: task.ticketId })
+        : Promise.resolve(null),
+    ]);
+
+    return toTaskDetail(task, { timeline, proofs, order, ticket });
+  }
+
+  async isTenantDriver({
+    tenantId,
+    userId,
+  }: {
+    tenantId: string;
+    userId: string;
+  }): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: users.id })
+      .from(users)
+      .innerJoin(userRoles, eq(userRoles.userId, users.id))
+      .innerJoin(roles, eq(roles.id, userRoles.roleId))
+      .where(
+        and(
+          eq(users.id, userId),
+          eq(users.tenantId, tenantId),
+          eq(users.userType, "tenant"),
+          eq(users.status, "active"),
+          isNull(users.deletedAt),
+          eq(userRoles.tenantId, tenantId),
+          isNull(userRoles.revokedAt),
+          eq(roles.scope, "tenant"),
+          eq(roles.code, "driver"),
+          eq(roles.status, "active"),
+          isNull(roles.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return Boolean(rows[0]);
   }
 
   async getOwnedTaskDetail({
@@ -368,6 +463,7 @@ export class DeliveryRepository {
         status: input.toStatus,
         exceptionReason:
           input.toStatus === "exception" ? input.exceptionReason : undefined,
+        cancellationReason: undefined,
         updatedAt: now,
         updatedBy: input.driverUserId,
         version: sql`${deliveryTasks.version} + 1`,
@@ -402,6 +498,7 @@ export class DeliveryRepository {
   }): Promise<{
     event: DeliveryTaskEvent;
     proof: DeliveryProof;
+    appointmentId: string | null;
   } | null> {
     return this.db.transaction(async (tx) => {
       const repository = new DeliveryRepository(tx);
@@ -424,7 +521,10 @@ export class DeliveryRepository {
             isNull(deliveryTasks.deletedAt),
           ),
         )
-        .returning({ id: deliveryTasks.id });
+        .returning({
+          id: deliveryTasks.id,
+          appointmentId: deliveryTasks.appointmentId,
+        });
 
       if (!updatedRows[0]) {
         return null;
@@ -455,14 +555,14 @@ export class DeliveryRepository {
         createdBy: input.driverUserId,
       });
 
-      return { event, proof };
+      return { event, proof, appointmentId: updatedRows[0].appointmentId };
     });
   }
 
   async createAssignedTask(input: {
     tenantId: string;
     branchId: string;
-    assigneeUserId: string;
+    assigneeUserId?: string | null;
     customerId: string;
     type: "pickup" | "dropoff";
     customerName: string;
@@ -473,6 +573,7 @@ export class DeliveryRepository {
     ticketId?: string;
     expectedAt?: Date;
     notes?: string;
+    appointmentId?: string;
   }): Promise<string> {
     const rows = await this.db
       .insert(deliveryTasks)
@@ -480,7 +581,8 @@ export class DeliveryRepository {
         id: createId(),
         tenantId: input.tenantId,
         branchId: input.branchId,
-        assigneeUserId: input.assigneeUserId,
+        assigneeUserId: input.assigneeUserId ?? null,
+        appointmentId: input.appointmentId,
         customerId: input.customerId,
         type: input.type,
         customerName: input.customerName,
@@ -492,10 +594,243 @@ export class DeliveryRepository {
         notes: input.notes,
         createdBy: input.createdBy,
         updatedBy: input.createdBy,
+        dispatchedAt: input.assigneeUserId ? new Date() : undefined,
+        dispatchedBy: input.assigneeUserId ? input.createdBy : undefined,
       })
       .returning({ id: deliveryTasks.id });
 
     return rows[0]?.id ?? "";
+  }
+
+  async listPendingDispatchTasks(input: {
+    tenantId: string;
+    branchId: string;
+  }): Promise<DeliveryTaskListItem[]> {
+    const rows = await this.db
+      .select({ ...getTableColumns(deliveryTasks) })
+      .from(deliveryTasks)
+      .where(
+        and(
+          eq(deliveryTasks.tenantId, input.tenantId),
+          eq(deliveryTasks.branchId, input.branchId),
+          eq(deliveryTasks.status, "pending_dispatch"),
+          isNull(deliveryTasks.assigneeUserId),
+          isNull(deliveryTasks.deletedAt),
+        ),
+      )
+      .orderBy(asc(deliveryTasks.expectedAt), asc(deliveryTasks.createdAt));
+
+    return rows.map(toTaskListItem);
+  }
+
+  async listAssignedDispatchTasks(input: {
+    tenantId: string;
+    branchId: string;
+    assigneeUserId?: string;
+    status?: DeliveryTaskStatus;
+    from?: Date;
+    to?: Date;
+  }): Promise<DeliveryTaskListItem[]> {
+    const statusFilter = input.status
+      ? eq(deliveryTasks.status, input.status)
+      : inArray(deliveryTasks.status, [
+          "pending_dispatch",
+          "en_route",
+          "arrived",
+          "picked_up",
+          "delivering",
+          "signed",
+          "exception",
+          "cancelled",
+        ]);
+    const rows = await this.db
+      .select({ ...getTableColumns(deliveryTasks) })
+      .from(deliveryTasks)
+      .where(
+        and(
+          eq(deliveryTasks.tenantId, input.tenantId),
+          eq(deliveryTasks.branchId, input.branchId),
+          statusFilter,
+          input.assigneeUserId
+            ? eq(deliveryTasks.assigneeUserId, input.assigneeUserId)
+            : sql`${deliveryTasks.assigneeUserId} is not null`,
+          input.from ? gte(deliveryTasks.expectedAt, input.from) : undefined,
+          input.to ? lt(deliveryTasks.expectedAt, input.to) : undefined,
+          isNull(deliveryTasks.deletedAt),
+        ),
+      )
+      .orderBy(asc(deliveryTasks.expectedAt), desc(deliveryTasks.updatedAt));
+
+    return rows.map(toTaskListItem);
+  }
+
+  async dispatchTask(input: {
+    tenantId: string;
+    taskId: string;
+    taskVersion: number;
+    assigneeUserId: string;
+    operatorUserId: string;
+    idempotencyKey: string;
+    note?: string;
+  }): Promise<DeliveryTaskEvent | null> {
+    return this.db.transaction(async (tx) => {
+      const repository = new DeliveryRepository(tx);
+      const now = new Date();
+      const updatedRows = await tx
+        .update(deliveryTasks)
+        .set({
+          assigneeUserId: input.assigneeUserId,
+          dispatchedAt: now,
+          dispatchedBy: input.operatorUserId,
+          updatedAt: now,
+          updatedBy: input.operatorUserId,
+          version: sql`${deliveryTasks.version} + 1`,
+        })
+        .where(
+          and(
+            eq(deliveryTasks.id, input.taskId),
+            eq(deliveryTasks.tenantId, input.tenantId),
+            eq(deliveryTasks.status, "pending_dispatch"),
+            eq(deliveryTasks.version, input.taskVersion),
+            isNull(deliveryTasks.assigneeUserId),
+            isNull(deliveryTasks.deletedAt),
+          ),
+        )
+        .returning({ id: deliveryTasks.id });
+
+      if (!updatedRows[0]) {
+        return null;
+      }
+
+      return repository.insertTaskEvent({
+        tenantId: input.tenantId,
+        taskId: input.taskId,
+        fromStatus: "pending_dispatch",
+        toStatus: "pending_dispatch",
+        idempotencyKey: input.idempotencyKey,
+        note:
+          input.note ??
+          `Dispatched to ${input.assigneeUserId}`,
+        createdBy: input.operatorUserId,
+      });
+    });
+  }
+
+  async reassignTask(input: {
+    tenantId: string;
+    taskId: string;
+    taskVersion: number;
+    fromStatus: DeliveryTaskStatus;
+    assigneeUserId: string;
+    operatorUserId: string;
+    idempotencyKey: string;
+    note?: string;
+  }): Promise<DeliveryTaskEvent | null> {
+    return this.db.transaction(async (tx) => {
+      const repository = new DeliveryRepository(tx);
+      const now = new Date();
+      const updatedRows = await tx
+        .update(deliveryTasks)
+        .set({
+          assigneeUserId: input.assigneeUserId,
+          dispatchedAt: now,
+          dispatchedBy: input.operatorUserId,
+          updatedAt: now,
+          updatedBy: input.operatorUserId,
+          version: sql`${deliveryTasks.version} + 1`,
+        })
+        .where(
+          and(
+            eq(deliveryTasks.id, input.taskId),
+            eq(deliveryTasks.tenantId, input.tenantId),
+            eq(deliveryTasks.status, input.fromStatus),
+            eq(deliveryTasks.version, input.taskVersion),
+            ne(deliveryTasks.status, "signed"),
+            ne(deliveryTasks.status, "cancelled"),
+            isNull(deliveryTasks.deletedAt),
+          ),
+        )
+        .returning({ id: deliveryTasks.id });
+
+      if (!updatedRows[0]) {
+        return null;
+      }
+
+      return repository.insertTaskEvent({
+        tenantId: input.tenantId,
+        taskId: input.taskId,
+        fromStatus: input.fromStatus,
+        toStatus: input.fromStatus,
+        idempotencyKey: input.idempotencyKey,
+        note:
+          input.note ??
+          `Reassigned to ${input.assigneeUserId}`,
+        createdBy: input.operatorUserId,
+      });
+    });
+  }
+
+  async cancelTask(input: {
+    tenantId: string;
+    taskId: string;
+    taskVersion: number;
+    fromStatus: DeliveryTaskStatus;
+    operatorUserId: string;
+    idempotencyKey: string;
+    reason: string;
+  }): Promise<{
+    event: DeliveryTaskEvent;
+    appointmentId: string | null;
+  } | null> {
+    return this.db.transaction(async (tx) => {
+      const repository = new DeliveryRepository(tx);
+      const now = new Date();
+      const updatedRows = await tx
+        .update(deliveryTasks)
+        .set({
+          status: "cancelled",
+          cancellationReason: input.reason,
+          cancelledAt: now,
+          cancelledBy: input.operatorUserId,
+          updatedAt: now,
+          updatedBy: input.operatorUserId,
+          version: sql`${deliveryTasks.version} + 1`,
+        })
+        .where(
+          and(
+            eq(deliveryTasks.id, input.taskId),
+            eq(deliveryTasks.tenantId, input.tenantId),
+            eq(deliveryTasks.status, input.fromStatus),
+            eq(deliveryTasks.version, input.taskVersion),
+            ne(deliveryTasks.status, "signed"),
+            ne(deliveryTasks.status, "cancelled"),
+            isNull(deliveryTasks.deletedAt),
+          ),
+        )
+        .returning({
+          id: deliveryTasks.id,
+          appointmentId: deliveryTasks.appointmentId,
+        });
+
+      if (!updatedRows[0]) {
+        return null;
+      }
+
+      const event = await repository.insertTaskEvent({
+        tenantId: input.tenantId,
+        taskId: input.taskId,
+        fromStatus: input.fromStatus,
+        toStatus: "cancelled",
+        idempotencyKey: input.idempotencyKey,
+        note: input.reason,
+        createdBy: input.operatorUserId,
+      });
+
+      return {
+        event,
+        appointmentId: updatedRows[0].appointmentId,
+      };
+    });
   }
 
   private async listTaskEvents({

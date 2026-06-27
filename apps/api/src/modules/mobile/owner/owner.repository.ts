@@ -1,15 +1,20 @@
 import {
   and,
+  asc,
   count,
+  desc,
   eq,
+  getTableColumns,
   gte,
   isNull,
   lt,
   sql,
 } from "drizzle-orm";
+import { createId } from "@cleanhub/id";
 
 import {
   appointments,
+  customers,
   deliveryTasks,
   orders,
   paymentTransactions,
@@ -19,7 +24,11 @@ import {
   type Database,
 } from "@cleanhub/db";
 
-import type { OwnerTodaySummary } from "./owner.types.js";
+import type {
+  OwnerAppointment,
+  OwnerAppointmentStatus,
+  OwnerTodaySummary,
+} from "./owner.types.js";
 
 type TenantBase = Pick<
   OwnerTodaySummary,
@@ -54,6 +63,34 @@ function toNumber(value: unknown): number {
   }
 
   return 0;
+}
+
+function toIsoString(value: Date | null): string | null {
+  return value ? value.toISOString() : null;
+}
+
+function toAppointment(row: typeof appointments.$inferSelect): OwnerAppointment {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    branchId: row.branchId,
+    customerId: row.customerId,
+    type: row.type,
+    status: row.status,
+    expectedAt: row.expectedAt.toISOString(),
+    address: row.address,
+    notes: row.notes,
+    deliveryTaskId: row.deliveryTaskId,
+    acceptedAt: toIsoString(row.acceptedAt),
+    acceptedBy: row.acceptedBy,
+    cancelledAt: toIsoString(row.cancelledAt),
+    cancelledBy: row.cancelledBy,
+    cancellationReason: row.cancellationReason,
+    doneAt: toIsoString(row.doneAt),
+    doneBy: row.doneBy,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
 }
 
 export class OwnerRepository {
@@ -240,5 +277,232 @@ export class OwnerRepository {
     }
 
     return summary;
+  }
+
+  async listAppointments(input: {
+    tenantId: string;
+    branchId?: string;
+    status?: OwnerAppointmentStatus;
+  }): Promise<OwnerAppointment[]> {
+    const rows = await this.db
+      .select({ ...getTableColumns(appointments) })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.tenantId, input.tenantId),
+          input.branchId ? eq(appointments.branchId, input.branchId) : undefined,
+          input.status ? eq(appointments.status, input.status) : undefined,
+          isNull(appointments.deletedAt),
+        ),
+      )
+      .orderBy(asc(appointments.expectedAt), desc(appointments.createdAt));
+
+    return rows.map(toAppointment);
+  }
+
+  async findAppointmentById(input: {
+    tenantId: string;
+    appointmentId: string;
+  }): Promise<OwnerAppointment | null> {
+    const rows = await this.db
+      .select({ ...getTableColumns(appointments) })
+      .from(appointments)
+      .where(
+        and(
+          eq(appointments.id, input.appointmentId),
+          eq(appointments.tenantId, input.tenantId),
+          isNull(appointments.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ? toAppointment(rows[0]) : null;
+  }
+
+  async acceptAppointmentAndCreateTask(input: {
+    tenantId: string;
+    appointmentId: string;
+    operatorUserId: string;
+    assigneeUserId?: string;
+    notes?: string;
+  }): Promise<{ appointment: OwnerAppointment; taskId: string } | null> {
+    return this.db.transaction(async (tx) => {
+      const [appointment] = await tx
+        .select({ ...getTableColumns(appointments) })
+        .from(appointments)
+        .where(
+          and(
+            eq(appointments.id, input.appointmentId),
+            eq(appointments.tenantId, input.tenantId),
+            isNull(appointments.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!appointment) {
+        return null;
+      }
+
+      if (appointment.deliveryTaskId && appointment.status === "accepted") {
+        return { appointment: toAppointment(appointment), taskId: appointment.deliveryTaskId };
+      }
+
+      if (appointment.status !== "pending") {
+        return null;
+      }
+
+      const [customer] = await tx
+        .select({
+          fullName: customers.fullName,
+          phone: customers.phone,
+        })
+        .from(customers)
+        .where(
+          and(
+            eq(customers.id, appointment.customerId),
+            eq(customers.tenantId, input.tenantId),
+            isNull(customers.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!customer) {
+        return null;
+      }
+
+      const now = new Date();
+      const taskId = createId();
+
+      await tx.insert(deliveryTasks).values({
+        id: taskId,
+        tenantId: appointment.tenantId,
+        branchId: appointment.branchId,
+        assigneeUserId: input.assigneeUserId,
+        appointmentId: appointment.id,
+        customerId: appointment.customerId,
+        type: appointment.type,
+        status: "pending_dispatch",
+        expectedAt: appointment.expectedAt,
+        customerName: customer.fullName,
+        customerPhone: customer.phone,
+        address: appointment.address,
+        notes: input.notes ?? appointment.notes,
+        createdBy: input.operatorUserId,
+        updatedBy: input.operatorUserId,
+        dispatchedAt: input.assigneeUserId ? now : undefined,
+        dispatchedBy: input.assigneeUserId ? input.operatorUserId : undefined,
+      });
+
+      const [updated] = await tx
+        .update(appointments)
+        .set({
+          status: "accepted",
+          deliveryTaskId: taskId,
+          acceptedAt: now,
+          acceptedBy: input.operatorUserId,
+          updatedAt: now,
+          updatedBy: input.operatorUserId,
+          version: sql`${appointments.version} + 1`,
+        })
+        .where(
+          and(
+            eq(appointments.id, input.appointmentId),
+            eq(appointments.tenantId, input.tenantId),
+            eq(appointments.status, "pending"),
+            isNull(appointments.deletedAt),
+          ),
+        )
+        .returning({ ...getTableColumns(appointments) });
+
+      return updated ? { appointment: toAppointment(updated), taskId } : null;
+    });
+  }
+
+  async rejectPendingAppointment(input: {
+    tenantId: string;
+    appointmentId: string;
+    operatorUserId: string;
+    reason: string;
+  }): Promise<OwnerAppointment | null> {
+    const now = new Date();
+    const rows = await this.db
+      .update(appointments)
+      .set({
+        status: "cancelled",
+        cancelledAt: now,
+        cancelledBy: input.operatorUserId,
+        cancellationReason: input.reason,
+        updatedAt: now,
+        updatedBy: input.operatorUserId,
+        version: sql`${appointments.version} + 1`,
+      })
+      .where(
+        and(
+          eq(appointments.id, input.appointmentId),
+          eq(appointments.tenantId, input.tenantId),
+          eq(appointments.status, "pending"),
+          isNull(appointments.deletedAt),
+        ),
+      )
+      .returning({ ...getTableColumns(appointments) });
+
+    return rows[0] ? toAppointment(rows[0]) : null;
+  }
+
+  async markAppointmentDoneFromDelivery(input: {
+    tenantId: string;
+    appointmentId: string;
+    taskId: string;
+    operatorUserId: string;
+  }): Promise<void> {
+    const now = new Date();
+
+    await this.db
+      .update(appointments)
+      .set({
+        status: "done",
+        doneAt: now,
+        doneBy: input.operatorUserId,
+        updatedAt: now,
+        updatedBy: input.operatorUserId,
+        version: sql`${appointments.version} + 1`,
+      })
+      .where(
+        and(
+          eq(appointments.id, input.appointmentId),
+          eq(appointments.tenantId, input.tenantId),
+          eq(appointments.deliveryTaskId, input.taskId),
+          isNull(appointments.deletedAt),
+        ),
+      );
+  }
+
+  async reopenAppointmentFromCancelledDelivery(input: {
+    tenantId: string;
+    appointmentId: string;
+    taskId: string;
+    operatorUserId: string;
+  }): Promise<void> {
+    const now = new Date();
+
+    await this.db
+      .update(appointments)
+      .set({
+        status: "accepted",
+        deliveryTaskId: null,
+        doneAt: null,
+        doneBy: null,
+        updatedAt: now,
+        updatedBy: input.operatorUserId,
+        version: sql`${appointments.version} + 1`,
+      })
+      .where(
+        and(
+          eq(appointments.id, input.appointmentId),
+          eq(appointments.tenantId, input.tenantId),
+          eq(appointments.deliveryTaskId, input.taskId),
+          isNull(appointments.deletedAt),
+        ),
+      );
   }
 }
