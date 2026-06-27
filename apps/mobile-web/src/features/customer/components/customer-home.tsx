@@ -318,7 +318,7 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
   return {
     authContext: session.authContext,
     profile,
-    activity,
+    activity: activity.data,
     appointments: sortAppointments(appointments.data),
     error: null,
   };

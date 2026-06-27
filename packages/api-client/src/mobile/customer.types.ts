@@ -100,6 +100,10 @@ export type MobileCustomerActivityList = {
   tickets: MobileCustomerTicketListItem[];
 };
 
+export type MobileCustomerActivityResponse = {
+  data: MobileCustomerActivityList;
+};
+
 export type MobileCustomerAppointmentStatus =
   | "pending"
   | "accepted"

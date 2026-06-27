@@ -1,7 +1,7 @@
 import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   MobileCreateCustomerAppointmentRequest,
-  MobileCustomerActivityList,
+  MobileCustomerActivityResponse,
   MobileCustomerAppointment,
   MobileCustomerOrderDetail,
   MobileCustomerProfile,
@@ -16,7 +16,10 @@ export function createMobileCustomerApi(client: ApiClient) {
     getProfile: (options?: RequestOptions) =>
       client.get<MobileCustomerProfile>("/mobile/customer/profile", options),
     listOrdersAndTickets: (options?: RequestOptions) =>
-      client.get<MobileCustomerActivityList>("/mobile/customer/orders", options),
+      client.get<MobileCustomerActivityResponse>(
+        "/mobile/customer/orders",
+        options,
+      ),
     getOrder: (orderId: string, options?: RequestOptions) =>
       client.get<MobileCustomerOrderDetail>(
         `/mobile/customer/orders/${encodeURIComponent(orderId)}`,
