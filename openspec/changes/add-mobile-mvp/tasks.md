@@ -81,12 +81,12 @@
 
 ## 11. 前端：配送侧页面（delivery-mobile / mobile-offline-sync）
 
-- [ ] 11.1 今日任务列表页（仅本人任务）
-- [ ] 11.2 任务详情页（客户/地址/电话/订单摘要）
-- [ ] 11.3 状态流转操作 + GPS 上报（`@capacitor/geolocation`，权限拒绝降级提示）
-- [ ] 11.4 拍照凭证上传（`@capacitor/camera`，权限拒绝降级提示）
-- [ ] 11.5 客户签收并完成任务
-- [ ] 11.6 接入离线队列：离线时操作入队并显示"待同步"，恢复网络自动回放
+- [x] 11.1 今日任务列表页（仅本人任务）
+- [x] 11.2 任务详情页（客户/地址/电话/订单摘要）
+- [x] 11.3 状态流转操作 + GPS 上报（`@capacitor/geolocation`，权限拒绝降级提示）
+- [x] 11.4 拍照凭证上传（`@capacitor/camera`，权限拒绝降级提示）
+- [x] 11.5 客户签收并完成任务
+- [x] 11.6 接入离线队列：离线时操作入队并显示"待同步"，恢复网络自动回放
 
 ## 12. 前端：Owner 看店页面（owner-mobile）
 
@@ -101,9 +101,9 @@
 
 ## 14. Capacitor 壳与打包（mobile-shell）
 
-- [ ] 14.1 配置 `apps/mobile` 加载 mobile-web 产物（prod）/ dev server（dev），按环境注入 `server.url`/`webDir`
-- [ ] 14.2 添加 Android/iOS 平台，声明 GPS、相机原生权限
-- [ ] 14.3 `apps/mobile-web` `next build` 导出 → `cap sync android` 与 `cap sync ios` 均通过
+- [x] 14.1 配置 `apps/mobile` 加载 mobile-web 产物（prod）/ dev server（dev），按环境注入 `server.url`/`webDir`
+- [x] 14.2 添加 Android/iOS 平台，声明 GPS、相机原生权限
+- [x] 14.3 `apps/mobile-web` `next build` 导出 → `cap sync android` 与 `cap sync ios` 均通过
 
 ## 15. 验收与全量校验（对照 specs 验收场景）
 

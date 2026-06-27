@@ -4,8 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "echo \"Mobile shell placeholder. Run Capacitor commands after native platforms are added.\"",
+    "dev": "cross-env CLEANHUB_MOBILE_DEV_SERVER_URL=http://localhost:3002 cap open android",
     "build": "tsc -p tsconfig.json",
+    "sync": "pnpm --filter @cleanhub/mobile-web build && cap sync",
+    "sync:android": "pnpm --filter @cleanhub/mobile-web build && cap sync android",
+    "sync:ios": "pnpm --filter @cleanhub/mobile-web build && cap sync ios",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
@@ -21,6 +24,7 @@
   },
   "devDependencies": {
     "@types/node": "^20",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "typescript": "^5"
   }

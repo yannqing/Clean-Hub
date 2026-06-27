@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { MobileAuthContext } from "@cleanhub/api-client";
 import { Button, Input, Label } from "@cleanhub/ui";
-import { Building2, CheckCircle2, ChevronRight, Loader2, LockKeyhole, LogOut, PackageCheck, ShieldCheck, Truck } from "lucide-react";
+import { Building2, ChevronRight, Loader2, LockKeyhole, LogOut, PackageCheck, ShieldCheck } from "lucide-react";
 
 import {
   enterTenantContext,
@@ -18,6 +18,9 @@ import {
   verifyCustomerOtp,
 } from "../actions";
 import type { LoginMode } from "../types";
+import { CustomerHome } from "@/features/customer";
+import { DeliveryHome } from "@/features/delivery";
+import { OwnerHome } from "@/features/owner";
 
 type SessionView = {
   authContext: MobileAuthContext;
@@ -29,30 +32,6 @@ const loginModes: { value: LoginMode; label: string }[] = [
   { value: "driver", label: "Livreur" },
   { value: "owner", label: "Owner" },
 ];
-
-function getHomeTitle(role: MobileAuthContext["role"]) {
-  if (role === "driver") {
-    return "Tournée du jour";
-  }
-
-  if (role === "owner") {
-    return "Vue boutique";
-  }
-
-  return "Mes commandes";
-}
-
-function getHomeCopy(role: MobileAuthContext["role"]) {
-  if (role === "driver") {
-    return "Les tâches assignées, le GPS, les photos et la signature arrivent dans le prochain lot frontend.";
-  }
-
-  if (role === "owner") {
-    return "Les indicateurs du jour sont prêts côté API; cette base garde l'accès mobile en lecture seule.";
-  }
-
-  return "L'espace client utilisera ce même jeton pour afficher commandes, tickets et rendez-vous.";
-}
 
 export function MobileAuthShell() {
   const [tenantCode, setTenantCode] = useState<string | null>(null);
@@ -207,6 +186,32 @@ export function MobileAuthShell() {
     );
   }
 
+  if (tenantCode && session) {
+    return (
+      <>
+        <div className="fixed right-4 top-[max(16px,env(safe-area-inset-top))] z-20">
+          <Button
+            aria-label="Se déconnecter"
+            className="size-11 rounded-md bg-white/95 p-0 shadow-sm backdrop-blur"
+            disabled={isPending}
+            type="button"
+            variant="outline"
+            onClick={handleLogout}
+          >
+            <LogOut className="size-4" aria-hidden="true" />
+          </Button>
+        </div>
+        {session.authContext.role === "driver" ? (
+          <DeliveryHome driverName={session.authContext.displayName} />
+        ) : session.authContext.role === "owner" ? (
+          <OwnerHome />
+        ) : (
+          <CustomerHome />
+        )}
+      </>
+    );
+  }
+
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-8 pt-[max(24px,env(safe-area-inset-top))]">
       <header className="mb-7 flex items-center justify-between">
@@ -259,12 +264,6 @@ export function MobileAuthShell() {
             <Button className="h-11 flex-1" disabled={isPending || Boolean(session)} variant="secondary" onClick={handleTenantReset}>
               Changer
             </Button>
-            {session ? (
-              <Button className="h-11 flex-1" disabled={isPending} variant="outline" onClick={handleLogout}>
-                <LogOut className="size-4" aria-hidden="true" />
-                Sortir
-              </Button>
-            ) : null}
           </div>
         )}
       </section>
@@ -386,44 +385,6 @@ export function MobileAuthShell() {
               Se connecter
             </Button>
           </form>
-        </section>
-      ) : null}
-
-      {session ? (
-        <section className="mt-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex size-10 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
-              {session.authContext.role === "driver" ? (
-                <Truck className="size-5" aria-hidden="true" />
-              ) : (
-                <CheckCircle2 className="size-5" aria-hidden="true" />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
-                {session.authContext.role}
-              </p>
-              <h2 className="mt-1 text-xl font-semibold text-slate-950">
-                {getHomeTitle(session.authContext.role)}
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{getHomeCopy(session.authContext.role)}</p>
-            </div>
-          </div>
-
-          <dl className="mt-5 grid grid-cols-2 gap-3">
-            <div className="rounded-md bg-slate-50 p-3">
-              <dt className="text-xs font-medium text-slate-500">Utilisateur</dt>
-              <dd className="mt-1 truncate text-sm font-semibold text-slate-950">
-                {session.authContext.displayName}
-              </dd>
-            </div>
-            <div className="rounded-md bg-slate-50 p-3">
-              <dt className="text-xs font-medium text-slate-500">Branches</dt>
-              <dd className="mt-1 text-sm font-semibold text-slate-950">
-                {session.authContext.branchIds.length || "Toutes"}
-              </dd>
-            </div>
-          </dl>
         </section>
       ) : null}
     </main>

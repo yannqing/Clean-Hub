@@ -12,6 +12,7 @@
     "@capacitor/preferences": "^8.0.1",
     "@cleanhub/api-client": "workspace:*",
     "@cleanhub/i18n": "workspace:*",
+    "@cleanhub/offline": "workspace:*",
     "@cleanhub/ui": "workspace:*",
     "lucide-react": "^1.14.0",
     "next": "16.2.6",
