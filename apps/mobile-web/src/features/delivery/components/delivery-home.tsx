@@ -1,7 +1,18 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Badge, Button, Input, Label, Textarea } from "@cleanhub/ui";
+import {
+  Badge,
+  Button,
+  Input,
+  Label,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  Textarea,
+} from "@cleanhub/ui";
 import {
   AlertTriangle,
   Camera,
@@ -51,6 +62,8 @@ type CapturedProofPhoto = {
   mimeType: string;
   capturedAt: string;
 };
+
+type DeliverySheet = "exception" | "proof" | "signature" | null;
 
 const statusLabels: Record<DeliveryTaskStatus, string> = {
   pending_dispatch: "A préparer",
@@ -176,6 +189,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
   const [tasks, setTasks] = useState<DeliveryTaskListItem[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<DeliveryTaskDetail | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [activeSheet, setActiveSheet] = useState<DeliverySheet>(null);
   const [dataSource, setDataSource] = useState<DataSource>("network");
   const [queue, setQueue] = useState<DeliveryQueueSummary>({
     count: 0,
@@ -257,7 +272,6 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
         (preferredTaskId &&
           response.tasks.some((task) => task.id === preferredTaskId) &&
           preferredTaskId) ||
-        response.tasks[0]?.id ||
         null;
 
       setSelectedTaskId(nextTaskId);
@@ -379,6 +393,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
 
   function handleTaskSelect(taskId: string) {
     setSelectedTaskId(taskId);
+    setSelectedTask(null);
+    setDetailOpen(true);
     void runAction("detail", () => loadTaskDetail(taskId));
   }
 
@@ -421,6 +437,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
 
       setExceptionReason("");
       handleActionResult(result, "exception");
+      setActiveSheet(null);
     });
   }
 
@@ -464,6 +481,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
       setProofPhoto(null);
       setProofMediaRef("");
       handleActionResult(result);
+      setActiveSheet(null);
     });
   }
 
@@ -582,6 +600,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
       clearSignature();
       setSignedByName("");
       handleActionResult(result, "signed");
+      setActiveSheet(null);
     });
   }
 
@@ -742,156 +761,214 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
         </div>
       </section>
 
-      {selectedTask ? (
-        <>
-          <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span
-                    className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusTone[selectedTask.status]}`}
-                  >
-                    {statusLabels[selectedTask.status]}
-                  </span>
-                  <Badge variant="outline">{taskTypeLabels[selectedTask.type]}</Badge>
-                </div>
-                <h2 className="mt-3 text-xl font-semibold text-slate-950">
-                  {selectedTask.customerName}
-                </h2>
-              </div>
-              {selectedTaskPendingCount > 0 ? (
-                <Badge className="bg-amber-100 text-amber-900" variant="secondary">
-                  Sync pending
-                </Badge>
-              ) : null}
-            </div>
+      <Sheet
+        open={detailOpen}
+        onOpenChange={(open) => {
+          setDetailOpen(open);
 
-            <div className="mt-4 space-y-3 text-sm">
-              <div className="flex gap-3">
-                <Clock3 className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                <span className="text-slate-700">
-                  {formatDateTime(selectedTask.expectedAt)}
-                </span>
-              </div>
-              <div className="flex gap-3">
-                <MapPin className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                <span className="text-slate-700">{selectedTask.address}</span>
-              </div>
-              {selectedTask.customerPhone ? (
-                <a
-                  className="flex gap-3 text-sm text-teal-800"
-                  href={`tel:${selectedTask.customerPhone}`}
-                >
-                  <Phone className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                  <span>{selectedTask.customerPhone}</span>
-                </a>
-              ) : null}
-              {selectedTask.notes ? (
-                <div className="flex gap-3">
-                  <FileText className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                  <span className="text-slate-700">{selectedTask.notes}</span>
-                </div>
-              ) : null}
-            </div>
-
-            <dl className="mt-5 grid grid-cols-2 gap-3">
-              <div className="rounded-md bg-slate-50 p-3">
-                <dt className="text-xs font-medium text-slate-500">Commande</dt>
-                <dd className="mt-1 truncate text-sm font-semibold text-slate-950">
-                  {selectedTask.order?.id ?? selectedTask.orderId ?? "-"}
-                </dd>
-                {selectedTask.order ? (
-                  <p className="mt-1 text-xs text-slate-600">
-                    {selectedTask.order.status} · {formatMoney(selectedTask.order.totalAmount)}
-                  </p>
-                ) : null}
-              </div>
-              <div className="rounded-md bg-slate-50 p-3">
-                <dt className="text-xs font-medium text-slate-500">Ticket</dt>
-                <dd className="mt-1 truncate text-sm font-semibold text-slate-950">
-                  {selectedTask.ticket?.ticketNo ?? selectedTask.ticketId ?? "-"}
-                </dd>
-                {selectedTask.ticket ? (
-                  <p className="mt-1 text-xs text-slate-600">
-                    {selectedTask.ticket.ticketStatus}
-                  </p>
-                ) : null}
-              </div>
-            </dl>
-          </section>
-
-          <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-md bg-teal-50 text-teal-700">
-                <Navigation className="size-4" aria-hidden="true" />
-              </div>
-              <div>
-                <h2 className="text-base font-semibold text-slate-950">Statut</h2>
-                <p className="text-sm text-slate-600">{statusLabels[selectedTask.status]}</p>
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-3">
-              <div className="space-y-2">
-                <Label htmlFor="status-note">Note</Label>
-                <Textarea
-                  id="status-note"
-                  className="min-h-20 text-base"
-                  placeholder="Optionnel"
-                  value={statusNote}
-                  onChange={(event) => setStatusNote(event.target.value)}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {nextStatusOptions[selectedTask.status].map((option) => (
-                  <Button
-                    className="h-12"
-                    disabled={Boolean(activeAction)}
-                    key={option.status}
-                    type="button"
-                    onClick={() => handleStatusUpdate(option.status)}
-                  >
-                    {activeAction === `status-${option.status}` ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    ) : (
-                      <MapPin className="size-4" aria-hidden="true" />
-                    )}
-                    {option.label}
-                  </Button>
-                ))}
-                {nextStatusOptions[selectedTask.status].length === 0 ? (
-                  <div className="col-span-2 rounded-md border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">
-                    Aucun passage de statut disponible.
+          if (!open) {
+            setActiveSheet(null);
+          }
+        }}
+      >
+        <SheetContent className="h-[92dvh] p-0">
+          {selectedTask ? (
+            <div className="flex min-h-full flex-col">
+              <div className="space-y-5 px-5 pb-4 pt-2">
+                <SheetHeader className="pr-8 text-left">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusTone[selectedTask.status]}`}
+                    >
+                      {statusLabels[selectedTask.status]}
+                    </span>
+                    <Badge variant="outline">{taskTypeLabels[selectedTask.type]}</Badge>
+                    {selectedTaskPendingCount > 0 ? (
+                      <Badge className="bg-amber-100 text-amber-900" variant="secondary">
+                        {selectedTaskPendingCount} à synchroniser
+                      </Badge>
+                    ) : null}
                   </div>
-                ) : null}
-              </div>
-            </div>
-          </section>
+                  <SheetTitle>{selectedTask.customerName}</SheetTitle>
+                  <SheetDescription>
+                    {formatDateTime(selectedTask.expectedAt)}
+                  </SheetDescription>
+                </SheetHeader>
 
-          <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-md bg-red-50 text-red-700">
-                <AlertTriangle className="size-4" aria-hidden="true" />
+                <div className="space-y-3 text-sm">
+                  <div className="flex gap-3">
+                    <Clock3 className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                    <span className="text-slate-700">
+                      {formatDateTime(selectedTask.expectedAt)}
+                    </span>
+                  </div>
+                  <div className="flex gap-3">
+                    <MapPin className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                    <span className="text-slate-700">{selectedTask.address}</span>
+                  </div>
+                  {selectedTask.customerPhone ? (
+                    <a
+                      className="flex gap-3 text-sm text-teal-800"
+                      href={`tel:${selectedTask.customerPhone}`}
+                    >
+                      <Phone className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                      <span>{selectedTask.customerPhone}</span>
+                    </a>
+                  ) : null}
+                  {selectedTask.notes ? (
+                    <div className="flex gap-3">
+                      <FileText className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
+                      <span className="text-slate-700">{selectedTask.notes}</span>
+                    </div>
+                  ) : null}
+                </div>
+
+                <dl className="grid grid-cols-2 gap-3">
+                  <div className="rounded-md bg-slate-50 p-3">
+                    <dt className="text-xs font-medium text-slate-500">Commande</dt>
+                    <dd className="mt-1 truncate text-sm font-semibold text-slate-950">
+                      {selectedTask.order?.id ?? selectedTask.orderId ?? "-"}
+                    </dd>
+                    {selectedTask.order ? (
+                      <p className="mt-1 text-xs text-slate-600">
+                        {selectedTask.order.status} · {formatMoney(selectedTask.order.totalAmount)}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="rounded-md bg-slate-50 p-3">
+                    <dt className="text-xs font-medium text-slate-500">Ticket</dt>
+                    <dd className="mt-1 truncate text-sm font-semibold text-slate-950">
+                      {selectedTask.ticket?.ticketNo ?? selectedTask.ticketId ?? "-"}
+                    </dd>
+                    {selectedTask.ticket ? (
+                      <p className="mt-1 text-xs text-slate-600">
+                        {selectedTask.ticket.ticketStatus}
+                      </p>
+                    ) : null}
+                  </div>
+                </dl>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <Button
+                    className="h-12 flex-col gap-1 text-xs"
+                    type="button"
+                    variant="outline"
+                    onClick={() => setActiveSheet("exception")}
+                  >
+                    <AlertTriangle className="size-4" aria-hidden="true" />
+                    Exception
+                  </Button>
+                  <Button
+                    className="h-12 flex-col gap-1 text-xs"
+                    type="button"
+                    variant="outline"
+                    onClick={() => setActiveSheet("proof")}
+                  >
+                    <Camera className="size-4" aria-hidden="true" />
+                    Photo
+                  </Button>
+                  <Button
+                    className="h-12 flex-col gap-1 text-xs"
+                    type="button"
+                    variant="outline"
+                    onClick={() => setActiveSheet("signature")}
+                  >
+                    <PenLine className="size-4" aria-hidden="true" />
+                    Signature
+                  </Button>
+                </div>
               </div>
-              <h2 className="text-base font-semibold text-slate-950">Exception</h2>
+
+              <div className="sticky bottom-0 mt-auto space-y-3 border-t border-slate-200 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+                <div className="flex items-center gap-3">
+                  <div className="flex size-9 items-center justify-center rounded-md bg-teal-50 text-teal-700">
+                    <Navigation className="size-4" aria-hidden="true" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-950">Statut</p>
+                    <p className="text-xs text-slate-600">{statusLabels[selectedTask.status]}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="status-note">Note</Label>
+                  <Textarea
+                    id="status-note"
+                    className="min-h-16 text-base"
+                    placeholder="Optionnel"
+                    value={statusNote}
+                    onChange={(event) => setStatusNote(event.target.value)}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {nextStatusOptions[selectedTask.status].map((option) => (
+                    <Button
+                      className="h-12"
+                      disabled={Boolean(activeAction)}
+                      key={option.status}
+                      type="button"
+                      onClick={() => handleStatusUpdate(option.status)}
+                    >
+                      {activeAction === `status-${option.status}` ? (
+                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <MapPin className="size-4" aria-hidden="true" />
+                      )}
+                      {option.label}
+                    </Button>
+                  ))}
+                  {nextStatusOptions[selectedTask.status].length === 0 ? (
+                    <div className="col-span-2 rounded-md border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">
+                      Aucun passage de statut disponible.
+                    </div>
+                  ) : null}
+                </div>
+              </div>
             </div>
-            <div className="mt-4 space-y-3">
+          ) : (
+            <div className="flex min-h-[50dvh] items-center justify-center px-5 text-sm text-slate-600">
+              <Loader2 className="mr-2 size-4 animate-spin text-teal-700" aria-hidden="true" />
+              Chargement du détail
+            </div>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      <Sheet
+        open={activeSheet === "exception"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveSheet(null);
+          }
+        }}
+      >
+        <SheetContent className="max-h-[72dvh] p-0">
+          <form className="flex min-h-full flex-col" onSubmit={(event) => {
+            event.preventDefault();
+            handleException();
+          }}>
+            <div className="space-y-4 px-5 pb-4 pt-2">
+              <SheetHeader className="pr-8 text-left">
+                <SheetTitle>Exception</SheetTitle>
+                <SheetDescription>Indiquez le motif avant de bloquer la tâche.</SheetDescription>
+              </SheetHeader>
               <div className="space-y-2">
                 <Label htmlFor="exception-reason">Motif</Label>
                 <Textarea
                   id="exception-reason"
-                  className="min-h-20 text-base"
+                  className="min-h-28 text-base"
                   value={exceptionReason}
                   onChange={(event) => setExceptionReason(event.target.value)}
                 />
               </div>
+            </div>
+            <div className="sticky bottom-0 mt-auto border-t border-slate-200 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
               <Button
                 className="h-12 w-full"
                 disabled={Boolean(activeAction) || !exceptionReason.trim()}
-                type="button"
+                type="submit"
                 variant="destructive"
-                onClick={handleException}
               >
                 {activeAction === "exception" ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -901,17 +978,26 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                 Marquer exception
               </Button>
             </div>
-          </section>
+          </form>
+        </SheetContent>
+      </Sheet>
 
-          <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-md bg-indigo-50 text-indigo-700">
-                <Camera className="size-4" aria-hidden="true" />
-              </div>
-              <h2 className="text-base font-semibold text-slate-950">Preuve photo</h2>
-            </div>
+      <Sheet
+        open={activeSheet === "proof"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveSheet(null);
+          }
+        }}
+      >
+        <SheetContent className="max-h-[82dvh] p-0">
+          <form className="flex min-h-full flex-col" onSubmit={handleProofSubmit}>
+            <div className="space-y-4 px-5 pb-4 pt-2">
+              <SheetHeader className="pr-8 text-left">
+                <SheetTitle>Preuve photo</SheetTitle>
+                <SheetDescription>Ajoutez une photo ou une référence média.</SheetDescription>
+              </SheetHeader>
 
-            <form className="mt-4 space-y-4" onSubmit={handleProofSubmit}>
               <div className="grid grid-cols-2 gap-2">
                 {(["pickup", "dropoff"] as const).map((type) => (
                   <button
@@ -960,7 +1046,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                   Photo capturée.
                 </div>
               ) : null}
-
+            </div>
+            <div className="sticky bottom-0 mt-auto border-t border-slate-200 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
               <Button className="h-12 w-full" disabled={Boolean(activeAction)} type="submit">
                 {activeAction === "proof" ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden="true" />
@@ -969,18 +1056,28 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                 )}
                 Envoyer la preuve
               </Button>
-            </form>
-          </section>
-
-          <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center gap-3">
-              <div className="flex size-9 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">
-                <PenLine className="size-4" aria-hidden="true" />
-              </div>
-              <h2 className="text-base font-semibold text-slate-950">Signature client</h2>
             </div>
+          </form>
+        </SheetContent>
+      </Sheet>
 
-            <form className="mt-4 space-y-4" onSubmit={handleSignatureSubmit}>
+      <Sheet
+        open={activeSheet === "signature"}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActiveSheet(null);
+            clearSignature();
+          }
+        }}
+      >
+        <SheetContent className="max-h-[86dvh] p-0">
+          <form className="flex min-h-full flex-col" onSubmit={handleSignatureSubmit}>
+            <div className="space-y-4 px-5 pb-4 pt-2">
+              <SheetHeader className="pr-8 text-left">
+                <SheetTitle>Signature client</SheetTitle>
+                <SheetDescription>Faites signer le client sur l&apos;écran.</SheetDescription>
+              </SheetHeader>
+
               <div className="space-y-2">
                 <Label htmlFor="signed-by">Nom du signataire</Label>
                 <Input
@@ -993,8 +1090,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
 
               <canvas
                 aria-label="Signature client"
-                className="h-36 w-full touch-none rounded-md border border-slate-300 bg-white"
-                height={220}
+                className="h-44 w-full touch-none rounded-md border border-slate-300 bg-white"
+                height={260}
                 ref={signatureCanvasRef}
                 width={680}
                 onPointerCancel={endSignature}
@@ -1003,30 +1100,29 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                 onPointerMove={drawSignature}
                 onPointerUp={endSignature}
               />
-
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  className="h-12"
-                  disabled={!hasSignature || Boolean(activeAction)}
-                  type="button"
-                  variant="secondary"
-                  onClick={clearSignature}
-                >
-                  Effacer
-                </Button>
-                <Button className="h-12" disabled={Boolean(activeAction)} type="submit">
-                  {activeAction === "signature" ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <UserRound className="size-4" aria-hidden="true" />
-                  )}
-                  Terminer
-                </Button>
-              </div>
-            </form>
-          </section>
-        </>
-      ) : null}
+            </div>
+            <div className="sticky bottom-0 mt-auto grid grid-cols-2 gap-2 border-t border-slate-200 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+              <Button
+                className="h-12"
+                disabled={!hasSignature || Boolean(activeAction)}
+                type="button"
+                variant="secondary"
+                onClick={clearSignature}
+              >
+                Effacer
+              </Button>
+              <Button className="h-12" disabled={Boolean(activeAction)} type="submit">
+                {activeAction === "signature" ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <UserRound className="size-4" aria-hidden="true" />
+                )}
+                Terminer
+              </Button>
+            </div>
+          </form>
+        </SheetContent>
+      </Sheet>
     </section>
   );
 }
