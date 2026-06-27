@@ -222,11 +222,32 @@ The desktop app is currently an Electron shell placeholder. Full Electron launch
 
 ### Mobile
 
+Start the mobile web dev server:
+
+```bash
+pnpm --filter @cleanhub/mobile-web dev
+```
+
+Open the native Android project:
+
 ```bash
 pnpm --filter @cleanhub/mobile dev
 ```
 
-The mobile app is currently a Capacitor shell placeholder. Android/iOS native platforms still need to be added before real mobile development.
+This command runs `cap open android`, so Android Studio must be installed and discoverable. If Capacitor cannot find it on Windows, set `CAPACITOR_ANDROID_STUDIO_PATH` to your `studio64.exe`, for example:
+
+```powershell
+$env:CAPACITOR_ANDROID_STUDIO_PATH = "C:\Program Files\Android\Android Studio\bin\studio64.exe"
+pnpm --filter @cleanhub/mobile dev
+```
+
+For a permanent user-level setting:
+
+```powershell
+[Environment]::SetEnvironmentVariable("CAPACITOR_ANDROID_STUDIO_PATH", "C:\Program Files\Android\Android Studio\bin\studio64.exe", "User")
+```
+
+The mobile app is a Capacitor shell that loads the `@cleanhub/mobile-web` Next.js app during development.
 
 ## Build
 

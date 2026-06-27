@@ -220,11 +220,32 @@ pnpm --filter @cleanhub/desktop dev
 
 ### 启动 Mobile
 
+先启动移动端 Web dev server：
+
+```bash
+pnpm --filter @cleanhub/mobile-web dev
+```
+
+打开 Android native 项目：
+
 ```bash
 pnpm --filter @cleanhub/mobile dev
 ```
 
-当前 mobile 还是 Capacitor 壳的占位结构，还没有添加 Android / iOS native platform，因此暂时不会真正启动移动应用。
+这个命令会执行 `cap open android`，因此需要先安装 Android Studio，并让 Capacitor 能找到它。Windows 下如果自动检测失败，可以把 `CAPACITOR_ANDROID_STUDIO_PATH` 指向你的 `studio64.exe`，例如：
+
+```powershell
+$env:CAPACITOR_ANDROID_STUDIO_PATH = "C:\Program Files\Android\Android Studio\bin\studio64.exe"
+pnpm --filter @cleanhub/mobile dev
+```
+
+如需永久写入当前用户环境变量：
+
+```powershell
+[Environment]::SetEnvironmentVariable("CAPACITOR_ANDROID_STUDIO_PATH", "C:\Program Files\Android\Android Studio\bin\studio64.exe", "User")
+```
+
+当前 mobile 是 Capacitor 壳，开发时会加载 `@cleanhub/mobile-web` Next.js 应用。
 
 ## 构建
 
