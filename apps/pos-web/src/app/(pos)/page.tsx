@@ -1,5 +1,7 @@
 import { BranchCard } from "@/features/branches/components";
 import { getMyBranchQuery } from "@/features/branches/queries";
+import { WorkspaceStatistics } from "@/features/statistics/components/workspace-statistics";
+import { getStatisticsOverviewQuery } from "@/features/statistics/queries";
 import { getCurrentUser } from "@/lib/auth";
 
 const ROLE_LABELS: Record<string, string> = {
@@ -9,10 +11,11 @@ const ROLE_LABELS: Record<string, string> = {
 };
 
 export default async function WorkspacePage() {
-  // Parallel data fetch — both are independent server queries.
-  const [user, branch] = await Promise.all([
+  // Parallel data fetch — all are independent server queries.
+  const [user, branch, statistics] = await Promise.all([
     getCurrentUser(),
     getMyBranchQuery(),
+    getStatisticsOverviewQuery({ period: "today" }),
   ]);
 
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : null;
@@ -43,6 +46,9 @@ export default async function WorkspacePage() {
           </p>
         </section>
       )}
+
+      {/* 今日统计概况 */}
+      <WorkspaceStatistics overview={statistics} />
     </div>
   );
 }

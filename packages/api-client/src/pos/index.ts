@@ -11,6 +11,7 @@ import { createPosServiceTicketsApi } from "./service-tickets";
 import { createPosStaffApi } from "./staff";
 import { createPosTerminalSettingsApi } from "./terminal-settings";
 import { createPosHardwareApi } from "./hardware";
+import { createPosStatisticsApi } from "./statistics";
 
 export * from "./auth";
 export * from "./auth.types";
@@ -36,6 +37,8 @@ export * from "./terminal-settings";
 export * from "./terminal-settings.types";
 export * from "./hardware";
 export * from "./hardware.types";
+export * from "./statistics";
+export * from "./statistics.types";
 
 export function createPosApi(client: ApiClient) {
   return {
@@ -56,6 +59,7 @@ export function createPosApi(client: ApiClient) {
     notifications: createPosNotificationsApi(client),
     terminalSettings: createPosTerminalSettingsApi(client),
     hardware: createPosHardwareApi(client),
+    statistics: createPosStatisticsApi(client),
   };
 }
 

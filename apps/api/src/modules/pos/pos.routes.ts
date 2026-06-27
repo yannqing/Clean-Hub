@@ -15,6 +15,7 @@ import { createPosStaffRoutes } from "./staff/staff.routes.js";
 import { createPosServiceTicketsRoutes } from "./service-tickets/service-tickets.routes.js";
 import { createPosTerminalSettingsRoutes } from "./terminal-settings/terminal-settings.routes.js";
 import { createPosHardwareRoutes } from "./hardware/hardware.routes.js";
+import { createPosStatisticsRoutes } from "./statistics/statistics.routes.js";
 
 export function createPosRoutes() {
   const routes = new Hono<AppBindings>();
@@ -35,6 +36,7 @@ export function createPosRoutes() {
   routes.route("/notifications", createPosNotificationsRoutes());
   routes.route("/terminal-settings", createPosTerminalSettingsRoutes());
   routes.route("/hardware-devices", createPosHardwareRoutes());
+  routes.route("/statistics", createPosStatisticsRoutes());
 
   return routes;
 }
