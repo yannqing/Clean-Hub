@@ -1,9 +1,9 @@
 ## 1. 脚手架与依赖（mobile-shell）
 
-- [ ] 1.1 新建 `apps/mobile-web` Next.js 应用，配置 `next.config` 为 `output: "export"`（禁用 SSR/middleware/proxy），命名 workspace `@cleanhub/mobile-web`
-- [ ] 1.2 接入共享配置：`@cleanhub/config`（tsconfig）、eslint、`@cleanhub/ui`、`@cleanhub/i18n`（默认 `fr`）、`@cleanhub/api-client`
+- [x] 1.1 新建 `apps/mobile-web` Next.js 应用，配置 `next.config` 为 `output: "export"`（禁用 SSR/middleware/proxy），命名 workspace `@cleanhub/mobile-web`
+- [x] 1.2 接入共享配置：`@cleanhub/config`（tsconfig）、eslint、`@cleanhub/ui`、`@cleanhub/i18n`（默认 `fr`）、`@cleanhub/api-client`
 - [ ] 1.3 为 `apps/mobile` 增加 Capacitor 插件依赖：`@capacitor/geolocation`、`@capacitor/camera`、`@capacitor/preferences`
-- [ ] 1.4 在 `turbo`/根脚本中登记 mobile-web 的 dev/build/lint/typecheck，确认不把 app 级依赖加到根 `package.json`
+- [x] 1.4 在 `turbo`/根脚本中登记 mobile-web 的 dev/build/lint/typecheck，确认不把 app 级依赖加到根 `package.json`
 
 ## 2. 数据库 schema 与迁移（mobile-auth / customer-mobile / delivery-mobile）
 
@@ -66,11 +66,11 @@
 
 ## 9. 前端：mobile-web 基座与认证（mobile-shell / mobile-auth）
 
-- [ ] 9.1 搭建 `apps/mobile-web/src/lib/api-client.ts`：环境 base URL + 从原生存储读取 token 的 provider 注入
-- [ ] 9.2 实现 token 安全存储/读取/清除（Capacitor Preferences）与登录态守卫（纯 CSR，无 middleware）
-- [ ] 9.3 实现租户上下文进入页（输入 pressing code → 解析租户；无效阻止进入）
-- [ ] 9.4 实现登录页：客户验证码登录、客户密码登录、配送员/Owner 密码登录（按角色进入不同主页）
-- [ ] 9.5 用 `features/**/queries|actions` 封装认证调用，不散落 `fetch`
+- [x] 9.1 搭建 `apps/mobile-web/src/lib/api-client.ts`：环境 base URL + 从原生存储读取 token 的 provider 注入
+- [x] 9.2 实现 token 安全存储/读取/清除（Capacitor Preferences）与登录态守卫（纯 CSR，无 middleware）
+- [x] 9.3 实现租户上下文进入页（输入 pressing code → 解析租户；无效阻止进入）
+- [x] 9.4 实现登录页：客户验证码登录、客户密码登录、配送员/Owner 密码登录（按角色进入不同主页）
+- [x] 9.5 用 `features/**/queries|actions` 封装认证调用，不散落 `fetch`
 
 ## 10. 前端：客户侧页面（customer-mobile）
 
