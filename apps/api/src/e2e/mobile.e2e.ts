@@ -44,6 +44,13 @@ type ApiResponse<T> = {
   body: T;
 };
 
+type MediaUploadTicket = {
+  objectKey: string;
+  uploadUrl: string;
+  headers: Record<string, string>;
+  expiresAt: string;
+};
+
 function idempotencyKey(label: string): string {
   return `${DEVICE_ID}-${label}`;
 }
@@ -81,6 +88,38 @@ async function request<T = JsonObject>(
   );
 
   return { status: response.status, headers: response.headers, body };
+}
+
+async function uploadMedia(input: {
+  token: string;
+  taskId: string;
+  purpose: "delivery_proof" | "delivery_signature";
+  contentType: string;
+  body: Blob;
+}): Promise<string> {
+  const ticket = await request<MediaUploadTicket>("/mobile/media/uploads", {
+    expectedStatus: 201,
+    token: input.token,
+    body: {
+      purpose: input.purpose,
+      contentType: input.contentType,
+      sizeBytes: input.body.size,
+      entityId: input.taskId,
+    },
+  });
+  const upload = await fetch(ticket.body.uploadUrl, {
+    method: "PUT",
+    headers: ticket.body.headers,
+    body: input.body,
+  });
+
+  assert.equal(
+    upload.status,
+    200,
+    `PUT media upload expected 200, got ${upload.status}`,
+  );
+
+  return ticket.body.objectKey;
 }
 
 function assertToken(
@@ -335,6 +374,26 @@ async function verifyDeliveryFlow(token: MobileTokenResponse): Promise<void> {
     assert.equal(result.body.task.status, toStatus);
   }
 
+  await request(`/mobile/delivery/tasks/${task.id}/proofs`, {
+    expectedStatus: 422,
+    token: token.accessToken,
+    body: {
+      type: "pickup",
+      idempotencyKey: idempotencyKey("proof-base64-rejected"),
+      base64: "ZmFrZQ==",
+      mimeType: "image/jpeg",
+      deviceId: DEVICE_ID,
+    },
+  });
+
+  const proofObjectKey = await uploadMedia({
+    token: token.accessToken,
+    taskId: task.id,
+    purpose: "delivery_proof",
+    contentType: "image/jpeg",
+    body: new Blob(["cleanhub mobile e2e proof"], { type: "image/jpeg" }),
+  });
+
   const proof = await request<{ idempotent: boolean; proof: { type: string } }>(
     `/mobile/delivery/tasks/${task.id}/proofs`,
     {
@@ -343,7 +402,7 @@ async function verifyDeliveryFlow(token: MobileTokenResponse): Promise<void> {
       body: {
         type: "pickup",
         idempotencyKey: idempotencyKey("proof-pickup"),
-        mediaRef: "e2e://pickup-proof.jpg",
+        mediaRef: proofObjectKey,
         deviceId: DEVICE_ID,
       },
     },
@@ -359,12 +418,41 @@ async function verifyDeliveryFlow(token: MobileTokenResponse): Promise<void> {
       body: {
         type: "pickup",
         idempotencyKey: idempotencyKey("proof-pickup"),
-        mediaRef: "e2e://pickup-proof.jpg",
+        mediaRef: proofObjectKey,
         deviceId: DEVICE_ID,
       },
     },
   );
   assert.equal(proofReplay.body.idempotent, true);
+
+  const proofDetail = await request<{
+    proofs: Array<{ mediaRef: string; mediaUrl?: string }>;
+  }>(`/mobile/delivery/tasks/${task.id}`, { token: token.accessToken });
+  const uploadedProof = proofDetail.body.proofs.find(
+    (item) => item.mediaRef === proofObjectKey,
+  );
+
+  assert.ok(uploadedProof?.mediaUrl);
+  assert.equal((await fetch(uploadedProof.mediaUrl)).status, 200);
+
+  await request(`/mobile/delivery/tasks/${task.id}/signature`, {
+    expectedStatus: 422,
+    token: token.accessToken,
+    body: {
+      idempotencyKey: idempotencyKey("signature-base64-rejected"),
+      signatureBase64: "ZmFrZQ==",
+      mimeType: "image/png",
+      deviceId: DEVICE_ID,
+    },
+  });
+
+  const signatureObjectKey = await uploadMedia({
+    token: token.accessToken,
+    taskId: task.id,
+    purpose: "delivery_signature",
+    contentType: "image/png",
+    body: new Blob(["cleanhub mobile e2e signature"], { type: "image/png" }),
+  });
 
   const signed = await request<{ task: { status: string }; proof: { type: string } }>(
     `/mobile/delivery/tasks/${task.id}/signature`,
@@ -372,7 +460,7 @@ async function verifyDeliveryFlow(token: MobileTokenResponse): Promise<void> {
       token: token.accessToken,
       body: {
         idempotencyKey: idempotencyKey("signature"),
-        signatureMediaRef: "e2e://signature.png",
+        signatureMediaRef: signatureObjectKey,
         lat: "31.2304000",
         lng: "121.4737000",
         deviceId: DEVICE_ID,

@@ -1,5 +1,6 @@
 import { getDb, type Database } from "@cleanhub/db";
 
+import { MediaError, MediaService } from "../../media/index.js";
 import { DeliveryRepository } from "./delivery.repository.js";
 import type {
   DeliveryAssignTaskInput,
@@ -21,7 +22,13 @@ import type { MobileAuthContext } from "../auth/auth.types.js";
 export type DeliveryServiceOptions = {
   db?: Database;
   repository?: DeliveryRepositoryLike;
+  mediaService?: DeliveryMediaServiceLike;
 };
+
+export type DeliveryMediaServiceLike = Pick<
+  MediaService,
+  "assertOwnedAndCommit" | "createDownloadLink"
+>;
 
 export type DeliveryRepositoryLike = {
   listTodayTasks(input: {
@@ -88,6 +95,22 @@ export type DeliveryRepositoryLike = {
     toStatus: DeliveryTaskStatus;
     exceptionReason?: string;
   }): Promise<boolean>;
+  signTask(input: {
+    tenantId: string;
+    taskId: string;
+    driverUserId: string;
+    fromStatus: DeliveryTaskStatus;
+    signatureMediaRef: string;
+    deviceId?: string;
+    idempotencyKey: string;
+    capturedAt?: Date;
+    lat?: string;
+    lng?: string;
+    signedByName?: string;
+  }): Promise<{
+    event: DeliveryTaskEvent;
+    proof: DeliveryProof;
+  } | null>;
   createAssignedTask(input: {
     tenantId: string;
     branchId: string;
@@ -201,10 +224,12 @@ function assertValidTransition(
 
 export class DeliveryService {
   private readonly repository: DeliveryRepositoryLike;
+  private readonly mediaService: DeliveryMediaServiceLike;
 
   constructor(options: DeliveryServiceOptions = {}) {
     this.repository =
       options.repository ?? new DeliveryRepository(options.db ?? getDb());
+    this.mediaService = options.mediaService ?? new MediaService();
   }
 
   async listTodayTasks(
@@ -236,7 +261,7 @@ export class DeliveryService {
       throw taskNotFound();
     }
 
-    return detail;
+    return this.attachProofReadLinks(driver.tenantId, detail);
   }
 
   async updateStatus(
@@ -345,6 +370,14 @@ export class DeliveryService {
       };
     }
 
+    await this.commitMediaRef({
+      tenantId: driver.tenantId,
+      objectKey: input.mediaRef,
+      expectedPurpose: "delivery_proof",
+      expectedEntityId: task.id,
+      expectedCreatedBy: driver.subjectId,
+    });
+
     const proof = await this.repository.insertProof({
       tenantId: driver.tenantId,
       taskId: task.id,
@@ -397,26 +430,29 @@ export class DeliveryService {
 
     assertValidTransition(task.status, "signed");
 
-    const proof = await this.repository.insertProof({
+    await this.commitMediaRef({
+      tenantId: driver.tenantId,
+      objectKey: input.signatureMediaRef,
+      expectedPurpose: "delivery_signature",
+      expectedEntityId: task.id,
+      expectedCreatedBy: driver.subjectId,
+    });
+
+    const signed = await this.repository.signTask({
       tenantId: driver.tenantId,
       taskId: task.id,
-      type: "signature",
-      mediaRef: input.signatureMediaRef,
+      driverUserId: driver.subjectId,
+      fromStatus: task.status,
+      signatureMediaRef: input.signatureMediaRef,
       deviceId: input.deviceId,
       idempotencyKey: input.idempotencyKey,
       capturedAt: input.capturedAt,
-      createdBy: driver.subjectId,
+      lat: input.lat,
+      lng: input.lng,
+      signedByName: input.signedByName,
     });
 
-    const updated = await this.repository.updateTaskStatus({
-      taskId: task.id,
-      tenantId: driver.tenantId,
-      driverUserId: driver.subjectId,
-      fromStatus: task.status,
-      toStatus: "signed",
-    });
-
-    if (!updated) {
+    if (!signed) {
       const currentTask = await this.repository.findOwnedTaskById({
         tenantId: driver.tenantId,
         driverUserId: driver.subjectId,
@@ -432,25 +468,10 @@ export class DeliveryService {
       );
     }
 
-    const event = await this.repository.insertTaskEvent({
-      tenantId: driver.tenantId,
-      taskId: task.id,
-      fromStatus: task.status,
-      toStatus: "signed",
-      lat: input.lat,
-      lng: input.lng,
-      deviceId: input.deviceId,
-      idempotencyKey: input.idempotencyKey,
-      note: input.signedByName
-        ? `Signed by ${input.signedByName.trim()}`
-        : undefined,
-      createdBy: driver.subjectId,
-    });
-
     return {
       task: await this.getTaskDetail(driver, task.id),
-      event,
-      proof,
+      event: signed.event,
+      proof: signed.proof,
       idempotent: false,
     };
   }
@@ -484,5 +505,76 @@ export class DeliveryService {
     });
 
     return this.getTaskDetail(driver, taskId);
+  }
+
+  private async attachProofReadLinks(
+    tenantId: string,
+    detail: DeliveryTaskDetail,
+  ): Promise<DeliveryTaskDetail> {
+    const proofs = await Promise.all(
+      detail.proofs.map(async (proof) => {
+        try {
+          const link = await this.mediaService.createDownloadLink({
+            tenantId,
+            objectKey: proof.mediaRef,
+          });
+
+          return {
+            ...proof,
+            mediaUrl: link.downloadUrl,
+            mediaUrlExpiresAt: link.expiresAt,
+          };
+        } catch (error) {
+          if (error instanceof MediaError && error.status === 404) {
+            return proof;
+          }
+
+          throw this.mapMediaError(error);
+        }
+      }),
+    );
+
+    return {
+      ...detail,
+      proofs,
+    };
+  }
+
+  private async commitMediaRef(input: {
+    tenantId: string;
+    objectKey: string;
+    expectedPurpose: "delivery_proof" | "delivery_signature";
+    expectedEntityId: string;
+    expectedCreatedBy: string;
+  }): Promise<void> {
+    try {
+      await this.mediaService.assertOwnedAndCommit(input);
+    } catch (error) {
+      throw this.mapMediaError(error);
+    }
+  }
+
+  private mapMediaError(error: unknown): DeliveryError {
+    if (error instanceof MediaError) {
+      if (error.status === 404) {
+        return new MobileDeliveryError(
+          "DELIVERY_MEDIA_NOT_FOUND",
+          "Delivery media object was not found.",
+          404,
+        );
+      }
+
+      if (error.status === 403) {
+        return new MobileDeliveryError(
+          "DELIVERY_FORBIDDEN",
+          "Delivery media object is not accessible.",
+          403,
+        );
+      }
+
+      return validationError(error.message);
+    }
+
+    throw error;
   }
 }

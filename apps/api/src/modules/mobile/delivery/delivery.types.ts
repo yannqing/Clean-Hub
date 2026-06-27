@@ -70,6 +70,8 @@ export type DeliveryProof = {
   taskId: string;
   type: DeliveryProofType;
   mediaRef: string;
+  mediaUrl?: string;
+  mediaUrlExpiresAt?: string;
   deviceId: string | null;
   idempotencyKey: string;
   capturedAt: string | null;
@@ -142,6 +144,7 @@ export type DeliveryErrorCode =
   | "DELIVERY_FORBIDDEN"
   | "DELIVERY_TASK_NOT_FOUND"
   | "DELIVERY_TASK_CONFLICT"
+  | "DELIVERY_MEDIA_NOT_FOUND"
   | "DELIVERY_VALIDATION_ERROR";
 
 export class DeliveryError extends Error {

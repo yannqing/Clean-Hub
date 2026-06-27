@@ -45,7 +45,7 @@ export function createMobileDeliveryApi(client: ApiClient) {
       ),
     uploadProof: (
       taskId: string,
-      input: MobileUploadDeliveryProofRequest | FormData,
+      input: MobileUploadDeliveryProofRequest,
       options?: RequestOptions,
     ) =>
       client.post<MobileDeliveryMutationResult>(
@@ -55,7 +55,7 @@ export function createMobileDeliveryApi(client: ApiClient) {
       ),
     signTask: (
       taskId: string,
-      input: MobileSignDeliveryTaskRequest | FormData,
+      input: MobileSignDeliveryTaskRequest,
       options?: RequestOptions,
     ) =>
       client.post<MobileDeliveryMutationResult>(

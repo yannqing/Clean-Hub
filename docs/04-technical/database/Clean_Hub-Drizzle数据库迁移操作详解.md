@@ -84,10 +84,10 @@ DATABASE_URL="postgres://postgres:postgres@localhost:5432/cleanhub"
 
 | 命令 | 用途 | 是否会改数据库 |
 | ---- | ---- | ---- |
-| `pnpm db:up` | 创建并启动本地 PostgreSQL 容器 | 会创建/启动容器 |
+| `pnpm db:up` | 创建并启动本地 PostgreSQL 与 MinIO 容器 | 会创建/启动容器 |
 | `pnpm db:down` | 停止本地 PostgreSQL 容器 | 不删除数据卷 |
 | `pnpm db:ps` | 查看数据库容器状态 | 否 |
-| `pnpm db:logs` | 查看数据库容器日志 | 否 |
+| `pnpm db:logs` | 查看 PostgreSQL 与 MinIO 容器日志 | 否 |
 | `pnpm db:generate` | 根据 schema 生成 migration 文件 | 不直接改数据库 |
 | `pnpm db:migrate` | 执行 migration 到当前数据库 | 会改数据库结构 |
 | `pnpm db:push` | 直接把 schema 推到数据库 | 会改数据库结构 |
@@ -115,12 +115,63 @@ POSTGRES_USER="postgres"
 POSTGRES_PASSWORD="postgres"
 POSTGRES_PORT="5432"
 DATABASE_URL="postgres://postgres:postgres@localhost:5432/cleanhub"
+OBJECT_STORAGE_ENDPOINT="http://localhost:9000"
+OBJECT_STORAGE_BUCKET="cleanhub-media"
+OBJECT_STORAGE_ACCESS_KEY="cleanhub"
+OBJECT_STORAGE_SECRET_KEY="cleanhub-minio-password"
 ```
 
-### 5.3 启动 PostgreSQL
+### 5.3 启动 PostgreSQL 与 MinIO
 
 ```bash
 pnpm db:up
+```
+
+`pnpm db:up` 会启动：
+
+- `postgres`：本地 PostgreSQL。
+- `minio`：本地 S3 兼容对象存储。
+- `minio-init`：一次性创建 `OBJECT_STORAGE_BUCKET` 指定的私有 bucket。
+
+本地 MinIO 默认地址：
+
+```text
+S3 endpoint：http://localhost:9000
+Console：     http://localhost:9001
+```
+
+生产环境同样使用自托管 MinIO 或兼容 S3 的对象存储，但必须更换为独立强密钥、私有 bucket，并限制网络访问范围。
+
+### 5.3.1 媒体对象清理与回填
+
+配送拍照凭证与客户签名使用对象存储，不再把 base64 图片写入数据库。API 会在申请上传凭证时创建 `media_objects` pending 记录，业务提交对象 key 后标记为 `committed`。
+
+过期仍为 `pending` 的孤儿对象由独立 cron 清理：
+
+```bash
+pnpm --filter @cleanhub/api cron:media-cleanup
+```
+
+可选环境变量：
+
+```env
+MEDIA_CLEANUP_DISABLED="false"
+MEDIA_CLEANUP_INTERVAL_SECONDS="900"
+MEDIA_CLEANUP_BATCH_SIZE="100"
+```
+
+历史 `delivery_proofs.media_ref` 中的 `data:` 内联图片可通过一次性脚本回填到对象存储：
+
+```bash
+pnpm --filter @cleanhub/api backfill:delivery-proof-media
+```
+
+可选环境变量：
+
+```env
+MEDIA_BACKFILL_DRY_RUN="true"
+MEDIA_BACKFILL_BATCH_SIZE="50"
+MEDIA_BACKFILL_LIMIT="500"
 ```
 
 查看状态：

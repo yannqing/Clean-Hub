@@ -58,6 +58,8 @@ export type MobileDeliveryProof = {
   taskId: string;
   type: MobileDeliveryProofType;
   mediaRef: string;
+  mediaUrl?: string;
+  mediaUrlExpiresAt?: string;
   deviceId: string | null;
   idempotencyKey: string;
   capturedAt: string | null;
@@ -94,18 +96,14 @@ export type MobileUpdateDeliveryStatusRequest = {
 export type MobileUploadDeliveryProofRequest = {
   type: Exclude<MobileDeliveryProofType, "signature">;
   idempotencyKey: string;
-  mediaRef?: string;
-  base64?: string;
-  mimeType?: string;
+  mediaRef: string;
   deviceId?: string;
   capturedAt?: string;
 };
 
 export type MobileSignDeliveryTaskRequest = {
   idempotencyKey: string;
-  signatureMediaRef?: string;
-  signatureBase64?: string;
-  mimeType?: string;
+  signatureMediaRef: string;
   lat?: string | number;
   lng?: string | number;
   deviceId?: string;

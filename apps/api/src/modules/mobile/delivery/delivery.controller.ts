@@ -37,27 +37,27 @@ const statusBodySchema = z.object({
   exceptionReason: noteSchema,
 });
 
-const proofBodySchema = z.object({
-  type: z.enum(["pickup", "dropoff"]),
-  idempotencyKey: idempotencyKeySchema,
-  mediaRef: z.string().trim().min(1).max(20_000).optional(),
-  base64: z.string().trim().min(1).max(20_000_000).optional(),
-  mimeType: z.string().trim().min(1).max(120).optional(),
-  deviceId: deviceIdSchema,
-  capturedAt: z.string().datetime().optional(),
-});
+const proofBodySchema = z
+  .object({
+    type: z.enum(["pickup", "dropoff"]),
+    idempotencyKey: idempotencyKeySchema,
+    mediaRef: z.string().trim().min(1).max(2_000),
+    deviceId: deviceIdSchema,
+    capturedAt: z.string().datetime().optional(),
+  })
+  .strict();
 
-const signatureBodySchema = z.object({
-  idempotencyKey: idempotencyKeySchema,
-  signatureMediaRef: z.string().trim().min(1).max(20_000).optional(),
-  signatureBase64: z.string().trim().min(1).max(20_000_000).optional(),
-  mimeType: z.string().trim().min(1).max(120).optional(),
-  lat: coordinateSchema,
-  lng: coordinateSchema,
-  deviceId: deviceIdSchema,
-  capturedAt: z.string().datetime().optional(),
-  signedByName: z.string().trim().min(1).max(200).optional(),
-});
+const signatureBodySchema = z
+  .object({
+    idempotencyKey: idempotencyKeySchema,
+    signatureMediaRef: z.string().trim().min(1).max(2_000),
+    lat: coordinateSchema,
+    lng: coordinateSchema,
+    deviceId: deviceIdSchema,
+    capturedAt: z.string().datetime().optional(),
+    signedByName: z.string().trim().min(1).max(200).optional(),
+  })
+  .strict();
 
 const assignTaskBodySchema = z.object({
   tenantId: z.string().trim().min(1).max(120),
@@ -83,12 +83,6 @@ async function readJson(c: Context<AppBindings>): Promise<unknown> {
 }
 
 async function readBody(c: Context<AppBindings>): Promise<Record<string, unknown>> {
-  const contentType = c.req.header("content-type") ?? "";
-
-  if (contentType.toLowerCase().includes("multipart/form-data")) {
-    return c.req.parseBody();
-  }
-
   const body = await readJson(c);
 
   return typeof body === "object" && body !== null
@@ -110,50 +104,6 @@ function errorResponse(c: Context<AppBindings>, error: DeliveryError) {
 
 function parseDate(value: string | undefined): Date | undefined {
   return value ? new Date(value) : undefined;
-}
-
-function isUploadFile(value: unknown): value is File {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "arrayBuffer" in value &&
-    typeof (value as { arrayBuffer?: unknown }).arrayBuffer === "function"
-  );
-}
-
-async function fileToDataUri(file: File): Promise<string> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const mimeType = file.type || "application/octet-stream";
-
-  return `data:${mimeType};base64,${buffer.toString("base64")}`;
-}
-
-async function resolveMediaRef(input: {
-  mediaRef?: string;
-  base64?: string;
-  mimeType?: string;
-  file?: unknown;
-  fallbackPrefix: "proof" | "signature";
-}): Promise<string> {
-  if (input.mediaRef) {
-    return input.mediaRef;
-  }
-
-  if (isUploadFile(input.file)) {
-    return fileToDataUri(input.file);
-  }
-
-  if (input.base64) {
-    const mimeType = input.mimeType ?? "application/octet-stream";
-
-    return `data:${mimeType};base64,${input.base64}`;
-  }
-
-  throw new DeliveryError(
-    "DELIVERY_VALIDATION_ERROR",
-    `${input.fallbackPrefix} media is required.`,
-    422,
-  );
 }
 
 export function createDeliveryController({
@@ -224,8 +174,7 @@ export function createDeliveryController({
 
     uploadProof: async (c: Context<AppBindings>) => {
       const { taskId } = taskIdParamsSchema.parse(c.req.param());
-      const rawBody = await readBody(c);
-      const body = proofBodySchema.parse(rawBody);
+      const body = proofBodySchema.parse(await readBody(c));
 
       try {
         return c.json(
@@ -233,13 +182,7 @@ export function createDeliveryController({
             authContext: c.get("mobileAuthContext"),
             taskId,
             type: body.type as Exclude<DeliveryProofType, "signature">,
-            mediaRef: await resolveMediaRef({
-              mediaRef: body.mediaRef,
-              base64: body.base64,
-              mimeType: body.mimeType,
-              file: rawBody.file ?? rawBody.photo ?? rawBody.media,
-              fallbackPrefix: "proof",
-            }),
+            mediaRef: body.mediaRef,
             idempotencyKey: body.idempotencyKey,
             deviceId: body.deviceId,
             capturedAt: parseDate(body.capturedAt),
@@ -257,21 +200,14 @@ export function createDeliveryController({
 
     signTask: async (c: Context<AppBindings>) => {
       const { taskId } = taskIdParamsSchema.parse(c.req.param());
-      const rawBody = await readBody(c);
-      const body = signatureBodySchema.parse(rawBody);
+      const body = signatureBodySchema.parse(await readBody(c));
 
       try {
         return c.json(
           await deliveryService.signTask({
             authContext: c.get("mobileAuthContext"),
             taskId,
-            signatureMediaRef: await resolveMediaRef({
-              mediaRef: body.signatureMediaRef,
-              base64: body.signatureBase64,
-              mimeType: body.mimeType,
-              file: rawBody.file ?? rawBody.signature ?? rawBody.media,
-              fallbackPrefix: "signature",
-            }),
+            signatureMediaRef: body.signatureMediaRef,
             idempotencyKey: body.idempotencyKey,
             lat: body.lat,
             lng: body.lng,

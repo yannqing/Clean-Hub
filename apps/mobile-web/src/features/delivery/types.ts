@@ -8,6 +8,7 @@ import type {
   MobileSignDeliveryTaskRequest,
   MobileUpdateDeliveryStatusRequest,
 } from "@cleanhub/api-client";
+import type { QueuedUploadableMedia } from "./lib/media-upload";
 
 export type DeliveryTaskStatus = MobileDeliveryTaskStatus;
 export type DeliveryTaskListItem = MobileDeliveryTaskListItem;
@@ -29,12 +30,20 @@ export type DeliveryOfflinePayload =
   | {
       kind: "proof";
       taskId: string;
-      request: MobileUploadDeliveryProofRequest;
+      request:
+        | MobileUploadDeliveryProofRequest
+        | Omit<MobileUploadDeliveryProofRequest, "mediaRef">;
+      media?: QueuedUploadableMedia;
+      uploadedMediaRef?: string;
     }
   | {
       kind: "signature";
       taskId: string;
-      request: MobileSignDeliveryTaskRequest;
+      request:
+        | MobileSignDeliveryTaskRequest
+        | Omit<MobileSignDeliveryTaskRequest, "signatureMediaRef">;
+      media?: QueuedUploadableMedia;
+      uploadedMediaRef?: string;
     };
 
 export type DeliveryOfflineQueueItem = {

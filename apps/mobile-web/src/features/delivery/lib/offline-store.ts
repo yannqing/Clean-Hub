@@ -25,6 +25,12 @@ type SharedOfflineQueue = {
   }): Promise<DeliveryOfflineQueueItem>;
   list(): Promise<DeliveryOfflineQueueItem[]>;
   markSynced(id: string): Promise<void>;
+  updatePayload?(
+    id: string,
+    updater: (
+      payload: DeliveryOfflinePayload,
+    ) => DeliveryOfflinePayload,
+  ): Promise<DeliveryOfflineQueueItem | undefined>;
   replay(
     handler: (item: DeliveryOfflineQueueItem) => Promise<void>,
   ): Promise<DeliveryReplaySummary>;
@@ -121,6 +127,32 @@ class LocalDeliveryQueue {
   async markSynced(id: string): Promise<void> {
     const queue = await this.readQueue();
     await this.writeQueue(queue.filter((item) => item.id !== id));
+  }
+
+  async updatePayload(
+    id: string,
+    updater: (payload: DeliveryOfflinePayload) => DeliveryOfflinePayload,
+  ): Promise<DeliveryOfflineQueueItem | undefined> {
+    const queue = await this.readQueue();
+    const now = new Date().toISOString();
+    let updated: DeliveryOfflineQueueItem | undefined;
+
+    const nextQueue = queue.map((item) => {
+      if (item.id !== id) {
+        return item;
+      }
+
+      updated = {
+        ...item,
+        payload: updater(item.payload),
+        updatedAt: now,
+        lastError: undefined,
+      };
+      return updated;
+    });
+
+    await this.writeQueue(nextQueue);
+    return updated;
   }
 
   async replay(
@@ -322,6 +354,19 @@ export async function replayDeliveryQueue(
 ): Promise<DeliveryReplaySummary> {
   const queue = await getQueue();
   return queue.replay(handler);
+}
+
+export async function updateQueuedDeliveryPayload(
+  id: string,
+  updater: (payload: DeliveryOfflinePayload) => DeliveryOfflinePayload,
+): Promise<DeliveryOfflineQueueItem | undefined> {
+  const queue = await getQueue();
+
+  if (queue.updatePayload) {
+    return queue.updatePayload(id, updater);
+  }
+
+  return undefined;
 }
 
 export async function saveCachedDeliveryTasks(

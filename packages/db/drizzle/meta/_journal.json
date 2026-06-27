@@ -15,6 +15,13 @@
       "when": 1782411402470,
       "tag": "0001_misty_groot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782567837732,
+      "tag": "0002_short_malcolm_colcord",
+      "breakpoints": true
     }
   ]
 }

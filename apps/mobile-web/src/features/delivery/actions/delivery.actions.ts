@@ -13,10 +13,17 @@ import { getOrCreateDeviceId } from "@/lib/token-storage";
 import { getCurrentCoordinates, isOnline } from "../lib/device";
 import { createLocalId } from "../lib/id";
 import {
+  queuedMediaToUploadableMedia,
+  toQueuedUploadableMedia,
+  uploadDeliveryMedia,
+  type UploadableMedia,
+} from "../lib/media-upload";
+import {
   enqueueDeliveryOperation,
   listDeliveryQueue,
   replayDeliveryQueue,
   saveCachedDeliveryTaskDetail,
+  updateQueuedDeliveryPayload,
 } from "../lib/offline-store";
 import type {
   DeliveryActionResult,
@@ -37,17 +44,15 @@ type StatusInput = {
 type ProofInput = {
   taskId: string;
   type: Exclude<MobileDeliveryProofType, "signature">;
-  base64?: string;
+  media?: UploadableMedia;
   mediaRef?: string;
-  mimeType?: string;
   capturedAt?: string;
 };
 
 type SignatureInput = {
   taskId: string;
-  signatureBase64?: string;
+  signatureMedia?: UploadableMedia;
   signatureMediaRef?: string;
-  mimeType?: string;
   capturedAt?: string;
   signedByName?: string;
 };
@@ -139,19 +144,129 @@ async function applyQueuedOperation(payload: DeliveryOfflinePayload): Promise<vo
   }
 
   if (payload.kind === "proof") {
+    const mediaRef =
+      "mediaRef" in payload.request
+        ? payload.request.mediaRef
+        : payload.uploadedMediaRef
+          ? payload.uploadedMediaRef
+        : payload.media
+          ? await uploadDeliveryMedia({
+              purpose: "delivery_proof",
+              taskId: payload.taskId,
+              media: queuedMediaToUploadableMedia(payload.media),
+            })
+          : undefined;
+
+    if (!mediaRef) {
+      throw new Error("Queued proof media is missing.");
+    }
+
     const result = await apiClient.mobile.delivery.uploadProof(
       payload.taskId,
-      payload.request,
+      {
+        ...payload.request,
+        mediaRef,
+      },
     );
     await updateCacheFromOnlineResult(result);
     return;
   }
 
+  const signatureMediaRef =
+    "signatureMediaRef" in payload.request
+      ? payload.request.signatureMediaRef
+      : payload.uploadedMediaRef
+        ? payload.uploadedMediaRef
+      : payload.media
+        ? await uploadDeliveryMedia({
+            purpose: "delivery_signature",
+            taskId: payload.taskId,
+            media: queuedMediaToUploadableMedia(payload.media),
+          })
+        : undefined;
+
+  if (!signatureMediaRef) {
+    throw new Error("Queued signature media is missing.");
+  }
+
   const result = await apiClient.mobile.delivery.signTask(
     payload.taskId,
-    payload.request,
+    {
+      ...payload.request,
+      signatureMediaRef,
+    },
   );
   await updateCacheFromOnlineResult(result);
+}
+
+async function applyQueuedOperationItem(
+  item: DeliveryQueueSummary["items"][number],
+): Promise<void> {
+  const payload = item.payload;
+
+  if (payload.kind === "proof" && !("mediaRef" in payload.request)) {
+    let mediaRef = payload.uploadedMediaRef;
+
+    if (!mediaRef && payload.media) {
+      mediaRef = await uploadDeliveryMedia({
+        purpose: "delivery_proof",
+        taskId: payload.taskId,
+        media: queuedMediaToUploadableMedia(payload.media),
+      });
+      await updateQueuedDeliveryPayload(item.id, (currentPayload) =>
+        currentPayload.kind === "proof"
+          ? { ...currentPayload, uploadedMediaRef: mediaRef }
+          : currentPayload,
+      );
+    }
+
+    if (!mediaRef) {
+      throw new Error("Queued proof media is missing.");
+    }
+
+    const result = await apiClient.mobile.delivery.uploadProof(
+      payload.taskId,
+      {
+        ...payload.request,
+        mediaRef,
+      },
+    );
+    await updateCacheFromOnlineResult(result);
+    return;
+  }
+
+  if (payload.kind === "signature" && !("signatureMediaRef" in payload.request)) {
+    let signatureMediaRef = payload.uploadedMediaRef;
+
+    if (!signatureMediaRef && payload.media) {
+      signatureMediaRef = await uploadDeliveryMedia({
+        purpose: "delivery_signature",
+        taskId: payload.taskId,
+        media: queuedMediaToUploadableMedia(payload.media),
+      });
+      await updateQueuedDeliveryPayload(item.id, (currentPayload) =>
+        currentPayload.kind === "signature"
+          ? { ...currentPayload, uploadedMediaRef: signatureMediaRef }
+          : currentPayload,
+      );
+    }
+
+    if (!signatureMediaRef) {
+      throw new Error("Queued signature media is missing.");
+    }
+
+    const result = await apiClient.mobile.delivery.signTask(
+      payload.taskId,
+      {
+        ...payload.request,
+        signatureMediaRef,
+      },
+    );
+    await updateCacheFromOnlineResult(result);
+    return;
+  }
+
+  await applyQueuedOperation(payload);
 }
 
 export async function updateDeliveryStatus(
@@ -190,12 +305,34 @@ export async function updateDeliveryStatus(
 export async function uploadDeliveryProof(
   input: ProofInput,
 ): Promise<DeliveryActionResult> {
-  const request: MobileUploadDeliveryProofRequest = {
+  const existingMediaRef = input.mediaRef?.trim();
+
+  if (!input.media && !existingMediaRef) {
+    throw new Error("Proof media is required.");
+  }
+
+  if (existingMediaRef && !input.media) {
+    const request: MobileUploadDeliveryProofRequest = {
+      type: input.type,
+      idempotencyKey: createLocalId(),
+      mediaRef: existingMediaRef,
+      capturedAt: input.capturedAt,
+      deviceId: await getOrCreateDeviceId(),
+    };
+    const payload: DeliveryOfflinePayload = {
+      kind: "proof",
+      taskId: input.taskId,
+      request,
+    };
+
+    return runOrQueue(payload, () =>
+      apiClient.mobile.delivery.uploadProof(input.taskId, request),
+    );
+  }
+
+  const request: Omit<MobileUploadDeliveryProofRequest, "mediaRef"> = {
     type: input.type,
     idempotencyKey: createLocalId(),
-    base64: input.base64,
-    mediaRef: input.mediaRef?.trim() || undefined,
-    mimeType: input.mimeType,
     capturedAt: input.capturedAt,
     deviceId: await getOrCreateDeviceId(),
   };
@@ -203,11 +340,21 @@ export async function uploadDeliveryProof(
     kind: "proof",
     taskId: input.taskId,
     request,
+    media: await toQueuedUploadableMedia(input.media!),
   };
 
-  return runOrQueue(payload, () =>
-    apiClient.mobile.delivery.uploadProof(input.taskId, request),
-  );
+  return runOrQueue(payload, async () => {
+    const mediaRef = await uploadDeliveryMedia({
+      purpose: "delivery_proof",
+      taskId: input.taskId,
+      media: input.media!,
+    });
+
+    return apiClient.mobile.delivery.uploadProof(input.taskId, {
+      ...request,
+      mediaRef,
+    });
+  });
 }
 
 export async function signDeliveryTask(
@@ -217,12 +364,13 @@ export async function signDeliveryTask(
     getOrCreateDeviceId(),
     getCurrentCoordinates(),
   ]);
-  const request: MobileSignDeliveryTaskRequest = withCoordinates(
+  if (!input.signatureMedia && !input.signatureMediaRef?.trim()) {
+    throw new Error("Signature media is required.");
+  }
+
+  const request: Omit<MobileSignDeliveryTaskRequest, "signatureMediaRef"> = withCoordinates(
     {
       idempotencyKey: createLocalId(),
-      signatureBase64: input.signatureBase64,
-      signatureMediaRef: input.signatureMediaRef?.trim() || undefined,
-      mimeType: input.mimeType,
       capturedAt: input.capturedAt,
       signedByName: input.signedByName?.trim() || undefined,
       deviceId,
@@ -233,11 +381,25 @@ export async function signDeliveryTask(
     kind: "signature",
     taskId: input.taskId,
     request,
+    media: input.signatureMedia
+      ? await toQueuedUploadableMedia(input.signatureMedia)
+      : undefined,
   };
 
-  const actionResult = await runOrQueue(payload, () =>
-    apiClient.mobile.delivery.signTask(input.taskId, request),
-  );
+  const actionResult = await runOrQueue(payload, async () => {
+    const signatureMediaRef =
+      input.signatureMediaRef?.trim() ||
+      (await uploadDeliveryMedia({
+        purpose: "delivery_signature",
+        taskId: input.taskId,
+        media: input.signatureMedia!,
+      }));
+
+    return apiClient.mobile.delivery.signTask(input.taskId, {
+      ...request,
+      signatureMediaRef,
+    });
+  });
 
   return {
     ...actionResult,
@@ -250,5 +412,5 @@ export async function getDeliveryQueueSummary(): Promise<DeliveryQueueSummary> {
 }
 
 export async function replayPendingDeliveryOperations(): Promise<DeliveryReplaySummary> {
-  return replayDeliveryQueue((item) => applyQueuedOperation(item.payload));
+  return replayDeliveryQueue(applyQueuedOperationItem);
 }

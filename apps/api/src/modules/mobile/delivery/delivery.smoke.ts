@@ -1,6 +1,7 @@
 import {
   DELIVERY_STATUS_TRANSITIONS,
   DeliveryService,
+  type DeliveryMediaServiceLike,
   type DeliveryRepositoryLike,
 } from "./delivery.service.js";
 import { DeliveryError } from "./delivery.types.js";
@@ -125,10 +126,11 @@ function createRepository(options?: {
   existingEvent?: DeliveryTaskEvent | null;
   existingProof?: DeliveryProof | null;
   updateSucceeds?: boolean;
+  initialProofs?: DeliveryProof[];
 }): DeliveryRepositoryLike {
   let status = options?.status ?? "pending_dispatch";
   const events: DeliveryTaskEvent[] = [];
-  const proofs: DeliveryProof[] = [];
+  const proofs: DeliveryProof[] = [...(options?.initialProofs ?? [])];
 
   return {
     async listTodayTasks() {
@@ -152,7 +154,10 @@ function createRepository(options?: {
       };
     },
     async getOwnedTaskDetail() {
-      return makeDetail(status);
+      return {
+        ...makeDetail(status),
+        proofs,
+      };
     },
     async findTaskEventByIdempotencyKey() {
       return options?.existingEvent ?? null;
@@ -184,8 +189,62 @@ function createRepository(options?: {
       status = input.toStatus;
       return true;
     },
+    async signTask(input) {
+      if (options?.updateSucceeds === false || input.fromStatus !== status) {
+        return null;
+      }
+
+      status = "signed";
+
+      const proof = {
+        ...makeProof(input.idempotencyKey),
+        type: "signature" as const,
+        mediaRef: input.signatureMediaRef,
+      };
+      const event = makeEvent("signed", input.idempotencyKey);
+
+      proofs.push(proof);
+      events.push(event);
+
+      return { event, proof };
+    },
     async createAssignedTask() {
       return "task_1";
+    },
+  };
+}
+
+function createMediaService(): DeliveryMediaServiceLike & {
+  committed: string[];
+} {
+  const committed: string[] = [];
+
+  return {
+    committed,
+    async assertOwnedAndCommit({ objectKey }) {
+      committed.push(objectKey);
+      return {
+        id: `media_${committed.length}`,
+        tenantId: "tenant_1",
+        objectKey,
+        contentType: "image/jpeg",
+        sizeBytes: 128,
+        status: "committed",
+        purpose: objectKey.includes("delivery_signature")
+          ? "delivery_signature"
+          : "delivery_proof",
+        createdBy: "driver_1",
+        createdAt: new Date().toISOString(),
+        committedAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      };
+    },
+    async createDownloadLink({ objectKey }) {
+      return {
+        objectKey,
+        downloadUrl: `https://media.local/${encodeURIComponent(objectKey)}`,
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      };
     },
   };
 }
@@ -212,7 +271,10 @@ export async function runDeliverySmokeChecks(): Promise<void> {
     "signed must be terminal",
   );
 
-  const service = new DeliveryService({ repository: createRepository() });
+  const service = new DeliveryService({
+    repository: createRepository(),
+    mediaService: createMediaService(),
+  });
   const updated = await service.updateStatus({
     authContext: driverContext,
     taskId: "task_1",
@@ -236,7 +298,10 @@ export async function runDeliverySmokeChecks(): Promise<void> {
 
   await assertRejectsDelivery(
     () =>
-      new DeliveryService({ repository: createRepository() }).updateStatus({
+      new DeliveryService({
+        repository: createRepository(),
+        mediaService: createMediaService(),
+      }).updateStatus({
         authContext: driverContext,
         taskId: "task_1",
         toStatus: "signed",
@@ -249,6 +314,7 @@ export async function runDeliverySmokeChecks(): Promise<void> {
     () =>
       new DeliveryService({
         repository: createRepository({ status: "delivering" }),
+        mediaService: createMediaService(),
       }).updateStatus({
         authContext: driverContext,
         taskId: "task_1",
@@ -261,6 +327,7 @@ export async function runDeliverySmokeChecks(): Promise<void> {
   const existingEvent = makeEvent("en_route", "idem_replay");
   const replayed = await new DeliveryService({
     repository: createRepository({ existingEvent }),
+    mediaService: createMediaService(),
   }).updateStatus({
     authContext: driverContext,
     taskId: "task_1",
@@ -270,10 +337,52 @@ export async function runDeliverySmokeChecks(): Promise<void> {
 
   assert(replayed.idempotent, "replayed status update should be idempotent");
 
+  const mediaService = createMediaService();
+  const proofResult = await new DeliveryService({
+    repository: createRepository(),
+    mediaService,
+  }).uploadProof({
+    authContext: driverContext,
+    taskId: "task_1",
+    type: "pickup",
+    mediaRef: "tenant/tenant_1/delivery_proof/task_1/proof.jpg",
+    idempotencyKey: "proof_key",
+  });
+
+  assert(
+    mediaService.committed[0] ===
+      "tenant/tenant_1/delivery_proof/task_1/proof.jpg",
+    "proof upload should commit the media object",
+  );
+  assert(
+    Boolean(proofResult.task.proofs[0]?.mediaUrl?.startsWith("https://media.local/")),
+    "proof detail should include a download URL",
+  );
+
+  const replayMediaService = createMediaService();
+  const existingProof = makeProof("proof_replay");
+  const replayProof = await new DeliveryService({
+    repository: createRepository({ existingProof }),
+    mediaService: replayMediaService,
+  }).uploadProof({
+    authContext: driverContext,
+    taskId: "task_1",
+    type: "pickup",
+    mediaRef: "tenant/tenant_1/delivery_proof/task_1/replay.jpg",
+    idempotencyKey: "proof_replay",
+  });
+
+  assert(replayProof.idempotent, "replayed proof should be idempotent");
+  assert(
+    replayMediaService.committed.length === 0,
+    "replayed proof should not recommit media",
+  );
+
   await assertRejectsDelivery(
     () =>
       new DeliveryService({
         repository: createRepository({ status: "signed" }),
+        mediaService: createMediaService(),
       }).updateStatus({
         authContext: driverContext,
         taskId: "task_1",

@@ -41,6 +41,7 @@ import {
   uploadDeliveryProof,
 } from "../actions";
 import { captureDeliveryPhoto, isOnline } from "../lib/device";
+import type { UploadableMedia } from "../lib/media-upload";
 import { getDeliveryTaskDetail, getTodayDeliveryTasks } from "../queries";
 import type {
   DeliveryActionResult,
@@ -58,8 +59,7 @@ type DeliveryHomeProps = {
 type DataSource = "network" | "cache";
 
 type CapturedProofPhoto = {
-  base64: string;
-  mimeType: string;
+  media: UploadableMedia;
   capturedAt: string;
 };
 
@@ -450,7 +450,14 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
       }
 
       if (result.photo) {
-        setProofPhoto(result.photo);
+        setProofPhoto({
+          media: {
+            blob: result.photo.blob,
+            contentType: result.photo.contentType,
+            capturedAt: result.photo.capturedAt,
+          },
+          capturedAt: result.photo.capturedAt,
+        });
         setMessage("Photo prête à envoyer.");
       }
     });
@@ -472,8 +479,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
       const result = await uploadDeliveryProof({
         taskId: selectedTask.id,
         type: proofType,
-        base64: proofPhoto?.base64,
-        mimeType: proofPhoto?.mimeType,
+        media: proofPhoto?.media,
         capturedAt: proofPhoto?.capturedAt,
         mediaRef: proofMediaRef,
       });
@@ -582,13 +588,24 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
       return;
     }
 
-    const signatureBase64 = canvas.toDataURL("image/png").split(",")[1];
-
     void runAction("signature", async () => {
+      const signatureBlob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            resolve(blob);
+            return;
+          }
+
+          reject(new Error("Signature impossible à préparer."));
+        }, "image/png");
+      });
       const result = await signDeliveryTask({
         taskId: selectedTask.id,
-        signatureBase64,
-        mimeType: "image/png",
+        signatureMedia: {
+          blob: signatureBlob,
+          contentType: "image/png",
+          capturedAt: new Date().toISOString(),
+        },
         capturedAt: new Date().toISOString(),
         signedByName,
       });

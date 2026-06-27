@@ -387,6 +387,78 @@ export class DeliveryRepository {
     return Boolean(rows[0]);
   }
 
+  async signTask(input: {
+    tenantId: string;
+    taskId: string;
+    driverUserId: string;
+    fromStatus: DeliveryTaskStatus;
+    signatureMediaRef: string;
+    deviceId?: string;
+    idempotencyKey: string;
+    capturedAt?: Date;
+    lat?: string;
+    lng?: string;
+    signedByName?: string;
+  }): Promise<{
+    event: DeliveryTaskEvent;
+    proof: DeliveryProof;
+  } | null> {
+    return this.db.transaction(async (tx) => {
+      const repository = new DeliveryRepository(tx);
+      const now = new Date();
+      const updatedRows = await tx
+        .update(deliveryTasks)
+        .set({
+          status: "signed",
+          updatedAt: now,
+          updatedBy: input.driverUserId,
+          signedAt: now,
+          version: sql`${deliveryTasks.version} + 1`,
+        })
+        .where(
+          and(
+            eq(deliveryTasks.id, input.taskId),
+            eq(deliveryTasks.tenantId, input.tenantId),
+            eq(deliveryTasks.assigneeUserId, input.driverUserId),
+            eq(deliveryTasks.status, input.fromStatus),
+            isNull(deliveryTasks.deletedAt),
+          ),
+        )
+        .returning({ id: deliveryTasks.id });
+
+      if (!updatedRows[0]) {
+        return null;
+      }
+
+      const proof = await repository.insertProof({
+        tenantId: input.tenantId,
+        taskId: input.taskId,
+        type: "signature",
+        mediaRef: input.signatureMediaRef,
+        deviceId: input.deviceId,
+        idempotencyKey: input.idempotencyKey,
+        capturedAt: input.capturedAt,
+        createdBy: input.driverUserId,
+      });
+      const event = await repository.insertTaskEvent({
+        tenantId: input.tenantId,
+        taskId: input.taskId,
+        fromStatus: input.fromStatus,
+        toStatus: "signed",
+        lat: input.lat,
+        lng: input.lng,
+        deviceId: input.deviceId,
+        idempotencyKey: input.idempotencyKey,
+        note: input.signedByName
+          ? `Signed by ${input.signedByName.trim()}`
+          : undefined,
+        createdBy: input.driverUserId,
+      });
+
+      return { event, proof };
+    });
+  }
+
   async createAssignedTask(input: {
     tenantId: string;
     branchId: string;

@@ -50,6 +50,10 @@ export type ReplayResult<TPayload = unknown> = {
   failed?: OfflineQueueItem<TPayload>;
 };
 
+export type OfflineQueuePayloadUpdater<TPayload = unknown> = (
+  payload: TPayload,
+) => TPayload;
+
 export type DeliveryTaskSummary = {
   id: string;
   tenantId?: string;
@@ -196,6 +200,32 @@ export class OfflineQueue {
           : item,
       ),
     );
+  }
+
+  async updatePayload<TPayload = unknown>(
+    id: string,
+    updater: OfflineQueuePayloadUpdater<TPayload>,
+  ): Promise<OfflineQueueItem<TPayload> | undefined> {
+    const queue = await this.readQueue<TPayload>();
+    const now = new Date().toISOString();
+    let updated: OfflineQueueItem<TPayload> | undefined;
+
+    const nextQueue = queue.map((item) => {
+      if (item.id !== id) {
+        return item;
+      }
+
+      updated = {
+        ...item,
+        payload: updater(item.payload),
+        updatedAt: now,
+        lastError: undefined,
+      };
+      return updated;
+    });
+
+    await this.writeQueue(nextQueue);
+    return updated;
   }
 
   async replay<TPayload = unknown>(
@@ -390,6 +420,14 @@ export async function markSynced(
   id: string,
 ): Promise<void> {
   await queue.markSynced(id);
+}
+
+export async function updatePayload<TPayload = unknown>(
+  queue: OfflineQueue,
+  id: string,
+  updater: OfflineQueuePayloadUpdater<TPayload>,
+): Promise<OfflineQueueItem<TPayload> | undefined> {
+  return queue.updatePayload(id, updater);
 }
 
 export async function replay<TPayload = unknown>(

@@ -33,7 +33,7 @@ pnpm install
 
 ## Local Quick Start
 
-For a normal local `web-admin + api + PostgreSQL` development session, use this sequence:
+For a normal local `web-admin + api + PostgreSQL + MinIO` development session, use this sequence:
 
 ```bash
 cp .env.example .env
@@ -85,7 +85,7 @@ pnpm --filter @cleanhub/web-admin add @cleanhub/ui@workspace:*
 
 ## Database
 
-CleanHub uses Drizzle ORM with PostgreSQL. Local development can use the root Docker Compose file.
+CleanHub uses Drizzle ORM with PostgreSQL. Local development can use the root Docker Compose file. The same local stack also starts MinIO for S3-compatible media object storage.
 
 All business entity IDs use ULID strings. Database ID columns are stored as `varchar(26)`, not auto-increment integers and not PostgreSQL `uuid`. Generate IDs through `@cleanhub/id`.
 
@@ -95,11 +95,21 @@ Copy the example environment file first:
 cp .env.example .env
 ```
 
-Start the local PostgreSQL container:
+Start the local PostgreSQL and MinIO containers:
 
 ```bash
 pnpm db:up
 ```
+
+MinIO is available at:
+
+```text
+S3 endpoint: http://localhost:9000
+Console:     http://localhost:9001
+Bucket:      cleanhub-media
+```
+
+The default local MinIO credentials are defined in `.env.example`. Production deployments should use a private bucket, strong dedicated access keys, and the same `OBJECT_STORAGE_*` environment variables.
 
 Check container status or logs:
 
@@ -128,7 +138,7 @@ pnpm db:studio
 
 For early local prototyping only, `pnpm db:push` can push schema changes directly to the local database without creating migration files. Do not use `db:push` as the normal team workflow once migrations are being reviewed.
 
-Stop the local PostgreSQL container:
+Stop the local PostgreSQL and MinIO containers:
 
 ```bash
 pnpm db:down
@@ -248,6 +258,7 @@ For a permanent user-level setting:
 ```
 
 The mobile app is a Capacitor shell that loads the `@cleanhub/mobile-web` Next.js app during development.
+Delivery proof photos and customer signatures use object storage: mobile-web requests a short-lived upload ticket from the API, uploads media directly to MinIO/S3, then submits the returned object key to the delivery API.
 
 ## Build
 

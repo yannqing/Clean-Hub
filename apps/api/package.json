@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "cron:media-cleanup": "tsx src/cron/media-cleanup.ts",
+    "backfill:delivery-proof-media": "tsx src/scripts/backfill-delivery-proof-media.ts",
     "e2e:mobile": "tsx src/e2e/mobile.e2e.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
@@ -16,6 +18,7 @@
     "@cleanhub/domain": "workspace:*",
     "@cleanhub/id": "workspace:*",
     "@cleanhub/logger": "workspace:*",
+    "@cleanhub/storage": "workspace:*",
     "@hono/node-server": "^2.0.2",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.1",

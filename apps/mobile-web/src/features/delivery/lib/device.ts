@@ -1,4 +1,5 @@
 import type { DeliveryCoordinates } from "../types";
+import { compressImage } from "./image-compression";
 
 type GeolocationModule = {
   getCurrentPosition(options?: {
@@ -26,7 +27,8 @@ type CameraModule = {
 };
 
 export type CapturePhotoResult = {
-  base64: string;
+  blob: Blob;
+  contentType: string;
   mimeType: string;
   capturedAt: string;
 };
@@ -151,10 +153,17 @@ export async function captureDeliveryPhoto(): Promise<{
       };
     }
 
+    const mimeType = `image/${photo.format ?? "jpeg"}`;
+    const compressed = await compressImage({
+      dataUrl: `data:${mimeType};base64,${photo.base64String}`,
+      outputType: "image/jpeg",
+    });
+
     return {
       photo: {
-        base64: photo.base64String,
-        mimeType: `image/${photo.format ?? "jpeg"}`,
+        blob: compressed,
+        contentType: compressed.type || "image/jpeg",
+        mimeType: compressed.type || "image/jpeg",
         capturedAt: new Date().toISOString(),
       },
     };
