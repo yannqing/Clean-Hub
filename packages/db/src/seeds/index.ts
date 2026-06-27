@@ -14,6 +14,7 @@ const SEED_FILES = [
   "mobile-rbac.sql",
   "pos-cashiers.sql",
   "pos-business-data.sql",
+  "mobile-e2e.sql",
 ] as const;
 
 async function runSeeds(): Promise<void> {
