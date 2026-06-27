@@ -1,0 +1,44 @@
+@import "@cleanhub/ui/styles.css";
+
+:root {
+  color-scheme: light;
+  background: #f8faf9;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background:
+    linear-gradient(180deg, rgba(232, 247, 244, 0.9), rgba(248, 250, 249, 0) 260px),
+    #f8faf9;
+  color: #15201d;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.mobile-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #b8c7c1 transparent;
+}
+
+.mobile-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.mobile-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.mobile-scrollbar::-webkit-scrollbar-thumb {
+  background: #b8c7c1;
+  border-radius: 999px;
+}
