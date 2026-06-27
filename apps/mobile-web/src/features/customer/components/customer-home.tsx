@@ -15,7 +15,20 @@ import type {
   MobileCustomerTicketListItem,
   MobileCustomerTicketStatus,
 } from "@cleanhub/api-client";
-import { Badge, Button, Input, Label, Textarea } from "@cleanhub/ui";
+import {
+  Badge,
+  Button,
+  Input,
+  Label,
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+  Textarea,
+} from "@cleanhub/ui";
 import {
   CalendarClock,
   CheckCircle2,
@@ -332,6 +345,8 @@ export function CustomerHome() {
   const [appointments, setAppointments] = useState<MobileCustomerAppointment[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<ActivitySelection | null>(null);
   const [activityDetail, setActivityDetail] = useState<ActivityDetail | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [appointmentSheetOpen, setAppointmentSheetOpen] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState<AppointmentFormState>({
     type: "pickup",
     expectedAt: getDefaultExpectedAt(),
@@ -416,6 +431,7 @@ export function CustomerHome() {
   async function handleSelectActivity(item: ActivityListItem) {
     setSelectedActivity({ kind: item.kind, id: item.id });
     setActivityDetail(null);
+    setDetailOpen(true);
     setIsDetailLoading(true);
     setError(null);
 
@@ -427,6 +443,8 @@ export function CustomerHome() {
           : { kind: "ticket", data: detail as MobileCustomerTicketDetail },
       );
     } catch (nextError) {
+      setDetailOpen(false);
+      setSelectedActivity(null);
       setError(getErrorMessage(nextError));
     } finally {
       setIsDetailLoading(false);
@@ -464,6 +482,7 @@ export function CustomerHome() {
         notes: "",
       }));
       setActiveTab("appointments");
+      setAppointmentSheetOpen(false);
       setMessage("Rendez-vous cree.");
     } catch (nextError) {
       setError(getErrorMessage(nextError));
@@ -502,7 +521,7 @@ export function CustomerHome() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[max(28px,env(safe-area-inset-bottom))] pt-[max(24px,env(safe-area-inset-top))]">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(24px,env(safe-area-inset-top))]">
       <header className="mb-5 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
@@ -529,30 +548,7 @@ export function CustomerHome() {
         </Button>
       </header>
 
-      <nav className="sticky top-0 z-10 -mx-5 mb-5 bg-[#f8faf9]/95 px-5 py-2 backdrop-blur">
-        <div className="grid grid-cols-4 gap-2 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.value;
-
-            return (
-              <button
-                className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs font-medium transition ${
-                  isActive ? "bg-teal-700 text-white" : "text-slate-600 hover:bg-slate-50"
-                }`}
-                key={tab.value}
-                type="button"
-                onClick={() => setActiveTab(tab.value)}
-              >
-                <Icon className="size-4" aria-hidden="true" />
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-      </nav>
-
-      {error ? <AlertMessage tone="error" message={error} /> : null}
+      {error && !appointmentSheetOpen ? <AlertMessage tone="error" message={error} /> : null}
       {message ? <AlertMessage tone="success" message={message} /> : null}
 
       {activeTab === "resume" ? (
@@ -571,9 +567,7 @@ export function CustomerHome() {
 
       {activeTab === "orders" ? (
         <ActivityView
-          activityDetail={activityDetail}
           activityItems={activityItems}
-          isDetailLoading={isDetailLoading}
           selectedActivity={selectedActivity}
           onSelectActivity={(item) => void handleSelectActivity(item)}
         />
@@ -583,16 +577,89 @@ export function CustomerHome() {
         <AppointmentsView
           appointments={appointments}
           cancellingAppointmentId={cancellingAppointmentId}
-          form={appointmentForm}
-          isSubmitting={isSubmittingAppointment}
           onCancelAppointment={(appointmentId) => void handleCancelAppointment(appointmentId)}
-          onFormChange={setAppointmentForm}
-          onSubmit={handleCreateAppointment}
+          onOpenCreateAppointment={() => {
+            setError(null);
+            setMessage(null);
+            setAppointmentSheetOpen(true);
+          }}
         />
       ) : null}
 
       {activeTab === "profile" ? <ProfileView profile={profile} /> : null}
+
+      <ActivityDetailSheet
+        detail={activityDetail}
+        isLoading={isDetailLoading}
+        item={activityItems.find(
+          (item) => item.kind === selectedActivity?.kind && item.id === selectedActivity.id,
+        ) ?? null}
+        open={detailOpen}
+        onOpenChange={(open) => {
+          setDetailOpen(open);
+
+          if (!open) {
+            setSelectedActivity(null);
+            setActivityDetail(null);
+          }
+        }}
+      />
+
+      <AppointmentFormSheet
+        error={appointmentSheetOpen ? error : null}
+        form={appointmentForm}
+        isSubmitting={isSubmittingAppointment}
+        open={appointmentSheetOpen}
+        onFormChange={setAppointmentForm}
+        onOpenChange={(open) => {
+          setAppointmentSheetOpen(open);
+
+          if (!open) {
+            setError(null);
+          }
+        }}
+        onSubmit={handleCreateAppointment}
+      />
+
+      <CustomerTabBar activeTab={activeTab} onChange={setActiveTab} />
     </main>
+  );
+}
+
+function CustomerTabBar({
+  activeTab,
+  onChange,
+}: {
+  activeTab: CustomerTab;
+  onChange: (tab: CustomerTab) => void;
+}) {
+  return (
+    <nav
+      aria-label="Navigation principale"
+      className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md border-t border-slate-200 bg-[#f8faf9]/95 px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur"
+    >
+      <div className="grid grid-cols-4 gap-2 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.value;
+
+          return (
+            <button
+              aria-current={isActive ? "page" : undefined}
+              className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs font-medium transition ${
+                isActive ? "bg-teal-700 text-white" : "text-slate-600 hover:bg-slate-50"
+              }`}
+              key={tab.value}
+              type="button"
+              onClick={() => onChange(tab.value)}
+            >
+              <Icon className="size-4" aria-hidden="true" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -721,15 +788,11 @@ function StatBlock({ label, value }: { label: string; value: number }) {
 }
 
 function ActivityView({
-  activityDetail,
   activityItems,
-  isDetailLoading,
   selectedActivity,
   onSelectActivity,
 }: {
-  activityDetail: ActivityDetail | null;
   activityItems: ActivityListItem[];
-  isDetailLoading: boolean;
   selectedActivity: ActivitySelection | null;
   onSelectActivity: (item: ActivityListItem) => void;
 }) {
@@ -747,6 +810,7 @@ function ActivityView({
                 }`}
                 key={`${item.kind}-${item.id}`}
                 type="button"
+                aria-haspopup="dialog"
                 onClick={() => onSelectActivity(item)}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -783,18 +847,57 @@ function ActivityView({
           body="Les commandes et tickets actifs apparaitront ici."
         />
       )}
-
-      {isDetailLoading ? (
-        <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3 text-sm text-slate-600">
-            <Loader2 className="size-4 animate-spin text-teal-700" aria-hidden="true" />
-            Chargement du detail
-          </div>
-        </section>
-      ) : null}
-
-      {activityDetail ? <ActivityDetailPanel detail={activityDetail} /> : null}
     </div>
+  );
+}
+
+function ActivityDetailSheet({
+  detail,
+  isLoading,
+  item,
+  open,
+  onOpenChange,
+}: {
+  detail: ActivityDetail | null;
+  isLoading: boolean;
+  item: ActivityListItem | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="max-h-[90dvh] p-5">
+        <SheetHeader className="pr-8 text-left">
+          <SheetTitle>{item?.title ?? "Detail du suivi"}</SheetTitle>
+          <SheetDescription>
+            {item?.subtitle ?? "Commande ou ticket client"}
+          </SheetDescription>
+        </SheetHeader>
+
+        {isLoading ? (
+          <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex items-center gap-3 text-sm text-slate-600">
+              <Loader2 className="size-4 animate-spin text-teal-700" aria-hidden="true" />
+              Chargement du detail
+            </div>
+          </div>
+        ) : detail ? (
+          <ActivityDetailPanel detail={detail} />
+        ) : (
+          <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+            Selectionnez un suivi pour afficher le detail.
+          </p>
+        )}
+
+        <SheetFooter className="sticky bottom-0 -mx-5 mt-5 border-t border-slate-200 bg-white px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+          <SheetClose asChild>
+            <Button className="h-11 w-full" type="button" variant="outline">
+              Fermer
+            </Button>
+          </SheetClose>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -921,19 +1024,13 @@ function ItemList({
 function AppointmentsView({
   appointments,
   cancellingAppointmentId,
-  form,
-  isSubmitting,
   onCancelAppointment,
-  onFormChange,
-  onSubmit,
+  onOpenCreateAppointment,
 }: {
   appointments: MobileCustomerAppointment[];
   cancellingAppointmentId: string | null;
-  form: AppointmentFormState;
-  isSubmitting: boolean;
   onCancelAppointment: (appointmentId: string) => void;
-  onFormChange: React.Dispatch<React.SetStateAction<AppointmentFormState>>;
-  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  onOpenCreateAppointment: () => void;
 }) {
   return (
     <div className="space-y-4">
@@ -942,79 +1039,15 @@ function AppointmentsView({
           <div className="flex size-10 items-center justify-center rounded-md bg-teal-50 text-teal-700">
             <Plus className="size-5" aria-hidden="true" />
           </div>
-          <div>
-            <h2 className="text-base font-semibold text-slate-950">Nouveau rendez-vous</h2>
-            <p className="mt-1 text-sm text-slate-600">Collecte ou depot</p>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-base font-semibold text-slate-950">Rendez-vous</h2>
+            <p className="mt-1 text-sm text-slate-600">Collectes et depots planifies</p>
           </div>
-        </div>
-
-        <form className="mt-5 space-y-4" onSubmit={onSubmit}>
-          <fieldset className="grid grid-cols-2 gap-2">
-            <legend className="sr-only">Type de rendez-vous</legend>
-            {(["pickup", "dropoff"] as const).map((type) => (
-              <button
-                className={`min-h-12 rounded-md border px-3 text-sm font-medium transition ${
-                  form.type === type
-                    ? "border-teal-700 bg-teal-50 text-teal-900"
-                    : "border-slate-200 bg-white text-slate-700"
-                }`}
-                key={type}
-                type="button"
-                onClick={() => onFormChange((current) => ({ ...current, type }))}
-              >
-                {appointmentTypeViews[type]}
-              </button>
-            ))}
-          </fieldset>
-
-          <div className="space-y-2">
-            <Label htmlFor="appointment-expected-at">Date et heure</Label>
-            <Input
-              className="h-12 text-base"
-              id="appointment-expected-at"
-              type="datetime-local"
-              value={form.expectedAt}
-              onChange={(event) =>
-                onFormChange((current) => ({ ...current, expectedAt: event.target.value }))
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="appointment-address">Adresse</Label>
-            <Textarea
-              className="min-h-24 resize-none text-base"
-              id="appointment-address"
-              placeholder="Adresse de collecte ou de depot"
-              value={form.address}
-              onChange={(event) =>
-                onFormChange((current) => ({ ...current, address: event.target.value }))
-              }
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="appointment-notes">Notes</Label>
-            <Textarea
-              className="min-h-20 resize-none text-base"
-              id="appointment-notes"
-              placeholder="Instructions utiles"
-              value={form.notes}
-              onChange={(event) =>
-                onFormChange((current) => ({ ...current, notes: event.target.value }))
-              }
-            />
-          </div>
-
-          <Button className="h-12 w-full" disabled={isSubmitting} type="submit">
-            {isSubmitting ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <CalendarClock className="size-4" aria-hidden="true" />
-            )}
-            Creer le rendez-vous
+          <Button className="h-11 shrink-0" type="button" onClick={onOpenCreateAppointment}>
+            <Plus className="size-4" aria-hidden="true" />
+            Nouveau
           </Button>
-        </form>
+        </div>
       </section>
 
       {appointments.length ? (
@@ -1032,6 +1065,126 @@ function AppointmentsView({
         <EmptyState icon={CalendarClock} title="Aucun rendez-vous" body="Les demandes creees apparaitront ici." />
       )}
     </div>
+  );
+}
+
+function AppointmentFormSheet({
+  error,
+  form,
+  isSubmitting,
+  open,
+  onFormChange,
+  onOpenChange,
+  onSubmit,
+}: {
+  error: string | null;
+  form: AppointmentFormState;
+  isSubmitting: boolean;
+  open: boolean;
+  onFormChange: React.Dispatch<React.SetStateAction<AppointmentFormState>>;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="max-h-[92dvh] p-5">
+        <SheetHeader className="pr-8 text-left">
+          <SheetTitle>Nouveau rendez-vous</SheetTitle>
+          <SheetDescription>Collecte a domicile ou depot en boutique</SheetDescription>
+        </SheetHeader>
+
+        {error ? <AlertMessage tone="error" message={error} /> : null}
+
+        <AppointmentForm
+          form={form}
+          isSubmitting={isSubmitting}
+          onFormChange={onFormChange}
+          onSubmit={onSubmit}
+        />
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function AppointmentForm({
+  form,
+  isSubmitting,
+  onFormChange,
+  onSubmit,
+}: {
+  form: AppointmentFormState;
+  isSubmitting: boolean;
+  onFormChange: React.Dispatch<React.SetStateAction<AppointmentFormState>>;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form className="space-y-4" onSubmit={onSubmit}>
+      <fieldset className="grid grid-cols-2 gap-2">
+        <legend className="sr-only">Type de rendez-vous</legend>
+        {(["pickup", "dropoff"] as const).map((type) => (
+          <button
+            className={`min-h-12 rounded-md border px-3 text-sm font-medium transition ${
+              form.type === type
+                ? "border-teal-700 bg-teal-50 text-teal-900"
+                : "border-slate-200 bg-white text-slate-700"
+            }`}
+            key={type}
+            type="button"
+            onClick={() => onFormChange((current) => ({ ...current, type }))}
+          >
+            {appointmentTypeViews[type]}
+          </button>
+        ))}
+      </fieldset>
+
+      <div className="space-y-2">
+        <Label htmlFor="appointment-expected-at">Date et heure</Label>
+        <Input
+          className="h-12 text-base"
+          id="appointment-expected-at"
+          type="datetime-local"
+          value={form.expectedAt}
+          onChange={(event) =>
+            onFormChange((current) => ({ ...current, expectedAt: event.target.value }))
+          }
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="appointment-address">Adresse</Label>
+        <Textarea
+          className="min-h-24 resize-none text-base"
+          id="appointment-address"
+          placeholder="Adresse de collecte ou de depot"
+          value={form.address}
+          onChange={(event) =>
+            onFormChange((current) => ({ ...current, address: event.target.value }))
+          }
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="appointment-notes">Notes</Label>
+        <Textarea
+          className="min-h-20 resize-none text-base"
+          id="appointment-notes"
+          placeholder="Instructions utiles"
+          value={form.notes}
+          onChange={(event) => onFormChange((current) => ({ ...current, notes: event.target.value }))}
+        />
+      </div>
+
+      <SheetFooter className="sticky bottom-0 -mx-5 mt-5 border-t border-slate-200 bg-white px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+        <Button className="h-12 w-full" disabled={isSubmitting} type="submit">
+          {isSubmitting ? (
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <CalendarClock className="size-4" aria-hidden="true" />
+          )}
+          Creer le rendez-vous
+        </Button>
+      </SheetFooter>
+    </form>
   );
 }
 
