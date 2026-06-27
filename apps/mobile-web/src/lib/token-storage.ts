@@ -31,7 +31,13 @@ async function getPreferenceStore(): Promise<PreferenceStore | null> {
 
   try {
     const preferences = await import("@capacitor/preferences");
-    return preferences.Preferences;
+    const store = preferences.Preferences;
+
+    return {
+      get: (options) => store.get(options),
+      set: (options) => store.set(options),
+      remove: (options) => store.remove(options),
+    };
   } catch {
     return null;
   }
