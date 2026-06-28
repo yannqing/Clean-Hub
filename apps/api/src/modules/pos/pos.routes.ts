@@ -16,6 +16,7 @@ import { createPosServiceTicketsRoutes } from "./service-tickets/service-tickets
 import { createPosTerminalSettingsRoutes } from "./terminal-settings/terminal-settings.routes.js";
 import { createPosHardwareRoutes } from "./hardware/hardware.routes.js";
 import { createPosStatisticsRoutes } from "./statistics/statistics.routes.js";
+import { createPosWorkspaceRoutes } from "./workspace/workspace.routes.js";
 
 export function createPosRoutes() {
   const routes = new Hono<AppBindings>();
@@ -37,6 +38,7 @@ export function createPosRoutes() {
   routes.route("/terminal-settings", createPosTerminalSettingsRoutes());
   routes.route("/hardware-devices", createPosHardwareRoutes());
   routes.route("/statistics", createPosStatisticsRoutes());
+  routes.route("/workspace", createPosWorkspaceRoutes());
 
   return routes;
 }

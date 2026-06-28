@@ -12,6 +12,7 @@ import { createPosStaffApi } from "./staff";
 import { createPosTerminalSettingsApi } from "./terminal-settings";
 import { createPosHardwareApi } from "./hardware";
 import { createPosStatisticsApi } from "./statistics";
+import { createPosWorkspaceApi } from "./workspace";
 
 export * from "./auth";
 export * from "./auth.types";
@@ -39,6 +40,8 @@ export * from "./hardware";
 export * from "./hardware.types";
 export * from "./statistics";
 export * from "./statistics.types";
+export * from "./workspace";
+export * from "./workspace.types";
 
 export function createPosApi(client: ApiClient) {
   return {
@@ -60,6 +63,7 @@ export function createPosApi(client: ApiClient) {
     terminalSettings: createPosTerminalSettingsApi(client),
     hardware: createPosHardwareApi(client),
     statistics: createPosStatisticsApi(client),
+    workspace: createPosWorkspaceApi(client),
   };
 }
 
