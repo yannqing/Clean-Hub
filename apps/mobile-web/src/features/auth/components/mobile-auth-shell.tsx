@@ -2,9 +2,15 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import type { MobileAuthContext } from "@cleanhub/api-client";
+import type { TranslationKey } from "@cleanhub/i18n";
+import { useTranslation } from "@cleanhub/i18n/react";
 import { Button, Input, Label } from "@cleanhub/ui";
 import { Building2, ChevronRight, Loader2, LockKeyhole, LogOut, PackageCheck, ShieldCheck } from "lucide-react";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { CustomerHome } from "@/features/customer";
+import { DeliveryHome } from "@/features/delivery";
+import { OwnerHome } from "@/features/owner";
 import {
   enterTenantContext,
   getCustomerTestOtp,
@@ -18,22 +24,25 @@ import {
   verifyCustomerOtp,
 } from "../actions";
 import type { LoginMode } from "../types";
-import { CustomerHome } from "@/features/customer";
-import { DeliveryHome } from "@/features/delivery";
-import { OwnerHome } from "@/features/owner";
 
 type SessionView = {
   authContext: MobileAuthContext;
 };
 
-const loginModes: { value: LoginMode; label: string }[] = [
-  { value: "customer-otp", label: "Client OTP" },
-  { value: "customer-password", label: "Client mot de passe" },
-  { value: "driver", label: "Livreur" },
-  { value: "owner", label: "Owner" },
-];
+function getErrorMessage(error: unknown, fallback: string, t: ReturnType<typeof useTranslation>["t"]): string {
+  if (error instanceof Error) {
+    if (error.message.startsWith("auth.") || error.message.startsWith("common.")) {
+      return t(error.message as TranslationKey);
+    }
+
+    return error.message;
+  }
+
+  return fallback;
+}
 
 export function MobileAuthShell() {
+  const { t } = useTranslation();
   const [tenantCode, setTenantCode] = useState<string | null>(null);
   const [session, setSession] = useState<SessionView | null>(null);
   const [tenantInput, setTenantInput] = useState("");
@@ -47,6 +56,17 @@ export function MobileAuthShell() {
   const [error, setError] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
   const [isPending, startTransition] = useTransition();
+
+  const loginModes = useMemo(
+    () =>
+      [
+        { value: "customer-otp", label: t("auth.login.customerOtp") },
+        { value: "customer-password", label: t("auth.login.customerPassword") },
+        { value: "driver", label: t("auth.login.driver") },
+        { value: "owner", label: t("auth.login.owner") },
+      ] satisfies { value: LoginMode; label: string }[],
+    [t],
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -62,7 +82,7 @@ export function MobileAuthShell() {
         setSession(state.session ? { authContext: state.session.authContext } : null);
       })
       .catch(() => {
-        setError("Impossible de relire la session locale.");
+        setError(t("auth.login.sessionReadFailed"));
       })
       .finally(() => {
         if (mounted) {
@@ -73,27 +93,27 @@ export function MobileAuthShell() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [t]);
 
   const activeLoginTitle = useMemo(() => {
     switch (mode) {
       case "customer-password":
-        return "Connexion client";
+        return t("auth.login.customerTitle");
       case "driver":
-        return "Connexion livreur";
+        return t("auth.login.driverTitle");
       case "owner":
-        return "Connexion owner";
+        return t("auth.login.ownerTitle");
       default:
-        return "Connexion par OTP";
+        return t("auth.login.otpTitle");
     }
-  }, [mode]);
+  }, [mode, t]);
 
   function runAction(action: () => Promise<void>) {
     setError(null);
     setMessage(null);
     startTransition(() => {
       void action().catch((nextError: unknown) => {
-        setError(nextError instanceof Error ? nextError.message : "Action impossible pour le moment.");
+        setError(getErrorMessage(nextError, t("common.errors.genericAction"), t));
       });
     });
   }
@@ -103,7 +123,7 @@ export function MobileAuthShell() {
     runAction(async () => {
       const nextTenantCode = await enterTenantContext(tenantInput);
       setTenantCode(nextTenantCode);
-      setMessage("Code pressing enregistré.");
+      setMessage(t("auth.tenant.saved"));
     });
   }
 
@@ -115,7 +135,7 @@ export function MobileAuthShell() {
     runAction(async () => {
       const response = await requestCustomerOtp({ tenantCode, phone });
       setTestOtp(response.code);
-      setMessage("Code envoyé. Le canal de test est affiché pour la recette MVP.");
+      setMessage(t("auth.login.otpSent"));
     });
   }
 
@@ -127,7 +147,7 @@ export function MobileAuthShell() {
     runAction(async () => {
       const response = await getCustomerTestOtp({ tenantCode, phone });
       setTestOtp(response.code);
-      setMessage("Code de test récupéré.");
+      setMessage(t("auth.login.testCodeFetched"));
     });
   }
 
@@ -135,7 +155,7 @@ export function MobileAuthShell() {
     event.preventDefault();
 
     if (!tenantCode) {
-      setError("Choisissez d'abord un pressing.");
+      setError(t("auth.login.chooseTenant"));
       return;
     }
 
@@ -150,7 +170,7 @@ export function MobileAuthShell() {
               : await loginOwner({ tenantCode, identifier, password });
 
       setSession(nextSession);
-      setMessage("Connexion réussie.");
+      setMessage(t("auth.login.success"));
     });
   }
 
@@ -160,7 +180,7 @@ export function MobileAuthShell() {
       setSession(null);
       setPassword("");
       setOtp("");
-      setMessage("Session fermée sur cet appareil.");
+      setMessage(t("auth.login.logoutSuccess"));
     });
   }
 
@@ -171,7 +191,7 @@ export function MobileAuthShell() {
       setTenantInput("");
       setSession(null);
       setTestOtp(null);
-      setMessage("Contexte pressing réinitialisé.");
+      setMessage(t("auth.tenant.reset"));
     });
   }
 
@@ -180,7 +200,7 @@ export function MobileAuthShell() {
       <main className="flex min-h-dvh items-center justify-center px-6">
         <div className="flex items-center gap-3 rounded-md border bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
           <Loader2 className="size-4 animate-spin text-teal-700" />
-          Chargement de l&apos;espace mobile
+          {t("auth.loading")}
         </div>
       </main>
     );
@@ -189,9 +209,10 @@ export function MobileAuthShell() {
   if (tenantCode && session) {
     return (
       <>
-        <div className="fixed right-4 top-[max(16px,env(safe-area-inset-top))] z-20">
+        <div className="fixed right-4 top-[max(16px,env(safe-area-inset-top))] z-20 flex flex-col items-end gap-2">
+          <LanguageSwitcher />
           <Button
-            aria-label="Se déconnecter"
+            aria-label={t("auth.logout")}
             className="size-11 rounded-md bg-white/95 p-0 shadow-sm backdrop-blur"
             disabled={isPending}
             type="button"
@@ -219,8 +240,11 @@ export function MobileAuthShell() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">CleanHub</p>
           <h1 className="mt-1 text-3xl font-semibold text-slate-950">Mobile</h1>
         </div>
-        <div className="flex size-11 items-center justify-center rounded-md bg-teal-700 text-white shadow-sm">
-          <PackageCheck className="size-5" aria-hidden="true" />
+        <div className="flex items-center gap-2">
+          <LanguageSwitcher />
+          <div className="flex size-11 items-center justify-center rounded-md bg-teal-700 text-white shadow-sm">
+            <PackageCheck className="size-5" aria-hidden="true" />
+          </div>
         </div>
       </header>
 
@@ -230,11 +254,11 @@ export function MobileAuthShell() {
             <Building2 className="size-4" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-slate-950">Pressing</p>
+            <p className="text-sm font-semibold text-slate-950">{t("auth.tenant.title")}</p>
             <p className="mt-1 text-sm leading-6 text-slate-600">
               {tenantCode
-                ? `Contexte actif: ${tenantCode}`
-                : "Entrez le code pressing remis par la boutique."}
+                ? t("auth.tenant.active", { tenantCode })
+                : t("auth.tenant.prompt")}
             </p>
           </div>
         </div>
@@ -242,7 +266,7 @@ export function MobileAuthShell() {
         {!tenantCode ? (
           <form className="mt-4 space-y-3" onSubmit={handleTenantSubmit}>
             <div className="space-y-2">
-              <Label htmlFor="tenant-code">Code pressing</Label>
+              <Label htmlFor="tenant-code">{t("auth.tenant.codeLabel")}</Label>
               <Input
                 id="tenant-code"
                 autoCapitalize="characters"
@@ -255,14 +279,14 @@ export function MobileAuthShell() {
               />
             </div>
             <Button className="h-12 w-full" disabled={isPending} type="submit">
-              Continuer
+              {t("common.continue")}
               <ChevronRight className="size-4" aria-hidden="true" />
             </Button>
           </form>
         ) : (
           <div className="mt-4 flex gap-2">
             <Button className="h-11 flex-1" disabled={isPending || Boolean(session)} variant="secondary" onClick={handleTenantReset}>
-              Changer
+              {t("common.change")}
             </Button>
           </div>
         )}
@@ -287,7 +311,7 @@ export function MobileAuthShell() {
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-950">{activeLoginTitle}</p>
-              <p className="text-sm text-slate-600">Jeton Bearer stocké localement après validation.</p>
+              <p className="text-sm text-slate-600">{t("auth.login.localToken")}</p>
             </div>
           </div>
 
@@ -316,7 +340,7 @@ export function MobileAuthShell() {
             {mode === "customer-otp" ? (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Téléphone</Label>
+                  <Label htmlFor="phone">{t("auth.login.phone")}</Label>
                   <Input
                     id="phone"
                     autoComplete="tel"
@@ -329,19 +353,19 @@ export function MobileAuthShell() {
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <Button className="h-11" disabled={isPending || !phone.trim()} type="button" variant="secondary" onClick={handleOtpRequest}>
-                    Envoyer
+                    {t("auth.login.sendOtp")}
                   </Button>
                   <Button className="h-11" disabled={isPending || !phone.trim()} type="button" variant="outline" onClick={handleOtpTestFetch}>
-                    Code test
+                    {t("auth.login.testCode")}
                   </Button>
                 </div>
                 {testOtp ? (
                   <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                    Code de recette: <span className="font-semibold">{testOtp}</span>
+                    {t("auth.login.recipeCode", { code: testOtp })}
                   </div>
                 ) : null}
                 <div className="space-y-2">
-                  <Label htmlFor="otp">Code OTP</Label>
+                  <Label htmlFor="otp">{t("auth.login.otpCode")}</Label>
                   <Input
                     id="otp"
                     autoComplete="one-time-code"
@@ -356,7 +380,7 @@ export function MobileAuthShell() {
             ) : (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="identifier">Téléphone ou email</Label>
+                  <Label htmlFor="identifier">{t("auth.login.identifier")}</Label>
                   <Input
                     id="identifier"
                     autoComplete="username"
@@ -367,7 +391,7 @@ export function MobileAuthShell() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="password">Mot de passe</Label>
+                  <Label htmlFor="password">{t("auth.login.password")}</Label>
                   <Input
                     id="password"
                     autoComplete="current-password"
@@ -382,7 +406,7 @@ export function MobileAuthShell() {
 
             <Button className="h-12 w-full" disabled={isPending} type="submit">
               {isPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <ShieldCheck className="size-4" aria-hidden="true" />}
-              Se connecter
+              {t("auth.login.submit")}
             </Button>
           </form>
         </section>

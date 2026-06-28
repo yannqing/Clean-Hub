@@ -8,6 +8,7 @@ import type {
   MobileSignDeliveryTaskRequest,
   MobileUpdateDeliveryStatusRequest,
 } from "@cleanhub/api-client";
+import type { TranslationKey } from "@cleanhub/i18n";
 import type { QueuedUploadableMedia } from "./lib/media-upload";
 
 export type DeliveryTaskStatus = MobileDeliveryTaskStatus;
@@ -67,7 +68,9 @@ export type DeliveryActionResult = {
   mode: DeliveryActionMode;
   result?: DeliveryMutationResult;
   queueItem?: DeliveryOfflineQueueItem;
-  message: string;
+  message?: string;
+  messageKey?: TranslationKey;
+  warningKey?: TranslationKey;
 };
 
 export type DeliveryQueueSummary = {

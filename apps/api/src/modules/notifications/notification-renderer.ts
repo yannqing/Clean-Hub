@@ -12,22 +12,40 @@ export type RenderedNotification = {
 };
 
 const TOKEN_PATTERN = /{{\s*([\w.]+)\s*}}/g;
+const legacyLocaleAliases = {
+  fr: [],
+  en: [],
+  "zh-CN": ["zh"],
+} as const satisfies Record<NotificationLocale, readonly string[]>;
 
-export function normalizeLocale(locale: string | null | undefined): string | null {
+export function normalizeLocale(
+  locale: string | null | undefined,
+): NotificationLocale | null {
   if (!locale) {
     return null;
   }
 
-  const normalized = locale.trim().toLowerCase();
+  const normalized = locale.trim().replace(/_/g, "-");
+  const lower = normalized.toLowerCase();
 
-  if (!normalized) {
+  if (!lower) {
     return null;
   }
 
-  const short = normalized.split("-")[0];
+  if (lower === "zh" || lower === "zh-cn" || lower === "zh-hans") {
+    return "zh-CN";
+  }
 
-  return SUPPORTED_NOTIFICATION_LOCALES.includes(short as NotificationLocale)
-    ? short
+  if (lower.startsWith("fr")) {
+    return "fr";
+  }
+
+  if (lower.startsWith("en")) {
+    return "en";
+  }
+
+  return SUPPORTED_NOTIFICATION_LOCALES.includes(normalized as NotificationLocale)
+    ? (normalized as NotificationLocale)
     : null;
 }
 
@@ -36,14 +54,21 @@ export function buildLocaleCandidates(input: {
   tenantDefaultLocale?: string | null;
   fallbackLocale?: string | null;
 }): string[] {
-  const candidates = [
+  const normalizedCandidates = [
     normalizeLocale(input.requestedLocale),
     normalizeLocale(input.tenantDefaultLocale),
     normalizeLocale(input.fallbackLocale),
     ...SUPPORTED_NOTIFICATION_LOCALES,
-  ].filter(Boolean) as string[];
+  ].filter(Boolean) as NotificationLocale[];
 
-  return [...new Set(candidates)];
+  return [
+    ...new Set(
+      normalizedCandidates.flatMap((locale) => [
+        locale,
+        ...legacyLocaleAliases[locale],
+      ]),
+    ),
+  ];
 }
 
 export function renderNotificationTemplate(
@@ -54,7 +79,7 @@ export function renderNotificationTemplate(
   return {
     title: renderText(template.titleTemplate, variables),
     content: renderText(template.contentTemplate, variables),
-    locale: template.locale,
+    locale: normalizeLocale(template.locale) ?? template.locale,
     fallbackUsed:
       Boolean(normalizeLocale(requestedLocale)) &&
       normalizeLocale(requestedLocale) !== normalizeLocale(template.locale),

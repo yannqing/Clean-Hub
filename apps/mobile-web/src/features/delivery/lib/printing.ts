@@ -2,6 +2,7 @@ import {
   buildDeliveryLabelText,
   buildDeliveryReceiptText,
   type DeliveryPrintTask,
+  type PrintLocale,
   type PortablePrinterDevice,
 } from "@cleanhub/hardware";
 
@@ -27,55 +28,71 @@ export const initialDeliveryPrinterState: DeliveryPrinterState = {
   error: null,
 };
 
-export function validateDeliveryPrintTask(task: DeliveryTaskDetail): string | null {
+export type DeliveryPrintMessages = {
+  connectFirst: string;
+  missingDocument: string;
+  missingInfo: string;
+  popupBlocked: string;
+  readyLabel: string;
+  readyReceipt: string;
+  webUnavailable: string;
+};
+
+export function validateDeliveryPrintTask(
+  task: DeliveryTaskDetail,
+  messages: Pick<DeliveryPrintMessages, "missingDocument" | "missingInfo">,
+): string | null {
   if (!task.id || !task.customerName || !task.address) {
-    return "La tache ne contient pas les informations indispensables.";
+    return messages.missingInfo;
   }
 
   if (!task.orderId && !task.ticketId) {
-    return "Ajoutez une commande ou un ticket avant impression.";
+    return messages.missingDocument;
   }
 
   return null;
 }
 
-export async function connectPortablePrinter(): Promise<DeliveryPrinterState> {
+export async function connectPortablePrinter(
+  messages: Pick<DeliveryPrintMessages, "webUnavailable">,
+): Promise<DeliveryPrinterState> {
   return {
     status: "unavailable",
     device: null,
-    error:
-      "Connexion Bluetooth indisponible dans cette vue web. Utilisez l'application native apres synchronisation Capacitor.",
+    error: messages.webUnavailable,
   };
 }
 
 export async function printDeliveryDocument(input: {
   task: DeliveryTaskDetail;
   document: DeliveryPrintDocument;
+  locale: PrintLocale;
+  messages: DeliveryPrintMessages;
   printer: DeliveryPrinterState;
 }): Promise<{ message: string }> {
-  const validationError = validateDeliveryPrintTask(input.task);
+  const validationError = validateDeliveryPrintTask(input.task, input.messages);
 
   if (validationError) {
     throw new Error(validationError);
   }
 
   if (!input.printer.device) {
-    throw new Error("Connectez une imprimante portable avant d'imprimer.");
+    throw new Error(input.messages.connectFirst);
   }
 
   const printable = toDeliveryPrintTask(input.task);
   const content =
     input.document === "label"
-      ? buildDeliveryLabelText(printable, { locale: "fr" })
-      : buildDeliveryReceiptText(printable, { locale: "fr" });
+      ? buildDeliveryLabelText(printable, { locale: input.locale })
+      : buildDeliveryReceiptText(printable, { locale: input.locale });
 
-  openBrowserPrintPreview(content, input.document);
+  openBrowserPrintPreview(content, input.document, input.locale, input.messages);
 
   return {
     message:
       input.document === "label"
-        ? "Etiquette preparee pour impression."
-        : "Recu prepare pour impression.",
+        ? input.messages.readyLabel
+        : input.messages.readyReceipt,
   };
 }
 
@@ -95,15 +112,20 @@ export function toDeliveryPrintTask(task: DeliveryTaskDetail): DeliveryPrintTask
   };
 }
 
-function openBrowserPrintPreview(content: string, document: DeliveryPrintDocument): void {
+function openBrowserPrintPreview(
+  content: string,
+  document: DeliveryPrintDocument,
+  locale: PrintLocale,
+  messages: Pick<DeliveryPrintMessages, "popupBlocked">,
+): void {
   const popup = window.open("", "_blank", "noopener,noreferrer,width=420,height=720");
 
   if (!popup) {
-    throw new Error("La fenetre d'impression a ete bloquee.");
+    throw new Error(messages.popupBlocked);
   }
 
   popup.document.write(`<!doctype html>
-<html lang="fr">
+<html lang="${locale}">
   <head>
     <meta charset="utf-8" />
     <title>CleanHub ${document}</title>

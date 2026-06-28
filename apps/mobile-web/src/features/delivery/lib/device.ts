@@ -1,3 +1,5 @@
+import type { TranslationKey } from "@cleanhub/i18n";
+
 import type { DeliveryCoordinates } from "../types";
 import { compressImage } from "./image-compression";
 
@@ -48,26 +50,27 @@ function getCapacitorPlugin<TPlugin>(name: string): TPlugin | null {
   return plugin ? (plugin as TPlugin) : null;
 }
 
-function getPermissionMessage(error: unknown, capability: "gps" | "camera"): string {
+function getPermissionWarningKey(error: unknown, capability: "gps" | "camera"): TranslationKey {
   if (!error) {
     return capability === "gps"
-      ? "Le module GPS natif n'est pas encore installé dans mobile-web. L'action peut partir sans position."
-      : "Le module caméra natif n'est pas encore installé dans mobile-web. Ajoutez une référence manuelle pour continuer.";
+      ? "delivery.device.gpsNativeMissing"
+      : "delivery.device.cameraNativeMissing";
   }
 
   return capability === "gps"
-    ? "Position indisponible ou permission refusée. L'action reste possible sans GPS."
-    : "Caméra indisponible ou permission refusée. Vous pouvez saisir une référence de preuve.";
+    ? "delivery.device.gpsPermissionDenied"
+    : "delivery.device.cameraPermissionDenied";
 }
 
 export async function getCurrentCoordinates(): Promise<{
   coordinates: DeliveryCoordinates | null;
   warning?: string;
+  warningKey?: TranslationKey;
 }> {
   if (typeof window === "undefined") {
     return {
       coordinates: null,
-      warning: "GPS indisponible pendant le rendu initial.",
+      warningKey: "delivery.device.gpsInitialUnavailable",
     };
   }
 
@@ -94,7 +97,7 @@ export async function getCurrentCoordinates(): Promise<{
 
       return {
         coordinates: null,
-        warning: getPermissionMessage(null, "gps"),
+        warningKey: getPermissionWarningKey(null, "gps"),
       };
     }
 
@@ -113,7 +116,7 @@ export async function getCurrentCoordinates(): Promise<{
   } catch (error) {
     return {
       coordinates: null,
-      warning: getPermissionMessage(error, "gps"),
+      warningKey: getPermissionWarningKey(error, "gps"),
     };
   }
 }
@@ -121,11 +124,12 @@ export async function getCurrentCoordinates(): Promise<{
 export async function captureDeliveryPhoto(): Promise<{
   photo: CapturePhotoResult | null;
   warning?: string;
+  warningKey?: TranslationKey;
 }> {
   if (typeof window === "undefined") {
     return {
       photo: null,
-      warning: "Caméra indisponible pendant le rendu initial.",
+      warningKey: "delivery.device.cameraInitialUnavailable",
     };
   }
 
@@ -135,7 +139,7 @@ export async function captureDeliveryPhoto(): Promise<{
     if (!camera) {
       return {
         photo: null,
-        warning: getPermissionMessage(null, "camera"),
+        warningKey: getPermissionWarningKey(null, "camera"),
       };
     }
 
@@ -149,7 +153,7 @@ export async function captureDeliveryPhoto(): Promise<{
     if (!photo.base64String) {
       return {
         photo: null,
-        warning: "Aucune photo reçue depuis la caméra.",
+        warningKey: "delivery.device.cameraNoPhoto",
       };
     }
 
@@ -170,7 +174,7 @@ export async function captureDeliveryPhoto(): Promise<{
   } catch (error) {
     return {
       photo: null,
-      warning: getPermissionMessage(error, "camera"),
+      warningKey: getPermissionWarningKey(error, "camera"),
     };
   }
 }

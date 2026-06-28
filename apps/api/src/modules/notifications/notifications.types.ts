@@ -1,4 +1,4 @@
-export const SUPPORTED_NOTIFICATION_LOCALES = ["fr", "en", "zh"] as const;
+export const SUPPORTED_NOTIFICATION_LOCALES = ["fr", "en", "zh-CN"] as const;
 
 export type NotificationLocale = (typeof SUPPORTED_NOTIFICATION_LOCALES)[number];
 

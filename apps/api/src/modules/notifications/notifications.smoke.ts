@@ -393,20 +393,45 @@ export async function runNotificationSmokeChecks(): Promise<void> {
   assert.equal(noConfig.enqueued, 0);
 
   repository.configs = [createConfig()];
-  repository.templates = [createTemplate("zh")];
-  const fallback = await service.publish(
-    createEvent({ relatedId: "order_zh", idempotencyKey: "order.created:zh" }),
+  repository.templates = [
+    createTemplate("zh-CN"),
+    createTemplate("zh", {
+      titleTemplate: "Legacy order {{orderNo}}",
+    }),
+  ];
+  const zhCanonical = await service.publish(
+    createEvent({
+      locale: "zh",
+      relatedId: "order_zh",
+      idempotencyKey: "order.created:zh",
+    }),
   );
+  const zhCanonicalNotification = [...repository.notifications.values()].at(-1);
 
-  assert.equal(fallback.enqueued, 1);
-  assert.equal([...repository.notifications.values()].at(-1)?.locale, "zh");
+  assert.equal(zhCanonical.enqueued, 1);
+  assert.equal(zhCanonicalNotification?.locale, "zh-CN");
+  assert.equal(zhCanonicalNotification?.templateId, "template_zh-CN");
+
+  repository.templates = [createTemplate("zh")];
+  const zhLegacy = await service.publish(
+    createEvent({
+      locale: "zh-Hans",
+      relatedId: "order_zh_legacy",
+      idempotencyKey: "order.created:zh-legacy",
+    }),
+  );
+  const zhLegacyNotification = [...repository.notifications.values()].at(-1);
+
+  assert.equal(zhLegacy.enqueued, 1);
+  assert.equal(zhLegacyNotification?.locale, "zh-CN");
+  assert.equal(zhLegacyNotification?.templateId, "template_zh");
 
   const deliveryResult = await service.processEmailDeliveries({
     now: new Date("2026-06-27T00:00:00.000Z"),
   });
 
-  assert.equal(deliveryResult.sent, 2);
-  assert.equal(adapter.sent.length, 2);
+  assert.equal(deliveryResult.sent, 3);
+  assert.equal(adapter.sent.length, 3);
   assert.equal([...repository.deliveries.values()][0]?.status, "sent");
   assert.equal([...repository.deliveries.values()][0]?.externalId, "message_1");
 

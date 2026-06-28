@@ -6,6 +6,7 @@ import type {
   MobileUploadDeliveryProofRequest,
 } from "@cleanhub/api-client";
 import { ApiNetworkError, ApiTimeoutError } from "@cleanhub/api-client";
+import type { TranslationKey } from "@cleanhub/i18n";
 
 import { apiClient } from "@/lib/api-client";
 import { getOrCreateDeviceId } from "@/lib/token-storage";
@@ -100,7 +101,7 @@ async function runOrQueue(
     return {
       mode: "queued",
       queueItem,
-      message: "Action enregistrée hors ligne. Elle sera synchronisée automatiquement.",
+      messageKey: "delivery.messages.offlineQueued",
     };
   }
 
@@ -111,9 +112,9 @@ async function runOrQueue(
     return {
       mode: "online",
       result,
-      message: result.idempotent
-        ? "Action déjà synchronisée."
-        : "Action synchronisée.",
+      messageKey: result.idempotent
+        ? "delivery.messages.alreadySynced"
+        : "delivery.messages.onlineSynced",
     };
   } catch (error) {
     if (!isOfflineError(error)) {
@@ -128,7 +129,7 @@ async function runOrQueue(
     return {
       mode: "queued",
       queueItem,
-      message: "Réseau indisponible. Action placée en attente de synchronisation.",
+      messageKey: "delivery.messages.networkQueued",
     };
   }
 }
@@ -158,7 +159,7 @@ async function applyQueuedOperation(payload: DeliveryOfflinePayload): Promise<vo
           : undefined;
 
     if (!mediaRef) {
-      throw new Error("Queued proof media is missing.");
+      throw new Error("delivery.messages.queuedProofMissing");
     }
 
     const result = await apiClient.mobile.delivery.uploadProof(
@@ -186,7 +187,7 @@ async function applyQueuedOperation(payload: DeliveryOfflinePayload): Promise<vo
         : undefined;
 
   if (!signatureMediaRef) {
-    throw new Error("Queued signature media is missing.");
+    throw new Error("delivery.messages.queuedSignatureMissing");
   }
 
   const result = await apiClient.mobile.delivery.signTask(
@@ -221,7 +222,7 @@ async function applyQueuedOperationItem(
     }
 
     if (!mediaRef) {
-      throw new Error("Queued proof media is missing.");
+      throw new Error("delivery.messages.queuedProofMissing");
     }
 
     const result = await apiClient.mobile.delivery.uploadProof(
@@ -252,7 +253,7 @@ async function applyQueuedOperationItem(
     }
 
     if (!signatureMediaRef) {
-      throw new Error("Queued signature media is missing.");
+      throw new Error("delivery.messages.queuedSignatureMissing");
     }
 
     const result = await apiClient.mobile.delivery.signTask(
@@ -271,7 +272,7 @@ async function applyQueuedOperationItem(
 
 export async function updateDeliveryStatus(
   input: StatusInput,
-): Promise<DeliveryActionResult & { gpsWarning?: string }> {
+): Promise<DeliveryActionResult & { gpsWarning?: string; gpsWarningKey?: TranslationKey }> {
   const [deviceId, gps] = await Promise.all([
     getOrCreateDeviceId(),
     getCurrentCoordinates(),
@@ -299,6 +300,7 @@ export async function updateDeliveryStatus(
   return {
     ...actionResult,
     gpsWarning: gps.warning,
+    gpsWarningKey: gps.warningKey,
   };
 }
 
@@ -308,7 +310,7 @@ export async function uploadDeliveryProof(
   const existingMediaRef = input.mediaRef?.trim();
 
   if (!input.media && !existingMediaRef) {
-    throw new Error("Proof media is required.");
+    throw new Error("delivery.messages.proofMediaRequired");
   }
 
   if (existingMediaRef && !input.media) {
@@ -359,13 +361,13 @@ export async function uploadDeliveryProof(
 
 export async function signDeliveryTask(
   input: SignatureInput,
-): Promise<DeliveryActionResult & { gpsWarning?: string }> {
+): Promise<DeliveryActionResult & { gpsWarning?: string; gpsWarningKey?: TranslationKey }> {
   const [deviceId, gps] = await Promise.all([
     getOrCreateDeviceId(),
     getCurrentCoordinates(),
   ]);
   if (!input.signatureMedia && !input.signatureMediaRef?.trim()) {
-    throw new Error("Signature media is required.");
+    throw new Error("delivery.messages.signatureMediaRequired");
   }
 
   const request: Omit<MobileSignDeliveryTaskRequest, "signatureMediaRef"> = withCoordinates(
@@ -404,6 +406,7 @@ export async function signDeliveryTask(
   return {
     ...actionResult,
     gpsWarning: gps.warning,
+    gpsWarningKey: gps.warningKey,
   };
 }
 

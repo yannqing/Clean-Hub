@@ -7,6 +7,8 @@ import type {
   MobileOwnerTodaySummary,
   MobileRefundRequest,
 } from "@cleanhub/api-client";
+import type { SupportedLocale, TranslationKey } from "@cleanhub/i18n";
+import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Badge,
   Button,
@@ -89,55 +91,40 @@ type ActionTarget =
   | { kind: "reject-refund"; refundRequest: MobileRefundRequest };
 
 const numberFormatter = new Intl.NumberFormat("fr-FR");
-const moneyFormatter = new Intl.NumberFormat("fr-FR", {
-  style: "currency",
-  currency: "XOF",
-  maximumFractionDigits: 0,
-});
-const dateFormatter = new Intl.DateTimeFormat("fr-FR", {
-  weekday: "long",
-  day: "2-digit",
-  month: "long",
-});
-const dateTimeFormatter = new Intl.DateTimeFormat("fr-FR", {
-  day: "2-digit",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-const timeFormatter = new Intl.DateTimeFormat("fr-FR", {
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-const tenantStatusLabels: Record<MobileOwnerTodaySummary["tenantStatus"], string> = {
-  active: "Actif",
-  disabled: "Désactivé",
-  suspended: "Suspendu",
+const intlLocales: Record<SupportedLocale, string> = {
+  fr: "fr-FR",
+  en: "en-US",
+  "zh-CN": "zh-CN",
 };
 
-const appointmentStatusLabels: Record<OwnerAppointmentStatus, string> = {
-  accepted: "Accepté",
-  cancelled: "Annulé",
-  done: "Terminé",
-  pending: "À valider",
-  rejected: "Refusé",
+const tenantStatusLabelKeys: Record<MobileOwnerTodaySummary["tenantStatus"], TranslationKey> = {
+  active: "owner.tenantStatus.active",
+  disabled: "owner.tenantStatus.disabled",
+  suspended: "owner.tenantStatus.suspended",
 };
 
-const deliveryStatusLabels: Record<MobileDeliveryTaskStatus, string> = {
-  arrived: "Arrivé",
-  cancelled: "Annulé",
-  delivering: "Livraison",
-  en_route: "En route",
-  exception: "Exception",
-  pending_dispatch: "À répartir",
-  picked_up: "Collecté",
-  signed: "Signé",
+const appointmentStatusLabelKeys: Record<OwnerAppointmentStatus, TranslationKey> = {
+  accepted: "owner.appointmentStatus.accepted",
+  cancelled: "owner.appointmentStatus.cancelled",
+  done: "owner.appointmentStatus.done",
+  pending: "owner.appointmentStatus.pending",
+  rejected: "owner.appointmentStatus.rejected",
 };
 
-const taskTypeLabels: Record<OwnerDispatchTask["type"], string> = {
-  dropoff: "Dépôt",
-  pickup: "Collecte",
+const deliveryStatusLabelKeys: Record<MobileDeliveryTaskStatus, TranslationKey> = {
+  arrived: "owner.deliveryStatus.arrived",
+  cancelled: "owner.deliveryStatus.cancelled",
+  delivering: "owner.deliveryStatus.delivering",
+  en_route: "owner.deliveryStatus.en_route",
+  exception: "owner.deliveryStatus.exception",
+  pending_dispatch: "owner.deliveryStatus.pending_dispatch",
+  picked_up: "owner.deliveryStatus.picked_up",
+  signed: "owner.deliveryStatus.signed",
+};
+
+const taskTypeLabelKeys: Record<OwnerDispatchTask["type"], TranslationKey> = {
+  dropoff: "owner.taskType.dropoff",
+  pickup: "owner.taskType.pickup",
 };
 
 const toneClasses: Record<MetricItem["tone"], string> = {
@@ -162,15 +149,19 @@ const statusBadgeClasses: Record<string, string> = {
   signed: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
-function formatCount(value: number): string {
-  return numberFormatter.format(value);
+function formatCount(value: number, locale?: string): string {
+  return locale ? new Intl.NumberFormat(locale).format(value) : numberFormatter.format(value);
 }
 
-function formatMoney(value: number): string {
-  return moneyFormatter.format(value);
+function formatMoney(value: number, locale: string): string {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency: "XOF",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
 
-function formatBusinessDate(value: string): string {
+function formatBusinessDate(value: string, locale: string): string {
   const [year, month, day] = value.split("-").map(Number);
   const date =
     year && month && day ? new Date(year, month - 1, day) : new Date(value);
@@ -179,55 +170,75 @@ function formatBusinessDate(value: string): string {
     return value;
   }
 
-  return dateFormatter.format(date);
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+  }).format(date);
 }
 
-function formatDateTime(value: string | null): string {
+function formatDateTime(value: string | null, locale: string, fallback: string): string {
   if (!value) {
-    return "Non planifié";
+    return fallback;
   }
 
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : dateTimeFormatter.format(date);
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat(locale, {
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(date);
 }
 
-function formatLoadTime(value: Date | null): string | null {
-  return value ? timeFormatter.format(value) : null;
+function formatLoadTime(value: Date | null, locale: string): string | null {
+  return value
+    ? new Intl.DateTimeFormat(locale, {
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(value)
+    : null;
 }
 
-function getErrorMessage(error: unknown): string {
+function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error
     ? error.message
-    : "Impossible de charger les données owner pour le moment.";
+    : fallback;
 }
 
-function createMetrics(summary: MobileOwnerTodaySummary): MetricItem[] {
+function createMetrics(
+  summary: MobileOwnerTodaySummary,
+  t: ReturnType<typeof useTranslation>["t"],
+  locale: string,
+): MetricItem[] {
   return [
     {
-      label: "Commandes",
-      value: formatCount(summary.todayOrderCount),
-      detail: "Aujourd'hui",
+      label: t("owner.metrics.orders"),
+      value: formatCount(summary.todayOrderCount, locale),
+      detail: t("owner.today"),
       icon: PackageCheck,
       tone: "teal",
     },
     {
-      label: "CA",
-      value: formatMoney(summary.todayRevenueAmount),
-      detail: "Aujourd'hui",
+      label: t("owner.metrics.revenue"),
+      value: formatMoney(summary.todayRevenueAmount, locale),
+      detail: t("owner.today"),
       icon: TrendingUp,
       tone: "emerald",
     },
     {
-      label: "À récupérer",
-      value: formatCount(summary.pendingPickupCount),
-      detail: "Attente",
+      label: t("owner.metrics.pickup"),
+      value: formatCount(summary.pendingPickupCount, locale),
+      detail: t("owner.waiting"),
       icon: Shirt,
       tone: "amber",
     },
     {
-      label: "En cours",
-      value: formatCount(summary.inProgressOrderCount),
-      detail: "Atelier",
+      label: t("owner.metrics.progress"),
+      value: formatCount(summary.inProgressOrderCount, locale),
+      detail: t("owner.workshop"),
       icon: Clock3,
       tone: "sky",
     },
@@ -291,11 +302,13 @@ function MetricTile({ metric }: { metric: MetricItem }) {
 }
 
 function SummaryRow({ label, value }: { label: string; value: number }) {
+  const { locale } = useTranslation();
+
   return (
     <div className="flex min-h-10 items-center justify-between gap-3 border-b border-slate-100 py-2 last:border-b-0">
       <span className="text-sm text-slate-600">{label}</span>
       <span className="text-base font-semibold tabular-nums text-slate-950">
-        {formatCount(value)}
+        {formatCount(value, intlLocales[locale])}
       </span>
     </div>
   );
@@ -335,6 +348,9 @@ function AppointmentItem({
   appointment: OwnerAppointmentListItem;
   onAction: (target: ActionTarget) => void;
 }) {
+  const { locale, t } = useTranslation();
+  const intlLocale = intlLocales[locale];
+  const notScheduled = t("owner.notScheduled");
   const isPending = appointment.status === "pending";
 
   return (
@@ -345,16 +361,16 @@ function AppointmentItem({
             {appointment.customerName}
           </p>
           <p className="mt-1 truncate text-xs text-slate-600">
-            {formatDateTime(appointment.scheduledAt ?? appointment.requestedAt)}
+            {formatDateTime(appointment.scheduledAt ?? appointment.requestedAt, intlLocale, notScheduled)}
           </p>
         </div>
         <StatusBadge
-          label={appointmentStatusLabels[appointment.status]}
+          label={t(appointmentStatusLabelKeys[appointment.status])}
           status={appointment.status}
         />
       </div>
       <p className="mt-3 line-clamp-2 text-sm text-slate-700">
-        {appointment.address || appointment.notes || "Adresse à confirmer"}
+        {appointment.address || appointment.notes || t("owner.addressToConfirm")}
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <Button
@@ -365,7 +381,7 @@ function AppointmentItem({
           onClick={() => onAction({ kind: "accept-appointment", appointment })}
         >
           <UserRoundCheck className="size-4" aria-hidden />
-          Accepter
+          {t("owner.actions.accept")}
         </Button>
         <Button
           className="w-full"
@@ -376,7 +392,7 @@ function AppointmentItem({
           onClick={() => onAction({ kind: "reject-appointment", appointment })}
         >
           <XCircle className="size-4" aria-hidden />
-          Refuser
+          {t("owner.actions.reject")}
         </Button>
       </div>
     </div>
@@ -390,6 +406,8 @@ function DispatchTaskItem({
   onAction: (target: ActionTarget) => void;
   task: OwnerDispatchTask;
 }) {
+  const { locale, t } = useTranslation();
+  const intlLocale = intlLocales[locale];
   const canAssign = task.status === "pending_dispatch";
   const canCancel = task.status !== "cancelled" && task.status !== "signed";
 
@@ -398,20 +416,20 @@ function DispatchTaskItem({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{taskTypeLabels[task.type]}</Badge>
-            <StatusBadge label={deliveryStatusLabels[task.status]} status={task.status} />
+            <Badge variant="outline">{t(taskTypeLabelKeys[task.type])}</Badge>
+            <StatusBadge label={t(deliveryStatusLabelKeys[task.status])} status={task.status} />
           </div>
           <p className="mt-2 truncate text-sm font-semibold text-slate-950">
             {task.customerName}
           </p>
           <p className="mt-1 truncate text-xs text-slate-600">
-            {formatDateTime(task.expectedAt)}
+            {formatDateTime(task.expectedAt, intlLocale, t("owner.notScheduled"))}
           </p>
         </div>
       </div>
       <p className="mt-3 line-clamp-2 text-sm text-slate-700">{task.address}</p>
       <p className="mt-2 truncate text-xs text-slate-500">
-        Assigné: {task.assigneeName || task.assigneeUserId || "Non assigné"}
+        {t("owner.assigned")}: {task.assigneeName || task.assigneeUserId || t("owner.unassigned")}
       </p>
       <div className="mt-3 grid grid-cols-3 gap-2">
         <Button
@@ -422,7 +440,7 @@ function DispatchTaskItem({
           onClick={() => onAction({ kind: "dispatch-task", task })}
         >
           <Send className="size-4" aria-hidden />
-          Dispatch
+          {t("owner.actions.dispatch")}
         </Button>
         <Button
           className="w-full px-2"
@@ -433,7 +451,7 @@ function DispatchTaskItem({
           onClick={() => onAction({ kind: "reassign-task", task })}
         >
           <Route className="size-4" aria-hidden />
-          Refaire
+          {t("owner.actions.reassign")}
         </Button>
         <Button
           className="w-full px-2"
@@ -444,7 +462,7 @@ function DispatchTaskItem({
           onClick={() => onAction({ kind: "cancel-task", task })}
         >
           <XCircle className="size-4" aria-hidden />
-          Annuler
+          {t("owner.actions.cancel")}
         </Button>
       </div>
     </div>
@@ -458,18 +476,21 @@ function RefundRequestItem({
   onAction: (target: ActionTarget) => void;
   refundRequest: MobileRefundRequest;
 }) {
+  const { locale, t } = useTranslation();
+  const intlLocale = intlLocales[locale];
+
   return (
     <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-semibold text-slate-950">
-            Commande {refundRequest.orderId.slice(-6).toUpperCase()}
+            {t("customer.detail.orderPrefix", { id: refundRequest.orderId.slice(-6).toUpperCase() })}
           </p>
           <p className="mt-1 text-xs text-slate-600">
-            {formatDateTime(refundRequest.createdAt)}
+            {formatDateTime(refundRequest.createdAt, intlLocale, t("owner.notScheduled"))}
           </p>
         </div>
-        <StatusBadge label="À approuver" status={refundRequest.status} />
+        <StatusBadge label={t("owner.actions.approveRefund")} status={refundRequest.status} />
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="text-sm text-slate-700">{refundRequest.reason}</p>
@@ -485,7 +506,7 @@ function RefundRequestItem({
           onClick={() => onAction({ kind: "approve-refund", refundRequest })}
         >
           <CheckCircle2 className="size-4" aria-hidden />
-          Approuver
+          {t("owner.actions.approveRefund")}
         </Button>
         <Button
           className="w-full"
@@ -495,7 +516,7 @@ function RefundRequestItem({
           onClick={() => onAction({ kind: "reject-refund", refundRequest })}
         >
           <XCircle className="size-4" aria-hidden />
-          Refuser
+          {t("owner.actions.rejectRefund")}
         </Button>
       </div>
     </div>
@@ -510,36 +531,36 @@ function EmptyState({ message }: { message: string }) {
   );
 }
 
-function getActionTitle(target: ActionTarget | null): string {
+function getActionTitleKey(target: ActionTarget | null): TranslationKey {
   if (!target) {
-    return "Action owner";
+    return "owner.actions.actionOwner";
   }
 
   if (target.kind === "accept-appointment") {
-    return "Accepter le rendez-vous";
+    return "owner.actions.acceptAppointment";
   }
   if (target.kind === "reject-appointment") {
-    return "Refuser le rendez-vous";
+    return "owner.actions.rejectAppointment";
   }
   if (target.kind === "dispatch-task") {
-    return "Dispatcher la tâche";
+    return "owner.actions.dispatchTask";
   }
   if (target.kind === "reassign-task") {
-    return "Réassigner la tâche";
+    return "owner.actions.reassignTask";
   }
   if (target.kind === "approve-refund") {
-    return "Approuver le remboursement";
+    return "owner.actions.approveRefundTitle";
   }
   if (target.kind === "reject-refund") {
-    return "Refuser le remboursement";
+    return "owner.actions.rejectRefundTitle";
   }
 
-  return "Annuler la tâche";
+  return "owner.actions.cancelTask";
 }
 
-function getActionSubject(target: ActionTarget | null): string {
+function getActionSubject(target: ActionTarget | null, fallback: string): string {
   if (!target) {
-    return "Sélectionnez un élément";
+    return fallback;
   }
 
   if (
@@ -586,6 +607,7 @@ function ActionSheet({
   onReasonChange: (value: string) => void;
   target: ActionTarget | null;
 }) {
+  const { t } = useTranslation();
   const needsAssignee =
     target?.kind === "accept-appointment" ||
     target?.kind === "dispatch-task" ||
@@ -601,15 +623,15 @@ function ActionSheet({
         <div className="flex max-h-[88dvh] flex-col">
           <div className="p-5">
             <SheetHeader className="pr-8 text-left">
-              <SheetTitle>{getActionTitle(target)}</SheetTitle>
-              <SheetDescription>{getActionSubject(target)}</SheetDescription>
+              <SheetTitle>{t(getActionTitleKey(target))}</SheetTitle>
+              <SheetDescription>{getActionSubject(target, t("owner.actions.selectItem"))}</SheetDescription>
             </SheetHeader>
 
             <div className="mt-5 space-y-4">
               {needsAssignee ? (
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700">
-                    ID livreur
+                    {t("owner.forms.assigneeId")}
                   </span>
                   <Input
                     className="mt-2"
@@ -622,20 +644,24 @@ function ActionSheet({
 
               {needsReason ? (
                 <label className="block">
-                  <span className="text-sm font-medium text-slate-700">Motif</span>
+                  <span className="text-sm font-medium text-slate-700">
+                    {t("owner.forms.reason")}
+                  </span>
                   <Textarea
                     className="mt-2 min-h-24"
-                    placeholder="Pourquoi cette action est nécessaire ?"
+                    placeholder={t("owner.forms.reasonPlaceholder")}
                     value={reason}
                     onChange={(event) => onReasonChange(event.target.value)}
                   />
                 </label>
               ) : (
                 <label className="block">
-                  <span className="text-sm font-medium text-slate-700">Note</span>
+                  <span className="text-sm font-medium text-slate-700">
+                    {t("owner.forms.note")}
+                  </span>
                   <Textarea
                     className="mt-2 min-h-24"
-                    placeholder="Consigne optionnelle"
+                    placeholder={t("owner.forms.notePlaceholder")}
                     value={note}
                     onChange={(event) => onNoteChange(event.target.value)}
                   />
@@ -660,7 +686,7 @@ function ActionSheet({
               {isSubmitting ? (
                 <Loader2 className="size-4 animate-spin" aria-hidden />
               ) : null}
-              Confirmer
+              {t("owner.actions.confirm")}
             </Button>
           </SheetFooter>
         </div>
@@ -670,6 +696,8 @@ function ActionSheet({
 }
 
 export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
+  const { locale, t } = useTranslation();
+  const intlLocale = intlLocales[locale];
   const [summary, setSummary] = useState<MobileOwnerTodaySummary | null>(initialSummary);
   const [boardState, setBoardState] = useState<BoardState>({
     appointments: [],
@@ -694,7 +722,10 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("");
 
-  const metrics = useMemo(() => (summary ? createMetrics(summary) : []), [summary]);
+  const metrics = useMemo(
+    () => (summary ? createMetrics(summary, t, intlLocale) : []),
+    [intlLocale, summary, t],
+  );
   const dispatchSummary = useMemo(
     () => getDispatchSummary(boardState.dispatchBoard),
     [boardState.dispatchBoard],
@@ -702,7 +733,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
   const visibleAppointments = boardState.appointments.slice(0, 5);
   const visibleTasks = boardState.dispatchBoard?.data.slice(0, 8) ?? [];
   const visibleRefundRequests = boardState.refundRequests.slice(0, 5);
-  const loadTime = formatLoadTime(lastLoadedAt);
+  const loadTime = formatLoadTime(lastLoadedAt, intlLocale);
 
   const loadSummary = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
@@ -722,13 +753,13 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
         return;
       }
 
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
     } finally {
       if (!signal?.aborted) {
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [t]);
 
   const loadBoard = useCallback(
     async (signal?: AbortSignal) => {
@@ -751,7 +782,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
           }
         } catch (nextError) {
           if (!signal?.aborted) {
-            setError(getErrorMessage(nextError));
+            setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
           }
         } finally {
           if (!signal?.aborted) {
@@ -793,14 +824,14 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
           return;
         }
 
-        setError(getErrorMessage(nextError));
+        setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
       } finally {
         if (!signal?.aborted) {
           setIsBoardLoading(false);
         }
       }
     },
-    [assigneeFilter, branchId, deliveryStatusFilter],
+    [assigneeFilter, branchId, deliveryStatusFilter, t],
   );
 
   useEffect(() => {
@@ -859,7 +890,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
       ) &&
       !cleanAssigneeUserId
     ) {
-      setActionError("Indiquez l'ID du livreur.");
+      setActionError(t("owner.messages.assigneeRequired"));
       return;
     }
 
@@ -869,7 +900,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
       ) &&
       !cleanReason
     ) {
-      setActionError("Indiquez le motif.");
+      setActionError(t("owner.messages.reasonRequired"));
       return;
     }
 
@@ -917,7 +948,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
       setActionTarget(null);
       await Promise.all([loadSummary(), loadBoard()]);
     } catch (nextError) {
-      setActionError(getErrorMessage(nextError));
+      setActionError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
     } finally {
       setIsSubmitting(false);
     }
@@ -929,17 +960,17 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
             <Truck className="size-4" aria-hidden />
-            Dispatch owner
+            {t("owner.dispatchOwner")}
           </p>
           <h1 className="mt-2 text-3xl font-semibold leading-tight text-slate-950">
-            Opérations du jour
+            {t("owner.operationsToday")}
           </h1>
           <p className="mt-2 break-words text-sm leading-6 text-slate-600">
-            {summary ? summary.tenantName : "Chargement du pressing"}
+            {summary ? summary.tenantName : t("owner.loadingTenant")}
           </p>
         </div>
         <Button
-          aria-label="Actualiser"
+          aria-label={t("common.refresh")}
           className="size-11 shrink-0 p-0"
           disabled={isLoading || isBoardLoading}
           type="button"
@@ -959,11 +990,11 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
       {summary ? (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
           <span className="min-w-0 truncate text-slate-600">
-            {formatBusinessDate(summary.businessDate)}
+            {formatBusinessDate(summary.businessDate, intlLocale)}
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
             <CheckCircle2 className="size-3.5" aria-hidden />
-            {tenantStatusLabels[summary.tenantStatus]}
+            {t(tenantStatusLabelKeys[summary.tenantStatus])}
           </span>
         </div>
       ) : null}
@@ -980,7 +1011,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
       {isLoading && !summary ? (
         <div className="mt-8 flex items-center justify-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-6 text-sm text-slate-700 shadow-sm">
           <Loader2 className="size-4 animate-spin text-teal-700" aria-hidden />
-          Chargement des indicateurs
+          {t("owner.loadingMetrics")}
         </div>
       ) : null}
 
@@ -998,7 +1029,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
             <div className="grid gap-3">
               <label className="block">
                 <span className="text-sm font-medium text-slate-700">
-                  Branche
+                  {t("owner.branch")}
                 </span>
                 <Input
                   className="mt-2"
@@ -1010,18 +1041,18 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700">
-                    Livreur
+                    {t("owner.driver")}
                   </span>
                   <Input
                     className="mt-2"
-                    placeholder="Tous"
+                    placeholder={t("owner.all")}
                     value={assigneeFilter}
                     onChange={(event) => setAssigneeFilter(event.target.value)}
                   />
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700">
-                    Statut
+                    {t("common.status")}
                   </span>
                   <select
                     className="mt-2 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
@@ -1032,10 +1063,10 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
                       )
                     }
                   >
-                    <option value="">Tous</option>
-                    {Object.entries(deliveryStatusLabels).map(([value, label]) => (
+                    <option value="">{t("owner.all")}</option>
+                    {Object.entries(deliveryStatusLabelKeys).map(([value, labelKey]) => (
                       <option key={value} value={value}>
-                        {label}
+                        {t(labelKey)}
                       </option>
                     ))}
                   </select>
@@ -1046,20 +1077,22 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
 
           <OperationalCard
             icon={CalendarDays}
-            subtitle={`${formatCount(boardState.appointments.length)} rendez-vous`}
-            title="Rendez-vous"
+            subtitle={t("owner.appointmentCount", {
+              count: formatCount(boardState.appointments.length, intlLocale),
+            })}
+            title={t("owner.sections.appointments")}
           >
             <div className="mt-4">
-              <SummaryRow label="En attente" value={summary.appointmentSummary.pending} />
-              <SummaryRow label="Acceptés" value={summary.appointmentSummary.accepted} />
-              <SummaryRow label="Terminés" value={summary.appointmentSummary.done} />
-              <SummaryRow label="Annulés" value={summary.appointmentSummary.cancelled} />
+              <SummaryRow label={t("owner.appointmentStatus.pending")} value={summary.appointmentSummary.pending} />
+              <SummaryRow label={t("owner.appointmentStatus.accepted")} value={summary.appointmentSummary.accepted} />
+              <SummaryRow label={t("owner.appointmentStatus.done")} value={summary.appointmentSummary.done} />
+              <SummaryRow label={t("owner.appointmentStatus.cancelled")} value={summary.appointmentSummary.cancelled} />
             </div>
             <div className="mt-4 space-y-3">
               {!branchId.trim() ? (
-                <EmptyState message="Renseignez une branche pour charger les rendez-vous." />
+                <EmptyState message={t("owner.messages.branchRequiredAppointments")} />
               ) : isBoardLoading && !visibleAppointments.length ? (
-                <EmptyState message="Chargement des rendez-vous..." />
+                <EmptyState message={t("owner.messages.loadingAppointments")} />
               ) : visibleAppointments.length ? (
                 visibleAppointments.map((appointment) => (
                   <AppointmentItem
@@ -1069,7 +1102,7 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
                   />
                 ))
               ) : (
-                <EmptyState message="Aucun rendez-vous à traiter." />
+                <EmptyState message={t("owner.messages.noAppointments")} />
               )}
             </div>
           </OperationalCard>
@@ -1078,40 +1111,42 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
             icon={Truck}
             subtitle={
               summary.featureFlags.deliveryEnabled
-                ? "Service livraison actif"
-                : "Service livraison inactif"
+                ? t("owner.deliveryActive")
+                : t("owner.deliveryInactive")
             }
-            title="Dispatch livraison"
+            title={t("owner.sections.dispatch")}
           >
             <div className="mt-4">
-              <SummaryRow label="À répartir" value={dispatchSummary.pendingDispatch} />
-              <SummaryRow label="Assignées" value={dispatchSummary.assigned} />
-              <SummaryRow label="En tournée" value={dispatchSummary.inProgress} />
-              <SummaryRow label="Exceptions" value={dispatchSummary.exception} />
+              <SummaryRow label={t("owner.deliveryStatus.pending_dispatch")} value={dispatchSummary.pendingDispatch} />
+              <SummaryRow label={t("owner.assigned")} value={dispatchSummary.assigned} />
+              <SummaryRow label={t("owner.metrics.progress")} value={dispatchSummary.inProgress} />
+              <SummaryRow label={t("owner.deliveryStatus.exception")} value={dispatchSummary.exception} />
             </div>
             <div className="mt-4 space-y-3">
               {!branchId.trim() ? (
-                <EmptyState message="Renseignez une branche pour charger le dispatch." />
+                <EmptyState message={t("owner.messages.branchRequiredDispatch")} />
               ) : isBoardLoading && !visibleTasks.length ? (
-                <EmptyState message="Chargement du dispatch..." />
+                <EmptyState message={t("owner.messages.loadingDispatch")} />
               ) : visibleTasks.length ? (
                 visibleTasks.map((task) => (
                   <DispatchTaskItem key={task.id} task={task} onAction={openAction} />
                 ))
               ) : (
-                <EmptyState message="Aucune tâche de livraison dans ce filtre." />
+                <EmptyState message={t("owner.messages.noDeliveryTasks")} />
               )}
             </div>
           </OperationalCard>
 
           <OperationalCard
             icon={RotateCcw}
-            subtitle={`${formatCount(boardState.refundRequests.length)} demandes`}
-            title="Remboursements"
+            subtitle={t("owner.requestCount", {
+              count: formatCount(boardState.refundRequests.length, intlLocale),
+            })}
+            title={t("owner.sections.refunds")}
           >
             <div className="mt-4 space-y-3">
               {isBoardLoading && !visibleRefundRequests.length ? (
-                <EmptyState message="Chargement des remboursements..." />
+                <EmptyState message={t("owner.messages.loadingRefunds")} />
               ) : visibleRefundRequests.length ? (
                 visibleRefundRequests.map((refundRequest) => (
                   <RefundRequestItem
@@ -1121,14 +1156,14 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
                   />
                 ))
               ) : (
-                <EmptyState message="Aucune demande de remboursement en attente." />
+                <EmptyState message={t("owner.messages.noRefunds")} />
               )}
             </div>
           </OperationalCard>
 
           {loadTime ? (
             <p className="mt-4 text-center text-xs text-slate-500">
-              Mis à jour à {loadTime}
+              {t("owner.updatedAt", { time: loadTime })}
             </p>
           ) : null}
         </>

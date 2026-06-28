@@ -76,7 +76,7 @@ function getErrorMessage(error: unknown): string {
     return error;
   }
 
-  return "Synchronisation impossible pour le moment.";
+  return "delivery.messages.syncUnavailable";
 }
 
 async function loadSharedOfflineModule(): Promise<SharedOfflineModule | null> {
@@ -205,7 +205,7 @@ class LocalDeliveryQueue {
     await this.writeQueue(nextQueue);
 
     if (!failed) {
-      throw new Error("Operation hors ligne introuvable.");
+      throw new Error("delivery.messages.offlineOperationMissing");
     }
 
     return failed;

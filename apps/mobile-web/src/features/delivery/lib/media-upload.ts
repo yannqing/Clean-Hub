@@ -33,7 +33,7 @@ export async function uploadDeliveryMedia(input: {
   });
 
   if (!response.ok) {
-    throw new Error("Media upload failed.");
+    throw new Error("delivery.messages.mediaUploadFailed");
   }
 
   return ticket.objectKey;
@@ -47,7 +47,7 @@ export function dataUrlToUploadableMedia(
   const contentType = metadata?.match(/^data:([^;]+);base64$/)?.[1];
 
   if (!contentType || !base64) {
-    throw new Error("Invalid media data URL.");
+    throw new Error("delivery.messages.invalidMediaData");
   }
 
   const binary = atob(base64);
@@ -82,9 +82,9 @@ export function uploadableMediaToDataUrl(
         return;
       }
 
-      reject(new Error("Unable to encode media."));
+      reject(new Error("delivery.messages.mediaEncodeFailed"));
     };
-    reader.onerror = () => reject(reader.error ?? new Error("Unable to encode media."));
+    reader.onerror = () => reject(reader.error ?? new Error("delivery.messages.mediaEncodeFailed"));
     reader.readAsDataURL(media.blob);
   });
 }

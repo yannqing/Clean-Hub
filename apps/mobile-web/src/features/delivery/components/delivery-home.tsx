@@ -1,6 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { PrintLocale } from "@cleanhub/hardware";
+import type { TranslationKey } from "@cleanhub/i18n";
+import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Badge,
   Button,
@@ -74,17 +77,6 @@ type CapturedProofPhoto = {
 
 type DeliverySheet = "exception" | "proof" | "signature" | null;
 
-const statusLabels: Record<DeliveryTaskStatus, string> = {
-  pending_dispatch: "A préparer",
-  en_route: "En route",
-  arrived: "Sur place",
-  picked_up: "Collecté",
-  delivering: "En livraison",
-  signed: "Signé",
-  exception: "Exception",
-  cancelled: "Annulé",
-};
-
 const statusTone: Record<DeliveryTaskStatus, string> = {
   pending_dispatch: "border-amber-200 bg-amber-50 text-amber-800",
   en_route: "border-sky-200 bg-sky-50 text-sky-800",
@@ -96,65 +88,90 @@ const statusTone: Record<DeliveryTaskStatus, string> = {
   cancelled: "border-slate-200 bg-slate-50 text-slate-600",
 };
 
-const taskTypeLabels = {
-  pickup: "Collecte",
-  dropoff: "Livraison",
-} satisfies Record<DeliveryTaskListItem["type"], string>;
+const statusLabelKeys: Record<DeliveryTaskStatus, TranslationKey> = {
+  pending_dispatch: "delivery.status.pending_dispatch",
+  en_route: "delivery.status.en_route",
+  arrived: "delivery.status.arrived",
+  picked_up: "delivery.status.picked_up",
+  delivering: "delivery.status.delivering",
+  signed: "delivery.status.signed",
+  exception: "delivery.status.exception",
+  cancelled: "delivery.status.cancelled",
+};
+
+const taskTypeLabelKeys = {
+  pickup: "delivery.type.pickup",
+  dropoff: "delivery.type.dropoff",
+} satisfies Record<DeliveryTaskListItem["type"], TranslationKey>;
 
 const nextStatusOptions = {
-  pending_dispatch: [{ status: "en_route", label: "Départ" }],
-  en_route: [{ status: "arrived", label: "Arrivée" }],
-  arrived: [{ status: "picked_up", label: "Collecter" }],
-  picked_up: [{ status: "delivering", label: "Livrer" }],
+  pending_dispatch: [{ status: "en_route", labelKey: "delivery.nextStatus.en_route" }],
+  en_route: [{ status: "arrived", labelKey: "delivery.nextStatus.arrived" }],
+  arrived: [{ status: "picked_up", labelKey: "delivery.nextStatus.picked_up" }],
+  picked_up: [{ status: "delivering", labelKey: "delivery.nextStatus.delivering" }],
   delivering: [],
   signed: [],
   exception: [],
   cancelled: [],
 } satisfies Record<
   DeliveryTaskStatus,
-  { status: DeliveryTaskStatus; label: string }[]
+  { status: DeliveryTaskStatus; labelKey: TranslationKey }[]
 >;
 
-const proofTypeLabels = {
-  pickup: "Collecte",
-  dropoff: "Livraison",
-  signature: "Signature",
-} satisfies Record<DeliveryProofType, string>;
+const proofTypeLabelKeys = {
+  pickup: "delivery.type.pickup",
+  dropoff: "delivery.type.dropoff",
+  signature: "delivery.type.signature",
+} satisfies Record<DeliveryProofType, TranslationKey>;
 
-function formatDateTime(value: string | null): string {
+const intlLocales: Record<PrintLocale, string> = {
+  fr: "fr-FR",
+  en: "en-US",
+  "zh-CN": "zh-CN",
+};
+
+function formatDateTime(value: string | null, locale: string, emptyLabel: string): string {
   if (!value) {
-    return "Non planifié";
+    return emptyLabel;
   }
 
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
 }
 
-function formatMoney(value: string): string {
+function formatMoney(value: string, locale: string): string {
   const numericValue = Number(value);
 
   if (!Number.isFinite(numericValue)) {
     return value;
   }
 
-  return new Intl.NumberFormat("fr-FR", {
+  return new Intl.NumberFormat(locale, {
     style: "currency",
     currency: "EUR",
   }).format(numericValue);
 }
 
-function getErrorMessage(error: unknown): string {
+function getErrorMessage(error: unknown, fallback: string, t: ReturnType<typeof useTranslation>["t"]): string {
   if (error instanceof Error) {
+    if (error.message.startsWith("delivery.")) {
+      return t(error.message as TranslationKey);
+    }
+
     return error.message;
   }
 
   if (typeof error === "string") {
+    if (error.startsWith("delivery.")) {
+      return t(error as TranslationKey);
+    }
+
     return error;
   }
 
-  return "Action impossible pour le moment.";
+  return fallback;
 }
 
 function getTaskPendingCount(
@@ -197,6 +214,21 @@ function applyStatusToTask<TTask extends DeliveryTaskListItem | DeliveryTaskDeta
 }
 
 export function DeliveryHome({ driverName }: DeliveryHomeProps) {
+  const { locale, t } = useTranslation();
+  const intlLocale = intlLocales[locale];
+  const notScheduledLabel = t("common.notScheduled");
+  const printMessages = useMemo(
+    () => ({
+      connectFirst: t("delivery.printer.connectFirst"),
+      missingDocument: t("delivery.printer.missingDocument"),
+      missingInfo: t("delivery.printer.missingInfo"),
+      popupBlocked: t("delivery.printer.popupBlocked"),
+      readyLabel: t("delivery.printer.readyLabel"),
+      readyReceipt: t("delivery.printer.readyReceipt"),
+      webUnavailable: t("delivery.printer.webUnavailable"),
+    }),
+    [t],
+  );
   const [tasks, setTasks] = useState<DeliveryTaskListItem[]>([]);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<DeliveryTaskDetail | null>(null);
@@ -301,11 +333,11 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
     try {
       await Promise.all([refreshTasks(null), refreshQueue()]);
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("delivery.messages.loadFailed"), t));
     } finally {
       setIsBooting(false);
     }
-  }, [refreshQueue, refreshTasks]);
+  }, [refreshQueue, refreshTasks, t]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -317,7 +349,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
 
   const replayQueue = useCallback(async () => {
     if (!isOnline()) {
-      setWarning("Réseau indisponible. Les actions restent en attente.");
+      setWarning(t("delivery.messages.networkUnavailable"));
       return;
     }
 
@@ -335,18 +367,18 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
 
       if (result.failed) {
         setWarning(
-          `Synchronisation partielle: ${result.replayed.length} action(s), puis échec.`,
+          t("delivery.messages.syncPartial", { count: result.replayed.length }),
         );
         return;
       }
 
-      setMessage(`${result.replayed.length} action(s) synchronisée(s).`);
+      setMessage(t("delivery.messages.syncCount", { count: result.replayed.length }));
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("delivery.messages.genericAction"), t));
     } finally {
       setActiveAction(null);
     }
-  }, [refreshQueue, refreshTasks, selectedTaskId]);
+  }, [refreshQueue, refreshTasks, selectedTaskId, t]);
 
   useEffect(() => {
     function handleOnline() {
@@ -372,7 +404,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
     result: DeliveryActionResult,
     queuedStatus?: DeliveryTaskStatus,
   ) {
-    setMessage(result.message);
+    setMessage(result.messageKey ? t(result.messageKey) : result.message ?? t("delivery.messages.statusUpdated"));
 
     if (result.result?.task) {
       replaceTask(result.result.task);
@@ -397,7 +429,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
     try {
       await action();
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("delivery.messages.genericAction"), t));
     } finally {
       setActiveAction(null);
     }
@@ -422,8 +454,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
         note: statusNote,
       });
 
-      if (result.gpsWarning) {
-        setWarning(result.gpsWarning);
+      if (result.gpsWarningKey || result.gpsWarning) {
+        setWarning(result.gpsWarningKey ? t(result.gpsWarningKey) : result.gpsWarning ?? null);
       }
 
       setStatusNote("");
@@ -443,8 +475,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
         exceptionReason,
       });
 
-      if (result.gpsWarning) {
-        setWarning(result.gpsWarning);
+      if (result.gpsWarningKey || result.gpsWarning) {
+        setWarning(result.gpsWarningKey ? t(result.gpsWarningKey) : result.gpsWarning ?? null);
       }
 
       setExceptionReason("");
@@ -457,8 +489,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
     void runAction("camera", async () => {
       const result = await captureDeliveryPhoto();
 
-      if (result.warning) {
-        setWarning(result.warning);
+      if (result.warningKey || result.warning) {
+        setWarning(result.warningKey ? t(result.warningKey) : result.warning ?? null);
       }
 
       if (result.photo) {
@@ -470,7 +502,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
           },
           capturedAt: result.photo.capturedAt,
         });
-        setMessage("Photo prête à envoyer.");
+        setMessage(t("delivery.proof.captured"));
       }
     });
   }
@@ -483,7 +515,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
     }
 
     if (!proofPhoto && !proofMediaRef.trim()) {
-      setError("Ajoutez une photo ou une référence de preuve.");
+      setError(t("delivery.messages.proofReferenceRequired"));
       return;
     }
 
@@ -596,7 +628,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
     const canvas = signatureCanvasRef.current;
 
     if (!canvas || !hasSignatureRef.current) {
-      setError("Signature client requise.");
+      setError(t("delivery.messages.signatureRequired"));
       return;
     }
 
@@ -608,7 +640,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
             return;
           }
 
-          reject(new Error("Signature impossible à préparer."));
+          reject(new Error(t("delivery.messages.signaturePrepareFailed")));
         }, "image/png");
       });
       const result = await signDeliveryTask({
@@ -622,8 +654,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
         signedByName,
       });
 
-      if (result.gpsWarning) {
-        setWarning(result.gpsWarning);
+      if (result.gpsWarningKey || result.gpsWarning) {
+        setWarning(result.gpsWarningKey ? t(result.gpsWarningKey) : result.gpsWarning ?? null);
       }
 
       clearSignature();
@@ -635,7 +667,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
 
   function handleConnectPrinter() {
     void runAction("printer-connect", async () => {
-      const nextPrinter = await connectPortablePrinter();
+      const nextPrinter = await connectPortablePrinter(printMessages);
       setPrinter(nextPrinter);
 
       if (nextPrinter.error) {
@@ -645,8 +677,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
 
       setMessage(
         nextPrinter.device?.name
-          ? `Imprimante connectee: ${nextPrinter.device.name}`
-          : "Imprimante connectee.",
+          ? t("delivery.printer.connectedDevice", { name: nextPrinter.device.name })
+          : t("delivery.printer.connected"),
       );
     });
   }
@@ -656,7 +688,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
       return;
     }
 
-    const validationError = validateDeliveryPrintTask(selectedTask);
+    const validationError = validateDeliveryPrintTask(selectedTask, printMessages);
 
     if (validationError) {
       setError(validationError);
@@ -664,7 +696,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
     }
 
     if (!printer.device) {
-      setWarning("Connectez une imprimante portable avant d'imprimer.");
+      setWarning(t("delivery.printer.connectFirst"));
       return;
     }
 
@@ -672,6 +704,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
       const result = await printDeliveryDocument({
         task: selectedTask,
         document,
+        locale,
+        messages: printMessages,
         printer,
       });
       setMessage(result.message);
@@ -683,7 +717,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
       <section className="flex min-h-[70dvh] items-center justify-center px-5">
         <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
           <Loader2 className="size-4 animate-spin text-teal-700" aria-hidden="true" />
-          Chargement de la tournée
+          {t("delivery.loading")}
         </div>
       </section>
     );
@@ -694,10 +728,10 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
       <header className="mb-5 flex items-center justify-between gap-4">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
-            Livraison
+            {t("delivery.title")}
           </p>
           <h1 className="mt-1 text-3xl font-semibold text-slate-950">
-            Tournée du jour
+            {t("delivery.subtitle")}
           </h1>
           {driverName ? (
             <p className="mt-1 truncate text-sm text-slate-600">{driverName}</p>
@@ -717,8 +751,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
           )}
           <span className="truncate">
             {queue.count > 0
-              ? `${queue.count} en attente de sync`
-              : "Aucune action en attente"}
+              ? t("delivery.queuePending", { count: queue.count })
+              : t("delivery.queueEmpty")}
           </span>
         </div>
         <Button
@@ -734,13 +768,13 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
           ) : (
             <CloudUpload className="size-4" aria-hidden="true" />
           )}
-          Sync
+          {t("delivery.sync")}
         </Button>
       </div>
 
       {dataSource === "cache" ? (
         <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Données locales affichées.
+          {t("delivery.localData")}
         </p>
       ) : null}
       {error ? (
@@ -762,9 +796,11 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Aujourd&apos;hui</h2>
+            <h2 className="text-base font-semibold text-slate-950">
+              {t("delivery.today")}
+            </h2>
             <p className="text-sm text-slate-600">
-              {orderedTasks.length} tâche(s)
+              {t("delivery.taskCount", { count: orderedTasks.length })}
             </p>
           </div>
           <Button
@@ -786,7 +822,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
         <div className="mt-4 space-y-2">
           {orderedTasks.length === 0 ? (
             <div className="rounded-md border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500">
-              Aucune tâche assignée pour aujourd&apos;hui.
+              {t("delivery.noTasks")}
             </div>
           ) : (
             orderedTasks.map((task) => {
@@ -819,12 +855,12 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                     <span
                       className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusTone[task.status]}`}
                     >
-                      {statusLabels[task.status]}
+                      {t(statusLabelKeys[task.status])}
                     </span>
-                    <Badge variant="outline">{taskTypeLabels[task.type]}</Badge>
+                    <Badge variant="outline">{t(taskTypeLabelKeys[task.type])}</Badge>
                     {pendingCount > 0 ? (
                       <Badge className="bg-amber-100 text-amber-900" variant="secondary">
-                        {pendingCount} à synchroniser
+                        {t("delivery.pendingSync", { count: pendingCount })}
                       </Badge>
                     ) : null}
                   </div>
@@ -854,18 +890,18 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                     <span
                       className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusTone[selectedTask.status]}`}
                     >
-                      {statusLabels[selectedTask.status]}
+                      {t(statusLabelKeys[selectedTask.status])}
                     </span>
-                    <Badge variant="outline">{taskTypeLabels[selectedTask.type]}</Badge>
+                    <Badge variant="outline">{t(taskTypeLabelKeys[selectedTask.type])}</Badge>
                     {selectedTaskPendingCount > 0 ? (
                       <Badge className="bg-amber-100 text-amber-900" variant="secondary">
-                        {selectedTaskPendingCount} à synchroniser
+                        {t("delivery.pendingSync", { count: selectedTaskPendingCount })}
                       </Badge>
                     ) : null}
                   </div>
                   <SheetTitle>{selectedTask.customerName}</SheetTitle>
                   <SheetDescription>
-                    {formatDateTime(selectedTask.expectedAt)}
+                    {formatDateTime(selectedTask.expectedAt, intlLocale, notScheduledLabel)}
                   </SheetDescription>
                 </SheetHeader>
 
@@ -873,7 +909,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                   <div className="flex gap-3">
                     <Clock3 className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
                     <span className="text-slate-700">
-                      {formatDateTime(selectedTask.expectedAt)}
+                      {formatDateTime(selectedTask.expectedAt, intlLocale, notScheduledLabel)}
                     </span>
                   </div>
                   <div className="flex gap-3">
@@ -899,18 +935,18 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
 
                 <dl className="grid grid-cols-2 gap-3">
                   <div className="rounded-md bg-slate-50 p-3">
-                    <dt className="text-xs font-medium text-slate-500">Commande</dt>
+                    <dt className="text-xs font-medium text-slate-500">{t("delivery.order")}</dt>
                     <dd className="mt-1 truncate text-sm font-semibold text-slate-950">
                       {selectedTask.order?.id ?? selectedTask.orderId ?? "-"}
                     </dd>
                     {selectedTask.order ? (
                       <p className="mt-1 text-xs text-slate-600">
-                        {selectedTask.order.status} · {formatMoney(selectedTask.order.totalAmount)}
+                        {selectedTask.order.status} · {formatMoney(selectedTask.order.totalAmount, intlLocale)}
                       </p>
                     ) : null}
                   </div>
                   <div className="rounded-md bg-slate-50 p-3">
-                    <dt className="text-xs font-medium text-slate-500">Ticket</dt>
+                    <dt className="text-xs font-medium text-slate-500">{t("delivery.ticket")}</dt>
                     <dd className="mt-1 truncate text-sm font-semibold text-slate-950">
                       {selectedTask.ticket?.ticketNo ?? selectedTask.ticketId ?? "-"}
                     </dd>
@@ -929,11 +965,15 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                         <Printer className="size-4" aria-hidden="true" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-950">Imprimante</p>
+                        <p className="text-sm font-semibold text-slate-950">
+                          {t("delivery.printer.title")}
+                        </p>
                         <p className="truncate text-xs text-slate-600">
                           {printer.device?.name ??
                             printer.device?.id ??
-                            (printer.status === "unavailable" ? "Bluetooth indisponible" : "Non connectee")}
+                            (printer.status === "unavailable"
+                              ? t("delivery.printer.unavailable")
+                              : t("delivery.printer.notConnected"))}
                         </p>
                       </div>
                     </div>
@@ -966,7 +1006,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                       ) : (
                         <ReceiptText className="size-4" aria-hidden="true" />
                       )}
-                      Recu
+                      {t("delivery.printer.receipt")}
                     </Button>
                     <Button
                       className="h-11"
@@ -980,7 +1020,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                       ) : (
                         <PackageCheck className="size-4" aria-hidden="true" />
                       )}
-                      Etiquette
+                      {t("delivery.printer.label")}
                     </Button>
                   </div>
                 </section>
@@ -993,7 +1033,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                     onClick={() => setActiveSheet("exception")}
                   >
                     <AlertTriangle className="size-4" aria-hidden="true" />
-                    Exception
+                    {t("delivery.exception.title")}
                   </Button>
                   <Button
                     className="h-12 flex-col gap-1 text-xs"
@@ -1002,7 +1042,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                     onClick={() => setActiveSheet("proof")}
                   >
                     <Camera className="size-4" aria-hidden="true" />
-                    Photo
+                    {t("delivery.proof.title")}
                   </Button>
                   <Button
                     className="h-12 flex-col gap-1 text-xs"
@@ -1011,7 +1051,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                     onClick={() => setActiveSheet("signature")}
                   >
                     <PenLine className="size-4" aria-hidden="true" />
-                    Signature
+                    {t("delivery.signature.title")}
                   </Button>
                 </div>
               </div>
@@ -1022,17 +1062,17 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                     <Navigation className="size-4" aria-hidden="true" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-950">Statut</p>
-                    <p className="text-xs text-slate-600">{statusLabels[selectedTask.status]}</p>
+                    <p className="text-sm font-semibold text-slate-950">{t("common.status")}</p>
+                    <p className="text-xs text-slate-600">{t(statusLabelKeys[selectedTask.status])}</p>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="status-note">Note</Label>
+                  <Label htmlFor="status-note">{t("common.note")}</Label>
                   <Textarea
                     id="status-note"
                     className="min-h-16 text-base"
-                    placeholder="Optionnel"
+                    placeholder={t("common.optional")}
                     value={statusNote}
                     onChange={(event) => setStatusNote(event.target.value)}
                   />
@@ -1052,12 +1092,12 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                       ) : (
                         <MapPin className="size-4" aria-hidden="true" />
                       )}
-                      {option.label}
+                      {t(option.labelKey)}
                     </Button>
                   ))}
                   {nextStatusOptions[selectedTask.status].length === 0 ? (
                     <div className="col-span-2 rounded-md border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">
-                      Aucun passage de statut disponible.
+                      {t("delivery.messages.noNextStatus")}
                     </div>
                   ) : null}
                 </div>
@@ -1066,7 +1106,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
           ) : (
             <div className="flex min-h-[50dvh] items-center justify-center px-5 text-sm text-slate-600">
               <Loader2 className="mr-2 size-4 animate-spin text-teal-700" aria-hidden="true" />
-              Chargement du détail
+              {t("delivery.detailLoading")}
             </div>
           )}
         </SheetContent>
@@ -1087,11 +1127,11 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
           }}>
             <div className="space-y-4 px-5 pb-4 pt-2">
               <SheetHeader className="pr-8 text-left">
-                <SheetTitle>Exception</SheetTitle>
-                <SheetDescription>Indiquez le motif avant de bloquer la tâche.</SheetDescription>
+                <SheetTitle>{t("delivery.exception.title")}</SheetTitle>
+                <SheetDescription>{t("delivery.exception.description")}</SheetDescription>
               </SheetHeader>
               <div className="space-y-2">
-                <Label htmlFor="exception-reason">Motif</Label>
+                <Label htmlFor="exception-reason">{t("delivery.exception.reason")}</Label>
                 <Textarea
                   id="exception-reason"
                   className="min-h-28 text-base"
@@ -1112,7 +1152,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                 ) : (
                   <AlertTriangle className="size-4" aria-hidden="true" />
                 )}
-                Marquer exception
+                {t("delivery.exception.submit")}
               </Button>
             </div>
           </form>
@@ -1131,8 +1171,8 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
           <form className="flex min-h-full flex-col" onSubmit={handleProofSubmit}>
             <div className="space-y-4 px-5 pb-4 pt-2">
               <SheetHeader className="pr-8 text-left">
-                <SheetTitle>Preuve photo</SheetTitle>
-                <SheetDescription>Ajoutez une photo ou une référence média.</SheetDescription>
+                <SheetTitle>{t("delivery.proof.title")}</SheetTitle>
+                <SheetDescription>{t("delivery.proof.description")}</SheetDescription>
               </SheetHeader>
 
               <div className="grid grid-cols-2 gap-2">
@@ -1147,18 +1187,18 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                     type="button"
                     onClick={() => setProofType(type)}
                   >
-                    {proofTypeLabels[type]}
+                    {t(proofTypeLabelKeys[type])}
                   </button>
                 ))}
               </div>
 
               <div className="grid grid-cols-[1fr_auto] gap-2">
                 <div className="space-y-2">
-                  <Label htmlFor="proof-reference">Référence média</Label>
+                  <Label htmlFor="proof-reference">{t("delivery.proof.reference")}</Label>
                   <Input
                     id="proof-reference"
                     className="h-12 text-base"
-                    placeholder="preuve://..."
+                    placeholder={t("delivery.proof.referencePlaceholder")}
                     value={proofMediaRef}
                     onChange={(event) => setProofMediaRef(event.target.value)}
                   />
@@ -1180,7 +1220,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
 
               {proofPhoto ? (
                 <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                  Photo capturée.
+                  {t("delivery.proof.captured")}
                 </div>
               ) : null}
             </div>
@@ -1191,7 +1231,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                 ) : (
                   <PackageCheck className="size-4" aria-hidden="true" />
                 )}
-                Envoyer la preuve
+                {t("delivery.proof.submit")}
               </Button>
             </div>
           </form>
@@ -1211,12 +1251,12 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
           <form className="flex min-h-full flex-col" onSubmit={handleSignatureSubmit}>
             <div className="space-y-4 px-5 pb-4 pt-2">
               <SheetHeader className="pr-8 text-left">
-                <SheetTitle>Signature client</SheetTitle>
-                <SheetDescription>Faites signer le client sur l&apos;écran.</SheetDescription>
+                <SheetTitle>{t("delivery.signature.title")}</SheetTitle>
+                <SheetDescription>{t("delivery.signature.description")}</SheetDescription>
               </SheetHeader>
 
               <div className="space-y-2">
-                <Label htmlFor="signed-by">Nom du signataire</Label>
+                <Label htmlFor="signed-by">{t("delivery.signature.signer")}</Label>
                 <Input
                   id="signed-by"
                   className="h-12 text-base"
@@ -1226,7 +1266,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
               </div>
 
               <canvas
-                aria-label="Signature client"
+                aria-label={t("delivery.signature.canvasLabel")}
                 className="h-44 w-full touch-none rounded-md border border-slate-300 bg-white"
                 height={260}
                 ref={signatureCanvasRef}
@@ -1246,7 +1286,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                 variant="secondary"
                 onClick={clearSignature}
               >
-                Effacer
+                {t("delivery.signature.clear")}
               </Button>
               <Button className="h-12" disabled={Boolean(activeAction)} type="submit">
                 {activeAction === "signature" ? (
@@ -1254,7 +1294,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                 ) : (
                   <UserRound className="size-4" aria-hidden="true" />
                 )}
-                Terminer
+                {t("delivery.signature.submit")}
               </Button>
             </div>
           </form>

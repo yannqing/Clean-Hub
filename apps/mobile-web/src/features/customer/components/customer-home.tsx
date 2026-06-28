@@ -17,6 +17,8 @@ import type {
   MobileCustomerTicketListItem,
   MobileCustomerTicketStatus,
 } from "@cleanhub/api-client";
+import type { SupportedLocale, TranslationKey } from "@cleanhub/i18n";
+import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Badge,
   Button,
@@ -167,6 +169,8 @@ type StatusView = {
   className: string;
 };
 
+type Translator = ReturnType<typeof useTranslation>["t"];
+
 const emptyActivity: MobileCustomerActivityList = {
   orders: [],
   tickets: [],
@@ -174,7 +178,7 @@ const emptyActivity: MobileCustomerActivityList = {
 
 const emptyAddressForm: CustomerAddressFormState = {
   customerId: "",
-  label: "Maison",
+  label: "",
   contactName: "",
   contactPhone: "",
   addressLine1: "",
@@ -195,94 +199,77 @@ const emptyPasswordForm: CustomerPasswordFormState = {
   confirmPassword: "",
 };
 
-const tabs: { value: CustomerTab; label: string; icon: typeof Home }[] = [
-  { value: "resume", label: "Accueil", icon: Home },
-  { value: "orders", label: "Suivi", icon: ReceiptText },
-  { value: "appointments", label: "RDV", icon: CalendarClock },
-  { value: "profile", label: "Profil", icon: UserRound },
-];
-
-const orderStatusViews: Record<MobileCustomerOrderStatus, StatusView> = {
-  draft: {
-    label: "Brouillon",
-    className: "border-slate-200 bg-slate-50 text-slate-700",
-  },
-  received: {
-    label: "Recu",
-    className: "border-blue-200 bg-blue-50 text-blue-800",
-  },
-  paid: {
-    label: "Payee",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  },
-  delivered: {
-    label: "Livree",
-    className: "border-teal-200 bg-teal-50 text-teal-800",
-  },
-  cancelled: {
-    label: "Annulee",
-    className: "border-red-200 bg-red-50 text-red-700",
-  },
+const tabIcons: Record<CustomerTab, typeof Home> = {
+  resume: Home,
+  orders: ReceiptText,
+  appointments: CalendarClock,
+  profile: UserRound,
 };
 
-const ticketStatusViews: Record<MobileCustomerTicketStatus, StatusView> = {
-  draft: {
-    label: "Brouillon",
-    className: "border-slate-200 bg-slate-50 text-slate-700",
-  },
-  pending: {
-    label: "En attente",
-    className: "border-amber-200 bg-amber-50 text-amber-800",
-  },
-  in_progress: {
-    label: "En cours",
-    className: "border-blue-200 bg-blue-50 text-blue-800",
-  },
-  ready_to_pick: {
-    label: "Pret",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  },
-  picked_up: {
-    label: "Retire",
-    className: "border-teal-200 bg-teal-50 text-teal-800",
-  },
-  cancelled: {
-    label: "Annule",
-    className: "border-red-200 bg-red-50 text-red-700",
-  },
-  exception: {
-    label: "Incident",
-    className: "border-red-200 bg-red-50 text-red-700",
-  },
+const orderStatusClasses: Record<MobileCustomerOrderStatus, string> = {
+  draft: "border-slate-200 bg-slate-50 text-slate-700",
+  received: "border-blue-200 bg-blue-50 text-blue-800",
+  paid: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  delivered: "border-teal-200 bg-teal-50 text-teal-800",
+  cancelled: "border-red-200 bg-red-50 text-red-700",
 };
 
-const appointmentStatusViews: Record<MobileCustomerAppointmentStatus, StatusView> = {
-  pending: {
-    label: "En attente",
-    className: "border-amber-200 bg-amber-50 text-amber-800",
-  },
-  accepted: {
-    label: "Accepte",
-    className: "border-blue-200 bg-blue-50 text-blue-800",
-  },
-  cancelled: {
-    label: "Annule",
-    className: "border-red-200 bg-red-50 text-red-700",
-  },
-  done: {
-    label: "Termine",
-    className: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  },
+const ticketStatusClasses: Record<MobileCustomerTicketStatus, string> = {
+  draft: "border-slate-200 bg-slate-50 text-slate-700",
+  pending: "border-amber-200 bg-amber-50 text-amber-800",
+  in_progress: "border-blue-200 bg-blue-50 text-blue-800",
+  ready_to_pick: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  picked_up: "border-teal-200 bg-teal-50 text-teal-800",
+  cancelled: "border-red-200 bg-red-50 text-red-700",
+  exception: "border-red-200 bg-red-50 text-red-700",
 };
 
-const appointmentTypeViews: Record<MobileCustomerAppointmentType, string> = {
-  pickup: "Collecte a domicile",
-  dropoff: "Depot en boutique",
+const appointmentStatusClasses: Record<MobileCustomerAppointmentStatus, string> = {
+  pending: "border-amber-200 bg-amber-50 text-amber-800",
+  accepted: "border-blue-200 bg-blue-50 text-blue-800",
+  cancelled: "border-red-200 bg-red-50 text-red-700",
+  done: "border-emerald-200 bg-emerald-50 text-emerald-800",
 };
 
-function formatDateTime(value: string | null): string {
+const orderStatusKeys: Record<MobileCustomerOrderStatus, TranslationKey> = {
+  draft: "customer.status.order.draft",
+  received: "customer.status.order.received",
+  paid: "customer.status.order.paid",
+  delivered: "customer.status.order.delivered",
+  cancelled: "customer.status.order.cancelled",
+};
+
+const ticketStatusKeys: Record<MobileCustomerTicketStatus, TranslationKey> = {
+  draft: "customer.status.ticket.draft",
+  pending: "customer.status.ticket.pending",
+  in_progress: "customer.status.ticket.in_progress",
+  ready_to_pick: "customer.status.ticket.ready_to_pick",
+  picked_up: "customer.status.ticket.picked_up",
+  cancelled: "customer.status.ticket.cancelled",
+  exception: "customer.status.ticket.exception",
+};
+
+const appointmentStatusKeys: Record<MobileCustomerAppointmentStatus, TranslationKey> = {
+  pending: "customer.status.appointment.pending",
+  accepted: "customer.status.appointment.accepted",
+  cancelled: "customer.status.appointment.cancelled",
+  done: "customer.status.appointment.done",
+};
+
+const appointmentTypeKeys: Record<MobileCustomerAppointmentType, TranslationKey> = {
+  pickup: "customer.appointmentTypes.pickup",
+  dropoff: "customer.appointmentTypes.dropoff",
+};
+
+const intlLocales: Record<SupportedLocale, string> = {
+  fr: "fr-FR",
+  en: "en-US",
+  "zh-CN": "zh-CN",
+};
+
+function formatDateTime(value: string | null, locale = "fr-FR"): string {
   if (!value) {
-    return "Non planifie";
+    return "";
   }
 
   const date = new Date(value);
@@ -291,22 +278,26 @@ function formatDateTime(value: string | null): string {
     return value;
   }
 
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(date);
 }
 
-function formatDate(value: string): string {
+function formatDate(value: string, locale = "fr-FR"): string {
   const date = new Date(value);
 
   if (Number.isNaN(date.getTime())) {
     return value;
   }
 
-  return new Intl.DateTimeFormat("fr-FR", {
+  return new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
   }).format(date);
+}
+
+function getIntlLocale(locale: SupportedLocale): string {
+  return intlLocales[locale];
 }
 
 function getDefaultExpectedAt(): string {
@@ -323,12 +314,12 @@ function toDateTimeLocalValue(date: Date): string {
   )}:${pad(date.getMinutes())}`;
 }
 
-function getErrorMessage(error: unknown): string {
+function getErrorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) {
     return error.message;
   }
 
-  return "Action impossible pour le moment.";
+  return fallback;
 }
 
 function amountToCents(value: string): number {
@@ -347,12 +338,51 @@ function getOrderBalance(order: MobileCustomerOrderDetail): string {
   );
 }
 
-function getActivityItems(activity: MobileCustomerActivityList): ActivityListItem[] {
+function getOrderStatusView(t: Translator, status: MobileCustomerOrderStatus): StatusView {
+  return {
+    label: t(orderStatusKeys[status]),
+    className: orderStatusClasses[status],
+  };
+}
+
+function getTicketStatusView(t: Translator, status: MobileCustomerTicketStatus): StatusView {
+  return {
+    label: t(ticketStatusKeys[status]),
+    className: ticketStatusClasses[status],
+  };
+}
+
+function getAppointmentStatusView(
+  t: Translator,
+  status: MobileCustomerAppointmentStatus,
+): StatusView {
+  return {
+    label: t(appointmentStatusKeys[status]),
+    className: appointmentStatusClasses[status],
+  };
+}
+
+function getAccountStatusView(
+  t: Translator,
+  status: MobileCustomerProfile["account"]["status"],
+): StatusView {
+  return status === "active"
+    ? {
+        label: t("customer.profile.active"),
+        className: "border-emerald-200 bg-emerald-50 text-emerald-800",
+      }
+    : {
+        label: t("customer.profile.disabled"),
+        className: "border-red-200 bg-red-50 text-red-700",
+      };
+}
+
+function getActivityItems(activity: MobileCustomerActivityList, t: Translator): ActivityListItem[] {
   const orders: ActivityListItem[] = activity.orders.map((order) => ({
     kind: "order",
     id: order.id,
-    title: `Commande ${order.id.slice(-6).toUpperCase()}`,
-    subtitle: `Paiement ${order.paymentStatus}`,
+    title: t("customer.detail.orderPrefix", { id: order.id.slice(-6).toUpperCase() }),
+    subtitle: `${t("customer.detail.payment")} ${order.paymentStatus}`,
     status: order.status,
     createdAt: order.createdAt,
     amount: order.totalAmount,
@@ -361,7 +391,9 @@ function getActivityItems(activity: MobileCustomerActivityList): ActivityListIte
   const tickets: ActivityListItem[] = activity.tickets.map((ticket) => ({
     kind: "ticket",
     id: ticket.id,
-    title: ticket.ticketNo ? `Ticket ${ticket.ticketNo}` : `Ticket ${ticket.id.slice(-6).toUpperCase()}`,
+    title: ticket.ticketNo
+      ? t("customer.detail.ticketPrefix", { id: ticket.ticketNo })
+      : t("customer.detail.ticketPrefix", { id: ticket.id.slice(-6).toUpperCase() }),
     subtitle: ticket.ticketType,
     status: ticket.ticketStatus,
     createdAt: ticket.createdAt,
@@ -472,7 +504,7 @@ type CustomerSnapshot = {
   addressBook: MobileCustomerAddress[];
   activity: MobileCustomerActivityList;
   appointments: MobileCustomerAppointment[];
-  error: string | null;
+  errorKey: TranslationKey | null;
 };
 
 async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
@@ -485,7 +517,7 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
       addressBook: [],
       activity: emptyActivity,
       appointments: [],
-      error: "Session client requise.",
+      errorKey: "customer.messages.customerSessionRequired",
     };
   }
 
@@ -502,11 +534,12 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
     addressBook: addressBook.data,
     activity: activity.data,
     appointments: sortAppointments(appointments.data),
-    error: null,
+    errorKey: null,
   };
 }
 
 export function CustomerHome() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<CustomerTab>("resume");
   const [authContext, setAuthContext] = useState<MobileAuthContext | null>(null);
   const [profile, setProfile] = useState<MobileCustomerProfile | null>(null);
@@ -564,7 +597,7 @@ export function CustomerHome() {
       setAddressBook(snapshot.addressBook);
       setActivity(snapshot.activity);
       setAppointments(snapshot.appointments);
-      setError(snapshot.error);
+      setError(snapshot.errorKey ? t(snapshot.errorKey) : null);
       setProfileForm(toProfileForm(snapshot.profile));
       setAppointmentForm((current) => ({
         ...current,
@@ -574,12 +607,12 @@ export function CustomerHome() {
           getPrimaryAddress(snapshot.profile),
       }));
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let mounted = true;
@@ -595,7 +628,7 @@ export function CustomerHome() {
         setAddressBook(snapshot.addressBook);
         setActivity(snapshot.activity);
         setAppointments(snapshot.appointments);
-        setError(snapshot.error);
+        setError(snapshot.errorKey ? t(snapshot.errorKey) : null);
         setProfileForm(toProfileForm(snapshot.profile));
         setAppointmentForm((current) => ({
           ...current,
@@ -607,7 +640,7 @@ export function CustomerHome() {
       })
       .catch((nextError: unknown) => {
         if (mounted) {
-          setError(getErrorMessage(nextError));
+          setError(getErrorMessage(nextError, t("common.errors.genericAction")));
         }
       })
       .finally(() => {
@@ -619,9 +652,9 @@ export function CustomerHome() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [t]);
 
-  const activityItems = useMemo(() => getActivityItems(activity), [activity]);
+  const activityItems = useMemo(() => getActivityItems(activity, t), [activity, t]);
   const appointmentSummary = useMemo(() => getAppointmentSummary(appointments), [appointments]);
   const latestActivity = activityItems[0] ?? null;
 
@@ -642,7 +675,7 @@ export function CustomerHome() {
     } catch (nextError) {
       setDetailOpen(false);
       setSelectedActivity(null);
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setIsDetailLoading(false);
     }
@@ -665,7 +698,7 @@ export function CustomerHome() {
     const amount = getOrderBalance(order);
 
     if (amountToCents(amount) <= 0) {
-      setError("Commande deja reglee.");
+      setError(t("customer.messages.orderSettled"));
       return;
     }
 
@@ -683,11 +716,11 @@ export function CustomerHome() {
       await refreshSelectedOrder(order.id);
       setMessage(
         result.idempotent
-          ? "Paiement deja initie."
-          : "Paiement cree. Finalisez-le dans la fenetre ouverte.",
+          ? t("customer.messages.paymentAlreadyInitiated")
+          : t("customer.messages.paymentCreated"),
       );
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -712,7 +745,7 @@ export function CustomerHome() {
 
     try {
       if (!refundForm.reason.trim()) {
-        throw new Error("Motif requis pour la demande.");
+        throw new Error(t("customer.messages.refundReasonRequired"));
       }
 
       const refund = await createCustomerRefundRequest(refundForm.orderId, {
@@ -722,9 +755,9 @@ export function CustomerHome() {
 
       await refreshSelectedOrder(refund.orderId);
       setRefundSheetOpen(false);
-      setMessage("Demande de remboursement envoyee.");
+      setMessage(t("customer.messages.refundRequested"));
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setIsSubmittingRefund(false);
     }
@@ -740,11 +773,11 @@ export function CustomerHome() {
       const expectedAt = new Date(appointmentForm.expectedAt);
 
       if (!appointmentForm.address.trim()) {
-        throw new Error("Adresse requise pour le rendez-vous.");
+        throw new Error(t("customer.messages.appointmentAddressRequired"));
       }
 
       if (Number.isNaN(expectedAt.getTime())) {
-        throw new Error("Date de rendez-vous invalide.");
+        throw new Error(t("customer.messages.invalidAppointmentDate"));
       }
 
       const created = await createCustomerAppointment({
@@ -762,9 +795,9 @@ export function CustomerHome() {
       }));
       setActiveTab("appointments");
       setAppointmentSheetOpen(false);
-      setMessage("Rendez-vous cree.");
+      setMessage(t("customer.messages.appointmentCreated"));
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setIsSubmittingAppointment(false);
     }
@@ -780,9 +813,9 @@ export function CustomerHome() {
       setAppointments((current) =>
         sortAppointments(current.map((appointment) => (appointment.id === updated.id ? updated : appointment))),
       );
-      setMessage("Rendez-vous annule.");
+      setMessage(t("customer.messages.appointmentCancelled"));
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setCancellingAppointmentId(null);
     }
@@ -801,6 +834,7 @@ export function CustomerHome() {
     setEditingAddressId(null);
     setAddressForm({
       ...emptyAddressForm,
+      label: t("customer.forms.defaultAddressLabel"),
       contactName: profile?.account.accountName ?? "",
       contactPhone: profile?.account.phone ?? "",
       isDefault: addressBook.length === 0,
@@ -831,16 +865,16 @@ export function CustomerHome() {
 
     try {
       if (!profileForm.accountName.trim()) {
-        throw new Error("Nom requis.");
+        throw new Error(t("customer.messages.nameRequired"));
       }
 
       const updated = await updateCustomerProfile(profileForm);
       setProfile(updated);
       setProfileForm(toProfileForm(updated));
       setProfileSheet(null);
-      setMessage("Profil mis a jour.");
+      setMessage(t("customer.messages.profileSaved"));
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setIsSubmittingProfile(false);
     }
@@ -854,7 +888,7 @@ export function CustomerHome() {
 
     try {
       if (!addressForm.label.trim() || !addressForm.addressLine1.trim()) {
-        throw new Error("Libelle et adresse requis.");
+        throw new Error(t("customer.messages.addressRequired"));
       }
 
       const input = toAddressInput(addressForm);
@@ -879,9 +913,13 @@ export function CustomerHome() {
       }));
       setProfileSheet(null);
       setEditingAddressId(null);
-      setMessage(editingAddressId ? "Adresse mise a jour." : "Adresse ajoutee.");
+      setMessage(
+        editingAddressId
+          ? t("customer.messages.addressUpdated")
+          : t("customer.messages.addressAdded"),
+      );
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setIsSubmittingAddress(false);
     }
@@ -895,9 +933,9 @@ export function CustomerHome() {
     try {
       await deleteCustomerAddress(addressId);
       setAddressBook((current) => current.filter((address) => address.id !== addressId));
-      setMessage("Adresse supprimee.");
+      setMessage(t("customer.messages.addressDeleted"));
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setAddressActionId(null);
     }
@@ -921,9 +959,9 @@ export function CustomerHome() {
         ...current,
         address: formatCustomerAddress(updated),
       }));
-      setMessage("Adresse par defaut mise a jour.");
+      setMessage(t("customer.messages.defaultAddressUpdated"));
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setAddressActionId(null);
     }
@@ -935,7 +973,7 @@ export function CustomerHome() {
     setMessage(null);
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setError("La confirmation ne correspond pas.");
+      setError(t("customer.messages.passwordMismatch"));
       return;
     }
 
@@ -948,9 +986,9 @@ export function CustomerHome() {
       });
       setPasswordForm(emptyPasswordForm);
       setProfileSheet(null);
-      setMessage("Mot de passe mis a jour. Reconnectez-vous sur les autres appareils.");
+      setMessage(t("customer.messages.passwordChangedOtherDevices"));
     } catch (nextError) {
-      setError(getErrorMessage(nextError));
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setIsSubmittingPassword(false);
     }
@@ -961,7 +999,7 @@ export function CustomerHome() {
       <main className="flex min-h-dvh items-center justify-center px-5">
         <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
           <Loader2 className="size-4 animate-spin text-teal-700" aria-hidden="true" />
-          Chargement de l&apos;espace client
+          {t("customer.home.loading")}
         </div>
       </main>
     );
@@ -974,13 +1012,15 @@ export function CustomerHome() {
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
             CleanHub
           </p>
-          <h1 className="mt-1 text-3xl font-semibold text-slate-950">Espace client</h1>
+          <h1 className="mt-1 text-3xl font-semibold text-slate-950">
+            {t("customer.home.clientSpace")}
+          </h1>
           <p className="mt-2 truncate text-sm text-slate-600">
-            {profile?.account.accountName ?? authContext?.displayName ?? "Client"}
+            {profile?.account.accountName ?? authContext?.displayName ?? t("customer.home.defaultCustomer")}
           </p>
         </div>
         <Button
-          aria-label="Actualiser"
+          aria-label={t("common.refresh")}
           className="size-11"
           disabled={isRefreshing}
           size="icon"
@@ -1161,9 +1201,18 @@ function CustomerTabBar({
   activeTab: CustomerTab;
   onChange: (tab: CustomerTab) => void;
 }) {
+  const { t } = useTranslation();
+  const tabs = (Object.entries(tabIcons) as [CustomerTab, typeof Home][]).map(
+    ([value, icon]) => ({
+      icon,
+      label: t(`customer.tabs.${value}` as TranslationKey),
+      value,
+    }),
+  );
+
   return (
     <nav
-      aria-label="Navigation principale"
+      aria-label={t("common.mainNavigation")}
       className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md border-t border-slate-200 bg-[#f8faf9]/95 px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur"
     >
       <div className="grid grid-cols-4 gap-2 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
@@ -1220,6 +1269,9 @@ function ResumeView({
   onOpenActivity: (item: ActivityListItem) => void;
   onOpenAppointments: () => void;
 }) {
+  const { locale, t } = useTranslation();
+  const intlLocale = getIntlLocale(locale);
+
   return (
     <div className="space-y-4">
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
@@ -1229,18 +1281,18 @@ function ResumeView({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold text-slate-950">
-              {profile?.account.accountName ?? "Compte client"}
+              {profile?.account.accountName ?? t("customer.home.clientAccount")}
             </p>
             <p className="mt-1 text-sm text-slate-600">
-              {profile?.account.phone ?? profile?.account.email ?? "Contact non renseigne"}
+              {profile?.account.phone ?? profile?.account.email ?? t("customer.home.contactMissing")}
             </p>
           </div>
         </div>
 
         <dl className="mt-5 grid grid-cols-3 gap-2">
-          <StatBlock label="Suivis" value={activityCount} />
-          <StatBlock label="RDV actifs" value={appointmentSummary.pending} />
-          <StatBlock label="Adresses" value={profile?.addresses.length ?? 0} />
+          <StatBlock label={t("customer.home.tracking")} value={activityCount} />
+          <StatBlock label={t("customer.home.activeAppointments")} value={appointmentSummary.pending} />
+          <StatBlock label={t("customer.home.addresses")} value={profile?.addresses.length ?? 0} />
         </dl>
       </section>
 
@@ -1255,7 +1307,9 @@ function ResumeView({
               <ActivityIcon kind={latestActivity.kind} />
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-slate-950">{latestActivity.title}</p>
-                <p className="mt-1 text-xs text-slate-500">{formatDate(latestActivity.createdAt)}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {formatDate(latestActivity.createdAt, intlLocale)}
+                </p>
               </div>
             </div>
             <ChevronRight className="mt-1 size-4 text-slate-400" aria-hidden="true" />
@@ -1264,8 +1318,8 @@ function ResumeView({
             <StatusBadge
               view={
                 latestActivity.kind === "order"
-                  ? orderStatusViews[latestActivity.status]
-                  : ticketStatusViews[latestActivity.status]
+                  ? getOrderStatusView(t, latestActivity.status)
+                  : getTicketStatusView(t, latestActivity.status)
               }
             />
           </div>
@@ -1273,8 +1327,8 @@ function ResumeView({
       ) : (
         <EmptyState
           icon={ReceiptText}
-          title="Aucun suivi"
-          body="Les commandes et tickets apparaitront ici apres prise en charge."
+          title={t("customer.empty.noTrackingTitle")}
+          body={t("customer.empty.noTrackingBody")}
         />
       )}
 
@@ -1291,10 +1345,10 @@ function ResumeView({
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-950">
-                  {appointmentTypeViews[appointmentSummary.next.type]}
+                  {t(appointmentTypeKeys[appointmentSummary.next.type])}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {formatDateTime(appointmentSummary.next.expectedAt)}
+                  {formatDateTime(appointmentSummary.next.expectedAt, intlLocale)}
                 </p>
               </div>
             </div>
@@ -1324,6 +1378,9 @@ function ActivityView({
   selectedActivity: ActivitySelection | null;
   onSelectActivity: (item: ActivityListItem) => void;
 }) {
+  const { locale, t } = useTranslation();
+  const intlLocale = getIntlLocale(locale);
+
   return (
     <div className="space-y-4">
       {activityItems.length ? (
@@ -1347,20 +1404,30 @@ function ActivityView({
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-950">{item.title}</p>
                       <p className="mt-1 truncate text-sm text-slate-600">{item.subtitle}</p>
-                      <p className="mt-1 text-xs text-slate-500">{formatDate(item.createdAt)}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {formatDate(item.createdAt, intlLocale)}
+                      </p>
                     </div>
                   </div>
                   <ChevronRight className="mt-1 size-4 text-slate-400" aria-hidden="true" />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <StatusBadge
-                    view={item.kind === "order" ? orderStatusViews[item.status] : ticketStatusViews[item.status]}
+                    view={
+                      item.kind === "order"
+                        ? getOrderStatusView(t, item.status)
+                        : getTicketStatusView(t, item.status)
+                    }
                   />
                   {item.kind === "order" ? (
-                    <span className="text-xs font-medium text-slate-500">Total {item.amount}</span>
+                    <span className="text-xs font-medium text-slate-500">
+                      {t("customer.detail.totalInline", { amount: item.amount })}
+                    </span>
                   ) : item.expectedAt ? (
                     <span className="text-xs font-medium text-slate-500">
-                      Retrait {formatDateTime(item.expectedAt)}
+                      {t("customer.detail.pickupInline", {
+                        date: formatDateTime(item.expectedAt, intlLocale),
+                      })}
                     </span>
                   ) : null}
                 </div>
@@ -1371,8 +1438,8 @@ function ActivityView({
       ) : (
         <EmptyState
           icon={ReceiptText}
-          title="Aucune commande"
-          body="Les commandes et tickets actifs apparaitront ici."
+          title={t("customer.empty.noOrdersTitle")}
+          body={t("customer.empty.noOrdersBody")}
         />
       )}
     </div>
@@ -1398,13 +1465,15 @@ function ActivityDetailSheet({
   onOpenChange: (open: boolean) => void;
   onOpenRefund: (order: MobileCustomerOrderDetail) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="max-h-[90dvh] p-5">
         <SheetHeader className="pr-8 text-left">
-          <SheetTitle>{item?.title ?? "Detail du suivi"}</SheetTitle>
+          <SheetTitle>{item?.title ?? t("customer.detail.defaultTitle")}</SheetTitle>
           <SheetDescription>
-            {item?.subtitle ?? "Commande ou ticket client"}
+            {item?.subtitle ?? t("customer.detail.defaultSubtitle")}
           </SheetDescription>
         </SheetHeader>
 
@@ -1412,7 +1481,7 @@ function ActivityDetailSheet({
           <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-3 text-sm text-slate-600">
               <Loader2 className="size-4 animate-spin text-teal-700" aria-hidden="true" />
-              Chargement du detail
+              {t("customer.detail.loading")}
             </div>
           </div>
         ) : detail ? (
@@ -1424,14 +1493,14 @@ function ActivityDetailSheet({
           />
         ) : (
           <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-            Selectionnez un suivi pour afficher le detail.
+            {t("customer.detail.selectPrompt")}
           </p>
         )}
 
         <SheetFooter className="sticky bottom-0 -mx-5 mt-5 border-t border-slate-200 bg-white px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
           <SheetClose asChild>
             <Button className="h-11 w-full" type="button" variant="outline">
-              Fermer
+              {t("common.close")}
             </Button>
           </SheetClose>
         </SheetFooter>
@@ -1451,6 +1520,9 @@ function ActivityDetailPanel({
   onCreatePayment: (order: MobileCustomerOrderDetail) => void;
   onOpenRefund: (order: MobileCustomerOrderDetail) => void;
 }) {
+  const { locale, t } = useTranslation();
+  const intlLocale = getIntlLocale(locale);
+
   if (detail.kind === "order") {
     const balance = getOrderBalance(detail.data);
     const canPay =
@@ -1464,18 +1536,21 @@ function ActivityDetailPanel({
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-slate-950">
-              Commande {detail.data.id.slice(-6).toUpperCase()}
+              {t("customer.detail.orderPrefix", { id: detail.data.id.slice(-6).toUpperCase() })}
             </p>
             <p className="mt-1 text-sm text-slate-600">{detail.data.orderType}</p>
           </div>
-          <StatusBadge view={orderStatusViews[detail.data.status]} />
+          <StatusBadge view={getOrderStatusView(t, detail.data.status)} />
         </div>
 
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <DetailTerm label="Total" value={detail.data.totalAmount} />
-          <DetailTerm label="Paye" value={detail.data.paidAmount} />
-          <DetailTerm label="Paiement" value={detail.data.paymentStatus} />
-          <DetailTerm label="Creee" value={formatDateTime(detail.data.createdAt)} />
+          <DetailTerm label={t("customer.detail.total")} value={detail.data.totalAmount} />
+          <DetailTerm label={t("customer.detail.paid")} value={detail.data.paidAmount} />
+          <DetailTerm label={t("customer.detail.payment")} value={detail.data.paymentStatus} />
+          <DetailTerm
+            label={t("customer.detail.created")}
+            value={formatDateTime(detail.data.createdAt, intlLocale)}
+          />
         </dl>
 
         {detail.data.notes ? (
@@ -1496,7 +1571,7 @@ function ActivityDetailPanel({
             ) : (
               <CreditCard className="size-4" aria-hidden="true" />
             )}
-            Payer
+            {t("customer.actions.pay")}
           </Button>
           <Button
             className="h-11"
@@ -1506,12 +1581,13 @@ function ActivityDetailPanel({
             onClick={() => onOpenRefund(detail.data)}
           >
             <RotateCcw className="size-4" aria-hidden="true" />
-            Rembourser
+            {t("customer.actions.refund")}
           </Button>
         </div>
 
         <ItemList
-          emptyLabel="Aucun article"
+          emptyLabel={t("customer.detail.noItems")}
+          title={t("customer.detail.articles")}
           items={detail.data.items.map((item) => ({
             id: item.id,
             title: item.itemName,
@@ -1528,18 +1604,29 @@ function ActivityDetailPanel({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-slate-950">
-            {detail.data.ticketNo ? `Ticket ${detail.data.ticketNo}` : "Ticket"}
+            {detail.data.ticketNo
+              ? t("customer.detail.ticketPrefix", { id: detail.data.ticketNo })
+              : t("customer.detail.ticketFallback")}
           </p>
           <p className="mt-1 text-sm text-slate-600">{detail.data.ticketType}</p>
         </div>
-        <StatusBadge view={ticketStatusViews[detail.data.ticketStatus]} />
+        <StatusBadge view={getTicketStatusView(t, detail.data.ticketStatus)} />
       </div>
 
       <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-        <DetailTerm label="Priorite" value={detail.data.priority} />
-        <DetailTerm label="Retrait" value={formatDateTime(detail.data.expectedPickupAt)} />
-        <DetailTerm label="Termine" value={formatDateTime(detail.data.completedAt)} />
-        <DetailTerm label="Cree" value={formatDateTime(detail.data.createdAt)} />
+        <DetailTerm label={t("customer.detail.priority")} value={detail.data.priority} />
+        <DetailTerm
+          label={t("customer.detail.pickup")}
+          value={formatDateTime(detail.data.expectedPickupAt, intlLocale)}
+        />
+        <DetailTerm
+          label={t("customer.detail.completed")}
+          value={formatDateTime(detail.data.completedAt, intlLocale)}
+        />
+        <DetailTerm
+          label={t("customer.detail.created")}
+          value={formatDateTime(detail.data.createdAt, intlLocale)}
+        />
       </dl>
 
       {detail.data.remark ? (
@@ -1549,7 +1636,8 @@ function ActivityDetailPanel({
       ) : null}
 
       <ItemList
-        emptyLabel="Aucun article"
+        emptyLabel={t("customer.detail.noItems")}
+        title={t("customer.detail.articles")}
         items={detail.data.items.map((item) => ({
           id: item.id,
           title: item.itemName,
@@ -1574,13 +1662,17 @@ function DetailTerm({ label, value }: { label: string; value: string }) {
 function ItemList({
   emptyLabel,
   items,
+  title,
 }: {
   emptyLabel: string;
   items: { id: string; title: string; subtitle: string; amount: string; status?: string }[];
+  title: string;
 }) {
   return (
     <div className="mt-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Articles</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {title}
+      </p>
       {items.length ? (
         <div className="mt-3 divide-y divide-slate-100 rounded-md border border-slate-200">
           {items.map((item) => (
@@ -1614,6 +1706,8 @@ function AppointmentsView({
   onCancelAppointment: (appointmentId: string) => void;
   onOpenCreateAppointment: () => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-4">
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
@@ -1622,12 +1716,16 @@ function AppointmentsView({
             <Plus className="size-5" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
-            <h2 className="text-base font-semibold text-slate-950">Rendez-vous</h2>
-            <p className="mt-1 text-sm text-slate-600">Collectes et depots planifies</p>
+            <h2 className="text-base font-semibold text-slate-950">
+              {t("customer.appointments.title")}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {t("customer.appointments.subtitle")}
+            </p>
           </div>
           <Button className="h-11 shrink-0" type="button" onClick={onOpenCreateAppointment}>
             <Plus className="size-4" aria-hidden="true" />
-            Nouveau
+            {t("customer.appointments.new")}
           </Button>
         </div>
       </section>
@@ -1644,7 +1742,11 @@ function AppointmentsView({
           ))}
         </section>
       ) : (
-        <EmptyState icon={CalendarClock} title="Aucun rendez-vous" body="Les demandes creees apparaitront ici." />
+        <EmptyState
+          icon={CalendarClock}
+          title={t("customer.empty.noAppointmentsTitle")}
+          body={t("customer.empty.noAppointmentsBody")}
+        />
       )}
     </div>
   );
@@ -1667,12 +1769,14 @@ function AppointmentFormSheet({
   onOpenChange: (open: boolean) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="max-h-[92dvh] p-5">
         <SheetHeader className="pr-8 text-left">
-          <SheetTitle>Nouveau rendez-vous</SheetTitle>
-          <SheetDescription>Collecte a domicile ou depot en boutique</SheetDescription>
+          <SheetTitle>{t("customer.appointments.newTitle")}</SheetTitle>
+          <SheetDescription>{t("customer.appointments.newDescription")}</SheetDescription>
         </SheetHeader>
 
         {error ? <AlertMessage tone="error" message={error} /> : null}
@@ -1699,10 +1803,12 @@ function AppointmentForm({
   onFormChange: React.Dispatch<React.SetStateAction<AppointmentFormState>>;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
       <fieldset className="grid grid-cols-2 gap-2">
-        <legend className="sr-only">Type de rendez-vous</legend>
+        <legend className="sr-only">{t("customer.appointments.typeLegend")}</legend>
         {(["pickup", "dropoff"] as const).map((type) => (
           <button
             className={`min-h-12 rounded-md border px-3 text-sm font-medium transition ${
@@ -1714,13 +1820,13 @@ function AppointmentForm({
             type="button"
             onClick={() => onFormChange((current) => ({ ...current, type }))}
           >
-            {appointmentTypeViews[type]}
+            {t(appointmentTypeKeys[type])}
           </button>
         ))}
       </fieldset>
 
       <div className="space-y-2">
-        <Label htmlFor="appointment-expected-at">Date et heure</Label>
+        <Label htmlFor="appointment-expected-at">{t("customer.forms.expectedAt")}</Label>
         <Input
           className="h-12 text-base"
           id="appointment-expected-at"
@@ -1733,11 +1839,11 @@ function AppointmentForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="appointment-address">Adresse</Label>
+        <Label htmlFor="appointment-address">{t("customer.forms.address")}</Label>
         <Textarea
           className="min-h-24 resize-none text-base"
           id="appointment-address"
-          placeholder="Adresse de collecte ou de depot"
+          placeholder={t("customer.appointments.addressPlaceholder")}
           value={form.address}
           onChange={(event) =>
             onFormChange((current) => ({ ...current, address: event.target.value }))
@@ -1746,11 +1852,11 @@ function AppointmentForm({
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="appointment-notes">Notes</Label>
+        <Label htmlFor="appointment-notes">{t("customer.forms.notes")}</Label>
         <Textarea
           className="min-h-20 resize-none text-base"
           id="appointment-notes"
-          placeholder="Instructions utiles"
+          placeholder={t("customer.appointments.notesPlaceholder")}
           value={form.notes}
           onChange={(event) => onFormChange((current) => ({ ...current, notes: event.target.value }))}
         />
@@ -1763,7 +1869,7 @@ function AppointmentForm({
           ) : (
             <CalendarClock className="size-4" aria-hidden="true" />
           )}
-          Creer le rendez-vous
+          {t("customer.appointments.create")}
         </Button>
       </SheetFooter>
     </form>
@@ -1787,19 +1893,21 @@ function RefundRequestSheet({
   onOpenChange: (open: boolean) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="max-h-[92dvh] p-5">
         <SheetHeader className="pr-8 text-left">
-          <SheetTitle>Demande de remboursement</SheetTitle>
-          <SheetDescription>Validation par l&apos;owner avant traitement</SheetDescription>
+          <SheetTitle>{t("customer.refund.title")}</SheetTitle>
+          <SheetDescription>{t("customer.refund.description")}</SheetDescription>
         </SheetHeader>
 
         {error ? <AlertMessage tone="error" message={error} /> : null}
 
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="space-y-2">
-            <Label htmlFor="refund-amount">Montant</Label>
+            <Label htmlFor="refund-amount">{t("customer.forms.refundAmount")}</Label>
             <Input
               className="h-12 text-base"
               id="refund-amount"
@@ -1815,11 +1923,11 @@ function RefundRequestSheet({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="refund-reason">Motif</Label>
+            <Label htmlFor="refund-reason">{t("customer.forms.refundReason")}</Label>
             <Textarea
               className="min-h-24 resize-none text-base"
               id="refund-reason"
-              placeholder="Expliquez la demande"
+              placeholder={t("customer.refund.placeholder")}
               value={form.reason}
               onChange={(event) =>
                 onFormChange((current) => ({
@@ -1837,7 +1945,7 @@ function RefundRequestSheet({
               ) : (
                 <RotateCcw className="size-4" aria-hidden="true" />
               )}
-              Envoyer la demande
+              {t("customer.refund.send")}
             </Button>
           </SheetFooter>
         </form>
@@ -1855,16 +1963,22 @@ function AppointmentCard({
   cancellingAppointmentId: string | null;
   onCancelAppointment: (appointmentId: string) => void;
 }) {
+  const { locale, t } = useTranslation();
+  const intlLocale = getIntlLocale(locale);
   const isCancelling = cancellingAppointmentId === appointment.id;
 
   return (
     <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-slate-950">{appointmentTypeViews[appointment.type]}</p>
-          <p className="mt-1 text-sm text-slate-600">{formatDateTime(appointment.expectedAt)}</p>
+          <p className="text-sm font-semibold text-slate-950">
+            {t(appointmentTypeKeys[appointment.type])}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            {formatDateTime(appointment.expectedAt, intlLocale)}
+          </p>
         </div>
-        <StatusBadge view={appointmentStatusViews[appointment.status]} />
+        <StatusBadge view={getAppointmentStatusView(t, appointment.status)} />
       </div>
 
       <div className="mt-4 flex gap-3 text-sm text-slate-600">
@@ -1891,7 +2005,7 @@ function AppointmentCard({
           ) : (
             <XCircle className="size-4" aria-hidden="true" />
           )}
-          Annuler
+          {t("common.cancel")}
         </Button>
       ) : null}
     </article>
@@ -1915,19 +2029,21 @@ function ProfileFormSheet({
   onOpenChange: (open: boolean) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="max-h-[86dvh] p-5">
         <SheetHeader className="pr-8 text-left">
-          <SheetTitle>Modifier le profil</SheetTitle>
-          <SheetDescription>Coordonnees principales du compte client</SheetDescription>
+          <SheetTitle>{t("customer.profile.editTitle")}</SheetTitle>
+          <SheetDescription>{t("customer.profile.editDescription")}</SheetDescription>
         </SheetHeader>
 
         {error ? <AlertMessage tone="error" message={error} /> : null}
 
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="space-y-2">
-            <Label htmlFor="profile-name">Nom</Label>
+            <Label htmlFor="profile-name">{t("customer.forms.name")}</Label>
             <Input
               className="h-12 text-base"
               id="profile-name"
@@ -1941,7 +2057,7 @@ function ProfileFormSheet({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="profile-phone">Telephone</Label>
+            <Label htmlFor="profile-phone">{t("customer.forms.phone")}</Label>
             <Input
               className="h-12 text-base"
               id="profile-phone"
@@ -1956,7 +2072,7 @@ function ProfileFormSheet({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="profile-email">Email</Label>
+            <Label htmlFor="profile-email">{t("customer.forms.email")}</Label>
             <Input
               className="h-12 text-base"
               id="profile-email"
@@ -1978,7 +2094,7 @@ function ProfileFormSheet({
               ) : (
                 <CheckCircle2 className="size-4" aria-hidden="true" />
               )}
-              Enregistrer
+              {t("common.save")}
             </Button>
           </SheetFooter>
         </form>
@@ -2006,12 +2122,16 @@ function AddressFormSheet({
   onOpenChange: (open: boolean) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="max-h-[92dvh] p-5">
         <SheetHeader className="pr-8 text-left">
-          <SheetTitle>{isEditing ? "Modifier l'adresse" : "Nouvelle adresse"}</SheetTitle>
-          <SheetDescription>Adresse de collecte ou livraison</SheetDescription>
+          <SheetTitle>
+            {isEditing ? t("customer.profile.addressEditTitle") : t("customer.profile.addressNewTitle")}
+          </SheetTitle>
+          <SheetDescription>{t("customer.profile.addressDescription")}</SheetDescription>
         </SheetHeader>
 
         {error ? <AlertMessage tone="error" message={error} /> : null}
@@ -2019,7 +2139,7 @@ function AddressFormSheet({
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="address-label">Libelle</Label>
+              <Label htmlFor="address-label">{t("customer.forms.label")}</Label>
               <Input
                 className="h-12 text-base"
                 id="address-label"
@@ -2030,7 +2150,7 @@ function AddressFormSheet({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="address-country">Pays</Label>
+              <Label htmlFor="address-country">{t("customer.forms.country")}</Label>
               <Input
                 className="h-12 text-base uppercase"
                 id="address-country"
@@ -2045,7 +2165,7 @@ function AddressFormSheet({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="address-contact-name">Contact</Label>
+              <Label htmlFor="address-contact-name">{t("customer.forms.contactName")}</Label>
               <Input
                 className="h-12 text-base"
                 id="address-contact-name"
@@ -2056,7 +2176,7 @@ function AddressFormSheet({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="address-contact-phone">Telephone</Label>
+              <Label htmlFor="address-contact-phone">{t("customer.forms.contactPhone")}</Label>
               <Input
                 className="h-12 text-base"
                 id="address-contact-phone"
@@ -2070,7 +2190,7 @@ function AddressFormSheet({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="address-line1">Adresse</Label>
+            <Label htmlFor="address-line1">{t("customer.forms.addressLine1")}</Label>
             <Textarea
               className="min-h-20 resize-none text-base"
               id="address-line1"
@@ -2081,7 +2201,7 @@ function AddressFormSheet({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="address-line2">Complement</Label>
+            <Label htmlFor="address-line2">{t("customer.forms.addressLine2")}</Label>
             <Input
               className="h-12 text-base"
               id="address-line2"
@@ -2094,7 +2214,7 @@ function AddressFormSheet({
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="address-city">Ville</Label>
+              <Label htmlFor="address-city">{t("customer.forms.city")}</Label>
               <Input
                 className="h-12 text-base"
                 id="address-city"
@@ -2105,7 +2225,7 @@ function AddressFormSheet({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="address-province">Region</Label>
+              <Label htmlFor="address-province">{t("customer.forms.province")}</Label>
               <Input
                 className="h-12 text-base"
                 id="address-province"
@@ -2119,7 +2239,7 @@ function AddressFormSheet({
 
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label htmlFor="address-postal">Code</Label>
+              <Label htmlFor="address-postal">{t("customer.forms.postalCode")}</Label>
               <Input
                 className="h-12 text-base"
                 id="address-postal"
@@ -2130,7 +2250,7 @@ function AddressFormSheet({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="address-latitude">Lat</Label>
+              <Label htmlFor="address-latitude">{t("customer.forms.latitude")}</Label>
               <Input
                 className="h-12 text-base"
                 id="address-latitude"
@@ -2142,7 +2262,7 @@ function AddressFormSheet({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="address-longitude">Lng</Label>
+              <Label htmlFor="address-longitude">{t("customer.forms.longitude")}</Label>
               <Input
                 className="h-12 text-base"
                 id="address-longitude"
@@ -2164,11 +2284,11 @@ function AddressFormSheet({
                 onFormChange((current) => ({ ...current, isDefault: event.target.checked }))
               }
             />
-            Adresse par defaut
+            {t("customer.forms.isDefault")}
           </label>
 
           <div className="space-y-2">
-            <Label htmlFor="address-notes">Notes</Label>
+            <Label htmlFor="address-notes">{t("customer.forms.notes")}</Label>
             <Textarea
               className="min-h-20 resize-none text-base"
               id="address-notes"
@@ -2186,7 +2306,7 @@ function AddressFormSheet({
               ) : (
                 <MapPin className="size-4" aria-hidden="true" />
               )}
-              Enregistrer l&apos;adresse
+              {t("customer.profile.saveAddress")}
             </Button>
           </SheetFooter>
         </form>
@@ -2212,19 +2332,21 @@ function PasswordFormSheet({
   onOpenChange: (open: boolean) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
+  const { t } = useTranslation();
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="max-h-[82dvh] p-5">
         <SheetHeader className="pr-8 text-left">
-          <SheetTitle>Modifier le mot de passe</SheetTitle>
-          <SheetDescription>La session des autres appareils sera expiree</SheetDescription>
+          <SheetTitle>{t("customer.profile.passwordTitle")}</SheetTitle>
+          <SheetDescription>{t("customer.profile.passwordDescription")}</SheetDescription>
         </SheetHeader>
 
         {error ? <AlertMessage tone="error" message={error} /> : null}
 
         <form className="space-y-4" onSubmit={onSubmit}>
           <div className="space-y-2">
-            <Label htmlFor="current-password">Mot de passe actuel</Label>
+            <Label htmlFor="current-password">{t("customer.forms.currentPassword")}</Label>
             <Input
               className="h-12 text-base"
               id="current-password"
@@ -2239,7 +2361,7 @@ function PasswordFormSheet({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="new-password">Nouveau mot de passe</Label>
+            <Label htmlFor="new-password">{t("customer.forms.newPassword")}</Label>
             <Input
               className="h-12 text-base"
               id="new-password"
@@ -2254,7 +2376,7 @@ function PasswordFormSheet({
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirm-password">Confirmation</Label>
+            <Label htmlFor="confirm-password">{t("customer.forms.confirmPassword")}</Label>
             <Input
               className="h-12 text-base"
               id="confirm-password"
@@ -2276,7 +2398,7 @@ function PasswordFormSheet({
               ) : (
                 <KeyRound className="size-4" aria-hidden="true" />
               )}
-              Mettre a jour
+              {t("customer.profile.updatePassword")}
             </Button>
           </SheetFooter>
         </form>
@@ -2306,8 +2428,16 @@ function ProfileView({
   onOpenPassword: () => void;
   onSetDefaultAddress: (addressId: string) => void;
 }) {
+  const { t } = useTranslation();
+
   if (!profile) {
-    return <EmptyState icon={UserRound} title="Profil indisponible" body="Reconnectez-vous puis reessayez." />;
+    return (
+      <EmptyState
+        icon={UserRound}
+        title={t("customer.empty.profileUnavailableTitle")}
+        body={t("customer.empty.profileUnavailableBody")}
+      />
+    );
   }
 
   return (
@@ -2322,19 +2452,7 @@ function ProfileView({
               <h2 className="break-words text-base font-semibold text-slate-950">
                 {profile.account.accountName}
               </h2>
-              <StatusBadge
-                view={
-                  profile.account.status === "active"
-                    ? {
-                        label: "Actif",
-                        className: "border-emerald-200 bg-emerald-50 text-emerald-800",
-                      }
-                    : {
-                        label: "Desactive",
-                        className: "border-red-200 bg-red-50 text-red-700",
-                      }
-                }
-              />
+              <StatusBadge view={getAccountStatusView(t, profile.account.status)} />
             </div>
             <ContactLine icon={Phone} value={profile.account.phone} />
             <ContactLine icon={Mail} value={profile.account.email} />
@@ -2343,11 +2461,11 @@ function ProfileView({
         <div className="mt-4 grid grid-cols-2 gap-2">
           <Button className="h-11" type="button" variant="outline" onClick={onEditProfile}>
             <Edit3 className="size-4" aria-hidden="true" />
-            Modifier
+            {t("common.edit")}
           </Button>
           <Button className="h-11" type="button" variant="outline" onClick={onOpenPassword}>
             <KeyRound className="size-4" aria-hidden="true" />
-            Mot de passe
+            {t("customer.profile.password")}
           </Button>
         </div>
       </section>
@@ -2355,14 +2473,16 @@ function ProfileView({
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Carnet d&apos;adresses</h2>
+            <h2 className="text-base font-semibold text-slate-950">
+              {t("customer.profile.addressBook")}
+            </h2>
             <p className="mt-1 text-sm text-slate-600">
-              {addressBook.length} adresse(s) de collecte ou livraison
+              {t("customer.profile.addressBookCount", { count: addressBook.length })}
             </p>
           </div>
           <Button className="h-10 shrink-0 px-3" type="button" onClick={onCreateAddress}>
             <Plus className="size-4" aria-hidden="true" />
-            Ajouter
+            {t("customer.profile.addAddress")}
           </Button>
         </div>
       </section>
@@ -2378,7 +2498,7 @@ function ProfileView({
                     {address.isDefault ? (
                       <Badge className="border-amber-200 bg-amber-50 text-amber-800" variant="outline">
                         <Star className="size-3" aria-hidden="true" />
-                        Defaut
+                        {t("customer.profile.defaultAddress")}
                       </Badge>
                     ) : null}
                   </div>
@@ -2434,13 +2554,17 @@ function ProfileView({
           ))}
         </section>
       ) : (
-        <EmptyState icon={MapPin} title="Aucune adresse" body="Ajoutez une adresse de collecte ou livraison." />
+        <EmptyState
+          icon={MapPin}
+          title={t("customer.empty.noAddressTitle")}
+          body={t("customer.empty.noAddressBody")}
+        />
       )}
 
       {profile.addresses.length ? (
         <section className="space-y-3">
           <h2 className="px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Contacts lies
+            {t("customer.profile.linkedContacts")}
           </h2>
           {profile.addresses.map((address) => (
             <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm" key={address.customerId}>
@@ -2451,19 +2575,7 @@ function ProfileView({
                     <p className="mt-1 text-xs font-medium text-slate-500">{address.relationship}</p>
                   ) : null}
                 </div>
-                <StatusBadge
-                  view={
-                    address.status === "active"
-                      ? {
-                          label: "Actif",
-                          className: "border-emerald-200 bg-emerald-50 text-emerald-800",
-                        }
-                      : {
-                          label: "Desactive",
-                          className: "border-red-200 bg-red-50 text-red-700",
-                        }
-                  }
-                />
+                <StatusBadge view={getAccountStatusView(t, address.status)} />
               </div>
 
               <div className="mt-4 space-y-2">
@@ -2475,7 +2587,11 @@ function ProfileView({
           ))}
         </section>
       ) : (
-        <EmptyState icon={MapPin} title="Aucune adresse" body="Aucune adresse client n'est liee au compte." />
+        <EmptyState
+          icon={MapPin}
+          title={t("customer.empty.noAddressTitle")}
+          body={t("customer.empty.noLinkedAddressBody")}
+        />
       )}
     </div>
   );

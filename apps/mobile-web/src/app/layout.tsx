@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "@cleanhub/ui";
 
+import { MobileI18nProvider } from "@/components/mobile-i18n-provider";
 import { MobileUpdateRequired } from "@/components/mobile-update-required";
 
 import "./globals.css";
@@ -25,9 +26,11 @@ export default function RootLayout({
   return (
     <html lang="fr">
       <body>
-        {children}
-        <MobileUpdateRequired />
-        <Toaster />
+        <MobileI18nProvider>
+          {children}
+          <MobileUpdateRequired />
+          <Toaster />
+        </MobileI18nProvider>
       </body>
     </html>
   );

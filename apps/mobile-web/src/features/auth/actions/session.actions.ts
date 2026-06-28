@@ -28,7 +28,7 @@ export async function enterTenantContext(input: string): Promise<string> {
   const tenantCode = input.trim().toUpperCase();
 
   if (!/^[A-Z0-9][A-Z0-9-]{2,31}$/.test(tenantCode)) {
-    throw new Error("Saisissez un code pressing valide.");
+    throw new Error("auth.tenant.invalidCode");
   }
 
   await saveTenantCode(tenantCode);

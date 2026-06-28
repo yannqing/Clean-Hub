@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { TranslationKey } from "@cleanhub/i18n";
+import { useTranslation } from "@cleanhub/i18n/react";
 import { Button } from "@cleanhub/ui";
 import { CheckCircle2, Loader2, RefreshCcw, XCircle } from "lucide-react";
 
@@ -10,6 +12,13 @@ import {
 } from "@/features/customer/queries";
 
 type PaymentState = "pending" | "paid" | "failed" | "refunded" | "unknown";
+
+const statusLabelKeys = {
+  pending: "customer.status.payment.pending",
+  paid: "customer.status.payment.paid",
+  failed: "customer.status.payment.failed",
+  refunded: "customer.status.payment.refunded",
+} satisfies Record<Exclude<PaymentState, "unknown">, TranslationKey>;
 
 function getPaymentId(): string {
   if (typeof window === "undefined") {
@@ -27,11 +36,20 @@ function getExternalId(): string {
   return new URLSearchParams(window.location.search).get("externalId") ?? "";
 }
 
-function statusCopy(status: PaymentState) {
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
+}
+
+function statusCopy(status: PaymentState): {
+  titleKey: TranslationKey;
+  bodyKey: TranslationKey;
+  tone: string;
+  icon: typeof CheckCircle2;
+} {
   if (status === "paid") {
     return {
-      title: "Paiement confirme",
-      body: "La commande a ete rapprochee avec le paiement.",
+      titleKey: "customer.paymentMock.paidTitle",
+      bodyKey: "customer.paymentMock.paidBody",
       tone: "text-emerald-700",
       icon: CheckCircle2,
     };
@@ -39,22 +57,32 @@ function statusCopy(status: PaymentState) {
 
   if (status === "failed") {
     return {
-      title: "Paiement refuse",
-      body: "La transaction a ete marquee en echec.",
+      titleKey: "customer.paymentMock.failedTitle",
+      bodyKey: "customer.paymentMock.failedBody",
       tone: "text-red-700",
       icon: XCircle,
     };
   }
 
+  if (status === "refunded") {
+    return {
+      titleKey: "customer.paymentMock.refundedTitle",
+      bodyKey: "customer.paymentMock.refundedBody",
+      tone: "text-slate-700",
+      icon: RefreshCcw,
+    };
+  }
+
   return {
-    title: "Paiement mock",
-    body: "Transaction en attente de callback mock.",
+    titleKey: "customer.paymentMock.pendingTitle",
+    bodyKey: "customer.paymentMock.pendingBody",
     tone: "text-amber-700",
     icon: Loader2,
   };
 }
 
 export default function MockPaymentPage() {
+  const { t } = useTranslation();
   const [paymentId] = useState(getPaymentId);
   const [externalId] = useState(getExternalId);
   const [status, setStatus] = useState<PaymentState>("pending");
@@ -69,7 +97,7 @@ export default function MockPaymentPage() {
   const refreshStatus = useCallback(async () => {
     if (!paymentId) {
       setStatus("unknown");
-      setError("Identifiant de paiement manquant.");
+      setError(t("common.errors.missingPaymentId"));
       return;
     }
 
@@ -81,20 +109,18 @@ export default function MockPaymentPage() {
       setStatus(result.transaction.paymentStatus as PaymentState);
     } catch (nextError) {
       setError(
-        nextError instanceof Error
-          ? nextError.message
-          : "Statut indisponible.",
+        getErrorMessage(nextError, t("customer.paymentMock.statusUnavailable")),
       );
     } finally {
       setIsLoading(false);
     }
-  }, [paymentId]);
+  }, [paymentId, t]);
 
   const completeMockPayment = useCallback(
     async (nextStatus: "paid" | "failed") => {
       if (!paymentId) {
         setStatus("unknown");
-        setError("Identifiant de paiement manquant.");
+        setError(t("common.errors.missingPaymentId"));
         return;
       }
 
@@ -106,15 +132,13 @@ export default function MockPaymentPage() {
         await refreshStatus();
       } catch (nextError) {
         setError(
-          nextError instanceof Error
-            ? nextError.message
-            : "Callback mock indisponible.",
+          getErrorMessage(nextError, t("customer.paymentMock.callbackUnavailable")),
         );
       } finally {
         setIsCompleting(null);
       }
     },
-    [paymentId, refreshStatus],
+    [paymentId, refreshStatus, t],
   );
 
   useEffect(() => {
@@ -134,29 +158,41 @@ export default function MockPaymentPage() {
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 py-[max(24px,env(safe-area-inset-top))]">
       <section className="mt-10 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
-        <div className={`flex size-12 items-center justify-center rounded-md bg-slate-50 ${copy.tone}`}>
+        <div
+          className={`flex size-12 items-center justify-center rounded-md bg-slate-50 ${copy.tone}`}
+        >
           <Icon
             className={`size-6 ${status === "pending" ? "animate-spin" : ""}`}
             aria-hidden="true"
           />
         </div>
         <h1 className="mt-4 text-2xl font-semibold text-slate-950">
-          {copy.title}
+          {t(copy.titleKey)}
         </h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">{copy.body}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{t(copy.bodyKey)}</p>
 
         <dl className="mt-5 space-y-3 rounded-md bg-slate-50 p-3 text-sm">
           <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">Payment</dt>
-            <dd className="break-all font-medium text-slate-950">{paymentId || "-"}</dd>
+            <dt className="text-slate-500">
+              {t("customer.paymentMock.payment")}
+            </dt>
+            <dd className="break-all font-medium text-slate-950">
+              {paymentId || "-"}
+            </dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">Gateway</dt>
-            <dd className="break-all font-medium text-slate-950">{externalId || "-"}</dd>
+            <dt className="text-slate-500">{t("customer.paymentMock.gateway")}</dt>
+            <dd className="break-all font-medium text-slate-950">
+              {externalId || "-"}
+            </dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt className="text-slate-500">Statut</dt>
-            <dd className="font-medium text-slate-950">{status}</dd>
+            <dt className="text-slate-500">{t("common.status")}</dt>
+            <dd className="font-medium text-slate-950">
+              {status === "unknown"
+                ? t("common.unavailable")
+                : t(statusLabelKeys[status])}
+            </dd>
           </div>
         </dl>
 
@@ -178,7 +214,7 @@ export default function MockPaymentPage() {
             ) : (
               <CheckCircle2 className="size-4" aria-hidden="true" />
             )}
-            Confirmer le paiement
+            {t("customer.paymentMock.confirmPayment")}
           </Button>
           <Button
             className="h-11 w-full"
@@ -192,7 +228,7 @@ export default function MockPaymentPage() {
             ) : (
               <XCircle className="size-4" aria-hidden="true" />
             )}
-            Simuler un refus
+            {t("customer.paymentMock.simulateFailure")}
           </Button>
           <Button
             className="h-11 w-full"
@@ -206,7 +242,7 @@ export default function MockPaymentPage() {
             ) : (
               <RefreshCcw className="size-4" aria-hidden="true" />
             )}
-            Actualiser
+            {t("common.refresh")}
           </Button>
         </div>
       </section>
