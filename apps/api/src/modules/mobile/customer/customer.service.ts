@@ -1,14 +1,21 @@
 import { getDb, type Database } from "@cleanhub/db";
 
+import { validatePasswordAgainstPolicy } from "../../auth/password-policy.helper.js";
+import { hashPassword, verifyPassword } from "../../auth/password.service.js";
+import { resolveEffectiveSecurityPolicy } from "../../saas/security/security-policy.js";
 import type { MobileAuthContext } from "../auth/auth.types.js";
 import { CustomerRepository } from "./customer.repository.js";
 import type {
   CreateCustomerAppointmentInput,
   CustomerActivityList,
+  CustomerAddress,
+  CustomerAddressWriteInput,
   CustomerAppointment,
+  CustomerChangePasswordInput,
   CustomerMobileContext,
   CustomerOrderDetail,
   CustomerProfile,
+  CustomerProfileUpdateInput,
   CustomerTicketDetail,
 } from "./customer.types.js";
 import { CustomerError } from "./customer.types.js";
@@ -23,6 +30,57 @@ export type CustomerRepositoryLike = {
     tenantId: string;
     customerAccountId: string;
   }): Promise<CustomerProfile | null>;
+  updateProfile(input: {
+    tenantId: string;
+    customerAccountId: string;
+    accountName?: string;
+    phone?: string | null;
+    email?: string | null;
+  }): Promise<CustomerProfile | null>;
+  listAddresses(input: {
+    tenantId: string;
+    customerAccountId: string;
+  }): Promise<CustomerAddress[]>;
+  findOwnedAddressById(input: {
+    tenantId: string;
+    customerAccountId: string;
+    addressId: string;
+  }): Promise<CustomerAddress | null>;
+  createAddress(input: {
+    tenantId: string;
+    customerAccountId: string;
+    data: CustomerAddressWriteInput;
+  }): Promise<CustomerAddress>;
+  updateAddress(input: {
+    tenantId: string;
+    customerAccountId: string;
+    addressId: string;
+    data: CustomerAddressWriteInput;
+  }): Promise<CustomerAddress | null>;
+  softDeleteAddress(input: {
+    tenantId: string;
+    customerAccountId: string;
+    addressId: string;
+  }): Promise<CustomerAddress | null>;
+  setDefaultAddress(input: {
+    tenantId: string;
+    customerAccountId: string;
+    addressId: string;
+  }): Promise<CustomerAddress | null>;
+  findCustomerCredential(input: {
+    tenantId: string;
+    customerAccountId: string;
+  }): Promise<{ id: string; passwordHash: string } | null>;
+  updateCustomerPassword(input: {
+    tenantId: string;
+    customerAccountId: string;
+    credentialId: string;
+    passwordHash: string;
+  }): Promise<void>;
+  revokeCustomerRefreshTokens(input: {
+    tenantId: string;
+    customerAccountId: string;
+  }): Promise<void>;
   findOwnedCustomerById(input: {
     tenantId: string;
     customerAccountId: string;
@@ -95,6 +153,14 @@ function profileNotFound(): CustomerError {
   );
 }
 
+function addressNotFound(): CustomerError {
+  return new CustomerError(
+    "CUSTOMER_ADDRESS_NOT_FOUND",
+    "Customer address was not found.",
+    404,
+  );
+}
+
 function validationError(message: string): CustomerError {
   return new CustomerError("CUSTOMER_VALIDATION_ERROR", message, 422);
 }
@@ -110,9 +176,11 @@ function assertCustomerContext(
 }
 
 export class CustomerService {
+  private readonly db?: Database;
   private readonly repository: CustomerRepositoryLike;
 
   constructor(options: CustomerServiceOptions = {}) {
+    this.db = options.db;
     this.repository =
       options.repository ?? new CustomerRepository(options.db ?? getDb());
   }
@@ -129,6 +197,163 @@ export class CustomerService {
     }
 
     return profile;
+  }
+
+  async updateProfile(
+    authContext: MobileAuthContext,
+    input: CustomerProfileUpdateInput,
+  ): Promise<CustomerProfile> {
+    const customer = assertCustomerContext(authContext);
+    const profile = await this.repository.updateProfile({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+      accountName: input.accountName,
+      phone: input.phone,
+      email: input.email,
+    });
+
+    if (!profile) {
+      throw profileNotFound();
+    }
+
+    return profile;
+  }
+
+  async listAddresses(
+    authContext: MobileAuthContext,
+  ): Promise<CustomerAddress[]> {
+    const customer = assertCustomerContext(authContext);
+
+    return this.repository.listAddresses({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+    });
+  }
+
+  async createAddress(
+    authContext: MobileAuthContext,
+    input: CustomerAddressWriteInput,
+  ): Promise<CustomerAddress> {
+    const customer = assertCustomerContext(authContext);
+    const data = await this.normalizeAddressInput(customer, input);
+
+    return this.repository.createAddress({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+      data,
+    });
+  }
+
+  async updateAddress(
+    authContext: MobileAuthContext,
+    addressId: string,
+    input: CustomerAddressWriteInput,
+  ): Promise<CustomerAddress> {
+    const customer = assertCustomerContext(authContext);
+    const existing = await this.repository.findOwnedAddressById({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+      addressId,
+    });
+
+    if (!existing) {
+      throw addressNotFound();
+    }
+
+    const data = await this.normalizeAddressInput(customer, input);
+    const updated = await this.repository.updateAddress({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+      addressId,
+      data,
+    });
+
+    if (!updated) {
+      throw addressNotFound();
+    }
+
+    return updated;
+  }
+
+  async deleteAddress(
+    authContext: MobileAuthContext,
+    addressId: string,
+  ): Promise<CustomerAddress> {
+    const customer = assertCustomerContext(authContext);
+    const deleted = await this.repository.softDeleteAddress({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+      addressId,
+    });
+
+    if (!deleted) {
+      throw addressNotFound();
+    }
+
+    return deleted;
+  }
+
+  async setDefaultAddress(
+    authContext: MobileAuthContext,
+    addressId: string,
+  ): Promise<CustomerAddress> {
+    const customer = assertCustomerContext(authContext);
+    const address = await this.repository.setDefaultAddress({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+      addressId,
+    });
+
+    if (!address) {
+      throw addressNotFound();
+    }
+
+    return address;
+  }
+
+  async changePassword(
+    authContext: MobileAuthContext,
+    input: CustomerChangePasswordInput,
+  ): Promise<{ passwordChanged: true }> {
+    const customer = assertCustomerContext(authContext);
+    const credential = await this.repository.findCustomerCredential({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+    });
+
+    if (!credential) {
+      throw profileNotFound();
+    }
+
+    const passwordValid = await verifyPassword(
+      input.currentPassword,
+      credential.passwordHash,
+    );
+
+    if (!passwordValid) {
+      throw validationError("Current password is incorrect.");
+    }
+
+    const policy = await resolveEffectiveSecurityPolicy(this.db ?? getDb());
+    const policyError = validatePasswordAgainstPolicy(input.newPassword, policy);
+
+    if (policyError) {
+      throw validationError(policyError);
+    }
+
+    const passwordHash = await hashPassword(input.newPassword);
+    await this.repository.updateCustomerPassword({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+      credentialId: credential.id,
+      passwordHash,
+    });
+    await this.repository.revokeCustomerRefreshTokens({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+    });
+
+    return { passwordChanged: true };
   }
 
   async listOrdersAndTickets(
@@ -309,6 +534,41 @@ export class CustomerService {
     }
 
     return defaultCustomer.id;
+  }
+
+  private async normalizeAddressInput(
+    customer: CustomerMobileContext,
+    input: CustomerAddressWriteInput,
+  ): Promise<CustomerAddressWriteInput> {
+    const customerId = input.customerId
+      ? await this.resolveCustomerId({
+          tenantId: customer.tenantId,
+          customerAccountId: customer.subjectId,
+          customerId: input.customerId,
+        })
+      : null;
+
+    if (input.latitude) {
+      const latitude = Number(input.latitude);
+
+      if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) {
+        throw validationError("Latitude must be between -90 and 90.");
+      }
+    }
+
+    if (input.longitude) {
+      const longitude = Number(input.longitude);
+
+      if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+        throw validationError("Longitude must be between -180 and 180.");
+      }
+    }
+
+    return {
+      ...input,
+      customerId,
+      country: input.country ?? "TH",
+    };
   }
 
   private async resolveBranchId({

@@ -27,6 +27,8 @@ import {
   PackageCheck,
   PenLine,
   Phone,
+  Printer,
+  ReceiptText,
   RefreshCw,
   Route,
   UserRound,
@@ -42,6 +44,13 @@ import {
 } from "../actions";
 import { captureDeliveryPhoto, isOnline } from "../lib/device";
 import type { UploadableMedia } from "../lib/media-upload";
+import {
+  connectPortablePrinter,
+  initialDeliveryPrinterState,
+  printDeliveryDocument,
+  validateDeliveryPrintTask,
+  type DeliveryPrintDocument,
+} from "../lib/printing";
 import { getDeliveryTaskDetail, getTodayDeliveryTasks } from "../queries";
 import type {
   DeliveryActionResult,
@@ -208,6 +217,7 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [printer, setPrinter] = useState(initialDeliveryPrinterState);
   const [isBooting, setIsBooting] = useState(true);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -623,6 +633,51 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
     });
   }
 
+  function handleConnectPrinter() {
+    void runAction("printer-connect", async () => {
+      const nextPrinter = await connectPortablePrinter();
+      setPrinter(nextPrinter);
+
+      if (nextPrinter.error) {
+        setWarning(nextPrinter.error);
+        return;
+      }
+
+      setMessage(
+        nextPrinter.device?.name
+          ? `Imprimante connectee: ${nextPrinter.device.name}`
+          : "Imprimante connectee.",
+      );
+    });
+  }
+
+  function handlePrintDocument(document: DeliveryPrintDocument) {
+    if (!selectedTask) {
+      return;
+    }
+
+    const validationError = validateDeliveryPrintTask(selectedTask);
+
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    if (!printer.device) {
+      setWarning("Connectez une imprimante portable avant d'imprimer.");
+      return;
+    }
+
+    void runAction(`print-${document}`, async () => {
+      const result = await printDeliveryDocument({
+        task: selectedTask,
+        document,
+        printer,
+      });
+      setMessage(result.message);
+    });
+  }
+
   if (isBooting) {
     return (
       <section className="flex min-h-[70dvh] items-center justify-center px-5">
@@ -866,6 +921,69 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
                     ) : null}
                   </div>
                 </dl>
+
+                <section className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white text-teal-700">
+                        <Printer className="size-4" aria-hidden="true" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-950">Imprimante</p>
+                        <p className="truncate text-xs text-slate-600">
+                          {printer.device?.name ??
+                            printer.device?.id ??
+                            (printer.status === "unavailable" ? "Bluetooth indisponible" : "Non connectee")}
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      className="h-10 shrink-0 px-3"
+                      disabled={Boolean(activeAction)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                      onClick={handleConnectPrinter}
+                    >
+                      {activeAction === "printer-connect" ? (
+                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <RefreshCw className="size-4" aria-hidden="true" />
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Button
+                      className="h-11"
+                      disabled={Boolean(activeAction) || !printer.device}
+                      type="button"
+                      variant="secondary"
+                      onClick={() => handlePrintDocument("receipt")}
+                    >
+                      {activeAction === "print-receipt" ? (
+                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <ReceiptText className="size-4" aria-hidden="true" />
+                      )}
+                      Recu
+                    </Button>
+                    <Button
+                      className="h-11"
+                      disabled={Boolean(activeAction) || !printer.device}
+                      type="button"
+                      variant="secondary"
+                      onClick={() => handlePrintDocument("label")}
+                    >
+                      {activeAction === "print-label" ? (
+                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      ) : (
+                        <PackageCheck className="size-4" aria-hidden="true" />
+                      )}
+                      Etiquette
+                    </Button>
+                  </div>
+                </section>
 
                 <div className="grid grid-cols-3 gap-2">
                   <Button

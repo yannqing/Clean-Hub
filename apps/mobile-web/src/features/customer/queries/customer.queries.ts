@@ -6,6 +6,10 @@ export async function getCustomerProfile() {
   return apiClient.mobile.customer.getProfile();
 }
 
+export async function getCustomerAddresses() {
+  return apiClient.mobile.customer.listAddresses();
+}
+
 export async function getCustomerOrdersAndTickets() {
   return apiClient.mobile.customer.listOrdersAndTickets();
 }

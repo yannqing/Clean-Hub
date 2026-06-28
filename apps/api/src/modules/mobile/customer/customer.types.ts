@@ -27,6 +27,56 @@ export type CustomerProfile = {
   addresses: CustomerProfileAddress[];
 };
 
+export type CustomerProfileUpdateInput = {
+  accountName?: string;
+  phone?: string | null;
+  email?: string | null;
+};
+
+export type CustomerAddress = {
+  id: string;
+  tenantId: string;
+  customerAccountId: string;
+  customerId: string | null;
+  label: string;
+  contactName: string | null;
+  contactPhone: string | null;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  country: string;
+  latitude: string | null;
+  longitude: string | null;
+  isDefault: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CustomerAddressWriteInput = {
+  customerId?: string | null;
+  label: string;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
+  country?: string;
+  latitude?: string | null;
+  longitude?: string | null;
+  isDefault?: boolean;
+  notes?: string | null;
+};
+
+export type CustomerChangePasswordInput = {
+  currentPassword: string;
+  newPassword: string;
+};
+
 export type CustomerOrderStatus =
   | "draft"
   | "received"
@@ -145,6 +195,7 @@ export type CreateCustomerAppointmentInput = {
 export type CustomerErrorCode =
   | "CUSTOMER_FORBIDDEN"
   | "CUSTOMER_PROFILE_NOT_FOUND"
+  | "CUSTOMER_ADDRESS_NOT_FOUND"
   | "CUSTOMER_ORDER_NOT_FOUND"
   | "CUSTOMER_TICKET_NOT_FOUND"
   | "CUSTOMER_APPOINTMENT_NOT_FOUND"

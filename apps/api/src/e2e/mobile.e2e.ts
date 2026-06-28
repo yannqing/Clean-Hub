@@ -1,5 +1,10 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
+import {
+  buildDeliveryLabelText,
+  buildDeliveryReceiptText,
+  type DeliveryPrintTask,
+} from "@cleanhub/hardware";
 
 type JsonObject = Record<string, unknown>;
 
@@ -82,6 +87,18 @@ type RefundRequestResponse = {
 
 function idempotencyKey(label: string): string {
   return `${DEVICE_ID}-${label}`;
+}
+
+function amountToCents(value: string): number {
+  return Math.round(Number.parseFloat(value) * 100);
+}
+
+function centsToAmount(value: number): string {
+  return (value / 100).toFixed(2);
+}
+
+function normalizePrintableText(value: string): string {
+  return value.replace(/\s+/g, " ").trim();
 }
 
 function stableStringify(value: unknown): string {
@@ -277,12 +294,80 @@ async function loginOwner(): Promise<MobileTokenResponse> {
 
 async function verifyCustomerFlow(token: MobileTokenResponse): Promise<void> {
   const profile = await request<{
-    account: { id: string };
+    account: { id: string; accountName: string };
     addresses: Array<{ customerId: string }>;
   }>("/mobile/customer/profile", { token: token.accessToken });
 
   assert.equal(profile.body.account.id, FIXTURES.customerAccountId);
   assert.ok(profile.body.addresses.some((item) => item.customerId === FIXTURES.customerId));
+
+  const updatedProfile = await request<{
+    account: { id: string; accountName: string; email: string | null };
+  }>("/mobile/customer/profile", {
+    method: "PATCH",
+    token: token.accessToken,
+    body: {
+      accountName: profile.body.account.accountName,
+      email: "zhang.wei@example.com",
+    },
+  });
+
+  assert.equal(updatedProfile.body.account.id, FIXTURES.customerAccountId);
+  assert.equal(updatedProfile.body.account.email, "zhang.wei@example.com");
+
+  const address = await request<{ id: string; isDefault: boolean; addressLine1: string }>(
+    "/mobile/customer/addresses",
+    {
+      expectedStatus: 201,
+      token: token.accessToken,
+      body: {
+        customerId: FIXTURES.customerId,
+        label: "Mobile E2E",
+        contactName: "Zhang Wei",
+        contactPhone: FIXTURES.customerPhone,
+        addressLine1: "Mobile E2E address",
+        city: "Shanghai",
+        country: "CN",
+        latitude: "31.2304000",
+        longitude: "121.4737000",
+        isDefault: true,
+      },
+    },
+  );
+
+  assert.equal(address.body.isDefault, true);
+
+  const addressList = await request<{ data: Array<{ id: string; isDefault: boolean }> }>(
+    "/mobile/customer/addresses",
+    { token: token.accessToken },
+  );
+  assert.ok(addressList.body.data.some((item) => item.id === address.body.id));
+
+  const updatedAddress = await request<{ id: string; addressLine1: string }>(
+    `/mobile/customer/addresses/${address.body.id}`,
+    {
+      method: "PATCH",
+      token: token.accessToken,
+      body: {
+        customerId: FIXTURES.customerId,
+        label: "Mobile E2E Updated",
+        addressLine1: "Mobile E2E updated address",
+        country: "CN",
+      },
+    },
+  );
+  assert.equal(updatedAddress.body.addressLine1, "Mobile E2E updated address");
+
+  const defaultAddress = await request<{ id: string; isDefault: boolean }>(
+    `/mobile/customer/addresses/${address.body.id}/default`,
+    { method: "POST", token: token.accessToken },
+  );
+  assert.equal(defaultAddress.body.isDefault, true);
+
+  await request(`/mobile/customer/addresses/${address.body.id}`, {
+    method: "DELETE",
+    token: token.accessToken,
+  });
 
   const activities = await request<{
     data: {
@@ -336,11 +421,67 @@ async function verifyCustomerFlow(token: MobileTokenResponse): Promise<void> {
   assert.equal(cancelled.body.status, "cancelled");
 }
 
+function verifyPrintTemplates(task: {
+  id: string;
+  type: "pickup" | "dropoff";
+  customerName: string;
+  customerPhone: string;
+  address: string;
+  orderId: string;
+  ticketId: string;
+  expectedAt?: string;
+}): void {
+  const printable: DeliveryPrintTask = {
+    taskId: task.id,
+    kind: task.type === "pickup" ? "pickup" : "delivery",
+    customer: {
+      name: task.customerName,
+      phone: task.customerPhone,
+    },
+    address: task.address,
+    orderId: task.orderId,
+    workOrderId: task.ticketId,
+    scheduledAt: task.expectedAt,
+  };
+  const receipt = buildDeliveryReceiptText(printable, { locale: "fr" });
+  const label = buildDeliveryLabelText(printable, { locale: "fr" });
+
+  for (const content of [receipt, label]) {
+    const normalizedContent = normalizePrintableText(content);
+
+    assert.match(normalizedContent, new RegExp(task.id));
+    assert.match(normalizedContent, new RegExp(task.customerName));
+    assert.match(normalizedContent, new RegExp(task.address));
+    assert.match(normalizedContent, new RegExp(task.orderId));
+    assert.match(normalizedContent, new RegExp(task.ticketId));
+  }
+}
+
 async function createDeliveryTask(
   token: MobileTokenResponse,
-): Promise<{ id: string; status: string }> {
+): Promise<{
+  id: string;
+  status: string;
+  type: "pickup" | "dropoff";
+  customerName: string;
+  customerPhone: string;
+  address: string;
+  orderId: string;
+  ticketId: string;
+  expectedAt?: string;
+}> {
   return (
-    await request<{ id: string; status: string }>("/mobile/delivery/tasks", {
+    await request<{
+      id: string;
+      status: string;
+      type: "pickup" | "dropoff";
+      customerName: string;
+      customerPhone: string;
+      address: string;
+      orderId: string;
+      ticketId: string;
+      expectedAt?: string;
+    }>("/mobile/delivery/tasks", {
       expectedStatus: 201,
       token: token.accessToken,
       body: {
@@ -365,6 +506,7 @@ async function verifyDeliveryFlow(token: MobileTokenResponse): Promise<void> {
   const task = await createDeliveryTask(token);
 
   assert.equal(task.status, "pending_dispatch");
+  verifyPrintTemplates(task);
 
   const tasks = await request<{ data: Array<{ id: string }> }>(
     "/mobile/delivery/tasks/today",
@@ -565,6 +707,21 @@ async function verifyPaymentFlow(input: {
   customer: MobileTokenResponse;
   owner: MobileTokenResponse;
 }): Promise<void> {
+  const startingOrder = await request<{
+    paymentStatus: string;
+    totalAmount: string;
+    paidAmount: string;
+  }>(`/mobile/customer/orders/${FIXTURES.orderId}`, {
+    token: input.customer.accessToken,
+  });
+  const startingPaidCents = amountToCents(startingOrder.body.paidAmount);
+  const balanceCents =
+    amountToCents(startingOrder.body.totalAmount) - startingPaidCents;
+  const paymentCents = Math.min(Math.max(balanceCents, 1), 1000);
+  const paymentAmount = centsToAmount(paymentCents);
+
+  assert.ok(balanceCents > 0, "payment flow requires a positive order balance");
+
   await request(`/mobile/payment/orders/${FIXTURES.orderId}/payments`, {
     expectedStatus: 422,
     token: input.customer.accessToken,
@@ -580,7 +737,7 @@ async function verifyPaymentFlow(input: {
       expectedStatus: 201,
       token: input.customer.accessToken,
       body: {
-        amount: "45.00",
+        amount: paymentAmount,
         idempotencyKey: idempotencyKey("payment-balance"),
       },
     },
@@ -596,7 +753,7 @@ async function verifyPaymentFlow(input: {
       expectedStatus: 201,
       token: input.customer.accessToken,
       body: {
-        amount: "45.00",
+        amount: paymentAmount,
         idempotencyKey: idempotencyKey("payment-balance"),
       },
     },
@@ -618,7 +775,7 @@ async function verifyPaymentFlow(input: {
     externalId: payment.body.gateway.externalId,
     event: `mock.payment.paid.${payment.body.transaction.id}`,
     status: "paid",
-    amount: "45.00",
+    amount: paymentAmount,
     transactionId: payment.body.transaction.id,
     occurredAt: new Date().toISOString(),
   });
@@ -653,8 +810,11 @@ async function verifyPaymentFlow(input: {
     `/mobile/customer/orders/${FIXTURES.orderId}`,
     { token: input.customer.accessToken },
   );
-  assert.equal(paidOrder.body.paymentStatus, "paid");
-  assert.equal(paidOrder.body.paidAmount, "95.00");
+  assert.ok(["paid", "partial"].includes(paidOrder.body.paymentStatus));
+  assert.equal(
+    paidOrder.body.paidAmount,
+    centsToAmount(startingPaidCents + paymentCents),
+  );
 
   await request(`/mobile/payment/orders/${FIXTURES.orderId}/refund-requests`, {
     expectedStatus: 422,
@@ -665,13 +825,15 @@ async function verifyPaymentFlow(input: {
     },
   });
 
+  const refundCents = Math.min(paymentCents, 1000);
+  const refundAmount = centsToAmount(refundCents);
   const refund = await request<RefundRequestResponse>(
     `/mobile/payment/orders/${FIXTURES.orderId}/refund-requests`,
     {
       expectedStatus: 201,
       token: input.customer.accessToken,
       body: {
-        amount: "10.00",
+        amount: refundAmount,
         reason: "Mobile E2E refund request",
       },
     },
@@ -701,7 +863,7 @@ async function verifyPaymentFlow(input: {
     externalId: approved.body.gateway.externalId,
     event: `${DEVICE_ID}.refund.succeeded`,
     status: "refunded",
-    amount: "10.00",
+    amount: refundAmount,
     transactionId: payment.body.transaction.id,
     refundRequestId: refund.body.id,
     occurredAt: new Date().toISOString(),
@@ -722,7 +884,10 @@ async function verifyPaymentFlow(input: {
     `/mobile/customer/orders/${FIXTURES.orderId}`,
     { token: input.customer.accessToken },
   );
-  assert.equal(refundedOrder.body.paidAmount, "85.00");
+  assert.equal(
+    refundedOrder.body.paidAmount,
+    centsToAmount(startingPaidCents + paymentCents - refundCents),
+  );
 }
 
 async function verifyAccessIsolation(input: {

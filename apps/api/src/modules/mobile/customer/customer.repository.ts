@@ -7,12 +7,16 @@ import {
   getTableColumns,
   isNull,
   sql,
+  type SQL,
 } from "drizzle-orm";
 
 import {
   appointments,
   branches,
   customerAccounts,
+  customerAddresses,
+  customerAuthRefreshTokens,
+  customerCredentials,
   customers,
   orderItems,
   orders,
@@ -22,6 +26,8 @@ import {
 } from "@cleanhub/db";
 
 import type {
+  CustomerAddress,
+  CustomerAddressWriteInput,
   CustomerAppointment,
   CustomerAppointmentType,
   CustomerOrderDetail,
@@ -54,6 +60,32 @@ function toAppointment(
     acceptedAt: toIsoString(row.acceptedAt),
     cancelledAt: toIsoString(row.cancelledAt),
     doneAt: toIsoString(row.doneAt),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function toCustomerAddress(
+  row: typeof customerAddresses.$inferSelect,
+): CustomerAddress {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    customerAccountId: row.customerAccountId,
+    customerId: row.customerId,
+    label: row.label,
+    contactName: row.contactName,
+    contactPhone: row.contactPhone,
+    addressLine1: row.addressLine1,
+    addressLine2: row.addressLine2,
+    city: row.city,
+    province: row.province,
+    postalCode: row.postalCode,
+    country: row.country,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    isDefault: row.isDefault,
+    notes: row.notes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -177,6 +209,372 @@ export class CustomerRepository {
       account,
       addresses: addressRows satisfies CustomerProfileAddress[],
     };
+  }
+
+  async updateProfile(input: {
+    tenantId: string;
+    customerAccountId: string;
+    accountName?: string;
+    phone?: string | null;
+    email?: string | null;
+  }): Promise<CustomerProfile | null> {
+    const now = new Date();
+    const values: {
+      updatedAt: Date;
+      version: SQL;
+      accountName?: string;
+      phone?: string | null;
+      email?: string | null;
+    } = {
+      updatedAt: now,
+      version: sql`${customerAccounts.version} + 1`,
+    };
+
+    if (input.accountName !== undefined) {
+      values.accountName = input.accountName;
+    }
+
+    if (input.phone !== undefined) {
+      values.phone = input.phone;
+    }
+
+    if (input.email !== undefined) {
+      values.email = input.email;
+    }
+
+    const rows = await this.db
+      .update(customerAccounts)
+      .set(values)
+      .where(
+        and(
+          eq(customerAccounts.id, input.customerAccountId),
+          eq(customerAccounts.tenantId, input.tenantId),
+          isNull(customerAccounts.deletedAt),
+        ),
+      )
+      .returning({ id: customerAccounts.id });
+
+    if (!rows[0]) {
+      return null;
+    }
+
+    return this.getProfile({
+      tenantId: input.tenantId,
+      customerAccountId: input.customerAccountId,
+    });
+  }
+
+  async listAddresses(input: {
+    tenantId: string;
+    customerAccountId: string;
+  }): Promise<CustomerAddress[]> {
+    const rows = await this.db
+      .select({ ...getTableColumns(customerAddresses) })
+      .from(customerAddresses)
+      .where(
+        and(
+          eq(customerAddresses.tenantId, input.tenantId),
+          eq(customerAddresses.customerAccountId, input.customerAccountId),
+          isNull(customerAddresses.deletedAt),
+        ),
+      )
+      .orderBy(desc(customerAddresses.isDefault), asc(customerAddresses.createdAt));
+
+    return rows.map(toCustomerAddress);
+  }
+
+  async findOwnedAddressById(input: {
+    tenantId: string;
+    customerAccountId: string;
+    addressId: string;
+  }): Promise<CustomerAddress | null> {
+    const rows = await this.db
+      .select({ ...getTableColumns(customerAddresses) })
+      .from(customerAddresses)
+      .where(
+        and(
+          eq(customerAddresses.id, input.addressId),
+          eq(customerAddresses.tenantId, input.tenantId),
+          eq(customerAddresses.customerAccountId, input.customerAccountId),
+          isNull(customerAddresses.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ? toCustomerAddress(rows[0]) : null;
+  }
+
+  async createAddress(input: {
+    tenantId: string;
+    customerAccountId: string;
+    data: CustomerAddressWriteInput;
+  }): Promise<CustomerAddress> {
+    return this.db.transaction(async (tx) => {
+      const now = new Date();
+
+      if (input.data.isDefault) {
+        await tx
+          .update(customerAddresses)
+          .set({
+            isDefault: false,
+            updatedAt: now,
+            version: sql`${customerAddresses.version} + 1`,
+          })
+          .where(
+            and(
+              eq(customerAddresses.tenantId, input.tenantId),
+              eq(customerAddresses.customerAccountId, input.customerAccountId),
+              eq(customerAddresses.isDefault, true),
+              isNull(customerAddresses.deletedAt),
+            ),
+          );
+      }
+
+      const rows = await tx
+        .insert(customerAddresses)
+        .values({
+          id: createId(),
+          tenantId: input.tenantId,
+          customerAccountId: input.customerAccountId,
+          customerId: input.data.customerId ?? null,
+          label: input.data.label,
+          contactName: input.data.contactName,
+          contactPhone: input.data.contactPhone,
+          addressLine1: input.data.addressLine1,
+          addressLine2: input.data.addressLine2,
+          city: input.data.city,
+          province: input.data.province,
+          postalCode: input.data.postalCode,
+          country: input.data.country ?? "TH",
+          latitude: input.data.latitude,
+          longitude: input.data.longitude,
+          isDefault: input.data.isDefault ?? false,
+          notes: input.data.notes,
+        })
+        .returning({ ...getTableColumns(customerAddresses) });
+
+      return toCustomerAddress(rows[0]);
+    });
+  }
+
+  async updateAddress(input: {
+    tenantId: string;
+    customerAccountId: string;
+    addressId: string;
+    data: CustomerAddressWriteInput;
+  }): Promise<CustomerAddress | null> {
+    return this.db.transaction(async (tx) => {
+      const now = new Date();
+
+      if (input.data.isDefault) {
+        await tx
+          .update(customerAddresses)
+          .set({
+            isDefault: false,
+            updatedAt: now,
+            version: sql`${customerAddresses.version} + 1`,
+          })
+          .where(
+            and(
+              eq(customerAddresses.tenantId, input.tenantId),
+              eq(customerAddresses.customerAccountId, input.customerAccountId),
+              eq(customerAddresses.isDefault, true),
+              isNull(customerAddresses.deletedAt),
+            ),
+          );
+      }
+
+      const rows = await tx
+        .update(customerAddresses)
+        .set({
+          customerId: input.data.customerId ?? null,
+          label: input.data.label,
+          contactName: input.data.contactName,
+          contactPhone: input.data.contactPhone,
+          addressLine1: input.data.addressLine1,
+          addressLine2: input.data.addressLine2,
+          city: input.data.city,
+          province: input.data.province,
+          postalCode: input.data.postalCode,
+          country: input.data.country ?? "TH",
+          latitude: input.data.latitude,
+          longitude: input.data.longitude,
+          isDefault: input.data.isDefault ?? false,
+          notes: input.data.notes,
+          updatedAt: now,
+          version: sql`${customerAddresses.version} + 1`,
+        })
+        .where(
+          and(
+            eq(customerAddresses.id, input.addressId),
+            eq(customerAddresses.tenantId, input.tenantId),
+            eq(customerAddresses.customerAccountId, input.customerAccountId),
+            isNull(customerAddresses.deletedAt),
+          ),
+        )
+        .returning({ ...getTableColumns(customerAddresses) });
+
+      return rows[0] ? toCustomerAddress(rows[0]) : null;
+    });
+  }
+
+  async softDeleteAddress(input: {
+    tenantId: string;
+    customerAccountId: string;
+    addressId: string;
+  }): Promise<CustomerAddress | null> {
+    const now = new Date();
+    const rows = await this.db
+      .update(customerAddresses)
+      .set({
+        isDefault: false,
+        deletedAt: now,
+        updatedAt: now,
+        version: sql`${customerAddresses.version} + 1`,
+      })
+      .where(
+        and(
+          eq(customerAddresses.id, input.addressId),
+          eq(customerAddresses.tenantId, input.tenantId),
+          eq(customerAddresses.customerAccountId, input.customerAccountId),
+          isNull(customerAddresses.deletedAt),
+        ),
+      )
+      .returning({ ...getTableColumns(customerAddresses) });
+
+    return rows[0] ? toCustomerAddress(rows[0]) : null;
+  }
+
+  async setDefaultAddress(input: {
+    tenantId: string;
+    customerAccountId: string;
+    addressId: string;
+  }): Promise<CustomerAddress | null> {
+    return this.db.transaction(async (tx) => {
+      const now = new Date();
+      const existingRows = await tx
+        .select({ id: customerAddresses.id })
+        .from(customerAddresses)
+        .where(
+          and(
+            eq(customerAddresses.id, input.addressId),
+            eq(customerAddresses.tenantId, input.tenantId),
+            eq(customerAddresses.customerAccountId, input.customerAccountId),
+            isNull(customerAddresses.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!existingRows[0]) {
+        return null;
+      }
+
+      await tx
+        .update(customerAddresses)
+        .set({
+          isDefault: false,
+          updatedAt: now,
+          version: sql`${customerAddresses.version} + 1`,
+        })
+        .where(
+          and(
+            eq(customerAddresses.tenantId, input.tenantId),
+            eq(customerAddresses.customerAccountId, input.customerAccountId),
+            eq(customerAddresses.isDefault, true),
+            isNull(customerAddresses.deletedAt),
+          ),
+        );
+
+      const rows = await tx
+        .update(customerAddresses)
+        .set({
+          isDefault: true,
+          updatedAt: now,
+          version: sql`${customerAddresses.version} + 1`,
+        })
+        .where(
+          and(
+            eq(customerAddresses.id, input.addressId),
+            eq(customerAddresses.tenantId, input.tenantId),
+            eq(customerAddresses.customerAccountId, input.customerAccountId),
+            isNull(customerAddresses.deletedAt),
+          ),
+        )
+        .returning({ ...getTableColumns(customerAddresses) });
+
+      return rows[0] ? toCustomerAddress(rows[0]) : null;
+    });
+  }
+
+  async findCustomerCredential(input: {
+    tenantId: string;
+    customerAccountId: string;
+  }): Promise<{ id: string; passwordHash: string } | null> {
+    const rows = await this.db
+      .select({
+        id: customerCredentials.id,
+        passwordHash: customerCredentials.passwordHash,
+      })
+      .from(customerCredentials)
+      .where(
+        and(
+          eq(customerCredentials.tenantId, input.tenantId),
+          eq(customerCredentials.customerAccountId, input.customerAccountId),
+          isNull(customerCredentials.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+
+  async updateCustomerPassword(input: {
+    tenantId: string;
+    customerAccountId: string;
+    credentialId: string;
+    passwordHash: string;
+  }): Promise<void> {
+    const now = new Date();
+    await this.db
+      .update(customerCredentials)
+      .set({
+        passwordHash: input.passwordHash,
+        failedAttempts: 0,
+        lockedUntil: null,
+        updatedAt: now,
+        version: sql`${customerCredentials.version} + 1`,
+      })
+      .where(
+        and(
+          eq(customerCredentials.id, input.credentialId),
+          eq(customerCredentials.tenantId, input.tenantId),
+          eq(customerCredentials.customerAccountId, input.customerAccountId),
+          isNull(customerCredentials.deletedAt),
+        ),
+      );
+  }
+
+  async revokeCustomerRefreshTokens(input: {
+    tenantId: string;
+    customerAccountId: string;
+  }): Promise<void> {
+    await this.db
+      .update(customerAuthRefreshTokens)
+      .set({
+        revokedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(customerAuthRefreshTokens.tenantId, input.tenantId),
+          eq(
+            customerAuthRefreshTokens.customerAccountId,
+            input.customerAccountId,
+          ),
+          isNull(customerAuthRefreshTokens.revokedAt),
+          isNull(customerAuthRefreshTokens.deletedAt),
+        ),
+      );
   }
 
   async findOwnedCustomerById({

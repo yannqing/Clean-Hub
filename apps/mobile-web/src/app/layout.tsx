@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Toaster } from "@cleanhub/ui";
 
+import { MobileUpdateRequired } from "@/components/mobile-update-required";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -24,6 +26,7 @@ export default function RootLayout({
     <html lang="fr">
       <body>
         {children}
+        <MobileUpdateRequired />
         <Toaster />
       </body>
     </html>

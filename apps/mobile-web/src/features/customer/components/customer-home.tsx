@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   MobileAuthContext,
   MobileCustomerActivityList,
+  MobileCustomerAddress,
+  MobileCustomerAddressInput,
   MobileCustomerAppointment,
   MobileCustomerAppointmentStatus,
   MobileCustomerAppointmentType,
@@ -34,7 +36,9 @@ import {
   CheckCircle2,
   ChevronRight,
   CreditCard,
+  Edit3,
   Home,
+  KeyRound,
   Loader2,
   Mail,
   MapPin,
@@ -44,6 +48,8 @@ import {
   ReceiptText,
   RefreshCcw,
   RotateCcw,
+  Star,
+  Trash2,
   TicketCheck,
   UserRound,
   XCircle,
@@ -53,12 +59,19 @@ import { getMobileSession } from "@/lib/token-storage";
 
 import {
   cancelCustomerAppointment,
+  changeCustomerPassword,
+  createCustomerAddress,
   createCustomerAppointment,
   createCustomerPayment,
   createCustomerRefundRequest,
+  deleteCustomerAddress,
+  setDefaultCustomerAddress,
+  updateCustomerAddress,
+  updateCustomerProfile,
 } from "../actions";
 import {
   getCustomerActivityDetail,
+  getCustomerAddresses,
   getCustomerAppointments,
   getCustomerOrdersAndTickets,
   getCustomerProfile,
@@ -112,11 +125,42 @@ type AppointmentFormState = {
   notes: string;
 };
 
+type CustomerProfileFormState = {
+  accountName: string;
+  phone: string;
+  email: string;
+};
+
+type CustomerAddressFormState = {
+  customerId: string;
+  label: string;
+  contactName: string;
+  contactPhone: string;
+  addressLine1: string;
+  addressLine2: string;
+  city: string;
+  province: string;
+  postalCode: string;
+  country: string;
+  latitude: string;
+  longitude: string;
+  isDefault: boolean;
+  notes: string;
+};
+
+type CustomerPasswordFormState = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
 type RefundFormState = {
   orderId: string;
   amount: string;
   reason: string;
 };
+
+type ProfileSheet = "profile" | "address" | "password" | null;
 
 type StatusView = {
   label: string;
@@ -126,6 +170,29 @@ type StatusView = {
 const emptyActivity: MobileCustomerActivityList = {
   orders: [],
   tickets: [],
+};
+
+const emptyAddressForm: CustomerAddressFormState = {
+  customerId: "",
+  label: "Maison",
+  contactName: "",
+  contactPhone: "",
+  addressLine1: "",
+  addressLine2: "",
+  city: "",
+  province: "",
+  postalCode: "",
+  country: "TH",
+  latitude: "",
+  longitude: "",
+  isDefault: false,
+  notes: "",
+};
+
+const emptyPasswordForm: CustomerPasswordFormState = {
+  currentPassword: "",
+  newPassword: "",
+  confirmPassword: "",
 };
 
 const tabs: { value: CustomerTab; label: string; icon: typeof Home }[] = [
@@ -317,6 +384,75 @@ function getPrimaryAddress(profile: MobileCustomerProfile | null): string {
   return profile?.addresses.find((item) => item.address)?.address ?? "";
 }
 
+function getAddressBookPrimaryAddress(addresses: MobileCustomerAddress[]): string {
+  const address = addresses.find((item) => item.isDefault) ?? addresses[0];
+
+  return address ? formatCustomerAddress(address) : "";
+}
+
+function toProfileForm(profile: MobileCustomerProfile | null): CustomerProfileFormState {
+  return {
+    accountName: profile?.account.accountName ?? "",
+    phone: profile?.account.phone ?? "",
+    email: profile?.account.email ?? "",
+  };
+}
+
+function toAddressForm(address?: MobileCustomerAddress | null): CustomerAddressFormState {
+  if (!address) {
+    return emptyAddressForm;
+  }
+
+  return {
+    customerId: address.customerId ?? "",
+    label: address.label,
+    contactName: address.contactName ?? "",
+    contactPhone: address.contactPhone ?? "",
+    addressLine1: address.addressLine1,
+    addressLine2: address.addressLine2 ?? "",
+    city: address.city ?? "",
+    province: address.province ?? "",
+    postalCode: address.postalCode ?? "",
+    country: address.country,
+    latitude: address.latitude ?? "",
+    longitude: address.longitude ?? "",
+    isDefault: address.isDefault,
+    notes: address.notes ?? "",
+  };
+}
+
+function toAddressInput(form: CustomerAddressFormState): MobileCustomerAddressInput {
+  return {
+    customerId: form.customerId || null,
+    label: form.label,
+    contactName: form.contactName || null,
+    contactPhone: form.contactPhone || null,
+    addressLine1: form.addressLine1,
+    addressLine2: form.addressLine2 || null,
+    city: form.city || null,
+    province: form.province || null,
+    postalCode: form.postalCode || null,
+    country: form.country || "TH",
+    latitude: form.latitude || null,
+    longitude: form.longitude || null,
+    isDefault: form.isDefault,
+    notes: form.notes || null,
+  };
+}
+
+function formatCustomerAddress(address: MobileCustomerAddress): string {
+  return [
+    address.addressLine1,
+    address.addressLine2,
+    address.city,
+    address.province,
+    address.postalCode,
+    address.country,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
 function getAppointmentSummary(appointments: MobileCustomerAppointment[]) {
   return {
     pending: appointments.filter((appointment) => appointment.status === "pending").length,
@@ -333,6 +469,7 @@ function getAppointmentSummary(appointments: MobileCustomerAppointment[]) {
 type CustomerSnapshot = {
   authContext: MobileAuthContext | null;
   profile: MobileCustomerProfile | null;
+  addressBook: MobileCustomerAddress[];
   activity: MobileCustomerActivityList;
   appointments: MobileCustomerAppointment[];
   error: string | null;
@@ -345,14 +482,16 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
     return {
       authContext: session?.authContext ?? null,
       profile: null,
+      addressBook: [],
       activity: emptyActivity,
       appointments: [],
       error: "Session client requise.",
     };
   }
 
-  const [profile, activity, appointments] = await Promise.all([
+  const [profile, addressBook, activity, appointments] = await Promise.all([
     getCustomerProfile(),
+    getCustomerAddresses(),
     getCustomerOrdersAndTickets(),
     getCustomerAppointments(),
   ]);
@@ -360,6 +499,7 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
   return {
     authContext: session.authContext,
     profile,
+    addressBook: addressBook.data,
     activity: activity.data,
     appointments: sortAppointments(appointments.data),
     error: null,
@@ -370,12 +510,18 @@ export function CustomerHome() {
   const [activeTab, setActiveTab] = useState<CustomerTab>("resume");
   const [authContext, setAuthContext] = useState<MobileAuthContext | null>(null);
   const [profile, setProfile] = useState<MobileCustomerProfile | null>(null);
+  const [addressBook, setAddressBook] = useState<MobileCustomerAddress[]>([]);
   const [activity, setActivity] = useState<MobileCustomerActivityList>(emptyActivity);
   const [appointments, setAppointments] = useState<MobileCustomerAppointment[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<ActivitySelection | null>(null);
   const [activityDetail, setActivityDetail] = useState<ActivityDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [appointmentSheetOpen, setAppointmentSheetOpen] = useState(false);
+  const [profileSheet, setProfileSheet] = useState<ProfileSheet>(null);
+  const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
+  const [profileForm, setProfileForm] = useState<CustomerProfileFormState>(() => toProfileForm(null));
+  const [addressForm, setAddressForm] = useState<CustomerAddressFormState>(emptyAddressForm);
+  const [passwordForm, setPasswordForm] = useState<CustomerPasswordFormState>(emptyPasswordForm);
   const [refundSheetOpen, setRefundSheetOpen] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState<AppointmentFormState>({
     type: "pickup",
@@ -392,9 +538,13 @@ export function CustomerHome() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
+  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+  const [isSubmittingAddress, setIsSubmittingAddress] = useState(false);
+  const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
   const [cancellingAppointmentId, setCancellingAppointmentId] = useState<string | null>(null);
+  const [addressActionId, setAddressActionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -411,12 +561,17 @@ export function CustomerHome() {
       const snapshot = await fetchCustomerSnapshot();
       setAuthContext(snapshot.authContext);
       setProfile(snapshot.profile);
+      setAddressBook(snapshot.addressBook);
       setActivity(snapshot.activity);
       setAppointments(snapshot.appointments);
       setError(snapshot.error);
+      setProfileForm(toProfileForm(snapshot.profile));
       setAppointmentForm((current) => ({
         ...current,
-        address: current.address || getPrimaryAddress(snapshot.profile),
+        address:
+          current.address ||
+          getAddressBookPrimaryAddress(snapshot.addressBook) ||
+          getPrimaryAddress(snapshot.profile),
       }));
     } catch (nextError) {
       setError(getErrorMessage(nextError));
@@ -437,12 +592,17 @@ export function CustomerHome() {
 
         setAuthContext(snapshot.authContext);
         setProfile(snapshot.profile);
+        setAddressBook(snapshot.addressBook);
         setActivity(snapshot.activity);
         setAppointments(snapshot.appointments);
         setError(snapshot.error);
+        setProfileForm(toProfileForm(snapshot.profile));
         setAppointmentForm((current) => ({
           ...current,
-          address: current.address || getPrimaryAddress(snapshot.profile),
+          address:
+            current.address ||
+            getAddressBookPrimaryAddress(snapshot.addressBook) ||
+            getPrimaryAddress(snapshot.profile),
         }));
       })
       .catch((nextError: unknown) => {
@@ -628,6 +788,174 @@ export function CustomerHome() {
     }
   }
 
+  function openProfileSheet() {
+    setError(null);
+    setMessage(null);
+    setProfileForm(toProfileForm(profile));
+    setProfileSheet("profile");
+  }
+
+  function openCreateAddressSheet() {
+    setError(null);
+    setMessage(null);
+    setEditingAddressId(null);
+    setAddressForm({
+      ...emptyAddressForm,
+      contactName: profile?.account.accountName ?? "",
+      contactPhone: profile?.account.phone ?? "",
+      isDefault: addressBook.length === 0,
+    });
+    setProfileSheet("address");
+  }
+
+  function openEditAddressSheet(address: MobileCustomerAddress) {
+    setError(null);
+    setMessage(null);
+    setEditingAddressId(address.id);
+    setAddressForm(toAddressForm(address));
+    setProfileSheet("address");
+  }
+
+  function openPasswordSheet() {
+    setError(null);
+    setMessage(null);
+    setPasswordForm(emptyPasswordForm);
+    setProfileSheet("password");
+  }
+
+  async function handleUpdateProfile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+    setIsSubmittingProfile(true);
+
+    try {
+      if (!profileForm.accountName.trim()) {
+        throw new Error("Nom requis.");
+      }
+
+      const updated = await updateCustomerProfile(profileForm);
+      setProfile(updated);
+      setProfileForm(toProfileForm(updated));
+      setProfileSheet(null);
+      setMessage("Profil mis a jour.");
+    } catch (nextError) {
+      setError(getErrorMessage(nextError));
+    } finally {
+      setIsSubmittingProfile(false);
+    }
+  }
+
+  async function handleSaveAddress(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+    setIsSubmittingAddress(true);
+
+    try {
+      if (!addressForm.label.trim() || !addressForm.addressLine1.trim()) {
+        throw new Error("Libelle et adresse requis.");
+      }
+
+      const input = toAddressInput(addressForm);
+      const saved = editingAddressId
+        ? await updateCustomerAddress(editingAddressId, input)
+        : await createCustomerAddress(input);
+
+      setAddressBook((current) => {
+        const withoutSaved = current.filter((address) => address.id !== saved.id);
+        const next = saved.isDefault
+          ? withoutSaved.map((address) => ({ ...address, isDefault: false }))
+          : withoutSaved;
+
+        return [saved, ...next].sort((left, right) =>
+          Number(right.isDefault) - Number(left.isDefault) ||
+          new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+        );
+      });
+      setAppointmentForm((current) => ({
+        ...current,
+        address: current.address || formatCustomerAddress(saved),
+      }));
+      setProfileSheet(null);
+      setEditingAddressId(null);
+      setMessage(editingAddressId ? "Adresse mise a jour." : "Adresse ajoutee.");
+    } catch (nextError) {
+      setError(getErrorMessage(nextError));
+    } finally {
+      setIsSubmittingAddress(false);
+    }
+  }
+
+  async function handleDeleteAddress(addressId: string) {
+    setError(null);
+    setMessage(null);
+    setAddressActionId(`delete-${addressId}`);
+
+    try {
+      await deleteCustomerAddress(addressId);
+      setAddressBook((current) => current.filter((address) => address.id !== addressId));
+      setMessage("Adresse supprimee.");
+    } catch (nextError) {
+      setError(getErrorMessage(nextError));
+    } finally {
+      setAddressActionId(null);
+    }
+  }
+
+  async function handleSetDefaultAddress(addressId: string) {
+    setError(null);
+    setMessage(null);
+    setAddressActionId(`default-${addressId}`);
+
+    try {
+      const updated = await setDefaultCustomerAddress(addressId);
+      setAddressBook((current) =>
+        current.map((address) =>
+          address.id === updated.id
+            ? updated
+            : { ...address, isDefault: false },
+        ),
+      );
+      setAppointmentForm((current) => ({
+        ...current,
+        address: formatCustomerAddress(updated),
+      }));
+      setMessage("Adresse par defaut mise a jour.");
+    } catch (nextError) {
+      setError(getErrorMessage(nextError));
+    } finally {
+      setAddressActionId(null);
+    }
+  }
+
+  async function handleChangePassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError("La confirmation ne correspond pas.");
+      return;
+    }
+
+    setIsSubmittingPassword(true);
+
+    try {
+      await changeCustomerPassword({
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword,
+      });
+      setPasswordForm(emptyPasswordForm);
+      setProfileSheet(null);
+      setMessage("Mot de passe mis a jour. Reconnectez-vous sur les autres appareils.");
+    } catch (nextError) {
+      setError(getErrorMessage(nextError));
+    } finally {
+      setIsSubmittingPassword(false);
+    }
+  }
+
   if (isLoading) {
     return (
       <main className="flex min-h-dvh items-center justify-center px-5">
@@ -705,7 +1033,19 @@ export function CustomerHome() {
         />
       ) : null}
 
-      {activeTab === "profile" ? <ProfileView profile={profile} /> : null}
+      {activeTab === "profile" ? (
+        <ProfileView
+          addressActionId={addressActionId}
+          addressBook={addressBook}
+          profile={profile}
+          onCreateAddress={openCreateAddressSheet}
+          onDeleteAddress={(addressId) => void handleDeleteAddress(addressId)}
+          onEditAddress={openEditAddressSheet}
+          onEditProfile={openProfileSheet}
+          onOpenPassword={openPasswordSheet}
+          onSetDefaultAddress={(addressId) => void handleSetDefaultAddress(addressId)}
+        />
+      ) : null}
 
       <ActivityDetailSheet
         detail={activityDetail}
@@ -757,6 +1097,56 @@ export function CustomerHome() {
           }
         }}
         onSubmit={handleCreateRefund}
+      />
+
+      <ProfileFormSheet
+        error={profileSheet === "profile" ? error : null}
+        form={profileForm}
+        isSubmitting={isSubmittingProfile}
+        open={profileSheet === "profile"}
+        onFormChange={setProfileForm}
+        onOpenChange={(open) => {
+          setProfileSheet(open ? "profile" : null);
+
+          if (!open) {
+            setError(null);
+          }
+        }}
+        onSubmit={handleUpdateProfile}
+      />
+
+      <AddressFormSheet
+        error={profileSheet === "address" ? error : null}
+        form={addressForm}
+        isEditing={Boolean(editingAddressId)}
+        isSubmitting={isSubmittingAddress}
+        open={profileSheet === "address"}
+        onFormChange={setAddressForm}
+        onOpenChange={(open) => {
+          setProfileSheet(open ? "address" : null);
+
+          if (!open) {
+            setEditingAddressId(null);
+            setError(null);
+          }
+        }}
+        onSubmit={handleSaveAddress}
+      />
+
+      <PasswordFormSheet
+        error={profileSheet === "password" ? error : null}
+        form={passwordForm}
+        isSubmitting={isSubmittingPassword}
+        open={profileSheet === "password"}
+        onFormChange={setPasswordForm}
+        onOpenChange={(open) => {
+          setProfileSheet(open ? "password" : null);
+
+          if (!open) {
+            setError(null);
+          }
+        }}
+        onSubmit={handleChangePassword}
       />
 
       <CustomerTabBar activeTab={activeTab} onChange={setActiveTab} />
@@ -1508,7 +1898,414 @@ function AppointmentCard({
   );
 }
 
-function ProfileView({ profile }: { profile: MobileCustomerProfile | null }) {
+function ProfileFormSheet({
+  error,
+  form,
+  isSubmitting,
+  open,
+  onFormChange,
+  onOpenChange,
+  onSubmit,
+}: {
+  error: string | null;
+  form: CustomerProfileFormState;
+  isSubmitting: boolean;
+  open: boolean;
+  onFormChange: React.Dispatch<React.SetStateAction<CustomerProfileFormState>>;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="max-h-[86dvh] p-5">
+        <SheetHeader className="pr-8 text-left">
+          <SheetTitle>Modifier le profil</SheetTitle>
+          <SheetDescription>Coordonnees principales du compte client</SheetDescription>
+        </SheetHeader>
+
+        {error ? <AlertMessage tone="error" message={error} /> : null}
+
+        <form className="space-y-4" onSubmit={onSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="profile-name">Nom</Label>
+            <Input
+              className="h-12 text-base"
+              id="profile-name"
+              value={form.accountName}
+              onChange={(event) =>
+                onFormChange((current) => ({
+                  ...current,
+                  accountName: event.target.value,
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="profile-phone">Telephone</Label>
+            <Input
+              className="h-12 text-base"
+              id="profile-phone"
+              inputMode="tel"
+              value={form.phone}
+              onChange={(event) =>
+                onFormChange((current) => ({
+                  ...current,
+                  phone: event.target.value,
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="profile-email">Email</Label>
+            <Input
+              className="h-12 text-base"
+              id="profile-email"
+              inputMode="email"
+              value={form.email}
+              onChange={(event) =>
+                onFormChange((current) => ({
+                  ...current,
+                  email: event.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <SheetFooter className="sticky bottom-0 -mx-5 mt-5 border-t border-slate-200 bg-white px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+            <Button className="h-12 w-full" disabled={isSubmitting} type="submit">
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <CheckCircle2 className="size-4" aria-hidden="true" />
+              )}
+              Enregistrer
+            </Button>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function AddressFormSheet({
+  error,
+  form,
+  isEditing,
+  isSubmitting,
+  open,
+  onFormChange,
+  onOpenChange,
+  onSubmit,
+}: {
+  error: string | null;
+  form: CustomerAddressFormState;
+  isEditing: boolean;
+  isSubmitting: boolean;
+  open: boolean;
+  onFormChange: React.Dispatch<React.SetStateAction<CustomerAddressFormState>>;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="max-h-[92dvh] p-5">
+        <SheetHeader className="pr-8 text-left">
+          <SheetTitle>{isEditing ? "Modifier l'adresse" : "Nouvelle adresse"}</SheetTitle>
+          <SheetDescription>Adresse de collecte ou livraison</SheetDescription>
+        </SheetHeader>
+
+        {error ? <AlertMessage tone="error" message={error} /> : null}
+
+        <form className="space-y-4" onSubmit={onSubmit}>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="address-label">Libelle</Label>
+              <Input
+                className="h-12 text-base"
+                id="address-label"
+                value={form.label}
+                onChange={(event) =>
+                  onFormChange((current) => ({ ...current, label: event.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address-country">Pays</Label>
+              <Input
+                className="h-12 text-base uppercase"
+                id="address-country"
+                maxLength={2}
+                value={form.country}
+                onChange={(event) =>
+                  onFormChange((current) => ({ ...current, country: event.target.value.toUpperCase() }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="address-contact-name">Contact</Label>
+              <Input
+                className="h-12 text-base"
+                id="address-contact-name"
+                value={form.contactName}
+                onChange={(event) =>
+                  onFormChange((current) => ({ ...current, contactName: event.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address-contact-phone">Telephone</Label>
+              <Input
+                className="h-12 text-base"
+                id="address-contact-phone"
+                inputMode="tel"
+                value={form.contactPhone}
+                onChange={(event) =>
+                  onFormChange((current) => ({ ...current, contactPhone: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="address-line1">Adresse</Label>
+            <Textarea
+              className="min-h-20 resize-none text-base"
+              id="address-line1"
+              value={form.addressLine1}
+              onChange={(event) =>
+                onFormChange((current) => ({ ...current, addressLine1: event.target.value }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="address-line2">Complement</Label>
+            <Input
+              className="h-12 text-base"
+              id="address-line2"
+              value={form.addressLine2}
+              onChange={(event) =>
+                onFormChange((current) => ({ ...current, addressLine2: event.target.value }))
+              }
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="address-city">Ville</Label>
+              <Input
+                className="h-12 text-base"
+                id="address-city"
+                value={form.city}
+                onChange={(event) =>
+                  onFormChange((current) => ({ ...current, city: event.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address-province">Region</Label>
+              <Input
+                className="h-12 text-base"
+                id="address-province"
+                value={form.province}
+                onChange={(event) =>
+                  onFormChange((current) => ({ ...current, province: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="address-postal">Code</Label>
+              <Input
+                className="h-12 text-base"
+                id="address-postal"
+                value={form.postalCode}
+                onChange={(event) =>
+                  onFormChange((current) => ({ ...current, postalCode: event.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address-latitude">Lat</Label>
+              <Input
+                className="h-12 text-base"
+                id="address-latitude"
+                inputMode="decimal"
+                value={form.latitude}
+                onChange={(event) =>
+                  onFormChange((current) => ({ ...current, latitude: event.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="address-longitude">Lng</Label>
+              <Input
+                className="h-12 text-base"
+                id="address-longitude"
+                inputMode="decimal"
+                value={form.longitude}
+                onChange={(event) =>
+                  onFormChange((current) => ({ ...current, longitude: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <label className="flex min-h-12 items-center gap-3 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700">
+            <input
+              checked={form.isDefault}
+              className="size-4 accent-teal-700"
+              type="checkbox"
+              onChange={(event) =>
+                onFormChange((current) => ({ ...current, isDefault: event.target.checked }))
+              }
+            />
+            Adresse par defaut
+          </label>
+
+          <div className="space-y-2">
+            <Label htmlFor="address-notes">Notes</Label>
+            <Textarea
+              className="min-h-20 resize-none text-base"
+              id="address-notes"
+              value={form.notes}
+              onChange={(event) =>
+                onFormChange((current) => ({ ...current, notes: event.target.value }))
+              }
+            />
+          </div>
+
+          <SheetFooter className="sticky bottom-0 -mx-5 mt-5 border-t border-slate-200 bg-white px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+            <Button className="h-12 w-full" disabled={isSubmitting} type="submit">
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <MapPin className="size-4" aria-hidden="true" />
+              )}
+              Enregistrer l&apos;adresse
+            </Button>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function PasswordFormSheet({
+  error,
+  form,
+  isSubmitting,
+  open,
+  onFormChange,
+  onOpenChange,
+  onSubmit,
+}: {
+  error: string | null;
+  form: CustomerPasswordFormState;
+  isSubmitting: boolean;
+  open: boolean;
+  onFormChange: React.Dispatch<React.SetStateAction<CustomerPasswordFormState>>;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="max-h-[82dvh] p-5">
+        <SheetHeader className="pr-8 text-left">
+          <SheetTitle>Modifier le mot de passe</SheetTitle>
+          <SheetDescription>La session des autres appareils sera expiree</SheetDescription>
+        </SheetHeader>
+
+        {error ? <AlertMessage tone="error" message={error} /> : null}
+
+        <form className="space-y-4" onSubmit={onSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="current-password">Mot de passe actuel</Label>
+            <Input
+              className="h-12 text-base"
+              id="current-password"
+              type="password"
+              value={form.currentPassword}
+              onChange={(event) =>
+                onFormChange((current) => ({
+                  ...current,
+                  currentPassword: event.target.value,
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="new-password">Nouveau mot de passe</Label>
+            <Input
+              className="h-12 text-base"
+              id="new-password"
+              type="password"
+              value={form.newPassword}
+              onChange={(event) =>
+                onFormChange((current) => ({
+                  ...current,
+                  newPassword: event.target.value,
+                }))
+              }
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="confirm-password">Confirmation</Label>
+            <Input
+              className="h-12 text-base"
+              id="confirm-password"
+              type="password"
+              value={form.confirmPassword}
+              onChange={(event) =>
+                onFormChange((current) => ({
+                  ...current,
+                  confirmPassword: event.target.value,
+                }))
+              }
+            />
+          </div>
+
+          <SheetFooter className="sticky bottom-0 -mx-5 mt-5 border-t border-slate-200 bg-white px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+            <Button className="h-12 w-full" disabled={isSubmitting} type="submit">
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <KeyRound className="size-4" aria-hidden="true" />
+              )}
+              Mettre a jour
+            </Button>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
+function ProfileView({
+  addressActionId,
+  addressBook,
+  profile,
+  onCreateAddress,
+  onDeleteAddress,
+  onEditAddress,
+  onEditProfile,
+  onOpenPassword,
+  onSetDefaultAddress,
+}: {
+  addressActionId: string | null;
+  addressBook: MobileCustomerAddress[];
+  profile: MobileCustomerProfile | null;
+  onCreateAddress: () => void;
+  onDeleteAddress: (addressId: string) => void;
+  onEditAddress: (address: MobileCustomerAddress) => void;
+  onEditProfile: () => void;
+  onOpenPassword: () => void;
+  onSetDefaultAddress: (addressId: string) => void;
+}) {
   if (!profile) {
     return <EmptyState icon={UserRound} title="Profil indisponible" body="Reconnectez-vous puis reessayez." />;
   }
@@ -1543,10 +2340,108 @@ function ProfileView({ profile }: { profile: MobileCustomerProfile | null }) {
             <ContactLine icon={Mail} value={profile.account.email} />
           </div>
         </div>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <Button className="h-11" type="button" variant="outline" onClick={onEditProfile}>
+            <Edit3 className="size-4" aria-hidden="true" />
+            Modifier
+          </Button>
+          <Button className="h-11" type="button" variant="outline" onClick={onOpenPassword}>
+            <KeyRound className="size-4" aria-hidden="true" />
+            Mot de passe
+          </Button>
+        </div>
       </section>
+
+      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">Carnet d&apos;adresses</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {addressBook.length} adresse(s) de collecte ou livraison
+            </p>
+          </div>
+          <Button className="h-10 shrink-0 px-3" type="button" onClick={onCreateAddress}>
+            <Plus className="size-4" aria-hidden="true" />
+            Ajouter
+          </Button>
+        </div>
+      </section>
+
+      {addressBook.length ? (
+        <section className="space-y-3">
+          {addressBook.map((address) => (
+            <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm" key={address.id}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="break-words text-sm font-semibold text-slate-950">{address.label}</p>
+                    {address.isDefault ? (
+                      <Badge className="border-amber-200 bg-amber-50 text-amber-800" variant="outline">
+                        <Star className="size-3" aria-hidden="true" />
+                        Defaut
+                      </Badge>
+                    ) : null}
+                  </div>
+                  {address.contactName ? (
+                    <p className="mt-1 text-xs font-medium text-slate-500">{address.contactName}</p>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="mt-4 space-y-2">
+                <ContactLine icon={MapPin} value={formatCustomerAddress(address)} />
+                <ContactLine icon={Phone} value={address.contactPhone} />
+              </div>
+
+              {address.notes ? (
+                <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700">
+                  {address.notes}
+                </p>
+              ) : null}
+
+              <div className="mt-4 grid grid-cols-3 gap-2">
+                <Button className="h-10 px-2" type="button" variant="outline" onClick={() => onEditAddress(address)}>
+                  <Edit3 className="size-4" aria-hidden="true" />
+                </Button>
+                <Button
+                  className="h-10 px-2"
+                  disabled={address.isDefault || addressActionId === `default-${address.id}`}
+                  type="button"
+                  variant="outline"
+                  onClick={() => onSetDefaultAddress(address.id)}
+                >
+                  {addressActionId === `default-${address.id}` ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Star className="size-4" aria-hidden="true" />
+                  )}
+                </Button>
+                <Button
+                  className="h-10 px-2"
+                  disabled={addressActionId === `delete-${address.id}`}
+                  type="button"
+                  variant="outline"
+                  onClick={() => onDeleteAddress(address.id)}
+                >
+                  {addressActionId === `delete-${address.id}` ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  )}
+                </Button>
+              </div>
+            </article>
+          ))}
+        </section>
+      ) : (
+        <EmptyState icon={MapPin} title="Aucune adresse" body="Ajoutez une adresse de collecte ou livraison." />
+      )}
 
       {profile.addresses.length ? (
         <section className="space-y-3">
+          <h2 className="px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            Contacts lies
+          </h2>
           {profile.addresses.map((address) => (
             <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm" key={address.customerId}>
               <div className="flex items-start justify-between gap-3">

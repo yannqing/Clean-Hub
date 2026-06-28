@@ -26,6 +26,10 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>CleanHub utilise l'appareil photo pour joindre une preuve aux tâches de livraison.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>CleanHub utilise Bluetooth pour rechercher et connecter une imprimante portable de livraison.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>CleanHub utilise Bluetooth pour imprimer les reçus et étiquettes de collecte ou de livraison.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>CleanHub utilise la localisation pendant les tournées pour enregistrer les mises à jour de livraison.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

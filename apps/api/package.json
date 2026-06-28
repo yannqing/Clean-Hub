@@ -17,6 +17,7 @@
   "dependencies": {
     "@cleanhub/db": "workspace:*",
     "@cleanhub/domain": "workspace:*",
+    "@cleanhub/hardware": "workspace:*",
     "@cleanhub/id": "workspace:*",
     "@cleanhub/logger": "workspace:*",
     "@cleanhub/storage": "workspace:*",

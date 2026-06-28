@@ -1,6 +1,7 @@
 import { CustomerService, type CustomerRepositoryLike } from "./customer.service.js";
 import { CustomerError } from "./customer.types.js";
 import type {
+  CustomerAddress,
   CustomerAppointment,
   CustomerProfile,
 } from "./customer.types.js";
@@ -97,6 +98,33 @@ function makeAppointment(
   };
 }
 
+function makeAddress(overrides: Partial<CustomerAddress> = {}): CustomerAddress {
+  const now = new Date().toISOString();
+
+  return {
+    id: "address_1",
+    tenantId: "tenant_1",
+    customerAccountId: "account_1",
+    customerId: "customer_1",
+    label: "Home",
+    contactName: "Customer One",
+    contactPhone: "+100000000",
+    addressLine1: "1 Main St",
+    addressLine2: null,
+    city: "Bangkok",
+    province: null,
+    postalCode: null,
+    country: "TH",
+    latitude: null,
+    longitude: null,
+    isDefault: true,
+    notes: null,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
 function createRepository(options?: {
   appointmentStatus?: CustomerAppointment["status"];
   denyCustomer?: boolean;
@@ -111,6 +139,92 @@ function createRepository(options?: {
         "profile must be account scoped",
       );
       return makeProfile();
+    },
+    async updateProfile({ tenantId, customerAccountId, accountName }) {
+      assert(tenantId === "tenant_1", "profile update must be tenant scoped");
+      assert(
+        customerAccountId === "account_1",
+        "profile update must be account scoped",
+      );
+
+      return {
+        ...makeProfile(),
+        account: {
+          ...makeProfile().account,
+          accountName: accountName ?? makeProfile().account.accountName,
+        },
+      };
+    },
+    async listAddresses({ tenantId, customerAccountId }) {
+      assert(tenantId === "tenant_1", "addresses must be tenant scoped");
+      assert(
+        customerAccountId === "account_1",
+        "addresses must be account scoped",
+      );
+      return [makeAddress()];
+    },
+    async findOwnedAddressById({ tenantId, customerAccountId, addressId }) {
+      assert(tenantId === "tenant_1", "address lookup must be tenant scoped");
+      assert(
+        customerAccountId === "account_1",
+        "address lookup must be account scoped",
+      );
+      return addressId === "address_1" ? makeAddress() : null;
+    },
+    async createAddress({ tenantId, customerAccountId, data }) {
+      assert(tenantId === "tenant_1", "address create must be tenant scoped");
+      assert(
+        customerAccountId === "account_1",
+        "address create must be account scoped",
+      );
+      return makeAddress({
+        label: data.label,
+        addressLine1: data.addressLine1,
+        isDefault: data.isDefault ?? false,
+      });
+    },
+    async updateAddress({ tenantId, customerAccountId, addressId, data }) {
+      assert(tenantId === "tenant_1", "address update must be tenant scoped");
+      assert(
+        customerAccountId === "account_1",
+        "address update must be account scoped",
+      );
+      return addressId === "address_1"
+        ? makeAddress({
+            label: data.label,
+            addressLine1: data.addressLine1,
+            isDefault: data.isDefault ?? false,
+          })
+        : null;
+    },
+    async softDeleteAddress({ tenantId, customerAccountId, addressId }) {
+      assert(tenantId === "tenant_1", "address delete must be tenant scoped");
+      assert(
+        customerAccountId === "account_1",
+        "address delete must be account scoped",
+      );
+      return addressId === "address_1"
+        ? makeAddress({ id: addressId, isDefault: false })
+        : null;
+    },
+    async setDefaultAddress({ tenantId, customerAccountId, addressId }) {
+      assert(tenantId === "tenant_1", "address default must be tenant scoped");
+      assert(
+        customerAccountId === "account_1",
+        "address default must be account scoped",
+      );
+      return addressId === "address_1"
+        ? makeAddress({ id: addressId, isDefault: true })
+        : null;
+    },
+    async findCustomerCredential() {
+      return null;
+    },
+    async updateCustomerPassword() {
+      return undefined;
+    },
+    async revokeCustomerRefreshTokens() {
+      return undefined;
     },
     async findOwnedCustomerById({ tenantId, customerAccountId, customerId }) {
       assert(tenantId === "tenant_1", "customer lookup must be tenant scoped");

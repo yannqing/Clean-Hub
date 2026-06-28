@@ -15,6 +15,13 @@ export function createCustomerRoutes({
   const controller = createCustomerController({ customerService });
 
   routes.get("/profile", controller.getProfile);
+  routes.patch("/profile", controller.updateProfile);
+  routes.get("/addresses", controller.listAddresses);
+  routes.post("/addresses", controller.createAddress);
+  routes.post("/addresses/:id/default", controller.setDefaultAddress);
+  routes.patch("/addresses/:id", controller.updateAddress);
+  routes.delete("/addresses/:id", controller.deleteAddress);
+  routes.post("/password", controller.changePassword);
   routes.get("/orders", controller.listOrdersAndTickets);
   routes.get("/orders/:id", controller.getOrderDetail);
   routes.get("/tickets/:id", controller.getTicketDetail);

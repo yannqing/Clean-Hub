@@ -20,6 +20,60 @@ export type MobileCustomerProfile = {
   addresses: MobileCustomerProfileAddress[];
 };
 
+export type MobileUpdateCustomerProfileRequest = {
+  accountName?: string;
+  phone?: string | null;
+  email?: string | null;
+};
+
+export type MobileCustomerAddress = {
+  id: string;
+  tenantId: string;
+  customerAccountId: string;
+  customerId: string | null;
+  label: string;
+  contactName: string | null;
+  contactPhone: string | null;
+  addressLine1: string;
+  addressLine2: string | null;
+  city: string | null;
+  province: string | null;
+  postalCode: string | null;
+  country: string;
+  latitude: string | null;
+  longitude: string | null;
+  isDefault: boolean;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MobileCustomerAddressInput = {
+  customerId?: string | null;
+  label: string;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  addressLine1: string;
+  addressLine2?: string | null;
+  city?: string | null;
+  province?: string | null;
+  postalCode?: string | null;
+  country?: string;
+  latitude?: string | null;
+  longitude?: string | null;
+  isDefault?: boolean;
+  notes?: string | null;
+};
+
+export type MobileChangeCustomerPasswordRequest = {
+  currentPassword: string;
+  newPassword: string;
+};
+
+export type MobileChangeCustomerPasswordResponse = {
+  passwordChanged: true;
+};
+
 export type MobileCustomerOrderStatus =
   | "draft"
   | "received"

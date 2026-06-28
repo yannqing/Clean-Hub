@@ -11,6 +11,7 @@
   "dependencies": {
     "@capacitor/preferences": "^8.0.1",
     "@cleanhub/api-client": "workspace:*",
+    "@cleanhub/hardware": "workspace:*",
     "@cleanhub/i18n": "workspace:*",
     "@cleanhub/offline": "workspace:*",
     "@cleanhub/ui": "workspace:*",

@@ -1,12 +1,17 @@
 import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
+  MobileChangeCustomerPasswordRequest,
+  MobileChangeCustomerPasswordResponse,
   MobileCreateCustomerAppointmentRequest,
   MobileCustomerActivityResponse,
+  MobileCustomerAddress,
+  MobileCustomerAddressInput,
   MobileCustomerAppointment,
   MobileCustomerOrderDetail,
   MobileCustomerProfile,
   MobileCustomerTicketDetail,
   MobileCustomerListResponse,
+  MobileUpdateCustomerProfileRequest,
 } from "./customer.types";
 
 type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
@@ -15,6 +20,59 @@ export function createMobileCustomerApi(client: ApiClient) {
   return {
     getProfile: (options?: RequestOptions) =>
       client.get<MobileCustomerProfile>("/mobile/customer/profile", options),
+    updateProfile: (
+      input: MobileUpdateCustomerProfileRequest,
+      options?: RequestOptions,
+    ) =>
+      client.patch<MobileCustomerProfile>(
+        "/mobile/customer/profile",
+        input,
+        options,
+      ),
+    listAddresses: (options?: RequestOptions) =>
+      client.get<MobileCustomerListResponse<MobileCustomerAddress>>(
+        "/mobile/customer/addresses",
+        options,
+      ),
+    createAddress: (
+      input: MobileCustomerAddressInput,
+      options?: RequestOptions,
+    ) =>
+      client.post<MobileCustomerAddress>(
+        "/mobile/customer/addresses",
+        input,
+        options,
+      ),
+    updateAddress: (
+      addressId: string,
+      input: MobileCustomerAddressInput,
+      options?: RequestOptions,
+    ) =>
+      client.patch<MobileCustomerAddress>(
+        `/mobile/customer/addresses/${encodeURIComponent(addressId)}`,
+        input,
+        options,
+      ),
+    deleteAddress: (addressId: string, options?: RequestOptions) =>
+      client.delete<MobileCustomerAddress>(
+        `/mobile/customer/addresses/${encodeURIComponent(addressId)}`,
+        options,
+      ),
+    setDefaultAddress: (addressId: string, options?: RequestOptions) =>
+      client.post<MobileCustomerAddress>(
+        `/mobile/customer/addresses/${encodeURIComponent(addressId)}/default`,
+        undefined,
+        options,
+      ),
+    changePassword: (
+      input: MobileChangeCustomerPasswordRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<MobileChangeCustomerPasswordResponse>(
+        "/mobile/customer/password",
+        input,
+        options,
+      ),
     listOrdersAndTickets: (options?: RequestOptions) =>
       client.get<MobileCustomerActivityResponse>(
         "/mobile/customer/orders",
