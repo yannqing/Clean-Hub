@@ -37,21 +37,36 @@ TBD - created by archiving change add-mobile-mvp. Update Purpose after archive.
 
 ### Requirement: 拍照凭证上传
 
-配送员 SHALL 能为取件/送达上传拍照凭证，凭证 MUST 关联到对应任务且可被后续追溯。
+配送员 SHALL 能为取件/送达上传拍照凭证，凭证 MUST 关联到对应任务且可被后续追溯。拍照媒体 MUST 经对象存储保存:客户端先获取上传凭证并直传对象存储，再以对象 key 作为 `mediaRef` 提交;系统 MUST NOT 接受内联 base64 图片数据。提交时系统 MUST 校验该 key 归属当前租户。
 
 #### Scenario: 上传取件/送达照片
 
-- **WHEN** 配送员拍照并上传凭证
-- **THEN** 系统保存该凭证并将其关联到对应任务（含类型：取件/送达）
+- **WHEN** 配送员拍照后客户端将图片直传对象存储并以返回的对象 key 提交凭证
+- **THEN** 系统校验 key 归属本租户后保存该凭证并将其关联到对应任务（含类型:取件/送达）
+
+#### Scenario: 拒绝内联 base64 提交
+
+- **WHEN** 客户端以内联 base64 图片数据提交凭证
+- **THEN** 系统拒绝该请求并返回校验错误，要求改用对象存储引用
+
+#### Scenario: 重复提交保持幂等
+
+- **WHEN** 配送员以相同幂等键重复提交同一凭证
+- **THEN** 系统返回首次结果且不产生重复凭证记录
 
 ### Requirement: 客户签收完成
 
-配送员 SHALL 能让客户在设备上完成签收以结束任务。
+配送员 SHALL 能让客户在设备上完成签收以结束任务。签名图像 MUST 经对象存储保存:客户端先直传对象存储再以对象 key 作为签名 `mediaRef` 提交;系统 MUST NOT 接受内联 base64 签名数据。
 
 #### Scenario: 客户签收后任务完成
 
-- **WHEN** 配送员采集到客户签收并提交
-- **THEN** 任务状态流转为已签收/完成，并记录签收凭证与时间
+- **WHEN** 配送员采集客户签名，客户端直传对象存储并以对象 key 提交签收
+- **THEN** 任务状态流转为已签收/完成，并记录签收凭证（对象引用）与时间
+
+#### Scenario: 拒绝内联 base64 签名
+
+- **WHEN** 客户端以内联 base64 签名数据提交签收
+- **THEN** 系统拒绝该请求并返回校验错误，要求改用对象存储引用
 
 ### Requirement: 配送任务状态机流转
 
@@ -71,3 +86,4 @@ TBD - created by archiving change add-mobile-mvp. Update Purpose after archive.
 
 - **WHEN** 配送员在任务过程中标记异常并填写原因
 - **THEN** 系统将任务置为异常状态并记录原因与时间
+
