@@ -25,6 +25,11 @@ import {
   Button,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Sheet,
   SheetClose,
   SheetContent,
@@ -42,6 +47,7 @@ import {
   Edit3,
   Home,
   KeyRound,
+  LocateFixed,
   Loader2,
   Mail,
   MapPin,
@@ -290,6 +296,303 @@ const intlLocales: Record<SupportedLocale, string> = {
   "zh-CN": "zh-CN",
 };
 
+type CountryOption = {
+  code: string;
+  fallbackLabel: string;
+};
+
+type AddressCoordinates = {
+  latitude: string;
+  longitude: string;
+};
+
+type GeolocationModule = {
+  getCurrentPosition(options?: {
+    enableHighAccuracy?: boolean;
+    timeout?: number;
+    maximumAge?: number;
+  }): Promise<{
+    coords: {
+      latitude: number;
+      longitude: number;
+    };
+  }>;
+};
+
+const addressCountryOptions: CountryOption[] = [
+  "AF",
+  "AX",
+  "AL",
+  "DZ",
+  "AS",
+  "AD",
+  "AO",
+  "AI",
+  "AQ",
+  "AG",
+  "AR",
+  "AM",
+  "AW",
+  "AU",
+  "AT",
+  "AZ",
+  "BS",
+  "BH",
+  "BD",
+  "BB",
+  "BY",
+  "BE",
+  "BZ",
+  "BJ",
+  "BM",
+  "BT",
+  "BO",
+  "BQ",
+  "BA",
+  "BW",
+  "BV",
+  "BR",
+  "IO",
+  "BN",
+  "BG",
+  "BF",
+  "BI",
+  "CV",
+  "KH",
+  "CM",
+  "CA",
+  "KY",
+  "CF",
+  "TD",
+  "CL",
+  "CN",
+  "CX",
+  "CC",
+  "CO",
+  "KM",
+  "CG",
+  "CD",
+  "CK",
+  "CR",
+  "CI",
+  "HR",
+  "CU",
+  "CW",
+  "CY",
+  "CZ",
+  "DK",
+  "DJ",
+  "DM",
+  "DO",
+  "EC",
+  "EG",
+  "SV",
+  "GQ",
+  "ER",
+  "EE",
+  "SZ",
+  "ET",
+  "FK",
+  "FO",
+  "FJ",
+  "FI",
+  "FR",
+  "GF",
+  "PF",
+  "TF",
+  "GA",
+  "GM",
+  "GE",
+  "DE",
+  "GH",
+  "GI",
+  "GR",
+  "GL",
+  "GD",
+  "GP",
+  "GU",
+  "GT",
+  "GG",
+  "GN",
+  "GW",
+  "GY",
+  "HT",
+  "HM",
+  "VA",
+  "HN",
+  "HK",
+  "HU",
+  "IS",
+  "IN",
+  "ID",
+  "IR",
+  "IQ",
+  "IE",
+  "IM",
+  "IL",
+  "IT",
+  "JM",
+  "JP",
+  "JE",
+  "JO",
+  "KZ",
+  "KE",
+  "KI",
+  "KP",
+  "KR",
+  "KW",
+  "KG",
+  "LA",
+  "LV",
+  "LB",
+  "LS",
+  "LR",
+  "LY",
+  "LI",
+  "LT",
+  "LU",
+  "MO",
+  "MG",
+  "MW",
+  "MY",
+  "MV",
+  "ML",
+  "MT",
+  "MH",
+  "MQ",
+  "MR",
+  "MU",
+  "YT",
+  "MX",
+  "FM",
+  "MD",
+  "MC",
+  "MN",
+  "ME",
+  "MS",
+  "MA",
+  "MZ",
+  "MM",
+  "NA",
+  "NR",
+  "NP",
+  "NL",
+  "NC",
+  "NZ",
+  "NI",
+  "NE",
+  "NG",
+  "NU",
+  "NF",
+  "MK",
+  "MP",
+  "NO",
+  "OM",
+  "PK",
+  "PW",
+  "PS",
+  "PA",
+  "PG",
+  "PY",
+  "PE",
+  "PH",
+  "PN",
+  "PL",
+  "PT",
+  "PR",
+  "QA",
+  "RE",
+  "RO",
+  "RU",
+  "RW",
+  "BL",
+  "SH",
+  "KN",
+  "LC",
+  "MF",
+  "PM",
+  "VC",
+  "WS",
+  "SM",
+  "ST",
+  "SA",
+  "SN",
+  "RS",
+  "SC",
+  "SL",
+  "SG",
+  "SX",
+  "SK",
+  "SI",
+  "SB",
+  "SO",
+  "ZA",
+  "GS",
+  "SS",
+  "ES",
+  "LK",
+  "SD",
+  "SR",
+  "SJ",
+  "SE",
+  "CH",
+  "SY",
+  "TW",
+  "TJ",
+  "TZ",
+  "TH",
+  "TL",
+  "TG",
+  "TK",
+  "TO",
+  "TT",
+  "TN",
+  "TR",
+  "TM",
+  "TC",
+  "TV",
+  "UG",
+  "UA",
+  "AE",
+  "GB",
+  "US",
+  "UM",
+  "UY",
+  "UZ",
+  "VU",
+  "VE",
+  "VN",
+  "VG",
+  "VI",
+  "WF",
+  "EH",
+  "YE",
+  "ZM",
+  "ZW",
+].map((code) => ({ code, fallbackLabel: code }));
+
+const countryDefaultsByTimeZone: Record<string, string> = {
+  "Africa/Abidjan": "CI",
+  "Africa/Algiers": "DZ",
+  "Africa/Bamako": "ML",
+  "Africa/Bangui": "CM",
+  "Africa/Casablanca": "MA",
+  "Africa/Dakar": "SN",
+  "Africa/Lagos": "NG",
+  "Africa/Lome": "TG",
+  "Africa/Ouagadougou": "BF",
+  "Africa/Porto-Novo": "BJ",
+  "Africa/Tunis": "TN",
+  "America/Chicago": "US",
+  "America/Los_Angeles": "US",
+  "America/New_York": "US",
+  "America/Toronto": "CA",
+  "Asia/Bangkok": "TH",
+  "Asia/Shanghai": "CN",
+  "Europe/London": "GB",
+  "Europe/Paris": "FR",
+};
+
 function formatDateTime(value: string | null, locale = "fr-FR"): string {
   if (!value) {
     return "";
@@ -321,6 +624,151 @@ function formatDate(value: string, locale = "fr-FR"): string {
 
 function getIntlLocale(locale: SupportedLocale): string {
   return intlLocales[locale];
+}
+
+function normalizeCountryCode(value: string | null | undefined): string {
+  const code = value?.trim().toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+
+  return code || "TH";
+}
+
+function getDeviceCountry(): string {
+  if (typeof Intl !== "undefined") {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timeZoneCountry = countryDefaultsByTimeZone[timeZone];
+
+    if (timeZoneCountry) {
+      return timeZoneCountry;
+    }
+  }
+
+  if (typeof navigator !== "undefined") {
+    const languages = navigator.languages?.length ? navigator.languages : [navigator.language];
+
+    for (const language of languages) {
+      const region = getLocaleRegion(language);
+
+      if (region) {
+        return region;
+      }
+    }
+  }
+
+  return "TH";
+}
+
+function getLocaleRegion(value: string | null | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const locale = new Intl.Locale(value).maximize();
+
+    return locale.region ? normalizeCountryCode(locale.region) : null;
+  } catch {
+    const region = value.match(/[-_]([A-Za-z]{2})\b/)?.[1];
+
+    return region ? normalizeCountryCode(region) : null;
+  }
+}
+
+function getCountryOptions(locale: SupportedLocale, selectedCountry: string): CountryOption[] {
+  const selectedCode = normalizeCountryCode(selectedCountry);
+  const options = addressCountryOptions.some((option) => option.code === selectedCode)
+    ? addressCountryOptions
+    : [{ code: selectedCode, fallbackLabel: selectedCode }, ...addressCountryOptions];
+
+  return options
+    .map((option) => ({
+      ...option,
+      fallbackLabel: getCountryLabel(locale, option),
+    }))
+    .sort((left, right) => left.fallbackLabel.localeCompare(right.fallbackLabel));
+}
+
+function getCountryFlag(countryCode: string): string {
+  const code = normalizeCountryCode(countryCode);
+
+  if (code.length !== 2) {
+    return "";
+  }
+
+  return String.fromCodePoint(
+    ...[...code].map((character) => 0x1f1e6 + character.charCodeAt(0) - 65),
+  );
+}
+
+function getCountryLabel(locale: SupportedLocale, option: CountryOption): string {
+  try {
+    const displayNames = new Intl.DisplayNames([getIntlLocale(locale)], {
+      type: "region",
+    });
+
+    return displayNames.of(option.code) ?? option.fallbackLabel;
+  } catch {
+    return option.fallbackLabel;
+  }
+}
+
+function getCapacitorPlugin<TPlugin>(name: string): TPlugin | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const candidate = window as Window & {
+    Capacitor?: {
+      Plugins?: Record<string, unknown>;
+    };
+  };
+
+  const plugin = candidate.Capacitor?.Plugins?.[name];
+  return plugin ? (plugin as TPlugin) : null;
+}
+
+async function getCurrentAddressCoordinates(): Promise<AddressCoordinates> {
+  if (typeof window === "undefined") {
+    throw new Error("Location is unavailable during initial render.");
+  }
+
+  const geolocation = getCapacitorPlugin<GeolocationModule>("Geolocation");
+
+  if (geolocation) {
+    const position = await geolocation.getCurrentPosition({
+      enableHighAccuracy: true,
+      timeout: 10_000,
+      maximumAge: 30_000,
+    });
+
+    return formatAddressCoordinates(position.coords.latitude, position.coords.longitude);
+  }
+
+  if (!navigator.geolocation) {
+    throw new Error("Location is unavailable on this device.");
+  }
+
+  const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 10_000,
+      maximumAge: 30_000,
+    });
+  });
+
+  return formatAddressCoordinates(position.coords.latitude, position.coords.longitude);
+}
+
+function formatAddressCoordinates(latitude: number, longitude: number): AddressCoordinates {
+  return {
+    latitude: formatCoordinate(latitude),
+    longitude: formatCoordinate(longitude),
+  };
+}
+
+function formatCoordinate(value: number): string {
+  return Number.isFinite(value)
+    ? value.toFixed(7).replace(/\.?0+$/, "")
+    : "";
 }
 
 function getDefaultExpectedAt(): string {
@@ -508,7 +956,7 @@ function toAddressForm(address?: MobileCustomerAddress | null): CustomerAddressF
     city: address.city ?? "",
     province: address.province ?? "",
     postalCode: address.postalCode ?? "",
-    country: address.country,
+    country: normalizeCountryCode(address.country),
     latitude: address.latitude ?? "",
     longitude: address.longitude ?? "",
     isDefault: address.isDefault,
@@ -527,7 +975,7 @@ function toAddressInput(form: CustomerAddressFormState): MobileCustomerAddressIn
     city: form.city || null,
     province: form.province || null,
     postalCode: form.postalCode || null,
-    country: form.country || "TH",
+    country: normalizeCountryCode(form.country),
     latitude: form.latitude || null,
     longitude: form.longitude || null,
     isDefault: form.isDefault,
@@ -642,6 +1090,7 @@ export function CustomerHome({ isLoggingOut = false, onLogout }: CustomerHomePro
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
   const [isSubmittingContact, setIsSubmittingContact] = useState(false);
   const [isSubmittingAddress, setIsSubmittingAddress] = useState(false);
+  const [isLocatingAddress, setIsLocatingAddress] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
@@ -942,6 +1391,7 @@ export function CustomerHome({ isLoggingOut = false, onLogout }: CustomerHomePro
     setEditingAddressId(null);
     setAddressForm({
       ...emptyAddressForm,
+      country: getDeviceCountry(),
       label: t("customer.forms.defaultAddressLabel"),
       contactName: profile?.account.accountName ?? "",
       contactPhone: profile?.account.phone ?? "",
@@ -956,6 +1406,26 @@ export function CustomerHome({ isLoggingOut = false, onLogout }: CustomerHomePro
     setEditingAddressId(address.id);
     setAddressForm(toAddressForm(address));
     setProfileSheet("address");
+  }
+
+  async function handleLocateAddress() {
+    setError(null);
+    setMessage(null);
+    setIsLocatingAddress(true);
+
+    try {
+      const coordinates = await getCurrentAddressCoordinates();
+      setAddressForm((current) => ({
+        ...current,
+        latitude: coordinates.latitude,
+        longitude: coordinates.longitude,
+      }));
+      setMessage(t("customer.messages.addressLocationCaptured"));
+    } catch {
+      setError(t("customer.messages.addressLocationUnavailable"));
+    } finally {
+      setIsLocatingAddress(false);
+    }
   }
 
   function openPasswordSheet() {
@@ -1323,14 +1793,17 @@ export function CustomerHome({ isLoggingOut = false, onLogout }: CustomerHomePro
         error={profileSheet === "address" ? error : null}
         form={addressForm}
         isEditing={Boolean(editingAddressId)}
+        isLocating={isLocatingAddress}
         isSubmitting={isSubmittingAddress}
         open={profileSheet === "address"}
         onFormChange={setAddressForm}
+        onLocate={() => void handleLocateAddress()}
         onOpenChange={(open) => {
           setProfileSheet(open ? "address" : null);
 
           if (!open) {
             setEditingAddressId(null);
+            setIsLocatingAddress(false);
             setError(null);
           }
         }}
@@ -2328,22 +2801,36 @@ function AddressFormSheet({
   error,
   form,
   isEditing,
+  isLocating,
   isSubmitting,
   open,
   onFormChange,
+  onLocate,
   onOpenChange,
   onSubmit,
 }: {
   error: string | null;
   form: CustomerAddressFormState;
   isEditing: boolean;
+  isLocating: boolean;
   isSubmitting: boolean;
   open: boolean;
   onFormChange: React.Dispatch<React.SetStateAction<CustomerAddressFormState>>;
+  onLocate: () => void;
   onOpenChange: (open: boolean) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
-  const { t } = useTranslation();
+  const { locale, t } = useTranslation();
+  const countryOptions = useMemo(
+    () => getCountryOptions(locale, form.country),
+    [form.country, locale],
+  );
+  const selectedCountryCode = normalizeCountryCode(form.country);
+  const selectedCountry = countryOptions.find((country) => country.code === selectedCountryCode) ?? {
+    code: selectedCountryCode,
+    fallbackLabel: selectedCountryCode,
+  };
+  const hasCoordinates = Boolean(form.latitude && form.longitude);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -2372,15 +2859,44 @@ function AddressFormSheet({
             </div>
             <div className="space-y-2">
               <Label htmlFor="address-country">{t("customer.forms.country")}</Label>
-              <Input
-                className="h-12 text-base uppercase"
-                id="address-country"
-                maxLength={2}
-                value={form.country}
-                onChange={(event) =>
-                  onFormChange((current) => ({ ...current, country: event.target.value.toUpperCase() }))
+              <Select
+                value={normalizeCountryCode(form.country)}
+                onValueChange={(country) =>
+                  onFormChange((current) => ({ ...current, country }))
                 }
-              />
+              >
+                <SelectTrigger
+                  aria-label={`${t("customer.forms.country")}: ${selectedCountry.fallbackLabel}`}
+                  className="h-12 w-full min-w-0 text-base"
+                  id="address-country"
+                >
+                  <SelectValue asChild>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span aria-hidden="true" className="text-lg leading-none">
+                        {getCountryFlag(selectedCountry.code)}
+                      </span>
+                      <span className="font-semibold tracking-normal text-slate-900">
+                        {selectedCountry.code}
+                      </span>
+                    </span>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="max-h-72 w-[min(20rem,calc(100vw-2rem))]" position="popper">
+                  {countryOptions.map((country) => (
+                    <SelectItem className="min-w-0 py-2" key={country.code} value={country.code}>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span aria-hidden="true" className="text-base leading-none">
+                          {getCountryFlag(country.code)}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{country.fallbackLabel}</span>
+                        <span className="shrink-0 text-xs font-semibold text-slate-500">
+                          {country.code}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
@@ -2458,7 +2974,7 @@ function AddressFormSheet({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="address-postal">{t("customer.forms.postalCode")}</Label>
               <Input
@@ -2471,28 +2987,23 @@ function AddressFormSheet({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="address-latitude">{t("customer.forms.latitude")}</Label>
-              <Input
-                className="h-12 text-base"
-                id="address-latitude"
-                inputMode="decimal"
-                value={form.latitude}
-                onChange={(event) =>
-                  onFormChange((current) => ({ ...current, latitude: event.target.value }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="address-longitude">{t("customer.forms.longitude")}</Label>
-              <Input
-                className="h-12 text-base"
-                id="address-longitude"
-                inputMode="decimal"
-                value={form.longitude}
-                onChange={(event) =>
-                  onFormChange((current) => ({ ...current, longitude: event.target.value }))
-                }
-              />
+              <Label>{t("customer.forms.location")}</Label>
+              <Button
+                className="h-12 w-full justify-center"
+                disabled={isLocating}
+                type="button"
+                variant={hasCoordinates ? "secondary" : "outline"}
+                onClick={onLocate}
+              >
+                {isLocating ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <LocateFixed className="size-4" aria-hidden="true" />
+                )}
+                {hasCoordinates
+                  ? t("customer.forms.locationCaptured")
+                  : t("customer.forms.useCurrentLocation")}
+              </Button>
             </div>
           </div>
 
