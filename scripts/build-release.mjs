@@ -21,6 +21,8 @@ const releaseRoot = join(rootDir, "release");
 const artifactDir = join(releaseRoot, "cleanhub");
 const webAdminDir = join(rootDir, "apps", "web-admin");
 const webAdminStandaloneDir = join(webAdminDir, ".next", "standalone");
+const posWebDir = join(rootDir, "apps", "pos-web");
+const posWebStandaloneDir = join(posWebDir, ".next", "standalone");
 
 function run(command, args, options = {}) {
   return new Promise((resolve, reject) => {
@@ -50,6 +52,14 @@ async function copyIfExists(from, to) {
   await cp(from, to, { recursive: true });
 }
 
+async function unlinkIfExists(filePath) {
+  if (!existsSync(filePath)) {
+    return;
+  }
+
+  await unlink(filePath);
+}
+
 async function sha256(filePath) {
   const content = await readFile(filePath);
   return createHash("sha256").update(content).digest("hex");
@@ -75,6 +85,12 @@ COPY db ./db
 ENV DRIZZLE_MIGRATIONS_FOLDER=/app/db/drizzle
 CMD ["node", "api/migrate.js"]
 
+FROM base AS seed
+COPY api ./api
+COPY db ./db
+ENV CLEANHUB_SEEDS_FOLDER=/app/db/seeds
+CMD ["node", "api/seed.js"]
+
 FROM base AS web-admin
 COPY web-admin/apps/web-admin/package.json ./web-admin/apps/web-admin/
 COPY web-admin/apps/web-admin/server.js ./web-admin/apps/web-admin/
@@ -95,6 +111,26 @@ ENV PORT=3000
 EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \\
   CMD node -e "fetch('http://127.0.0.1:3000/login').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "server.js"]
+
+FROM base AS pos-web
+COPY pos-web/apps/pos-web/package.json ./pos-web/apps/pos-web/
+COPY pos-web/apps/pos-web/server.js ./pos-web/apps/pos-web/
+COPY pos-web/apps/pos-web/.next ./pos-web/apps/pos-web/.next
+COPY pos-web/apps/pos-web/public ./pos-web/apps/pos-web/public
+WORKDIR /app/pos-web/apps/pos-web
+RUN mkdir -p /tmp/next-runtime \
+  && cd /tmp/next-runtime \
+  && npm init -y \
+  && npm install next react react-dom @swc/helpers@0.5.15 @next/env --omit=dev --no-audit --no-fund --registry=https://registry.npmmirror.com \
+  && rm -rf /app/pos-web/apps/pos-web/node_modules \
+  && mkdir -p /app/pos-web/apps/pos-web/node_modules \
+  && cp -R /tmp/next-runtime/node_modules/. /app/pos-web/apps/pos-web/node_modules \
+  && rm -rf /tmp/next-runtime
+ENV PORT=3001
+EXPOSE 3001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \\
+  CMD node -e "fetch('http://127.0.0.1:3001/login').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "server.js"]
 `,
   );
@@ -178,6 +214,32 @@ async function writeReleaseCompose() {
     networks:
       - cleanhub
 
+  pos-web:
+    image: cleanhub-pos-web:latest
+    container_name: cleanhub-pos-web
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: pos-web
+    env_file:
+      - ./.env.production
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      HOSTNAME: 0.0.0.0
+      CLEANHUB_API_BASE_URL: \${CLEANHUB_API_BASE_URL:-http://api:4000}
+      NEXT_PUBLIC_API_BASE_URL: \${NEXT_PUBLIC_API_BASE_URL:-/api}
+      POS_TENANT_CODE: \${POS_TENANT_CODE:-CLEAN-001}
+      NEXT_PUBLIC_POS_TENANT_CODE: \${NEXT_PUBLIC_POS_TENANT_CODE:-CLEAN-001}
+    ports:
+      - "127.0.0.1:\${POS_WEB_HOST_PORT:-3011}:3001"
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - cleanhub
+
   migrate:
     image: cleanhub-migrate:latest
     profiles:
@@ -192,6 +254,26 @@ async function writeReleaseCompose() {
       NODE_ENV: production
       DATABASE_URL: \${DATABASE_URL:-postgres://cleanhub:\${POSTGRES_PASSWORD}@postgres:5432/cleanhub}
       DRIZZLE_MIGRATIONS_FOLDER: /app/db/drizzle
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cleanhub
+
+  seed:
+    image: cleanhub-seed:latest
+    profiles:
+      - tools
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: seed
+    env_file:
+      - ./.env.production
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: \${DATABASE_URL:-postgres://cleanhub:\${POSTGRES_PASSWORD}@postgres:5432/cleanhub}
+      CLEANHUB_SEEDS_FOLDER: /app/db/seeds
     depends_on:
       postgres:
         condition: service_healthy
@@ -244,6 +326,12 @@ async function bundleApi() {
     ...commonOptions,
     entryPoints: [join(rootDir, "scripts", "release-migrate.ts")],
     outfile: join(artifactDir, "api", "migrate.js"),
+  });
+
+  await build({
+    ...commonOptions,
+    entryPoints: [join(rootDir, "scripts", "release-seed.ts")],
+    outfile: join(artifactDir, "api", "seed.js"),
   });
 }
 
@@ -299,6 +387,9 @@ async function copyWebAdminStandalone() {
   await copyIfExists(
     join(webAdminDir, "public"),
     join(artifactDir, "web-admin", "apps", "web-admin", "public"),
+  );
+  await unlinkIfExists(
+    join(artifactDir, "web-admin", "apps", "web-admin", ".env"),
   );
 
   // Windows release builds may miss this transitive runtime dependency after
@@ -394,13 +485,137 @@ async function copyWebAdminStandalone() {
   }
 }
 
+async function copyPosWebStandalone() {
+  await stat(posWebStandaloneDir);
+  const posWebArtifactDir = join(artifactDir, "pos-web");
+
+  if (process.platform === "win32") {
+    await cp(posWebStandaloneDir, posWebArtifactDir, {
+      recursive: true,
+      dereference: true,
+    });
+  } else {
+    await pruneDanglingSymlinks(posWebStandaloneDir);
+    await cp(posWebStandaloneDir, posWebArtifactDir, {
+      recursive: true,
+      verbatimSymlinks: true,
+    });
+  }
+
+  await cp(
+    join(posWebDir, ".next", "static"),
+    join(artifactDir, "pos-web", "apps", "pos-web", ".next", "static"),
+    { recursive: true },
+  );
+  await mkdir(join(artifactDir, "pos-web", "apps", "pos-web", "public"), {
+    recursive: true,
+  });
+  await copyIfExists(
+    join(posWebDir, "public"),
+    join(artifactDir, "pos-web", "apps", "pos-web", "public"),
+  );
+  await unlinkIfExists(join(artifactDir, "pos-web", "apps", "pos-web", ".env"));
+
+  const swcHelpersCandidates = [
+    join(posWebDir, "node_modules", "@swc", "helpers"),
+    join(posWebDir, "node_modules", "next", "node_modules", "@swc", "helpers"),
+    join(rootDir, "node_modules", "@swc", "helpers"),
+    join(rootDir, "node_modules", "next", "node_modules", "@swc", "helpers"),
+  ];
+  const swcHelpersTarget = join(
+    posWebArtifactDir,
+    "apps",
+    "pos-web",
+    "node_modules",
+    "@swc",
+    "helpers",
+  );
+  const posWebRequire = createRequire(join(posWebDir, "package.json"));
+  const rootRequire = createRequire(join(rootDir, "package.json"));
+
+  let copiedSwcHelpers = existsSync(swcHelpersTarget);
+  const swcHelpersStandaloneCandidates = [
+    join(posWebStandaloneDir, "node_modules", "@swc", "helpers"),
+    join(
+      posWebStandaloneDir,
+      "apps",
+      "pos-web",
+      "node_modules",
+      "@swc",
+      "helpers",
+    ),
+  ];
+
+  for (const candidate of swcHelpersStandaloneCandidates) {
+    if (!existsSync(candidate)) {
+      continue;
+    }
+    await cp(candidate, swcHelpersTarget, { recursive: true, force: true });
+    copiedSwcHelpers = true;
+    break;
+  }
+
+  for (const candidate of swcHelpersCandidates) {
+    if (!existsSync(candidate)) {
+      continue;
+    }
+    await cp(candidate, swcHelpersTarget, { recursive: true, force: true });
+    copiedSwcHelpers = true;
+    break;
+  }
+
+  if (!copiedSwcHelpers) {
+    const resolvedSwcHelpersCandidates = [];
+
+    try {
+      resolvedSwcHelpersCandidates.push(
+        dirname(posWebRequire.resolve("@swc/helpers/package.json")),
+      );
+    } catch {
+      // ignore
+    }
+
+    try {
+      resolvedSwcHelpersCandidates.push(
+        dirname(rootRequire.resolve("@swc/helpers/package.json")),
+      );
+    } catch {
+      // ignore
+    }
+
+    for (const candidate of resolvedSwcHelpersCandidates) {
+      if (!existsSync(candidate)) {
+        continue;
+      }
+      await cp(candidate, swcHelpersTarget, { recursive: true, force: true });
+      copiedSwcHelpers = true;
+      break;
+    }
+  }
+
+  if (!copiedSwcHelpers) {
+    console.warn(
+      [
+        "Warning: '@swc/helpers' was not found while preparing pos-web artifact.",
+        "Packaging will continue. If runtime fails, ensure dependency installation before build.",
+        "Checked paths:",
+        ...swcHelpersStandaloneCandidates.map((path) => `  - ${path}`),
+        ...swcHelpersCandidates.map((path) => `  - ${path}`),
+        "Also attempted resolution via require.resolve from pos-web/root package contexts.",
+      ].join("\n"),
+    );
+  }
+}
+
 async function writeManifest() {
   const files = [
     "Dockerfile",
     "docker-compose.yml",
     "api/index.js",
     "api/migrate.js",
+    "api/seed.js",
     "web-admin/apps/web-admin/server.js",
+    "pos-web/apps/pos-web/server.js",
     "env/production.env.example",
     "nginx/cleanhub.conf.example",
   ];
@@ -432,6 +647,7 @@ async function main() {
   await rm(releaseRoot, { recursive: true, force: true });
   await mkdir(join(artifactDir, "api"), { recursive: true });
   await mkdir(join(artifactDir, "db"), { recursive: true });
+  await mkdir(join(artifactDir, "db", "seeds"), { recursive: true });
   await mkdir(join(artifactDir, "env"), { recursive: true });
   await mkdir(join(artifactDir, "nginx"), { recursive: true });
 
@@ -445,12 +661,26 @@ async function main() {
       NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api",
     },
   });
+  await run("pnpm", ["--filter", "@cleanhub/pos-web", "build"], {
+    env: {
+      NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api",
+      NEXT_PUBLIC_POS_TENANT_CODE:
+        process.env.NEXT_PUBLIC_POS_TENANT_CODE ?? "CLEAN-001",
+      POS_TENANT_CODE: process.env.POS_TENANT_CODE ?? "CLEAN-001",
+    },
+  });
 
   await bundleApi();
   await copyWebAdminStandalone();
+  await copyPosWebStandalone();
   await cp(
     join(rootDir, "packages", "db", "drizzle"),
     join(artifactDir, "db", "drizzle"),
+    { recursive: true },
+  );
+  await cp(
+    join(rootDir, "packages", "db", "src", "seeds"),
+    join(artifactDir, "db", "seeds"),
     { recursive: true },
   );
   await cp(

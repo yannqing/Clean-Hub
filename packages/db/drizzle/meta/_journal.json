@@ -15,6 +15,13 @@
       "when": 1782468499975,
       "tag": "0001_cool_banshee",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782468500000,
+      "tag": "0002_set_ticket_item_default_to_pending_wash",
+      "breakpoints": true
     }
   ]
 }
