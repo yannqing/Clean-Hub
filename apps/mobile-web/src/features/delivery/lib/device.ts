@@ -21,7 +21,7 @@ type CameraModule = {
     quality?: number;
     allowEditing?: boolean;
     resultType: "base64";
-    source: "CAMERA";
+    source: "CAMERA" | "PHOTOS";
   }): Promise<{
     base64String?: string;
     format?: string;
@@ -60,6 +60,66 @@ function getPermissionWarningKey(error: unknown, capability: "gps" | "camera"): 
   return capability === "gps"
     ? "delivery.device.gpsPermissionDenied"
     : "delivery.device.cameraPermissionDenied";
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+        return;
+      }
+
+      reject(new Error("delivery.messages.mediaEncodeFailed"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("delivery.messages.mediaEncodeFailed"));
+    reader.readAsDataURL(file);
+  });
+}
+
+type PhotoSource = "camera" | "gallery";
+
+function selectPhotoFile(source: PhotoSource): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+
+    input.type = "file";
+    input.accept = "image/*";
+    if (source === "camera") {
+      input.capture = "environment";
+    }
+    input.style.position = "fixed";
+    input.style.left = "-9999px";
+
+    const cleanup = () => {
+      input.remove();
+      window.removeEventListener("focus", handleFocus);
+    };
+
+    function handleFocus() {
+      window.setTimeout(() => {
+        if (!input.files?.length) {
+          cleanup();
+          resolve(null);
+        }
+      }, 500);
+    }
+
+    input.addEventListener(
+      "change",
+      () => {
+        const file = input.files?.[0] ?? null;
+        cleanup();
+        resolve(file);
+      },
+      { once: true },
+    );
+    window.addEventListener("focus", handleFocus);
+    document.body.append(input);
+    input.click();
+  });
 }
 
 export async function getCurrentCoordinates(): Promise<{
@@ -121,7 +181,9 @@ export async function getCurrentCoordinates(): Promise<{
   }
 }
 
-export async function captureDeliveryPhoto(): Promise<{
+export async function captureDeliveryPhoto(
+  source: PhotoSource = "camera",
+): Promise<{
   photo: CapturePhotoResult | null;
   warning?: string;
   warningKey?: TranslationKey;
@@ -137,9 +199,27 @@ export async function captureDeliveryPhoto(): Promise<{
     const camera = getCapacitorPlugin<CameraModule>("Camera");
 
     if (!camera) {
+      const file = await selectPhotoFile(source);
+
+      if (file) {
+        const compressed = await compressImage({
+          dataUrl: await fileToDataUrl(file),
+          outputType: "image/jpeg",
+        });
+
+        return {
+          photo: {
+            blob: compressed,
+            contentType: compressed.type || "image/jpeg",
+            mimeType: compressed.type || "image/jpeg",
+            capturedAt: new Date().toISOString(),
+          },
+        };
+      }
+
       return {
         photo: null,
-        warningKey: getPermissionWarningKey(null, "camera"),
+        warningKey: "delivery.device.cameraNoPhoto",
       };
     }
 
@@ -147,7 +227,7 @@ export async function captureDeliveryPhoto(): Promise<{
       quality: 72,
       allowEditing: false,
       resultType: "base64",
-      source: "CAMERA",
+      source: source === "gallery" ? "PHOTOS" : "CAMERA",
     });
 
     if (!photo.base64String) {

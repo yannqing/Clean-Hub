@@ -23,6 +23,7 @@ import {
   Clock3,
   CloudUpload,
   FileText,
+  ImageIcon,
   Loader2,
   MapPin,
   Navigation,
@@ -75,6 +76,7 @@ type DataSource = "network" | "cache";
 type CapturedProofPhoto = {
   media: UploadableMedia;
   capturedAt: string;
+  previewUrl: string;
 };
 
 type DeliverySheet = "exception" | "proof" | "signature" | null;
@@ -311,7 +313,6 @@ export function DeliveryHome({
   const [exceptionReason, setExceptionReason] = useState("");
   const [proofType, setProofType] =
     useState<Exclude<DeliveryProofType, "signature">>("pickup");
-  const [proofMediaRef, setProofMediaRef] = useState("");
   const [proofPhoto, setProofPhoto] = useState<CapturedProofPhoto | null>(null);
   const [signedByName, setSignedByName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -415,6 +416,15 @@ export function DeliveryHome({
     return () => window.clearTimeout(timeoutId);
   }, [boot]);
 
+  useEffect(
+    () => () => {
+      if (proofPhoto) {
+        URL.revokeObjectURL(proofPhoto.previewUrl);
+      }
+    },
+    [proofPhoto],
+  );
+
   const replayQueue = useCallback(async () => {
     if (!isOnline()) {
       setWarning(t("delivery.messages.networkUnavailable"));
@@ -516,6 +526,13 @@ export function DeliveryHome({
     }
 
     setProofType(task.type);
+    setProofPhoto((currentPhoto) => {
+      if (currentPhoto) {
+        URL.revokeObjectURL(currentPhoto.previewUrl);
+      }
+
+      return null;
+    });
     setActiveSheet("proof");
   }
 
@@ -562,22 +579,32 @@ export function DeliveryHome({
     });
   }
 
-  function handleCapturePhoto() {
-    void runAction("camera", async () => {
-      const result = await captureDeliveryPhoto();
+  function handleCapturePhoto(source: "camera" | "gallery") {
+    void runAction(source, async () => {
+      const result = await captureDeliveryPhoto(source);
 
       if (result.warningKey || result.warning) {
         setWarning(result.warningKey ? t(result.warningKey) : result.warning ?? null);
       }
 
       if (result.photo) {
-        setProofPhoto({
-          media: {
-            blob: result.photo.blob,
-            contentType: result.photo.contentType,
-            capturedAt: result.photo.capturedAt,
-          },
-          capturedAt: result.photo.capturedAt,
+        const photo = result.photo;
+        const previewUrl = URL.createObjectURL(photo.blob);
+
+        setProofPhoto((currentPhoto) => {
+          if (currentPhoto) {
+            URL.revokeObjectURL(currentPhoto.previewUrl);
+          }
+
+          return {
+            media: {
+              blob: photo.blob,
+              contentType: photo.contentType,
+              capturedAt: photo.capturedAt,
+            },
+            capturedAt: photo.capturedAt,
+            previewUrl,
+          };
         });
         setMessage(t("delivery.proof.captured"));
       }
@@ -591,8 +618,8 @@ export function DeliveryHome({
       return;
     }
 
-    if (!proofPhoto && !proofMediaRef.trim()) {
-      setError(t("delivery.messages.proofReferenceRequired"));
+    if (!proofPhoto) {
+      setError(t("delivery.messages.proofMediaRequired"));
       return;
     }
 
@@ -600,13 +627,17 @@ export function DeliveryHome({
       const result = await uploadDeliveryProof({
         taskId: selectedTask.id,
         type: proofType,
-        media: proofPhoto?.media,
-        capturedAt: proofPhoto?.capturedAt,
-        mediaRef: proofMediaRef,
+        media: proofPhoto.media,
+        capturedAt: proofPhoto.capturedAt,
       });
 
-      setProofPhoto(null);
-      setProofMediaRef("");
+      setProofPhoto((currentPhoto) => {
+        if (currentPhoto) {
+          URL.revokeObjectURL(currentPhoto.previewUrl);
+        }
+
+        return null;
+      });
       handleActionResult(result);
       setActiveSheet(null);
     });
@@ -802,6 +833,8 @@ export function DeliveryHome({
   const selectedTaskTerminalMessageKey = selectedTask
     ? terminalStatusMessageKeys[selectedTask.status]
     : null;
+  const selectedTaskProofImages =
+    selectedTask?.proofs.filter((proof) => Boolean(proof.mediaUrl)) ?? [];
   const selectedTaskSecondaryActionCount =
     Number(selectedTaskCanUploadProof) +
     Number(selectedTaskCanReportException);
@@ -1038,6 +1071,43 @@ export function DeliveryHome({
                     ) : null}
                   </div>
                 </dl>
+
+                {selectedTaskProofImages.length > 0 ? (
+                  <section className="space-y-3 rounded-md border border-slate-200 bg-white p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold text-slate-950">
+                        {t("delivery.proof.savedTitle")}
+                      </h3>
+                      <span className="text-xs text-slate-500">
+                        {t("delivery.proof.savedCount", {
+                          count: selectedTaskProofImages.length,
+                        })}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {selectedTaskProofImages.map((proof) => (
+                        <a
+                          className="group overflow-hidden rounded-md border border-slate-200 bg-slate-50"
+                          href={proof.mediaUrl}
+                          key={proof.id}
+                          rel="noreferrer"
+                          target="_blank"
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element -- Proof URLs are short-lived private media links. */}
+                          <img
+                            alt={t(proofTypeLabelKeys[proof.type])}
+                            className="aspect-[4/3] w-full object-cover transition group-active:scale-[0.98]"
+                            src={proof.mediaUrl}
+                          />
+                          <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs text-slate-600">
+                            <span>{t(proofTypeLabelKeys[proof.type])}</span>
+                            <span>{formatDateTime(proof.capturedAt ?? proof.createdAt, intlLocale, notScheduledLabel)}</span>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
 
                 {selectedTaskCanUsePrinter ? (
                   <section className="rounded-md border border-slate-200 bg-slate-50 p-3">
@@ -1279,40 +1349,63 @@ export function DeliveryHome({
                 </div>
               ) : null}
 
-              <div className="grid grid-cols-[1fr_auto] gap-2">
-                <div className="space-y-2">
-                  <Label htmlFor="proof-reference">{t("delivery.proof.reference")}</Label>
-                  <Input
-                    id="proof-reference"
-                    className="h-12 text-base"
-                    placeholder={t("delivery.proof.referencePlaceholder")}
-                    value={proofMediaRef}
-                    onChange={(event) => setProofMediaRef(event.target.value)}
-                  />
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    className="h-12"
+                    disabled={Boolean(activeAction)}
+                    type="button"
+                    variant="secondary"
+                    onClick={() => handleCapturePhoto("camera")}
+                  >
+                    {activeAction === "camera" ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <Camera className="size-4" aria-hidden="true" />
+                    )}
+                    {proofPhoto ? t("delivery.proof.retake") : t("delivery.proof.capture")}
+                  </Button>
+                  <Button
+                    className="h-12"
+                    disabled={Boolean(activeAction)}
+                    type="button"
+                    variant="secondary"
+                    onClick={() => handleCapturePhoto("gallery")}
+                  >
+                    {activeAction === "gallery" ? (
+                      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    ) : (
+                      <ImageIcon className="size-4" aria-hidden="true" />
+                    )}
+                    {t("delivery.proof.gallery")}
+                  </Button>
                 </div>
-                <Button
-                  className="mt-7 size-12"
-                  disabled={Boolean(activeAction)}
-                  type="button"
-                  variant="secondary"
-                  onClick={handleCapturePhoto}
-                >
-                  {activeAction === "camera" ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Camera className="size-4" aria-hidden="true" />
-                  )}
-                </Button>
-              </div>
 
-              {proofPhoto ? (
-                <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-                  {t("delivery.proof.captured")}
-                </div>
-              ) : null}
+                {proofPhoto ? (
+                  <div className="overflow-hidden rounded-md border border-emerald-200 bg-emerald-50">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- Local blob previews cannot use Next image optimization. */}
+                    <img
+                      alt={t("delivery.proof.previewAlt")}
+                      className="aspect-[4/3] w-full object-cover"
+                      src={proofPhoto.previewUrl}
+                    />
+                    <p className="px-3 py-2 text-sm text-emerald-800">
+                      {t("delivery.proof.captured")}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500">
+                    {t("delivery.proof.empty")}
+                  </div>
+                )}
+              </div>
             </div>
             <div className="sticky bottom-0 mt-auto border-t border-slate-200 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
-              <Button className="h-12 w-full" disabled={Boolean(activeAction)} type="submit">
+              <Button
+                className="h-12 w-full"
+                disabled={Boolean(activeAction) || !proofPhoto}
+                type="submit"
+              >
                 {activeAction === "proof" ? (
                   <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                 ) : (

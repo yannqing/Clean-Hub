@@ -45,8 +45,7 @@ type StatusInput = {
 type ProofInput = {
   taskId: string;
   type: Exclude<MobileDeliveryProofType, "signature">;
-  media?: UploadableMedia;
-  mediaRef?: string;
+  media: UploadableMedia;
   capturedAt?: string;
 };
 
@@ -307,29 +306,8 @@ export async function updateDeliveryStatus(
 export async function uploadDeliveryProof(
   input: ProofInput,
 ): Promise<DeliveryActionResult> {
-  const existingMediaRef = input.mediaRef?.trim();
-
-  if (!input.media && !existingMediaRef) {
+  if (!input.media) {
     throw new Error("delivery.messages.proofMediaRequired");
-  }
-
-  if (existingMediaRef && !input.media) {
-    const request: MobileUploadDeliveryProofRequest = {
-      type: input.type,
-      idempotencyKey: createLocalId(),
-      mediaRef: existingMediaRef,
-      capturedAt: input.capturedAt,
-      deviceId: await getOrCreateDeviceId(),
-    };
-    const payload: DeliveryOfflinePayload = {
-      kind: "proof",
-      taskId: input.taskId,
-      request,
-    };
-
-    return runOrQueue(payload, () =>
-      apiClient.mobile.delivery.uploadProof(input.taskId, request),
-    );
   }
 
   const request: Omit<MobileUploadDeliveryProofRequest, "mediaRef"> = {
