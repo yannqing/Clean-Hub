@@ -1,4 +1,14 @@
-// 订单管理 — UI components.
-// Add named exports here as you create them, e.g.:
-//   export { OrdersListView } from "./orders-list-view";
-export {};
+export { OrderActionsPanel } from "./order-actions-panel";
+export {
+  OrderBadge,
+  OrderPaymentStatusBadge,
+  OrderStatusBadge,
+} from "./order-badges";
+export { OrderCreateDialog } from "./order-create-dialog";
+export { OrderDetailView } from "./order-detail-view";
+export { OrderInfoEditor } from "./order-info-editor";
+export { OrderItemsManager } from "./order-items-manager";
+export { OrderMetrics } from "./order-metrics";
+export { OrderPagination } from "./order-pagination";
+export { OrdersTable } from "./orders-table";
+export { OrdersToolbar } from "./orders-toolbar";

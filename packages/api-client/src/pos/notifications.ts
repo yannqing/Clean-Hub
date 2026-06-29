@@ -1,28 +1,39 @@
-import type { ApiClient } from "../types";
+import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   MarkAllPosNotificationsReadResult,
-  MarkPosNotificationReadRequest,
-  PosNotification,
+  PosNotificationInboxItem,
   PosNotificationListQuery,
   PosNotificationListResponse,
+  PosNotificationOverview,
 } from "./notifications.types";
+
+const BASE = "/pos/notifications";
+
+type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
 
 export function createPosNotificationsApi(client: ApiClient) {
   return {
-    list: (query?: PosNotificationListQuery) =>
-      client.get<PosNotificationListResponse>("/pos/notifications", { query }),
-    markRead: (
-      notificationId: string,
-      input: MarkPosNotificationReadRequest,
-    ) =>
-      client.patch<PosNotification>(
-        `/pos/notifications/${notificationId}`,
-        input,
-      ),
-    markAllRead: () =>
-      client.patch<MarkAllPosNotificationsReadResult>(
-        "/pos/notifications/read-all",
+    list: (query?: PosNotificationListQuery, options?: RequestOptions) =>
+      client.get<PosNotificationListResponse>(BASE, { query, ...options }),
+    overview: (options?: RequestOptions) =>
+      client.get<PosNotificationOverview>(`${BASE}/overview`, options),
+    markRead: (deliveryId: string, options?: RequestOptions) =>
+      client.patch<PosNotificationInboxItem>(
+        `${BASE}/${deliveryId}/read`,
         {},
+        options,
+      ),
+    markAllRead: (options?: RequestOptions) =>
+      client.patch<MarkAllPosNotificationsReadResult>(
+        `${BASE}/read-all`,
+        {},
+        options,
+      ),
+    archive: (deliveryId: string, options?: RequestOptions) =>
+      client.patch<PosNotificationInboxItem>(
+        `${BASE}/${deliveryId}/archive`,
+        {},
+        options,
       ),
   };
 }

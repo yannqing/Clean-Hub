@@ -15,6 +15,7 @@ const SEED_FILES = [
   "pos-cashiers.sql",
   "pos-business-data.sql",
   "notification-defaults.sql",
+  "pos-terminal-settings.sql",
   "mobile-e2e.sql",
 ] as const;
 

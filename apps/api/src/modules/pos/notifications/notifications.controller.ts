@@ -1,20 +1,24 @@
 import type { Context } from "hono";
 
 import type { AppBindings } from "../../../http/types.js";
-import { PosNotImplementedError } from "../not-implemented.errors.js";
 import { getRequestMeta } from "../request-meta.helper.js";
-import { requirePathParam } from "../require-path-param.helper.js";
+import { PosNotificationError } from "./notifications.errors.js";
 import {
+  archivePosNotification,
+  getPosNotificationsOverview,
   listPosNotifications,
   markAllPosNotificationsRead,
   markPosNotificationRead,
 } from "./notifications.service.js";
-import type {
-  MarkPosNotificationReadRequest,
-  PosNotificationListQuery,
-} from "./notifications.types.js";
+import {
+  posNotificationDeliveryParamsSchema,
+  posNotificationListQuerySchema,
+} from "./notifications.validation.js";
 
-function notImplementedResponse(c: Context<AppBindings>, error: PosNotImplementedError) {
+function createErrorResponse(
+  c: Context<AppBindings>,
+  error: PosNotificationError,
+) {
   return c.json(
     {
       message: error.message,
@@ -26,33 +30,34 @@ function notImplementedResponse(c: Context<AppBindings>, error: PosNotImplemente
 }
 
 export async function listPosNotificationsController(c: Context<AppBindings>) {
-  const query = c.req.query() as PosNotificationListQuery;
+  const query = posNotificationListQuerySchema.parse(c.req.query());
   const result = await listPosNotifications({
     authContext: c.get("authContext"),
     query,
   });
-  return c.json({ data: result });
+  return c.json(result);
+}
+
+export async function getPosNotificationsOverviewController(
+  c: Context<AppBindings>,
+) {
+  const overview = await getPosNotificationsOverview(c.get("authContext"));
+  return c.json(overview);
 }
 
 export async function markPosNotificationReadController(c: Context<AppBindings>) {
-  const notificationId = requirePathParam(c, "notificationId");
-  if (notificationId instanceof Response) {
-    return notificationId;
-  }
-  const rawBody = await c.req.json().catch(() => ({}));
-  const data = rawBody as MarkPosNotificationReadRequest;
+  const params = posNotificationDeliveryParamsSchema.parse(c.req.param());
 
   try {
     const notification = await markPosNotificationRead({
       authContext: c.get("authContext"),
       requestMeta: getRequestMeta(c),
-      notificationId,
-      data,
+      deliveryId: params.deliveryId,
     });
     return c.json(notification);
   } catch (error) {
-    if (error instanceof PosNotImplementedError) {
-      return notImplementedResponse(c, error);
+    if (error instanceof PosNotificationError) {
+      return createErrorResponse(c, error);
     }
     throw error;
   }
@@ -68,8 +73,26 @@ export async function markAllPosNotificationsReadController(
     });
     return c.json(result);
   } catch (error) {
-    if (error instanceof PosNotImplementedError) {
-      return notImplementedResponse(c, error);
+    if (error instanceof PosNotificationError) {
+      return createErrorResponse(c, error);
+    }
+    throw error;
+  }
+}
+
+export async function archivePosNotificationController(c: Context<AppBindings>) {
+  const params = posNotificationDeliveryParamsSchema.parse(c.req.param());
+
+  try {
+    const notification = await archivePosNotification({
+      authContext: c.get("authContext"),
+      requestMeta: getRequestMeta(c),
+      deliveryId: params.deliveryId,
+    });
+    return c.json(notification);
+  } catch (error) {
+    if (error instanceof PosNotificationError) {
+      return createErrorResponse(c, error);
     }
     throw error;
   }

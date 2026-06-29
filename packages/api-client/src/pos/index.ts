@@ -1,16 +1,23 @@
 import type { ApiClient } from "../types";
 import { createPosTerminalAuthApi } from "./auth";
+import { createPosAccountsApi } from "./accounts";
 import { createPosBranchesApi } from "./branches";
 import { createPosCustomersApi } from "./customers";
 import { createPosNotificationsApi } from "./notifications";
 import { createPosOrdersApi } from "./orders";
 import { createPosOverviewApi } from "./overview";
 import { createPosReceptionApi } from "./reception";
+import { createPosServiceTicketsApi } from "./service-tickets";
 import { createPosStaffApi } from "./staff";
-import { createPosTicketsApi } from "./tickets";
+import { createPosTerminalSettingsApi } from "./terminal-settings";
+import { createPosHardwareApi } from "./hardware";
+import { createPosStatisticsApi } from "./statistics";
+import { createPosWorkspaceApi } from "./workspace";
 
 export * from "./auth";
 export * from "./auth.types";
+export * from "./accounts";
+export * from "./accounts.types";
 export * from "./branches";
 export * from "./branches.types";
 export * from "./customers";
@@ -23,16 +30,25 @@ export * from "./overview";
 export * from "./overview.types";
 export * from "./reception";
 export * from "./reception.types";
+export * from "./service-tickets";
+export * from "./service-tickets.types";
 export * from "./staff";
 export * from "./staff.types";
-export * from "./tickets";
-export * from "./tickets.types";
+export * from "./terminal-settings";
+export * from "./terminal-settings.types";
+export * from "./hardware";
+export * from "./hardware.types";
+export * from "./statistics";
+export * from "./statistics.types";
+export * from "./workspace";
+export * from "./workspace.types";
 
 export function createPosApi(client: ApiClient) {
   return {
     branches: createPosBranchesApi(client),
     customers: createPosCustomersApi(client),
-    tickets: createPosTicketsApi(client),
+    serviceTickets: createPosServiceTicketsApi(client),
+    accounts: createPosAccountsApi(client),
     orders: createPosOrdersApi(client),
     overview: createPosOverviewApi(client),
     staff: createPosStaffApi(client),
@@ -44,6 +60,10 @@ export function createPosApi(client: ApiClient) {
      */
     terminalAuth: createPosTerminalAuthApi(client),
     notifications: createPosNotificationsApi(client),
+    terminalSettings: createPosTerminalSettingsApi(client),
+    hardware: createPosHardwareApi(client),
+    statistics: createPosStatisticsApi(client),
+    workspace: createPosWorkspaceApi(client),
   };
 }
 

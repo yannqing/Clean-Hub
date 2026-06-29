@@ -1,5 +1,5 @@
 {
-  "id": "c96608de-81e9-427d-bf89-0f07829e26b7",
+  "id": "9118d2ad-54f1-4aca-bf4f-015f0e68c968",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -7568,7 +7568,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'washing'"
+          "default": "'pending_wash'"
         },
         "item_color": {
           "name": "item_color",
@@ -8194,9 +8194,11 @@
       "name": "ticket_item_status",
       "schema": "public",
       "values": [
+        "pending_wash",
         "washing",
         "done",
-        "ready_to_pick"
+        "ready_to_pick",
+        "exception"
       ]
     },
     "public.ticket_item_type": {

@@ -10,6 +10,8 @@
   },
   "scripts": {
     "dev": "turbo dev",
+    "dev:api": "pnpm --filter @cleanhub/api dev",
+    "dev:pos-web": "pnpm --filter @cleanhub/pos-web dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

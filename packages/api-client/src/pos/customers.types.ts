@@ -1,32 +1,114 @@
-export type PosCustomerStatus = "active" | "blocked";
+/**
+ * POS customer management DTOs.
+ *
+ * Two entities back POS customer management:
+ *   - customer account (`/pos/accounts`)
+ *   - customer profile (`/pos/customers`, always nested under an account)
+ *
+ * Field shapes mirror apps/api/src/modules/pos/customers/customers.types.ts.
+ * Stats (tier/balance/order count/last visit) are intentionally NOT modelled
+ * here: the milestone doc defers those to other modules / real-time
+ * aggregation.
+ */
 
-export type PosCustomerSummary = {
+export type PosCustomerStatus = "active" | "disabled";
+
+// ---- shared query ---------------------------------------------------------
+
+export type PosCustomerListResultType = "account" | "profile";
+
+// ---- account --------------------------------------------------------------
+
+export type PosCustomerAccountSummary = {
   id: string;
-  fullName: string;
-  phone: string;
+  accountName: string;
+  phone: string | null;
+  email: string | null;
   status: PosCustomerStatus;
-};
-
-export type PosCustomerDetail = PosCustomerSummary & {
-  address: string | null;
-  notes: string | null;
-  orderCount: number;
   createdAt: string;
 };
 
+export type PosCustomerAccountDetail = PosCustomerAccountSummary & {
+  updatedAt: string;
+  version: number;
+};
+
+// ---- profile --------------------------------------------------------------
+
+export type PosCustomerProfileSummary = {
+  id: string;
+  customerAccountId: string;
+  fullName: string;
+  phone: string | null;
+  email: string | null;
+  status: PosCustomerStatus;
+  createdAt: string;
+};
+
+export type PosCustomerProfileDetail = PosCustomerProfileSummary & {
+  relationship: string | null;
+  address: string | null;
+  notes: string | null;
+  updatedAt: string;
+  version: number;
+};
+
+/**
+ * A profile row joined with its owning account, used by the hybrid list and
+ * the phone-fallback search. Kept flat so the list can mix accounts and
+ * profiles without a discriminator union on the wire.
+ */
+export type PosCustomerProfileWithAccount = PosCustomerProfileSummary & {
+  accountName: string;
+};
+
+// ---- hybrid list ----------------------------------------------------------
+
 export type PosCustomerListQuery = {
   q?: string;
+  resultType?: PosCustomerListResultType;
+  status?: PosCustomerStatus;
   limit?: number;
   offset?: number;
 };
 
-export type PosCustomerListResponse = {
-  data: PosCustomerSummary[];
+export type PosCustomerListResult = {
+  data: Array<
+    | { kind: "account"; account: PosCustomerAccountSummary }
+    | { kind: "profile"; profile: PosCustomerProfileWithAccount }
+  >;
+  total: number;
+  /** Total matching accounts across all pages (unaffected by resultType filter). */
+  totalAccounts: number;
+  /** Total matching profiles across all pages (unaffected by resultType filter). */
+  totalProfiles: number;
+  limit: number;
+  offset: number;
 };
 
-export type CreatePosCustomerRequest = {
+// ---- status change --------------------------------------------------------
+
+export type PosCustomerStatusChangeRequest = {
+  status: PosCustomerStatus;
+  reason?: string;
+};
+
+// ---- profile body shapes --------------------------------------------------
+
+export type CreatePosProfileRequest = {
   fullName: string;
-  phone: string;
+  phone?: string;
+  email?: string;
+  relationship?: string;
   address?: string;
   notes?: string;
+};
+
+export type UpdatePosProfileRequest = {
+  fullName?: string;
+  phone?: string | null;
+  email?: string | null;
+  relationship?: string | null;
+  address?: string | null;
+  notes?: string | null;
 };
