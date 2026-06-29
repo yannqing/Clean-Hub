@@ -53,7 +53,24 @@ export function handleApiError(error: Error, c: import("hono").Context<AppBindin
     );
   }
 
-  logger.error({ error, requestId }, "Unhandled API error");
+  // Surface the underlying cause (e.g. driver/connection errors wrapped by
+  // Drizzle) so failures like pool connection timeouts are diagnosable instead
+  // of being swallowed into an empty object.
+  const cause = (error as { cause?: unknown }).cause;
+  logger.error(
+    {
+      requestId,
+      errName: error.name,
+      errMessage: error.message,
+      causeMessage: cause instanceof Error ? cause.message : undefined,
+      causeCode:
+        cause && typeof cause === "object" && "code" in cause
+          ? (cause as { code?: unknown }).code
+          : undefined,
+      stack: error.stack,
+    },
+    "Unhandled API error",
+  );
 
   return c.json<ApiErrorResponse>(
     {
