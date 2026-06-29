@@ -155,6 +155,61 @@ function createRepository(options?: {
         },
       };
     },
+    async createContact({ tenantId, customerAccountId, data }) {
+      assert(tenantId === "tenant_1", "contact create must be tenant scoped");
+      assert(
+        customerAccountId === "account_1",
+        "contact create must be account scoped",
+      );
+
+      return {
+        customerId: "customer_2",
+        fullName: data.fullName,
+        phone: data.phone ?? null,
+        email: data.email ?? null,
+        relationship: data.relationship ?? null,
+        address: data.address ?? null,
+        status: "active",
+      };
+    },
+    async updateContact({ tenantId, customerAccountId, customerId, data }) {
+      assert(tenantId === "tenant_1", "contact update must be tenant scoped");
+      assert(
+        customerAccountId === "account_1",
+        "contact update must be account scoped",
+      );
+
+      return customerId === "customer_1"
+        ? {
+            customerId,
+            fullName: data.fullName,
+            phone: data.phone ?? null,
+            email: data.email ?? null,
+            relationship: data.relationship ?? null,
+            address: data.address ?? null,
+            status: "active",
+          }
+        : null;
+    },
+    async softDeleteContact({ tenantId, customerAccountId, customerId }) {
+      assert(tenantId === "tenant_1", "contact delete must be tenant scoped");
+      assert(
+        customerAccountId === "account_1",
+        "contact delete must be account scoped",
+      );
+
+      return customerId === "customer_1"
+        ? {
+            customerId,
+            fullName: "Customer One",
+            phone: "+100000000",
+            email: "customer@example.com",
+            relationship: null,
+            address: "1 Main St",
+            status: "active",
+          }
+        : null;
+    },
     async listAddresses({ tenantId, customerAccountId }) {
       assert(tenantId === "tenant_1", "addresses must be tenant scoped");
       assert(
@@ -331,6 +386,20 @@ export async function runCustomerSmokeChecks(): Promise<void> {
   const profile = await service.getProfile(customerContext);
 
   assert(profile.account.id === "account_1", "profile should return account");
+
+  const contact = await service.updateContact(customerContext, "customer_1", {
+    fullName: "Customer One Updated",
+    phone: "+100000001",
+    email: "updated@example.com",
+    relationship: "Primary",
+    address: "2 Main St",
+  });
+
+  assert(contact.fullName === "Customer One Updated", "contact should update");
+
+  const deletedContact = await service.deleteContact(customerContext, "customer_1");
+
+  assert(deletedContact.customerId === "customer_1", "contact should delete");
 
   const order = await service.getOrderDetail(customerContext, "order_1");
 

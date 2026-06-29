@@ -33,10 +33,11 @@ import {
   Printer,
   ReceiptText,
   RefreshCw,
-  Route,
   UserRound,
   WifiOff,
 } from "lucide-react";
+
+import { WorkspaceHeader } from "@/components/workspace-header";
 
 import {
   getDeliveryQueueSummary,
@@ -66,6 +67,8 @@ import type {
 
 type DeliveryHomeProps = {
   driverName?: string;
+  isLoggingOut?: boolean;
+  onLogout?: () => void;
 };
 
 type DataSource = "network" | "cache";
@@ -213,7 +216,11 @@ function applyStatusToTask<TTask extends DeliveryTaskListItem | DeliveryTaskDeta
   };
 }
 
-export function DeliveryHome({ driverName }: DeliveryHomeProps) {
+export function DeliveryHome({
+  driverName,
+  isLoggingOut = false,
+  onLogout = () => undefined,
+}: DeliveryHomeProps) {
   const { locale, t } = useTranslation();
   const intlLocale = intlLocales[locale];
   const notScheduledLabel = t("common.notScheduled");
@@ -725,22 +732,14 @@ export function DeliveryHome({ driverName }: DeliveryHomeProps) {
 
   return (
     <section className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-8 pt-[max(20px,env(safe-area-inset-top))]">
-      <header className="mb-5 flex items-center justify-between gap-4">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
-            {t("delivery.title")}
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold text-slate-950">
-            {t("delivery.subtitle")}
-          </h1>
-          {driverName ? (
-            <p className="mt-1 truncate text-sm text-slate-600">{driverName}</p>
-          ) : null}
-        </div>
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-md bg-teal-700 text-white shadow-sm">
-          <Route className="size-5" aria-hidden="true" />
-        </div>
-      </header>
+      <WorkspaceHeader
+        eyebrow={t("delivery.title")}
+        isLoggingOut={isLoggingOut}
+        logoutLabel={t("auth.logout")}
+        subtitle={driverName}
+        title={t("delivery.subtitle")}
+        onLogout={onLogout}
+      />
 
       <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm">
         <div className="flex min-w-0 items-center gap-2 text-sm text-slate-700">

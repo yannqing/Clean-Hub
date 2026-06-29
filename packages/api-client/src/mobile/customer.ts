@@ -7,6 +7,8 @@ import type {
   MobileCustomerAddress,
   MobileCustomerAddressInput,
   MobileCustomerAppointment,
+  MobileCustomerContact,
+  MobileCustomerContactInput,
   MobileCustomerOrderDetail,
   MobileCustomerProfile,
   MobileCustomerTicketDetail,
@@ -27,6 +29,30 @@ export function createMobileCustomerApi(client: ApiClient) {
       client.patch<MobileCustomerProfile>(
         "/mobile/customer/profile",
         input,
+        options,
+      ),
+    createContact: (
+      input: MobileCustomerContactInput,
+      options?: RequestOptions,
+    ) =>
+      client.post<MobileCustomerContact>(
+        "/mobile/customer/contacts",
+        input,
+        options,
+      ),
+    updateContact: (
+      customerId: string,
+      input: MobileCustomerContactInput,
+      options?: RequestOptions,
+    ) =>
+      client.patch<MobileCustomerContact>(
+        `/mobile/customer/contacts/${encodeURIComponent(customerId)}`,
+        input,
+        options,
+      ),
+    deleteContact: (customerId: string, options?: RequestOptions) =>
+      client.delete<MobileCustomerContact>(
+        `/mobile/customer/contacts/${encodeURIComponent(customerId)}`,
         options,
       ),
     listAddresses: (options?: RequestOptions) =>

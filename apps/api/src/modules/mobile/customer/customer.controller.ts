@@ -48,6 +48,21 @@ const updateProfileBodySchema = z
     { message: "At least one profile field is required." },
   );
 
+const contactBodySchema = z.object({
+  fullName: z.string().trim().min(1).max(200),
+  phone: nullableTrimmed(32),
+  email: z
+    .string()
+    .trim()
+    .email()
+    .max(320)
+    .nullable()
+    .optional()
+    .transform((value) => (value === "" ? null : value?.toLowerCase())),
+  relationship: nullableTrimmed(80),
+  address: nullableTrimmed(2000),
+});
+
 const addressBodySchema = z.object({
   customerId: nullableTrimmed(120),
   label: z.string().trim().min(1).max(80),
@@ -114,6 +129,60 @@ export function createCustomerController({
       try {
         return c.json(
           await customerService.updateProfile(c.get("mobileAuthContext"), body),
+        );
+      } catch (error) {
+        if (error instanceof CustomerError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
+    createContact: async (c: Context<AppBindings>) => {
+      const body = contactBodySchema.parse(await readJson(c));
+
+      try {
+        return c.json(
+          await customerService.createContact(c.get("mobileAuthContext"), body),
+          201,
+        );
+      } catch (error) {
+        if (error instanceof CustomerError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
+    updateContact: async (c: Context<AppBindings>) => {
+      const { id } = idParamsSchema.parse(c.req.param());
+      const body = contactBodySchema.parse(await readJson(c));
+
+      try {
+        return c.json(
+          await customerService.updateContact(
+            c.get("mobileAuthContext"),
+            id,
+            body,
+          ),
+        );
+      } catch (error) {
+        if (error instanceof CustomerError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
+    deleteContact: async (c: Context<AppBindings>) => {
+      const { id } = idParamsSchema.parse(c.req.param());
+
+      try {
+        return c.json(
+          await customerService.deleteContact(c.get("mobileAuthContext"), id),
         );
       } catch (error) {
         if (error instanceof CustomerError) {

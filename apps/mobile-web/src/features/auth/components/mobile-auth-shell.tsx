@@ -5,7 +5,7 @@ import type { MobileAuthContext } from "@cleanhub/api-client";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { Button, Input, Label } from "@cleanhub/ui";
-import { Building2, ChevronRight, Loader2, LockKeyhole, LogOut, PackageCheck, ShieldCheck } from "lucide-react";
+import { Building2, ChevronRight, Loader2, LockKeyhole, PackageCheck, ShieldCheck } from "lucide-react";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { CustomerHome } from "@/features/customer";
@@ -207,29 +207,16 @@ export function MobileAuthShell() {
   }
 
   if (tenantCode && session) {
-    return (
-      <>
-        <div className="fixed right-4 top-[max(16px,env(safe-area-inset-top))] z-20 flex flex-col items-end gap-2">
-          <LanguageSwitcher />
-          <Button
-            aria-label={t("auth.logout")}
-            className="size-11 rounded-md bg-white/95 p-0 shadow-sm backdrop-blur"
-            disabled={isPending}
-            type="button"
-            variant="outline"
-            onClick={handleLogout}
-          >
-            <LogOut className="size-4" aria-hidden="true" />
-          </Button>
-        </div>
-        {session.authContext.role === "driver" ? (
-          <DeliveryHome driverName={session.authContext.displayName} />
-        ) : session.authContext.role === "owner" ? (
-          <OwnerHome />
-        ) : (
-          <CustomerHome />
-        )}
-      </>
+    return session.authContext.role === "driver" ? (
+      <DeliveryHome
+        driverName={session.authContext.displayName}
+        isLoggingOut={isPending}
+        onLogout={handleLogout}
+      />
+    ) : session.authContext.role === "owner" ? (
+      <OwnerHome isLoggingOut={isPending} onLogout={handleLogout} />
+    ) : (
+      <CustomerHome isLoggingOut={isPending} onLogout={handleLogout} />
     );
   }
 

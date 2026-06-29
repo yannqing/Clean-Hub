@@ -9,6 +9,7 @@ import type {
   MobileCustomerAppointment,
   MobileCustomerAppointmentStatus,
   MobileCustomerAppointmentType,
+  MobileCustomerContact,
   MobileCustomerOrderDetail,
   MobileCustomerOrderListItem,
   MobileCustomerOrderStatus,
@@ -44,11 +45,9 @@ import {
   Loader2,
   Mail,
   MapPin,
-  PackageCheck,
   Phone,
   Plus,
   ReceiptText,
-  RefreshCcw,
   RotateCcw,
   Star,
   Trash2,
@@ -58,17 +57,21 @@ import {
 } from "lucide-react";
 
 import { getMobileSession } from "@/lib/token-storage";
+import { WorkspaceHeader } from "@/components/workspace-header";
 
 import {
   cancelCustomerAppointment,
   changeCustomerPassword,
   createCustomerAddress,
   createCustomerAppointment,
+  createCustomerContact,
   createCustomerPayment,
   createCustomerRefundRequest,
   deleteCustomerAddress,
+  deleteCustomerContact,
   setDefaultCustomerAddress,
   updateCustomerAddress,
+  updateCustomerContact,
   updateCustomerProfile,
 } from "../actions";
 import {
@@ -82,6 +85,8 @@ import {
 type CustomerTab = "resume" | "orders" | "appointments" | "profile";
 
 type ActivityKind = "order" | "ticket";
+
+type ActivityStatusFilter = "all" | "active" | "done" | "cancelled";
 
 type ActivityListItem =
   | {
@@ -133,6 +138,14 @@ type CustomerProfileFormState = {
   email: string;
 };
 
+type CustomerContactFormState = {
+  fullName: string;
+  phone: string;
+  email: string;
+  relationship: string;
+  address: string;
+};
+
 type CustomerAddressFormState = {
   customerId: string;
   label: string;
@@ -162,7 +175,7 @@ type RefundFormState = {
   reason: string;
 };
 
-type ProfileSheet = "profile" | "address" | "password" | null;
+type ProfileSheet = "profile" | "contact" | "address" | "password" | null;
 
 type StatusView = {
   label: string;
@@ -174,6 +187,14 @@ type Translator = ReturnType<typeof useTranslation>["t"];
 const emptyActivity: MobileCustomerActivityList = {
   orders: [],
   tickets: [],
+};
+
+const emptyContactForm: CustomerContactFormState = {
+  fullName: "",
+  phone: "",
+  email: "",
+  relationship: "",
+  address: "",
 };
 
 const emptyAddressForm: CustomerAddressFormState = {
@@ -205,6 +226,8 @@ const tabIcons: Record<CustomerTab, typeof Home> = {
   appointments: CalendarClock,
   profile: UserRound,
 };
+
+const activityStatusFilters: ActivityStatusFilter[] = ["all", "active", "done", "cancelled"];
 
 const orderStatusClasses: Record<MobileCustomerOrderStatus, string> = {
   draft: "border-slate-200 bg-slate-50 text-slate-700",
@@ -406,6 +429,32 @@ function getActivityItems(activity: MobileCustomerActivityList, t: Translator): 
   );
 }
 
+function getActivityStatusGroup(item: ActivityListItem): Exclude<ActivityStatusFilter, "all"> {
+  if (item.status === "cancelled" || item.status === "exception") {
+    return "cancelled";
+  }
+
+  if (
+    (item.kind === "order" && item.status === "delivered") ||
+    (item.kind === "ticket" && item.status === "picked_up")
+  ) {
+    return "done";
+  }
+
+  return "active";
+}
+
+function filterActivityItems(
+  items: ActivityListItem[],
+  filter: ActivityStatusFilter,
+): ActivityListItem[] {
+  if (filter === "all") {
+    return items;
+  }
+
+  return items.filter((item) => getActivityStatusGroup(item) === filter);
+}
+
 function sortAppointments(appointments: MobileCustomerAppointment[]): MobileCustomerAppointment[] {
   return [...appointments].sort(
     (left, right) => new Date(right.expectedAt).getTime() - new Date(left.expectedAt).getTime(),
@@ -427,6 +476,20 @@ function toProfileForm(profile: MobileCustomerProfile | null): CustomerProfileFo
     accountName: profile?.account.accountName ?? "",
     phone: profile?.account.phone ?? "",
     email: profile?.account.email ?? "",
+  };
+}
+
+function toContactForm(contact?: MobileCustomerContact | null): CustomerContactFormState {
+  if (!contact) {
+    return emptyContactForm;
+  }
+
+  return {
+    fullName: contact.fullName,
+    phone: contact.phone ?? "",
+    email: contact.email ?? "",
+    relationship: contact.relationship ?? "",
+    address: contact.address ?? "",
   };
 }
 
@@ -472,6 +535,16 @@ function toAddressInput(form: CustomerAddressFormState): MobileCustomerAddressIn
   };
 }
 
+function toContactInput(form: CustomerContactFormState) {
+  return {
+    fullName: form.fullName,
+    phone: form.phone || null,
+    email: form.email || null,
+    relationship: form.relationship || null,
+    address: form.address || null,
+  };
+}
+
 function formatCustomerAddress(address: MobileCustomerAddress): string {
   return [
     address.addressLine1,
@@ -483,19 +556,6 @@ function formatCustomerAddress(address: MobileCustomerAddress): string {
   ]
     .filter(Boolean)
     .join(", ");
-}
-
-function getAppointmentSummary(appointments: MobileCustomerAppointment[]) {
-  return {
-    pending: appointments.filter((appointment) => appointment.status === "pending").length,
-    next:
-      [...appointments]
-        .filter((appointment) => appointment.status === "pending" || appointment.status === "accepted")
-        .sort(
-          (left, right) =>
-            new Date(left.expectedAt).getTime() - new Date(right.expectedAt).getTime(),
-        )[0] ?? null,
-  };
 }
 
 type CustomerSnapshot = {
@@ -538,9 +598,15 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
   };
 }
 
-export function CustomerHome() {
+type CustomerHomeProps = {
+  isLoggingOut?: boolean;
+  onLogout?: () => void;
+};
+
+export function CustomerHome({ isLoggingOut = false, onLogout }: CustomerHomeProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<CustomerTab>("resume");
+  const [activeTab, setActiveTab] = useState<CustomerTab>("orders");
+  const [activityFilter, setActivityFilter] = useState<ActivityStatusFilter>("all");
   const [authContext, setAuthContext] = useState<MobileAuthContext | null>(null);
   const [profile, setProfile] = useState<MobileCustomerProfile | null>(null);
   const [addressBook, setAddressBook] = useState<MobileCustomerAddress[]>([]);
@@ -551,8 +617,10 @@ export function CustomerHome() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [appointmentSheetOpen, setAppointmentSheetOpen] = useState(false);
   const [profileSheet, setProfileSheet] = useState<ProfileSheet>(null);
+  const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState<CustomerProfileFormState>(() => toProfileForm(null));
+  const [contactForm, setContactForm] = useState<CustomerContactFormState>(emptyContactForm);
   const [addressForm, setAddressForm] = useState<CustomerAddressFormState>(emptyAddressForm);
   const [passwordForm, setPasswordForm] = useState<CustomerPasswordFormState>(emptyPasswordForm);
   const [refundSheetOpen, setRefundSheetOpen] = useState(false);
@@ -572,11 +640,13 @@ export function CustomerHome() {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [isSubmittingAppointment, setIsSubmittingAppointment] = useState(false);
   const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+  const [isSubmittingContact, setIsSubmittingContact] = useState(false);
   const [isSubmittingAddress, setIsSubmittingAddress] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
   const [cancellingAppointmentId, setCancellingAppointmentId] = useState<string | null>(null);
+  const [contactActionId, setContactActionId] = useState<string | null>(null);
   const [addressActionId, setAddressActionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -655,8 +725,26 @@ export function CustomerHome() {
   }, [t]);
 
   const activityItems = useMemo(() => getActivityItems(activity, t), [activity, t]);
-  const appointmentSummary = useMemo(() => getAppointmentSummary(appointments), [appointments]);
-  const latestActivity = activityItems[0] ?? null;
+  const filteredActivityItems = useMemo(
+    () => filterActivityItems(activityItems, activityFilter),
+    [activityFilter, activityItems],
+  );
+
+  useEffect(() => {
+    const refreshWhenActive = () => {
+      if (document.visibilityState === "visible") {
+        void loadCustomerData("refresh");
+      }
+    };
+
+    window.addEventListener("focus", refreshWhenActive);
+    document.addEventListener("visibilitychange", refreshWhenActive);
+
+    return () => {
+      window.removeEventListener("focus", refreshWhenActive);
+      document.removeEventListener("visibilitychange", refreshWhenActive);
+    };
+  }, [loadCustomerData]);
 
   async function handleSelectActivity(item: ActivityListItem) {
     setSelectedActivity({ kind: item.kind, id: item.id });
@@ -828,6 +916,26 @@ export function CustomerHome() {
     setProfileSheet("profile");
   }
 
+  function openCreateContactSheet() {
+    setError(null);
+    setMessage(null);
+    setEditingContactId(null);
+    setContactForm({
+      ...emptyContactForm,
+      phone: profile?.account.phone ?? "",
+      email: profile?.account.email ?? "",
+    });
+    setProfileSheet("contact");
+  }
+
+  function openEditContactSheet(contact: MobileCustomerContact) {
+    setError(null);
+    setMessage(null);
+    setEditingContactId(contact.customerId);
+    setContactForm(toContactForm(contact));
+    setProfileSheet("contact");
+  }
+
   function openCreateAddressSheet() {
     setError(null);
     setMessage(null);
@@ -877,6 +985,82 @@ export function CustomerHome() {
       setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
       setIsSubmittingProfile(false);
+    }
+  }
+
+  async function handleSaveContact(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+    setIsSubmittingContact(true);
+
+    try {
+      if (!contactForm.fullName.trim()) {
+        throw new Error(t("customer.messages.contactNameRequired"));
+      }
+
+      const input = toContactInput(contactForm);
+      const saved = editingContactId
+        ? await updateCustomerContact(editingContactId, input)
+        : await createCustomerContact(input);
+
+      setProfile((current) => {
+        if (!current) {
+          return current;
+        }
+
+        const withoutSaved = current.addresses.filter(
+          (contact) => contact.customerId !== saved.customerId,
+        );
+
+        return {
+          ...current,
+          addresses: [saved, ...withoutSaved],
+        };
+      });
+      setProfileSheet(null);
+      setEditingContactId(null);
+      setMessage(
+        editingContactId
+          ? t("customer.messages.contactUpdated")
+          : t("customer.messages.contactAdded"),
+      );
+    } catch (nextError) {
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
+    } finally {
+      setIsSubmittingContact(false);
+    }
+  }
+
+  async function handleDeleteContact(customerId: string) {
+    setError(null);
+    setMessage(null);
+    setContactActionId(`delete-${customerId}`);
+
+    try {
+      await deleteCustomerContact(customerId);
+      setProfile((current) =>
+        current
+          ? {
+              ...current,
+              addresses: current.addresses.filter(
+                (contact) => contact.customerId !== customerId,
+              ),
+            }
+          : current,
+      );
+      setAddressBook((current) =>
+        current.map((address) =>
+          address.customerId === customerId
+            ? { ...address, customerId: null }
+            : address,
+        ),
+      );
+      setMessage(t("customer.messages.contactDeleted"));
+    } catch (nextError) {
+      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
+    } finally {
+      setContactActionId(null);
     }
   }
 
@@ -1006,56 +1190,32 @@ export function CustomerHome() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(24px,env(safe-area-inset-top))]">
-      <header className="mb-5 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
-            CleanHub
-          </p>
-          <h1 className="mt-1 text-3xl font-semibold text-slate-950">
-            {t("customer.home.clientSpace")}
-          </h1>
-          <p className="mt-2 truncate text-sm text-slate-600">
-            {profile?.account.accountName ?? authContext?.displayName ?? t("customer.home.defaultCustomer")}
-          </p>
-        </div>
-        <Button
-          aria-label={t("common.refresh")}
-          className="size-11"
-          disabled={isRefreshing}
-          size="icon"
-          variant="outline"
-          onClick={() => void loadCustomerData("refresh")}
-        >
-          {isRefreshing ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <RefreshCcw className="size-4" aria-hidden="true" />
-          )}
-        </Button>
-      </header>
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))]">
+      <WorkspaceHeader
+        isLoggingOut={isLoggingOut}
+        logoutLabel={t("auth.logout")}
+        subtitle={
+          profile?.account.accountName ??
+          authContext?.displayName ??
+          t("customer.home.defaultCustomer")
+        }
+        title={t("customer.home.clientSpace")}
+        onLogout={onLogout ?? (() => setActiveTab("profile"))}
+      />
+      <span className="sr-only" aria-live="polite">
+        {isRefreshing ? t("common.refresh") : ""}
+      </span>
 
       {error && !appointmentSheetOpen ? <AlertMessage tone="error" message={error} /> : null}
       {message ? <AlertMessage tone="success" message={message} /> : null}
 
-      {activeTab === "resume" ? (
-        <ResumeView
-          activityCount={activity.orders.length + activity.tickets.length}
-          appointmentSummary={appointmentSummary}
-          latestActivity={latestActivity}
-          profile={profile}
-          onOpenActivity={(item) => {
-            setActiveTab("orders");
-            void handleSelectActivity(item);
-          }}
-          onOpenAppointments={() => setActiveTab("appointments")}
-        />
-      ) : null}
-
-      {activeTab === "orders" ? (
+      {activeTab === "resume" || activeTab === "orders" ? (
         <ActivityView
-          activityItems={activityItems}
+          activityItems={filteredActivityItems}
+          activeFilter={activityFilter}
           selectedActivity={selectedActivity}
+          totalCount={activityItems.length}
+          onFilterChange={setActivityFilter}
           onSelectActivity={(item) => void handleSelectActivity(item)}
         />
       ) : null}
@@ -1077,10 +1237,14 @@ export function CustomerHome() {
         <ProfileView
           addressActionId={addressActionId}
           addressBook={addressBook}
+          contactActionId={contactActionId}
           profile={profile}
           onCreateAddress={openCreateAddressSheet}
+          onCreateContact={openCreateContactSheet}
           onDeleteAddress={(addressId) => void handleDeleteAddress(addressId)}
+          onDeleteContact={(customerId) => void handleDeleteContact(customerId)}
           onEditAddress={openEditAddressSheet}
+          onEditContact={openEditContactSheet}
           onEditProfile={openProfileSheet}
           onOpenPassword={openPasswordSheet}
           onSetDefaultAddress={(addressId) => void handleSetDefaultAddress(addressId)}
@@ -1173,6 +1337,24 @@ export function CustomerHome() {
         onSubmit={handleSaveAddress}
       />
 
+      <ContactFormSheet
+        error={profileSheet === "contact" ? error : null}
+        form={contactForm}
+        isEditing={Boolean(editingContactId)}
+        isSubmitting={isSubmittingContact}
+        open={profileSheet === "contact"}
+        onFormChange={setContactForm}
+        onOpenChange={(open) => {
+          setProfileSheet(open ? "contact" : null);
+
+          if (!open) {
+            setEditingContactId(null);
+            setError(null);
+          }
+        }}
+        onSubmit={handleSaveContact}
+      />
+
       <PasswordFormSheet
         error={profileSheet === "password" ? error : null}
         form={passwordForm}
@@ -1254,128 +1436,19 @@ function AlertMessage({ message, tone }: { message: string; tone: "error" | "suc
   );
 }
 
-function ResumeView({
-  activityCount,
-  appointmentSummary,
-  latestActivity,
-  profile,
-  onOpenActivity,
-  onOpenAppointments,
-}: {
-  activityCount: number;
-  appointmentSummary: { pending: number; next: MobileCustomerAppointment | null };
-  latestActivity: ActivityListItem | null;
-  profile: MobileCustomerProfile | null;
-  onOpenActivity: (item: ActivityListItem) => void;
-  onOpenAppointments: () => void;
-}) {
-  const { locale, t } = useTranslation();
-  const intlLocale = getIntlLocale(locale);
-
-  return (
-    <div className="space-y-4">
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 items-center justify-center rounded-md bg-teal-50 text-teal-700">
-            <PackageCheck className="size-5" aria-hidden="true" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-slate-950">
-              {profile?.account.accountName ?? t("customer.home.clientAccount")}
-            </p>
-            <p className="mt-1 text-sm text-slate-600">
-              {profile?.account.phone ?? profile?.account.email ?? t("customer.home.contactMissing")}
-            </p>
-          </div>
-        </div>
-
-        <dl className="mt-5 grid grid-cols-3 gap-2">
-          <StatBlock label={t("customer.home.tracking")} value={activityCount} />
-          <StatBlock label={t("customer.home.activeAppointments")} value={appointmentSummary.pending} />
-          <StatBlock label={t("customer.home.addresses")} value={profile?.addresses.length ?? 0} />
-        </dl>
-      </section>
-
-      {latestActivity ? (
-        <button
-          className="w-full rounded-md border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-teal-300"
-          type="button"
-          onClick={() => onOpenActivity(latestActivity)}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 gap-3">
-              <ActivityIcon kind={latestActivity.kind} />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-950">{latestActivity.title}</p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {formatDate(latestActivity.createdAt, intlLocale)}
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="mt-1 size-4 text-slate-400" aria-hidden="true" />
-          </div>
-          <div className="mt-3">
-            <StatusBadge
-              view={
-                latestActivity.kind === "order"
-                  ? getOrderStatusView(t, latestActivity.status)
-                  : getTicketStatusView(t, latestActivity.status)
-              }
-            />
-          </div>
-        </button>
-      ) : (
-        <EmptyState
-          icon={ReceiptText}
-          title={t("customer.empty.noTrackingTitle")}
-          body={t("customer.empty.noTrackingBody")}
-        />
-      )}
-
-      {appointmentSummary.next ? (
-        <button
-          className="w-full rounded-md border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-teal-300"
-          type="button"
-          onClick={onOpenAppointments}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex min-w-0 gap-3">
-              <div className="flex size-10 items-center justify-center rounded-md bg-amber-50 text-amber-700">
-                <CalendarClock className="size-5" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-950">
-                  {t(appointmentTypeKeys[appointmentSummary.next.type])}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {formatDateTime(appointmentSummary.next.expectedAt, intlLocale)}
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="mt-1 size-4 text-slate-400" aria-hidden="true" />
-          </div>
-        </button>
-      ) : null}
-    </div>
-  );
-}
-
-function StatBlock({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-md bg-slate-50 px-2 py-3 text-center">
-      <dt className="text-xs font-medium text-slate-500">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold text-slate-950">{value}</dd>
-    </div>
-  );
-}
-
 function ActivityView({
+  activeFilter,
   activityItems,
   selectedActivity,
+  totalCount,
+  onFilterChange,
   onSelectActivity,
 }: {
+  activeFilter: ActivityStatusFilter;
   activityItems: ActivityListItem[];
   selectedActivity: ActivitySelection | null;
+  totalCount: number;
+  onFilterChange: (filter: ActivityStatusFilter) => void;
   onSelectActivity: (item: ActivityListItem) => void;
 }) {
   const { locale, t } = useTranslation();
@@ -1383,6 +1456,33 @@ function ActivityView({
 
   return (
     <div className="space-y-4">
+      <div
+        className="mobile-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+        role="tablist"
+        aria-label={t("customer.filters.label")}
+      >
+        {activityStatusFilters.map((filter) => {
+          const isActive = activeFilter === filter;
+
+          return (
+            <button
+              aria-selected={isActive}
+              className={`h-9 shrink-0 rounded-full px-4 text-sm font-semibold transition ${
+                isActive
+                  ? "bg-teal-700 text-white shadow-sm shadow-teal-900/20"
+                  : "bg-transparent text-slate-600 hover:bg-white"
+              }`}
+              key={filter}
+              role="tab"
+              type="button"
+              onClick={() => onFilterChange(filter)}
+            >
+              {t(`customer.filters.${filter}` as TranslationKey)}
+            </button>
+          );
+        })}
+      </div>
+
       {activityItems.length ? (
         <section className="space-y-3">
           {activityItems.map((item) => {
@@ -1409,16 +1509,18 @@ function ActivityView({
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="mt-1 size-4 text-slate-400" aria-hidden="true" />
+                  <div className="flex shrink-0 items-center gap-2">
+                    <StatusBadge
+                      view={
+                        item.kind === "order"
+                          ? getOrderStatusView(t, item.status)
+                          : getTicketStatusView(t, item.status)
+                      }
+                    />
+                    <ChevronRight className="size-4 text-slate-400" aria-hidden="true" />
+                  </div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <StatusBadge
-                    view={
-                      item.kind === "order"
-                        ? getOrderStatusView(t, item.status)
-                        : getTicketStatusView(t, item.status)
-                    }
-                  />
+                <div className="mt-3 flex flex-wrap items-center justify-end gap-2 pl-14">
                   {item.kind === "order" ? (
                     <span className="text-xs font-medium text-slate-500">
                       {t("customer.detail.totalInline", { amount: item.amount })}
@@ -1435,6 +1537,12 @@ function ActivityView({
             );
           })}
         </section>
+      ) : totalCount ? (
+        <EmptyState
+          icon={ReceiptText}
+          title={t("customer.empty.noFilteredTrackingTitle")}
+          body={t("customer.empty.noFilteredTrackingBody")}
+        />
       ) : (
         <EmptyState
           icon={ReceiptText}
@@ -2103,6 +2211,119 @@ function ProfileFormSheet({
   );
 }
 
+function ContactFormSheet({
+  error,
+  form,
+  isEditing,
+  isSubmitting,
+  open,
+  onFormChange,
+  onOpenChange,
+  onSubmit,
+}: {
+  error: string | null;
+  form: CustomerContactFormState;
+  isEditing: boolean;
+  isSubmitting: boolean;
+  open: boolean;
+  onFormChange: React.Dispatch<React.SetStateAction<CustomerContactFormState>>;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="max-h-[90dvh] p-5">
+        <SheetHeader className="pr-8 text-left">
+          <SheetTitle>
+            {isEditing ? t("customer.profile.contactEditTitle") : t("customer.profile.contactNewTitle")}
+          </SheetTitle>
+          <SheetDescription>{t("customer.profile.contactDescription")}</SheetDescription>
+        </SheetHeader>
+
+        {error ? <AlertMessage tone="error" message={error} /> : null}
+
+        <form className="space-y-4" onSubmit={onSubmit}>
+          <div className="space-y-2">
+            <Label htmlFor="contact-full-name">{t("customer.forms.name")}</Label>
+            <Input
+              className="h-12 text-base"
+              id="contact-full-name"
+              value={form.fullName}
+              onChange={(event) =>
+                onFormChange((current) => ({ ...current, fullName: event.target.value }))
+              }
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="contact-phone">{t("customer.forms.phone")}</Label>
+              <Input
+                className="h-12 text-base"
+                id="contact-phone"
+                inputMode="tel"
+                value={form.phone}
+                onChange={(event) =>
+                  onFormChange((current) => ({ ...current, phone: event.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact-email">{t("customer.forms.email")}</Label>
+              <Input
+                className="h-12 text-base"
+                id="contact-email"
+                inputMode="email"
+                value={form.email}
+                onChange={(event) =>
+                  onFormChange((current) => ({ ...current, email: event.target.value }))
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="contact-relationship">{t("customer.forms.relationship")}</Label>
+            <Input
+              className="h-12 text-base"
+              id="contact-relationship"
+              value={form.relationship}
+              onChange={(event) =>
+                onFormChange((current) => ({ ...current, relationship: event.target.value }))
+              }
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="contact-address">{t("customer.forms.address")}</Label>
+            <Textarea
+              className="min-h-24 resize-none text-base"
+              id="contact-address"
+              value={form.address}
+              onChange={(event) =>
+                onFormChange((current) => ({ ...current, address: event.target.value }))
+              }
+            />
+          </div>
+
+          <SheetFooter className="sticky bottom-0 -mx-5 mt-5 border-t border-slate-200 bg-white px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-3">
+            <Button className="h-12 w-full" disabled={isSubmitting} type="submit">
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <CheckCircle2 className="size-4" aria-hidden="true" />
+              )}
+              {t("customer.profile.saveContact")}
+            </Button>
+          </SheetFooter>
+        </form>
+      </SheetContent>
+    </Sheet>
+  );
+}
+
 function AddressFormSheet({
   error,
   form,
@@ -2410,20 +2631,28 @@ function PasswordFormSheet({
 function ProfileView({
   addressActionId,
   addressBook,
+  contactActionId,
   profile,
   onCreateAddress,
+  onCreateContact,
   onDeleteAddress,
+  onDeleteContact,
   onEditAddress,
+  onEditContact,
   onEditProfile,
   onOpenPassword,
   onSetDefaultAddress,
 }: {
   addressActionId: string | null;
   addressBook: MobileCustomerAddress[];
+  contactActionId: string | null;
   profile: MobileCustomerProfile | null;
   onCreateAddress: () => void;
+  onCreateContact: () => void;
   onDeleteAddress: (addressId: string) => void;
+  onDeleteContact: (customerId: string) => void;
   onEditAddress: (address: MobileCustomerAddress) => void;
+  onEditContact: (contact: MobileCustomerContact) => void;
   onEditProfile: () => void;
   onOpenPassword: () => void;
   onSetDefaultAddress: (addressId: string) => void;
@@ -2563,25 +2792,52 @@ function ProfileView({
 
       {profile.addresses.length ? (
         <section className="space-y-3">
-          <h2 className="px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-            {t("customer.profile.linkedContacts")}
-          </h2>
+          <div className="flex items-center justify-between gap-3 px-1">
+            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              {t("customer.profile.linkedContacts")}
+            </h2>
+            <Button className="h-9 shrink-0 px-3" type="button" variant="outline" onClick={onCreateContact}>
+              <Plus className="size-4" aria-hidden="true" />
+              {t("customer.profile.addContact")}
+            </Button>
+          </div>
           {profile.addresses.map((address) => (
             <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm" key={address.customerId}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="break-words text-sm font-semibold text-slate-950">{address.fullName}</p>
-                  {address.relationship ? (
-                    <p className="mt-1 text-xs font-medium text-slate-500">{address.relationship}</p>
-                  ) : null}
-                </div>
-                <StatusBadge view={getAccountStatusView(t, address.status)} />
-              </div>
+              <div className="flex items-start gap-3">
+                <button
+                  className="min-w-0 flex-1 text-left"
+                  type="button"
+                  onClick={() => onEditContact(address)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-semibold text-slate-950">{address.fullName}</p>
+                      {address.relationship ? (
+                        <p className="mt-1 text-xs font-medium text-slate-500">{address.relationship}</p>
+                      ) : null}
+                    </div>
+                    <StatusBadge view={getAccountStatusView(t, address.status)} />
+                  </div>
 
-              <div className="mt-4 space-y-2">
-                <ContactLine icon={MapPin} value={address.address} />
-                <ContactLine icon={Phone} value={address.phone} />
-                <ContactLine icon={Mail} value={address.email} />
+                  <div className="mt-4 space-y-2">
+                    <ContactLine icon={MapPin} value={address.address} />
+                    <ContactLine icon={Phone} value={address.phone} />
+                    <ContactLine icon={Mail} value={address.email} />
+                  </div>
+                </button>
+                <Button
+                  className="size-9 shrink-0 p-0"
+                  disabled={contactActionId === `delete-${address.customerId}`}
+                  type="button"
+                  variant="outline"
+                  onClick={() => onDeleteContact(address.customerId)}
+                >
+                  {contactActionId === `delete-${address.customerId}` ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  )}
+                </Button>
               </div>
             </article>
           ))}
@@ -2591,6 +2847,12 @@ function ProfileView({
           icon={MapPin}
           title={t("customer.empty.noAddressTitle")}
           body={t("customer.empty.noLinkedAddressBody")}
+          action={
+            <Button className="mt-4 h-10" type="button" onClick={onCreateContact}>
+              <Plus className="size-4" aria-hidden="true" />
+              {t("customer.profile.addContact")}
+            </Button>
+          }
         />
       )}
     </div>
@@ -2611,10 +2873,12 @@ function ContactLine({ icon: Icon, value }: { icon: typeof Phone; value: string 
 }
 
 function EmptyState({
+  action,
   body,
   icon: Icon,
   title,
 }: {
+  action?: React.ReactNode;
   body: string;
   icon: typeof ReceiptText;
   title: string;
@@ -2626,6 +2890,7 @@ function EmptyState({
       </div>
       <h2 className="mt-3 text-base font-semibold text-slate-950">{title}</h2>
       <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+      {action}
     </section>
   );
 }

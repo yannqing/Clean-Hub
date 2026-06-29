@@ -30,6 +30,8 @@ import type {
   CustomerAddressWriteInput,
   CustomerAppointment,
   CustomerAppointmentType,
+  CustomerContact,
+  CustomerContactWriteInput,
   CustomerOrderDetail,
   CustomerOrderItem,
   CustomerOrderListItem,
@@ -88,6 +90,18 @@ function toCustomerAddress(
     notes: row.notes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function toCustomerContact(row: typeof customers.$inferSelect): CustomerContact {
+  return {
+    customerId: row.id,
+    fullName: row.fullName,
+    phone: row.phone,
+    email: row.email,
+    relationship: row.relationship,
+    address: row.address,
+    status: row.status,
   };
 }
 
@@ -262,6 +276,92 @@ export class CustomerRepository {
       tenantId: input.tenantId,
       customerAccountId: input.customerAccountId,
     });
+  }
+
+  async createContact(input: {
+    tenantId: string;
+    customerAccountId: string;
+    data: CustomerContactWriteInput;
+  }): Promise<CustomerContact> {
+    const rows = await this.db
+      .insert(customers)
+      .values({
+        id: createId(),
+        tenantId: input.tenantId,
+        customerAccountId: input.customerAccountId,
+        fullName: input.data.fullName,
+        phone: input.data.phone,
+        email: input.data.email,
+        relationship: input.data.relationship,
+        address: input.data.address,
+        status: "active",
+      })
+      .returning({ ...getTableColumns(customers) });
+
+    const contact = rows[0];
+
+    if (!contact) {
+      throw new Error("Customer contact insert failed.");
+    }
+
+    return toCustomerContact(contact);
+  }
+
+  async updateContact(input: {
+    tenantId: string;
+    customerAccountId: string;
+    customerId: string;
+    data: CustomerContactWriteInput;
+  }): Promise<CustomerContact | null> {
+    const now = new Date();
+    const rows = await this.db
+      .update(customers)
+      .set({
+        fullName: input.data.fullName,
+        phone: input.data.phone,
+        email: input.data.email,
+        relationship: input.data.relationship,
+        address: input.data.address,
+        updatedAt: now,
+        version: sql`${customers.version} + 1`,
+      })
+      .where(
+        and(
+          eq(customers.id, input.customerId),
+          eq(customers.tenantId, input.tenantId),
+          eq(customers.customerAccountId, input.customerAccountId),
+          isNull(customers.deletedAt),
+        ),
+      )
+      .returning({ ...getTableColumns(customers) });
+
+    return rows[0] ? toCustomerContact(rows[0]) : null;
+  }
+
+  async softDeleteContact(input: {
+    tenantId: string;
+    customerAccountId: string;
+    customerId: string;
+  }): Promise<CustomerContact | null> {
+    const now = new Date();
+    const rows = await this.db
+      .update(customers)
+      .set({
+        deletedAt: now,
+        updatedAt: now,
+        version: sql`${customers.version} + 1`,
+      })
+      .where(
+        and(
+          eq(customers.id, input.customerId),
+          eq(customers.tenantId, input.tenantId),
+          eq(customers.customerAccountId, input.customerAccountId),
+          isNull(customers.deletedAt),
+        ),
+      )
+      .returning({ ...getTableColumns(customers) });
+
+    return rows[0] ? toCustomerContact(rows[0]) : null;
   }
 
   async listAddresses(input: {

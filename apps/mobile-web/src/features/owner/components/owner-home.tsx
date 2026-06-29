@@ -39,6 +39,8 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { WorkspaceHeader } from "@/components/workspace-header";
+
 import {
   acceptOwnerAppointment,
   approveOwnerRefundRequest,
@@ -63,6 +65,8 @@ import type {
 
 type OwnerHomeProps = {
   initialSummary?: MobileOwnerTodaySummary | null;
+  isLoggingOut?: boolean;
+  onLogout?: () => void;
 };
 
 type IconComponent = ComponentType<{ className?: string; "aria-hidden"?: true }>;
@@ -695,7 +699,11 @@ function ActionSheet({
   );
 }
 
-export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
+export function OwnerHome({
+  initialSummary = null,
+  isLoggingOut = false,
+  onLogout = () => undefined,
+}: OwnerHomeProps) {
   const { locale, t } = useTranslation();
   const intlLocale = intlLocales[locale];
   const [summary, setSummary] = useState<MobileOwnerTodaySummary | null>(initialSummary);
@@ -956,46 +964,43 @@ export function OwnerHome({ initialSummary = null }: OwnerHomeProps) {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[max(32px,env(safe-area-inset-bottom))] pt-[max(24px,env(safe-area-inset-top))]">
-      <header className="flex items-start justify-between gap-4">
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">
-            <Truck className="size-4" aria-hidden />
-            {t("owner.dispatchOwner")}
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold leading-tight text-slate-950">
-            {t("owner.operationsToday")}
-          </h1>
-          <p className="mt-2 break-words text-sm leading-6 text-slate-600">
-            {summary ? summary.tenantName : t("owner.loadingTenant")}
-          </p>
-        </div>
-        <Button
-          aria-label={t("common.refresh")}
-          className="size-11 shrink-0 p-0"
-          disabled={isLoading || isBoardLoading}
-          type="button"
-          variant="secondary"
-          onClick={() => {
-            void Promise.all([loadSummary(), loadBoard()]);
-          }}
-        >
-          {isLoading || isBoardLoading ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden />
-          ) : (
-            <RefreshCcw className="size-4" aria-hidden />
-          )}
-        </Button>
-      </header>
+      <WorkspaceHeader
+        eyebrow={t("owner.dispatchOwner")}
+        isLoggingOut={isLoggingOut}
+        logoutLabel={t("auth.logout")}
+        subtitle={summary ? summary.tenantName : t("owner.loadingTenant")}
+        title={t("owner.operationsToday")}
+        onLogout={onLogout}
+      />
 
       {summary ? (
         <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
           <span className="min-w-0 truncate text-slate-600">
             {formatBusinessDate(summary.businessDate, intlLocale)}
           </span>
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-            <CheckCircle2 className="size-3.5" aria-hidden />
-            {t(tenantStatusLabelKeys[summary.tenantStatus])}
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+              <CheckCircle2 className="size-3.5" aria-hidden />
+              {t(tenantStatusLabelKeys[summary.tenantStatus])}
+            </span>
+            <Button
+              aria-label={t("common.refresh")}
+              className="size-9 p-0"
+              disabled={isLoading || isBoardLoading}
+              size="icon"
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                void Promise.all([loadSummary(), loadBoard()]);
+              }}
+            >
+              {isLoading || isBoardLoading ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden />
+              ) : (
+                <RefreshCcw className="size-4" aria-hidden />
+              )}
+            </Button>
+          </div>
         </div>
       ) : null}
 

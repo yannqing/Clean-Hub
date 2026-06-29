@@ -27,10 +27,20 @@ export type CustomerProfile = {
   addresses: CustomerProfileAddress[];
 };
 
+export type CustomerContact = CustomerProfileAddress;
+
 export type CustomerProfileUpdateInput = {
   accountName?: string;
   phone?: string | null;
   email?: string | null;
+};
+
+export type CustomerContactWriteInput = {
+  fullName: string;
+  phone?: string | null;
+  email?: string | null;
+  relationship?: string | null;
+  address?: string | null;
 };
 
 export type CustomerAddress = {
@@ -195,6 +205,7 @@ export type CreateCustomerAppointmentInput = {
 export type CustomerErrorCode =
   | "CUSTOMER_FORBIDDEN"
   | "CUSTOMER_PROFILE_NOT_FOUND"
+  | "CUSTOMER_CONTACT_NOT_FOUND"
   | "CUSTOMER_ADDRESS_NOT_FOUND"
   | "CUSTOMER_ORDER_NOT_FOUND"
   | "CUSTOMER_TICKET_NOT_FOUND"

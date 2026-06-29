@@ -20,10 +20,20 @@ export type MobileCustomerProfile = {
   addresses: MobileCustomerProfileAddress[];
 };
 
+export type MobileCustomerContact = MobileCustomerProfileAddress;
+
 export type MobileUpdateCustomerProfileRequest = {
   accountName?: string;
   phone?: string | null;
   email?: string | null;
+};
+
+export type MobileCustomerContactInput = {
+  fullName: string;
+  phone?: string | null;
+  email?: string | null;
+  relationship?: string | null;
+  address?: string | null;
 };
 
 export type MobileCustomerAddress = {

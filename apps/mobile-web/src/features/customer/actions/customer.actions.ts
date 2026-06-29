@@ -1,6 +1,7 @@
 import type {
   MobileChangeCustomerPasswordRequest,
   MobileCustomerAddressInput,
+  MobileCustomerContactInput,
   MobileCreateCustomerAppointmentRequest,
   MobileCreateRefundRequest,
   MobileUpdateCustomerProfileRequest,
@@ -29,6 +30,31 @@ export async function updateCustomerProfile(input: MobileUpdateCustomerProfileRe
     phone: input.phone?.trim() || null,
     email: input.email?.trim().toLowerCase() || null,
   });
+}
+
+function cleanContactInput(input: MobileCustomerContactInput): MobileCustomerContactInput {
+  return {
+    fullName: input.fullName.trim(),
+    phone: input.phone?.trim() || null,
+    email: input.email?.trim().toLowerCase() || null,
+    relationship: input.relationship?.trim() || null,
+    address: input.address?.trim() || null,
+  };
+}
+
+export async function createCustomerContact(input: MobileCustomerContactInput) {
+  return apiClient.mobile.customer.createContact(cleanContactInput(input));
+}
+
+export async function updateCustomerContact(
+  customerId: string,
+  input: MobileCustomerContactInput,
+) {
+  return apiClient.mobile.customer.updateContact(customerId, cleanContactInput(input));
+}
+
+export async function deleteCustomerContact(customerId: string) {
+  return apiClient.mobile.customer.deleteContact(customerId);
 }
 
 function cleanAddressInput(input: MobileCustomerAddressInput): MobileCustomerAddressInput {

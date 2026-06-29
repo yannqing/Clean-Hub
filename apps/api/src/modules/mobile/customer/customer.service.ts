@@ -12,6 +12,8 @@ import type {
   CustomerAddressWriteInput,
   CustomerAppointment,
   CustomerChangePasswordInput,
+  CustomerContact,
+  CustomerContactWriteInput,
   CustomerMobileContext,
   CustomerOrderDetail,
   CustomerProfile,
@@ -37,6 +39,22 @@ export type CustomerRepositoryLike = {
     phone?: string | null;
     email?: string | null;
   }): Promise<CustomerProfile | null>;
+  createContact(input: {
+    tenantId: string;
+    customerAccountId: string;
+    data: CustomerContactWriteInput;
+  }): Promise<CustomerContact>;
+  updateContact(input: {
+    tenantId: string;
+    customerAccountId: string;
+    customerId: string;
+    data: CustomerContactWriteInput;
+  }): Promise<CustomerContact | null>;
+  softDeleteContact(input: {
+    tenantId: string;
+    customerAccountId: string;
+    customerId: string;
+  }): Promise<CustomerContact | null>;
   listAddresses(input: {
     tenantId: string;
     customerAccountId: string;
@@ -161,6 +179,14 @@ function addressNotFound(): CustomerError {
   );
 }
 
+function contactNotFound(): CustomerError {
+  return new CustomerError(
+    "CUSTOMER_CONTACT_NOT_FOUND",
+    "Customer contact was not found.",
+    404,
+  );
+}
+
 function validationError(message: string): CustomerError {
   return new CustomerError("CUSTOMER_VALIDATION_ERROR", message, 422);
 }
@@ -217,6 +243,57 @@ export class CustomerService {
     }
 
     return profile;
+  }
+
+  async createContact(
+    authContext: MobileAuthContext,
+    input: CustomerContactWriteInput,
+  ): Promise<CustomerContact> {
+    const customer = assertCustomerContext(authContext);
+
+    return this.repository.createContact({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+      data: input,
+    });
+  }
+
+  async updateContact(
+    authContext: MobileAuthContext,
+    customerId: string,
+    input: CustomerContactWriteInput,
+  ): Promise<CustomerContact> {
+    const customer = assertCustomerContext(authContext);
+    const updated = await this.repository.updateContact({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+      customerId,
+      data: input,
+    });
+
+    if (!updated) {
+      throw contactNotFound();
+    }
+
+    return updated;
+  }
+
+  async deleteContact(
+    authContext: MobileAuthContext,
+    customerId: string,
+  ): Promise<CustomerContact> {
+    const customer = assertCustomerContext(authContext);
+    const deleted = await this.repository.softDeleteContact({
+      tenantId: customer.tenantId,
+      customerAccountId: customer.subjectId,
+      customerId,
+    });
+
+    if (!deleted) {
+      throw contactNotFound();
+    }
+
+    return deleted;
   }
 
   async listAddresses(
