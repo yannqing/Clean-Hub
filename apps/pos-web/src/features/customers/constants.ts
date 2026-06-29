@@ -68,3 +68,106 @@ export const EMPTY_PROFILE_FORM: ProfileFormValues = {
 
 /** Placeholder for stats the milestone doc defers (tier/balance/orders). */
 export const CUSTOMER_STAT_PLACEHOLDER = "—";
+
+/** Currency used when no per-branch currency is available (placeholder). */
+export const CUSTOMER_CURRENCY = "XOF";
+
+// ---- 服务工单 label maps (local, not cross-feature imports) ----------------
+// Values mirror apps/pos-web/src/features/tickets/constants.ts but are kept
+// local so the customers feature does not depend on the tickets feature.
+
+export const CUSTOMER_TICKET_STATUS_LABELS: Record<string, string> = {
+  draft: "草稿",
+  pending: "待处理",
+  in_progress: "处理中",
+  ready_to_pick: "待取件",
+  picked_up: "已取件",
+  cancelled: "已取消",
+  exception: "异常",
+};
+
+export const CUSTOMER_TICKET_STATUS_TONES: Record<string, string> = {
+  draft: "bg-slate-100 text-slate-600",
+  pending: "bg-blue-50 text-blue-700",
+  in_progress: "bg-blue-50 text-blue-700",
+  ready_to_pick: "bg-violet-50 text-violet-700",
+  picked_up: "bg-emerald-50 text-emerald-700",
+  cancelled: "bg-red-50 text-red-700",
+  exception: "bg-amber-50 text-amber-700",
+};
+
+export const CUSTOMER_TICKET_TYPE_LABELS: Record<string, string> = {
+  laundry: "洗衣护理",
+  car_wash: "车辆清洗",
+  retail: "零售",
+  delivery: "配送",
+};
+
+export const CUSTOMER_TICKET_PRIORITY_LABELS: Record<string, string> = {
+  normal: "普通",
+  urgent: "加急",
+  critical: "最紧急",
+};
+
+// ---- 订单 label maps (local) -----------------------------------------------
+
+export const CUSTOMER_ORDER_STATUS_LABELS: Record<string, string> = {
+  draft: "草稿",
+  received: "已接收",
+  paid: "已支付",
+  delivered: "已交付",
+  cancelled: "已取消",
+};
+
+export const CUSTOMER_ORDER_STATUS_TONES: Record<string, string> = {
+  draft: "bg-slate-100 text-slate-600",
+  received: "bg-blue-50 text-blue-700",
+  paid: "bg-emerald-50 text-emerald-700",
+  delivered: "bg-violet-50 text-violet-700",
+  cancelled: "bg-red-50 text-red-700",
+};
+
+export const CUSTOMER_ORDER_PAYMENT_LABELS: Record<string, string> = {
+  unpaid: "未支付",
+  paid: "已支付",
+  partial: "部分支付",
+  refunded: "已退款",
+};
+
+export const CUSTOMER_ORDER_PAYMENT_TONES: Record<string, string> = {
+  unpaid: "bg-red-50 text-red-700",
+  paid: "bg-emerald-50 text-emerald-700",
+  partial: "bg-amber-50 text-amber-700",
+  refunded: "bg-slate-100 text-slate-600",
+};
+
+export const CUSTOMER_ORDER_TYPE_LABELS: Record<string, string> = {
+  ticket: "工单订单",
+  manual: "手动订单",
+};
+
+// ---- 工单项目（服务项目）label maps (local) ---------------------------------
+// Powers the 服务项目 tab on the customer detail view.
+
+export const CUSTOMER_TICKET_ITEM_STATUS_LABELS: Record<string, string> = {
+  pending_wash: "待清洗",
+  washing: "清洗中",
+  done: "已完成",
+  ready_to_pick: "待取件",
+  exception: "异常",
+};
+
+export const CUSTOMER_TICKET_ITEM_STATUS_TONES: Record<string, string> = {
+  pending_wash: "bg-slate-100 text-slate-600",
+  washing: "bg-blue-50 text-blue-700",
+  done: "bg-emerald-50 text-emerald-700",
+  ready_to_pick: "bg-violet-50 text-violet-700",
+  exception: "bg-red-50 text-red-700",
+};
+
+export const CUSTOMER_TICKET_ITEM_TYPE_LABELS: Record<string, string> = {
+  cloth: "衣物",
+  car: "车",
+  shoe: "鞋",
+  carpet: "地毯",
+};
