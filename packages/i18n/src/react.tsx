@@ -14,12 +14,12 @@ import {
   defaultLocale,
   resolveLocale,
   type SupportedLocale,
-} from "./locales.js";
+} from "./locales";
 import {
   translate,
   type TranslationKey,
   type TranslationParams,
-} from "./translate.js";
+} from "./translate";
 
 export type LocaleStorageAdapter = {
   get(): Promise<string | null>;

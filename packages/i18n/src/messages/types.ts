@@ -1,4 +1,4 @@
-import type { SupportedLocale } from "../locales.js";
+import type { SupportedLocale } from "../locales";
 
 export type MessageNamespace = "common" | "auth" | "customer" | "delivery" | "owner";
 

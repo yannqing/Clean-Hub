@@ -10,7 +10,7 @@ import {
   translate,
   type SupportedLocale,
   type TranslationKey,
-} from "./index.js";
+} from "./index";
 
 assert.equal(defaultLocale, "fr");
 assert.equal(normalizeLocale("zh"), "zh-CN");

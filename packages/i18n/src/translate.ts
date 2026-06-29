@@ -1,6 +1,6 @@
-import { defaultLocale, type SupportedLocale } from "./locales.js";
-import { messages, type DefaultMessageCatalog } from "./messages/index.js";
-import type { NestedMessages } from "./messages/types.js";
+import { defaultLocale, type SupportedLocale } from "./locales";
+import { messages, type DefaultMessageCatalog } from "./messages/index";
+import type { NestedMessages } from "./messages/types";
 
 export type TranslationParams = Record<string, string | number | boolean | null | undefined>;
 

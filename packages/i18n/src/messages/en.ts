@@ -1,4 +1,4 @@
-import type { MessageCatalog } from "./types.js";
+import type { MessageCatalog } from "./types";
 
 export const enMessages = {
   common: {

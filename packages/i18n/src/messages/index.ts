@@ -1,7 +1,7 @@
-import { enMessages } from "./en.js";
-import { frMessages } from "./fr.js";
-import { zhCNMessages } from "./zh-CN.js";
-import type { MessageCatalogs } from "./types.js";
+import { enMessages } from "./en";
+import { frMessages } from "./fr";
+import { zhCNMessages } from "./zh-CN";
+import type { MessageCatalogs } from "./types";
 
 export const messages = {
   fr: frMessages,
