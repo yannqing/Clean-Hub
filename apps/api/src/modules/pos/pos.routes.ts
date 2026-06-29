@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import type { AppBindings } from "../../http/types.js";
+import type { NotificationPublisher } from "../notifications/index.js";
 import { createPosAuthRoutes } from "./auth/auth.routes.js";
 import { getMyPosBranchController } from "./branches/pos.controller.js";
 import {
@@ -18,7 +19,13 @@ import { createPosHardwareRoutes } from "./hardware/hardware.routes.js";
 import { createPosStatisticsRoutes } from "./statistics/statistics.routes.js";
 import { createPosWorkspaceRoutes } from "./workspace/workspace.routes.js";
 
-export function createPosRoutes() {
+export type CreatePosRoutesOptions = {
+  notificationPublisher?: NotificationPublisher;
+};
+
+export function createPosRoutes({
+  notificationPublisher,
+}: CreatePosRoutesOptions = {}) {
   const routes = new Hono<AppBindings>();
 
   // GET /pos/branches/me — the active branch for the signed-in POS user.
@@ -30,7 +37,7 @@ export function createPosRoutes() {
   routes.route("/customers", createPosCustomersRoutes());
   routes.route("/service-tickets", createPosServiceTicketsRoutes());
   routes.route("/accounts", createPosAccountsRoutes());
-  routes.route("/orders", createPosOrdersRoutes());
+  routes.route("/orders", createPosOrdersRoutes({ notificationPublisher }));
   routes.route("/overview", createPosOverviewRoutes());
   routes.route("/staff", createPosStaffRoutes());
   routes.route("/reception", createPosReceptionRoutes());

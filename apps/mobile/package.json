@@ -4,20 +4,32 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "echo \"Mobile shell placeholder. Run Capacitor commands after native platforms are added.\"",
+    "dev": "cross-env CLEANHUB_MOBILE_DEV_SERVER_URL=http://localhost:3002 cap open android",
     "build": "tsc -p tsconfig.json",
+    "sync": "pnpm --filter @cleanhub/mobile-web build && cap sync",
+    "sync:env": "node ../../scripts/mobile/sync-mobile.mjs",
+    "sync:android": "pnpm --filter @cleanhub/mobile-web build && cap sync android",
+    "sync:ios": "pnpm --filter @cleanhub/mobile-web build && cap sync ios",
+    "package:android": "node ../../scripts/mobile/package-android.mjs",
+    "package:ios": "node ../../scripts/mobile/package-ios.mjs",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@capacitor-community/bluetooth-le": "^8.2.0",
     "@capacitor/android": "^8.1.0",
+    "@capacitor/camera": "^8.2.0",
     "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
+    "@capacitor/geolocation": "^8.2.0",
     "@capacitor/ios": "^8.1.0",
+    "@capacitor/preferences": "^8.0.1",
+    "@cleanhub/hardware": "workspace:*",
     "@cleanhub/offline": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20",
+    "cross-env": "^10.1.0",
     "eslint": "^9",
     "typescript": "^5"
   }

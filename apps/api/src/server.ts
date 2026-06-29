@@ -1,10 +1,20 @@
 import { serve } from "@hono/node-server";
-import { closeDbConnection } from "@cleanhub/db";
+import { closeDbConnection, warmUpDbConnection } from "@cleanhub/db";
 
 import { createApiApp } from "./app.js";
 
-export function startApiServer() {
+export async function startApiServer() {
   const { app, env, logger } = createApiApp();
+
+  try {
+    await warmUpDbConnection();
+    logger.info("Database connection pool warmed up");
+  } catch (error) {
+    logger.warn(
+      { err: error },
+      "Database warm-up failed; starting API without a warm pool",
+    );
+  }
 
   const server = serve({
     fetch: app.fetch,

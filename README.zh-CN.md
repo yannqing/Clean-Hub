@@ -33,7 +33,7 @@ pnpm install
 
 ## 本地快速启动
 
-如果你要在本地启动常规的 `web-admin + api + PostgreSQL` 开发环境，建议按下面顺序执行：
+如果你要在本地启动常规的 `web-admin + api + PostgreSQL + MinIO` 开发环境，建议按下面顺序执行：
 
 ```bash
 cp .env.example .env
@@ -85,7 +85,7 @@ pnpm --filter @cleanhub/web-admin add @cleanhub/ui@workspace:*
 
 ## 数据库
 
-CleanHub 使用 Drizzle ORM + PostgreSQL。本地开发可以直接使用根目录的 Docker Compose。
+CleanHub 使用 Drizzle ORM + PostgreSQL。本地开发可以直接使用根目录的 Docker Compose。同一本地栈也会启动 MinIO，作为 S3 兼容的媒体对象存储。
 
 所有业务实体 ID 统一使用 ULID 字符串。数据库 ID 字段使用 `varchar(26)`，不使用自增整数，也不使用 PostgreSQL `uuid` 主键。应用层需要生成 ID 时统一从 `@cleanhub/id` 导入。
 
@@ -95,11 +95,21 @@ CleanHub 使用 Drizzle ORM + PostgreSQL。本地开发可以直接使用根目�
 cp .env.example .env
 ```
 
-创建并启动本地 PostgreSQL 容器：
+创建并启动本地 PostgreSQL 与 MinIO 容器：
 
 ```bash
 pnpm db:up
 ```
+
+MinIO 本地访问地址：
+
+```text
+S3 endpoint：http://localhost:9000
+Console：     http://localhost:9001
+Bucket：      cleanhub-media
+```
+
+默认本地 MinIO 凭据写在 `.env.example`。生产环境应使用私有 bucket、独立强密钥，并通过同一组 `OBJECT_STORAGE_*` 环境变量配置。
 
 查看容器状态或日志：
 
@@ -128,7 +138,7 @@ pnpm db:studio
 
 仅在早期本地原型阶段，可以用 `pnpm db:push` 直接把 schema 推到本地数据库，不生成 migration 文件。等团队开始正式评审 migration 后，不建议把 `db:push` 作为常规协作流程。
 
-停止本地 PostgreSQL 容器：
+停止本地 PostgreSQL 与 MinIO 容器：
 
 ```bash
 pnpm db:down
@@ -220,11 +230,33 @@ pnpm --filter @cleanhub/desktop dev
 
 ### 启动 Mobile
 
+先启动移动端 Web dev server：
+
+```bash
+pnpm --filter @cleanhub/mobile-web dev
+```
+
+打开 Android native 项目：
+
 ```bash
 pnpm --filter @cleanhub/mobile dev
 ```
 
-当前 mobile 还是 Capacitor 壳的占位结构，还没有添加 Android / iOS native platform，因此暂时不会真正启动移动应用。
+这个命令会执行 `cap open android`，因此需要先安装 Android Studio，并让 Capacitor 能找到它。Windows 下如果自动检测失败，可以把 `CAPACITOR_ANDROID_STUDIO_PATH` 指向你的 `studio64.exe`，例如：
+
+```powershell
+$env:CAPACITOR_ANDROID_STUDIO_PATH = "C:\Program Files\Android\Android Studio\bin\studio64.exe"
+pnpm --filter @cleanhub/mobile dev
+```
+
+如需永久写入当前用户环境变量：
+
+```powershell
+[Environment]::SetEnvironmentVariable("CAPACITOR_ANDROID_STUDIO_PATH", "C:\Program Files\Android\Android Studio\bin\studio64.exe", "User")
+```
+
+当前 mobile 是 Capacitor 壳，开发时会加载 `@cleanhub/mobile-web` Next.js 应用。
+配送拍照凭证与客户签名使用对象存储：mobile-web 先向 API 申请短时效上传凭证，再直传 MinIO/S3，最后把返回的对象 key 提交给配送 API。
 
 ## 构建
 

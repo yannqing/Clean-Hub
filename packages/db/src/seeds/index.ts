@@ -11,9 +11,12 @@ config({ path: join(dirname(fileURLToPath(import.meta.url)), "../../../../.env")
 
 const SEED_FILES = [
   "dev-accounts.sql",
+  "mobile-rbac.sql",
   "pos-cashiers.sql",
   "pos-business-data.sql",
+  "notification-defaults.sql",
   "pos-terminal-settings.sql",
+  "mobile-e2e.sql",
 ] as const;
 
 async function runSeeds(): Promise<void> {

@@ -5,7 +5,8 @@ export type AdminRole =
   | "support"
   | "owner"
   | "manager"
-  | "cashier";
+  | "cashier"
+  | "driver";
 
 export type AuthRequestMeta = {
   ipAddress?: string;

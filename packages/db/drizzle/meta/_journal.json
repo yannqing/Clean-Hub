@@ -22,6 +22,13 @@
       "when": 1782468500000,
       "tag": "0002_set_ticket_item_default_to_pending_wash",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1782747381594,
+      "tag": "0003_add_mobile_merge_schema",
+      "breakpoints": true
     }
   ]
 }

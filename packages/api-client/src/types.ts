@@ -67,11 +67,17 @@ export type ApiRetryConfig = {
 };
 
 export type ApiUnauthorizedResult = "retry" | "logout" | "ignore" | void;
+export type ApiTokenProvider = () =>
+  | string
+  | null
+  | undefined
+  | Promise<string | null | undefined>;
 
 export type ApiClientConfig = {
   baseUrl: string;
   fetchImpl?: typeof fetch;
   defaultHeaders?: HeadersInit | (() => HeadersInit | Promise<HeadersInit>);
+  tokenProvider?: ApiTokenProvider;
   credentials?: RequestCredentials;
   timeoutMs?: number;
   retry?: ApiRetryConfig;

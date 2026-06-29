@@ -1,8 +1,24 @@
-export const supportedLocales = ["en", "fr", "zh-CN"] as const;
-
-export type SupportedLocale = (typeof supportedLocales)[number];
-
-export const defaultLocale: SupportedLocale = "en";
+export {
+  defaultLocale,
+  isSupportedLocale,
+  localeLabels,
+  localeStorageKey,
+  normalizeLocale,
+  resolveLocale,
+  supportedLocales,
+  type SupportedLocale,
+} from "./locales";
+export { messages, type Messages } from "./messages/index";
+export {
+  createTranslator,
+  hasMessage,
+  listMessageKeys,
+  translate,
+  type MissingTranslationHandler,
+  type TranslationKey,
+  type TranslationParams,
+  type TranslatorOptions,
+} from "./translate";
 
 export const businessLineLabels = {
   en: {
@@ -24,10 +40,6 @@ export const businessLineLabels = {
     delivery: "配送",
   },
 } as const satisfies Record<
-  SupportedLocale,
+  import("./locales").SupportedLocale,
   Record<"laundry" | "car_wash" | "retail" | "delivery", string>
 >;
-
-export function isSupportedLocale(value: string): value is SupportedLocale {
-  return (supportedLocales as readonly string[]).includes(value);
-}

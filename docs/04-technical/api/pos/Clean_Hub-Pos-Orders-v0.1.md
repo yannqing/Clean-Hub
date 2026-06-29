@@ -1,9 +1,9 @@
 # Clean Hub POS Orders API（订单管理）
 
-> 版本：v0.1  
-> 子系统：pos  
-> 后端模块：`apps/api/src/modules/pos/orders/`  
-> API Client：`packages/api-client/src/pos/orders.ts`  
+> 版本：v0.1
+> 子系统：pos
+> 后端模块：`apps/api/src/modules/pos/orders/`
+> API Client：`packages/api-client/src/pos/orders.ts`
 > 路由前缀：`/pos/orders`，挂载于 `apps/api/src/modules/pos/pos.routes.ts`
 
 ## 1. 通用约定

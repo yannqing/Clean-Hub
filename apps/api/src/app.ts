@@ -9,6 +9,9 @@ import { createRequestContextMiddleware } from "./http/request-context.middlewar
 import type { AppBindings } from "./http/types.js";
 import { createAuthServiceFromEnv } from "./modules/auth/auth.factory.js";
 import { createAuthRoutes } from "./modules/auth/auth.routes.js";
+import { createMobileAuthServiceFromEnv } from "./modules/mobile/auth/auth.service.js";
+import { createMobileRoutes } from "./modules/mobile/mobile.routes.js";
+import { NotificationsService } from "./modules/notifications/index.js";
 import { createSaasAuditRoutes } from "./modules/saas/audit/audit.routes.js";
 import {
   createSaasBackupRoutes,
@@ -46,6 +49,8 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
     service: "cleanhub-api",
   });
   const authService = createAuthServiceFromEnv({ env });
+  const mobileAuthService = createMobileAuthServiceFromEnv({ env });
+  const notificationsService = new NotificationsService({ env });
   const app = new Hono<AppBindings>();
 
   app.use("*", async (c, next) => {
@@ -79,6 +84,13 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   );
 
   app.route("/auth", createAuthRoutes({ authService }));
+  app.route(
+    "/mobile",
+    createMobileRoutes({
+      mobileAuthService,
+      notificationPublisher: notificationsService,
+    }),
+  );
 
   app.use("/saas/*", createRequireAuthMiddleware(authService));
   app.use("/tenant/*", createRequireAuthMiddleware(authService));
@@ -116,7 +128,7 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.route("/tenant/reports", createTenantReportRoutes());
 
   // POS 终端侧（收银员 / 店长 / 店主）
-  app.route("/pos", createPosRoutes());
+  app.route("/pos", createPosRoutes({ notificationPublisher: notificationsService }));
 
   // 测试路由
   app.route("/saas/test/user", createSaaSTestRoutes());

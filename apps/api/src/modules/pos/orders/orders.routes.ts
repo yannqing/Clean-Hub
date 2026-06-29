@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import type { AppBindings } from "../../../http/types.js";
+import type { NotificationPublisher } from "../../notifications/index.js";
 import {
   changePosOrderStatusController,
   createPosOrderController,
@@ -22,11 +23,17 @@ import {
  * Specific paths are registered before `/:orderId` so Hono does not capture
  * `/overview`, `/payments`, or `/items` as a generic order id.
  */
-export function createPosOrdersRoutes() {
+export type CreatePosOrdersRoutesOptions = {
+  notificationPublisher?: NotificationPublisher;
+};
+
+export function createPosOrdersRoutes({
+  notificationPublisher,
+}: CreatePosOrdersRoutesOptions = {}) {
   const routes = new Hono<AppBindings>();
 
   routes.get("/", listPosOrdersController);
-  routes.post("/", createPosOrderController);
+  routes.post("/", createPosOrderController({ notificationPublisher }));
   routes.get("/overview", getPosOrderOverviewController);
 
   routes.get("/:orderId/payments", listPosOrderPaymentsController);
