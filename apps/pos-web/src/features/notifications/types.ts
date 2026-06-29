@@ -1,6 +1,22 @@
-/**
- * 通知中心 — local types.
- * Prefer re-exporting DTOs from @cleanhub/api-client so the wire shape stays
- * the single source of truth. Add UI-only types below as needed.
- */
-export type { PosNotification } from "@cleanhub/api-client";
+import type { PosNotificationErrorCode } from "@cleanhub/api-client";
+
+export type {
+  MarkAllPosNotificationsReadResult,
+  PosNoticePriority,
+  PosNoticeReadStatus,
+  PosNoticeRelatedType,
+  PosNoticeType,
+  PosNotificationErrorCode,
+  PosNotificationInboxItem,
+  PosNotificationListQuery,
+  PosNotificationListResponse,
+  PosNotificationOverview,
+} from "@cleanhub/api-client";
+
+export type NotificationActionResult<TPayload = unknown> = {
+  ok: boolean;
+  message: string;
+  code?: PosNotificationErrorCode;
+  status?: number;
+  data?: TPayload;
+};
