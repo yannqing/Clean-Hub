@@ -233,7 +233,7 @@ const orderStatusClasses: Record<MobileCustomerOrderStatus, string> = {
   draft: "border-slate-200 bg-slate-50 text-slate-700",
   received: "border-blue-200 bg-blue-50 text-blue-800",
   paid: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  delivered: "border-teal-200 bg-teal-50 text-teal-800",
+  delivered: "border-emerald-200 bg-emerald-50 text-emerald-800",
   cancelled: "border-red-200 bg-red-50 text-red-700",
 };
 
@@ -242,7 +242,7 @@ const ticketStatusClasses: Record<MobileCustomerTicketStatus, string> = {
   pending: "border-amber-200 bg-amber-50 text-amber-800",
   in_progress: "border-blue-200 bg-blue-50 text-blue-800",
   ready_to_pick: "border-emerald-200 bg-emerald-50 text-emerald-800",
-  picked_up: "border-teal-200 bg-teal-50 text-teal-800",
+  picked_up: "border-emerald-200 bg-emerald-50 text-emerald-800",
   cancelled: "border-red-200 bg-red-50 text-red-700",
   exception: "border-red-200 bg-red-50 text-red-700",
 };
@@ -1182,7 +1182,7 @@ export function CustomerHome({ isLoggingOut = false, onLogout }: CustomerHomePro
     return (
       <main className="flex min-h-dvh items-center justify-center px-5">
         <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-          <Loader2 className="size-4 animate-spin text-teal-700" aria-hidden="true" />
+          <Loader2 className="size-4 animate-spin text-blue-600" aria-hidden="true" />
           {t("customer.home.loading")}
         </div>
       </main>
@@ -1395,7 +1395,7 @@ function CustomerTabBar({
   return (
     <nav
       aria-label={t("common.mainNavigation")}
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md border-t border-slate-200 bg-[#f8faf9]/95 px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md border-t border-slate-200 bg-[#F7F9FC]/95 px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur"
     >
       <div className="grid grid-cols-4 gap-2 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
         {tabs.map((tab) => {
@@ -1406,7 +1406,7 @@ function CustomerTabBar({
             <button
               aria-current={isActive ? "page" : undefined}
               className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs font-medium transition ${
-                isActive ? "bg-teal-700 text-white" : "text-slate-600 hover:bg-slate-50"
+                isActive ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"
               }`}
               key={tab.value}
               type="button"
@@ -1428,7 +1428,7 @@ function AlertMessage({ message, tone }: { message: string; tone: "error" | "suc
       className={`mb-4 rounded-md border px-3 py-2 text-sm ${
         tone === "error"
           ? "border-red-200 bg-red-50 text-red-700"
-          : "border-teal-200 bg-teal-50 text-teal-800"
+          : "border-emerald-200 bg-emerald-50 text-emerald-800"
       }`}
     >
       {message}
@@ -1469,7 +1469,7 @@ function ActivityView({
               aria-selected={isActive}
               className={`h-9 shrink-0 rounded-full px-4 text-sm font-semibold transition ${
                 isActive
-                  ? "bg-teal-700 text-white shadow-sm shadow-teal-900/20"
+                  ? "bg-blue-600 text-white shadow-sm shadow-blue-900/20"
                   : "bg-transparent text-slate-600 hover:bg-white"
               }`}
               key={filter}
@@ -1491,7 +1491,7 @@ function ActivityView({
             return (
               <button
                 className={`w-full rounded-md border bg-white p-4 text-left shadow-sm transition ${
-                  selected ? "border-teal-400 ring-2 ring-teal-100" : "border-slate-200 hover:border-teal-300"
+                  selected ? "border-blue-400 ring-2 ring-blue-100" : "border-slate-200 hover:border-blue-300"
                 }`}
                 key={`${item.kind}-${item.id}`}
                 type="button"
@@ -1588,7 +1588,7 @@ function ActivityDetailSheet({
         {isLoading ? (
           <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center gap-3 text-sm text-slate-600">
-              <Loader2 className="size-4 animate-spin text-teal-700" aria-hidden="true" />
+              <Loader2 className="size-4 animate-spin text-blue-600" aria-hidden="true" />
               {t("customer.detail.loading")}
             </div>
           </div>
@@ -1820,7 +1820,7 @@ function AppointmentsView({
     <div className="space-y-4">
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-md bg-teal-50 text-teal-700">
+          <div className="flex size-10 items-center justify-center rounded-md bg-blue-50 text-blue-700">
             <Plus className="size-5" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
@@ -1921,7 +1921,7 @@ function AppointmentForm({
           <button
             className={`min-h-12 rounded-md border px-3 text-sm font-medium transition ${
               form.type === type
-                ? "border-teal-700 bg-teal-50 text-teal-900"
+                ? "border-blue-600 bg-blue-50 text-blue-900"
                 : "border-slate-200 bg-white text-slate-700"
             }`}
             key={type}
@@ -2499,7 +2499,7 @@ function AddressFormSheet({
           <label className="flex min-h-12 items-center gap-3 rounded-md border border-slate-200 px-3 text-sm font-medium text-slate-700">
             <input
               checked={form.isDefault}
-              className="size-4 accent-teal-700"
+              className="size-4 accent-blue-600"
               type="checkbox"
               onChange={(event) =>
                 onFormChange((current) => ({ ...current, isDefault: event.target.checked }))
@@ -2673,7 +2673,7 @@ function ProfileView({
     <div className="space-y-4">
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="flex size-10 items-center justify-center rounded-md bg-teal-50 text-teal-700">
+          <div className="flex size-10 items-center justify-center rounded-md bg-blue-50 text-blue-700">
             <UserRound className="size-5" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">

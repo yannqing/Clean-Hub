@@ -34,7 +34,7 @@ export function WorkspaceHeader({
     <header className="mb-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase text-teal-700">{eyebrow}</p>
+          <p className="text-xs font-semibold uppercase text-blue-700">{eyebrow}</p>
           <h1 className="mt-1 text-3xl font-semibold leading-tight text-slate-950">{title}</h1>
           {subtitle ? (
             <p className="mt-2 truncate text-sm text-slate-600">{subtitle}</p>

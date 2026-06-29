@@ -2,7 +2,12 @@
 
 :root {
   color-scheme: light;
-  background: #f8faf9;
+  background: #f7f9fc;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --ring: #93c5fd;
+  --sidebar-primary: #2563eb;
+  --sidebar-primary-foreground: #ffffff;
 }
 
 html,
@@ -12,10 +17,8 @@ body {
 
 body {
   margin: 0;
-  background:
-    linear-gradient(180deg, rgba(232, 247, 244, 0.9), rgba(248, 250, 249, 0) 260px),
-    #f8faf9;
-  color: #15201d;
+  background: #f7f9fc;
+  color: var(--foreground);
 }
 
 button,
@@ -27,7 +30,7 @@ textarea {
 
 .mobile-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #b8c7c1 transparent;
+  scrollbar-color: #cbd5e1 transparent;
 }
 
 .mobile-scrollbar::-webkit-scrollbar {
@@ -39,6 +42,6 @@ textarea {
 }
 
 .mobile-scrollbar::-webkit-scrollbar-thumb {
-  background: #b8c7c1;
+  background: #cbd5e1;
   border-radius: 999px;
 }

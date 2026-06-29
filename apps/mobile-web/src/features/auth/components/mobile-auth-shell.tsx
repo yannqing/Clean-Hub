@@ -199,7 +199,7 @@ export function MobileAuthShell() {
     return (
       <main className="flex min-h-dvh items-center justify-center px-6">
         <div className="flex items-center gap-3 rounded-md border bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-          <Loader2 className="size-4 animate-spin text-teal-700" />
+          <Loader2 className="size-4 animate-spin text-blue-600" />
           {t("auth.loading")}
         </div>
       </main>
@@ -224,12 +224,12 @@ export function MobileAuthShell() {
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-8 pt-[max(24px,env(safe-area-inset-top))]">
       <header className="mb-7 flex items-center justify-between">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-teal-700">CleanHub</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">CleanHub</p>
           <h1 className="mt-1 text-3xl font-semibold text-slate-950">Mobile</h1>
         </div>
         <div className="flex items-center gap-2">
           <LanguageSwitcher />
-          <div className="flex size-11 items-center justify-center rounded-md bg-teal-700 text-white shadow-sm">
+          <div className="flex size-11 items-center justify-center rounded-md bg-blue-600 text-white shadow-sm">
             <PackageCheck className="size-5" aria-hidden="true" />
           </div>
         </div>
@@ -237,7 +237,7 @@ export function MobileAuthShell() {
 
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex items-start gap-3">
-          <div className="mt-0.5 flex size-9 items-center justify-center rounded-md bg-teal-50 text-teal-700">
+          <div className="mt-0.5 flex size-9 items-center justify-center rounded-md bg-blue-50 text-blue-700">
             <Building2 className="size-4" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
@@ -285,7 +285,7 @@ export function MobileAuthShell() {
         </p>
       ) : null}
       {message ? (
-        <p className="mt-4 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-800">
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           {message}
         </p>
       ) : null}
@@ -307,7 +307,7 @@ export function MobileAuthShell() {
               <button
                 className={`min-h-11 rounded-md border px-3 text-sm font-medium transition ${
                   mode === loginMode.value
-                    ? "border-teal-700 bg-teal-50 text-teal-900"
+                    ? "border-blue-600 bg-blue-50 text-blue-900"
                     : "border-slate-200 bg-white text-slate-700"
                 }`}
                 key={loginMode.value}

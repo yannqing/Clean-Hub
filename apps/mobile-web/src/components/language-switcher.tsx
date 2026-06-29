@@ -38,7 +38,7 @@ export function LanguageSwitcher({ className = "" }: { className?: string }) {
                 aria-pressed={isActive}
                 className={`flex h-10 w-full items-center justify-between rounded px-3 text-sm font-medium transition ${
                   isActive
-                    ? "bg-teal-50 text-teal-800"
+                    ? "bg-blue-50 text-blue-700"
                     : "text-slate-600 hover:bg-slate-100"
                 }`}
                 key={option}

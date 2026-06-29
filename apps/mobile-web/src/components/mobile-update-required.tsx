@@ -19,7 +19,7 @@ export function MobileUpdateRequired() {
           {t("common.update.requiredBody")}
         </p>
         <a
-          className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-md bg-teal-700 px-4 text-sm font-semibold text-white"
+          className="mt-5 inline-flex h-11 w-full items-center justify-center rounded-md bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
           href={mobileReleaseConfig.updateUrl}
         >
           {t("common.update.install")}

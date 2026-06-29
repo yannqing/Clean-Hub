@@ -602,7 +602,7 @@ export function DeliveryHome({
     context.lineWidth = 5;
     context.lineCap = "round";
     context.lineJoin = "round";
-    context.strokeStyle = "#0f766e";
+    context.strokeStyle = "#2563eb";
     context.lineTo(point.x, point.y);
     context.stroke();
   }
@@ -723,7 +723,7 @@ export function DeliveryHome({
     return (
       <section className="flex min-h-[70dvh] items-center justify-center px-5">
         <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-          <Loader2 className="size-4 animate-spin text-teal-700" aria-hidden="true" />
+          <Loader2 className="size-4 animate-spin text-blue-600" aria-hidden="true" />
           {t("delivery.loading")}
         </div>
       </section>
@@ -787,7 +787,7 @@ export function DeliveryHome({
         </p>
       ) : null}
       {message ? (
-        <p className="mb-4 rounded-md border border-teal-200 bg-teal-50 px-3 py-2 text-sm text-teal-800">
+        <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           {message}
         </p>
       ) : null}
@@ -832,7 +832,7 @@ export function DeliveryHome({
                 <button
                   className={`w-full rounded-md border px-3 py-3 text-left transition ${
                     isSelected
-                      ? "border-teal-700 bg-teal-50"
+                      ? "border-blue-600 bg-blue-50"
                       : "border-slate-200 bg-white active:bg-slate-50"
                   }`}
                   key={task.id}
@@ -917,7 +917,7 @@ export function DeliveryHome({
                   </div>
                   {selectedTask.customerPhone ? (
                     <a
-                      className="flex gap-3 text-sm text-teal-800"
+                      className="flex gap-3 text-sm text-blue-700"
                       href={`tel:${selectedTask.customerPhone}`}
                     >
                       <Phone className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
@@ -960,7 +960,7 @@ export function DeliveryHome({
                 <section className="rounded-md border border-slate-200 bg-slate-50 p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white text-teal-700">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white text-blue-700">
                         <Printer className="size-4" aria-hidden="true" />
                       </div>
                       <div className="min-w-0">
@@ -1057,7 +1057,7 @@ export function DeliveryHome({
 
               <div className="sticky bottom-0 mt-auto space-y-3 border-t border-slate-200 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
                 <div className="flex items-center gap-3">
-                  <div className="flex size-9 items-center justify-center rounded-md bg-teal-50 text-teal-700">
+                  <div className="flex size-9 items-center justify-center rounded-md bg-blue-50 text-blue-700">
                     <Navigation className="size-4" aria-hidden="true" />
                   </div>
                   <div>
@@ -1104,7 +1104,7 @@ export function DeliveryHome({
             </div>
           ) : (
             <div className="flex min-h-[50dvh] items-center justify-center px-5 text-sm text-slate-600">
-              <Loader2 className="mr-2 size-4 animate-spin text-teal-700" aria-hidden="true" />
+              <Loader2 className="mr-2 size-4 animate-spin text-blue-600" aria-hidden="true" />
               {t("delivery.detailLoading")}
             </div>
           )}
@@ -1179,7 +1179,7 @@ export function DeliveryHome({
                   <button
                     className={`h-11 rounded-md border px-3 text-sm font-medium ${
                       proofType === type
-                        ? "border-teal-700 bg-teal-50 text-teal-900"
+                        ? "border-blue-600 bg-blue-50 text-blue-900"
                         : "border-slate-200 bg-white text-slate-700"
                     }`}
                     key={type}

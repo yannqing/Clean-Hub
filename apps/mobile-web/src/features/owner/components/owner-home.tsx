@@ -76,7 +76,7 @@ type MetricItem = {
   value: string;
   detail: string;
   icon: IconComponent;
-  tone: "teal" | "emerald" | "amber" | "sky";
+  tone: "blue" | "emerald" | "amber" | "sky";
 };
 
 type BoardState = {
@@ -135,7 +135,7 @@ const toneClasses: Record<MetricItem["tone"], string> = {
   amber: "bg-amber-50 text-amber-700",
   emerald: "bg-emerald-50 text-emerald-700",
   sky: "bg-sky-50 text-sky-700",
-  teal: "bg-teal-50 text-teal-700",
+  blue: "bg-blue-50 text-blue-700",
 };
 
 const statusBadgeClasses: Record<string, string> = {
@@ -148,7 +148,7 @@ const statusBadgeClasses: Record<string, string> = {
   exception: "border-red-200 bg-red-50 text-red-700",
   pending: "border-amber-200 bg-amber-50 text-amber-700",
   pending_dispatch: "border-amber-200 bg-amber-50 text-amber-700",
-  picked_up: "border-teal-200 bg-teal-50 text-teal-700",
+  picked_up: "border-blue-200 bg-blue-50 text-blue-700",
   rejected: "border-red-200 bg-red-50 text-red-700",
   signed: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
@@ -223,7 +223,7 @@ function createMetrics(
       value: formatCount(summary.todayOrderCount, locale),
       detail: t("owner.today"),
       icon: PackageCheck,
-      tone: "teal",
+      tone: "blue",
     },
     {
       label: t("owner.metrics.revenue"),
@@ -332,7 +332,7 @@ function OperationalCard({
   return (
     <section className="mt-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-teal-50 text-teal-700">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700">
           <Icon className="size-5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
@@ -1015,7 +1015,7 @@ export function OwnerHome({
 
       {isLoading && !summary ? (
         <div className="mt-8 flex items-center justify-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-6 text-sm text-slate-700 shadow-sm">
-          <Loader2 className="size-4 animate-spin text-teal-700" aria-hidden />
+          <Loader2 className="size-4 animate-spin text-blue-600" aria-hidden />
           {t("owner.loadingMetrics")}
         </div>
       ) : null}
