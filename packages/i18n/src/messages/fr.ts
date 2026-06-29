@@ -351,9 +351,17 @@ export const frMessages = {
       picked_up: "Collecter",
       delivering: "Livrer",
     },
+    workflow: {
+      title: "Prochaine étape",
+      signedDone: "Cette tâche est signée et terminée.",
+      exceptionLocked:
+        "Cette tâche est marquée en exception et attend un suivi boutique.",
+      cancelled: "Cette tâche a été annulée.",
+    },
     proof: {
       title: "Preuve photo",
       description: "Ajoutez une photo ou une référence média.",
+      forTask: "Type de preuve",
       reference: "Référence média",
       referencePlaceholder: "media://...",
       captured: "Photo prete a envoyer.",

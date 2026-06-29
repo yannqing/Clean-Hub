@@ -351,9 +351,16 @@ export const enMessages = {
       picked_up: "Pick up",
       delivering: "Deliver",
     },
+    workflow: {
+      title: "Next step",
+      signedDone: "This task is signed and complete.",
+      exceptionLocked: "This task is marked as an exception and is waiting for store follow-up.",
+      cancelled: "This task was cancelled.",
+    },
     proof: {
       title: "Photo proof",
       description: "Add a photo or media reference.",
+      forTask: "Proof type",
       reference: "Media reference",
       referencePlaceholder: "media://...",
       captured: "Photo ready to send.",

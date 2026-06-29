@@ -19,7 +19,6 @@ import {
 import {
   AlertTriangle,
   Camera,
-  CheckCircle2,
   ChevronRight,
   Clock3,
   CloudUpload,
@@ -80,6 +79,17 @@ type CapturedProofPhoto = {
 
 type DeliverySheet = "exception" | "proof" | "signature" | null;
 
+type PrimaryTaskAction =
+  | {
+      kind: "status";
+      status: DeliveryTaskStatus;
+      labelKey: TranslationKey;
+    }
+  | {
+      kind: "signature";
+      labelKey: TranslationKey;
+    };
+
 const statusTone: Record<DeliveryTaskStatus, string> = {
   pending_dispatch: "border-amber-200 bg-amber-50 text-amber-800",
   en_route: "border-sky-200 bg-sky-50 text-sky-800",
@@ -102,11 +112,6 @@ const statusLabelKeys: Record<DeliveryTaskStatus, TranslationKey> = {
   cancelled: "delivery.status.cancelled",
 };
 
-const taskTypeLabelKeys = {
-  pickup: "delivery.type.pickup",
-  dropoff: "delivery.type.dropoff",
-} satisfies Record<DeliveryTaskListItem["type"], TranslationKey>;
-
 const nextStatusOptions = {
   pending_dispatch: [{ status: "en_route", labelKey: "delivery.nextStatus.en_route" }],
   en_route: [{ status: "arrived", labelKey: "delivery.nextStatus.arrived" }],
@@ -120,6 +125,23 @@ const nextStatusOptions = {
   DeliveryTaskStatus,
   { status: DeliveryTaskStatus; labelKey: TranslationKey }[]
 >;
+
+const terminalStatusMessageKeys: Record<DeliveryTaskStatus, TranslationKey | null> = {
+  pending_dispatch: null,
+  en_route: null,
+  arrived: null,
+  picked_up: null,
+  delivering: null,
+  signed: "delivery.workflow.signedDone",
+  exception: "delivery.workflow.exceptionLocked",
+  cancelled: "delivery.workflow.cancelled",
+};
+
+const proofEnabledStatuses: readonly DeliveryTaskStatus[] = [
+  "arrived",
+  "picked_up",
+  "delivering",
+] as const;
 
 const proofTypeLabelKeys = {
   pickup: "delivery.type.pickup",
@@ -214,6 +236,45 @@ function applyStatusToTask<TTask extends DeliveryTaskListItem | DeliveryTaskDeta
     status,
     updatedAt: new Date().toISOString(),
   };
+}
+
+function isTerminalStatus(status: DeliveryTaskStatus): boolean {
+  return terminalStatusMessageKeys[status] !== null;
+}
+
+function canUploadProofForStatus(status: DeliveryTaskStatus): boolean {
+  return proofEnabledStatuses.includes(status);
+}
+
+function canUsePrinterForStatus(status: DeliveryTaskStatus): boolean {
+  return status === "signed" || proofEnabledStatuses.includes(status);
+}
+
+function canRequestSignatureForStatus(status: DeliveryTaskStatus): boolean {
+  return status === "delivering";
+}
+
+function canReportExceptionForStatus(status: DeliveryTaskStatus): boolean {
+  return !isTerminalStatus(status);
+}
+
+function getPrimaryTaskAction(task: DeliveryTaskDetail): PrimaryTaskAction | null {
+  if (canRequestSignatureForStatus(task.status)) {
+    return {
+      kind: "signature",
+      labelKey: "delivery.signature.submit",
+    };
+  }
+
+  const [nextStatus] = nextStatusOptions[task.status];
+
+  return nextStatus
+    ? {
+        kind: "status",
+        status: nextStatus.status,
+        labelKey: nextStatus.labelKey,
+      }
+    : null;
 }
 
 export function DeliveryHome({
@@ -447,6 +508,15 @@ export function DeliveryHome({
     setSelectedTask(null);
     setDetailOpen(true);
     void runAction("detail", () => loadTaskDetail(taskId));
+  }
+
+  function openProofSheet(task: DeliveryTaskDetail) {
+    if (!canUploadProofForStatus(task.status)) {
+      return;
+    }
+
+    setProofType(task.type);
+    setActiveSheet("proof");
   }
 
   function handleStatusUpdate(toStatus: DeliveryTaskStatus) {
@@ -719,6 +789,23 @@ export function DeliveryHome({
     });
   }
 
+  const primaryTaskAction = selectedTask ? getPrimaryTaskAction(selectedTask) : null;
+  const selectedTaskCanReportException = selectedTask
+    ? canReportExceptionForStatus(selectedTask.status)
+    : false;
+  const selectedTaskCanUploadProof = selectedTask
+    ? canUploadProofForStatus(selectedTask.status)
+    : false;
+  const selectedTaskCanUsePrinter = selectedTask
+    ? canUsePrinterForStatus(selectedTask.status)
+    : false;
+  const selectedTaskTerminalMessageKey = selectedTask
+    ? terminalStatusMessageKeys[selectedTask.status]
+    : null;
+  const selectedTaskSecondaryActionCount =
+    Number(selectedTaskCanUploadProof) +
+    Number(selectedTaskCanReportException);
+
   if (isBooting) {
     return (
       <section className="flex min-h-[70dvh] items-center justify-center px-5">
@@ -741,35 +828,31 @@ export function DeliveryHome({
         onLogout={onLogout}
       />
 
-      <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 shadow-sm">
-        <div className="flex min-w-0 items-center gap-2 text-sm text-slate-700">
-          {queue.count > 0 ? (
-            <WifiOff className="size-4 shrink-0 text-amber-700" aria-hidden="true" />
-          ) : (
-            <CheckCircle2 className="size-4 shrink-0 text-emerald-700" aria-hidden="true" />
-          )}
-          <span className="truncate">
-            {queue.count > 0
-              ? t("delivery.queuePending", { count: queue.count })
-              : t("delivery.queueEmpty")}
-          </span>
+      {queue.count > 0 ? (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 shadow-sm">
+          <div className="flex min-w-0 items-center gap-2 text-sm font-medium text-amber-900">
+            <WifiOff className="size-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">
+              {t("delivery.queuePending", { count: queue.count })}
+            </span>
+          </div>
+          <Button
+            className="h-9 px-3"
+            disabled={!canSync || activeAction === "sync"}
+            size="sm"
+            type="button"
+            variant="secondary"
+            onClick={() => void replayQueue()}
+          >
+            {activeAction === "sync" ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <CloudUpload className="size-4" aria-hidden="true" />
+            )}
+            {t("delivery.sync")}
+          </Button>
         </div>
-        <Button
-          className="h-9 px-3"
-          disabled={!canSync || activeAction === "sync"}
-          size="sm"
-          type="button"
-          variant="secondary"
-          onClick={() => void replayQueue()}
-        >
-          {activeAction === "sync" ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <CloudUpload className="size-4" aria-hidden="true" />
-          )}
-          {t("delivery.sync")}
-        </Button>
-      </div>
+      ) : null}
 
       {dataSource === "cache" ? (
         <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -803,7 +886,8 @@ export function DeliveryHome({
             </p>
           </div>
           <Button
-            className="h-10 px-3"
+            aria-label={t("common.refresh")}
+            className="size-10 p-0"
             disabled={Boolean(activeAction)}
             size="sm"
             type="button"
@@ -856,7 +940,6 @@ export function DeliveryHome({
                     >
                       {t(statusLabelKeys[task.status])}
                     </span>
-                    <Badge variant="outline">{t(taskTypeLabelKeys[task.type])}</Badge>
                     {pendingCount > 0 ? (
                       <Badge className="bg-amber-100 text-amber-900" variant="secondary">
                         {t("delivery.pendingSync", { count: pendingCount })}
@@ -882,8 +965,8 @@ export function DeliveryHome({
       >
         <SheetContent className="h-[92dvh] p-0">
           {selectedTask ? (
-            <div className="flex min-h-full flex-col">
-              <div className="space-y-5 px-5 pb-4 pt-2">
+            <div className="flex h-full flex-col">
+              <div className="flex-1 space-y-4 overflow-y-auto px-5 pb-4 pt-2">
                 <SheetHeader className="pr-8 text-left">
                   <div className="flex flex-wrap items-center gap-2">
                     <span
@@ -891,7 +974,6 @@ export function DeliveryHome({
                     >
                       {t(statusLabelKeys[selectedTask.status])}
                     </span>
-                    <Badge variant="outline">{t(taskTypeLabelKeys[selectedTask.type])}</Badge>
                     {selectedTaskPendingCount > 0 ? (
                       <Badge className="bg-amber-100 text-amber-900" variant="secondary">
                         {t("delivery.pendingSync", { count: selectedTaskPendingCount })}
@@ -957,101 +1039,103 @@ export function DeliveryHome({
                   </div>
                 </dl>
 
-                <section className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white text-blue-700">
-                        <Printer className="size-4" aria-hidden="true" />
+                {selectedTaskCanUsePrinter ? (
+                  <section className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white text-blue-700">
+                          <Printer className="size-4" aria-hidden="true" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-950">
+                            {t("delivery.printer.title")}
+                          </p>
+                          <p className="truncate text-xs text-slate-600">
+                            {printer.device?.name ??
+                              printer.device?.id ??
+                              (printer.status === "unavailable"
+                                ? t("delivery.printer.unavailable")
+                                : t("delivery.printer.notConnected"))}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-950">
-                          {t("delivery.printer.title")}
-                        </p>
-                        <p className="truncate text-xs text-slate-600">
-                          {printer.device?.name ??
-                            printer.device?.id ??
-                            (printer.status === "unavailable"
-                              ? t("delivery.printer.unavailable")
-                              : t("delivery.printer.notConnected"))}
-                        </p>
-                      </div>
+                      <Button
+                        aria-label={t("delivery.printer.connect")}
+                        className="size-10 shrink-0 p-0"
+                        disabled={Boolean(activeAction)}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                        onClick={handleConnectPrinter}
+                      >
+                        {activeAction === "printer-connect" ? (
+                          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <RefreshCw className="size-4" aria-hidden="true" />
+                        )}
+                      </Button>
                     </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <Button
+                        className="h-11"
+                        disabled={Boolean(activeAction) || !printer.device}
+                        type="button"
+                        variant="secondary"
+                        onClick={() => handlePrintDocument("receipt")}
+                      >
+                        {activeAction === "print-receipt" ? (
+                          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <ReceiptText className="size-4" aria-hidden="true" />
+                        )}
+                        {t("delivery.printer.receipt")}
+                      </Button>
+                      <Button
+                        className="h-11"
+                        disabled={Boolean(activeAction) || !printer.device}
+                        type="button"
+                        variant="secondary"
+                        onClick={() => handlePrintDocument("label")}
+                      >
+                        {activeAction === "print-label" ? (
+                          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                        ) : (
+                          <PackageCheck className="size-4" aria-hidden="true" />
+                        )}
+                        {t("delivery.printer.label")}
+                      </Button>
+                    </div>
+                  </section>
+                ) : null}
+
+                <div
+                  className={`grid gap-2 ${
+                    selectedTaskSecondaryActionCount > 1 ? "grid-cols-2" : "grid-cols-1"
+                  }`}
+                >
+                  {selectedTaskCanUploadProof ? (
                     <Button
-                      className="h-10 shrink-0 px-3"
-                      disabled={Boolean(activeAction)}
-                      size="sm"
+                      className="h-12"
                       type="button"
                       variant="outline"
-                      onClick={handleConnectPrinter}
+                      onClick={() => openProofSheet(selectedTask)}
                     >
-                      {activeAction === "printer-connect" ? (
-                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                      ) : (
-                        <RefreshCw className="size-4" aria-hidden="true" />
-                      )}
+                      <Camera className="size-4" aria-hidden="true" />
+                      {t("delivery.proof.title")}
                     </Button>
-                  </div>
-
-                  <div className="mt-3 grid grid-cols-2 gap-2">
+                  ) : null}
+                  {selectedTaskCanReportException ? (
                     <Button
-                      className="h-11"
-                      disabled={Boolean(activeAction) || !printer.device}
+                      className="h-12"
                       type="button"
-                      variant="secondary"
-                      onClick={() => handlePrintDocument("receipt")}
+                      variant="outline"
+                      onClick={() => setActiveSheet("exception")}
                     >
-                      {activeAction === "print-receipt" ? (
-                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                      ) : (
-                        <ReceiptText className="size-4" aria-hidden="true" />
-                      )}
-                      {t("delivery.printer.receipt")}
+                      <AlertTriangle className="size-4" aria-hidden="true" />
+                      {t("delivery.exception.title")}
                     </Button>
-                    <Button
-                      className="h-11"
-                      disabled={Boolean(activeAction) || !printer.device}
-                      type="button"
-                      variant="secondary"
-                      onClick={() => handlePrintDocument("label")}
-                    >
-                      {activeAction === "print-label" ? (
-                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                      ) : (
-                        <PackageCheck className="size-4" aria-hidden="true" />
-                      )}
-                      {t("delivery.printer.label")}
-                    </Button>
-                  </div>
-                </section>
-
-                <div className="grid grid-cols-3 gap-2">
-                  <Button
-                    className="h-12 flex-col gap-1 text-xs"
-                    type="button"
-                    variant="outline"
-                    onClick={() => setActiveSheet("exception")}
-                  >
-                    <AlertTriangle className="size-4" aria-hidden="true" />
-                    {t("delivery.exception.title")}
-                  </Button>
-                  <Button
-                    className="h-12 flex-col gap-1 text-xs"
-                    type="button"
-                    variant="outline"
-                    onClick={() => setActiveSheet("proof")}
-                  >
-                    <Camera className="size-4" aria-hidden="true" />
-                    {t("delivery.proof.title")}
-                  </Button>
-                  <Button
-                    className="h-12 flex-col gap-1 text-xs"
-                    type="button"
-                    variant="outline"
-                    onClick={() => setActiveSheet("signature")}
-                  >
-                    <PenLine className="size-4" aria-hidden="true" />
-                    {t("delivery.signature.title")}
-                  </Button>
+                  ) : null}
                 </div>
               </div>
 
@@ -1061,45 +1145,57 @@ export function DeliveryHome({
                     <Navigation className="size-4" aria-hidden="true" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-slate-950">{t("common.status")}</p>
+                    <p className="text-sm font-semibold text-slate-950">{t("delivery.workflow.title")}</p>
                     <p className="text-xs text-slate-600">{t(statusLabelKeys[selectedTask.status])}</p>
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="status-note">{t("common.note")}</Label>
-                  <Textarea
-                    id="status-note"
-                    className="min-h-16 text-base"
-                    placeholder={t("common.optional")}
-                    value={statusNote}
-                    onChange={(event) => setStatusNote(event.target.value)}
-                  />
-                </div>
+                {selectedTaskTerminalMessageKey ? (
+                  <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                    {t(selectedTaskTerminalMessageKey)}
+                  </p>
+                ) : null}
 
-                <div className="grid grid-cols-2 gap-2">
-                  {nextStatusOptions[selectedTask.status].map((option) => (
+                {primaryTaskAction?.kind === "status" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="status-note">{t("common.note")}</Label>
+                    <Textarea
+                      id="status-note"
+                      className="min-h-16 text-base"
+                      placeholder={t("common.optional")}
+                      value={statusNote}
+                      onChange={(event) => setStatusNote(event.target.value)}
+                    />
+                  </div>
+                ) : null}
+
+                {primaryTaskAction ? (
+                  <div>
                     <Button
-                      className="h-12"
+                      className="h-12 w-full"
                       disabled={Boolean(activeAction)}
-                      key={option.status}
                       type="button"
-                      onClick={() => handleStatusUpdate(option.status)}
+                      onClick={() => {
+                        if (primaryTaskAction.kind === "signature") {
+                          setActiveSheet("signature");
+                          return;
+                        }
+
+                        handleStatusUpdate(primaryTaskAction.status);
+                      }}
                     >
-                      {activeAction === `status-${option.status}` ? (
+                      {primaryTaskAction.kind === "status" &&
+                      activeAction === `status-${primaryTaskAction.status}` ? (
                         <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      ) : primaryTaskAction.kind === "signature" ? (
+                        <PenLine className="size-4" aria-hidden="true" />
                       ) : (
                         <MapPin className="size-4" aria-hidden="true" />
                       )}
-                      {t(option.labelKey)}
+                      {t(primaryTaskAction.labelKey)}
                     </Button>
-                  ))}
-                  {nextStatusOptions[selectedTask.status].length === 0 ? (
-                    <div className="col-span-2 rounded-md border border-dashed border-slate-300 px-3 py-4 text-sm text-slate-500">
-                      {t("delivery.messages.noNextStatus")}
-                    </div>
-                  ) : null}
-                </div>
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : (
@@ -1174,22 +1270,14 @@ export function DeliveryHome({
                 <SheetDescription>{t("delivery.proof.description")}</SheetDescription>
               </SheetHeader>
 
-              <div className="grid grid-cols-2 gap-2">
-                {(["pickup", "dropoff"] as const).map((type) => (
-                  <button
-                    className={`h-11 rounded-md border px-3 text-sm font-medium ${
-                      proofType === type
-                        ? "border-blue-600 bg-blue-50 text-blue-900"
-                        : "border-slate-200 bg-white text-slate-700"
-                    }`}
-                    key={type}
-                    type="button"
-                    onClick={() => setProofType(type)}
-                  >
-                    {t(proofTypeLabelKeys[type])}
-                  </button>
-                ))}
-              </div>
+              {selectedTask ? (
+                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <span className="font-medium text-slate-950">
+                    {t("delivery.proof.forTask")}
+                  </span>{" "}
+                  {t(proofTypeLabelKeys[selectedTask.type])}
+                </div>
+              ) : null}
 
               <div className="grid grid-cols-[1fr_auto] gap-2">
                 <div className="space-y-2">

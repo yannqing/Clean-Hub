@@ -350,9 +350,16 @@ export const zhCNMessages = {
       picked_up: "取件",
       delivering: "送达",
     },
+    workflow: {
+      title: "下一步",
+      signedDone: "任务已签收完成，无需继续操作。",
+      exceptionLocked: "任务已标记异常，等待门店处理。",
+      cancelled: "任务已取消。",
+    },
     proof: {
       title: "照片凭证",
       description: "添加照片或媒体引用。",
+      forTask: "凭证类型",
       reference: "媒体引用",
       referencePlaceholder: "media://...",
       captured: "照片已准备发送。",
