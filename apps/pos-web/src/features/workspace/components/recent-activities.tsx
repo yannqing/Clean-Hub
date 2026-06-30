@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import type {
   PosRecentActivity,
   PosRecentActivityType,
@@ -62,51 +59,7 @@ function SectionHeader() {
   );
 }
 
-export function RecentActivities() {
-  const [activities, setActivities] = useState<PosRecentActivity[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchActivities = async () => {
-      try {
-        const response = await fetch(
-          "/api/workspace/recent-activities?limit=5",
-        );
-        if (response.ok) {
-          const data = await response.json();
-          setActivities(data.activities);
-        }
-      } catch (error) {
-        console.error("Failed to fetch recent activities:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchActivities();
-  }, []);
-
-  if (loading) {
-    return (
-      <section>
-        <SectionHeader />
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
-          <div className="space-y-4">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-3">
-                <div className="h-9 w-9 animate-pulse rounded-full bg-slate-100" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-3 w-2/3 animate-pulse rounded bg-slate-100" />
-                  <div className="h-2.5 w-1/3 animate-pulse rounded bg-slate-50" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-    );
-  }
-
+export function RecentActivities({ activities }: { activities: PosRecentActivity[] }) {
   if (activities.length === 0) {
     return (
       <section>
