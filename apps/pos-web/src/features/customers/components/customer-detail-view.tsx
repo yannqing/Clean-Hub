@@ -4,23 +4,41 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
+import type {
+  PosOrderSummary,
+  ServiceTicketSummary,
+} from "@cleanhub/api-client";
 import { toast } from "@cleanhub/ui";
 
 import { posApi } from "@/lib/api-client";
 
-import { CUSTOMER_PROFILE_RELATIONSHIPS } from "../constants";
-import { changeProfileStatus, updateProfile } from "../queries";
+import {
+  CUSTOMER_CURRENCY,
+  CUSTOMER_PROFILE_RELATIONSHIPS,
+  CUSTOMER_TICKET_STATUS_LABELS,
+  CUSTOMER_TICKET_STATUS_TONES,
+  CUSTOMER_TICKET_TYPE_LABELS,
+  CUSTOMER_ORDER_PAYMENT_LABELS,
+  CUSTOMER_ORDER_TYPE_LABELS,
+} from "../constants";
+import { changeProfileStatus, fetchCustomerOrderStats, updateProfile } from "../queries";
 import type {
   CustomerDialogState,
   PosCustomerAccountDetail,
   PosCustomerProfileDetail,
   ProfileFormValues,
 } from "../types";
+import { CustomerOrderList } from "./customer-order-list";
+import { CustomerServiceItemList } from "./customer-service-item-list";
 import { CustomerStatusSwitch } from "./customer-status-switch";
+import { CustomerTicketList } from "./customer-ticket-list";
 import { ProfileFormDialog } from "./profile-form-dialog";
+import { ServiceTicketCreateDialog } from "./service-ticket-create-dialog";
 
 type CustomerDetailViewProps = {
   customerId: string;
+  /** Entry source. `intake` = arrived from 客户接待; otherwise 客户管理. */
+  from?: string;
 };
 
 type DetailTab = "overview" | "tickets" | "orders" | "items" | "notes";
@@ -33,24 +51,25 @@ const TAB_LABELS: Record<DetailTab, string> = {
   notes: "备注",
 };
 
-const OTHER_MODULE_PLACEHOLDER: Record<
-  Exclude<DetailTab, "overview" | "notes">,
-  string
-> = {
-  tickets: "工单管理模块开发中，敬请期待。",
-  orders: "订单管理模块开发中，敬请期待。",
-  items: "服务项目将随工单模块一起提供，敬请期待。",
-};
-
-export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
+export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps) {
   const router = useRouter();
+
+  // Whether this detail view was reached via 客户接待 (intake). Controls the
+  // breadcrumb trail and the back-button destination so the clerk returns to
+  // the intake page rather than the customer-management list.
+  const fromIntake = from === "intake";
 
   const [profile, setProfile] = useState<PosCustomerProfileDetail | null>(null);
   const [account, setAccount] = useState<PosCustomerAccountDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTicketCount, setActiveTicketCount] = useState(0);
+  const [orderCount, setOrderCount] = useState(0);
+  const [totalPaid, setTotalPaid] = useState(0);
+  const [recentTickets, setRecentTickets] = useState<ServiceTicketSummary[]>([]);
+  const [recentOrders, setRecentOrders] = useState<PosOrderSummary[]>([]);
   const [tab, setTab] = useState<DetailTab>("overview");
   const [dialog, setDialog] = useState<CustomerDialogState>({ type: "none" });
+  const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
   const [notesDraft, setNotesDraft] = useState("");
   const [savingNotes, setSavingNotes] = useState(false);
   const [notificationPermissions, setNotificationPermissions] = useState({
@@ -66,20 +85,38 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
       setProfile(detail);
       setNotesDraft(detail.notes ?? "");
 
-      const [accountDetail, ticketsResult] = await Promise.allSettled([
+      const [
+        accountDetail,
+        ticketsResult,
+        orderStats,
+        recentTicketsResult,
+        recentOrdersResult,
+      ] = await Promise.allSettled([
         posApi.pos.accounts.get(detail.customerAccountId),
-        posApi.pos.serviceTickets.list({
-          customerId,
-          status: ["draft", "pending", "in_progress", "ready_to_pick"],
-          limit: 1,
-          offset: 0,
-        }),
+        // Total ticket count for the overview metric.
+        posApi.pos.serviceTickets.list({ customerId, limit: 1, offset: 0 }),
+        // Order count + lifetime paid for the overview metric.
+        fetchCustomerOrderStats(customerId),
+        // Recent 5 tickets for the overview preview.
+        posApi.pos.serviceTickets.list({ customerId, limit: 5, offset: 0 }),
+        // Recent 5 orders for the overview preview.
+        posApi.pos.orders.list({ customerId, limit: 5, offset: 0 }),
       ]);
 
       setAccount(accountDetail.status === "fulfilled" ? accountDetail.value : null);
       setActiveTicketCount(
         ticketsResult.status === "fulfilled" ? ticketsResult.value.total : 0,
       );
+      if (orderStats.status === "fulfilled") {
+        setOrderCount(orderStats.value.orderCount);
+        setTotalPaid(orderStats.value.totalPaid);
+      }
+      if (recentTicketsResult.status === "fulfilled") {
+        setRecentTickets(recentTicketsResult.value.data);
+      }
+      if (recentOrdersResult.status === "fulfilled") {
+        setRecentOrders(recentOrdersResult.value.data);
+      }
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "加载客户档案失败，请重试。",
@@ -127,7 +164,14 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
   }
 
   function handleCreateServiceTicket() {
-    toast.info("新建服务工单功能尚在开发中，尽情期待");
+    setTicketDialogOpen(true);
+  }
+
+  function handleTicketCreated(ticketId: string) {
+    // Refresh the detail (ticket count/overview) then open the new ticket so
+    // the clerk can add items and pricing next.
+    void loadDetail();
+    router.push(`/tickets/${ticketId}`);
   }
 
   if (loading) {
@@ -159,11 +203,17 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
           <button
             className="hover:text-blue-700"
             type="button"
-            onClick={() => router.push("/customers")}
+            onClick={() => router.push(fromIntake ? "/new-intake" : "/customers")}
           >
-            客户管理
+            {fromIntake ? "客户接待" : "客户管理"}
           </button>
           <span>&gt;</span>
+          {fromIntake && (
+            <>
+              <span className="text-slate-400">客户服务</span>
+              <span>&gt;</span>
+            </>
+          )}
           <span className="rounded-md bg-blue-50 px-2 py-1 text-blue-700">
             {profile.fullName}
           </span>
@@ -171,9 +221,9 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
         <button
           className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
           type="button"
-          onClick={() => router.push("/customers")}
+          onClick={() => router.push(fromIntake ? "/new-intake" : "/customers")}
         >
-          返回账户档案
+          {fromIntake ? "返回客户接待" : "返回账户档案"}
         </button>
       </div>
 
@@ -217,10 +267,10 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
 
         <div className="grid grid-cols-2 border-t border-slate-200 sm:grid-cols-4">
           {[
-            { label: "账户余额", value: "XOF 0", hint: "可用余额" },
-            { label: "进行中工单", value: String(activeTicketCount), hint: "未完成工单" },
-            { label: "历史订单", value: "-", hint: "本期不实现" },
-            { label: "最近到店", value: "-", hint: "本期不实现" },
+            { label: "账户余额", value: `${CUSTOMER_CURRENCY} 0`, hint: "暂未实现" },
+            { label: "历史工单", value: String(activeTicketCount), hint: "工单总数" },
+            { label: "历史订单", value: String(orderCount), hint: "订单总数" },
+            { label: "累计消费", value: `${CUSTOMER_CURRENCY} ${totalPaid.toLocaleString("en-US")}`, hint: "已支付总额" },
           ].map((metric) => (
             <div
               className="border-r border-slate-100 px-5 py-4 last:border-r-0"
@@ -270,11 +320,42 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
 
       {tab === "overview" ? (
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="rounded-xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-            <div className="text-sm font-medium text-slate-500">
-              功能正在开发中，尽情期待
-            </div>
-          </section>
+          <div className="space-y-5">
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-semibold text-slate-950">当前服务</h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    进行中的工单在全部项目完成并取件前保持开启。
+                  </p>
+                </div>
+                <button
+                  className="text-sm font-semibold text-blue-700"
+                  type="button"
+                  onClick={() => setTab("tickets")}
+                >
+                  查看工单
+                </button>
+              </div>
+              <CurrentServiceCard ticket={recentTickets[0]} />
+            </section>
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h2 className="font-semibold text-slate-950">最近动态</h2>
+                <button
+                  className="text-sm font-semibold text-blue-700"
+                  type="button"
+                  onClick={() => setTab("orders")}
+                >
+                  完整记录
+                </button>
+              </div>
+              <RecentActivity
+                tickets={recentTickets}
+                orders={recentOrders}
+              />
+            </section>
+          </div>
           <aside className="space-y-5 lg:col-start-2">
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <h2 className="font-semibold text-slate-950">档案信息</h2>
@@ -338,12 +419,16 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
         </div>
       ) : null}
 
-      {tab === "tickets" || tab === "orders" || tab === "items" ? (
-        <section className="mt-5 rounded-xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-          <div className="text-sm text-slate-500">
-            {OTHER_MODULE_PLACEHOLDER[tab]}
-          </div>
-        </section>
+      {tab === "tickets" ? (
+        <CustomerTicketList customerId={customerId} />
+      ) : null}
+
+      {tab === "orders" ? (
+        <CustomerOrderList customerId={customerId} />
+      ) : null}
+
+      {tab === "items" ? (
+        <CustomerServiceItemList customerId={customerId} />
       ) : null}
 
       <ProfileFormDialog
@@ -384,6 +469,14 @@ export function CustomerDetailView({ customerId }: CustomerDetailViewProps) {
           setProfile(updated);
         }}
         open={dialog.type === "edit-profile"}
+      />
+
+      <ServiceTicketCreateDialog
+        customerId={customerId}
+        customerName={profile.fullName}
+        onCreated={handleTicketCreated}
+        onOpenChange={setTicketDialogOpen}
+        open={ticketDialogOpen}
       />
     </div>
   );
@@ -484,4 +577,117 @@ function formatDate(iso: string): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function formatMoney(amount: string | number | null | undefined): string {
+  const value = Number(amount ?? 0);
+  if (!Number.isFinite(value)) return `${CUSTOMER_CURRENCY} 0`;
+  return `${CUSTOMER_CURRENCY} ${value.toLocaleString("en-US")}`;
+}
+
+function formatDateShort(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * The single most-recent ticket shown as a highlighted "current service" card,
+ * mirroring the prototype overview. Empty state when the customer has no
+ * tickets.
+ */
+function CurrentServiceCard({ ticket }: { ticket: ServiceTicketSummary | undefined }) {
+  if (!ticket) {
+    return (
+      <div className="mt-4 rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+        暂无工单记录。
+      </div>
+    );
+  }
+  const tone = CUSTOMER_TICKET_STATUS_TONES[ticket.ticketStatus] ?? "bg-slate-100 text-slate-600";
+  return (
+    <div className="mt-4 grid grid-cols-[1fr_130px_120px] items-center rounded-lg border border-slate-200 p-4">
+      <div className="min-w-0">
+        <div className="font-semibold text-slate-950">
+          {CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType}
+        </div>
+        <div className="mt-1 text-xs text-slate-500">
+          工单 {ticket.ticketNo || "—"} · {ticket.itemCount} 个项目 · {formatDateShort(ticket.createdAt)}
+        </div>
+      </div>
+      <span className="text-sm text-slate-500">
+        {ticket.expectedPickupAt ? formatDateShort(ticket.expectedPickupAt) : "未设置取件"}
+      </span>
+      <span className={`justify-self-end rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}>
+        {CUSTOMER_TICKET_STATUS_LABELS[ticket.ticketStatus] ?? ticket.ticketStatus}
+      </span>
+    </div>
+  );
+}
+
+type ActivityItem = {
+  title: string;
+  detail: string;
+  time: string;
+  amount?: string;
+};
+
+/**
+ * Recent-activity timeline blending ticket and order events, newest first.
+ * Mirrors the prototype `activity()` rows.
+ */
+function RecentActivity({
+  tickets,
+  orders,
+}: {
+  tickets: ServiceTicketSummary[];
+  orders: PosOrderSummary[];
+}) {
+  const items: ActivityItem[] = [
+    ...tickets.slice(0, 3).map<ActivityItem>((ticket) => ({
+      title: "工单创建",
+      detail: `${CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType} · ${ticket.itemCount} 个项目`,
+      time: formatDateShort(ticket.createdAt),
+      amount: ticket.totalAmount ? formatMoney(ticket.totalAmount) : undefined,
+    })),
+    ...orders.slice(0, 3).map<ActivityItem>((order) => ({
+      title: "订单记录",
+      detail: `${CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ?? order.orderType} · ${CUSTOMER_ORDER_PAYMENT_LABELS[order.paymentStatus] ?? order.paymentStatus}`,
+      time: formatDateShort(order.createdAt),
+      amount: order.totalAmount ? formatMoney(order.totalAmount) : undefined,
+    })),
+  ].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 6);
+
+  if (items.length === 0) {
+    return (
+      <div className="mt-4 rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+        暂无动态记录。
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4 divide-y divide-slate-100">
+      {items.map((item, index) => (
+        <div className="flex items-center gap-3 py-3 first:pt-0 last:pb-0" key={index}>
+          <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-semibold text-slate-800">{item.title}</div>
+            <div className="text-xs text-slate-500">{item.detail}</div>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-slate-400">{item.time}</div>
+            {item.amount ? (
+              <div className="mt-1 text-sm font-semibold text-slate-950">{item.amount}</div>
+            ) : null}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 }

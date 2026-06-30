@@ -179,4 +179,101 @@ export async function deleteProfile(customerId: string): Promise<void> {
   await posApi.pos.customers.remove(customerId);
 }
 
+// ---- customer-scoped tickets / orders --------------------------------------
+// These power the customer detail page tabs. Each is a thin wrapper over the
+// existing pos service-tickets / orders list endpoints, scoped by customerId.
+
+/** Paginated service tickets for one customer. */
+export async function fetchCustomerTickets(
+  customerId: string,
+  page: number,
+  pageSize: number,
+): Promise<{ rows: import("@cleanhub/api-client").ServiceTicketSummary[]; total: number }> {
+  const result = await posApi.pos.serviceTickets.list({
+    customerId,
+    limit: pageSize,
+    offset: toOffset(page, pageSize),
+  });
+  return { rows: result.data, total: result.total };
+}
+
+/** Paginated orders for one customer. */
+export async function fetchCustomerOrders(
+  customerId: string,
+  page: number,
+  pageSize: number,
+): Promise<{ rows: import("@cleanhub/api-client").PosOrderSummary[]; total: number }> {
+  const result = await posApi.pos.orders.list({
+    customerId,
+    limit: pageSize,
+    offset: toOffset(page, pageSize),
+  });
+  return { rows: result.data, total: result.total };
+}
+
+/** Order stats for the overview strip: total count + lifetime paid. */
+export async function fetchCustomerOrderStats(
+  customerId: string,
+): Promise<{ orderCount: number; totalPaid: number }> {
+  // Fetch up to 50 orders to sum paidAmount client-side (no aggregate endpoint).
+  const result = await posApi.pos.orders.list({
+    customerId,
+    limit: 50,
+    offset: 0,
+  });
+  const totalPaid = result.data.reduce(
+    (sum, order) => sum + Number(order.paidAmount ?? 0),
+    0,
+  );
+  return { orderCount: result.total, totalPaid };
+}
+
+/**
+ * Service items (ticket_items) across a customer's recent tickets, for the
+ * 服务项目 tab. There is no "list items by customer" endpoint, so we fetch the
+ * customer's recent tickets then load each ticket's detail (which carries its
+ * `items[]`). Limited to recent 20 tickets to bound the number of detail calls.
+ */
+export async function fetchCustomerServiceItems(
+  customerId: string,
+): Promise<{
+  items: Array<
+    import("@cleanhub/api-client").ServiceTicketItem & {
+      ticketNo: string | null;
+      ticketType: import("@cleanhub/api-client").ServiceTicketType;
+    }
+  >;
+}> {
+  const list = await posApi.pos.serviceTickets.list({
+    customerId,
+    limit: 20,
+    offset: 0,
+  });
+
+  const details = await Promise.allSettled(
+    list.data.map((ticket) => posApi.pos.serviceTickets.get(ticket.id)),
+  );
+
+  const items: Array<
+    import("@cleanhub/api-client").ServiceTicketItem & {
+      ticketNo: string | null;
+      ticketType: import("@cleanhub/api-client").ServiceTicketType;
+    }
+  > = [];
+  details.forEach((result, index) => {
+    if (result.status !== "fulfilled") return;
+    const detail = result.value;
+    for (const item of detail.items) {
+      items.push({
+        ...item,
+        ticketNo: list.data[index]?.ticketNo ?? null,
+        ticketType: detail.ticketType,
+      });
+    }
+  });
+
+  // Newest items first.
+  items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return { items };
+}
 export { CUSTOMER_DEFAULT_FILTERS };
