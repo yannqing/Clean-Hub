@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import type { PosPendingTask, PosPendingTaskType } from "@cleanhub/api-client";
 import { Icon, type PosIconName } from "@/components/app-shell/icons";
 
@@ -76,44 +73,7 @@ const PRIORITY_LABELS: Record<"high" | "medium" | "low", string> = {
   low: "低优先级",
 };
 
-export function PendingTasks() {
-  const [tasks, setTasks] = useState<PosPendingTask[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const response = await fetch("/api/workspace/pending-tasks");
-        if (response.ok) {
-          const data = await response.json();
-          setTasks(data.tasks);
-        }
-      } catch (error) {
-        console.error("Failed to fetch pending tasks:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchTasks();
-  }, []);
-
-  if (loading) {
-    return (
-      <section>
-        <SectionHeader title="待办任务" />
-        <div className="space-y-3">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-[72px] animate-pulse rounded-2xl border border-slate-200 bg-white"
-            />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
+export function PendingTasks({ tasks }: { tasks: PosPendingTask[] }) {
   if (tasks.length === 0) {
     return (
       <section>

@@ -1,6 +1,10 @@
 "use client";
 
-import type { PosWorkspaceOverview } from "@cleanhub/api-client";
+import type {
+  PosPendingTask,
+  PosRecentActivity,
+  PosWorkspaceOverview,
+} from "@cleanhub/api-client";
 import type { PosSessionUser } from "@/lib/session";
 import { Icon } from "@/components/app-shell/icons";
 import { WorkspaceBranchCard } from "./workspace-branch-card";
@@ -12,6 +16,8 @@ import { PendingTasks } from "./pending-tasks";
 type WorkspaceViewProps = {
   user: PosSessionUser | null;
   overview: PosWorkspaceOverview | null;
+  recentActivities: PosRecentActivity[];
+  pendingTasks: PosPendingTask[];
 };
 
 const ROLE_LABELS: Record<string, string> = {
@@ -20,7 +26,12 @@ const ROLE_LABELS: Record<string, string> = {
   cashier: "收银员",
 };
 
-export function WorkspaceView({ user, overview }: WorkspaceViewProps) {
+export function WorkspaceView({
+  user,
+  overview,
+  recentActivities,
+  pendingTasks,
+}: WorkspaceViewProps) {
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : null;
   const today = new Date().toLocaleDateString("zh-CN", {
     year: "numeric",
@@ -88,8 +99,8 @@ export function WorkspaceView({ user, overview }: WorkspaceViewProps) {
 
       {/* 待办任务 + 最近活动 双栏布局（大屏下） */}
       <div className="grid grid-cols-1 gap-7 xl:grid-cols-2">
-        <PendingTasks />
-        <RecentActivities />
+        <PendingTasks tasks={pendingTasks} />
+        <RecentActivities activities={recentActivities} />
       </div>
     </div>
   );
