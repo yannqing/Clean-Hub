@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ComponentType } from "react";
 import type {
   MobileDeliveryTaskStatus,
+  MobileOwnerBranchOption,
+  MobileOwnerDriverOption,
   MobileOwnerTodaySummary,
   MobileRefundRequest,
 } from "@cleanhub/api-client";
@@ -12,7 +14,6 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Badge,
   Button,
-  Input,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -54,7 +55,9 @@ import {
 import {
   getOwnerDispatchBoard,
   getOwnerTodaySummary,
+  listOwnerBranches,
   listOwnerAppointments,
+  listOwnerDrivers,
   listOwnerRefundRequests,
 } from "../queries";
 import type {
@@ -198,6 +201,16 @@ function formatLoadTime(value: Date | null, locale: string): string | null {
         minute: "2-digit",
       }).format(value)
     : null;
+}
+
+function formatBranchOption(branch: MobileOwnerBranchOption): string {
+  return branch.address ? `${branch.name} - ${branch.address}` : branch.name;
+}
+
+function formatDriverOption(driver: MobileOwnerDriverOption): string {
+  const contact = driver.phone ?? driver.email;
+
+  return contact ? `${driver.displayName} - ${contact}` : driver.displayName;
 }
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -591,6 +604,7 @@ function getActionSubject(
 
 function ActionSheet({
   currency,
+  drivers,
   error,
   isSubmitting,
   note,
@@ -605,6 +619,7 @@ function ActionSheet({
   target,
 }: {
   currency: string;
+  drivers: MobileOwnerDriverOption[];
   error: string | null;
   isSubmitting: boolean;
   note: string;
@@ -650,14 +665,20 @@ function ActionSheet({
               {needsAssignee ? (
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700">
-                    {t("owner.forms.assigneeId")}
+                    {t("owner.forms.assignee")}
                   </span>
-                  <Input
-                    className="mt-2"
-                    placeholder="user_..."
+                  <select
+                    className="mt-2 flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                     value={assigneeUserId}
                     onChange={(event) => onAssigneeUserIdChange(event.target.value)}
-                  />
+                  >
+                    <option value="">{t("owner.actions.selectDriver")}</option>
+                    {drivers.map((driver) => (
+                      <option key={driver.id} value={driver.id}>
+                        {formatDriverOption(driver)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
               ) : null}
 
@@ -723,6 +744,8 @@ export function OwnerHome({
   const { locale, t } = useTranslation();
   const intlLocale = intlLocales[locale];
   const [summary, setSummary] = useState<MobileOwnerTodaySummary | null>(initialSummary);
+  const [branches, setBranches] = useState<MobileOwnerBranchOption[]>([]);
+  const [drivers, setDrivers] = useState<MobileOwnerDriverOption[]>([]);
   const [boardState, setBoardState] = useState<BoardState>({
     appointments: [],
     dispatchBoard: null,
@@ -736,6 +759,7 @@ export function OwnerHome({
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!initialSummary);
+  const [isDirectoryLoading, setIsDirectoryLoading] = useState(false);
   const [isBoardLoading, setIsBoardLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(
@@ -785,6 +809,76 @@ export function OwnerHome({
       }
     }
   }, [t]);
+
+  const loadBranches = useCallback(async (signal?: AbortSignal) => {
+    setIsDirectoryLoading(true);
+
+    try {
+      const response = await listOwnerBranches({ signal });
+
+      if (signal?.aborted) {
+        return;
+      }
+
+      setBranches(response.data);
+      setBranchId((current) => current || (response.data[0]?.id ?? ""));
+    } catch (nextError) {
+      if (!signal?.aborted) {
+        setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
+      }
+    } finally {
+      if (!signal?.aborted) {
+        setIsDirectoryLoading(false);
+      }
+    }
+  }, [t]);
+
+  const loadDrivers = useCallback(
+    async (signal?: AbortSignal) => {
+      const cleanBranchId = branchId.trim();
+
+      if (!cleanBranchId) {
+        setDrivers([]);
+        setAssigneeFilter("");
+        setAssigneeUserId("");
+        return;
+      }
+
+      setIsDirectoryLoading(true);
+
+      try {
+        const response = await listOwnerDrivers(
+          { branchId: cleanBranchId },
+          { signal },
+        );
+
+        if (signal?.aborted) {
+          return;
+        }
+
+        setDrivers(response.data);
+        setAssigneeFilter((current) =>
+          current && response.data.some((driver) => driver.id === current)
+            ? current
+            : "",
+        );
+        setAssigneeUserId((current) =>
+          current && response.data.some((driver) => driver.id === current)
+            ? current
+            : "",
+        );
+      } catch (nextError) {
+        if (!signal?.aborted) {
+          setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setIsDirectoryLoading(false);
+        }
+      }
+    },
+    [branchId, t],
+  );
 
   const loadBoard = useCallback(
     async (signal?: AbortSignal) => {
@@ -874,6 +968,30 @@ export function OwnerHome({
       controller.abort();
     };
   }, [initialSummary, loadSummary]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      void loadBranches(controller.signal);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [loadBranches]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      void loadDrivers(controller.signal);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [loadDrivers]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1053,24 +1171,46 @@ export function OwnerHome({
                 <span className="text-sm font-medium text-slate-700">
                   {t("owner.branch")}
                 </span>
-                <Input
-                  className="mt-2"
-                  placeholder="branch_..."
+                <select
+                  className="mt-2 flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  disabled={isDirectoryLoading && !branches.length}
                   value={branchId}
-                  onChange={(event) => setBranchId(event.target.value)}
-                />
+                  onChange={(event) => {
+                    setBranchId(event.target.value);
+                    setAssigneeFilter("");
+                    setAssigneeUserId("");
+                  }}
+                >
+                  <option value="">
+                    {isDirectoryLoading && !branches.length
+                      ? t("common.loading")
+                      : t("owner.actions.selectBranch")}
+                  </option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {formatBranchOption(branch)}
+                    </option>
+                  ))}
+                </select>
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700">
                     {t("owner.driver")}
                   </span>
-                  <Input
-                    className="mt-2"
-                    placeholder={t("owner.all")}
+                  <select
+                    className="mt-2 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    disabled={!branchId.trim() || (isDirectoryLoading && !drivers.length)}
                     value={assigneeFilter}
                     onChange={(event) => setAssigneeFilter(event.target.value)}
-                  />
+                  >
+                    <option value="">{t("owner.all")}</option>
+                    {drivers.map((driver) => (
+                      <option key={driver.id} value={driver.id}>
+                        {formatDriverOption(driver)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700">
@@ -1195,6 +1335,7 @@ export function OwnerHome({
       <ActionSheet
         assigneeUserId={assigneeUserId}
         currency={tenantCurrency}
+        drivers={drivers}
         error={actionError}
         isSubmitting={isSubmitting}
         note={note}

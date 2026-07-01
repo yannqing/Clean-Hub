@@ -2,8 +2,11 @@ import type {
   ApiRequestOptions,
   MobileDeliveryDispatchBoardResponse,
   MobileDeliveryTaskListItem,
+  MobileOwnerBranchListResponse,
   MobileOwnerAppointment,
   MobileOwnerAppointmentListResponse,
+  MobileOwnerDriverListQuery,
+  MobileOwnerDriverListResponse,
   MobileRefundRequestListResponse,
 } from "@cleanhub/api-client";
 
@@ -106,6 +109,19 @@ export async function getOwnerDispatchBoard(
   );
 
   return toDispatchBoard(response);
+}
+
+export async function listOwnerBranches(
+  options?: QueryOptions,
+): Promise<MobileOwnerBranchListResponse> {
+  return apiClient.mobile.owner.listBranches(options);
+}
+
+export async function listOwnerDrivers(
+  query: MobileOwnerDriverListQuery = {},
+  options?: QueryOptions,
+): Promise<MobileOwnerDriverListResponse> {
+  return apiClient.mobile.owner.listDrivers(query, options);
 }
 
 export async function listOwnerAppointments(

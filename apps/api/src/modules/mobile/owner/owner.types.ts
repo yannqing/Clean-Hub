@@ -39,6 +39,22 @@ export type OwnerTodaySummary = {
   };
 };
 
+export type OwnerBranchOption = {
+  id: string;
+  name: string;
+  address: string | null;
+  status: "active" | "inactive";
+};
+
+export type OwnerDriverOption = {
+  id: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  status: "active";
+  branchIds: string[];
+};
+
 export type OwnerAppointmentStatus = "pending" | "accepted" | "cancelled" | "done";
 export type OwnerAppointmentType = "pickup" | "dropoff";
 

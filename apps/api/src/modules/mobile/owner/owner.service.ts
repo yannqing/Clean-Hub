@@ -7,12 +7,23 @@ import type {
   OwnerAppointment,
   OwnerAppointmentAcceptResult,
   OwnerAppointmentStatus,
+  OwnerBranchOption,
+  OwnerDriverOption,
   OwnerMobileContext,
   OwnerTodaySummary,
 } from "./owner.types.js";
 import { OwnerError } from "./owner.types.js";
 
 export type OwnerRepositoryLike = {
+  listBranches(input: {
+    tenantId: string;
+    allowedBranchIds?: string[];
+  }): Promise<OwnerBranchOption[]>;
+  listDrivers(input: {
+    tenantId: string;
+    branchId?: string;
+    allowedBranchIds?: string[];
+  }): Promise<OwnerDriverOption[]>;
   findTenantBase(tenantId: string): Promise<Pick<
     OwnerTodaySummary,
     "tenantId" | "tenantName" | "tenantStatus" | "currency" | "featureFlags"
@@ -227,6 +238,36 @@ export class OwnerService implements AppointmentOperationsServiceLike {
       appointmentSummary,
       deliverySummary,
     };
+  }
+
+  async listBranches(
+    authContext: MobileAuthContext,
+  ): Promise<OwnerBranchOption[]> {
+    const owner = assertOwnerContext(authContext);
+
+    return this.repository.listBranches({
+      tenantId: owner.tenantId,
+      allowedBranchIds:
+        owner.branchIds.length > 0 ? owner.branchIds : undefined,
+    });
+  }
+
+  async listDrivers(input: {
+    authContext: MobileAuthContext;
+    branchId?: string;
+  }): Promise<OwnerDriverOption[]> {
+    const owner = assertOwnerContext(input.authContext);
+
+    if (input.branchId) {
+      assertBranchAccess(owner, input.branchId);
+    }
+
+    return this.repository.listDrivers({
+      tenantId: owner.tenantId,
+      branchId: input.branchId,
+      allowedBranchIds:
+        owner.branchIds.length > 0 ? owner.branchIds : undefined,
+    });
   }
 
   async listAppointments(input: {

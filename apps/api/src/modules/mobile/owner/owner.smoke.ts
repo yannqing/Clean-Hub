@@ -106,6 +106,61 @@ function createRepository(options?: {
   }
 
   return {
+    async listBranches({ tenantId, allowedBranchIds }) {
+      assertTenant(tenantId);
+
+      const branches = [
+        {
+          id: "branch_1",
+          name: "Main Branch",
+          address: "1 Main St",
+          status: "active" as const,
+        },
+        {
+          id: "branch_2",
+          name: "Second Branch",
+          address: "2 Main St",
+          status: "active" as const,
+        },
+      ];
+
+      return allowedBranchIds
+        ? branches.filter((branch) => allowedBranchIds.includes(branch.id))
+        : branches;
+    },
+    async listDrivers({ tenantId, branchId, allowedBranchIds }) {
+      assertTenant(tenantId);
+
+      const drivers = [
+        {
+          id: "driver_1",
+          displayName: "Driver One",
+          email: "driver@example.com",
+          phone: "+100000001",
+          status: "active" as const,
+          branchIds: ["branch_1"],
+        },
+        {
+          id: "driver_2",
+          displayName: "Driver Two",
+          email: "driver2@example.com",
+          phone: "+100000002",
+          status: "active" as const,
+          branchIds: ["branch_2"],
+        },
+      ];
+
+      return drivers.filter((driver) => {
+        const scopedByBranch = branchId
+          ? driver.branchIds.includes(branchId)
+          : true;
+        const scopedByOwner = allowedBranchIds
+          ? driver.branchIds.some((id) => allowedBranchIds.includes(id))
+          : true;
+
+        return scopedByBranch && scopedByOwner;
+      });
+    },
     async findTenantBase(tenantId) {
       assertTenant(tenantId);
 
@@ -303,6 +358,16 @@ export async function runOwnerSmokeChecks(): Promise<void> {
     "summary should include deliveries",
   );
 
+  const branches = await service.listBranches(ownerContext);
+  assert(branches.length === 2, "tenant owner should list tenant branches");
+
+  const drivers = await service.listDrivers({
+    authContext: ownerContext,
+    branchId: "branch_1",
+  });
+  assert(drivers.length === 1, "owner should list branch drivers");
+  assert(drivers[0]?.id === "driver_1", "branch driver should match filter");
+
   const appointments = await service.listAppointments({
     authContext: ownerContext,
     branchId: "branch_1",
@@ -360,6 +425,24 @@ export async function runOwnerSmokeChecks(): Promise<void> {
         repository: createRepository({ branchId: "branch_1" }),
         deliveryRepository: createDeliveryRepository(),
       }).listAppointments({
+        authContext: restrictedOwnerContext,
+        branchId: "branch_1",
+      }),
+    403,
+  );
+
+  const restrictedBranches = await service.listBranches(restrictedOwnerContext);
+  assert(
+    restrictedBranches.every((branch) => branch.id === "branch_2"),
+    "restricted owner should only list allowed branches",
+  );
+
+  await assertRejectsOwner(
+    () =>
+      new OwnerService({
+        repository: createRepository(),
+        deliveryRepository: createDeliveryRepository(),
+      }).listDrivers({
         authContext: restrictedOwnerContext,
         branchId: "branch_1",
       }),

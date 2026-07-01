@@ -6,28 +6,37 @@ import {
   eq,
   getTableColumns,
   gte,
+  inArray,
   isNull,
   lt,
   sql,
+  type SQL,
 } from "drizzle-orm";
 import { createId } from "@cleanhub/id";
 
 import {
   appointments,
+  branches,
   customers,
   deliveryTasks,
   orders,
   paymentTransactions,
+  roles,
   serviceTickets,
   tenantFeatureFlags,
   tenantSettings,
   tenants,
+  userProfiles,
+  userRoles,
+  users,
   type Database,
 } from "@cleanhub/db";
 
 import type {
   OwnerAppointment,
   OwnerAppointmentStatus,
+  OwnerBranchOption,
+  OwnerDriverOption,
   OwnerTodaySummary,
 } from "./owner.types.js";
 
@@ -96,6 +105,103 @@ function toAppointment(row: typeof appointments.$inferSelect): OwnerAppointment 
 
 export class OwnerRepository {
   constructor(private readonly db: Database) {}
+
+  async listBranches(input: {
+    tenantId: string;
+    allowedBranchIds?: string[];
+  }): Promise<OwnerBranchOption[]> {
+    if (input.allowedBranchIds?.length === 0) {
+      return [];
+    }
+
+    const filters: SQL[] = [
+      eq(branches.tenantId, input.tenantId),
+      isNull(branches.deletedAt),
+    ];
+
+    if (input.allowedBranchIds) {
+      filters.push(inArray(branches.id, input.allowedBranchIds));
+    }
+
+    const rows = await this.db
+      .select({
+        id: branches.id,
+        name: branches.name,
+        address: branches.address,
+        status: branches.status,
+      })
+      .from(branches)
+      .where(and(...filters))
+      .orderBy(asc(branches.name));
+
+    return rows;
+  }
+
+  async listDrivers(input: {
+    tenantId: string;
+    branchId?: string;
+    allowedBranchIds?: string[];
+  }): Promise<OwnerDriverOption[]> {
+    if (input.allowedBranchIds?.length === 0) {
+      return [];
+    }
+
+    const filters: SQL[] = [
+      eq(users.tenantId, input.tenantId),
+      eq(users.userType, "tenant"),
+      eq(users.status, "active"),
+      isNull(users.deletedAt),
+      eq(userRoles.tenantId, input.tenantId),
+      isNull(userRoles.revokedAt),
+      eq(roles.scope, "tenant"),
+      eq(roles.code, "driver"),
+      eq(roles.status, "active"),
+      isNull(roles.deletedAt),
+    ];
+
+    if (input.branchId) {
+      filters.push(eq(userRoles.branchId, input.branchId));
+    } else if (input.allowedBranchIds) {
+      filters.push(inArray(userRoles.branchId, input.allowedBranchIds));
+    }
+
+    const rows = await this.db
+      .select({
+        id: users.id,
+        displayName: userProfiles.displayName,
+        email: users.email,
+        phone: users.phone,
+        status: users.status,
+        branchId: userRoles.branchId,
+      })
+      .from(users)
+      .innerJoin(userRoles, eq(userRoles.userId, users.id))
+      .innerJoin(roles, eq(roles.id, userRoles.roleId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(...filters))
+      .orderBy(asc(userProfiles.displayName), asc(users.email), asc(users.id));
+
+    const driversById = new Map<string, OwnerDriverOption>();
+
+    for (const row of rows) {
+      const driver = driversById.get(row.id) ?? {
+        id: row.id,
+        displayName: row.displayName ?? row.email ?? row.id,
+        email: row.email,
+        phone: row.phone,
+        status: "active" as const,
+        branchIds: [],
+      };
+
+      if (row.branchId && !driver.branchIds.includes(row.branchId)) {
+        driver.branchIds.push(row.branchId);
+      }
+
+      driversById.set(row.id, driver);
+    }
+
+    return [...driversById.values()];
+  }
 
   async findTenantBase(tenantId: string): Promise<TenantBase | null> {
     const rows = await this.db

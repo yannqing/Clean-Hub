@@ -10,13 +10,13 @@
 
 ## 2. 派单看板门店/配送员选择器（`delivery-dispatch`）
 
-- [ ] 2.1 在 `apps/api/src/modules/mobile/owner` 下新增只读端点：门店列表（按 `tenantId` 过滤，复用 `tenant/branches` 仓储查询逻辑）
-- [ ] 2.2 新增只读端点：配送员列表（按 `tenantId` 及可选 `branchId` 过滤，复用 `pos/staff` 仓储查询逻辑，筛选配送员角色）
-- [ ] 2.3 为以上两个端点补充与其他 `mobile/owner/*` 端点一致的鉴权中间件，并验证跨租户请求返回空/403
-- [ ] 2.4 在 `@cleanhub/api-client` 中新增对应的类型与调用方法
-- [ ] 2.5 在 `apps/mobile-web/src/features/owner/queries` 新增门店列表、配送员列表查询封装
-- [ ] 2.6 将 `owner-home.tsx` 中 `branchId` 的纯文本输入替换为门店下拉/搜索选择器
-- [ ] 2.7 将 `owner-home.tsx` 中 `assigneeUserId`（派单/改派/接受预约动作里的指派人）纯文本输入替换为基于所选门店的配送员选择器
+- [x] 2.1 在 `apps/api/src/modules/mobile/owner` 下新增只读端点：门店列表（按 `tenantId` 过滤，复用 `tenant/branches` 仓储查询逻辑）
+- [x] 2.2 新增只读端点：配送员列表（按 `tenantId` 及可选 `branchId` 过滤，复用 `pos/staff` 仓储查询逻辑，筛选配送员角色）
+- [x] 2.3 为以上两个端点补充与其他 `mobile/owner/*` 端点一致的鉴权中间件，并验证跨租户请求返回空/403
+- [x] 2.4 在 `@cleanhub/api-client` 中新增对应的类型与调用方法
+- [x] 2.5 在 `apps/mobile-web/src/features/owner/queries` 新增门店列表、配送员列表查询封装
+- [x] 2.6 将 `owner-home.tsx` 中 `branchId` 的纯文本输入替换为门店下拉/搜索选择器
+- [x] 2.7 将 `owner-home.tsx` 中 `assigneeUserId`（派单/改派/接受预约动作里的指派人）纯文本输入替换为基于所选门店的配送员选择器
 - [ ] 2.8 手动验证：门店主在派单看板依次选择门店、配送员并完成派单/改派/接受预约，确认不再需要手打任何 ID
 
 ## 3. 客户端首页概览（`customer-mobile`）
