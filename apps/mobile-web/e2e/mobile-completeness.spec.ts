@@ -139,6 +139,9 @@ async function firstCustomerOrder(api: APIRequestContext): Promise<{
 }
 
 async function createDeliveryTask(api: APIRequestContext): Promise<DeliveryTaskResponse> {
+  const uniqueSuffix = Date.now().toString(36);
+  const customerName = `Playwright E2E Customer ${uniqueSuffix}`;
+  const address = `Playwright E2E pickup address ${uniqueSuffix}`;
   const [driver, owner, customer] = await Promise.all([
     loginByApi(api, "driver"),
     loginByApi(api, "owner"),
@@ -168,9 +171,9 @@ async function createDeliveryTask(api: APIRequestContext): Promise<DeliveryTaskR
       assigneeUserId: driver.authContext.subjectId,
       customerId,
       type: "pickup",
-      customerName: "Playwright E2E Customer",
+      customerName,
       customerPhone: "13800000001",
-      address: "Playwright E2E pickup address",
+      address,
       orderId: order.id,
       ticketId: ticket.id,
       expectedAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
