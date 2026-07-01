@@ -12,6 +12,7 @@ export type MobileOwnerTodaySummary = {
   tenantId: string;
   tenantName: string;
   tenantStatus: "active" | "suspended" | "disabled";
+  currency: string;
   businessDate: string;
   featureFlags: MobileOwnerSummaryFeatureFlags;
   todayOrderCount: number;

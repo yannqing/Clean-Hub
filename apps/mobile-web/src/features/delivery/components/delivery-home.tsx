@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 
 import { WorkspaceHeader } from "@/components/workspace-header";
+import { formatTenantMoney, resolveTenantCurrency } from "@/lib/currency";
 
 import {
   getDeliveryQueueSummary,
@@ -66,6 +67,7 @@ import type {
 } from "../types";
 
 type DeliveryHomeProps = {
+  currency?: string;
   driverName?: string;
   isLoggingOut?: boolean;
   onLogout?: () => void;
@@ -168,19 +170,6 @@ function formatDateTime(value: string | null, locale: string, emptyLabel: string
   }).format(new Date(value));
 }
 
-function formatMoney(value: string, locale: string): string {
-  const numericValue = Number(value);
-
-  if (!Number.isFinite(numericValue)) {
-    return value;
-  }
-
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: "EUR",
-  }).format(numericValue);
-}
-
 function getErrorMessage(error: unknown, fallback: string, t: ReturnType<typeof useTranslation>["t"]): string {
   if (error instanceof Error) {
     if (error.message.startsWith("delivery.")) {
@@ -280,12 +269,14 @@ function getPrimaryTaskAction(task: DeliveryTaskDetail): PrimaryTaskAction | nul
 }
 
 export function DeliveryHome({
+  currency,
   driverName,
   isLoggingOut = false,
   onLogout = () => undefined,
 }: DeliveryHomeProps) {
   const { locale, t } = useTranslation();
   const intlLocale = intlLocales[locale];
+  const tenantCurrency = resolveTenantCurrency(currency);
   const notScheduledLabel = t("common.notScheduled");
   const printMessages = useMemo(
     () => ({
@@ -1055,7 +1046,12 @@ export function DeliveryHome({
                     </dd>
                     {selectedTask.order ? (
                       <p className="mt-1 text-xs text-slate-600">
-                        {selectedTask.order.status} · {formatMoney(selectedTask.order.totalAmount, intlLocale)}
+                        {selectedTask.order.status} ·{" "}
+                        {formatTenantMoney(
+                          selectedTask.order.totalAmount,
+                          intlLocale,
+                          tenantCurrency,
+                        )}
                       </p>
                     ) : null}
                   </div>

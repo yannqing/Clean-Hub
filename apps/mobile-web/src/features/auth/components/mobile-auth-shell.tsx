@@ -209,14 +209,23 @@ export function MobileAuthShell() {
   if (tenantCode && session) {
     return session.authContext.role === "driver" ? (
       <DeliveryHome
+        currency={session.authContext.currency}
         driverName={session.authContext.displayName}
         isLoggingOut={isPending}
         onLogout={handleLogout}
       />
     ) : session.authContext.role === "owner" ? (
-      <OwnerHome isLoggingOut={isPending} onLogout={handleLogout} />
+      <OwnerHome
+        currency={session.authContext.currency}
+        isLoggingOut={isPending}
+        onLogout={handleLogout}
+      />
     ) : (
-      <CustomerHome isLoggingOut={isPending} onLogout={handleLogout} />
+      <CustomerHome
+        initialAuthContext={session.authContext}
+        isLoggingOut={isPending}
+        onLogout={handleLogout}
+      />
     );
   }
 

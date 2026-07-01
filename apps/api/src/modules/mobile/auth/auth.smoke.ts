@@ -180,13 +180,29 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
     });
   }
 
-  async findActiveTenantByCode(tenantCode: string): Promise<{ id: string } | null> {
+  async findActiveTenantByCode(
+    tenantCode: string,
+  ): Promise<{ id: string; defaultCurrency: string } | null> {
     if (tenantCode === "CLEAN-001") {
-      return { id: "tenant_1" };
+      return { id: "tenant_1", defaultCurrency: "XOF" };
     }
 
     if (tenantCode === "CLEAN-002") {
-      return { id: "tenant_2" };
+      return { id: "tenant_2", defaultCurrency: "EUR" };
+    }
+
+    return null;
+  }
+
+  async findTenantById(
+    tenantId: string,
+  ): Promise<{ id: string; defaultCurrency: string } | null> {
+    if (tenantId === "tenant_1") {
+      return { id: "tenant_1", defaultCurrency: "XOF" };
+    }
+
+    if (tenantId === "tenant_2") {
+      return { id: "tenant_2", defaultCurrency: "EUR" };
     }
 
     return null;
@@ -560,11 +576,13 @@ async function assertCustomerOtpSuccess(): Promise<void> {
 
   assert(login.authContext.subjectType === "customer", "OTP login is customer");
   assert(login.authContext.role === "customer", "OTP login role is customer");
+  assert(login.authContext.currency === "XOF", "OTP login includes tenant currency");
   assert(login.tokens.refreshToken.startsWith("cust_"), "customer refresh is wrapped");
 
   const context = await service.getMobileAuthContext(login.tokens.accessToken);
 
   assert(context.subjectId === "customer_account_1", "customer token resolves");
+  assert(context.currency === "XOF", "customer token resolves tenant currency");
   assert(context.roles.length === 1 && context.roles[0] === "customer", "customer role is isolated");
 }
 
@@ -649,6 +667,7 @@ async function assertStaffRoleIsolation(): Promise<void> {
 
   assert(driver.authContext.subjectType === "staff", "driver is staff");
   assert(driver.authContext.role === "driver", "driver role is selected");
+  assert(driver.authContext.currency === "XOF", "driver login includes tenant currency");
   assert(driver.authContext.branchIds[0] === "branch_1", "driver branch is included");
   assert(driver.tokens.refreshToken.startsWith("staff_"), "staff refresh is wrapped");
 

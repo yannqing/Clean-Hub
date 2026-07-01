@@ -40,6 +40,7 @@ import {
 } from "lucide-react";
 
 import { WorkspaceHeader } from "@/components/workspace-header";
+import { formatTenantMoney, resolveTenantCurrency } from "@/lib/currency";
 
 import {
   acceptOwnerAppointment,
@@ -64,6 +65,7 @@ import type {
 } from "../types";
 
 type OwnerHomeProps = {
+  currency?: string;
   initialSummary?: MobileOwnerTodaySummary | null;
   isLoggingOut?: boolean;
   onLogout?: () => void;
@@ -157,14 +159,6 @@ function formatCount(value: number, locale?: string): string {
   return locale ? new Intl.NumberFormat(locale).format(value) : numberFormatter.format(value);
 }
 
-function formatMoney(value: number, locale: string): string {
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: "XOF",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
 function formatBusinessDate(value: string, locale: string): string {
   const [year, month, day] = value.split("-").map(Number);
   const date =
@@ -227,7 +221,7 @@ function createMetrics(
     },
     {
       label: t("owner.metrics.revenue"),
-      value: formatMoney(summary.todayRevenueAmount, locale),
+      value: formatTenantMoney(summary.todayRevenueAmount, locale, summary.currency),
       detail: t("owner.today"),
       icon: TrendingUp,
       tone: "emerald",
@@ -474,9 +468,11 @@ function DispatchTaskItem({
 }
 
 function RefundRequestItem({
+  currency,
   onAction,
   refundRequest,
 }: {
+  currency: string;
   onAction: (target: ActionTarget) => void;
   refundRequest: MobileRefundRequest;
 }) {
@@ -499,7 +495,7 @@ function RefundRequestItem({
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="text-sm text-slate-700">{refundRequest.reason}</p>
         <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-950">
-          {refundRequest.amount}
+          {formatTenantMoney(refundRequest.amount, intlLocale, currency)}
         </p>
       </div>
       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -562,7 +558,12 @@ function getActionTitleKey(target: ActionTarget | null): TranslationKey {
   return "owner.actions.cancelTask";
 }
 
-function getActionSubject(target: ActionTarget | null, fallback: string): string {
+function getActionSubject(
+  target: ActionTarget | null,
+  fallback: string,
+  locale: string,
+  currency: string,
+): string {
   if (!target) {
     return fallback;
   }
@@ -578,13 +579,18 @@ function getActionSubject(target: ActionTarget | null, fallback: string): string
     target.kind === "approve-refund" ||
     target.kind === "reject-refund"
   ) {
-    return `${target.refundRequest.amount} - ${target.refundRequest.reason}`;
+    return `${formatTenantMoney(
+      target.refundRequest.amount,
+      locale,
+      currency,
+    )} - ${target.refundRequest.reason}`;
   }
 
   return target.task.customerName;
 }
 
 function ActionSheet({
+  currency,
   error,
   isSubmitting,
   note,
@@ -598,6 +604,7 @@ function ActionSheet({
   onReasonChange,
   target,
 }: {
+  currency: string;
   error: string | null;
   isSubmitting: boolean;
   note: string;
@@ -611,7 +618,8 @@ function ActionSheet({
   onReasonChange: (value: string) => void;
   target: ActionTarget | null;
 }) {
-  const { t } = useTranslation();
+  const { locale, t } = useTranslation();
+  const intlLocale = intlLocales[locale];
   const needsAssignee =
     target?.kind === "accept-appointment" ||
     target?.kind === "dispatch-task" ||
@@ -628,7 +636,14 @@ function ActionSheet({
           <div className="p-5">
             <SheetHeader className="pr-8 text-left">
               <SheetTitle>{t(getActionTitleKey(target))}</SheetTitle>
-              <SheetDescription>{getActionSubject(target, t("owner.actions.selectItem"))}</SheetDescription>
+              <SheetDescription>
+                {getActionSubject(
+                  target,
+                  t("owner.actions.selectItem"),
+                  intlLocale,
+                  currency,
+                )}
+              </SheetDescription>
             </SheetHeader>
 
             <div className="mt-5 space-y-4">
@@ -700,6 +715,7 @@ function ActionSheet({
 }
 
 export function OwnerHome({
+  currency,
   initialSummary = null,
   isLoggingOut = false,
   onLogout = () => undefined,
@@ -742,6 +758,7 @@ export function OwnerHome({
   const visibleTasks = boardState.dispatchBoard?.data.slice(0, 8) ?? [];
   const visibleRefundRequests = boardState.refundRequests.slice(0, 5);
   const loadTime = formatLoadTime(lastLoadedAt, intlLocale);
+  const tenantCurrency = resolveTenantCurrency(summary?.currency ?? currency);
 
   const loadSummary = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
@@ -1155,9 +1172,10 @@ export function OwnerHome({
               ) : visibleRefundRequests.length ? (
                 visibleRefundRequests.map((refundRequest) => (
                   <RefundRequestItem
+                    currency={tenantCurrency}
                     key={refundRequest.id}
-                    refundRequest={refundRequest}
                     onAction={openAction}
+                    refundRequest={refundRequest}
                   />
                 ))
               ) : (
@@ -1176,6 +1194,7 @@ export function OwnerHome({
 
       <ActionSheet
         assigneeUserId={assigneeUserId}
+        currency={tenantCurrency}
         error={actionError}
         isSubmitting={isSubmitting}
         note={note}

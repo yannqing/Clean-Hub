@@ -10,6 +10,7 @@ export type MobileAuthContext = {
   subjectId: string;
   displayName: string;
   tenantId: string;
+  currency: string;
   branchIds: string[];
   role: MobileRole;
   roles: MobileRole[];

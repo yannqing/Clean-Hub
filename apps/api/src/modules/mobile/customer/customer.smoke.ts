@@ -12,6 +12,7 @@ const customerContext: MobileAuthContext = {
   subjectId: "account_1",
   displayName: "Customer One",
   tenantId: "tenant_1",
+  currency: "XOF",
   branchIds: [],
   role: "customer",
   roles: ["customer"],

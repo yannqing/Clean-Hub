@@ -15,6 +15,7 @@ const ownerContext: MobileAuthContext = {
   subjectId: "owner_1",
   displayName: "Owner One",
   tenantId: "tenant_1",
+  currency: "XOF",
   branchIds: [],
   role: "owner",
   roles: ["owner"],
@@ -116,6 +117,7 @@ function createRepository(options?: {
         tenantId,
         tenantName: "Demo Tenant",
         tenantStatus: "active",
+        currency: "XOF",
         featureFlags: {
           laundryEnabled: true,
           carWashEnabled: false,
@@ -125,7 +127,7 @@ function createRepository(options?: {
         },
       } satisfies Pick<
         OwnerTodaySummary,
-        "tenantId" | "tenantName" | "tenantStatus" | "featureFlags"
+        "tenantId" | "tenantName" | "tenantStatus" | "currency" | "featureFlags"
       >;
     },
     async countTodayOrders({ tenantId }) {
@@ -286,6 +288,7 @@ export async function runOwnerSmokeChecks(): Promise<void> {
   const summary = await service.getTodaySummary(ownerContext);
 
   assert(summary.tenantId === "tenant_1", "summary should use token tenant");
+  assert(summary.currency === "XOF", "summary should include tenant currency");
   assert(summary.todayOrderCount === 8, "summary should include order count");
   assert(
     summary.todayRevenueAmount === 12500,

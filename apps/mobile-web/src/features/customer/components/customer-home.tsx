@@ -64,6 +64,7 @@ import {
 
 import { getMobileSession } from "@/lib/token-storage";
 import { WorkspaceHeader } from "@/components/workspace-header";
+import { formatTenantMoney, resolveTenantCurrency } from "@/lib/currency";
 
 import {
   cancelCustomerAppointment,
@@ -1047,15 +1048,22 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
 }
 
 type CustomerHomeProps = {
+  initialAuthContext?: MobileAuthContext | null;
   isLoggingOut?: boolean;
   onLogout?: () => void;
 };
 
-export function CustomerHome({ isLoggingOut = false, onLogout }: CustomerHomeProps) {
+export function CustomerHome({
+  initialAuthContext = null,
+  isLoggingOut = false,
+  onLogout,
+}: CustomerHomeProps) {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<CustomerTab>("orders");
   const [activityFilter, setActivityFilter] = useState<ActivityStatusFilter>("all");
-  const [authContext, setAuthContext] = useState<MobileAuthContext | null>(null);
+  const [authContext, setAuthContext] = useState<MobileAuthContext | null>(
+    initialAuthContext,
+  );
   const [profile, setProfile] = useState<MobileCustomerProfile | null>(null);
   const [addressBook, setAddressBook] = useState<MobileCustomerAddress[]>([]);
   const [activity, setActivity] = useState<MobileCustomerActivityList>(emptyActivity);
@@ -1178,6 +1186,7 @@ export function CustomerHome({ isLoggingOut = false, onLogout }: CustomerHomePro
     () => filterActivityItems(activityItems, activityFilter),
     [activityFilter, activityItems],
   );
+  const tenantCurrency = resolveTenantCurrency(authContext?.currency);
 
   useEffect(() => {
     const refreshWhenActive = () => {
@@ -1683,6 +1692,7 @@ export function CustomerHome({ isLoggingOut = false, onLogout }: CustomerHomePro
         <ActivityView
           activityItems={filteredActivityItems}
           activeFilter={activityFilter}
+          currency={tenantCurrency}
           selectedActivity={selectedActivity}
           totalCount={activityItems.length}
           onFilterChange={setActivityFilter}
@@ -1722,6 +1732,7 @@ export function CustomerHome({ isLoggingOut = false, onLogout }: CustomerHomePro
       ) : null}
 
       <ActivityDetailSheet
+        currency={tenantCurrency}
         detail={activityDetail}
         isPaymentSubmitting={isSubmittingPayment}
         isLoading={isDetailLoading}
@@ -1758,6 +1769,7 @@ export function CustomerHome({ isLoggingOut = false, onLogout }: CustomerHomePro
       />
 
       <RefundRequestSheet
+        currency={tenantCurrency}
         error={refundSheetOpen ? error : null}
         form={refundForm}
         isSubmitting={isSubmittingRefund}
@@ -1912,6 +1924,7 @@ function AlertMessage({ message, tone }: { message: string; tone: "error" | "suc
 function ActivityView({
   activeFilter,
   activityItems,
+  currency,
   selectedActivity,
   totalCount,
   onFilterChange,
@@ -1919,6 +1932,7 @@ function ActivityView({
 }: {
   activeFilter: ActivityStatusFilter;
   activityItems: ActivityListItem[];
+  currency: string;
   selectedActivity: ActivitySelection | null;
   totalCount: number;
   onFilterChange: (filter: ActivityStatusFilter) => void;
@@ -1996,7 +2010,13 @@ function ActivityView({
                 <div className="mt-3 flex flex-wrap items-center justify-end gap-2 pl-14">
                   {item.kind === "order" ? (
                     <span className="text-xs font-medium text-slate-500">
-                      {t("customer.detail.totalInline", { amount: item.amount })}
+                      {t("customer.detail.totalInline", {
+                        amount: formatTenantMoney(
+                          item.amount,
+                          intlLocale,
+                          currency,
+                        ),
+                      })}
                     </span>
                   ) : item.expectedAt ? (
                     <span className="text-xs font-medium text-slate-500">
@@ -2028,6 +2048,7 @@ function ActivityView({
 }
 
 function ActivityDetailSheet({
+  currency,
   detail,
   isPaymentSubmitting,
   isLoading,
@@ -2037,6 +2058,7 @@ function ActivityDetailSheet({
   onOpenChange,
   onOpenRefund,
 }: {
+  currency: string;
   detail: ActivityDetail | null;
   isPaymentSubmitting: boolean;
   isLoading: boolean;
@@ -2067,6 +2089,7 @@ function ActivityDetailSheet({
           </div>
         ) : detail ? (
           <ActivityDetailPanel
+            currency={currency}
             detail={detail}
             isPaymentSubmitting={isPaymentSubmitting}
             onCreatePayment={onCreatePayment}
@@ -2091,11 +2114,13 @@ function ActivityDetailSheet({
 }
 
 function ActivityDetailPanel({
+  currency,
   detail,
   isPaymentSubmitting,
   onCreatePayment,
   onOpenRefund,
 }: {
+  currency: string;
   detail: ActivityDetail;
   isPaymentSubmitting: boolean;
   onCreatePayment: (order: MobileCustomerOrderDetail) => void;
@@ -2111,6 +2136,8 @@ function ActivityDetailPanel({
       detail.data.paymentStatus !== "paid" &&
       detail.data.paymentStatus !== "refunded";
     const canRefund = amountToCents(detail.data.paidAmount) > 0;
+    const formatMoney = (value: string | number) =>
+      formatTenantMoney(value, intlLocale, currency);
 
     return (
       <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
@@ -2125,8 +2152,8 @@ function ActivityDetailPanel({
         </div>
 
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-          <DetailTerm label={t("customer.detail.total")} value={detail.data.totalAmount} />
-          <DetailTerm label={t("customer.detail.paid")} value={detail.data.paidAmount} />
+          <DetailTerm label={t("customer.detail.total")} value={formatMoney(detail.data.totalAmount)} />
+          <DetailTerm label={t("customer.detail.paid")} value={formatMoney(detail.data.paidAmount)} />
           <DetailTerm label={t("customer.detail.payment")} value={detail.data.paymentStatus} />
           <DetailTerm
             label={t("customer.detail.created")}
@@ -2172,8 +2199,8 @@ function ActivityDetailPanel({
           items={detail.data.items.map((item) => ({
             id: item.id,
             title: item.itemName,
-            subtitle: `${item.quantity} x ${item.unitAmount}`,
-            amount: item.lineAmount,
+            subtitle: `${item.quantity} x ${formatMoney(item.unitAmount)}`,
+            amount: formatMoney(item.lineAmount),
           }))}
         />
       </section>
@@ -2222,8 +2249,12 @@ function ActivityDetailPanel({
         items={detail.data.items.map((item) => ({
           id: item.id,
           title: item.itemName,
-          subtitle: `${item.quantity} x ${item.unitAmount}${item.itemCategory ? ` - ${item.itemCategory}` : ""}`,
-          amount: item.lineAmount,
+          subtitle: `${item.quantity} x ${formatTenantMoney(
+            item.unitAmount,
+            intlLocale,
+            currency,
+          )}${item.itemCategory ? ` - ${item.itemCategory}` : ""}`,
+          amount: formatTenantMoney(item.lineAmount, intlLocale, currency),
           status: item.itemStatus,
         }))}
       />
@@ -2458,6 +2489,7 @@ function AppointmentForm({
 }
 
 function RefundRequestSheet({
+  currency,
   error,
   form,
   isSubmitting,
@@ -2466,6 +2498,7 @@ function RefundRequestSheet({
   onOpenChange,
   onSubmit,
 }: {
+  currency: string;
   error: string | null;
   form: RefundFormState;
   isSubmitting: boolean;
@@ -2474,7 +2507,8 @@ function RefundRequestSheet({
   onOpenChange: (open: boolean) => void;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
-  const { t } = useTranslation();
+  const { locale, t } = useTranslation();
+  const intlLocale = getIntlLocale(locale);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -2493,6 +2527,7 @@ function RefundRequestSheet({
               className="h-12 text-base"
               id="refund-amount"
               inputMode="decimal"
+              placeholder={formatTenantMoney(0, intlLocale, currency)}
               value={form.amount}
               onChange={(event) =>
                 onFormChange((current) => ({

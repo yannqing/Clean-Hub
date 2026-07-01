@@ -15,7 +15,7 @@ import { OwnerError } from "./owner.types.js";
 export type OwnerRepositoryLike = {
   findTenantBase(tenantId: string): Promise<Pick<
     OwnerTodaySummary,
-    "tenantId" | "tenantName" | "tenantStatus" | "featureFlags"
+    "tenantId" | "tenantName" | "tenantStatus" | "currency" | "featureFlags"
   > | null>;
   countTodayOrders(input: {
     tenantId: string;

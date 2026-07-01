@@ -22,6 +22,7 @@ const driverContext: MobileAuthContext = {
   subjectId: "driver_1",
   displayName: "Driver One",
   tenantId: "tenant_1",
+  currency: "XOF",
   branchIds: ["branch_1"],
   role: "driver",
   roles: ["driver"],

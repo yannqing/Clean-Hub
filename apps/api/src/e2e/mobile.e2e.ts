@@ -42,6 +42,7 @@ type MobileTokenResponse = {
     subjectType: "customer" | "staff";
     subjectId: string;
     tenantId: string;
+    currency: string;
     role: "customer" | "driver" | "owner";
   };
 };

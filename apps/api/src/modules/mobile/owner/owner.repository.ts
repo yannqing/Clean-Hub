@@ -20,6 +20,7 @@ import {
   paymentTransactions,
   serviceTickets,
   tenantFeatureFlags,
+  tenantSettings,
   tenants,
   type Database,
 } from "@cleanhub/db";
@@ -32,7 +33,7 @@ import type {
 
 type TenantBase = Pick<
   OwnerTodaySummary,
-  "tenantId" | "tenantName" | "tenantStatus" | "featureFlags"
+  "tenantId" | "tenantName" | "tenantStatus" | "currency" | "featureFlags"
 >;
 
 function emptyAppointmentSummary(): OwnerTodaySummary["appointmentSummary"] {
@@ -102,6 +103,7 @@ export class OwnerRepository {
         tenantId: tenants.id,
         tenantName: tenants.name,
         tenantStatus: tenants.status,
+        currency: sql<string>`coalesce(${tenantSettings.defaultCurrency}, 'XOF')`,
         laundryEnabled: tenantFeatureFlags.laundryEnabled,
         carWashEnabled: tenantFeatureFlags.carWashEnabled,
         retailProductsEnabled: tenantFeatureFlags.retailProductsEnabled,
@@ -110,6 +112,7 @@ export class OwnerRepository {
       })
       .from(tenants)
       .innerJoin(tenantFeatureFlags, eq(tenantFeatureFlags.tenantId, tenants.id))
+      .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))
       .where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
       .limit(1);
 
@@ -123,6 +126,7 @@ export class OwnerRepository {
       tenantId: row.tenantId,
       tenantName: row.tenantName,
       tenantStatus: row.tenantStatus,
+      currency: row.currency,
       featureFlags: {
         laundryEnabled: row.laundryEnabled,
         carWashEnabled: row.carWashEnabled,

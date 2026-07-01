@@ -18,6 +18,7 @@ export type OwnerTodaySummary = {
   tenantId: string;
   tenantName: string;
   tenantStatus: "active" | "suspended" | "disabled";
+  currency: string;
   businessDate: string;
   featureFlags: OwnerSummaryFeatureFlags;
   todayOrderCount: number;
