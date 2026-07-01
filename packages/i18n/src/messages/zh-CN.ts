@@ -144,6 +144,16 @@ export const zhCNMessages = {
       activeAppointments: "活跃预约",
       addresses: "地址",
     },
+    overview: {
+      next: "下一项",
+      nextSubtitle: "最近的预约、订单或工单。",
+      active: "进行中",
+      ready: "待取",
+      viewTracking: "查看跟踪",
+      noPendingTitle: "暂无待处理事项",
+      noPendingBody: "需要上门取送或到店交付时，可先发起预约。",
+      emptyHint: "发起新预约后，这里会显示服务跟踪。",
+    },
     actions: {
       pay: "支付",
       refund: "申请退款",

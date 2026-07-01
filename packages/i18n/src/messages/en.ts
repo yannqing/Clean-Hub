@@ -145,6 +145,16 @@ export const enMessages = {
       activeAppointments: "Active visits",
       addresses: "Addresses",
     },
+    overview: {
+      next: "Next up",
+      nextSubtitle: "Your nearest visit, order, or ticket.",
+      active: "In progress",
+      ready: "Ready",
+      viewTracking: "Tracking",
+      noPendingTitle: "Nothing pending",
+      noPendingBody: "Start a visit when you need pickup or drop-off.",
+      emptyHint: "Create a new visit to start service tracking.",
+    },
     actions: {
       pay: "Pay",
       refund: "Request refund",

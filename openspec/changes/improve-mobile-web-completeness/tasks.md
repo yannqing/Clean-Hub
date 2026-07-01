@@ -21,11 +21,11 @@
 
 ## 3. 客户端首页概览（`customer-mobile`）
 
-- [ ] 3.1 在 `customer-home.tsx` 中为 `resume`（首页）Tab 编写独立的概览组件，与 `orders` Tab 使用的 `ActivityView` 区分开
-- [ ] 3.2 基于已加载的 `activity`、`appointments` 数据在前端聚合：下一条待处理事项、进行中/待取数量统计
-- [ ] 3.3 抽出与订单 Tab 共用的状态分组函数（复用 `getActivityStatusGroup` 等既有逻辑），确保首页统计口径与订单列表一致
-- [ ] 3.4 在首页概览中加入"发起新预约"快捷入口，复用现有 `AppointmentFormSheet`
-- [ ] 3.5 补充空状态：客户无任何预约/进行中订单/工单时展示引导文案而非空白
+- [x] 3.1 在 `customer-home.tsx` 中为 `resume`（首页）Tab 编写独立的概览组件，与 `orders` Tab 使用的 `ActivityView` 区分开
+- [x] 3.2 基于已加载的 `activity`、`appointments` 数据在前端聚合：下一条待处理事项、进行中/待取数量统计
+- [x] 3.3 抽出与订单 Tab 共用的状态分组函数（复用 `getActivityStatusGroup` 等既有逻辑），确保首页统计口径与订单列表一致
+- [x] 3.4 在首页概览中加入"发起新预约"快捷入口，复用现有 `AppointmentFormSheet`
+- [x] 3.5 补充空状态：客户无任何预约/进行中订单/工单时展示引导文案而非空白
 - [ ] 3.6 手动验证：分别在"有进行中订单"“无任何记录”两种账号下查看首页，确认展示内容与订单 Tab 统计一致且不再是重复列表
 
 ## 4. 详情视图 URL 恢复（`mobile-shell`）

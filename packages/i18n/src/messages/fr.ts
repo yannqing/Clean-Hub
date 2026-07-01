@@ -145,6 +145,16 @@ export const frMessages = {
       activeAppointments: "RDV actifs",
       addresses: "Adresses",
     },
+    overview: {
+      next: "À venir",
+      nextSubtitle: "Votre prochain rendez-vous, commande ou ticket.",
+      active: "En cours",
+      ready: "Prêt",
+      viewTracking: "Suivi",
+      noPendingTitle: "Rien en attente",
+      noPendingBody: "Créez un rendez-vous pour une collecte ou un dépôt.",
+      emptyHint: "Créez un rendez-vous pour démarrer le suivi.",
+    },
     actions: {
       pay: "Payer",
       refund: "Demander remboursement",

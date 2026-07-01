@@ -132,6 +132,16 @@ type ActivitySelection = {
   id: string;
 };
 
+type CustomerOverviewNextItem =
+  | {
+      kind: "activity";
+      activity: ActivityListItem;
+    }
+  | {
+      kind: "appointment";
+      appointment: MobileCustomerAppointment;
+    };
+
 type AppointmentFormState = {
   type: MobileCustomerAppointmentType;
   expectedAt: string;
@@ -904,6 +914,45 @@ function filterActivityItems(
   return items.filter((item) => getActivityStatusGroup(item) === filter);
 }
 
+function isOpenAppointment(appointment: MobileCustomerAppointment): boolean {
+  return appointment.status === "pending" || appointment.status === "accepted";
+}
+
+function getOverviewSortTime(item: CustomerOverviewNextItem): number {
+  const value =
+    item.kind === "appointment"
+      ? item.appointment.expectedAt
+      : item.activity.kind === "ticket"
+        ? item.activity.expectedAt ?? item.activity.createdAt
+        : item.activity.createdAt;
+  const time = new Date(value).getTime();
+
+  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
+}
+
+function getNextOverviewItem(
+  activityItems: ActivityListItem[],
+  appointments: MobileCustomerAppointment[],
+): CustomerOverviewNextItem | null {
+  const activeActivity = activityItems
+    .filter((item) => getActivityStatusGroup(item) === "active")
+    .map((activity) => ({ kind: "activity" as const, activity }));
+  const openAppointments = appointments
+    .filter(isOpenAppointment)
+    .map((appointment) => ({ kind: "appointment" as const, appointment }));
+  const [nextItem] = [...activeActivity, ...openAppointments].sort(
+    (left, right) => getOverviewSortTime(left) - getOverviewSortTime(right),
+  );
+
+  return nextItem ?? null;
+}
+
+function getReadyForPickupCount(activityItems: ActivityListItem[]): number {
+  return activityItems.filter(
+    (item) => item.kind === "ticket" && item.status === "ready_to_pick",
+  ).length;
+}
+
 function sortAppointments(appointments: MobileCustomerAppointment[]): MobileCustomerAppointment[] {
   return [...appointments].sort(
     (left, right) => new Date(right.expectedAt).getTime() - new Date(left.expectedAt).getTime(),
@@ -1059,7 +1108,7 @@ export function CustomerHome({
   onLogout,
 }: CustomerHomeProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<CustomerTab>("orders");
+  const [activeTab, setActiveTab] = useState<CustomerTab>("resume");
   const [activityFilter, setActivityFilter] = useState<ActivityStatusFilter>("all");
   const [authContext, setAuthContext] = useState<MobileAuthContext | null>(
     initialAuthContext,
@@ -1657,6 +1706,12 @@ export function CustomerHome({
     }
   }
 
+  function openAppointmentSheet() {
+    setError(null);
+    setMessage(null);
+    setAppointmentSheetOpen(true);
+  }
+
   if (isLoading) {
     return (
       <main className="flex min-h-dvh items-center justify-center px-5">
@@ -1688,7 +1743,19 @@ export function CustomerHome({
       {error && !appointmentSheetOpen ? <AlertMessage tone="error" message={error} /> : null}
       {message ? <AlertMessage tone="success" message={message} /> : null}
 
-      {activeTab === "resume" || activeTab === "orders" ? (
+      {activeTab === "resume" ? (
+        <CustomerOverviewView
+          activityItems={activityItems}
+          appointments={appointments}
+          currency={tenantCurrency}
+          onOpenCreateAppointment={openAppointmentSheet}
+          onSelectActivity={(item) => void handleSelectActivity(item)}
+          onShowAppointments={() => setActiveTab("appointments")}
+          onShowOrders={() => setActiveTab("orders")}
+        />
+      ) : null}
+
+      {activeTab === "orders" ? (
         <ActivityView
           activityItems={filteredActivityItems}
           activeFilter={activityFilter}
@@ -1705,11 +1772,7 @@ export function CustomerHome({
           appointments={appointments}
           cancellingAppointmentId={cancellingAppointmentId}
           onCancelAppointment={(appointmentId) => void handleCancelAppointment(appointmentId)}
-          onOpenCreateAppointment={() => {
-            setError(null);
-            setMessage(null);
-            setAppointmentSheetOpen(true);
-          }}
+          onOpenCreateAppointment={openAppointmentSheet}
         />
       ) : null}
 
@@ -1918,6 +1981,182 @@ function AlertMessage({ message, tone }: { message: string; tone: "error" | "suc
     >
       {message}
     </p>
+  );
+}
+
+function CustomerOverviewView({
+  activityItems,
+  appointments,
+  currency,
+  onOpenCreateAppointment,
+  onSelectActivity,
+  onShowAppointments,
+  onShowOrders,
+}: {
+  activityItems: ActivityListItem[];
+  appointments: MobileCustomerAppointment[];
+  currency: string;
+  onOpenCreateAppointment: () => void;
+  onSelectActivity: (item: ActivityListItem) => void;
+  onShowAppointments: () => void;
+  onShowOrders: () => void;
+}) {
+  const { locale, t } = useTranslation();
+  const intlLocale = getIntlLocale(locale);
+  const activeItems = filterActivityItems(activityItems, "active");
+  const openAppointments = appointments.filter(isOpenAppointment);
+  const readyCount = getReadyForPickupCount(activityItems);
+  const nextItem = getNextOverviewItem(activityItems, appointments);
+  const hasOverviewData =
+    activeItems.length > 0 || openAppointments.length > 0 || readyCount > 0;
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-slate-950">
+              {t("customer.overview.next")}
+            </h2>
+            <p className="mt-1 text-sm text-slate-600">
+              {t("customer.overview.nextSubtitle")}
+            </p>
+          </div>
+          <CalendarClock className="size-5 text-blue-600" aria-hidden="true" />
+        </div>
+
+        {nextItem ? (
+          nextItem.kind === "activity" ? (
+            <button
+              className="mt-4 w-full rounded-md border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300"
+              type="button"
+              onClick={() => onSelectActivity(nextItem.activity)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-950">
+                    {nextItem.activity.title}
+                  </p>
+                  <p className="mt-1 truncate text-sm text-slate-600">
+                    {nextItem.activity.subtitle}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {nextItem.activity.kind === "order"
+                      ? t("customer.detail.totalInline", {
+                          amount: formatTenantMoney(
+                            nextItem.activity.amount,
+                            intlLocale,
+                            currency,
+                          ),
+                        })
+                      : nextItem.activity.expectedAt
+                        ? t("customer.detail.pickupInline", {
+                            date: formatDateTime(
+                              nextItem.activity.expectedAt,
+                              intlLocale,
+                            ),
+                          })
+                        : formatDate(nextItem.activity.createdAt, intlLocale)}
+                  </p>
+                </div>
+                <ChevronRight className="size-4 shrink-0 text-slate-400" aria-hidden="true" />
+              </div>
+            </button>
+          ) : (
+            <button
+              className="mt-4 w-full rounded-md border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-blue-300"
+              type="button"
+              onClick={onShowAppointments}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-950">
+                    {t("customer.appointments.title")}
+                  </p>
+                  <p className="mt-1 truncate text-sm text-slate-600">
+                    {nextItem.appointment.address}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {formatDateTime(nextItem.appointment.expectedAt, intlLocale)}
+                  </p>
+                </div>
+                <StatusBadge
+                  view={getAppointmentStatusView(t, nextItem.appointment.status)}
+                />
+              </div>
+            </button>
+          )
+        ) : (
+          <div className="mt-4">
+            <EmptyState
+              icon={CalendarClock}
+              title={t("customer.overview.noPendingTitle")}
+              body={t("customer.overview.noPendingBody")}
+            />
+          </div>
+        )}
+      </section>
+
+      <section className="grid grid-cols-3 gap-2">
+        <OverviewMetric
+          icon={ReceiptText}
+          label={t("customer.overview.active")}
+          value={activeItems.length}
+        />
+        <OverviewMetric
+          icon={TicketCheck}
+          label={t("customer.overview.ready")}
+          value={readyCount}
+        />
+        <OverviewMetric
+          icon={CalendarClock}
+          label={t("customer.home.appointments")}
+          value={openAppointments.length}
+        />
+      </section>
+
+      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-2 gap-2">
+          <Button className="h-11" type="button" onClick={onOpenCreateAppointment}>
+            <Plus className="size-4" aria-hidden="true" />
+            {t("customer.actions.newAppointment")}
+          </Button>
+          <Button className="h-11" type="button" variant="outline" onClick={onShowOrders}>
+            <ReceiptText className="size-4" aria-hidden="true" />
+            {t("customer.overview.viewTracking")}
+          </Button>
+        </div>
+        {!hasOverviewData ? (
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            {t("customer.overview.emptyHint")}
+          </p>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+function OverviewMetric({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof ReceiptText;
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <Icon className="size-4 text-blue-600" aria-hidden="true" />
+        <span className="text-lg font-semibold tabular-nums text-slate-950">
+          {value}
+        </span>
+      </div>
+      <p className="mt-2 min-h-8 text-xs font-medium leading-4 text-slate-600">
+        {label}
+      </p>
+    </div>
   );
 }
 
