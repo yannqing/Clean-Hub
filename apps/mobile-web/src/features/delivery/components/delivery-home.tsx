@@ -39,6 +39,10 @@ import {
 
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { formatTenantMoney, resolveTenantCurrency } from "@/lib/currency";
+import {
+  readMobileDetailUrlState,
+  writeMobileDetailUrlState,
+} from "@/lib/detail-url";
 
 import {
   getDeliveryQueueSummary,
@@ -158,6 +162,8 @@ const intlLocales: Record<PrintLocale, string> = {
   en: "en-US",
   "zh-CN": "zh-CN",
 };
+
+const deliveryDetailUrlViews = ["task"] as const;
 
 function formatDateTime(value: string | null, locale: string, emptyLabel: string): string {
   if (!value) {
@@ -315,6 +321,7 @@ export function DeliveryHome({
   const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const isSigningRef = useRef(false);
   const hasSignatureRef = useRef(false);
+  const hasRestoredDetailRef = useRef(false);
   const [hasSignature, setHasSignature] = useState(false);
 
   const selectedTaskPendingCount = selectedTask
@@ -504,12 +511,78 @@ export function DeliveryHome({
     }
   }
 
-  function handleTaskSelect(taskId: string) {
+  const closeTaskDetail = useCallback((syncUrl = true) => {
+    setDetailOpen(false);
+    setActiveSheet(null);
+    setSelectedTaskId(null);
+    setSelectedTask(null);
+
+    if (syncUrl) {
+      writeMobileDetailUrlState(null, "replace");
+    }
+  }, []);
+
+  const openTaskDetail = useCallback((
+    taskId: string,
+    options: { syncUrl?: boolean } = {},
+  ) => {
+    if (options.syncUrl ?? true) {
+      writeMobileDetailUrlState({ view: "task", id: taskId }, "push");
+    }
+
     setSelectedTaskId(taskId);
     setSelectedTask(null);
     setDetailOpen(true);
-    void runAction("detail", () => loadTaskDetail(taskId));
+    void runAction("detail", async () => {
+      try {
+        await loadTaskDetail(taskId);
+      } catch (nextError) {
+        closeTaskDetail(false);
+        writeMobileDetailUrlState(null, "replace");
+        throw new Error(
+          getErrorMessage(
+            nextError,
+            t("delivery.messages.detailUnavailable"),
+            t,
+          ),
+        );
+      }
+    });
+  }, [closeTaskDetail, loadTaskDetail, t]);
+
+  function handleTaskSelect(taskId: string) {
+    openTaskDetail(taskId);
   }
+
+  useEffect(() => {
+    if (isBooting || hasRestoredDetailRef.current) {
+      return;
+    }
+
+    hasRestoredDetailRef.current = true;
+    const detailState = readMobileDetailUrlState(deliveryDetailUrlViews);
+
+    if (detailState) {
+      openTaskDetail(detailState.id, { syncUrl: false });
+    }
+  }, [isBooting, openTaskDetail]);
+
+  useEffect(() => {
+    function handlePopState() {
+      const detailState = readMobileDetailUrlState(deliveryDetailUrlViews);
+
+      if (!detailState) {
+        closeTaskDetail(false);
+        return;
+      }
+
+      openTaskDetail(detailState.id, { syncUrl: false });
+    }
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [closeTaskDetail, openTaskDetail]);
 
   function openProofSheet(task: DeliveryTaskDetail) {
     if (!canUploadProofForStatus(task.status)) {
@@ -980,10 +1053,10 @@ export function DeliveryHome({
       <Sheet
         open={detailOpen}
         onOpenChange={(open) => {
-          setDetailOpen(open);
-
           if (!open) {
-            setActiveSheet(null);
+            closeTaskDetail();
+          } else {
+            setDetailOpen(true);
           }
         }}
       >

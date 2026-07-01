@@ -30,10 +30,10 @@
 
 ## 4. 详情视图 URL 恢复（`mobile-shell`）
 
-- [ ] 4.1 设计 URL 查询参数约定（如 `?view=order&id=<id>`、`?view=task&id=<id>`），确认与 Capacitor 静态导出打包方式兼容（不使用 Next.js 动态路由段）
-- [ ] 4.2 在 `customer-home.tsx` 中为订单/工单详情 Sheet 打开/关闭时同步 `history.pushState`/`history.replaceState`，页面加载时读取查询参数还原 `selectedActivity`
-- [ ] 4.3 在 `delivery-home.tsx` 中为任务详情做同样的 URL 同步与还原
-- [ ] 4.4 处理无效/跨租户/跨账号标识：请求详情失败时展示未找到或无权限提示，并清理 URL 中的无效参数
+- [x] 4.1 设计 URL 查询参数约定（如 `?view=order&id=<id>`、`?view=task&id=<id>`），确认与 Capacitor 静态导出打包方式兼容（不使用 Next.js 动态路由段）
+- [x] 4.2 在 `customer-home.tsx` 中为订单/工单详情 Sheet 打开/关闭时同步 `history.pushState`/`history.replaceState`，页面加载时读取查询参数还原 `selectedActivity`
+- [x] 4.3 在 `delivery-home.tsx` 中为任务详情做同样的 URL 同步与还原
+- [x] 4.4 处理无效/跨租户/跨账号标识：请求详情失败时展示未找到或无权限提示，并清理 URL 中的无效参数
 - [ ] 4.5 在 Android/iOS（Capacitor 模拟器或真机）验证物理返回键/侧滑手势与 `pushState` 历史栈的交互，若行为异常则按设计文档中的退化方案调整（仅支持深链进入，不强求逐级返回）
 - [ ] 4.6 手动验证：刷新详情页面、通过带参数的链接直接打开应用，确认能正确恢复到对应订单/任务详情
 

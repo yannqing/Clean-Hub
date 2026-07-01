@@ -305,6 +305,7 @@ export const zhCNMessages = {
       addressLocationUnavailable: "无法获取当前位置，请检查定位权限。",
       passwordChangedOtherDevices: "密码已更新。请在其他设备上重新登录。",
       customerSessionRequired: "需要客户会话。",
+      detailUnavailable: "未找到该详情，或当前账户无权查看。",
     },
     paymentMock: {
       paidTitle: "支付已确认",
@@ -448,6 +449,7 @@ export const zhCNMessages = {
       signatureRequired: "需要客户签名。",
       signatureMediaRequired: "需要签名媒体。",
       signaturePrepareFailed: "无法准备签名。",
+      detailUnavailable: "未找到该任务，或当前账户无权查看。",
     },
   },
   owner: {

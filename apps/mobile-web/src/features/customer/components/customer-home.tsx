@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   MobileAuthContext,
   MobileCustomerActivityList,
@@ -65,6 +65,10 @@ import {
 import { getMobileSession } from "@/lib/token-storage";
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { formatTenantMoney, resolveTenantCurrency } from "@/lib/currency";
+import {
+  readMobileDetailUrlState,
+  writeMobileDetailUrlState,
+} from "@/lib/detail-url";
 
 import {
   cancelCustomerAppointment,
@@ -243,6 +247,8 @@ const tabIcons: Record<CustomerTab, typeof Home> = {
   appointments: CalendarClock,
   profile: UserRound,
 };
+
+const customerDetailUrlViews = ["order", "ticket"] as const;
 
 const activityStatusFilters: ActivityStatusFilter[] = ["all", "active", "done", "cancelled"];
 
@@ -1156,6 +1162,7 @@ export function CustomerHome({
   const [addressActionId, setAddressActionId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const hasRestoredDetailRef = useRef(false);
 
   const loadCustomerData = useCallback(async (mode: "boot" | "refresh" = "refresh") => {
     if (mode === "boot") {
@@ -1253,28 +1260,88 @@ export function CustomerHome({
     };
   }, [loadCustomerData]);
 
-  async function handleSelectActivity(item: ActivityListItem) {
-    setSelectedActivity({ kind: item.kind, id: item.id });
+  const closeActivityDetail = useCallback((syncUrl = true) => {
+    setDetailOpen(false);
+    setSelectedActivity(null);
+    setActivityDetail(null);
+
+    if (syncUrl) {
+      writeMobileDetailUrlState(null, "replace");
+    }
+  }, []);
+
+  const openActivityDetail = useCallback(async (
+    selection: ActivitySelection,
+    options: { syncUrl?: boolean } = {},
+  ) => {
+    if (options.syncUrl ?? true) {
+      writeMobileDetailUrlState(
+        { view: selection.kind, id: selection.id },
+        "push",
+      );
+    }
+
+    setSelectedActivity(selection);
     setActivityDetail(null);
     setDetailOpen(true);
     setIsDetailLoading(true);
     setError(null);
 
     try {
-      const detail = await getCustomerActivityDetail({ kind: item.kind, id: item.id });
+      const detail = await getCustomerActivityDetail(selection);
       setActivityDetail(
-        item.kind === "order"
+        selection.kind === "order"
           ? { kind: "order", data: detail as MobileCustomerOrderDetail }
           : { kind: "ticket", data: detail as MobileCustomerTicketDetail },
       );
     } catch (nextError) {
-      setDetailOpen(false);
-      setSelectedActivity(null);
-      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
+      closeActivityDetail(false);
+      writeMobileDetailUrlState(null, "replace");
+      setError(getErrorMessage(nextError, t("customer.messages.detailUnavailable")));
     } finally {
       setIsDetailLoading(false);
     }
+  }, [closeActivityDetail, t]);
+
+  function handleSelectActivity(item: ActivityListItem) {
+    void openActivityDetail({ kind: item.kind, id: item.id });
   }
+
+  useEffect(() => {
+    if (isLoading || hasRestoredDetailRef.current) {
+      return;
+    }
+
+    hasRestoredDetailRef.current = true;
+    const detailState = readMobileDetailUrlState(customerDetailUrlViews);
+
+    if (detailState) {
+      void openActivityDetail(
+        { kind: detailState.view, id: detailState.id },
+        { syncUrl: false },
+      );
+    }
+  }, [isLoading, openActivityDetail]);
+
+  useEffect(() => {
+    function handlePopState() {
+      const detailState = readMobileDetailUrlState(customerDetailUrlViews);
+
+      if (!detailState) {
+        closeActivityDetail(false);
+        return;
+      }
+
+      void openActivityDetail(
+        { kind: detailState.view, id: detailState.id },
+        { syncUrl: false },
+      );
+    }
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, [closeActivityDetail, openActivityDetail]);
 
   async function refreshSelectedOrder(orderId: string) {
     const [detail, nextActivity] = await Promise.all([
@@ -1805,11 +1872,10 @@ export function CustomerHome({
         open={detailOpen}
         onCreatePayment={(order) => void handleCreatePayment(order)}
         onOpenChange={(open) => {
-          setDetailOpen(open);
-
           if (!open) {
-            setSelectedActivity(null);
-            setActivityDetail(null);
+            closeActivityDetail();
+          } else {
+            setDetailOpen(true);
           }
         }}
         onOpenRefund={openRefundSheet}

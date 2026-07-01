@@ -306,6 +306,7 @@ export const frMessages = {
       addressLocationUnavailable: "Position actuelle indisponible. Verifiez l'autorisation.",
       passwordChangedOtherDevices: "Mot de passe mis a jour. Reconnectez-vous sur les autres appareils.",
       customerSessionRequired: "Session client requise.",
+      detailUnavailable: "Ce detail est introuvable ou indisponible pour ce compte.",
     },
     paymentMock: {
       paidTitle: "Paiement confirme",
@@ -453,6 +454,7 @@ export const frMessages = {
       signatureRequired: "Signature client requise.",
       signatureMediaRequired: "Le média de signature est requis.",
       signaturePrepareFailed: "Signature impossible à préparer.",
+      detailUnavailable: "Cette tache est introuvable ou indisponible pour ce compte.",
     },
   },
   owner: {

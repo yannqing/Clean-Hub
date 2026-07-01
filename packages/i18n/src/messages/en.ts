@@ -306,6 +306,7 @@ export const enMessages = {
       addressLocationUnavailable: "Current location unavailable. Check location permission.",
       passwordChangedOtherDevices: "Password updated. Sign in again on other devices.",
       customerSessionRequired: "Customer session required.",
+      detailUnavailable: "This detail was not found or is not available for this account.",
     },
     paymentMock: {
       paidTitle: "Payment confirmed",
@@ -452,6 +453,7 @@ export const enMessages = {
       signatureRequired: "Customer signature is required.",
       signatureMediaRequired: "Signature media is required.",
       signaturePrepareFailed: "Unable to prepare the signature.",
+      detailUnavailable: "This task was not found or is not available for this account.",
     },
   },
   owner: {
