@@ -1316,10 +1316,14 @@ export function CustomerHome({
     const detailState = readMobileDetailUrlState(customerDetailUrlViews);
 
     if (detailState) {
-      void openActivityDetail(
-        { kind: detailState.view, id: detailState.id },
-        { syncUrl: false },
-      );
+      const restoreTimeoutId = window.setTimeout(() => {
+        void openActivityDetail(
+          { kind: detailState.view, id: detailState.id },
+          { syncUrl: false },
+        );
+      }, 0);
+
+      return () => window.clearTimeout(restoreTimeoutId);
     }
   }, [isLoading, openActivityDetail]);
 

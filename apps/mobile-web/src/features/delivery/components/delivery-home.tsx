@@ -493,10 +493,10 @@ export function DeliveryHome({
     void refreshQueue();
   }
 
-  async function runAction(
+  const runAction = useCallback(async (
     actionKey: string,
     action: () => Promise<void>,
-  ): Promise<void> {
+  ): Promise<void> => {
     setActiveAction(actionKey);
     setError(null);
     setMessage(null);
@@ -509,7 +509,7 @@ export function DeliveryHome({
     } finally {
       setActiveAction(null);
     }
-  }
+  }, [t]);
 
   const closeTaskDetail = useCallback((syncUrl = true) => {
     setDetailOpen(false);
@@ -520,7 +520,7 @@ export function DeliveryHome({
     if (syncUrl) {
       writeMobileDetailUrlState(null, "replace");
     }
-  }, []);
+  }, [setActiveSheet]);
 
   const openTaskDetail = useCallback((
     taskId: string,
@@ -548,7 +548,7 @@ export function DeliveryHome({
         );
       }
     });
-  }, [closeTaskDetail, loadTaskDetail, t]);
+  }, [closeTaskDetail, loadTaskDetail, runAction, t]);
 
   function handleTaskSelect(taskId: string) {
     openTaskDetail(taskId);
@@ -563,7 +563,11 @@ export function DeliveryHome({
     const detailState = readMobileDetailUrlState(deliveryDetailUrlViews);
 
     if (detailState) {
-      openTaskDetail(detailState.id, { syncUrl: false });
+      const restoreTimeoutId = window.setTimeout(() => {
+        openTaskDetail(detailState.id, { syncUrl: false });
+      }, 0);
+
+      return () => window.clearTimeout(restoreTimeoutId);
     }
   }, [isBooting, openTaskDetail]);
 

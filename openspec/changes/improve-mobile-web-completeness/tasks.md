@@ -39,8 +39,8 @@
 
 ## 5. 回归检查
 
-- [ ] 5.1 `pnpm --filter @cleanhub/mobile-web typecheck`
-- [ ] 5.2 `pnpm --filter @cleanhub/mobile-web lint`
-- [ ] 5.3 `pnpm --filter @cleanhub/mobile-web build`（确认静态导出仍然成功）
-- [ ] 5.4 `pnpm --filter @cleanhub/api typecheck`（如涉及新增端点）
+- [x] 5.1 `pnpm --filter @cleanhub/mobile-web typecheck`
+- [x] 5.2 `pnpm --filter @cleanhub/mobile-web lint`
+- [x] 5.3 `pnpm --filter @cleanhub/mobile-web build`（确认静态导出仍然成功）
+- [x] 5.4 `pnpm --filter @cleanhub/api typecheck`（如涉及新增端点）
 - [ ] 5.5 手动过一遍客户/配送员/门店主三个角色的登录与核心业务路径，确认本次四项改动均未影响既有功能
