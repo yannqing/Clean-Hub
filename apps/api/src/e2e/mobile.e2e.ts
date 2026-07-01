@@ -24,13 +24,13 @@ const FIXTURES = {
   tenantId: "01KRERJN800000000000000001",
   branchId: "01KRERJN8G0000000000000040",
   customerAccountId: "01SEED0100ACC0000000000001",
-  customerId: "01SEED0100CUS0000000000001",
+  customerId: "01SEED0100CPS0000000000001",
   customerPhone: "13800000001",
   customerIdentifier: "zhang.wei@example.com",
   driverId: "01SEEDM0B0USR00000000001",
   driverIdentifier: "mobile.driver1@cleanhub.local",
   ownerIdentifier: "tenant.admin1@cleanhub.local",
-  orderId: "01SEED0100ORD0000000000002",
+  orderId: "01SEED01000RD0000000000002",
   ticketId: "01SEED0100TKT0000000000001",
 } as const;
 
