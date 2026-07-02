@@ -41,6 +41,11 @@ export type TenantMessages = {
     notUpdated: string;
     invalidDate: string;
     requestFailed: string;
+    // 全局错误/未找到兜底文案（app/error.tsx、app/not-found.tsx 使用）
+    somethingWentWrong: string;
+    loadErrorDescription: string;
+    notFoundTitle: string;
+    notFoundDescription: string;
   };
 
   branches: {

@@ -29,6 +29,10 @@ export const tenantMessagesZhCN: TenantMessages = {
     notUpdated: "未更新",
     invalidDate: "无效日期",
     requestFailed: "门店请求失败。",
+    somethingWentWrong: "出错了",
+    loadErrorDescription: "无法加载此页面，请重试。",
+    notFoundTitle: "页面未找到",
+    notFoundDescription: "您访问的页面不存在或已被移动。",
   },
 
   branches: {

@@ -36,6 +36,10 @@ export const saasMessagesZhCN: SaasMessages = {
     optionalTenantUlid: "可选租户 ULID",
     modulePlaceholder: "模块占位",
     badge: "CleanHub 管理后台",
+    somethingWentWrong: "出错了",
+    loadErrorDescription: "无法加载此页面，请重试。",
+    notFoundTitle: "页面未找到",
+    notFoundDescription: "您访问的页面不存在或已被移动。",
     statusLabels: {
       active: "活跃",
       suspended: "已暂停",

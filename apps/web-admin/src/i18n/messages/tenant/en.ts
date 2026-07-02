@@ -29,6 +29,11 @@ export const tenantMessagesEn: TenantMessages = {
     notUpdated: "Not updated",
     invalidDate: "Invalid date",
     requestFailed: "Branch request failed.",
+    somethingWentWrong: "Something went wrong",
+    loadErrorDescription: "We couldn't load this page. Please try again.",
+    notFoundTitle: "Page not found",
+    notFoundDescription:
+      "The page you're looking for doesn't exist or may have moved.",
   },
 
   branches: {
