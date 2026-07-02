@@ -17,9 +17,10 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { useTenantI18n } from "@/i18n";
 
 import { updateBranchAction, updateBranchStatusAction } from "../actions";
-import { branchLanguageOptions } from "../constants";
+import { branchLanguageValues } from "../constants";
 import type {
   BranchFormValues,
   BranchLanguage,
@@ -27,33 +28,8 @@ import type {
   BranchSummary,
 } from "../types";
 
-const branchStatusLabels: Record<BranchStatus, string> = {
-  active: "Active",
-  inactive: "Inactive",
-};
-
-const VERSION_CONFLICT_MESSAGE =
-  "Branch was updated by another request. Refresh and try again.";
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Branch request failed.";
-}
-
-function formatDate(value?: string | null): string {
-  if (!value) {
-    return "Not updated";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Invalid date";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+function isVersionConflict(result: { code?: string; status?: number }): boolean {
+  return result.status === 409 || result.code === "BRANCH_VERSION_CONFLICT";
 }
 
 function businessHoursToText(
@@ -79,15 +55,12 @@ function toFormValues(branch: BranchSummary): BranchFormValues {
   };
 }
 
-function isVersionConflict(result: { code?: string; status?: number }): boolean {
-  return result.status === 409 || result.code === "BRANCH_VERSION_CONFLICT";
-}
-
 export type BranchDetailViewProps = {
   initialBranch: BranchSummary;
 };
 
 export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
+  const { m, formatDateTime } = useTenantI18n();
   const [branch, setBranch] = useState(initialBranch);
   const [formValues, setFormValues] = useState<BranchFormValues>(
     toFormValues(initialBranch),
@@ -125,7 +98,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
 
       if (!result.ok) {
         const nextMessage = isVersionConflict(result)
-          ? VERSION_CONFLICT_MESSAGE
+          ? m.branches.detail.versionConflict
           : result.message;
         setErrors(result.errors);
         setMessage(nextMessage);
@@ -136,9 +109,12 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
       setBranch(result.data);
       setFormValues(toFormValues(result.data));
       setErrors({});
-      toast.success("Branch updated.");
+      toast.success(m.branches.detail.updated);
     } catch (saveError) {
-      const nextMessage = getErrorMessage(saveError);
+      const nextMessage =
+        saveError instanceof Error
+          ? saveError.message
+          : m.common.requestFailed;
       setMessage(nextMessage);
       toast.error(nextMessage);
     } finally {
@@ -161,7 +137,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
 
       if (!result.ok) {
         const nextMessage = isVersionConflict(result)
-          ? VERSION_CONFLICT_MESSAGE
+          ? m.branches.detail.versionConflict
           : result.message;
         setErrors(result.errors);
         setMessage(nextMessage);
@@ -172,9 +148,12 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
       setBranch(result.data);
       setFormValues(toFormValues(result.data));
       setErrors({});
-      toast.success("Branch status updated.");
+      toast.success(m.branches.list.statusUpdated);
     } catch (statusError) {
-      const nextMessage = getErrorMessage(statusError);
+      const nextMessage =
+        statusError instanceof Error
+          ? statusError.message
+          : m.common.requestFailed;
       setMessage(nextMessage);
       toast.error(nextMessage);
     } finally {
@@ -186,17 +165,17 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
     <section className="grid gap-6 p-5">
       <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">Branch profile</Badge>
+          <Badge variant="secondary">{m.branches.detail.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
             {branch.name}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Edit store defaults, receipt identity, and operating metadata.
+            {m.branches.detail.description}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant={branch.status === "active" ? "default" : "outline"}>
-            {branchStatusLabels[branch.status]}
+            {m.common.statusLabels[branch.status]}
           </Badge>
           <Badge variant="outline">v{branch.version}</Badge>
         </div>
@@ -206,7 +185,9 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
         <div className="grid gap-5 rounded-md border bg-background p-5">
           <div className="grid gap-4 lg:grid-cols-[1fr_180px_160px]">
             <div className="grid gap-2">
-              <Label htmlFor="branch-detail-name">Name</Label>
+              <Label htmlFor="branch-detail-name">
+                {m.branches.create.fields.name}
+              </Label>
               <Input
                 aria-invalid={Boolean(errors.name)}
                 id="branch-detail-name"
@@ -219,7 +200,9 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="branch-detail-phone">Phone</Label>
+              <Label htmlFor="branch-detail-phone">
+                {m.branches.create.fields.phone}
+              </Label>
               <Input
                 aria-invalid={Boolean(errors.phone)}
                 id="branch-detail-phone"
@@ -232,7 +215,9 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="branch-detail-currency">Currency</Label>
+              <Label htmlFor="branch-detail-currency">
+                {m.branches.create.fields.currency}
+              </Label>
               <Input
                 aria-invalid={Boolean(errors.defaultCurrency)}
                 id="branch-detail-currency"
@@ -252,7 +237,9 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
 
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="grid gap-2">
-              <Label htmlFor="branch-detail-language">Default language</Label>
+              <Label htmlFor="branch-detail-language">
+                {m.branches.create.fields.defaultLanguage}
+              </Label>
               <Select
                 onValueChange={(value) =>
                   updateForm("defaultLanguage", value as BranchLanguage)
@@ -263,9 +250,9 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {branchLanguageOptions.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
+                  {branchLanguageValues.map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {m.common.languageLabels[value]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -273,21 +260,23 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
             </div>
 
             <div className="grid gap-2">
-              <Label>Status</Label>
+              <Label>{m.branches.create.fields.status}</Label>
               <div className="flex h-10 items-center rounded-md border bg-muted/30 px-3">
                 <Badge
                   variant={branch.status === "active" ? "default" : "outline"}
                 >
-                  {branchStatusLabels[branch.status]}
+                  {m.common.statusLabels[branch.status]}
                 </Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                Use Enable or Disable to update status.
+                {m.branches.detail.statusHint}
               </p>
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="branch-detail-logo-url">Logo URL</Label>
+              <Label htmlFor="branch-detail-logo-url">
+                {m.branches.create.fields.logoUrl}
+              </Label>
               <Input
                 aria-invalid={Boolean(errors.logoUrl)}
                 id="branch-detail-logo-url"
@@ -301,7 +290,9 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="branch-detail-address">Address</Label>
+            <Label htmlFor="branch-detail-address">
+              {m.branches.create.fields.address}
+            </Label>
             <Textarea
               aria-invalid={Boolean(errors.address)}
               id="branch-detail-address"
@@ -315,7 +306,9 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="branch-detail-receipt-name">Receipt name</Label>
+              <Label htmlFor="branch-detail-receipt-name">
+                {m.branches.create.fields.receiptName}
+              </Label>
               <Input
                 aria-invalid={Boolean(errors.receiptName)}
                 id="branch-detail-receipt-name"
@@ -332,7 +325,9 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="branch-detail-receipt-phone">Receipt phone</Label>
+              <Label htmlFor="branch-detail-receipt-phone">
+                {m.branches.create.fields.receiptPhone}
+              </Label>
               <Input
                 aria-invalid={Boolean(errors.receiptPhone)}
                 id="branch-detail-receipt-phone"
@@ -350,7 +345,9 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="branch-detail-receipt-address">Receipt address</Label>
+            <Label htmlFor="branch-detail-receipt-address">
+              {m.branches.create.fields.receiptAddress}
+            </Label>
             <Textarea
               aria-invalid={Boolean(errors.receiptAddress)}
               id="branch-detail-receipt-address"
@@ -367,7 +364,9 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="branch-detail-hours">Business hours JSON</Label>
+            <Label htmlFor="branch-detail-hours">
+              {m.branches.create.fields.businessHoursJson}
+            </Label>
             <Textarea
               aria-invalid={Boolean(errors.businessHoursJson)}
               id="branch-detail-hours"
@@ -391,7 +390,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
 
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center">
             <Button disabled={saving} onClick={handleSave} type="button">
-              {saving ? "Saving..." : "Save branch"}
+              {saving ? m.common.saving : m.branches.detail.saveBranch}
             </Button>
             <Button
               disabled={saving || branch.status === "active"}
@@ -399,7 +398,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
               type="button"
               variant="outline"
             >
-              Enable
+              {m.common.enable}
             </Button>
             <Button
               disabled={saving || branch.status === "inactive"}
@@ -407,30 +406,38 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
               type="button"
               variant="outline"
             >
-              Disable
+              {m.common.disable}
             </Button>
             <Button asChild type="button" variant="outline">
-              <Link href={webAdminRoutes.tenant.branches}>Back to list</Link>
+              <Link href={webAdminRoutes.tenant.branches}>
+                {m.common.backToList}
+              </Link>
             </Button>
           </div>
         </div>
 
         <aside className="h-fit rounded-md border bg-background p-5">
           <div className="border-b pb-3">
-            <h2 className="text-base font-semibold">Integration checks</h2>
+            <h2 className="text-base font-semibold">
+              {m.branches.detail.integrationChecks}
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Branch scope and tenant isolation are enforced by the API.
+              {m.branches.detail.integrationChecksDesc}
             </p>
           </div>
           <dl className="mt-4 grid gap-3 text-sm">
             <div>
-              <dt className="text-muted-foreground">Branch ID</dt>
+              <dt className="text-muted-foreground">
+                {m.branches.detail.branchIdLabel}
+              </dt>
               <dd className="mt-1 break-all font-medium">{branch.id}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Updated</dt>
+              <dt className="text-muted-foreground">
+                {m.branches.detail.updatedLabel}
+              </dt>
               <dd className="mt-1 font-medium">
-                {formatDate(branch.updatedAt)}
+                {formatDateTime(branch.updatedAt) || m.common.notUpdated}
               </dd>
             </div>
           </dl>
