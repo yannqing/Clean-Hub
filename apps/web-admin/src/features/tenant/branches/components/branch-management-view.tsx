@@ -20,13 +20,13 @@ import {
 } from "@cleanhub/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { interpolate, useTenantI18n } from "@/i18n";
 
 import { updateBranchStatusAction } from "../actions";
-import { BRANCH_LIST_LIMIT, getBranchListQuery } from "../queries";
+import { BRANCH_LIST_LIMIT, useBranchListQuery } from "../queries";
 import type {
   BranchListFilters,
   BranchStatus,
@@ -77,17 +77,11 @@ export function BranchManagementView({
   const pathname = usePathname();
   const router = useRouter();
   const { m, formatDateTime } = useTenantI18n();
-  const [branches, setBranches] = useState<BranchSummary[]>(
-    initialBranches ?? [],
-  );
   const [status, setStatus] = useState<StatusFilter>(
     initialFilters?.status ?? "all",
   );
   const [query, setQuery] = useState(initialFilters?.q ?? "");
-  const [loading, setLoading] = useState(!initialBranches && !initialError);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(initialError ?? null);
-  const didUseInitialResult = useRef(Boolean(initialBranches || initialError));
 
   const filters: BranchListFilters = useMemo(
     () => ({
@@ -97,56 +91,24 @@ export function BranchManagementView({
     [query, status],
   );
 
-  const loadBranches = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const { data: branches = [], error, refetch, isFetching } = useBranchListQuery(
+    filters,
+    {
+      // SSR 预取结果作为 initialData，实现 hydrate；
+      // 写操作（Server Action）成功后 revalidatePath 触发 RSC 重取，
+      // 新的 initialData 流入，数据自动更新。
+      initialData: initialBranches,
+    },
+  );
 
-    try {
-      router.replace(buildBranchListUrl(pathname, filters), { scroll: false });
-      setBranches(await getBranchListQuery(filters));
-    } catch (loadError) {
-      setError(getErrorMessage(loadError, m.common.requestFailed));
-    } finally {
-      setLoading(false);
-    }
-  }, [filters, m.common.requestFailed, pathname, router]);
-
+  // 筛选条件变化时同步 URL（保留可分享/可刷新的链接）。
   useEffect(() => {
-    if (didUseInitialResult.current) {
-      didUseInitialResult.current = false;
-      return;
-    }
+    router.replace(buildBranchListUrl(pathname, filters), { scroll: false });
+  }, [filters, pathname, router]);
 
-    let isCurrent = true;
-    const controller = new AbortController();
-    const timeoutId = window.setTimeout(() => {
-      router.replace(buildBranchListUrl(pathname, filters), { scroll: false });
-
-      getBranchListQuery(filters, { signal: controller.signal })
-        .then((items) => {
-          if (isCurrent) {
-            setBranches(items);
-            setError(null);
-          }
-        })
-        .catch((loadError: unknown) => {
-          if (isCurrent && !controller.signal.aborted) {
-            setError(getErrorMessage(loadError, m.common.requestFailed));
-          }
-        })
-        .finally(() => {
-          if (isCurrent) {
-            setLoading(false);
-          }
-        });
-    }, 250);
-
-    return () => {
-      isCurrent = false;
-      controller.abort();
-      window.clearTimeout(timeoutId);
-    };
-  }, [filters, m.common.requestFailed, pathname, router]);
+  // initialError 仅在首次 SSR 预取失败时存在；client 端错误改由 useQuery 的 error 接管。
+  const errorMessage = initialError ?? (error ? getErrorMessage(error, m.common.requestFailed) : null);
+  const loading = isFetching && branches.length === 0;
 
   async function handleStatusChange(branch: BranchSummary) {
     setSaving(true);
@@ -166,7 +128,7 @@ export function BranchManagementView({
       }
 
       toast.success(m.branches.list.statusUpdated);
-      await loadBranches();
+      await refetch();
     } catch (statusError) {
       const message = getErrorMessage(statusError, m.common.requestFailed);
       toast.error(message);
@@ -196,7 +158,7 @@ export function BranchManagementView({
           </Button>
           <Button
             disabled={loading}
-            onClick={loadBranches}
+            onClick={() => refetch()}
             type="button"
             variant="outline"
           >
@@ -211,7 +173,6 @@ export function BranchManagementView({
           <Input
             id="branch-search"
             onChange={(event) => {
-              setLoading(true);
               setQuery(event.target.value);
             }}
             placeholder={m.branches.list.searchPlaceholder}
@@ -223,7 +184,6 @@ export function BranchManagementView({
           <Label htmlFor="branch-status">{m.common.status}</Label>
           <Select
             onValueChange={(value) => {
-              setLoading(true);
               setStatus(value as StatusFilter);
             }}
             value={status}
@@ -250,10 +210,10 @@ export function BranchManagementView({
             <div className="h-14 animate-pulse rounded-md bg-muted" key={item} />
           ))}
         </div>
-      ) : error ? (
+      ) : errorMessage ? (
         <div className="p-5">
           <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            {error}
+            {errorMessage}
           </div>
         </div>
       ) : branches.length === 0 ? (

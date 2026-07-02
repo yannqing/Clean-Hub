@@ -13,14 +13,17 @@ import {
   Textarea,
   toast,
 } from "@cleanhub/ui";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { useTenantI18n } from "@/i18n";
+import { tenantQueryKeys } from "@/lib/query-keys";
 
 import { updateBranchAction, updateBranchStatusAction } from "../actions";
 import { branchLanguageValues } from "../constants";
+import { useBranchDetailQuery } from "../queries";
 import type {
   BranchFormValues,
   BranchLanguage,
@@ -61,15 +64,30 @@ export type BranchDetailViewProps = {
 
 export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
   const { m, formatDateTime } = useTenantI18n();
-  const [branch, setBranch] = useState(initialBranch);
+  const queryClient = useQueryClient();
+  // SSR 预取结果作为 initialData；写操作成功后用 setQueryData 同步缓存，
+  // 同时 Server Action 的 revalidatePath 触发 RSC 重取保持一致。
+  const { data: branch = initialBranch } = useBranchDetailQuery(initialBranch.id, {
+    initialData: initialBranch,
+  });
   const [formValues, setFormValues] = useState<BranchFormValues>(
-    toFormValues(initialBranch),
+    toFormValues(branch),
   );
   const [errors, setErrors] = useState<
     Partial<Record<keyof BranchFormValues, string>>
   >({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+
+  // 写操作成功后同步到 query cache + 表单。
+  function applyUpdatedBranch(next: BranchSummary) {
+    queryClient.setQueryData(
+      tenantQueryKeys.branches.detail(next.id),
+      next,
+    );
+    setFormValues(toFormValues(next));
+    setErrors({});
+  }
 
   function updateForm<K extends keyof BranchFormValues>(
     key: K,
@@ -106,9 +124,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
         return;
       }
 
-      setBranch(result.data);
-      setFormValues(toFormValues(result.data));
-      setErrors({});
+      applyUpdatedBranch(result.data);
       toast.success(m.branches.detail.updated);
     } catch (saveError) {
       const nextMessage =
@@ -145,9 +161,7 @@ export function BranchDetailView({ initialBranch }: BranchDetailViewProps) {
         return;
       }
 
-      setBranch(result.data);
-      setFormValues(toFormValues(result.data));
-      setErrors({});
+      applyUpdatedBranch(result.data);
       toast.success(m.branches.list.statusUpdated);
     } catch (statusError) {
       const nextMessage =
