@@ -2,6 +2,7 @@ import { webAdminRoutes } from "@/config/routes";
 
 import type { WebAdminLocale } from "./locale";
 import { saasMessagesByLocale, type SaasMessages } from "./messages/saas";
+import { tenantMessagesByLocale, type TenantMessages } from "./messages/tenant";
 
 type ShellCopy = {
   eyebrow: string;
@@ -30,6 +31,7 @@ export type WebAdminMessages = {
     signingOut: string;
   };
   saas: SaasMessages;
+  tenant: TenantMessages;
 };
 
 const en: WebAdminMessages = {
@@ -145,6 +147,7 @@ const en: WebAdminMessages = {
     signingOut: "Signing out...",
   },
   saas: saasMessagesByLocale.en,
+  tenant: tenantMessagesByLocale.en,
 };
 
 const zhCN: WebAdminMessages = {
@@ -228,6 +231,7 @@ const zhCN: WebAdminMessages = {
     signingOut: "正在退出...",
   },
   saas: saasMessagesByLocale["zh-CN"],
+  tenant: tenantMessagesByLocale["zh-CN"],
 };
 
 export const webAdminMessages: Record<WebAdminLocale, WebAdminMessages> = {

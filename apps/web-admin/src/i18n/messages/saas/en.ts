@@ -36,6 +36,11 @@ export const saasMessagesEn: SaasMessages = {
     optionalTenantUlid: "Optional tenant ULID",
     modulePlaceholder: "Module placeholder",
     badge: "CleanHub Web Admin",
+    somethingWentWrong: "Something went wrong",
+    loadErrorDescription: "We couldn't load this page. Please try again.",
+    notFoundTitle: "Page not found",
+    notFoundDescription:
+      "The page you're looking for doesn't exist or may have moved.",
     statusLabels: {
       active: "Active",
       suspended: "Suspended",

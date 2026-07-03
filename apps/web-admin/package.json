@@ -16,6 +16,7 @@
     "@cleanhub/i18n": "workspace:*",
     "@cleanhub/ui": "workspace:*",
     "@swc/helpers": "^0.5.15",
+    "@tanstack/react-query": "^5.101.2",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4"

@@ -18,18 +18,18 @@ import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { useTenantI18n } from "@/i18n";
 
 import { createBranchAction } from "../actions";
-import { branchLanguageOptions, emptyBranchFormValues } from "../constants";
+import {
+  branchLanguageValues,
+  emptyBranchFormValues,
+} from "../constants";
 import type {
   BranchFormValues,
   BranchLanguage,
   BranchStatus,
 } from "../types";
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Branch request failed.";
-}
 
 export type BranchCreateViewProps = {
   defaultsWarning?: string;
@@ -43,6 +43,7 @@ export function BranchCreateView({
   initialDefaultLanguage,
 }: BranchCreateViewProps = {}) {
   const router = useRouter();
+  const { m } = useTenantI18n();
   const [formValues, setFormValues] = useState<BranchFormValues>(() => ({
     ...emptyBranchFormValues,
     defaultCurrency:
@@ -86,11 +87,14 @@ export function BranchCreateView({
         return;
       }
 
-      toast.success("Branch created.");
+      toast.success(m.branches.create.created);
       router.push(`${webAdminRoutes.tenant.branches}/${result.data.id}`);
       router.refresh();
     } catch (submitError) {
-      const message = getErrorMessage(submitError);
+      const message =
+        submitError instanceof Error
+          ? submitError.message
+          : m.common.requestFailed;
       setFormError(message);
       toast.error(message);
     } finally {
@@ -102,18 +106,19 @@ export function BranchCreateView({
     <section className="grid gap-6 p-5">
       <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">New branch</Badge>
+          <Badge variant="secondary">{m.branches.create.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Create branch
+            {m.branches.create.title}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Add an operating location for the current tenant. Tenant and Manager
-            branch scope are enforced by the API.
+            {m.branches.create.description}
           </p>
         </div>
 
         <Button asChild type="button" variant="outline">
-          <Link href={webAdminRoutes.tenant.branches}>Back to list</Link>
+          <Link href={webAdminRoutes.tenant.branches}>
+            {m.common.backToList}
+          </Link>
         </Button>
       </div>
 
@@ -129,7 +134,7 @@ export function BranchCreateView({
 
         <div className="grid gap-4 lg:grid-cols-[1fr_180px_160px]">
           <div className="grid gap-2">
-            <Label htmlFor="branch-name">Name</Label>
+            <Label htmlFor="branch-name">{m.branches.create.fields.name}</Label>
             <Input
               aria-invalid={Boolean(errors.name)}
               id="branch-name"
@@ -142,7 +147,9 @@ export function BranchCreateView({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="branch-phone">Phone</Label>
+            <Label htmlFor="branch-phone">
+              {m.branches.create.fields.phone}
+            </Label>
             <Input
               aria-invalid={Boolean(errors.phone)}
               id="branch-phone"
@@ -155,7 +162,9 @@ export function BranchCreateView({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="branch-currency">Currency</Label>
+            <Label htmlFor="branch-currency">
+              {m.branches.create.fields.currency}
+            </Label>
             <Input
               aria-invalid={Boolean(errors.defaultCurrency)}
               id="branch-currency"
@@ -175,7 +184,9 @@ export function BranchCreateView({
 
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="grid gap-2">
-            <Label htmlFor="branch-language">Default language</Label>
+            <Label htmlFor="branch-language">
+              {m.branches.create.fields.defaultLanguage}
+            </Label>
             <Select
               onValueChange={(value) =>
                 updateForm("defaultLanguage", value as BranchLanguage)
@@ -186,9 +197,9 @@ export function BranchCreateView({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {branchLanguageOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                {branchLanguageValues.map((value) => (
+                  <SelectItem key={value} value={value}>
+                    {m.common.languageLabels[value]}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -201,7 +212,9 @@ export function BranchCreateView({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="branch-form-status">Status</Label>
+            <Label htmlFor="branch-form-status">
+              {m.branches.create.fields.status}
+            </Label>
             <Select
               onValueChange={(value) =>
                 updateForm("status", value as BranchStatus)
@@ -212,8 +225,12 @@ export function BranchCreateView({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="active">
+                  {m.common.statusLabels.active}
+                </SelectItem>
+                <SelectItem value="inactive">
+                  {m.common.statusLabels.inactive}
+                </SelectItem>
               </SelectContent>
             </Select>
             {errors.status ? (
@@ -222,7 +239,9 @@ export function BranchCreateView({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="branch-logo-url">Logo URL</Label>
+            <Label htmlFor="branch-logo-url">
+              {m.branches.create.fields.logoUrl}
+            </Label>
             <Input
               aria-invalid={Boolean(errors.logoUrl)}
               id="branch-logo-url"
@@ -237,7 +256,9 @@ export function BranchCreateView({
 
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="grid gap-2">
-            <Label htmlFor="branch-receipt-name">Receipt name</Label>
+            <Label htmlFor="branch-receipt-name">
+              {m.branches.create.fields.receiptName}
+            </Label>
             <Input
               aria-invalid={Boolean(errors.receiptName)}
               id="branch-receipt-name"
@@ -250,7 +271,9 @@ export function BranchCreateView({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="branch-receipt-phone">Receipt phone</Label>
+            <Label htmlFor="branch-receipt-phone">
+              {m.branches.create.fields.receiptPhone}
+            </Label>
             <Input
               aria-invalid={Boolean(errors.receiptPhone)}
               id="branch-receipt-phone"
@@ -266,7 +289,9 @@ export function BranchCreateView({
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="branch-address">Address</Label>
+          <Label htmlFor="branch-address">
+            {m.branches.create.fields.address}
+          </Label>
           <Textarea
             aria-invalid={Boolean(errors.address)}
             id="branch-address"
@@ -279,7 +304,9 @@ export function BranchCreateView({
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="branch-receipt-address">Receipt address</Label>
+          <Label htmlFor="branch-receipt-address">
+            {m.branches.create.fields.receiptAddress}
+          </Label>
           <Textarea
             aria-invalid={Boolean(errors.receiptAddress)}
             id="branch-receipt-address"
@@ -294,14 +321,16 @@ export function BranchCreateView({
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="branch-business-hours">Business hours JSON</Label>
+          <Label htmlFor="branch-business-hours">
+            {m.branches.create.fields.businessHoursJson}
+          </Label>
           <Textarea
             aria-invalid={Boolean(errors.businessHoursJson)}
             id="branch-business-hours"
             onChange={(event) =>
               updateForm("businessHoursJson", event.target.value)
             }
-            placeholder='{"mon":"08:00-18:00"}'
+            placeholder={m.branches.create.businessHoursPlaceholder}
             value={formValues.businessHoursJson}
           />
           {errors.businessHoursJson ? (
@@ -319,10 +348,10 @@ export function BranchCreateView({
 
         <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center">
           <Button disabled={saving} type="submit">
-            {saving ? "Saving..." : "Create branch"}
+            {saving ? m.common.saving : m.branches.create.createButton}
           </Button>
           <Button asChild type="button" variant="outline">
-            <Link href={webAdminRoutes.tenant.branches}>Cancel</Link>
+            <Link href={webAdminRoutes.tenant.branches}>{m.common.cancel}</Link>
           </Button>
         </div>
       </form>

@@ -13,7 +13,8 @@ import type { ReportSummary, ReportSummaryQuery } from "../types";
 
 type ReportSummaryViewProps = {
   query: ReportSummaryQuery;
-  summary: ReportSummary;
+  summary?: ReportSummary;
+  error?: string;
 };
 
 function formatMoney(value: number): string {
@@ -34,11 +35,17 @@ function formatPercent(part: number, total: number): string {
   }).format(part / total);
 }
 
-export function ReportSummaryView({ query, summary }: ReportSummaryViewProps) {
-  const paymentTotal = Object.values(summary.paymentBreakdown).reduce(
-    (total, value) => total + value,
-    0,
-  );
+export function ReportSummaryView({
+  query,
+  summary,
+  error,
+}: ReportSummaryViewProps) {
+  const paymentTotal = summary
+    ? Object.values(summary.paymentBreakdown).reduce(
+        (total, value) => total + value,
+        0,
+      )
+    : 0;
 
   return (
     <div className="grid gap-6">
@@ -83,84 +90,92 @@ export function ReportSummaryView({ query, summary }: ReportSummaryViewProps) {
         </div>
       </form>
 
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Gross Sales</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">
-              {formatMoney(summary.grossSales)}
-            </div>
-          </CardContent>
-        </Card>
+      {error ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          {error}
+        </div>
+      ) : summary ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Gross Sales</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-semibold">
+                  {formatMoney(summary.grossSales)}
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">{summary.orderCount}</div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Orders</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-semibold">{summary.orderCount}</div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Pending Pickup</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">
-              {summary.pendingPickupCount}
-            </div>
-          </CardContent>
-        </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Pending Pickup</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-semibold">
+                  {summary.pendingPickupCount}
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">In Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold">
-              {summary.inProgressCount}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-semibold">
+                  {summary.inProgressCount}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Payment Breakdown</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {Object.entries(summary.paymentBreakdown).map(([method, amount]) => (
-              <div
-                className="flex items-center justify-between gap-3 border-b pb-2 last:border-b-0 last:pb-0"
-                key={method}
-              >
-                <span className="capitalize text-sm">{method}</span>
-                <span className="text-sm font-medium">
-                  {formatMoney(amount)} · {formatPercent(amount, paymentTotal)}
-                </span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Payment Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                {Object.entries(summary.paymentBreakdown).map(([method, amount]) => (
+                  <div
+                    className="flex items-center justify-between gap-3 border-b pb-2 last:border-b-0 last:pb-0"
+                    key={method}
+                  >
+                    <span className="capitalize text-sm">{method}</span>
+                    <span className="text-sm font-medium">
+                      {formatMoney(amount)} · {formatPercent(amount, paymentTotal)}
+                    </span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Exports</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-3">
-            <Button disabled type="button" variant="outline">
-              Export
-            </Button>
-            <Button disabled type="button" variant="outline">
-              Z Report
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Exports</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-3">
+                <Button disabled type="button" variant="outline">
+                  Export
+                </Button>
+                <Button disabled type="button" variant="outline">
+                  Z Report
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </>
+      ) : null}
     </div>
   );
 }
