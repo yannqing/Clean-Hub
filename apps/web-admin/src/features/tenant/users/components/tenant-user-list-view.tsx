@@ -83,12 +83,40 @@ function RoleBadge({ role }: { role: string }) {
   return <Badge variant="outline">{role}</Badge>;
 }
 
+function getTenantUserRoleCode(role: string): TenantUserRoleCode | undefined {
+  return tenantUserRoleOptions.some((option) => option.value === role)
+    ? (role as TenantUserRoleCode)
+    : undefined;
+}
+
+function createEditForm(
+  user: TenantUserSummary | TenantUserDetail,
+): UpdateTenantUserRequest {
+  const roleCode = getTenantUserRoleCode(user.role);
+  const form: UpdateTenantUserRequest = {
+    displayName: user.displayName,
+    branchIds: user.branchIds,
+  };
+
+  if ("phone" in user) {
+    form.phone = user.phone;
+  }
+
+  if (roleCode) {
+    form.roleCode = roleCode;
+  }
+
+  return form;
+}
+
 function BranchSelect({
   branches,
+  disabled = false,
   onChange,
   selected,
 }: {
   branches: BranchSummary[];
+  disabled?: boolean;
   selected: string[];
   onChange: (ids: string[]) => void;
 }) {
@@ -100,11 +128,16 @@ function BranchSelect({
         branches.map((branch) => (
           <label
             key={branch.id}
-            className="flex items-center gap-2 cursor-pointer"
+            className={`flex items-center gap-2 ${
+              disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+            }`}
           >
             <Checkbox
               checked={selected.includes(branch.id)}
+              disabled={disabled}
               onCheckedChange={(checked) => {
+                if (disabled) return;
+
                 if (checked) {
                   onChange([...selected, branch.id]);
                 } else {
@@ -125,6 +158,7 @@ export function TenantUserListView({
   initialUsers = [],
 }: TenantUserListViewProps) {
   const isCurrent = useRef(true);
+  const editRequestSeq = useRef(0);
 
   const [users, setUsers] = useState<TenantUserSummary[]>(initialUsers);
   const [offset, setOffset] = useState(0);
@@ -157,6 +191,7 @@ export function TenantUserListView({
   const [editOpen, setEditOpen] = useState(false);
   const [editUserId, setEditUserId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<UpdateTenantUserRequest>({});
+  const [editDetailLoading, setEditDetailLoading] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
@@ -274,17 +309,33 @@ export function TenantUserListView({
   }, [createForm, loadUsers]);
 
   const openEdit = useCallback((user: TenantUserSummary) => {
+    const requestSeq = editRequestSeq.current + 1;
+
+    editRequestSeq.current = requestSeq;
     setEditUserId(user.id);
-    setEditForm({
-      displayName: user.displayName,
-      branchIds: user.branchIds,
-    });
+    setEditForm(createEditForm(user));
+    setEditDetailLoading(true);
     setEditError(null);
     setEditOpen(true);
+
+    getTenantUserDetailQuery(user.id)
+      .then((result) => {
+        if (!isCurrent.current || editRequestSeq.current !== requestSeq) return;
+        setEditForm(createEditForm(result));
+      })
+      .catch((err: unknown) => {
+        if (!isCurrent.current || editRequestSeq.current !== requestSeq) return;
+        setEditError(getErrorMessage(err));
+      })
+      .finally(() => {
+        if (isCurrent.current && editRequestSeq.current === requestSeq) {
+          setEditDetailLoading(false);
+        }
+      });
   }, []);
 
   const handleEdit = useCallback(async () => {
-    if (!editUserId) return;
+    if (!editUserId || editDetailLoading) return;
     setEditLoading(true);
     setEditError(null);
 
@@ -301,7 +352,7 @@ export function TenantUserListView({
     setEditOpen(false);
     setEditUserId(null);
     void loadUsers();
-  }, [editUserId, editForm, loadUsers]);
+  }, [editDetailLoading, editUserId, editForm, loadUsers]);
 
   const handleDisable = useCallback(
     async (userId: string) => {
@@ -727,8 +778,12 @@ export function TenantUserListView({
       <Dialog
         onOpenChange={(open) => {
           if (!open) {
+            editRequestSeq.current += 1;
             setEditOpen(false);
             setEditUserId(null);
+            setEditForm({});
+            setEditDetailLoading(false);
+            setEditError(null);
           }
         }}
         open={editOpen}
@@ -740,9 +795,15 @@ export function TenantUserListView({
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
+            {editDetailLoading ? (
+              <p className="text-sm text-muted-foreground">
+                Loading current member details...
+              </p>
+            ) : null}
             <div className="flex flex-col gap-1.5">
               <Label>Display Name</Label>
               <Input
+                disabled={editDetailLoading}
                 onChange={(e) =>
                   setEditForm((prev) => ({ ...prev, displayName: e.target.value }))
                 }
@@ -752,6 +813,7 @@ export function TenantUserListView({
             <div className="flex flex-col gap-1.5">
               <Label>Phone</Label>
               <Input
+                disabled={editDetailLoading}
                 onChange={(e) =>
                   setEditForm((prev) => ({
                     ...prev,
@@ -766,6 +828,7 @@ export function TenantUserListView({
             <div className="flex flex-col gap-1.5">
               <Label>Role</Label>
               <Select
+                disabled={editDetailLoading}
                 onValueChange={(value) =>
                   setEditForm((prev) => ({
                     ...prev,
@@ -790,6 +853,7 @@ export function TenantUserListView({
               <Label>Branches</Label>
               <BranchSelect
                 branches={branches}
+                disabled={editDetailLoading}
                 onChange={(ids) =>
                   setEditForm((prev) => ({ ...prev, branchIds: ids }))
                 }
@@ -806,7 +870,7 @@ export function TenantUserListView({
                 Cancel
               </Button>
               <Button
-                disabled={editLoading}
+                disabled={editLoading || editDetailLoading}
                 onClick={() => void handleEdit()}
               >
                 {editLoading ? "Saving..." : "Save"}
