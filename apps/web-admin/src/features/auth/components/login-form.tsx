@@ -1,21 +1,23 @@
 "use client";
 
+import { zodResolver } from "@hookform/resolvers/zod";
 import { Button, Input, Label, cn, toast } from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useForm, useWatch } from "react-hook-form";
 
 import { loginAction } from "../actions";
 import { webAdminRoutes } from "@/config/routes";
 
 import { getOrCreateWebAdminDeviceId } from "../utils";
 import {
-  validateLoginForm,
-  type LoginFormFieldErrors,
+  loginFormSchema,
+  type LoginFormField,
   type LoginFormValues,
   type LoginMode,
 } from "../validators/login-form.validator";
 
-const initialState: LoginFormValues = {
+const defaultValues: LoginFormValues = {
   loginMode: "tenant",
   identifier: "",
   password: "",
@@ -83,82 +85,71 @@ const LOGIN_MODE_OPTIONS: {
 
 export function LoginForm() {
   const router = useRouter();
-  const [formState, setFormState] = useState<LoginFormValues>(initialState);
-  const [fieldErrors, setFieldErrors] = useState<LoginFormFieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
 
-  const isTenantLogin = formState.loginMode === "tenant";
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    setError,
+    control,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    defaultValues,
+    resolver: zodResolver(loginFormSchema),
+    mode: "onSubmit",
+  });
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setErrorMessage(null);
+  // `useWatch` returns a stable subscription value (unlike `watch()`, which
+  // returns a fresh function each render and trips React Compiler's
+  // incompatible-library check).
+  const loginMode = useWatch({ control, name: "loginMode" });
+  const isTenantLogin = loginMode === "tenant";
 
-    // Quick client-side validation for instant field feedback.
-    const validationErrors = validateLoginForm(formState);
-    if (validationErrors) {
-      setFieldErrors(validationErrors);
-      return;
+  function setLoginMode(mode: LoginMode) {
+    setValue("loginMode", mode, { shouldValidate: false });
+
+    // `tenantCode` is only relevant for store login; clear it when switching
+    // away so a stale value cannot satisfy the schema after the field is hidden.
+    if (mode === "platform") {
+      setValue("tenantCode", "", { shouldValidate: false });
     }
 
-    setFieldErrors({});
-    setSubmitting(true);
+    setErrorMessage(null);
+  }
+
+  async function submit(values: LoginFormValues) {
+    setErrorMessage(null);
 
     const result = await loginAction({
-      ...formState,
+      ...values,
       deviceId: getOrCreateWebAdminDeviceId(),
     });
 
     if (!result.ok) {
-      setFieldErrors(result.errors);
+      // Map server-side field errors back onto react-hook-form so the inline
+      // messages stay consistent with the resolver-driven ones.
+      for (const [field, message] of Object.entries(result.errors)) {
+        if (typeof message === "string") {
+          setError(field as LoginFormField, { message });
+        }
+      }
+
       setErrorMessage(result.message);
       toast.error(result.message);
-      setSubmitting(false);
       return;
     }
 
     toast.success("Signed in successfully.");
     router.replace(resolvePostLoginPath(result.data.role));
     router.refresh();
-    setSubmitting(false);
-  }
-
-  function updateField<K extends keyof LoginFormValues>(
-    field: K,
-    value: LoginFormValues[K],
-  ) {
-    setFormState((current) => ({
-      ...current,
-      [field]: value,
-    }));
-
-    if (fieldErrors[field]) {
-      setFieldErrors((current) => {
-        const next = { ...current };
-        delete next[field];
-        return next;
-      });
-    }
-  }
-
-  function setLoginMode(mode: LoginMode) {
-    setFormState((current) => ({
-      ...current,
-      loginMode: mode,
-      tenantCode: mode === "platform" ? "" : current.tenantCode,
-    }));
-    setFieldErrors((current) => {
-      const next = { ...current };
-      delete next.tenantCode;
-      return next;
-    });
-    setErrorMessage(null);
   }
 
   return (
     <form
       className="mt-8 grid gap-5 rounded-lg border border-border bg-background p-6 shadow-sm"
-      onSubmit={handleSubmit}
+      onSubmit={handleSubmit(submit)}
+      noValidate
     >
       <fieldset className="grid gap-2">
         <legend className="text-sm font-medium">Sign in as</legend>
@@ -168,7 +159,7 @@ export function LoginForm() {
           aria-label="Sign in as"
         >
           {LOGIN_MODE_OPTIONS.map((option) => {
-            const selected = formState.loginMode === option.value;
+            const selected = loginMode === option.value;
 
             return (
               <button
@@ -200,21 +191,18 @@ export function LoginForm() {
         <div className="grid gap-2">
           <Label htmlFor="tenantCode">Pressing code</Label>
           <Input
-            aria-invalid={Boolean(fieldErrors.tenantCode)}
+            aria-invalid={Boolean(errors.tenantCode)}
             autoComplete="organization"
             id="tenantCode"
-            name="tenantCode"
-            onChange={(event) => updateField("tenantCode", event.target.value)}
             placeholder="e.g. SN-0042"
-            required
             type="text"
-            value={formState.tenantCode}
+            {...register("tenantCode")}
           />
           <p className="text-xs text-muted-foreground">
             The store code assigned by CleanHub. Required for store administrators.
           </p>
-          {fieldErrors.tenantCode ? (
-            <p className="text-xs text-destructive">{fieldErrors.tenantCode}</p>
+          {errors.tenantCode ? (
+            <p className="text-xs text-destructive">{errors.tenantCode.message}</p>
           ) : null}
         </div>
       ) : (
@@ -227,36 +215,30 @@ export function LoginForm() {
       <div className="grid gap-2">
         <Label htmlFor="identifier">Email or phone</Label>
         <Input
-          aria-invalid={Boolean(fieldErrors.identifier)}
+          aria-invalid={Boolean(errors.identifier)}
           autoComplete="username"
           id="identifier"
-          name="identifier"
-          onChange={(event) => updateField("identifier", event.target.value)}
           placeholder="admin@cleanhub.local"
-          required
           type="text"
-          value={formState.identifier}
+          {...register("identifier")}
         />
-        {fieldErrors.identifier ? (
-          <p className="text-xs text-destructive">{fieldErrors.identifier}</p>
+        {errors.identifier ? (
+          <p className="text-xs text-destructive">{errors.identifier.message}</p>
         ) : null}
       </div>
 
       <div className="grid gap-2">
         <Label htmlFor="password">Password</Label>
         <Input
-          aria-invalid={Boolean(fieldErrors.password)}
+          aria-invalid={Boolean(errors.password)}
           autoComplete="current-password"
           id="password"
-          name="password"
-          onChange={(event) => updateField("password", event.target.value)}
           placeholder="Enter password"
-          required
           type="password"
-          value={formState.password}
+          {...register("password")}
         />
-        {fieldErrors.password ? (
-          <p className="text-xs text-destructive">{fieldErrors.password}</p>
+        {errors.password ? (
+          <p className="text-xs text-destructive">{errors.password.message}</p>
         ) : null}
       </div>
 
@@ -266,8 +248,8 @@ export function LoginForm() {
         </p>
       ) : null}
 
-      <Button className="w-full" disabled={submitting} type="submit">
-        {submitting ? "Signing in..." : "Sign in"}
+      <Button disabled={isSubmitting} type="submit">
+        {isSubmitting ? "Signing in..." : "Sign in"}
       </Button>
     </form>
   );

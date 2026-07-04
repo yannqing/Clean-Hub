@@ -4,11 +4,11 @@ import type { AuthContext } from "@cleanhub/api-client";
 
 import { webAdminApi } from "@/lib/api-client";
 
-import type {
-  LoginFormFieldErrors,
-  LoginFormValues,
+import {
+  validateLoginForm,
+  type LoginFormFieldErrors,
+  type LoginFormValues,
 } from "../validators/login-form.validator";
-import { validateLoginForm } from "../validators/login-form.validator";
 
 type LoginActionResult =
   | {
@@ -32,14 +32,17 @@ function getLoginErrorMessage(error: unknown): string {
 /**
  * Server action for the web-admin login form.
  *
- * Validates the form, calls /auth/login, and returns a structured result. The
- * client component owns the bits that can only run in the browser: generating
- * the device id (localStorage), showing toasts, and redirecting based on role.
+ * Validates the form with the shared `loginFormSchema` (the same schema the
+ * client uses through `react-hook-form`), calls /auth/login, and returns a
+ * structured result. The client component owns the bits that can only run in
+ * the browser: generating the device id (localStorage), showing toasts, and
+ * redirecting based on role.
  */
 export async function loginAction(
   input: LoginFormValues & { deviceId: string },
 ): Promise<LoginActionResult> {
-  // Re-validate server-side; the client also validates, but never trust it alone.
+  // Re-validate server-side; the client also validates, but never trust it
+  // alone. `loginFormSchema` is the single source of truth for the rules.
   const validationErrors = validateLoginForm(input);
 
   if (validationErrors) {
@@ -70,4 +73,3 @@ export async function loginAction(
     };
   }
 }
-
