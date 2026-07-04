@@ -21,7 +21,8 @@ import { interpolate } from "@/i18n/messages/saas";
 import { updateTenantAction, updateTenantStatusAction } from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantDefaultValues } from "../constants";
-import { getCurrentSaasAuthQuery, getTenantDetailQuery } from "../queries";
+import { getCurrentAuthQuery } from "@/features/auth/queries";
+import { getTenantDetailQuery } from "../queries";
 import type { TenantDetail, TenantFormValues, TenantStatus } from "../types";
 import { TenantForm } from "./tenant-form";
 
@@ -164,7 +165,7 @@ export function TenantDetailView({
     let isCurrent = true;
 
     Promise.allSettled([
-      getCurrentSaasAuthQuery(),
+      getCurrentAuthQuery(),
       getTenantDetailQuery(tenantId),
     ])
       .then(([authResult, tenantResult]) => {

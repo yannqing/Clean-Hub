@@ -21,6 +21,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { getCurrentAuthQuery } from "@/features/auth/queries";
 import { useSaasI18n } from "@/i18n";
 import { interpolate } from "@/i18n/messages/saas";
 
@@ -35,7 +36,6 @@ import {
   tenantLanguageOptions,
 } from "../constants";
 import {
-  getCurrentSaasAuthQuery,
   getTenantDetailQuery,
   getTenantFeatureFlagsQuery,
   getTenantSettingsQuery,
@@ -579,7 +579,7 @@ export function TenantSettingsView({
 
       try {
         const results = await Promise.allSettled([
-          getCurrentSaasAuthQuery(),
+          getCurrentAuthQuery(),
           getTenantDetailQuery(tenantId),
           getTenantSettingsQuery(tenantId),
           getTenantFeatureFlagsQuery(tenantId),
@@ -604,7 +604,7 @@ export function TenantSettingsView({
     let isCurrent = true;
 
     Promise.allSettled([
-      getCurrentSaasAuthQuery(),
+      getCurrentAuthQuery(),
       getTenantDetailQuery(tenantId),
       getTenantSettingsQuery(tenantId),
       getTenantFeatureFlagsQuery(tenantId),

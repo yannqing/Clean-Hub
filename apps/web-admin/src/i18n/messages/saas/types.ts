@@ -319,7 +319,7 @@ export type SaasMessages = {
       noAction: string;
     };
   };
-  audit: {
+  auditLogs: {
     badge: string;
     title: string;
     loadError: string;
@@ -346,7 +346,7 @@ export type SaasMessages = {
       actor: string;
     };
   };
-  operationLogs: {
+  systemLogs: {
     badge: string;
     title: string;
     loadError: string;
@@ -449,7 +449,7 @@ export type SaasMessages = {
       };
     };
   };
-  feedback: {
+  feedbackTickets: {
     badge: string;
     title: string;
     loadError: string;

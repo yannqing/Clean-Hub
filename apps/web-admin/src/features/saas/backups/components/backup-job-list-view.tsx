@@ -272,7 +272,7 @@ export function BackupJobListView() {
             </div>
 
             <div className="grid gap-2">
-              <Label htmlFor="backup-tenant-filter">{m.operationLogs.tenantId}</Label>
+              <Label htmlFor="backup-tenant-filter">{m.systemLogs.tenantId}</Label>
               <Input
                 id="backup-tenant-filter"
                 onChange={(event) => {
@@ -311,7 +311,7 @@ export function BackupJobListView() {
                   <TableHead>{m.backups.columns.created}</TableHead>
                   <TableHead>{m.backups.scope}</TableHead>
                   <TableHead>{m.common.status}</TableHead>
-                  <TableHead>{m.operationLogs.columns.tenant}</TableHead>
+                  <TableHead>{m.systemLogs.columns.tenant}</TableHead>
                   <TableHead>{m.backups.columns.requestedBy}</TableHead>
                   <TableHead>{m.backups.columns.finished}</TableHead>
                   <TableHead className="text-right">{m.common.actions}</TableHead>
@@ -435,7 +435,7 @@ export function BackupJobListView() {
                     <TableRow>
                       <TableHead>{m.backups.columns.created}</TableHead>
                       <TableHead>{m.common.status}</TableHead>
-                      <TableHead>{m.operationLogs.columns.tenant}</TableHead>
+                      <TableHead>{m.systemLogs.columns.tenant}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
