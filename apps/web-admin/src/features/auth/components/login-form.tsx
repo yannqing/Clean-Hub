@@ -6,9 +6,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
-import { loginAction } from "../actions";
 import { webAdminRoutes } from "@/config/routes";
 
+import { loginBrowserSessionAction } from "../actions/browser-session.action";
 import { getOrCreateWebAdminDeviceId } from "../utils";
 import {
   loginFormSchema,
