@@ -78,7 +78,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="backup-tenant-id">{m.operationLogs.tenantId}</Label>
+          <Label htmlFor="backup-tenant-id">{m.systemLogs.tenantId}</Label>
           <Input
             disabled={scope === "platform"}
             id="backup-tenant-id"

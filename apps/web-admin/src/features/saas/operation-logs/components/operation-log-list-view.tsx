@@ -82,7 +82,7 @@ export function OperationLogListView() {
       const data = await getOperationLogListQuery(listQuery);
       setLogs(data);
     } catch (loadError) {
-      setError(getErrorMessage(loadError) || m.operationLogs.loadError);
+      setError(getErrorMessage(loadError) || m.systemLogs.loadError);
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,7 @@ export function OperationLogListView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError) || m.operationLogs.loadError);
+          setError(getErrorMessage(loadError) || m.systemLogs.loadError);
         }
       })
       .finally(() => {
@@ -114,15 +114,15 @@ export function OperationLogListView() {
     return () => {
       isCurrent = false;
     };
-  }, [listQuery, m.operationLogs.loadError]);
+  }, [listQuery, m.systemLogs.loadError]);
 
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">{m.operationLogs.badge}</Badge>
+          <Badge variant="secondary">{m.systemLogs.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {m.operationLogs.title}
+            {m.systemLogs.title}
           </h1>
         </div>
 
@@ -133,7 +133,7 @@ export function OperationLogListView() {
 
       <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-5">
         <div className="grid gap-2">
-          <Label htmlFor="operation-log-level-filter">{m.operationLogs.level}</Label>
+          <Label htmlFor="operation-log-level-filter">{m.systemLogs.level}</Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
@@ -159,20 +159,20 @@ export function OperationLogListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="operation-log-service-filter">{m.operationLogs.service}</Label>
+          <Label htmlFor="operation-log-service-filter">{m.systemLogs.service}</Label>
           <Input
             id="operation-log-service-filter"
             onChange={(event) => {
               setLoading(true);
               setService(event.target.value);
             }}
-            placeholder={m.operationLogs.servicePlaceholder}
+            placeholder={m.systemLogs.servicePlaceholder}
             value={service}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="operation-log-tenant-filter">{m.operationLogs.tenantId}</Label>
+          <Label htmlFor="operation-log-tenant-filter">{m.systemLogs.tenantId}</Label>
           <Input
             id="operation-log-tenant-filter"
             onChange={(event) => {
@@ -230,7 +230,7 @@ export function OperationLogListView() {
         <div className="p-5">
           <div className="rounded-md border border-dashed p-8 text-center">
             <h2 className="text-base font-semibold">
-              {m.operationLogs.emptyTitle}
+              {m.systemLogs.emptyTitle}
             </h2>
           </div>
         </div>
@@ -238,14 +238,14 @@ export function OperationLogListView() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>{m.operationLogs.columns.created}</TableHead>
-              <TableHead>{m.operationLogs.level}</TableHead>
-              <TableHead>{m.operationLogs.service}</TableHead>
-              <TableHead>{m.audit.columns.event}</TableHead>
-              <TableHead>{m.operationLogs.columns.message}</TableHead>
-              <TableHead>{m.operationLogs.columns.tenant}</TableHead>
-              <TableHead>{m.operationLogs.columns.actor}</TableHead>
-              <TableHead>{m.operationLogs.columns.request}</TableHead>
+              <TableHead>{m.systemLogs.columns.created}</TableHead>
+              <TableHead>{m.systemLogs.level}</TableHead>
+              <TableHead>{m.systemLogs.service}</TableHead>
+              <TableHead>{m.auditLogs.columns.event}</TableHead>
+              <TableHead>{m.systemLogs.columns.message}</TableHead>
+              <TableHead>{m.systemLogs.columns.tenant}</TableHead>
+              <TableHead>{m.systemLogs.columns.actor}</TableHead>
+              <TableHead>{m.systemLogs.columns.request}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -268,7 +268,7 @@ export function OperationLogListView() {
                 </TableCell>
                 <TableCell>{log.tenantId ?? m.common.platform}</TableCell>
                 <TableCell>{log.actorUserId ?? m.common.system}</TableCell>
-                <TableCell>{log.requestId ?? m.operationLogs.columns.none}</TableCell>
+                <TableCell>{log.requestId ?? m.systemLogs.columns.none}</TableCell>
               </TableRow>
             ))}
           </TableBody>

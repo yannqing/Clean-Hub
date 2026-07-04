@@ -110,7 +110,7 @@ export function FeedbackTicketListView() {
       setTickets(data);
       setSelectedTicket((current) => getSelectedTicket(current, data));
     } catch (loadError) {
-      setError(getErrorMessage(loadError) || m.feedback.loadError);
+      setError(getErrorMessage(loadError) || m.feedbackTickets.loadError);
     } finally {
       setLoading(false);
     }
@@ -124,7 +124,7 @@ export function FeedbackTicketListView() {
       const detail = await getFeedbackTicketDetailQuery(ticketId);
       setSelectedTicket(detail);
     } catch (loadError) {
-      setDetailError(getErrorMessage(loadError) || m.feedback.loadError);
+      setDetailError(getErrorMessage(loadError) || m.feedbackTickets.loadError);
     } finally {
       setDetailLoading(false);
     }
@@ -167,7 +167,7 @@ export function FeedbackTicketListView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError) || m.feedback.loadError);
+          setError(getErrorMessage(loadError) || m.feedbackTickets.loadError);
         }
       })
       .finally(() => {
@@ -185,9 +185,9 @@ export function FeedbackTicketListView() {
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">{m.feedback.badge}</Badge>
+          <Badge variant="secondary">{m.feedbackTickets.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {m.feedback.title}
+            {m.feedbackTickets.title}
           </h1>
         </div>
 
@@ -227,7 +227,7 @@ export function FeedbackTicketListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="feedback-priority-filter">{m.feedback.priority}</Label>
+          <Label htmlFor="feedback-priority-filter">{m.feedbackTickets.priority}</Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
@@ -252,7 +252,7 @@ export function FeedbackTicketListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="feedback-tenant-filter">{m.feedback.tenantId}</Label>
+          <Label htmlFor="feedback-tenant-filter">{m.feedbackTickets.tenantId}</Label>
           <Input
             id="feedback-tenant-filter"
             onChange={(event) => {
@@ -265,14 +265,14 @@ export function FeedbackTicketListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="feedback-assignee-filter">{m.feedback.assigneeId}</Label>
+          <Label htmlFor="feedback-assignee-filter">{m.feedbackTickets.assigneeId}</Label>
           <Input
             id="feedback-assignee-filter"
             onChange={(event) => {
               setLoading(true);
               setAssigneeUserId(event.target.value);
             }}
-            placeholder={m.feedback.assigneePlaceholder}
+            placeholder={m.feedbackTickets.assigneePlaceholder}
             value={assigneeUserId}
           />
         </div>
@@ -299,7 +299,7 @@ export function FeedbackTicketListView() {
             <div className="p-5">
               <div className="rounded-md border border-dashed p-8 text-center">
                 <h2 className="text-base font-semibold">
-                  {m.feedback.emptyTitle}
+                  {m.feedbackTickets.emptyTitle}
                 </h2>
               </div>
             </div>
@@ -307,12 +307,12 @@ export function FeedbackTicketListView() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{m.feedback.columns.ticket}</TableHead>
+                  <TableHead>{m.feedbackTickets.columns.ticket}</TableHead>
                   <TableHead>{m.common.status}</TableHead>
-                  <TableHead>{m.feedback.priority}</TableHead>
-                  <TableHead>{m.feedback.columns.tenant}</TableHead>
-                  <TableHead>{m.feedback.columns.assignee}</TableHead>
-                  <TableHead>{m.feedback.columns.created}</TableHead>
+                  <TableHead>{m.feedbackTickets.priority}</TableHead>
+                  <TableHead>{m.feedbackTickets.columns.tenant}</TableHead>
+                  <TableHead>{m.feedbackTickets.columns.assignee}</TableHead>
+                  <TableHead>{m.feedbackTickets.columns.created}</TableHead>
                   <TableHead className="text-right">{m.common.actions}</TableHead>
                 </TableRow>
               </TableHeader>
@@ -355,7 +355,7 @@ export function FeedbackTicketListView() {
                         type="button"
                         variant="outline"
                       >
-                        {m.feedback.detail}
+                        {m.feedbackTickets.detail}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -367,7 +367,7 @@ export function FeedbackTicketListView() {
 
         <aside className="grid content-start gap-5 p-5">
           <div>
-            <h2 className="text-base font-semibold">{m.feedback.detailTitle}</h2>
+            <h2 className="text-base font-semibold">{m.feedbackTickets.detailTitle}</h2>
           </div>
 
           {detailLoading ? (
@@ -384,28 +384,28 @@ export function FeedbackTicketListView() {
               <div className="grid gap-3 rounded-md border p-4">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {m.feedback.fields.title}
+                    {m.feedbackTickets.fields.title}
                   </p>
                   <p className="mt-1 font-medium">{selectedTicket.title}</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {m.feedback.fields.description}
+                    {m.feedbackTickets.fields.description}
                   </p>
                   <p className="mt-1 whitespace-pre-wrap text-sm">
-                    {selectedTicket.description ?? m.feedback.fields.noDescription}
+                    {selectedTicket.description ?? m.feedbackTickets.fields.noDescription}
                   </p>
                 </div>
                 <div className="grid gap-2 text-sm">
                   <p>
-                    {m.feedback.fields.reporter}{" "}
+                    {m.feedbackTickets.fields.reporter}{" "}
                     {selectedTicket.reporterUserId ?? m.common.unknown}
                   </p>
                   <p>
-                    {m.feedback.fields.source} {selectedTicket.source ?? m.common.unknown}
+                    {m.feedbackTickets.fields.source} {selectedTicket.source ?? m.common.unknown}
                   </p>
                   <p>
-                    {m.feedback.fields.updated}{" "}
+                    {m.feedbackTickets.fields.updated}{" "}
                     {formatDateTime(selectedTicket.updatedAt) || m.common.invalidDate}
                   </p>
                 </div>
@@ -427,7 +427,7 @@ export function FeedbackTicketListView() {
             </>
           ) : (
             <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-              {m.feedback.selectHint}
+              {m.feedbackTickets.selectHint}
             </div>
           )}
         </aside>
