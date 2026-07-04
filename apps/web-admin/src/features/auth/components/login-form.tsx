@@ -4,9 +4,9 @@ import { Button, Input, Label, cn, toast } from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { loginAction } from "../actions";
 import { webAdminRoutes } from "@/config/routes";
 
+import { loginBrowserSessionAction } from "../actions/browser-session.action";
 import { getOrCreateWebAdminDeviceId } from "../utils";
 import {
   validateLoginForm,
@@ -104,23 +104,25 @@ export function LoginForm() {
     setFieldErrors({});
     setSubmitting(true);
 
-    const result = await loginAction({
-      ...formState,
-      deviceId: getOrCreateWebAdminDeviceId(),
-    });
+    try {
+      const authContext = await loginBrowserSessionAction({
+        identifier: formState.identifier.trim(),
+        password: formState.password,
+        tenantCode: isTenantLogin ? formState.tenantCode.trim() : undefined,
+        deviceId: getOrCreateWebAdminDeviceId(),
+      });
 
-    if (!result.ok) {
-      setFieldErrors(result.errors);
-      setErrorMessage(result.message);
-      toast.error(result.message);
+      toast.success("Signed in successfully.");
+      router.replace(resolvePostLoginPath(authContext.role));
+      router.refresh();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to sign in.";
+      setErrorMessage(message);
+      toast.error(message);
+    } finally {
       setSubmitting(false);
-      return;
     }
-
-    toast.success("Signed in successfully.");
-    router.replace(resolvePostLoginPath(result.data.role));
-    router.refresh();
-    setSubmitting(false);
   }
 
   function updateField<K extends keyof LoginFormValues>(
