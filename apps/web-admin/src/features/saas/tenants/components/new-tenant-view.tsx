@@ -7,11 +7,11 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { getCurrentAuthQuery } from "@/features/auth/queries";
 import { useSaasI18n } from "@/i18n";
 
 import { createTenantAction } from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
-import { getCurrentSaasAuthQuery } from "../queries";
 import { TenantForm } from "./tenant-form";
 
 function canCreateTenant(authContext: AuthContext | null): boolean {
@@ -29,7 +29,7 @@ export function NewTenantView() {
   useEffect(() => {
     let isCurrent = true;
 
-    getCurrentSaasAuthQuery()
+    getCurrentAuthQuery()
       .then((data) => {
         if (!isCurrent) {
           return;

@@ -27,6 +27,7 @@ import {
 import type { FormEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { getCurrentAuthQuery } from "@/features/auth/queries";
 import { useSaasI18n } from "@/i18n";
 import { interpolate } from "@/i18n/messages/saas";
 
@@ -40,7 +41,6 @@ import {
   saasUserStatusOptions,
 } from "../constants";
 import {
-  getCurrentSaasAuthQuery,
   getSaasRoleListQuery,
   getSaasUserDetailQuery,
   getSaasUserListQuery,
@@ -294,7 +294,7 @@ export function SaasUserListView() {
   useEffect(() => {
     let isCurrent = true;
 
-    Promise.allSettled([getCurrentSaasAuthQuery(), getSaasRoleListQuery()])
+    Promise.allSettled([getCurrentAuthQuery(), getSaasRoleListQuery()])
       .then(([authResult, rolesResult]) => {
         if (!isCurrent) {
           return;
