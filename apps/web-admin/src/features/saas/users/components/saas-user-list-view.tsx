@@ -18,6 +18,7 @@ import {
   SelectValue,
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -25,7 +26,7 @@ import {
   Textarea,
 } from "@cleanhub/ui";
 import type { FormEvent } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { getCurrentAuthQuery } from "@/features/auth/queries";
 import { useSaasI18n } from "@/i18n";
@@ -201,6 +202,7 @@ function getDefaultStatusReason(
 
 export function SaasUserListView() {
   const { m, formatDate: formatSaasDate } = useSaasI18n();
+  const captionId = useId();
   const editRequestIdRef = useRef(0);
   const [users, setUsers] = useState<SaasUserSummary[]>([]);
   const [query, setQuery] = useState("");
@@ -809,7 +811,10 @@ export function SaasUserListView() {
           </div>
         </div>
       ) : (
-        <Table>
+        <Table aria-describedby={captionId}>
+          <TableCaption className="sr-only" id={captionId}>
+            {m.users.title}
+          </TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead>{m.users.columns.member}</TableHead>

@@ -15,13 +15,14 @@ import {
   SelectValue,
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@cleanhub/ui";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { useSaasI18n } from "@/i18n";
@@ -80,6 +81,7 @@ function getEmptyStateMessage(
 
 export function TenantListView() {
   const { m, formatDate } = useSaasI18n();
+  const captionId = useId();
   const requestIdRef = useRef(0);
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
@@ -325,9 +327,11 @@ export function TenantListView() {
           </div>
         </div>
       ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
+        <Table aria-describedby={captionId}>
+          <TableCaption className="sr-only" id={captionId}>
+            {m.tenants.list.title}
+          </TableCaption>
+          <TableHeader>
               <TableRow>
                 <TableHead>{m.tenants.list.columns.name}</TableHead>
                 <TableHead>{m.tenants.list.columns.pressingCode}</TableHead>
@@ -388,7 +392,6 @@ export function TenantListView() {
               ))}
             </TableBody>
           </Table>
-        </div>
       )}
 
       <Dialog
