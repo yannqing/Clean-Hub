@@ -34,6 +34,11 @@ export type SaasMessages = {
     optionalTenantUlid: string;
     modulePlaceholder: string;
     badge: string;
+    // 全局错误/未找到兜底文案（app/error.tsx、app/not-found.tsx 使用）
+    somethingWentWrong: string;
+    loadErrorDescription: string;
+    notFoundTitle: string;
+    notFoundDescription: string;
     statusLabels: {
       active: string;
       suspended: string;
@@ -314,7 +319,7 @@ export type SaasMessages = {
       noAction: string;
     };
   };
-  audit: {
+  auditLogs: {
     badge: string;
     title: string;
     loadError: string;
@@ -341,7 +346,7 @@ export type SaasMessages = {
       actor: string;
     };
   };
-  operationLogs: {
+  systemLogs: {
     badge: string;
     title: string;
     loadError: string;
@@ -444,7 +449,7 @@ export type SaasMessages = {
       };
     };
   };
-  feedback: {
+  feedbackTickets: {
     badge: string;
     title: string;
     loadError: string;

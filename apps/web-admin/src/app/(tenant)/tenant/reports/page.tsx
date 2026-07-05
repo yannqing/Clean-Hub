@@ -24,7 +24,21 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     to: getStringParam(params, "to"),
     branchId: getStringParam(params, "branchId"),
   };
-  const summary = await getReportSummaryQuery(query);
+  const result = await getReportSummaryQuery(query)
+    .then((summary) => ({ summary, error: undefined }))
+    .catch((error: unknown) => ({
+      summary: undefined,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Report summary failed to load.",
+    }));
 
-  return <ReportSummaryView query={query} summary={summary} />;
+  return (
+    <ReportSummaryView
+      error={result.error}
+      query={query}
+      summary={result.summary}
+    />
+  );
 }

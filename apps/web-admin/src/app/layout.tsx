@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Toaster } from "@cleanhub/ui";
 
+import { AppProviders } from "@/components/providers";
 import { WebAdminLocaleProvider } from "@/i18n";
 import {
   getWebAdminHtmlLang,
@@ -25,7 +26,7 @@ export default async function RootLayout({
     <html lang={getWebAdminHtmlLang(initialLocale)}>
       <body>
         <WebAdminLocaleProvider initialLocale={initialLocale}>
-          {children}
+          <AppProviders>{children}</AppProviders>
         </WebAdminLocaleProvider>
         <Toaster />
       </body>

@@ -49,7 +49,7 @@ export function FeedbackTicketStatusControl({
     const result = await updateFeedbackTicketStatusAction(ticketId, input);
 
     if (result.ok) {
-      toast.success(m.feedback.status.updated);
+      toast.success(m.feedbackTickets.status.updated);
       setReason("");
       onUpdated(result.data);
     } else {
@@ -62,7 +62,7 @@ export function FeedbackTicketStatusControl({
   return (
     <form className="grid gap-3" onSubmit={handleSubmit}>
       <div className="grid gap-2">
-        <Label htmlFor={`feedback-status-${ticketId}`}>{m.feedback.status.label}</Label>
+        <Label htmlFor={`feedback-status-${ticketId}`}>{m.feedbackTickets.status.label}</Label>
         <Select
           onValueChange={(nextValue) =>
             setValue(nextValue as FeedbackTicketStatus)
@@ -93,19 +93,19 @@ export function FeedbackTicketStatusControl({
 
       <div className="grid gap-2">
         <Label htmlFor={`feedback-status-reason-${ticketId}`}>
-          {m.feedback.status.reason}
+          {m.feedbackTickets.status.reason}
         </Label>
         <Textarea
           id={`feedback-status-reason-${ticketId}`}
           maxLength={500}
           onChange={(event) => setReason(event.target.value)}
-          placeholder={m.feedback.status.reasonPlaceholder}
+          placeholder={m.feedbackTickets.status.reasonPlaceholder}
           value={reason}
         />
       </div>
 
       <Button disabled={submitting || value === status} type="submit">
-        {submitting ? m.common.saving : m.feedback.status.submit}
+        {submitting ? m.common.saving : m.feedbackTickets.status.submit}
       </Button>
     </form>
   );

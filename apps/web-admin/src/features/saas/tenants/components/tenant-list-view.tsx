@@ -28,7 +28,8 @@ import { useSaasI18n } from "@/i18n";
 
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantDialogContentClass, tenantStatusOptions } from "../constants";
-import { getCurrentSaasAuthQuery, getTenantListQuery } from "../queries";
+import { getCurrentAuthQuery } from "@/features/auth/queries";
+import { getTenantListQuery } from "../queries";
 import type { TenantStatus, TenantStatusCounts, TenantSummary } from "../types";
 import { TenantDetailView } from "./tenant-detail-view";
 import { TenantSettingsView } from "./tenant-settings-view";
@@ -138,7 +139,7 @@ export function TenantListView() {
               getTenantListQuery(metricsQuery),
             ]);
       const [authResult, tenantResults] = await Promise.allSettled([
-        getCurrentSaasAuthQuery(),
+        getCurrentAuthQuery(),
         tenantRequest,
       ]);
 

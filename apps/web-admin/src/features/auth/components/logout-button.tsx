@@ -4,8 +4,9 @@ import { Button, toast } from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { logoutAction } from "../actions";
 import { webAdminRoutes } from "@/config/routes";
+
+import { logoutBrowserSessionAction } from "../actions/browser-session.action";
 
 type LogoutButtonProps = {
   className?: string;
@@ -24,18 +25,19 @@ export function LogoutButton({
   async function handleLogout() {
     setSubmitting(true);
 
-    const result = await logoutAction();
-
-    if (result.ok) {
+    try {
+      await logoutBrowserSessionAction();
       toast.success("Signed out.");
-    } else {
-      toast.error(result.message);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to sign out cleanly.";
+      toast.error(message);
+    } finally {
+      // Always return to the login page, even if the server logout failed.
+      router.replace(webAdminRoutes.login);
+      router.refresh();
+      setSubmitting(false);
     }
-
-    // Always return to the login page, even if the server logout failed.
-    router.replace(webAdminRoutes.login);
-    router.refresh();
-    setSubmitting(false);
   }
 
   return (

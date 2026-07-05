@@ -36,6 +36,11 @@ export const saasMessagesEn: SaasMessages = {
     optionalTenantUlid: "Optional tenant ULID",
     modulePlaceholder: "Module placeholder",
     badge: "CleanHub Web Admin",
+    somethingWentWrong: "Something went wrong",
+    loadErrorDescription: "We couldn't load this page. Please try again.",
+    notFoundTitle: "Page not found",
+    notFoundDescription:
+      "The page you're looking for doesn't exist or may have moved.",
     statusLabels: {
       active: "Active",
       suspended: "Suspended",
@@ -339,7 +344,7 @@ export const saasMessagesEn: SaasMessages = {
       noAction: "No action",
     },
   },
-  audit: {
+  auditLogs: {
     badge: "SaaS audit",
     title: "Audit Logs",
     loadError: "Failed to load audit logs.",
@@ -366,7 +371,7 @@ export const saasMessagesEn: SaasMessages = {
       actor: "Actor",
     },
   },
-  operationLogs: {
+  systemLogs: {
     badge: "SaaS operation logs",
     title: "Operation Logs",
     loadError: "Failed to load operation logs.",
@@ -470,7 +475,7 @@ export const saasMessagesEn: SaasMessages = {
       },
     },
   },
-  feedback: {
+  feedbackTickets: {
     badge: "SaaS feedback",
     title: "Feedback Tickets",
     loadError: "Failed to load feedback.",

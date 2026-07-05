@@ -31,7 +31,7 @@ export function FeedbackTicketAssigneeControl({
     });
 
     if (result.ok) {
-      toast.success(m.feedback.assignee.updated);
+      toast.success(m.feedbackTickets.assignee.updated);
       setValue(result.data.assigneeUserId ?? "");
       onUpdated(result.data);
     } else {
@@ -45,12 +45,12 @@ export function FeedbackTicketAssigneeControl({
     <form className="grid gap-3" onSubmit={handleSubmit}>
       <div className="grid gap-2">
         <Label htmlFor={`feedback-assignee-${ticketId}`}>
-          {m.feedback.assignee.label}
+          {m.feedbackTickets.assignee.label}
         </Label>
         <Input
           id={`feedback-assignee-${ticketId}`}
           onChange={(event) => setValue(event.target.value)}
-          placeholder={m.feedback.assignee.placeholder}
+          placeholder={m.feedbackTickets.assignee.placeholder}
           value={value}
         />
       </div>
@@ -60,7 +60,7 @@ export function FeedbackTicketAssigneeControl({
         type="submit"
         variant="outline"
       >
-        {submitting ? m.common.saving : m.feedback.assignee.submit}
+        {submitting ? m.common.saving : m.feedbackTickets.assignee.submit}
       </Button>
     </form>
   );

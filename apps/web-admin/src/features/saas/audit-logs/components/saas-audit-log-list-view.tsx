@@ -81,7 +81,7 @@ export function SaasAuditLogListView() {
       setLogs(result.items);
       setTotal(result.total);
     } catch (loadError) {
-      setError(getErrorMessage(loadError) || m.audit.loadError);
+      setError(getErrorMessage(loadError) || m.auditLogs.loadError);
     } finally {
       setLoading(false);
     }
@@ -102,7 +102,7 @@ export function SaasAuditLogListView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError) || m.audit.loadError);
+          setError(getErrorMessage(loadError) || m.auditLogs.loadError);
         }
       })
       .finally(() => {
@@ -114,7 +114,7 @@ export function SaasAuditLogListView() {
     return () => {
       isCurrent = false;
     };
-  }, [listQuery, m.audit.loadError]);
+  }, [listQuery, m.auditLogs.loadError]);
 
   const openDetail = useCallback((log: AuditLogSummary) => {
     setSelectedLog(log);
@@ -127,7 +127,7 @@ export function SaasAuditLogListView() {
         setDetail(data);
       })
       .catch((err: unknown) => {
-        setDetailError(getErrorMessage(err) || m.audit.loadError);
+        setDetailError(getErrorMessage(err) || m.auditLogs.loadError);
       })
       .finally(() => {
         setDetailLoading(false);
@@ -141,9 +141,9 @@ export function SaasAuditLogListView() {
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">{m.audit.badge}</Badge>
+          <Badge variant="secondary">{m.auditLogs.badge}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {m.audit.title}
+            {m.auditLogs.title}
           </h1>
         </div>
 
@@ -154,7 +154,7 @@ export function SaasAuditLogListView() {
 
       <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-5">
         <div className="grid gap-2">
-          <Label htmlFor="audit-category-filter">{m.audit.category}</Label>
+          <Label htmlFor="audit-category-filter">{m.auditLogs.category}</Label>
           <Select
             onValueChange={(value) => {
               setOffset(0);
@@ -184,7 +184,7 @@ export function SaasAuditLogListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="audit-success-filter">{m.audit.result}</Label>
+          <Label htmlFor="audit-success-filter">{m.auditLogs.result}</Label>
           <Select
             onValueChange={(value) => {
               setOffset(0);
@@ -205,7 +205,7 @@ export function SaasAuditLogListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="audit-actor-filter">{m.audit.actorUserId}</Label>
+          <Label htmlFor="audit-actor-filter">{m.auditLogs.actorUserId}</Label>
           <Input
             id="audit-actor-filter"
             onChange={(event) => {
@@ -265,7 +265,7 @@ export function SaasAuditLogListView() {
       ) : logs.length === 0 ? (
         <div className="p-5">
           <div className="rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">{m.audit.emptyTitle}</h2>
+            <h2 className="text-base font-semibold">{m.auditLogs.emptyTitle}</h2>
           </div>
         </div>
       ) : (
@@ -273,12 +273,12 @@ export function SaasAuditLogListView() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{m.audit.columns.created}</TableHead>
-                <TableHead>{m.audit.category}</TableHead>
-                <TableHead>{m.audit.columns.event}</TableHead>
-                <TableHead>{m.audit.columns.entity}</TableHead>
-                <TableHead>{m.audit.columns.actor}</TableHead>
-                <TableHead>{m.audit.result}</TableHead>
+                <TableHead>{m.auditLogs.columns.created}</TableHead>
+                <TableHead>{m.auditLogs.category}</TableHead>
+                <TableHead>{m.auditLogs.columns.event}</TableHead>
+                <TableHead>{m.auditLogs.columns.entity}</TableHead>
+                <TableHead>{m.auditLogs.columns.actor}</TableHead>
+                <TableHead>{m.auditLogs.result}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -363,9 +363,9 @@ export function SaasAuditLogListView() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{m.audit.detail.title}</DialogTitle>
+            <DialogTitle>{m.auditLogs.detail.title}</DialogTitle>
             <DialogDescription className="sr-only">
-              {m.audit.detail.description}
+              {m.auditLogs.detail.description}
             </DialogDescription>
           </DialogHeader>
 
@@ -381,9 +381,9 @@ export function SaasAuditLogListView() {
           ) : detail ? (
             <div className="grid gap-3 text-sm">
               <div className="grid grid-cols-[140px_1fr] gap-y-2">
-                <span className="text-muted-foreground">{m.audit.detail.id}</span>
+                <span className="text-muted-foreground">{m.auditLogs.detail.id}</span>
                 <span className="break-all font-mono text-xs">{detail.id}</span>
-                <span className="text-muted-foreground">{m.audit.category}</span>
+                <span className="text-muted-foreground">{m.auditLogs.category}</span>
                 <span>
                   {detail.eventCategory === "auth"
                     ? m.common.auditCategoryLabels.auth
@@ -395,21 +395,21 @@ export function SaasAuditLogListView() {
                           ? m.common.auditCategoryLabels.saasUser
                           : detail.eventCategory}
                 </span>
-                <span className="text-muted-foreground">{m.audit.columns.event}</span>
+                <span className="text-muted-foreground">{m.auditLogs.columns.event}</span>
                 <span>{getAuditEventDescription(detail.eventType)}</span>
-                <span className="text-muted-foreground">{m.audit.detail.entityType}</span>
+                <span className="text-muted-foreground">{m.auditLogs.detail.entityType}</span>
                 <span>{detail.entityType ?? m.common.notSet}</span>
-                <span className="text-muted-foreground">{m.audit.detail.entityId}</span>
+                <span className="text-muted-foreground">{m.auditLogs.detail.entityId}</span>
                 <span className="break-all font-mono text-xs">
                   {detail.entityId ?? m.common.notSet}
                 </span>
-                <span className="text-muted-foreground">{m.audit.columns.actor}</span>
+                <span className="text-muted-foreground">{m.auditLogs.columns.actor}</span>
                 <span>{detail.actorDisplayName ?? detail.actorUserId ?? m.common.system}</span>
-                <span className="text-muted-foreground">{m.audit.detail.tenant}</span>
+                <span className="text-muted-foreground">{m.auditLogs.detail.tenant}</span>
                 <span className="break-all font-mono text-xs">
                   {detail.tenantId ?? m.common.platform}
                 </span>
-                <span className="text-muted-foreground">{m.audit.result}</span>
+                <span className="text-muted-foreground">{m.auditLogs.result}</span>
                 <Badge
                   className="w-fit"
                   variant={detail.success ? "default" : "destructive"}
@@ -420,13 +420,13 @@ export function SaasAuditLogListView() {
                 </Badge>
                 {detail.reason ? (
                   <>
-                    <span className="text-muted-foreground">{m.audit.detail.reason}</span>
+                    <span className="text-muted-foreground">{m.auditLogs.detail.reason}</span>
                     <span>{detail.reason}</span>
                   </>
                 ) : null}
-                <span className="text-muted-foreground">{m.audit.detail.ipAddress}</span>
+                <span className="text-muted-foreground">{m.auditLogs.detail.ipAddress}</span>
                 <span>{detail.ipAddress ?? m.common.notSet}</span>
-                <span className="text-muted-foreground">{m.audit.columns.created}</span>
+                <span className="text-muted-foreground">{m.auditLogs.columns.created}</span>
                 <span>{formatDateTime(detail.createdAt) || m.common.invalidDate}</span>
               </div>
 
@@ -435,7 +435,7 @@ export function SaasAuditLogListView() {
                   {detail.before ? (
                     <div className="grid gap-1">
                       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {m.audit.detail.before}
+                        {m.auditLogs.detail.before}
                       </span>
                       <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">
                         {JSON.stringify(detail.before, null, 2)}
@@ -445,7 +445,7 @@ export function SaasAuditLogListView() {
                   {detail.after ? (
                     <div className="grid gap-1">
                       <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {m.audit.detail.after}
+                        {m.auditLogs.detail.after}
                       </span>
                       <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">
                         {JSON.stringify(detail.after, null, 2)}

@@ -36,6 +36,10 @@ export const saasMessagesZhCN: SaasMessages = {
     optionalTenantUlid: "可选租户 ULID",
     modulePlaceholder: "模块占位",
     badge: "CleanHub 管理后台",
+    somethingWentWrong: "出错了",
+    loadErrorDescription: "无法加载此页面，请重试。",
+    notFoundTitle: "页面未找到",
+    notFoundDescription: "您访问的页面不存在或已被移动。",
     statusLabels: {
       active: "活跃",
       suspended: "已暂停",
@@ -335,7 +339,7 @@ export const saasMessagesZhCN: SaasMessages = {
       noAction: "无操作",
     },
   },
-  audit: {
+  auditLogs: {
     badge: "SaaS 审计",
     title: "审计日志",
     loadError: "加载审计日志失败。",
@@ -362,7 +366,7 @@ export const saasMessagesZhCN: SaasMessages = {
       actor: "操作者",
     },
   },
-  operationLogs: {
+  systemLogs: {
     badge: "SaaS 操作日志",
     title: "操作日志",
     loadError: "加载操作日志失败。",
@@ -465,7 +469,7 @@ export const saasMessagesZhCN: SaasMessages = {
       },
     },
   },
-  feedback: {
+  feedbackTickets: {
     badge: "SaaS 反馈",
     title: "反馈工单",
     loadError: "加载反馈失败。",

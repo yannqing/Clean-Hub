@@ -1,4 +1,4 @@
-import { LoginFormPlaceholder } from "@/components/auth";
+import { LoginForm } from "@/features/auth/components";
 
 export default function LoginPage() {
   return (
@@ -14,7 +14,7 @@ export default function LoginPage() {
             their pressing code.
           </p>
         </div>
-        <LoginFormPlaceholder />
+        <LoginForm />
       </div>
     </main>
   );
