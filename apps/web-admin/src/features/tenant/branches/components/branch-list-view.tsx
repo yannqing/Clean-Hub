@@ -12,6 +12,7 @@ import {
   SelectValue,
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -19,7 +20,7 @@ import {
   toast,
 } from "@cleanhub/ui";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 
@@ -70,6 +71,7 @@ function getActionFailureMessage(result: BranchActionFailure): string {
 }
 
 export function BranchListView() {
+  const captionId = useId();
   const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -307,7 +309,10 @@ export function BranchListView() {
                 or filters to narrow the list.
               </div>
             ) : null}
-            <Table>
+            <Table aria-describedby={captionId}>
+              <TableCaption className="sr-only" id={captionId}>
+                Branches
+              </TableCaption>
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
