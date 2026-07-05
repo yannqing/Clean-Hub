@@ -1,13 +1,14 @@
 "use client";
 
 import type { AuthContext } from "@cleanhub/api-client";
-import { Card, CardContent, cn } from "@cleanhub/ui";
+import { Card, CardContent, Icon, cn } from "@cleanhub/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { LanguageSwitcher } from "@/components/i18n";
 import { filterSidebarSections } from "@/config/feature-visibility";
+import { getNavIcon } from "@/config/nav-icons";
 import { webAdminWorkspaceTabs } from "@/config/navigation";
 import { webAdminRoutes } from "@/config/routes";
 import { LogoutButton } from "@/features/auth/components";
@@ -133,12 +134,13 @@ export function AdminDashboardShell({
                 <div className="grid gap-1">
                   {section.items.map((item) => {
                     const active = isActivePath(pathname, item.href);
+                    const IconComponent = getNavIcon(item.href);
 
                     return (
                       <Link
                         aria-current={active ? "page" : undefined}
                         className={cn(
-                          "group relative flex h-9 items-center rounded-md px-3 text-sm font-medium transition-colors",
+                          "group relative flex h-9 items-center gap-2.5 rounded-md px-3 text-sm font-medium transition-colors",
                           "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                           active
@@ -154,6 +156,17 @@ export function AdminDashboardShell({
                             active && "opacity-100",
                           )}
                         />
+                        {IconComponent ? (
+                          <Icon
+                            aria-hidden
+                            className={cn(
+                              "text-muted-foreground transition-colors",
+                              active &&
+                                "text-sidebar-accent-foreground",
+                            )}
+                            icon={IconComponent}
+                          />
+                        ) : null}
                         <span className="truncate">{item.label}</span>
                       </Link>
                     );

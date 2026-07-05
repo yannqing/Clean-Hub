@@ -1,9 +1,16 @@
-export type AdminRole =
-  | "super_admin"
-  | "support"
-  | "owner"
-  | "manager"
-  | "cashier";
+// Re-export the canonical role / permission types so consumers of
+// `@cleanhub/api-client` get them from a single source of truth
+// (`@cleanhub/domain`) without having to add that package as a direct
+// dependency. Keeping the re-export here means `AuthContext` below stays
+// strongly typed against the same catalog used by the backend RBAC layer.
+export type {
+  AdminRole,
+  Permission,
+  SaasAdminRole,
+  TenantRole,
+} from "@cleanhub/domain";
+
+import type { AdminRole, Permission } from "@cleanhub/domain";
 
 export type AuthContext = {
   userId: string;
@@ -12,7 +19,7 @@ export type AuthContext = {
   branchIds: string[];
   role: AdminRole;
   roles: string[];
-  permissions: string[];
+  permissions: Permission[];
   accessTokenExpiresAt: string;
 };
 

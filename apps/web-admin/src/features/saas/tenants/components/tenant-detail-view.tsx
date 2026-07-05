@@ -17,6 +17,10 @@ import { useEffect, useState } from "react";
 import { webAdminRoutes } from "@/config/routes";
 import { useSaasI18n } from "@/i18n";
 import { interpolate } from "@/i18n/messages/saas";
+import {
+  canUpdateTenantStatus,
+  canWriteTenant,
+} from "@/lib/permissions";
 
 import { updateTenantAction, updateTenantStatusAction } from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
@@ -79,19 +83,6 @@ function getStatusActionLabel(
   return m.tenants.detail.disable;
 }
 
-function canWriteTenant(authContext: AuthContext | null): boolean {
-  return Boolean(
-    authContext &&
-      authContext.tenantId === null &&
-      (authContext.role === "super_admin" ||
-        authContext.permissions.includes("saas:tenant:write")),
-  );
-}
-
-function canUpdateTenantStatus(authContext: AuthContext | null): boolean {
-  return authContext?.role === "super_admin" && authContext.tenantId === null;
-}
-
 export function TenantDetailView({
   tenantId,
   presentation = "page",
@@ -112,7 +103,6 @@ export function TenantDetailView({
   );
   const canManageTenant = canWriteTenant(authContext);
   const canManageStatus = canUpdateTenantStatus(authContext);
-
   async function handleUpdateTenant(values: TenantFormValues) {
     const tenantResult = await updateTenantAction(tenantId, values);
 

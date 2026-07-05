@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cleanhub/domain": "workspace:*",
     "@cleanhub/id": "workspace:*"
   }
 }

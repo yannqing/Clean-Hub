@@ -1,3 +1,4 @@
+import { isSaasAdminRole, type AdminRole } from "@cleanhub/domain";
 import { NextResponse, type NextRequest } from "next/server";
 
 const ACCESS_COOKIE_NAME = "cleanhub_access_token";
@@ -7,8 +8,6 @@ const API_BASE_URL =
   process.env.CLEANHUB_API_BASE_URL ??
   process.env.NEXT_PUBLIC_API_BASE_URL ??
   DEFAULT_API_BASE_URL;
-
-type AdminRole = "super_admin" | "support" | "owner" | "manager";
 
 type AuthContext = {
   userId: string;
@@ -25,12 +24,8 @@ type AuthResolution = {
   setCookieHeaders: string[];
 };
 
-function isSaasRole(role: AdminRole): boolean {
-  return role === "super_admin" || role === "support";
-}
-
 function getDefaultPathForRole(role: AdminRole): string {
-  return isSaasRole(role) ? "/saas" : "/tenant";
+  return isSaasAdminRole(role) ? "/saas" : "/tenant";
 }
 
 function isSaasPath(pathname: string): boolean {
@@ -168,11 +163,11 @@ export async function proxy(request: NextRequest) {
     return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 
-  if (isSaasPath(pathname) && !isSaasRole(auth.authContext.role)) {
+  if (isSaasPath(pathname) && !isSaasAdminRole(auth.authContext.role)) {
     return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 
-  if (isTenantPath(pathname) && isSaasRole(auth.authContext.role)) {
+  if (isTenantPath(pathname) && isSaasAdminRole(auth.authContext.role)) {
     return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 
