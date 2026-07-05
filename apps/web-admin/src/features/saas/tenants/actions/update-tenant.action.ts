@@ -1,11 +1,11 @@
 "use server";
 
-import type { AuthContext } from "@cleanhub/api-client";
 import { revalidatePath } from "next/cache";
 
 import { getAuthSessionQuery } from "@/features/auth/queries";
 import { getSaasServerApiRequestOptions } from "@/features/saas/server/api-request-options";
 import { webAdminApi } from "@/lib/api-client";
+import { canWriteTenant } from "@/lib/permissions";
 
 import type { TenantDetail, TenantFormValues } from "../types";
 import { validateTenantUpdateForm } from "../validators";
@@ -25,14 +25,6 @@ type UpdateTenantActionResult =
 const FORBIDDEN_MESSAGE =
   "Tenant updates require Super Admin or SaaS tenant write permission.";
 
-function canWriteTenant(authContext: AuthContext): boolean {
-  return Boolean(
-    authContext.tenantId === null &&
-      (authContext.role === "super_admin" ||
-        authContext.permissions.includes("saas:tenant:write")),
-  );
-}
-
 export async function updateTenantAction(
   tenantId: string,
   input: TenantFormValues,
@@ -40,7 +32,7 @@ export async function updateTenantAction(
   const requestOptions = await getSaasServerApiRequestOptions();
   const authContext = await getAuthSessionQuery(requestOptions);
 
-  if (!authContext || !canWriteTenant(authContext)) {
+  if (!canWriteTenant(authContext)) {
     return {
       ok: false,
       errors: {},

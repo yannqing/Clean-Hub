@@ -1,11 +1,12 @@
 "use server";
 
-import type { AuthContext, TenantStatus } from "@cleanhub/api-client";
+import type { TenantStatus } from "@cleanhub/api-client";
 import { revalidatePath } from "next/cache";
 
 import { getAuthSessionQuery } from "@/features/auth/queries";
 import { getSaasServerApiRequestOptions } from "@/features/saas/server/api-request-options";
 import { webAdminApi } from "@/lib/api-client";
+import { canUpdateTenantStatus } from "@/lib/permissions";
 
 import type { TenantDetail } from "../types";
 import { getTenantStatusActionErrorResult } from "./tenant-action-errors";
@@ -26,10 +27,6 @@ type TenantStatusActionResult =
 
 const FORBIDDEN_MESSAGE = "You do not have permission to update tenant status.";
 
-function canUpdateTenantStatus(authContext: AuthContext): boolean {
-  return authContext.role === "super_admin" && authContext.tenantId === null;
-}
-
 export async function suspendTenantAction(
   tenantId: string,
   input: { reason: string; status?: TenantStatus },
@@ -37,7 +34,7 @@ export async function suspendTenantAction(
   const requestOptions = await getSaasServerApiRequestOptions();
   const authContext = await getAuthSessionQuery(requestOptions);
 
-  if (!authContext || !canUpdateTenantStatus(authContext)) {
+  if (!canUpdateTenantStatus(authContext)) {
     return {
       ok: false as const,
       errors: {},

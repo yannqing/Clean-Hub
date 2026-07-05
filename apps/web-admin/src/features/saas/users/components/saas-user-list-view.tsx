@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentAuthQuery } from "@/features/auth/queries";
 import { useSaasI18n } from "@/i18n";
 import { interpolate } from "@/i18n/messages/saas";
+import { canManageSaasUsers, isPlatformSuperAdmin } from "@/lib/permissions";
 
 import {
   inviteSaasUserAction,
@@ -257,8 +258,8 @@ export function SaasUserListView() {
     [query, status],
   );
 
-  const isSuperAdmin = authContext?.role === "super_admin";
-  const canManageMembers = isSuperAdmin && !authError;
+  const isSuperAdmin = isPlatformSuperAdmin(authContext);
+  const canManageMembers = canManageSaasUsers(authContext) && !authError;
   const activeRoleCodes = useMemo<SaasUserRoleCode[]>(() => {
     const loadedRoleCodes = roles
       .filter((role) => role.status === "active")

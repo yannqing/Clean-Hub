@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { useSaasI18n } from "@/i18n";
+import { canCreateTenant } from "@/lib/permissions";
 
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantDialogContentClass, tenantStatusOptions } from "../constants";
@@ -75,10 +76,6 @@ function getEmptyStateMessage(
   }
 
   return defaultMessage;
-}
-
-function canCreateTenant(authContext: AuthContext | null): boolean {
-  return authContext?.role === "super_admin" && authContext.tenantId === null;
 }
 
 export function TenantListView() {

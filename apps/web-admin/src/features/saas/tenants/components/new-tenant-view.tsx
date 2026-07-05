@@ -9,14 +9,11 @@ import { useEffect, useState } from "react";
 import { webAdminRoutes } from "@/config/routes";
 import { getCurrentAuthQuery } from "@/features/auth/queries";
 import { useSaasI18n } from "@/i18n";
+import { canCreateTenant } from "@/lib/permissions";
 
 import { createTenantAction } from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { TenantForm } from "./tenant-form";
-
-function canCreateTenant(authContext: AuthContext | null): boolean {
-  return authContext?.role === "super_admin" && authContext.tenantId === null;
-}
 
 export function NewTenantView() {
   const { m } = useSaasI18n();

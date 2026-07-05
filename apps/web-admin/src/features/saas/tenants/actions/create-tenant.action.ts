@@ -1,12 +1,12 @@
 "use server";
 
-import type { AuthContext } from "@cleanhub/api-client";
 import { revalidatePath } from "next/cache";
 
 import { getAuthSessionQuery } from "@/features/auth/queries";
 import { getSecuritySettingsQuery } from "@/features/saas/security/queries";
 import { getSaasServerApiRequestOptions } from "@/features/saas/server/api-request-options";
 import { webAdminApi } from "@/lib/api-client";
+import { canCreateTenant } from "@/lib/permissions";
 
 import type { CreateTenantResponse, TenantFormValues } from "../types";
 import { validateTenantForm } from "../validators";
@@ -25,17 +25,13 @@ type CreateTenantActionResult =
 
 const FORBIDDEN_MESSAGE = "Only super admins can create tenants.";
 
-function isSuperAdminWithoutTenant(authContext: AuthContext): boolean {
-  return authContext.role === "super_admin" && authContext.tenantId === null;
-}
-
 export async function createTenantAction(
   input: TenantFormValues,
 ): Promise<CreateTenantActionResult> {
   const requestOptions = await getSaasServerApiRequestOptions();
   const authContext = await getAuthSessionQuery(requestOptions);
 
-  if (!authContext || !isSuperAdminWithoutTenant(authContext)) {
+  if (!canCreateTenant(authContext)) {
     return {
       ok: false,
       errors: {},
