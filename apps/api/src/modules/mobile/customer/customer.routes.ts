@@ -19,6 +19,7 @@ export function createCustomerRoutes({
   routes.post("/contacts", controller.createContact);
   routes.patch("/contacts/:id", controller.updateContact);
   routes.delete("/contacts/:id", controller.deleteContact);
+  routes.get("/branches", controller.listBranches);
   routes.get("/addresses", controller.listAddresses);
   routes.post("/addresses", controller.createAddress);
   routes.post("/addresses/:id/default", controller.setDefaultAddress);

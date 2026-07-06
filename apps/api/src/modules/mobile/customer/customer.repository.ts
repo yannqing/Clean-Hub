@@ -30,6 +30,7 @@ import type {
   CustomerAddressWriteInput,
   CustomerAppointment,
   CustomerAppointmentType,
+  CustomerBranchOption,
   CustomerContact,
   CustomerContactWriteInput,
   CustomerOrderDetail,
@@ -381,6 +382,27 @@ export class CustomerRepository {
       .orderBy(desc(customerAddresses.isDefault), asc(customerAddresses.createdAt));
 
     return rows.map(toCustomerAddress);
+  }
+
+  async listBranches(input: { tenantId: string }): Promise<CustomerBranchOption[]> {
+    const rows = await this.db
+      .select({
+        id: branches.id,
+        name: branches.name,
+        address: branches.address,
+        status: branches.status,
+      })
+      .from(branches)
+      .where(
+        and(
+          eq(branches.tenantId, input.tenantId),
+          eq(branches.status, "active"),
+          isNull(branches.deletedAt),
+        ),
+      )
+      .orderBy(asc(branches.name), asc(branches.createdAt));
+
+    return rows;
   }
 
   async findOwnedAddressById(input: {

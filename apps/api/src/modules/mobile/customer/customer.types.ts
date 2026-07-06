@@ -65,6 +65,13 @@ export type CustomerAddress = {
   updatedAt: string;
 };
 
+export type CustomerBranchOption = {
+  id: string;
+  name: string;
+  address: string | null;
+  status: "active" | "inactive";
+};
+
 export type CustomerAddressWriteInput = {
   customerId?: string | null;
   label: string;
@@ -217,7 +224,7 @@ export class CustomerError extends Error {
   constructor(
     readonly code: CustomerErrorCode,
     message: string,
-    readonly status: 403 | 404 | 409 | 422,
+    readonly status: 400 | 403 | 404 | 409 | 422,
     readonly details?: Record<string, unknown>,
   ) {
     super(message);

@@ -10,6 +10,10 @@ export async function getCustomerAddresses() {
   return apiClient.mobile.customer.listAddresses();
 }
 
+export async function getCustomerBranches() {
+  return apiClient.mobile.customer.listBranches();
+}
+
 export async function getCustomerOrdersAndTickets() {
   return apiClient.mobile.customer.listOrdersAndTickets();
 }

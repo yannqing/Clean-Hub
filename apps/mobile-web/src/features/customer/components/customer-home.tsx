@@ -9,6 +9,7 @@ import type {
   MobileCustomerAppointment,
   MobileCustomerAppointmentStatus,
   MobileCustomerAppointmentType,
+  MobileCustomerBranchOption,
   MobileCustomerContact,
   MobileCustomerOrderDetail,
   MobileCustomerOrderListItem,
@@ -91,6 +92,7 @@ import {
   getCustomerActivityDetail,
   getCustomerAddresses,
   getCustomerAppointments,
+  getCustomerBranches,
   getCustomerOrdersAndTickets,
   getCustomerProfile,
   getCustomerRefundRequests,
@@ -151,6 +153,8 @@ type CustomerOverviewNextItem =
 
 type AppointmentFormState = {
   type: MobileCustomerAppointmentType;
+  branchId: string;
+  addressId: string;
   expectedAt: string;
   address: string;
   notes: string;
@@ -237,6 +241,9 @@ const emptyAddressForm: CustomerAddressFormState = {
   isDefault: false,
   notes: "",
 };
+
+const CUSTOM_APPOINTMENT_ADDRESS_ID = "__custom";
+const MIN_APPOINTMENT_LEAD_TIME_MINUTES = 30;
 
 const emptyPasswordForm: CustomerPasswordFormState = {
   currentPassword: "",
@@ -816,6 +823,14 @@ function getDefaultExpectedAt(): string {
   return toDateTimeLocalValue(date);
 }
 
+function getMinimumAppointmentDate(): Date {
+  return new Date(Date.now() + MIN_APPOINTMENT_LEAD_TIME_MINUTES * 60 * 1000);
+}
+
+function getMinimumAppointmentDateValue(): string {
+  return toDateTimeLocalValue(getMinimumAppointmentDate());
+}
+
 function toDateTimeLocalValue(date: Date): string {
   const pad = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
@@ -1006,6 +1021,10 @@ function getAddressBookPrimaryAddress(addresses: MobileCustomerAddress[]): strin
   return address ? formatCustomerAddress(address) : "";
 }
 
+function getAddressBookPrimaryAddressId(addresses: MobileCustomerAddress[]): string {
+  return (addresses.find((item) => item.isDefault) ?? addresses[0])?.id ?? CUSTOM_APPOINTMENT_ADDRESS_ID;
+}
+
 function toProfileForm(profile: MobileCustomerProfile | null): CustomerProfileFormState {
   return {
     accountName: profile?.account.accountName ?? "",
@@ -1097,6 +1116,7 @@ type CustomerSnapshot = {
   authContext: MobileAuthContext | null;
   profile: MobileCustomerProfile | null;
   addressBook: MobileCustomerAddress[];
+  branches: MobileCustomerBranchOption[];
   activity: MobileCustomerActivityList;
   appointments: MobileCustomerAppointment[];
   refundRequests: MobileRefundRequest[];
@@ -1111,6 +1131,7 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
       authContext: session?.authContext ?? null,
       profile: null,
       addressBook: [],
+      branches: [],
       activity: emptyActivity,
       appointments: [],
       refundRequests: [],
@@ -1118,9 +1139,10 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
     };
   }
 
-  const [profile, addressBook, activity, appointments, refundRequests] = await Promise.all([
+  const [profile, addressBook, branches, activity, appointments, refundRequests] = await Promise.all([
     getCustomerProfile(),
     getCustomerAddresses(),
+    getCustomerBranches(),
     getCustomerOrdersAndTickets(),
     getCustomerAppointments(),
     getCustomerRefundRequests(),
@@ -1130,6 +1152,7 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
     authContext: session.authContext,
     profile,
     addressBook: addressBook.data,
+    branches: branches.data,
     activity: activity.data,
     appointments: sortAppointments(appointments.data),
     refundRequests: refundRequests.data,
@@ -1156,6 +1179,7 @@ export function CustomerHome({
   );
   const [profile, setProfile] = useState<MobileCustomerProfile | null>(null);
   const [addressBook, setAddressBook] = useState<MobileCustomerAddress[]>([]);
+  const [branches, setBranches] = useState<MobileCustomerBranchOption[]>([]);
   const [activity, setActivity] = useState<MobileCustomerActivityList>(emptyActivity);
   const [appointments, setAppointments] = useState<MobileCustomerAppointment[]>([]);
   const [refundRequests, setRefundRequests] = useState<MobileRefundRequest[]>([]);
@@ -1173,6 +1197,8 @@ export function CustomerHome({
   const [refundSheetOpen, setRefundSheetOpen] = useState(false);
   const [appointmentForm, setAppointmentForm] = useState<AppointmentFormState>({
     type: "pickup",
+    branchId: "",
+    addressId: CUSTOM_APPOINTMENT_ADDRESS_ID,
     expectedAt: getDefaultExpectedAt(),
     address: "",
     notes: "",
@@ -1215,6 +1241,7 @@ export function CustomerHome({
       setAuthContext(snapshot.authContext);
       setProfile(snapshot.profile);
       setAddressBook(snapshot.addressBook);
+      setBranches(snapshot.branches);
       setActivity(snapshot.activity);
       setAppointments(snapshot.appointments);
       setRefundRequests(snapshot.refundRequests);
@@ -1222,6 +1249,11 @@ export function CustomerHome({
       setProfileForm(toProfileForm(snapshot.profile));
       setAppointmentForm((current) => ({
         ...current,
+        branchId: current.branchId || snapshot.branches[0]?.id || "",
+        addressId:
+          current.addressId === CUSTOM_APPOINTMENT_ADDRESS_ID && current.address
+            ? current.addressId
+            : getAddressBookPrimaryAddressId(snapshot.addressBook),
         address:
           current.address ||
           getAddressBookPrimaryAddress(snapshot.addressBook) ||
@@ -1247,6 +1279,7 @@ export function CustomerHome({
         setAuthContext(snapshot.authContext);
         setProfile(snapshot.profile);
         setAddressBook(snapshot.addressBook);
+        setBranches(snapshot.branches);
         setActivity(snapshot.activity);
         setAppointments(snapshot.appointments);
         setRefundRequests(snapshot.refundRequests);
@@ -1254,6 +1287,11 @@ export function CustomerHome({
         setProfileForm(toProfileForm(snapshot.profile));
         setAppointmentForm((current) => ({
           ...current,
+          branchId: current.branchId || snapshot.branches[0]?.id || "",
+          addressId:
+            current.addressId === CUSTOM_APPOINTMENT_ADDRESS_ID && current.address
+              ? current.addressId
+              : getAddressBookPrimaryAddressId(snapshot.addressBook),
           address:
             current.address ||
             getAddressBookPrimaryAddress(snapshot.addressBook) ||
@@ -1543,8 +1581,13 @@ export function CustomerHome({
         throw new Error(t("customer.messages.invalidAppointmentDate"));
       }
 
+      if (expectedAt.getTime() < getMinimumAppointmentDate().getTime()) {
+        throw new Error(t("customer.messages.appointmentInPast"));
+      }
+
       const created = await createCustomerAppointment({
         type: appointmentForm.type,
+        branchId: appointmentForm.branchId || undefined,
         expectedAt: expectedAt.toISOString(),
         address: appointmentForm.address,
         notes: appointmentForm.notes,
@@ -1789,6 +1832,7 @@ export function CustomerHome({
       });
       setAppointmentForm((current) => ({
         ...current,
+        addressId: current.address ? current.addressId : saved.id,
         address: current.address || formatCustomerAddress(saved),
       }));
       setProfileSheet(null);
@@ -1813,6 +1857,11 @@ export function CustomerHome({
     try {
       await deleteCustomerAddress(addressId);
       setAddressBook((current) => current.filter((address) => address.id !== addressId));
+      setAppointmentForm((current) =>
+        current.addressId === addressId
+          ? { ...current, addressId: CUSTOM_APPOINTMENT_ADDRESS_ID }
+          : current,
+      );
       setMessage(t("customer.messages.addressDeleted"));
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("common.errors.genericAction")));
@@ -1837,6 +1886,7 @@ export function CustomerHome({
       );
       setAppointmentForm((current) => ({
         ...current,
+        addressId: updated.id,
         address: formatCustomerAddress(updated),
       }));
       setMessage(t("customer.messages.defaultAddressUpdated"));
@@ -1984,6 +2034,8 @@ export function CustomerHome({
       />
 
       <AppointmentFormSheet
+        addressBook={addressBook}
+        branches={branches}
         error={appointmentSheetOpen ? error : null}
         form={appointmentForm}
         isSubmitting={isSubmittingAppointment}
@@ -2853,6 +2905,8 @@ function AppointmentsView({
 }
 
 function AppointmentFormSheet({
+  addressBook,
+  branches,
   error,
   form,
   isSubmitting,
@@ -2861,6 +2915,8 @@ function AppointmentFormSheet({
   onOpenChange,
   onSubmit,
 }: {
+  addressBook: MobileCustomerAddress[];
+  branches: MobileCustomerBranchOption[];
   error: string | null;
   form: AppointmentFormState;
   isSubmitting: boolean;
@@ -2882,6 +2938,8 @@ function AppointmentFormSheet({
         {error ? <AlertMessage tone="error" message={error} /> : null}
 
         <AppointmentForm
+          addressBook={addressBook}
+          branches={branches}
           form={form}
           isSubmitting={isSubmitting}
           onFormChange={onFormChange}
@@ -2893,17 +2951,42 @@ function AppointmentFormSheet({
 }
 
 function AppointmentForm({
+  addressBook,
+  branches,
   form,
   isSubmitting,
   onFormChange,
   onSubmit,
 }: {
+  addressBook: MobileCustomerAddress[];
+  branches: MobileCustomerBranchOption[];
   form: AppointmentFormState;
   isSubmitting: boolean;
   onFormChange: React.Dispatch<React.SetStateAction<AppointmentFormState>>;
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
   const { t } = useTranslation();
+  const selectedAddressId = addressBook.some((address) => address.id === form.addressId)
+    ? form.addressId
+    : CUSTOM_APPOINTMENT_ADDRESS_ID;
+
+  function handleAddressSourceChange(addressId: string) {
+    if (addressId === CUSTOM_APPOINTMENT_ADDRESS_ID) {
+      onFormChange((current) => ({
+        ...current,
+        addressId,
+      }));
+      return;
+    }
+
+    const selectedAddress = addressBook.find((address) => address.id === addressId);
+
+    onFormChange((current) => ({
+      ...current,
+      addressId,
+      address: selectedAddress ? formatCustomerAddress(selectedAddress) : current.address,
+    }));
+  }
 
   return (
     <form className="space-y-4" onSubmit={onSubmit}>
@@ -2925,11 +3008,35 @@ function AppointmentForm({
         ))}
       </fieldset>
 
+      {branches.length > 1 ? (
+        <div className="space-y-2">
+          <Label htmlFor="appointment-branch">{t("customer.appointments.branch")}</Label>
+          <Select
+            value={form.branchId}
+            onValueChange={(branchId) =>
+              onFormChange((current) => ({ ...current, branchId }))
+            }
+          >
+            <SelectTrigger className="h-12 text-base" id="appointment-branch">
+              <SelectValue placeholder={t("customer.appointments.branchPlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {branches.map((branch) => (
+                <SelectItem key={branch.id} value={branch.id}>
+                  {branch.address ? `${branch.name} - ${branch.address}` : branch.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
       <div className="space-y-2">
         <Label htmlFor="appointment-expected-at">{t("customer.forms.expectedAt")}</Label>
         <Input
           className="h-12 text-base"
           id="appointment-expected-at"
+          min={getMinimumAppointmentDateValue()}
           type="datetime-local"
           value={form.expectedAt}
           onChange={(event) =>
@@ -2937,6 +3044,29 @@ function AppointmentForm({
           }
         />
       </div>
+
+      {addressBook.length > 0 ? (
+        <div className="space-y-2">
+          <Label htmlFor="appointment-address-source">
+            {t("customer.appointments.addressSource")}
+          </Label>
+          <Select value={selectedAddressId} onValueChange={handleAddressSourceChange}>
+            <SelectTrigger className="h-12 text-base" id="appointment-address-source">
+              <SelectValue placeholder={t("customer.appointments.addressSourcePlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              {addressBook.map((address) => (
+                <SelectItem key={address.id} value={address.id}>
+                  {[address.label, formatCustomerAddress(address)].filter(Boolean).join(" - ")}
+                </SelectItem>
+              ))}
+              <SelectItem value={CUSTOM_APPOINTMENT_ADDRESS_ID}>
+                {t("customer.appointments.customAddress")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
 
       <div className="space-y-2">
         <Label htmlFor="appointment-address">{t("customer.forms.address")}</Label>
@@ -2946,7 +3076,11 @@ function AppointmentForm({
           placeholder={t("customer.appointments.addressPlaceholder")}
           value={form.address}
           onChange={(event) =>
-            onFormChange((current) => ({ ...current, address: event.target.value }))
+            onFormChange((current) => ({
+              ...current,
+              addressId: CUSTOM_APPOINTMENT_ADDRESS_ID,
+              address: event.target.value,
+            }))
           }
         />
       </div>
