@@ -21,6 +21,7 @@ import {
   SheetHeader,
   SheetTitle,
   Textarea,
+  toast,
 } from "@cleanhub/ui";
 import {
   AlertCircle,
@@ -1172,6 +1173,7 @@ export function OwnerHome({
 
       setActionTarget(null);
       await Promise.all([loadSummary(), loadBoard()]);
+      toast.success(t("owner.messages.actionDone"));
     } catch (nextError) {
       setActionError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
     } finally {

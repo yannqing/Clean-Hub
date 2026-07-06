@@ -40,6 +40,7 @@ import {
   SheetHeader,
   SheetTitle,
   Textarea,
+  toast,
 } from "@cleanhub/ui";
 import {
   CalendarClock,
@@ -1281,7 +1282,6 @@ export function CustomerHome({
   const [cancellingAppointmentId, setCancellingAppointmentId] = useState<string | null>(null);
   const [contactActionId, setContactActionId] = useState<string | null>(null);
   const [addressActionId, setAddressActionId] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasRestoredDetailRef = useRef(false);
 
@@ -1537,7 +1537,7 @@ export function CustomerHome({
         .then((order) => {
           if (order.paymentStatus === "paid") {
             setPendingPaymentOrderId(null);
-            setMessage(t("customer.paymentMock.paidTitle"));
+            toast.success(t("customer.paymentMock.paidTitle"));
           } else if (order.paymentStatus === "failed") {
             setPendingPaymentOrderId(null);
             setError(t("customer.paymentMock.failedTitle"));
@@ -1566,7 +1566,6 @@ export function CustomerHome({
     }
 
     setError(null);
-    setMessage(null);
     setIsSubmittingPayment(true);
 
     try {
@@ -1578,7 +1577,7 @@ export function CustomerHome({
       setPendingPaymentOrderId(order.id);
       await openExternalUrl(result.gateway.paymentUrl);
       await refreshSelectedOrder(order.id);
-      setMessage(
+      toast.success(
         result.idempotent
           ? t("customer.messages.paymentAlreadyInitiated")
           : t("customer.messages.paymentCreated"),
@@ -1592,7 +1591,6 @@ export function CustomerHome({
 
   function openRefundSheet(order: MobileCustomerOrderDetail) {
     setError(null);
-    setMessage(null);
     setRefundForm({
       orderId: order.id,
       amount: order.paidAmount,
@@ -1604,7 +1602,6 @@ export function CustomerHome({
   async function handleCreateRefund(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
     setIsSubmittingRefund(true);
 
     try {
@@ -1623,7 +1620,7 @@ export function CustomerHome({
         ...current.filter((request) => request.id !== refund.id),
       ]);
       setRefundSheetOpen(false);
-      setMessage(t("customer.messages.refundRequested"));
+      toast.success(t("customer.messages.refundRequested"));
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
@@ -1634,7 +1631,6 @@ export function CustomerHome({
   async function handleCreateAppointment(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
     setIsSubmittingAppointment(true);
 
     try {
@@ -1668,7 +1664,7 @@ export function CustomerHome({
       }));
       setActiveTab("appointments");
       setAppointmentSheetOpen(false);
-      setMessage(t("customer.messages.appointmentCreated"));
+      toast.success(t("customer.messages.appointmentCreated"));
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
@@ -1678,7 +1674,6 @@ export function CustomerHome({
 
   async function handleCancelAppointment(appointmentId: string) {
     setError(null);
-    setMessage(null);
     setCancellingAppointmentId(appointmentId);
 
     try {
@@ -1686,7 +1681,7 @@ export function CustomerHome({
       setAppointments((current) =>
         sortAppointments(current.map((appointment) => (appointment.id === updated.id ? updated : appointment))),
       );
-      setMessage(t("customer.messages.appointmentCancelled"));
+      toast.success(t("customer.messages.appointmentCancelled"));
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
@@ -1696,20 +1691,17 @@ export function CustomerHome({
 
   function requestCancelAppointment(appointmentId: string) {
     setError(null);
-    setMessage(null);
     setConfirmTarget({ kind: "cancel-appointment", appointmentId });
   }
 
   function openProfileSheet() {
     setError(null);
-    setMessage(null);
     setProfileForm(toProfileForm(profile));
     setProfileSheet("profile");
   }
 
   function openCreateContactSheet() {
     setError(null);
-    setMessage(null);
     setEditingContactId(null);
     setContactForm({
       ...emptyContactForm,
@@ -1721,7 +1713,6 @@ export function CustomerHome({
 
   function openEditContactSheet(contact: MobileCustomerContact) {
     setError(null);
-    setMessage(null);
     setEditingContactId(contact.customerId);
     setContactForm(toContactForm(contact));
     setProfileSheet("contact");
@@ -1729,7 +1720,6 @@ export function CustomerHome({
 
   function openCreateAddressSheet() {
     setError(null);
-    setMessage(null);
     setEditingAddressId(null);
     setAddressForm({
       ...emptyAddressForm,
@@ -1744,7 +1734,6 @@ export function CustomerHome({
 
   function openEditAddressSheet(address: MobileCustomerAddress) {
     setError(null);
-    setMessage(null);
     setEditingAddressId(address.id);
     setAddressForm(toAddressForm(address));
     setProfileSheet("address");
@@ -1752,7 +1741,6 @@ export function CustomerHome({
 
   async function handleLocateAddress() {
     setError(null);
-    setMessage(null);
     setIsLocatingAddress(true);
 
     try {
@@ -1762,7 +1750,7 @@ export function CustomerHome({
         latitude: coordinates.latitude,
         longitude: coordinates.longitude,
       }));
-      setMessage(t("customer.messages.addressLocationCaptured"));
+      toast.success(t("customer.messages.addressLocationCaptured"));
     } catch {
       setError(t("customer.messages.addressLocationUnavailable"));
     } finally {
@@ -1772,7 +1760,6 @@ export function CustomerHome({
 
   function openPasswordSheet() {
     setError(null);
-    setMessage(null);
     setPasswordForm(emptyPasswordForm);
     setProfileSheet("password");
   }
@@ -1780,7 +1767,6 @@ export function CustomerHome({
   async function handleUpdateProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
     setIsSubmittingProfile(true);
 
     try {
@@ -1792,7 +1778,7 @@ export function CustomerHome({
       setProfile(updated);
       setProfileForm(toProfileForm(updated));
       setProfileSheet(null);
-      setMessage(t("customer.messages.profileSaved"));
+      toast.success(t("customer.messages.profileSaved"));
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
@@ -1803,7 +1789,6 @@ export function CustomerHome({
   async function handleSaveContact(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
     setIsSubmittingContact(true);
 
     try {
@@ -1832,7 +1817,7 @@ export function CustomerHome({
       });
       setProfileSheet(null);
       setEditingContactId(null);
-      setMessage(
+      toast.success(
         editingContactId
           ? t("customer.messages.contactUpdated")
           : t("customer.messages.contactAdded"),
@@ -1846,7 +1831,6 @@ export function CustomerHome({
 
   async function handleDeleteContact(customerId: string) {
     setError(null);
-    setMessage(null);
     setContactActionId(`delete-${customerId}`);
 
     try {
@@ -1868,7 +1852,7 @@ export function CustomerHome({
             : address,
         ),
       );
-      setMessage(t("customer.messages.contactDeleted"));
+      toast.success(t("customer.messages.contactDeleted"));
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
@@ -1878,14 +1862,12 @@ export function CustomerHome({
 
   function requestDeleteContact(customerId: string) {
     setError(null);
-    setMessage(null);
     setConfirmTarget({ kind: "delete-contact", customerId });
   }
 
   async function handleSaveAddress(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
     setIsSubmittingAddress(true);
 
     try {
@@ -1916,7 +1898,7 @@ export function CustomerHome({
       }));
       setProfileSheet(null);
       setEditingAddressId(null);
-      setMessage(
+      toast.success(
         editingAddressId
           ? t("customer.messages.addressUpdated")
           : t("customer.messages.addressAdded"),
@@ -1930,7 +1912,6 @@ export function CustomerHome({
 
   async function handleDeleteAddress(addressId: string) {
     setError(null);
-    setMessage(null);
     setAddressActionId(`delete-${addressId}`);
 
     try {
@@ -1941,7 +1922,7 @@ export function CustomerHome({
           ? { ...current, addressId: CUSTOM_APPOINTMENT_ADDRESS_ID }
           : current,
       );
-      setMessage(t("customer.messages.addressDeleted"));
+      toast.success(t("customer.messages.addressDeleted"));
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
@@ -1951,7 +1932,6 @@ export function CustomerHome({
 
   function requestDeleteAddress(addressId: string) {
     setError(null);
-    setMessage(null);
     setConfirmTarget({ kind: "delete-address", addressId });
   }
 
@@ -1975,7 +1955,6 @@ export function CustomerHome({
 
   async function handleSetDefaultAddress(addressId: string) {
     setError(null);
-    setMessage(null);
     setAddressActionId(`default-${addressId}`);
 
     try {
@@ -1992,7 +1971,7 @@ export function CustomerHome({
         addressId: updated.id,
         address: formatCustomerAddress(updated),
       }));
-      setMessage(t("customer.messages.defaultAddressUpdated"));
+      toast.success(t("customer.messages.defaultAddressUpdated"));
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
@@ -2003,7 +1982,6 @@ export function CustomerHome({
   async function handleChangePassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
-    setMessage(null);
 
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setError(t("customer.messages.passwordMismatch"));
@@ -2019,7 +1997,7 @@ export function CustomerHome({
       });
       setPasswordForm(emptyPasswordForm);
       setProfileSheet(null);
-      setMessage(t("customer.messages.passwordChangedOtherDevices"));
+      toast.success(t("customer.messages.passwordChangedOtherDevices"));
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("common.errors.genericAction")));
     } finally {
@@ -2029,7 +2007,6 @@ export function CustomerHome({
 
   function openAppointmentSheet() {
     setError(null);
-    setMessage(null);
     setAppointmentSheetOpen(true);
   }
 
@@ -2062,7 +2039,6 @@ export function CustomerHome({
       </span>
 
       {error && !appointmentSheetOpen ? <AlertMessage tone="error" message={error} /> : null}
-      {message ? <AlertMessage tone="success" message={message} /> : null}
 
       {activeTab === "resume" ? (
         <CustomerOverviewView

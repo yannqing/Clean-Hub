@@ -15,6 +15,7 @@ import {
   SheetHeader,
   SheetTitle,
   Textarea,
+  toast,
 } from "@cleanhub/ui";
 import {
   AlertTriangle,
@@ -313,7 +314,6 @@ export function DeliveryHome({
     useState<Exclude<DeliveryProofType, "signature">>("pickup");
   const [proofPhoto, setProofPhoto] = useState<CapturedProofPhoto | null>(null);
   const [signedByName, setSignedByName] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [printer, setPrinter] = useState(initialDeliveryPrinterState);
@@ -449,7 +449,7 @@ export function DeliveryHome({
         return;
       }
 
-      setMessage(t("delivery.messages.syncCount", { count: result.replayed.length }));
+      toast.success(t("delivery.messages.syncCount", { count: result.replayed.length }));
     } catch (nextError) {
       setError(getErrorMessage(nextError, t("delivery.messages.genericAction"), t));
     } finally {
@@ -481,7 +481,11 @@ export function DeliveryHome({
     result: DeliveryActionResult,
     queuedStatus?: DeliveryTaskStatus,
   ) {
-    setMessage(result.messageKey ? t(result.messageKey) : result.message ?? t("delivery.messages.statusUpdated"));
+    toast.success(
+      result.messageKey
+        ? t(result.messageKey)
+        : result.message ?? t("delivery.messages.statusUpdated"),
+    );
 
     if (result.result?.task) {
       replaceTask(result.result.task);
@@ -500,7 +504,6 @@ export function DeliveryHome({
   ): Promise<void> => {
     setActiveAction(actionKey);
     setError(null);
-    setMessage(null);
     setWarning(null);
 
     try {
@@ -675,7 +678,7 @@ export function DeliveryHome({
             previewUrl,
           };
         });
-        setMessage(t("delivery.proof.captured"));
+        toast.success(t("delivery.proof.captured"));
       }
     });
   }
@@ -852,7 +855,7 @@ export function DeliveryHome({
         return;
       }
 
-      setMessage(
+      toast.success(
         nextPrinter.device?.name
           ? t("delivery.printer.connectedDevice", { name: nextPrinter.device.name })
           : t("delivery.printer.connected"),
@@ -885,7 +888,7 @@ export function DeliveryHome({
         messages: printMessages,
         printer,
       });
-      setMessage(result.message);
+      toast.success(result.message);
     });
   }
 
@@ -969,11 +972,6 @@ export function DeliveryHome({
       {warning ? (
         <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
           {warning}
-        </p>
-      ) : null}
-      {message ? (
-        <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
-          {message}
         </p>
       ) : null}
 
