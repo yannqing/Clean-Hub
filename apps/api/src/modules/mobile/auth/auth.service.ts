@@ -41,6 +41,7 @@ export type MobileAuthServiceOptions = {
   accessTokenSecret: string;
   accessTokenTtlSeconds?: number;
   refreshTokenTtlSeconds?: number;
+  testOtpEnabled?: boolean;
 };
 
 export type CreateMobileAuthServiceFromEnvOptions = {
@@ -160,6 +161,10 @@ function readOptionalPositiveInteger(value: string | undefined): number | undefi
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+function readBooleanFlag(value: string | undefined): boolean {
+  return value === "true";
+}
+
 export function createMobileAuthServiceFromEnv({
   db = getDb(),
   env = process.env,
@@ -182,6 +187,7 @@ export function createMobileAuthServiceFromEnv({
     refreshTokenTtlSeconds: readOptionalPositiveInteger(
       env.AUTH_REFRESH_TOKEN_TTL_SECONDS,
     ),
+    testOtpEnabled: readBooleanFlag(env.MOBILE_AUTH_TEST_OTP_ENABLED),
   });
 }
 
@@ -191,6 +197,7 @@ export class MobileAuthService {
   private readonly tokenService: TokenService;
   private readonly envRefreshTokenTtlSeconds: number;
   private readonly securityPolicy?: EffectiveSecurityPolicy;
+  private readonly testOtpEnabled: boolean;
 
   constructor({
     db,
@@ -199,10 +206,12 @@ export class MobileAuthService {
     accessTokenSecret,
     accessTokenTtlSeconds,
     refreshTokenTtlSeconds,
+    testOtpEnabled = false,
   }: MobileAuthServiceOptions) {
     this.db = db;
     this.repository = repository ?? new MobileAuthRepository(db);
     this.securityPolicy = securityPolicy;
+    this.testOtpEnabled = testOtpEnabled;
     this.envRefreshTokenTtlSeconds =
       refreshTokenTtlSeconds ?? 30 * 24 * 60 * 60;
     this.tokenService = new TokenService({
@@ -211,6 +220,10 @@ export class MobileAuthService {
       accessTokenTtlSeconds,
       refreshTokenTtlSeconds: this.envRefreshTokenTtlSeconds,
     });
+  }
+
+  isTestOtpEnabled(): boolean {
+    return this.testOtpEnabled;
   }
 
   async requestCustomerOtp(
@@ -241,7 +254,7 @@ export class MobileAuthService {
     });
 
     return {
-      code,
+      code: this.testOtpEnabled ? code : undefined,
       expiresAt: expiresAt.toISOString(),
     };
   }
@@ -249,6 +262,10 @@ export class MobileAuthService {
   async getCustomerTestOtp(
     input: MobileRequestOtpInput,
   ): Promise<MobileTestOtpResult> {
+    if (!this.testOtpEnabled) {
+      throw new AuthError("FEATURE_DISABLED", "Test OTP is disabled.");
+    }
+
     const tenant = await this.resolveTenant(input.tenantCode);
     const phone = normalizePhone(input.phone);
     const customer = await this.repository.findCustomerByPhone({

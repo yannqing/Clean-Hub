@@ -32,6 +32,7 @@ export default defineConfig({
       command: "pnpm --filter @cleanhub/api dev",
       env: {
         CORS_ORIGINS: baseURL,
+        MOBILE_AUTH_TEST_OTP_ENABLED: "true",
         NEXT_PUBLIC_API_BASE_URL: apiBaseURL,
         PORT: apiBaseURL.split(":").at(-1) ?? "4100",
       },

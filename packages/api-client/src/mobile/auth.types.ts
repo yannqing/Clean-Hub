@@ -48,6 +48,6 @@ export type MobileRefreshRequest = {
 export type MobileLogoutRequest = MobileRefreshRequest;
 
 export type MobileTestOtpResponse = {
-  code: string;
+  code?: string;
   expiresAt: string;
 };

@@ -537,6 +537,14 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
 async function createService(): Promise<{
   service: MobileAuthService;
   repository: FakeMobileAuthRepository;
+}>;
+async function createService(options: { testOtpEnabled: true }): Promise<{
+  service: MobileAuthService;
+  repository: FakeMobileAuthRepository;
+}>;
+async function createService(options?: { testOtpEnabled?: boolean }): Promise<{
+  service: MobileAuthService;
+  repository: FakeMobileAuthRepository;
 }> {
   const passwordHash = await hashPassword(GOOD_PASSWORD);
   const repository = new FakeMobileAuthRepository(passwordHash);
@@ -547,13 +555,34 @@ async function createService(): Promise<{
     accessTokenSecret: TEST_SECRET,
     accessTokenTtlSeconds: 60,
     refreshTokenTtlSeconds: 60 * 60,
+    testOtpEnabled: options?.testOtpEnabled ?? false,
   });
 
   return { service, repository };
 }
 
-async function assertCustomerOtpSuccess(): Promise<void> {
+async function assertCustomerOtpDoesNotExposeCodeByDefault(): Promise<void> {
   const { service } = await createService();
+
+  const requestedOtp = await service.requestCustomerOtp({
+    tenantCode: "CLEAN-001",
+    phone: "+100000000",
+    deviceId: "device_1",
+  });
+
+  assert(!requestedOtp.code, "OTP request must not expose code by default");
+  await assertRejectsAuth(
+    () =>
+      service.getCustomerTestOtp({
+        tenantCode: "CLEAN-001",
+        phone: "+100000000",
+      }),
+    "FEATURE_DISABLED",
+  );
+}
+
+async function assertCustomerOtpSuccess(): Promise<void> {
+  const { service } = await createService({ testOtpEnabled: true });
 
   const requestedOtp = await service.requestCustomerOtp({
     tenantCode: "CLEAN-001",
@@ -564,6 +593,14 @@ async function assertCustomerOtpSuccess(): Promise<void> {
     tenantCode: "CLEAN-001",
     phone: "+100000000",
   });
+
+  if (!requestedOtp.code) {
+    throw new Error("test-enabled OTP request should expose code");
+  }
+
+  if (!testOtp.code) {
+    throw new Error("test OTP should expose latest code");
+  }
 
   assert(testOtp.code === requestedOtp.code, "test OTP should expose latest code");
 
@@ -805,6 +842,7 @@ async function assertRefreshAndLogout(): Promise<void> {
 }
 
 export async function runMobileAuthSmokeChecks(): Promise<void> {
+  await assertCustomerOtpDoesNotExposeCodeByDefault();
   await assertCustomerOtpSuccess();
   await assertCustomerOtpAttemptLimit();
   await assertCustomerPasswordLockout();

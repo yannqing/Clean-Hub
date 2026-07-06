@@ -11,6 +11,7 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { CustomerHome } from "@/features/customer";
 import { DeliveryHome } from "@/features/delivery";
 import { OwnerHome } from "@/features/owner";
+import { mobileReleaseConfig } from "@/lib/mobile-release-config";
 import {
   enterTenantContext,
   getCustomerTestOtp,
@@ -56,6 +57,7 @@ export function MobileAuthShell() {
   const [error, setError] = useState<string | null>(null);
   const [isBooting, setIsBooting] = useState(true);
   const [isPending, startTransition] = useTransition();
+  const showTestOtp = mobileReleaseConfig.appEnvironment !== "prod";
 
   const loginModes = useMemo(
     () =>
@@ -134,7 +136,7 @@ export function MobileAuthShell() {
 
     runAction(async () => {
       const response = await requestCustomerOtp({ tenantCode, phone });
-      setTestOtp(response.code);
+      setTestOtp(response.code ?? null);
       setMessage(t("auth.login.otpSent"));
     });
   }
@@ -146,7 +148,7 @@ export function MobileAuthShell() {
 
     runAction(async () => {
       const response = await getCustomerTestOtp({ tenantCode, phone });
-      setTestOtp(response.code);
+      setTestOtp(response.code ?? null);
       setMessage(t("auth.login.testCodeFetched"));
     });
   }
@@ -347,15 +349,17 @@ export function MobileAuthShell() {
                     onChange={(event) => setPhone(event.target.value)}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
+                <div className={`grid gap-2 ${showTestOtp ? "grid-cols-2" : "grid-cols-1"}`}>
                   <Button className="h-11" disabled={isPending || !phone.trim()} type="button" variant="secondary" onClick={handleOtpRequest}>
                     {t("auth.login.sendOtp")}
                   </Button>
-                  <Button className="h-11" disabled={isPending || !phone.trim()} type="button" variant="outline" onClick={handleOtpTestFetch}>
-                    {t("auth.login.testCode")}
-                  </Button>
+                  {showTestOtp ? (
+                    <Button className="h-11" disabled={isPending || !phone.trim()} type="button" variant="outline" onClick={handleOtpTestFetch}>
+                      {t("auth.login.testCode")}
+                    </Button>
+                  ) : null}
                 </div>
-                {testOtp ? (
+                {showTestOtp && testOtp ? (
                   <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
                     {t("auth.login.recipeCode", { code: testOtp })}
                   </div>

@@ -113,6 +113,6 @@ export type MobileStoredRefreshToken = {
 };
 
 export type MobileTestOtpResult = {
-  code: string;
+  code?: string;
   expiresAt: string;
 };
