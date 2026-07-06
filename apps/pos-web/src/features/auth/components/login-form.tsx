@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslation } from "@cleanhub/i18n/react";
-import { toast } from "@cleanhub/ui";
+import { posToast as toast } from "@/lib/pos-toast";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 

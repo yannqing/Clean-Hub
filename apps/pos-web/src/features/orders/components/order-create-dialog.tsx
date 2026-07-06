@@ -1,5 +1,6 @@
 "use client";
 
+import { posToast as toast } from "@/lib/pos-toast";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type {
@@ -15,7 +16,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  toast,
 } from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";

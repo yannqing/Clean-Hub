@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { toast } from "@cleanhub/ui";
+import { posToast as toast } from "@/lib/pos-toast";
 import { useRouter } from "next/navigation";
 import type {
   PosOrderDetail,

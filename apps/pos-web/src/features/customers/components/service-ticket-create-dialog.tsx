@@ -1,5 +1,6 @@
 "use client";
 
+import { posToast as toast } from "@/lib/pos-toast";
 import { useEffect, useState } from "react";
 
 import type {
@@ -13,7 +14,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  toast,
 } from "@cleanhub/ui";
 
 import { posApi } from "@/lib/api-client";
