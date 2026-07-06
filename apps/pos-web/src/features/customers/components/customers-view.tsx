@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -35,8 +35,13 @@ import { ProfileFormDialog } from "./profile-form-dialog";
  * vs. an account's profiles), filter/pagination state, and which dialog is
  * open. All data is fetched client-side via the queries module.
  */
-export function CustomersView() {
+type CustomersViewProps = {
+  initialQuery?: string;
+};
+
+export function CustomersView({ initialQuery = "" }: CustomersViewProps) {
   const router = useRouter();
+  const normalizedInitialQuery = initialQuery.trim();
   const [viewMode, setViewMode] = useState<CustomerViewMode>("list");
   const [accountContext, setAccountContext] =
     useState<{ accountId: string; accountName: string } | null>(null);
@@ -45,14 +50,16 @@ export function CustomersView() {
 
   const [filters, setFilters] = useState<CustomerFilterState>({
     ...CUSTOMER_DEFAULT_FILTERS,
+    query: normalizedInitialQuery,
   });
-  const [draftQuery, setDraftQuery] = useState("");
+  const [draftQuery, setDraftQuery] = useState(normalizedInitialQuery);
 
   const [rows, setRows] = useState<CustomerListRow[]>([]);
   const [total, setTotal] = useState(0);
   const [totalAccounts, setTotalAccounts] = useState(0);
   const [totalProfiles, setTotalProfiles] = useState(0);
   const [loading, setLoading] = useState(false);
+  const reloadRequestIdRef = useRef(0);
 
   const [accounts, setAccounts] = useState<PosCustomerAccountSummary[]>([]);
   const [dialog, setDialog] = useState<CustomerDialogState>({ type: "none" });
@@ -70,11 +77,14 @@ export function CustomersView() {
   }, []);
 
   const reload = useCallback(async () => {
+    const requestId = reloadRequestIdRef.current + 1;
+    reloadRequestIdRef.current = requestId;
     setLoading(true);
     try {
       let data: { rows: CustomerListRow[]; total: number };
       if (viewMode === "account" && accountContext) {
         data = await fetchAccountProfiles(accountContext.accountId, filters);
+        if (reloadRequestIdRef.current !== requestId) return;
         setRows(data.rows);
         setTotal(data.total);
         setTotalAccounts(0);
@@ -82,19 +92,23 @@ export function CustomersView() {
       } else {
         const listData = await fetchCustomerList(filters);
         data = listData;
+        if (reloadRequestIdRef.current !== requestId) return;
         setRows(listData.rows);
         setTotal(listData.total);
         setTotalAccounts(listData.totalAccounts);
         setTotalProfiles(listData.totalProfiles);
       }
     } catch (error) {
+      if (reloadRequestIdRef.current !== requestId) return;
       toast.error(
         error instanceof Error ? error.message : "加载数据失败，请重试。",
       );
       setRows([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      if (reloadRequestIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
   }, [viewMode, accountContext, filters]);
 
@@ -105,8 +119,24 @@ export function CustomersView() {
 
   // ---- search / pagination handlers ---------------------------------------
 
+  function replaceCustomerQueryParam(value: string | undefined) {
+    const search = new URLSearchParams();
+    if (value) {
+      search.set("q", value);
+    }
+
+    const queryString = search.toString();
+    router.replace(queryString ? `/customers?${queryString}` : "/customers", {
+      scroll: false,
+    });
+  }
+
   function handleSearch() {
-    setFilters((current) => ({ ...current, query: draftQuery, page: 1 }));
+    const query = draftQuery.trim();
+    setFilters((current) => ({ ...current, query, page: 1 }));
+    if (viewMode === "list") {
+      replaceCustomerQueryParam(query || undefined);
+    }
   }
 
   function handleReset() {
@@ -115,6 +145,9 @@ export function CustomersView() {
       ...CUSTOMER_DEFAULT_FILTERS,
       resultType: accountContext ? "all" : CUSTOMER_DEFAULT_FILTERS.resultType,
     });
+    if (viewMode === "list") {
+      replaceCustomerQueryParam(undefined);
+    }
   }
 
   function handleResultTypeChange(value: CustomerFilterState["resultType"]) {

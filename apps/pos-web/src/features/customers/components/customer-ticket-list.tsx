@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import type { ServiceTicketSummary } from "@cleanhub/api-client";
+import type { ServiceTicketSummary, ServiceTicketType } from "@cleanhub/api-client";
 
 import { toast } from "@cleanhub/ui";
 
@@ -22,6 +22,7 @@ type CustomerTicketListProps = {
 };
 
 const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
 const SERVICE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: "all", label: "全部业务类型" },
@@ -43,52 +44,55 @@ export function CustomerTicketList({
 }: CustomerTicketListProps) {
   const router = useRouter();
   const [rows, setRows] = useState<ServiceTicketSummary[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const [currentPageSize, setCurrentPageSize] = useState(pageSize);
   const [query, setQuery] = useState("");
   const [serviceFilter, setServiceFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
+  const reloadRequestIdRef = useRef(0);
 
   const reload = useCallback(async () => {
+    const requestId = reloadRequestIdRef.current + 1;
+    reloadRequestIdRef.current = requestId;
     setLoading(true);
     try {
-      // Fetch a generous page so client-side filtering has enough rows to work
-      // with (the prototype filters in-memory).
-      const result = await fetchCustomerTickets(customerId, 1, 100);
+      const dateRange = getCreatedDateRange(dateFilter);
+      const result = await fetchCustomerTickets(customerId, page, currentPageSize, {
+        q: query,
+        ticketType:
+          serviceFilter === "all"
+            ? undefined
+            : (serviceFilter as ServiceTicketType),
+        createdAfter: dateRange.createdAfter,
+        createdBefore: dateRange.createdBefore,
+      });
+      if (reloadRequestIdRef.current !== requestId) return;
       setRows(result.rows);
+      setTotal(result.total);
     } catch (error) {
+      if (reloadRequestIdRef.current !== requestId) return;
       toast.error(
         error instanceof Error ? error.message : "加载工单失败，请重试。",
       );
       setRows([]);
+      setTotal(0);
     } finally {
-      setLoading(false);
+      if (reloadRequestIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
-  }, [customerId]);
+  }, [customerId, page, currentPageSize, query, serviceFilter, dateFilter]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch; setState happens in the async continuation.
     void reload();
   }, [reload]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return rows.filter((ticket) => {
-      const queryMatches =
-        !q ||
-        [ticket.ticketNo, ticket.ticketType, ticket.customerName]
-          .filter(Boolean)
-          .some((value) => value!.toLowerCase().includes(q));
-      const serviceMatches =
-        serviceFilter === "all" || ticket.ticketType === serviceFilter;
-      const dateMatches = matchesDateFilter(ticket, dateFilter);
-      return queryMatches && serviceMatches && dateMatches;
-    });
-  }, [rows, query, serviceFilter, dateFilter]);
-
-  const total = filtered.length;
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pageCount = Math.max(1, Math.ceil(total / currentPageSize));
+  const from = total === 0 ? 0 : (page - 1) * currentPageSize + 1;
+  const to = Math.min(total, (page - 1) * currentPageSize + rows.length);
 
   return (
     <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -152,12 +156,12 @@ export function CustomerTicketList({
             <div>预计取件</div>
           </div>
 
-          {pageRows.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="border-t border-slate-100 px-5 py-10 text-center text-sm text-slate-500">
               {loading ? "加载中…" : "没有符合当前筛选条件的工单。"}
             </div>
           ) : (
-            pageRows.map((ticket) => {
+            rows.map((ticket) => {
               const tone =
                 CUSTOMER_TICKET_STATUS_TONES[ticket.ticketStatus] ??
                 "bg-slate-100 text-slate-600";
@@ -199,11 +203,34 @@ export function CustomerTicketList({
         </div>
       </div>
 
-      <div className="flex items-center justify-end border-t border-slate-200 px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <span>
+            第 {from}-{to} 条 / 共 {total} 条
+          </span>
+          <label className="flex items-center gap-1">
+            每页
+            <select
+              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none"
+              value={currentPageSize}
+              onChange={(event) => {
+                setCurrentPageSize(Number(event.target.value));
+                setPage(1);
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            条
+          </label>
+        </div>
         <div className="flex items-center gap-1">
           <button
             className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
-            disabled={page === 1}
+            disabled={loading || page === 1}
             type="button"
             onClick={() => setPage((p) => p - 1)}
           >
@@ -214,7 +241,7 @@ export function CustomerTicketList({
           </span>
           <button
             className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
-            disabled={page === pageCount}
+            disabled={loading || page === pageCount}
             type="button"
             onClick={() => setPage((p) => p + 1)}
           >
@@ -226,19 +253,29 @@ export function CustomerTicketList({
   );
 }
 
-function matchesDateFilter(
-  ticket: ServiceTicketSummary,
-  filter: string,
-): boolean {
-  if (filter === "all") return true;
-  const created = new Date(ticket.createdAt);
-  if (Number.isNaN(created.getTime())) return false;
-  const now = new Date();
-  const diffDays = (now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24);
-  if (filter === "today") return diffDays < 1;
-  if (filter === "7d") return diffDays < 7;
-  if (filter === "30d") return diffDays < 30;
-  return true;
+function getCreatedDateRange(filter: string): {
+  createdAfter?: string;
+  createdBefore?: string;
+} {
+  if (filter === "all") return {};
+
+  const end = new Date();
+  const start = new Date(end);
+
+  if (filter === "today") {
+    start.setHours(0, 0, 0, 0);
+  } else if (filter === "7d") {
+    start.setDate(start.getDate() - 7);
+  } else if (filter === "30d") {
+    start.setDate(start.getDate() - 30);
+  } else {
+    return {};
+  }
+
+  return {
+    createdAfter: start.toISOString(),
+    createdBefore: end.toISOString(),
+  };
 }
 
 function formatDate(iso: string): string {

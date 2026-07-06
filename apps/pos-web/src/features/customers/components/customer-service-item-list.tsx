@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -23,6 +23,7 @@ type CustomerServiceItemListProps = {
 };
 
 const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
 /** A service-item row enriched with its owning ticket's number + type. */
 type ServiceItemRow = ServiceTicketItem & {
@@ -43,50 +44,49 @@ export function CustomerServiceItemList({
 }: CustomerServiceItemListProps) {
   const router = useRouter();
   const [rows, setRows] = useState<ServiceItemRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const [currentPageSize, setCurrentPageSize] = useState(pageSize);
   const [query, setQuery] = useState("");
+  const reloadRequestIdRef = useRef(0);
 
   const reload = useCallback(async () => {
+    const requestId = reloadRequestIdRef.current + 1;
+    reloadRequestIdRef.current = requestId;
     setLoading(true);
     try {
-      const result = await fetchCustomerServiceItems(customerId);
+      const result = await fetchCustomerServiceItems(
+        customerId,
+        page,
+        currentPageSize,
+        query,
+      );
+      if (reloadRequestIdRef.current !== requestId) return;
       setRows(result.items);
+      setTotal(result.total);
     } catch (error) {
+      if (reloadRequestIdRef.current !== requestId) return;
       toast.error(
         error instanceof Error ? error.message : "加载服务项目失败，请重试。",
       );
       setRows([]);
+      setTotal(0);
     } finally {
-      setLoading(false);
+      if (reloadRequestIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
-  }, [customerId]);
+  }, [customerId, page, currentPageSize, query]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch; setState happens in the async continuation.
     void reload();
   }, [reload]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((item) =>
-      [
-        item.itemName,
-        item.itemCategory,
-        item.ticketNo,
-        item.defectNotes,
-        item.specialRequest,
-        item.remark,
-      ]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(q)),
-    );
-  }, [rows, query]);
-
-  const total = filtered.length;
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pageCount = Math.max(1, Math.ceil(total / currentPageSize));
+  const from = total === 0 ? 0 : (page - 1) * currentPageSize + 1;
+  const to = Math.min(total, (page - 1) * currentPageSize + rows.length);
 
   return (
     <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -123,12 +123,12 @@ export function CustomerServiceItemList({
             <div>状态</div>
           </div>
 
-          {pageRows.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="border-t border-slate-100 px-5 py-10 text-center text-sm text-slate-500">
               {loading ? "加载中…" : "没有符合当前条件的服务项目。"}
             </div>
           ) : (
-            pageRows.map((item) => {
+            rows.map((item) => {
               const tone =
                 CUSTOMER_TICKET_ITEM_STATUS_TONES[item.itemStatus] ??
                 "bg-slate-100 text-slate-600";
@@ -181,11 +181,34 @@ export function CustomerServiceItemList({
         </div>
       </div>
 
-      <div className="flex items-center justify-end border-t border-slate-200 px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <span>
+            第 {from}-{to} 条 / 共 {total} 条
+          </span>
+          <label className="flex items-center gap-1">
+            每页
+            <select
+              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none"
+              value={currentPageSize}
+              onChange={(event) => {
+                setCurrentPageSize(Number(event.target.value));
+                setPage(1);
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            条
+          </label>
+        </div>
         <div className="flex items-center gap-1">
           <button
             className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
-            disabled={page === 1}
+            disabled={loading || page === 1}
             type="button"
             onClick={() => setPage((p) => p - 1)}
           >
@@ -196,7 +219,7 @@ export function CustomerServiceItemList({
           </span>
           <button
             className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
-            disabled={page === pageCount}
+            disabled={loading || page === pageCount}
             type="button"
             onClick={() => setPage((p) => p + 1)}
           >

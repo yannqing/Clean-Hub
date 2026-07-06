@@ -156,6 +156,8 @@ export async function listPosServiceTickets(
     branchId: query.branchId,
     assistantId: query.assistantId,
     q: query.q,
+    createdBefore: query.createdBefore,
+    createdAfter: query.createdAfter,
     expectedPickupBefore: query.expectedPickupBefore,
     expectedPickupAfter: query.expectedPickupAfter,
     limit: query.limit ?? 50,

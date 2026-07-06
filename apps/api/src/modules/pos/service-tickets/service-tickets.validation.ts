@@ -79,6 +79,8 @@ export const serviceTicketListQuerySchema = z.object({
   branchId: optionalUlid.optional(),
   assistantId: optionalUlid.optional(),
   q: z.string().trim().min(1).max(120).optional(),
+  createdBefore: isoTimestampSchema.optional(),
+  createdAfter: isoTimestampSchema.optional(),
   expectedPickupBefore: isoTimestampSchema.optional(),
   expectedPickupAfter: isoTimestampSchema.optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),

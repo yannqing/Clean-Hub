@@ -9,8 +9,10 @@ import {
   deletePosAccountController,
   deletePosProfileController,
   getPosAccountController,
+  getPosCustomerOrderStatsController,
   getPosProfileController,
   getPosProfilesByAccountController,
+  listPosCustomerServiceItemsController,
   listPosCustomersController,
   updatePosAccountController,
   updatePosProfileController,
@@ -27,6 +29,11 @@ export function createPosCustomersRoutes() {
   const routes = new Hono<AppBindings>();
 
   routes.get("/", listPosCustomersController);
+  routes.get("/:customerId/order-stats", getPosCustomerOrderStatsController);
+  routes.get(
+    "/:customerId/service-items",
+    listPosCustomerServiceItemsController,
+  );
   routes.get("/:customerId", getPosProfileController);
   routes.patch("/:customerId", updatePosProfileController);
   routes.post("/:customerId/status-changes", changePosProfileStatusController);

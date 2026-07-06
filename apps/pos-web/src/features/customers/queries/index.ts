@@ -93,10 +93,13 @@ export async function fetchAccountProfiles(
   accountId: string,
   filters: CustomerFilterState,
 ): Promise<{ rows: CustomerListRow[]; total: number }> {
-  const response = await posApi.pos.accounts.listProfiles(accountId);
-  const q = filters.query.trim().toLowerCase();
+  const response = await posApi.pos.accounts.listProfiles(accountId, {
+    q: filters.query.trim() || undefined,
+    limit: filters.pageSize,
+    offset: toOffset(filters.page, filters.pageSize),
+  });
 
-  const all: Extract<CustomerListRow, { kind: "profile" }>[] = response.data.map(
+  const rows: Extract<CustomerListRow, { kind: "profile" }>[] = response.data.map(
     (profile: PosCustomerProfileSummary) => ({
       kind: "profile" as const,
       id: profile.id,
@@ -108,22 +111,9 @@ export async function fetchAccountProfiles(
       status: profile.status,
       createdAt: profile.createdAt,
     }),
-  ).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  );
 
-  // Account-scoped filtering is client-side (no server filter on this route).
-  const filtered = q
-    ? all.filter((row) =>
-        [row.fullName, row.phone, row.email]
-          .filter(Boolean)
-          .some((value) => value!.toLowerCase().includes(q)),
-      )
-    : all;
-
-  const total = filtered.length;
-  const start = toOffset(filters.page, filters.pageSize);
-  const paged = filtered.slice(start, start + filters.pageSize);
-
-  return { rows: paged, total };
+  return { rows, total: response.total };
 }
 
 // ---- account mutations ----------------------------------------------------
@@ -188,9 +178,19 @@ export async function fetchCustomerTickets(
   customerId: string,
   page: number,
   pageSize: number,
+  filters?: {
+    q?: string;
+    ticketType?: import("@cleanhub/api-client").ServiceTicketType;
+    createdAfter?: string;
+    createdBefore?: string;
+  },
 ): Promise<{ rows: import("@cleanhub/api-client").ServiceTicketSummary[]; total: number }> {
   const result = await posApi.pos.serviceTickets.list({
     customerId,
+    q: filters?.q?.trim() || undefined,
+    ticketType: filters?.ticketType,
+    createdAfter: filters?.createdAfter,
+    createdBefore: filters?.createdBefore,
     limit: pageSize,
     offset: toOffset(page, pageSize),
   });
@@ -202,9 +202,11 @@ export async function fetchCustomerOrders(
   customerId: string,
   page: number,
   pageSize: number,
+  query = "",
 ): Promise<{ rows: import("@cleanhub/api-client").PosOrderSummary[]; total: number }> {
   const result = await posApi.pos.orders.list({
     customerId,
+    q: query.trim() || undefined,
     limit: pageSize,
     offset: toOffset(page, pageSize),
   });
@@ -215,27 +217,21 @@ export async function fetchCustomerOrders(
 export async function fetchCustomerOrderStats(
   customerId: string,
 ): Promise<{ orderCount: number; totalPaid: number }> {
-  // Fetch up to 50 orders to sum paidAmount client-side (no aggregate endpoint).
-  const result = await posApi.pos.orders.list({
-    customerId,
-    limit: 50,
-    offset: 0,
-  });
-  const totalPaid = result.data.reduce(
-    (sum, order) => sum + Number(order.paidAmount ?? 0),
-    0,
-  );
-  return { orderCount: result.total, totalPaid };
+  const result = await posApi.pos.customers.orderStats(customerId);
+  return {
+    orderCount: result.orderCount,
+    totalPaid: Number(result.totalPaid ?? 0),
+  };
 }
 
 /**
- * Service items (ticket_items) across a customer's recent tickets, for the
- * 服务项目 tab. There is no "list items by customer" endpoint, so we fetch the
- * customer's recent tickets then load each ticket's detail (which carries its
- * `items[]`). Limited to recent 20 tickets to bound the number of detail calls.
+ * Service items (ticket_items) across a customer's tickets, for the 服务项目 tab.
  */
 export async function fetchCustomerServiceItems(
   customerId: string,
+  page: number,
+  pageSize: number,
+  query = "",
 ): Promise<{
   items: Array<
     import("@cleanhub/api-client").ServiceTicketItem & {
@@ -243,37 +239,14 @@ export async function fetchCustomerServiceItems(
       ticketType: import("@cleanhub/api-client").ServiceTicketType;
     }
   >;
+  total: number;
 }> {
-  const list = await posApi.pos.serviceTickets.list({
-    customerId,
-    limit: 20,
-    offset: 0,
+  const result = await posApi.pos.customers.serviceItems(customerId, {
+    q: query.trim() || undefined,
+    limit: pageSize,
+    offset: toOffset(page, pageSize),
   });
 
-  const details = await Promise.allSettled(
-    list.data.map((ticket) => posApi.pos.serviceTickets.get(ticket.id)),
-  );
-
-  const items: Array<
-    import("@cleanhub/api-client").ServiceTicketItem & {
-      ticketNo: string | null;
-      ticketType: import("@cleanhub/api-client").ServiceTicketType;
-    }
-  > = [];
-  details.forEach((result, index) => {
-    if (result.status !== "fulfilled") return;
-    const detail = result.value;
-    for (const item of detail.items) {
-      items.push({
-        ...item,
-        ticketNo: list.data[index]?.ticketNo ?? null,
-        ticketType: detail.ticketType,
-      });
-    }
-  });
-
-  // Newest items first.
-  items.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  return { items };
+  return { items: result.data, total: result.total };
 }
 export { CUSTOMER_DEFAULT_FILTERS };

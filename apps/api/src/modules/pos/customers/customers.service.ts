@@ -6,6 +6,8 @@ import {
   cascadeSoftDeleteProfilesByAccount,
   countPosAccounts,
   countPosProfiles,
+  findPosCustomerOrderStats,
+  findPosCustomerServiceItems,
   findPosAccountByEmail,
   findPosAccountById,
   findPosAccountByPhone,
@@ -33,15 +35,19 @@ import type {
   CreatePosProfileInput,
   DeletePosAccountInput,
   DeletePosProfileInput,
+  GetPosCustomerOrderStatsInput,
   GetPosAccountInput,
   GetPosProfileInput,
   GetPosProfilesByAccountInput,
+  ListPosAccountProfilesResult,
+  ListPosCustomerServiceItemsInput,
+  ListPosCustomerServiceItemsResult,
   ListPosCustomersInput,
   ListPosCustomersResult,
   PosCustomerAccountDetail,
+  PosCustomerOrderStats,
   PosCustomerAccountSummary,
   PosCustomerProfileDetail,
-  PosCustomerProfileSummary,
   PosCustomerProfileWithAccount,
   UpdatePosAccountInput,
   UpdatePosProfileInput,
@@ -75,6 +81,15 @@ function requireProfile(
     );
   }
   return profile;
+}
+
+function resolveListBranchScope(
+  authContext: { role: string; branchIds: string[] },
+): string[] | undefined {
+  if (authContext.role === "owner" || authContext.role === "manager") {
+    return authContext.branchIds.length > 0 ? authContext.branchIds : undefined;
+  }
+  return authContext.branchIds;
 }
 
 // ---- list -----------------------------------------------------------------
@@ -181,7 +196,7 @@ export async function getPosAccount(
 export async function getPosProfilesByAccount(
   input: GetPosProfilesByAccountInput,
   db: Database = getDb(),
-): Promise<PosCustomerProfileSummary[]> {
+): Promise<ListPosAccountProfilesResult> {
   assertPosContext(input.authContext);
   const tenantId = input.authContext.tenantId!;
 
@@ -190,7 +205,12 @@ export async function getPosProfilesByAccount(
   const account = await findPosAccountById(db, tenantId, input.accountId);
   requireAccount(account);
 
-  return findPosProfilesByAccount(db, tenantId, input.accountId);
+  return findPosProfilesByAccount(
+    db,
+    tenantId,
+    input.accountId,
+    input.query,
+  );
 }
 
 // ---- accounts: writes -----------------------------------------------------
@@ -434,6 +454,43 @@ export async function getPosProfile(
     input.customerId,
   );
   return requireProfile(profile);
+}
+
+export async function getPosCustomerOrderStats(
+  input: GetPosCustomerOrderStatsInput,
+  db: Database = getDb(),
+): Promise<PosCustomerOrderStats> {
+  assertPosContext(input.authContext);
+  const tenantId = input.authContext.tenantId!;
+
+  requireProfile(await findPosProfileById(db, tenantId, input.customerId));
+
+  return findPosCustomerOrderStats(
+    db,
+    tenantId,
+    input.customerId,
+    resolveListBranchScope(input.authContext),
+  );
+}
+
+export async function listPosCustomerServiceItems(
+  input: ListPosCustomerServiceItemsInput,
+  db: Database = getDb(),
+): Promise<ListPosCustomerServiceItemsResult> {
+  assertPosContext(input.authContext);
+  const tenantId = input.authContext.tenantId!;
+
+  requireProfile(await findPosProfileById(db, tenantId, input.customerId));
+
+  return findPosCustomerServiceItems(
+    db,
+    tenantId,
+    input.customerId,
+    {
+      ...input.query,
+      allowedBranchIds: resolveListBranchScope(input.authContext),
+    },
+  );
 }
 
 // ---- profiles: writes -----------------------------------------------------

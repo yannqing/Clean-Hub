@@ -11,6 +11,11 @@
  * the milestone doc defers those to other modules / real-time aggregation.
  */
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
+import type {
+  ServiceTicketItemStatus,
+  ServiceTicketItemType,
+  ServiceTicketType,
+} from "../service-tickets/service-tickets.types.js";
 
 export type PosCustomerStatus = "active" | "disabled";
 
@@ -90,6 +95,19 @@ export type ListPosCustomersResult = {
   offset: number;
 };
 
+export type ListPosAccountProfilesQuery = {
+  q?: string;
+  limit: number;
+  offset: number;
+};
+
+export type ListPosAccountProfilesResult = {
+  data: PosCustomerProfileSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type CreatePosAccountRequest = {
   accountName: string;
   /** Phone and email are mutually optional but at least one is required. */
@@ -126,6 +144,50 @@ export type ChangePosCustomerStatusRequest = {
   reason?: string;
 };
 
+export type PosCustomerOrderStats = {
+  orderCount: number;
+  totalPaid: string;
+};
+
+export type PosCustomerServiceItemSummary = {
+  id: string;
+  ticketId: string;
+  ticketNo: string | null;
+  ticketType: ServiceTicketType;
+  itemType: ServiceTicketItemType | null;
+  itemName: string;
+  itemCategory: string | null;
+  itemStatus: ServiceTicketItemStatus;
+  itemColor: string | null;
+  itemBrand: string | null;
+  itemMaterial: string | null;
+  quantity: number;
+  unitAmount: string;
+  lineAmount: string;
+  serviceId: string | null;
+  labelCode: string | null;
+  defectNotes: string | null;
+  specialRequest: string | null;
+  remark: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+};
+
+export type ListPosCustomerServiceItemsQuery = {
+  q?: string;
+  limit: number;
+  offset: number;
+};
+
+export type ListPosCustomerServiceItemsResult = {
+  data: PosCustomerServiceItemSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 // ---- Service input shapes -------------------------------------------------
 
 export type ListPosCustomersInput = {
@@ -141,11 +203,23 @@ export type GetPosAccountInput = {
 export type GetPosProfilesByAccountInput = {
   authContext: AuthContext;
   accountId: string;
+  query: ListPosAccountProfilesQuery;
 };
 
 export type GetPosProfileInput = {
   authContext: AuthContext;
   customerId: string;
+};
+
+export type GetPosCustomerOrderStatsInput = {
+  authContext: AuthContext;
+  customerId: string;
+};
+
+export type ListPosCustomerServiceItemsInput = {
+  authContext: AuthContext;
+  customerId: string;
+  query: ListPosCustomerServiceItemsQuery;
 };
 
 export type CreatePosAccountInput = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
@@ -31,16 +31,21 @@ export function IntakeCustomerLookup() {
   const [rows, setRows] = useState<IntakeProfileRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
+  const reloadRequestIdRef = useRef(0);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createProfileDialogOpen, setCreateProfileDialogOpen] = useState(false);
 
   const reload = useCallback(async (next: IntakeProfileQuery) => {
+    const requestId = reloadRequestIdRef.current + 1;
+    reloadRequestIdRef.current = requestId;
     setLoading(true);
     try {
       const result = await searchIntakeProfiles(next);
+      if (reloadRequestIdRef.current !== requestId) return;
       setRows(result.rows);
       setTotal(result.total);
     } catch (error) {
+      if (reloadRequestIdRef.current !== requestId) return;
       toast.error(
         error instanceof Error
           ? error.message
@@ -49,7 +54,9 @@ export function IntakeCustomerLookup() {
       setRows([]);
       setTotal(0);
     } finally {
-      setLoading(false);
+      if (reloadRequestIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
   }, []);
 

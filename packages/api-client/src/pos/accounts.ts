@@ -1,6 +1,7 @@
 import type { ApiClient } from "../types";
 import type {
   CreatePosAccountRequest,
+  PosAccountProfilesQuery,
   PosAccountProfilesResponse,
   PosCustomerStatusChangeRequest,
   UpdatePosAccountRequest,
@@ -27,9 +28,10 @@ export function createPosAccountsApi(client: ApiClient) {
       client.get<PosCustomerAccountDetail>(`/pos/accounts/${accountId}`),
 
     /** Profiles under an account. GET /pos/accounts/:accountId/customers */
-    listProfiles: (accountId: string) =>
+    listProfiles: (accountId: string, query?: PosAccountProfilesQuery) =>
       client.get<PosAccountProfilesResponse>(
         `/pos/accounts/${accountId}/customers`,
+        { query },
       ),
 
     /** Create a profile nested under an account. POST /pos/accounts/:accountId/customers */
