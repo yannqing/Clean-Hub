@@ -74,7 +74,11 @@ export type MobileOwnerAppointment = {
   tenantId: string;
   branchId: string;
   customerId: string;
+  customerName: string;
+  customerPhone: string | null;
   deliveryTaskId: string | null;
+  assigneeUserId: string | null;
+  assigneeName: string | null;
   type: MobileOwnerAppointmentType;
   status: MobileOwnerAppointmentStatus;
   expectedAt: string;

@@ -79,18 +79,29 @@ function toIsoString(value: Date | null): string | null {
   return value ? value.toISOString() : null;
 }
 
-function toAppointment(row: typeof appointments.$inferSelect): OwnerAppointment {
+type OwnerAppointmentRow = typeof appointments.$inferSelect & {
+  customerName: string;
+  customerPhone: string | null;
+  assigneeUserId: string | null;
+  assigneeName: string | null;
+};
+
+function toAppointment(row: OwnerAppointmentRow): OwnerAppointment {
   return {
     id: row.id,
     tenantId: row.tenantId,
     branchId: row.branchId,
     customerId: row.customerId,
+    customerName: row.customerName,
+    customerPhone: row.customerPhone,
     type: row.type,
     status: row.status,
     expectedAt: row.expectedAt.toISOString(),
     address: row.address,
     notes: row.notes,
     deliveryTaskId: row.deliveryTaskId,
+    assigneeUserId: row.assigneeUserId,
+    assigneeName: row.assigneeName,
     acceptedAt: toIsoString(row.acceptedAt),
     acceptedBy: row.acceptedBy,
     cancelledAt: toIsoString(row.cancelledAt),
@@ -100,6 +111,16 @@ function toAppointment(row: typeof appointments.$inferSelect): OwnerAppointment 
     doneBy: row.doneBy,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function toAppointmentRow(row: typeof appointments.$inferSelect): OwnerAppointmentRow {
+  return {
+    ...row,
+    customerName: row.customerId,
+    customerPhone: null,
+    assigneeUserId: null,
+    assigneeName: null,
   };
 }
 
@@ -395,8 +416,33 @@ export class OwnerRepository {
     status?: OwnerAppointmentStatus;
   }): Promise<OwnerAppointment[]> {
     const rows = await this.db
-      .select({ ...getTableColumns(appointments) })
+      .select({
+        ...getTableColumns(appointments),
+        customerName: customers.fullName,
+        customerPhone: customers.phone,
+        assigneeUserId: deliveryTasks.assigneeUserId,
+        assigneeDisplayName: userProfiles.displayName,
+        assigneeEmail: users.email,
+      })
       .from(appointments)
+      .innerJoin(
+        customers,
+        and(
+          eq(customers.id, appointments.customerId),
+          eq(customers.tenantId, appointments.tenantId),
+          isNull(customers.deletedAt),
+        ),
+      )
+      .leftJoin(
+        deliveryTasks,
+        and(
+          eq(deliveryTasks.id, appointments.deliveryTaskId),
+          eq(deliveryTasks.tenantId, appointments.tenantId),
+          isNull(deliveryTasks.deletedAt),
+        ),
+      )
+      .leftJoin(users, eq(users.id, deliveryTasks.assigneeUserId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
       .where(
         and(
           eq(appointments.tenantId, input.tenantId),
@@ -407,7 +453,12 @@ export class OwnerRepository {
       )
       .orderBy(asc(appointments.expectedAt), desc(appointments.createdAt));
 
-    return rows.map(toAppointment);
+    return rows.map((row) =>
+      toAppointment({
+        ...row,
+        assigneeName: row.assigneeDisplayName ?? row.assigneeEmail ?? row.assigneeUserId ?? null,
+      }),
+    );
   }
 
   async findAppointmentById(input: {
@@ -426,7 +477,7 @@ export class OwnerRepository {
       )
       .limit(1);
 
-    return rows[0] ? toAppointment(rows[0]) : null;
+    return rows[0] ? toAppointment(toAppointmentRow(rows[0])) : null;
   }
 
   async acceptAppointmentAndCreateTask(input: {
@@ -454,7 +505,10 @@ export class OwnerRepository {
       }
 
       if (appointment.deliveryTaskId && appointment.status === "accepted") {
-        return { appointment: toAppointment(appointment), taskId: appointment.deliveryTaskId };
+        return {
+          appointment: toAppointment(toAppointmentRow(appointment)),
+          taskId: appointment.deliveryTaskId,
+        };
       }
 
       if (appointment.status !== "pending") {
@@ -524,7 +578,9 @@ export class OwnerRepository {
         )
         .returning({ ...getTableColumns(appointments) });
 
-      return updated ? { appointment: toAppointment(updated), taskId } : null;
+      return updated
+        ? { appointment: toAppointment(toAppointmentRow(updated)), taskId }
+        : null;
     });
   }
 
@@ -556,7 +612,7 @@ export class OwnerRepository {
       )
       .returning({ ...getTableColumns(appointments) });
 
-    return rows[0] ? toAppointment(rows[0]) : null;
+    return rows[0] ? toAppointment(toAppointmentRow(rows[0])) : null;
   }
 
   async markAppointmentDoneFromDelivery(input: {

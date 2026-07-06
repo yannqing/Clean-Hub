@@ -17,6 +17,7 @@ import type {
   MobileCustomerTicketDetail,
   MobileCustomerTicketListItem,
   MobileCustomerTicketStatus,
+  MobileRefundRequest,
 } from "@cleanhub/api-client";
 import type { SupportedLocale, TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
@@ -91,6 +92,7 @@ import {
   getCustomerAppointments,
   getCustomerOrdersAndTickets,
   getCustomerProfile,
+  getCustomerRefundRequests,
 } from "../queries";
 
 type CustomerTab = "resume" | "orders" | "appointments" | "profile";
@@ -277,6 +279,15 @@ const appointmentStatusClasses: Record<MobileCustomerAppointmentStatus, string> 
   done: "border-emerald-200 bg-emerald-50 text-emerald-800",
 };
 
+const refundStatusClasses: Record<MobileRefundRequest["status"], string> = {
+  approved: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  failed: "border-red-200 bg-red-50 text-red-700",
+  pending: "border-amber-200 bg-amber-50 text-amber-800",
+  processing: "border-sky-200 bg-sky-50 text-sky-800",
+  refunded: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  rejected: "border-red-200 bg-red-50 text-red-700",
+};
+
 const orderStatusKeys: Record<MobileCustomerOrderStatus, TranslationKey> = {
   draft: "customer.status.order.draft",
   received: "customer.status.order.received",
@@ -300,6 +311,15 @@ const appointmentStatusKeys: Record<MobileCustomerAppointmentStatus, Translation
   accepted: "customer.status.appointment.accepted",
   cancelled: "customer.status.appointment.cancelled",
   done: "customer.status.appointment.done",
+};
+
+const refundStatusKeys: Record<MobileRefundRequest["status"], TranslationKey> = {
+  approved: "customer.status.refund.approved",
+  failed: "customer.status.refund.failed",
+  pending: "customer.status.refund.pending",
+  processing: "customer.status.refund.processing",
+  refunded: "customer.status.refund.refunded",
+  rejected: "customer.status.refund.rejected",
 };
 
 const appointmentTypeKeys: Record<MobileCustomerAppointmentType, TranslationKey> = {
@@ -850,6 +870,16 @@ function getAppointmentStatusView(
   };
 }
 
+function getRefundStatusView(
+  t: Translator,
+  status: MobileRefundRequest["status"],
+): StatusView {
+  return {
+    label: t(refundStatusKeys[status]),
+    className: refundStatusClasses[status],
+  };
+}
+
 function getAccountStatusView(
   t: Translator,
   status: MobileCustomerProfile["account"]["status"],
@@ -1068,6 +1098,7 @@ type CustomerSnapshot = {
   addressBook: MobileCustomerAddress[];
   activity: MobileCustomerActivityList;
   appointments: MobileCustomerAppointment[];
+  refundRequests: MobileRefundRequest[];
   errorKey: TranslationKey | null;
 };
 
@@ -1081,15 +1112,17 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
       addressBook: [],
       activity: emptyActivity,
       appointments: [],
+      refundRequests: [],
       errorKey: "customer.messages.customerSessionRequired",
     };
   }
 
-  const [profile, addressBook, activity, appointments] = await Promise.all([
+  const [profile, addressBook, activity, appointments, refundRequests] = await Promise.all([
     getCustomerProfile(),
     getCustomerAddresses(),
     getCustomerOrdersAndTickets(),
     getCustomerAppointments(),
+    getCustomerRefundRequests(),
   ]);
 
   return {
@@ -1098,6 +1131,7 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
     addressBook: addressBook.data,
     activity: activity.data,
     appointments: sortAppointments(appointments.data),
+    refundRequests: refundRequests.data,
     errorKey: null,
   };
 }
@@ -1123,6 +1157,7 @@ export function CustomerHome({
   const [addressBook, setAddressBook] = useState<MobileCustomerAddress[]>([]);
   const [activity, setActivity] = useState<MobileCustomerActivityList>(emptyActivity);
   const [appointments, setAppointments] = useState<MobileCustomerAppointment[]>([]);
+  const [refundRequests, setRefundRequests] = useState<MobileRefundRequest[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<ActivitySelection | null>(null);
   const [activityDetail, setActivityDetail] = useState<ActivityDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -1180,6 +1215,7 @@ export function CustomerHome({
       setAddressBook(snapshot.addressBook);
       setActivity(snapshot.activity);
       setAppointments(snapshot.appointments);
+      setRefundRequests(snapshot.refundRequests);
       setError(snapshot.errorKey ? t(snapshot.errorKey) : null);
       setProfileForm(toProfileForm(snapshot.profile));
       setAppointmentForm((current) => ({
@@ -1211,6 +1247,7 @@ export function CustomerHome({
         setAddressBook(snapshot.addressBook);
         setActivity(snapshot.activity);
         setAppointments(snapshot.appointments);
+        setRefundRequests(snapshot.refundRequests);
         setError(snapshot.errorKey ? t(snapshot.errorKey) : null);
         setProfileForm(toProfileForm(snapshot.profile));
         setAppointmentForm((current) => ({
@@ -1288,7 +1325,17 @@ export function CustomerHome({
     setError(null);
 
     try {
-      const detail = await getCustomerActivityDetail(selection);
+      const [detail, nextRefundRequests] = await Promise.all([
+        getCustomerActivityDetail(selection),
+        selection.kind === "order"
+          ? getCustomerRefundRequests()
+          : Promise.resolve(null),
+      ]);
+
+      if (nextRefundRequests) {
+        setRefundRequests(nextRefundRequests.data);
+      }
+
       setActivityDetail(
         selection.kind === "order"
           ? { kind: "order", data: detail as MobileCustomerOrderDetail }
@@ -1348,12 +1395,14 @@ export function CustomerHome({
   }, [closeActivityDetail, openActivityDetail]);
 
   async function refreshSelectedOrder(orderId: string) {
-    const [detail, nextActivity] = await Promise.all([
+    const [detail, nextActivity, nextRefundRequests] = await Promise.all([
       getCustomerActivityDetail({ kind: "order", id: orderId }),
       getCustomerOrdersAndTickets(),
+      getCustomerRefundRequests(),
     ]);
 
     setActivity(nextActivity.data);
+    setRefundRequests(nextRefundRequests.data);
     setActivityDetail({
       kind: "order",
       data: detail as MobileCustomerOrderDetail,
@@ -1420,6 +1469,10 @@ export function CustomerHome({
       });
 
       await refreshSelectedOrder(refund.orderId);
+      setRefundRequests((current) => [
+        refund,
+        ...current.filter((request) => request.id !== refund.id),
+      ]);
       setRefundSheetOpen(false);
       setMessage(t("customer.messages.refundRequested"));
     } catch (nextError) {
@@ -1868,6 +1921,7 @@ export function CustomerHome({
       <ActivityDetailSheet
         currency={tenantCurrency}
         detail={activityDetail}
+        refundRequests={refundRequests}
         isPaymentSubmitting={isSubmittingPayment}
         isLoading={isDetailLoading}
         item={activityItems.find(
@@ -2366,6 +2420,7 @@ function ActivityDetailSheet({
   open,
   onOpenChange,
   onOpenRefund,
+  refundRequests,
 }: {
   currency: string;
   detail: ActivityDetail | null;
@@ -2376,6 +2431,7 @@ function ActivityDetailSheet({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenRefund: (order: MobileCustomerOrderDetail) => void;
+  refundRequests: MobileRefundRequest[];
 }) {
   const { t } = useTranslation();
 
@@ -2403,6 +2459,7 @@ function ActivityDetailSheet({
             isPaymentSubmitting={isPaymentSubmitting}
             onCreatePayment={onCreatePayment}
             onOpenRefund={onOpenRefund}
+            refundRequests={refundRequests}
           />
         ) : (
           <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
@@ -2428,17 +2485,22 @@ function ActivityDetailPanel({
   isPaymentSubmitting,
   onCreatePayment,
   onOpenRefund,
+  refundRequests,
 }: {
   currency: string;
   detail: ActivityDetail;
   isPaymentSubmitting: boolean;
   onCreatePayment: (order: MobileCustomerOrderDetail) => void;
   onOpenRefund: (order: MobileCustomerOrderDetail) => void;
+  refundRequests: MobileRefundRequest[];
 }) {
   const { locale, t } = useTranslation();
   const intlLocale = getIntlLocale(locale);
 
   if (detail.kind === "order") {
+    const orderRefundRequests = refundRequests.filter(
+      (refundRequest) => refundRequest.orderId === detail.data.id,
+    );
     const balance = getOrderBalance(detail.data);
     const canPay =
       amountToCents(balance) > 0 &&
@@ -2512,6 +2574,11 @@ function ActivityDetailPanel({
             amount: formatMoney(item.lineAmount),
           }))}
         />
+
+        <RefundRequestList
+          currency={currency}
+          refundRequests={orderRefundRequests}
+        />
       </section>
     );
   }
@@ -2568,6 +2635,74 @@ function ActivityDetailPanel({
         }))}
       />
     </section>
+  );
+}
+
+function RefundRequestList({
+  currency,
+  refundRequests,
+}: {
+  currency: string;
+  refundRequests: MobileRefundRequest[];
+}) {
+  const { locale, t } = useTranslation();
+  const intlLocale = getIntlLocale(locale);
+
+  return (
+    <div className="mt-5">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {t("customer.detail.refundRequests")}
+      </p>
+      {refundRequests.length ? (
+        <div className="mt-3 space-y-3">
+          {refundRequests.map((refundRequest) => {
+            const decision =
+              refundRequest.rejectionReason ??
+              refundRequest.failedReason ??
+              (refundRequest.refundedAt
+                ? formatDateTime(refundRequest.refundedAt, intlLocale)
+                : refundRequest.approvedAt
+                  ? formatDateTime(refundRequest.approvedAt, intlLocale)
+                  : null);
+
+            return (
+              <div
+                className="rounded-md border border-slate-200 bg-slate-50 p-3"
+                key={refundRequest.id}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold tabular-nums text-slate-950">
+                      {formatTenantMoney(refundRequest.amount, intlLocale, currency)}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {t("customer.detail.refundCreated")}:{" "}
+                      {formatDateTime(refundRequest.createdAt, intlLocale)}
+                    </p>
+                  </div>
+                  <StatusBadge view={getRefundStatusView(t, refundRequest.status)} />
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-700">
+                  <span className="font-medium text-slate-900">
+                    {t("customer.detail.refundReason")}:
+                  </span>{" "}
+                  {refundRequest.reason}
+                </p>
+                {decision ? (
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    {t("customer.detail.refundDecision")}: {decision}
+                  </p>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p className="mt-3 rounded-md border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600">
+          {t("customer.detail.noRefundRequests")}
+        </p>
+      )}
+    </div>
   );
 }
 

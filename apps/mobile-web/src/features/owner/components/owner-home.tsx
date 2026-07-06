@@ -131,6 +131,15 @@ const deliveryStatusLabelKeys: Record<MobileDeliveryTaskStatus, TranslationKey> 
   signed: "owner.deliveryStatus.signed",
 };
 
+const refundStatusLabelKeys: Record<MobileRefundRequest["status"], TranslationKey> = {
+  approved: "owner.refundStatus.approved",
+  failed: "owner.refundStatus.failed",
+  pending: "owner.refundStatus.pending",
+  processing: "owner.refundStatus.processing",
+  refunded: "owner.refundStatus.refunded",
+  rejected: "owner.refundStatus.rejected",
+};
+
 const taskTypeLabelKeys: Record<OwnerDispatchTask["type"], TranslationKey> = {
   dropoff: "owner.taskType.dropoff",
   pickup: "owner.taskType.pickup",
@@ -145,16 +154,20 @@ const toneClasses: Record<MetricItem["tone"], string> = {
 
 const statusBadgeClasses: Record<string, string> = {
   accepted: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  approved: "border-emerald-200 bg-emerald-50 text-emerald-700",
   arrived: "border-cyan-200 bg-cyan-50 text-cyan-700",
   cancelled: "border-slate-200 bg-slate-100 text-slate-600",
   delivering: "border-sky-200 bg-sky-50 text-sky-700",
   done: "border-slate-200 bg-slate-100 text-slate-600",
   en_route: "border-sky-200 bg-sky-50 text-sky-700",
   exception: "border-red-200 bg-red-50 text-red-700",
+  failed: "border-red-200 bg-red-50 text-red-700",
   pending: "border-amber-200 bg-amber-50 text-amber-700",
   pending_dispatch: "border-amber-200 bg-amber-50 text-amber-700",
   picked_up: "border-blue-200 bg-blue-50 text-blue-700",
+  processing: "border-sky-200 bg-sky-50 text-sky-700",
   rejected: "border-red-200 bg-red-50 text-red-700",
+  refunded: "border-emerald-200 bg-emerald-50 text-emerald-700",
   signed: "border-emerald-200 bg-emerald-50 text-emerald-700",
 };
 
@@ -503,7 +516,7 @@ function RefundRequestItem({
             {formatDateTime(refundRequest.createdAt, intlLocale, t("owner.notScheduled"))}
           </p>
         </div>
-        <StatusBadge label={t("owner.actions.approveRefund")} status={refundRequest.status} />
+        <StatusBadge label={t(refundStatusLabelKeys[refundRequest.status])} status={refundRequest.status} />
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="text-sm text-slate-700">{refundRequest.reason}</p>

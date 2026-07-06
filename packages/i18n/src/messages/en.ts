@@ -123,6 +123,14 @@ export const enMessages = {
         failed: "Failed",
         refunded: "Refunded",
       },
+      refund: {
+        pending: "Pending",
+        approved: "Approved",
+        processing: "Processing",
+        rejected: "Rejected",
+        refunded: "Refunded",
+        failed: "Failed",
+      },
     },
     appointmentTypes: {
       pickup: "Pickup",
@@ -202,6 +210,11 @@ export const enMessages = {
       noItems: "No items",
       totalInline: "Total {amount}",
       pickupInline: "Pickup {date}",
+      refundRequests: "Refund requests",
+      noRefundRequests: "No refund requests for this order.",
+      refundReason: "Reason",
+      refundCreated: "Requested",
+      refundDecision: "Decision",
     },
     appointments: {
       title: "Appointments",
@@ -505,6 +518,14 @@ export const enMessages = {
       pending_dispatch: "To dispatch",
       picked_up: "Picked up",
       signed: "Signed",
+    },
+    refundStatus: {
+      pending: "Pending",
+      approved: "Approved",
+      processing: "Processing",
+      rejected: "Rejected",
+      refunded: "Refunded",
+      failed: "Failed",
     },
     taskType: {
       dropoff: "Drop-off",

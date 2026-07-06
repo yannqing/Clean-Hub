@@ -212,6 +212,7 @@ function asListItem(task: DeliveryTaskDetail): DeliveryTaskListItem {
     branchId: task.branchId,
     appointmentId: task.appointmentId,
     assigneeUserId: task.assigneeUserId,
+    assigneeName: task.assigneeName,
     type: task.type,
     status: task.status,
     expectedAt: task.expectedAt,

@@ -95,6 +95,7 @@ function makeDetail(
     branchId: "branch_1",
     appointmentId: null,
     assigneeUserId: "driver_1",
+    assigneeName: "Driver One",
     type: "pickup",
     status,
     expectedAt: now,

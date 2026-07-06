@@ -63,12 +63,16 @@ export type OwnerAppointment = {
   tenantId: string;
   branchId: string;
   customerId: string;
+  customerName: string;
+  customerPhone: string | null;
   type: OwnerAppointmentType;
   status: OwnerAppointmentStatus;
   expectedAt: string;
   address: string;
   notes: string | null;
   deliveryTaskId: string | null;
+  assigneeUserId: string | null;
+  assigneeName: string | null;
   acceptedAt: string | null;
   acceptedBy: string | null;
   cancelledAt: string | null;

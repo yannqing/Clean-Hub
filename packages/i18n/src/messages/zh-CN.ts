@@ -122,6 +122,14 @@ export const zhCNMessages = {
         failed: "失败",
         refunded: "已退款",
       },
+      refund: {
+        pending: "待处理",
+        approved: "已批准",
+        processing: "处理中",
+        rejected: "已拒绝",
+        refunded: "已退款",
+        failed: "失败",
+      },
     },
     appointmentTypes: {
       pickup: "取件",
@@ -201,6 +209,11 @@ export const zhCNMessages = {
       noItems: "暂无项目",
       totalInline: "总计 {amount}",
       pickupInline: "取件 {date}",
+      refundRequests: "退款申请",
+      noRefundRequests: "此订单暂无退款申请。",
+      refundReason: "原因",
+      refundCreated: "申请时间",
+      refundDecision: "处理结果",
     },
     appointments: {
       title: "预约",
@@ -501,6 +514,14 @@ export const zhCNMessages = {
       pending_dispatch: "待调度",
       picked_up: "已取件",
       signed: "已签收",
+    },
+    refundStatus: {
+      pending: "待处理",
+      approved: "已批准",
+      processing: "处理中",
+      rejected: "已拒绝",
+      refunded: "已退款",
+      failed: "失败",
     },
     taskType: {
       dropoff: "送达",

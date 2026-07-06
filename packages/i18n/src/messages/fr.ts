@@ -123,6 +123,14 @@ export const frMessages = {
         failed: "Echec",
         refunded: "Rembourse",
       },
+      refund: {
+        pending: "En attente",
+        approved: "Approuve",
+        processing: "En traitement",
+        rejected: "Refuse",
+        refunded: "Rembourse",
+        failed: "Echec",
+      },
     },
     appointmentTypes: {
       pickup: "Collecte",
@@ -202,6 +210,11 @@ export const frMessages = {
       noItems: "Aucun article",
       totalInline: "Total {amount}",
       pickupInline: "Retrait {date}",
+      refundRequests: "Demandes de remboursement",
+      noRefundRequests: "Aucune demande de remboursement pour cette commande.",
+      refundReason: "Motif",
+      refundCreated: "Demandee",
+      refundDecision: "Decision",
     },
     appointments: {
       title: "Rendez-vous",
@@ -506,6 +519,14 @@ export const frMessages = {
       pending_dispatch: "À répartir",
       picked_up: "Collecté",
       signed: "Signé",
+    },
+    refundStatus: {
+      pending: "En attente",
+      approved: "Approuve",
+      processing: "En traitement",
+      rejected: "Refuse",
+      refunded: "Rembourse",
+      failed: "Echec",
     },
     taskType: {
       dropoff: "Dépôt",
