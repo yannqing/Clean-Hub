@@ -707,7 +707,9 @@ export async function recalculateOrderPaymentState(
   const rows = await db
     .select({
       paidAmount: sql<string>`coalesce(sum(${paymentTransactions.amount}), 0)`,
-      paidAt: sql<Date | null>`max(${paymentTransactions.paidAt})`,
+      // Raw sql fragments bypass drizzle's column mapping, so the driver
+      // returns timestamptz as a string — convert before writing back.
+      paidAt: sql<string | null>`max(${paymentTransactions.paidAt})`,
     })
     .from(paymentTransactions)
     .where(
@@ -736,7 +738,7 @@ export async function recalculateOrderPaymentState(
     .update(orders)
     .set({
       paidAmount: paidAmount.toFixed(2),
-      paidAt: rows[0]?.paidAt ?? null,
+      paidAt: rows[0]?.paidAt ? new Date(rows[0].paidAt) : null,
       paymentStatus,
       status: nextStatus,
       updatedAt: new Date(),
