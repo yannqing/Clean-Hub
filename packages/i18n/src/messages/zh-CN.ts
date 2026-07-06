@@ -238,6 +238,17 @@ export const zhCNMessages = {
       placeholder: "说明申请原因",
       send: "发送申请",
     },
+    confirm: {
+      cancelAppointmentTitle: "取消预约？",
+      cancelAppointmentDescription: "该预约将被取消，并从当前计划中移除。",
+      cancelAppointmentConfirm: "取消预约",
+      deleteAddressTitle: "删除地址？",
+      deleteAddressDescription: "该取件或配送地址将从地址簿中移除。",
+      deleteAddressConfirm: "删除地址",
+      deleteContactTitle: "删除联系人？",
+      deleteContactDescription: "该关联客户联系人将从资料中移除。",
+      deleteContactConfirm: "删除联系人",
+    },
     profile: {
       editTitle: "编辑资料",
       editDescription: "客户账户主要联系方式",

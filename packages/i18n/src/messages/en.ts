@@ -239,6 +239,17 @@ export const enMessages = {
       placeholder: "Explain the request",
       send: "Send request",
     },
+    confirm: {
+      cancelAppointmentTitle: "Cancel appointment?",
+      cancelAppointmentDescription: "This appointment will be cancelled and removed from the active schedule.",
+      cancelAppointmentConfirm: "Cancel appointment",
+      deleteAddressTitle: "Delete address?",
+      deleteAddressDescription: "This saved pickup or delivery address will be removed from your address book.",
+      deleteAddressConfirm: "Delete address",
+      deleteContactTitle: "Delete contact?",
+      deleteContactDescription: "This linked customer contact will be removed from your profile.",
+      deleteContactConfirm: "Delete contact",
+    },
     profile: {
       editTitle: "Edit profile",
       editDescription: "Main customer account details",

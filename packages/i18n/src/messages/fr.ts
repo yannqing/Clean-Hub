@@ -239,6 +239,17 @@ export const frMessages = {
       placeholder: "Expliquez la demande",
       send: "Envoyer la demande",
     },
+    confirm: {
+      cancelAppointmentTitle: "Annuler le rendez-vous ?",
+      cancelAppointmentDescription: "Ce rendez-vous sera annule et retire du planning actif.",
+      cancelAppointmentConfirm: "Annuler le rendez-vous",
+      deleteAddressTitle: "Supprimer l'adresse ?",
+      deleteAddressDescription: "Cette adresse de collecte ou livraison sera retiree du carnet d'adresses.",
+      deleteAddressConfirm: "Supprimer l'adresse",
+      deleteContactTitle: "Supprimer le contact ?",
+      deleteContactDescription: "Ce contact client lie sera retire de votre profil.",
+      deleteContactConfirm: "Supprimer le contact",
+    },
     profile: {
       editTitle: "Modifier le profil",
       editDescription: "Coordonnees principales du compte client",

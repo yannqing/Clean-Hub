@@ -65,6 +65,7 @@ import {
 } from "lucide-react";
 
 import { getMobileSession } from "@/lib/token-storage";
+import { ConfirmSheet } from "@/components/confirm-sheet";
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { formatTenantMoney, resolveTenantCurrency } from "@/lib/currency";
 import {
@@ -204,6 +205,11 @@ type RefundFormState = {
 };
 
 type ProfileSheet = "profile" | "contact" | "address" | "password" | null;
+
+type CustomerConfirmTarget =
+  | { kind: "cancel-appointment"; appointmentId: string }
+  | { kind: "delete-address"; addressId: string }
+  | { kind: "delete-contact"; customerId: string };
 
 type StatusView = {
   label: string;
@@ -1025,6 +1031,57 @@ function getAddressBookPrimaryAddressId(addresses: MobileCustomerAddress[]): str
   return (addresses.find((item) => item.isDefault) ?? addresses[0])?.id ?? CUSTOM_APPOINTMENT_ADDRESS_ID;
 }
 
+function getConfirmTitle(t: Translator, target: CustomerConfirmTarget | null): string {
+  if (!target) {
+    return "";
+  }
+
+  if (target.kind === "cancel-appointment") {
+    return t("customer.confirm.cancelAppointmentTitle");
+  }
+
+  if (target.kind === "delete-address") {
+    return t("customer.confirm.deleteAddressTitle");
+  }
+
+  return t("customer.confirm.deleteContactTitle");
+}
+
+function getConfirmDescription(
+  t: Translator,
+  target: CustomerConfirmTarget | null,
+): string {
+  if (!target) {
+    return "";
+  }
+
+  if (target.kind === "cancel-appointment") {
+    return t("customer.confirm.cancelAppointmentDescription");
+  }
+
+  if (target.kind === "delete-address") {
+    return t("customer.confirm.deleteAddressDescription");
+  }
+
+  return t("customer.confirm.deleteContactDescription");
+}
+
+function getConfirmLabel(t: Translator, target: CustomerConfirmTarget | null): string {
+  if (!target) {
+    return "";
+  }
+
+  if (target.kind === "cancel-appointment") {
+    return t("customer.confirm.cancelAppointmentConfirm");
+  }
+
+  if (target.kind === "delete-address") {
+    return t("customer.confirm.deleteAddressConfirm");
+  }
+
+  return t("customer.confirm.deleteContactConfirm");
+}
+
 function toProfileForm(profile: MobileCustomerProfile | null): CustomerProfileFormState {
   return {
     accountName: profile?.account.accountName ?? "",
@@ -1188,6 +1245,7 @@ export function CustomerHome({
   const [detailOpen, setDetailOpen] = useState(false);
   const [appointmentSheetOpen, setAppointmentSheetOpen] = useState(false);
   const [profileSheet, setProfileSheet] = useState<ProfileSheet>(null);
+  const [confirmTarget, setConfirmTarget] = useState<CustomerConfirmTarget | null>(null);
   const [editingContactId, setEditingContactId] = useState<string | null>(null);
   const [editingAddressId, setEditingAddressId] = useState<string | null>(null);
   const [profileForm, setProfileForm] = useState<CustomerProfileFormState>(() => toProfileForm(null));
@@ -1226,6 +1284,15 @@ export function CustomerHome({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const hasRestoredDetailRef = useRef(false);
+
+  const isConfirmSubmitting =
+    confirmTarget?.kind === "cancel-appointment"
+      ? cancellingAppointmentId === confirmTarget.appointmentId
+      : confirmTarget?.kind === "delete-address"
+        ? addressActionId === `delete-${confirmTarget.addressId}`
+        : confirmTarget?.kind === "delete-contact"
+          ? contactActionId === `delete-${confirmTarget.customerId}`
+          : false;
 
   const loadCustomerData = useCallback(async (mode: "boot" | "refresh" = "refresh") => {
     if (mode === "boot") {
@@ -1627,6 +1694,12 @@ export function CustomerHome({
     }
   }
 
+  function requestCancelAppointment(appointmentId: string) {
+    setError(null);
+    setMessage(null);
+    setConfirmTarget({ kind: "cancel-appointment", appointmentId });
+  }
+
   function openProfileSheet() {
     setError(null);
     setMessage(null);
@@ -1803,6 +1876,12 @@ export function CustomerHome({
     }
   }
 
+  function requestDeleteContact(customerId: string) {
+    setError(null);
+    setMessage(null);
+    setConfirmTarget({ kind: "delete-contact", customerId });
+  }
+
   async function handleSaveAddress(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
@@ -1868,6 +1947,30 @@ export function CustomerHome({
     } finally {
       setAddressActionId(null);
     }
+  }
+
+  function requestDeleteAddress(addressId: string) {
+    setError(null);
+    setMessage(null);
+    setConfirmTarget({ kind: "delete-address", addressId });
+  }
+
+  async function handleConfirmDestructiveAction() {
+    const target = confirmTarget;
+
+    if (!target) {
+      return;
+    }
+
+    if (target.kind === "cancel-appointment") {
+      await handleCancelAppointment(target.appointmentId);
+    } else if (target.kind === "delete-address") {
+      await handleDeleteAddress(target.addressId);
+    } else {
+      await handleDeleteContact(target.customerId);
+    }
+
+    setConfirmTarget(null);
   }
 
   async function handleSetDefaultAddress(addressId: string) {
@@ -1989,7 +2092,7 @@ export function CustomerHome({
         <AppointmentsView
           appointments={appointments}
           cancellingAppointmentId={cancellingAppointmentId}
-          onCancelAppointment={(appointmentId) => void handleCancelAppointment(appointmentId)}
+          onCancelAppointment={requestCancelAppointment}
           onOpenCreateAppointment={openAppointmentSheet}
         />
       ) : null}
@@ -2002,8 +2105,8 @@ export function CustomerHome({
           profile={profile}
           onCreateAddress={openCreateAddressSheet}
           onCreateContact={openCreateContactSheet}
-          onDeleteAddress={(addressId) => void handleDeleteAddress(addressId)}
-          onDeleteContact={(customerId) => void handleDeleteContact(customerId)}
+          onDeleteAddress={requestDeleteAddress}
+          onDeleteContact={requestDeleteContact}
           onEditAddress={openEditAddressSheet}
           onEditContact={openEditContactSheet}
           onEditProfile={openProfileSheet}
@@ -2031,6 +2134,21 @@ export function CustomerHome({
           }
         }}
         onOpenRefund={openRefundSheet}
+      />
+
+      <ConfirmSheet
+        cancelLabel={t("common.cancel")}
+        confirmLabel={getConfirmLabel(t, confirmTarget)}
+        description={getConfirmDescription(t, confirmTarget)}
+        isSubmitting={isConfirmSubmitting}
+        open={Boolean(confirmTarget)}
+        title={getConfirmTitle(t, confirmTarget)}
+        onConfirm={() => void handleConfirmDestructiveAction()}
+        onOpenChange={(open) => {
+          if (!open && !isConfirmSubmitting) {
+            setConfirmTarget(null);
+          }
+        }}
       />
 
       <AppointmentFormSheet
