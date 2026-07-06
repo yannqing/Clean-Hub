@@ -8,7 +8,7 @@
 --
 -- Credentials (all 4 accounts):
 --   Password: 123456   (scrypt$16384$8$1$...)
---   PIN:      1234     (same value as dev-accounts.sql; column is NOT NULL)
+--   PIN:      123456   (same value as dev-accounts.sql; column is NOT NULL)
 --
 -- Accounts (tenantCode: CLEAN-001):
 --   pos.cashier1@cleanhub.local
@@ -17,9 +17,9 @@
 --   pos.cashier4@cleanhub.local
 
 -- Reuse the exact scrypt hashes used by dev-accounts.sql so the credentials
--- match the documented "Password: 123456 / PIN: 1234".
+-- match the documented "Password: 123456 / PIN: 123456".
 --   password_hash = scrypt of "123456"
---   pin_hash      = scrypt of "1234"
+--   pin_hash      = scrypt of "123456"
 
 -- 1) Cashier role for Demo Tenant 1 (absent from dev-accounts.sql).
 INSERT INTO roles (id, tenant_id, scope, code, name, description, status, is_system)
@@ -101,7 +101,7 @@ VALUES
     'pos.cashier1@cleanhub.local',
     'pos.cashier1@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
+    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
     'active'
   ),
   (
@@ -111,7 +111,7 @@ VALUES
     'pos.cashier2@cleanhub.local',
     'pos.cashier2@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
+    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
     'active'
   ),
   (
@@ -121,7 +121,7 @@ VALUES
     'pos.cashier3@cleanhub.local',
     'pos.cashier3@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
+    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
     'active'
   ),
   (
@@ -131,7 +131,7 @@ VALUES
     'pos.cashier4@cleanhub.local',
     'pos.cashier4@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
+    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
     'active'
   )
 ON CONFLICT (id) DO UPDATE
