@@ -55,6 +55,89 @@ function appendSetCookieHeaders(
   return response;
 }
 
+function parseCookieHeader(cookieHeader: string | null): Map<string, string> {
+  const cookies = new Map<string, string>();
+
+  if (!cookieHeader) {
+    return cookies;
+  }
+
+  for (const pair of cookieHeader.split(";")) {
+    const trimmed = pair.trim();
+    const equalsIndex = trimmed.indexOf("=");
+
+    if (equalsIndex <= 0) {
+      continue;
+    }
+
+    cookies.set(trimmed.slice(0, equalsIndex), trimmed.slice(equalsIndex + 1));
+  }
+
+  return cookies;
+}
+
+function mergeSetCookieIntoCookieHeader(
+  cookieHeader: string | null,
+  setCookieHeaders: string[],
+): string {
+  const cookies = parseCookieHeader(cookieHeader);
+
+  for (const setCookie of setCookieHeaders) {
+    const [nameValue, ...attributes] = setCookie.split(";");
+    const equalsIndex = nameValue.indexOf("=");
+
+    if (equalsIndex <= 0) {
+      continue;
+    }
+
+    const name = nameValue.slice(0, equalsIndex).trim();
+    const value = nameValue.slice(equalsIndex + 1);
+    const removesCookie =
+      value === "" ||
+      attributes.some((attribute) => /^max-age=0$/i.test(attribute.trim()));
+
+    if (removesCookie) {
+      cookies.delete(name);
+    } else {
+      cookies.set(name, value);
+    }
+  }
+
+  return Array.from(cookies.entries())
+    .map(([name, value]) => `${name}=${value}`)
+    .join("; ");
+}
+
+function createNextResponse(
+  request: NextRequest,
+  setCookieHeaders: string[] = [],
+): NextResponse {
+  if (setCookieHeaders.length === 0) {
+    return NextResponse.next();
+  }
+
+  const requestHeaders = new Headers(request.headers);
+  const cookieHeader = mergeSetCookieIntoCookieHeader(
+    request.headers.get("cookie"),
+    setCookieHeaders,
+  );
+
+  if (cookieHeader) {
+    requestHeaders.set("cookie", cookieHeader);
+  } else {
+    requestHeaders.delete("cookie");
+  }
+
+  return appendSetCookieHeaders(
+    NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    }),
+    setCookieHeaders,
+  );
+}
+
 function createRedirect(
   request: NextRequest,
   path: string,
@@ -134,7 +217,7 @@ export async function proxy(request: NextRequest) {
 
   if (pathname === LOGIN_PATH) {
     if (!auth || !isPosAllowedRole(auth.authContext.role)) {
-      return NextResponse.next();
+      return createNextResponse(request);
     }
 
     return createRedirect(request, "/", auth.setCookieHeaders);
@@ -149,7 +232,7 @@ export async function proxy(request: NextRequest) {
     return redirectToLogin(request);
   }
 
-  return appendSetCookieHeaders(NextResponse.next(), auth.setCookieHeaders);
+  return createNextResponse(request, auth.setCookieHeaders);
 }
 
 export const config = {

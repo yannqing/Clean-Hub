@@ -16,25 +16,12 @@ function getApiBaseUrl(): string {
   );
 }
 
-function getSetCookieHeaders(responseHeaders: Headers): string[] {
-  const headersWithSetCookie = responseHeaders as Headers & {
-    getSetCookie?: () => string[];
-  };
-
-  if (typeof headersWithSetCookie.getSetCookie === "function") {
-    return headersWithSetCookie.getSetCookie();
-  }
-
-  const setCookie = responseHeaders.get("set-cookie");
-  return setCookie ? [setCookie] : [];
-}
-
 async function callAuth(
   path: "/auth/me" | "/auth/refresh",
   method: "GET" | "POST",
   cookieHeader: string,
   requestId: string,
-): Promise<{ authContext: AuthContext; setCookieHeaders: string[] } | null> {
+): Promise<AuthContext | null> {
   try {
     const response = await fetch(`${getApiBaseUrl()}${path}`, {
       method,
@@ -50,10 +37,7 @@ async function callAuth(
       return null;
     }
 
-    return {
-      authContext: (await response.json()) as AuthContext,
-      setCookieHeaders: getSetCookieHeaders(response.headers),
-    };
+    return (await response.json()) as AuthContext;
   } catch {
     return null;
   }
@@ -63,9 +47,6 @@ async function callAuth(
  * Resolve the signed-in POS user on the server. Forwards the incoming request
  * cookies to /auth/me (falling back to /auth/refresh) and returns the session
  * when the user holds a POS-allowed tenant role. Returns null otherwise.
- *
- * The refreshed Set-Cookie headers are applied back to the response so token
- * rotation propagates to the browser.
  */
 export async function getCurrentUser(): Promise<PosSessionUser | null> {
   const cookieStore = await cookies();
@@ -93,28 +74,16 @@ export async function getCurrentUser(): Promise<PosSessionUser | null> {
   }
 
   for (const { path, method } of attempts) {
-    const result = await callAuth(path, method, cookieHeader, requestId);
-    if (!result) {
+    const authContext = await callAuth(path, method, cookieHeader, requestId);
+    if (!authContext) {
       continue;
     }
 
-    for (const setCookie of result.setCookieHeaders) {
-      const [nameValue] = setCookie.split(";");
-      const equalsIndex = nameValue.indexOf("=");
-      if (equalsIndex === -1) {
-        continue;
-      }
-
-      const name = nameValue.slice(0, equalsIndex).trim();
-      const value = nameValue.slice(equalsIndex + 1);
-      cookieStore.set(name, value, { path: "/" });
-    }
-
-    if (!isPosAllowedRole(result.authContext.role)) {
+    if (!isPosAllowedRole(authContext.role)) {
       return null;
     }
 
-    return result.authContext;
+    return authContext;
   }
 
   return null;
