@@ -9,6 +9,10 @@ import {
   type OwnerTodaySummary,
 } from "./owner.types.js";
 import type { MobileAuthContext } from "../auth/auth.types.js";
+import type {
+  NotificationEvent,
+  NotificationPublishResult,
+} from "../../notifications/index.js";
 
 const ownerContext: MobileAuthContext = {
   subjectType: "staff",
@@ -340,10 +344,42 @@ function createDeliveryRepository(options?: {
   };
 }
 
+function createNotificationPublisher(): {
+  events: NotificationEvent[];
+  publish(event: NotificationEvent): Promise<NotificationPublishResult>;
+} {
+  const events: NotificationEvent[] = [];
+
+  return {
+    events,
+    async publish(event) {
+      events.push(event);
+      return {
+        matched: 1,
+        enqueued: 1,
+        skipped: 0,
+        idempotent: 0,
+      };
+    },
+  };
+}
+
+function createFailingNotificationPublisher(): {
+  publish(event: NotificationEvent): Promise<NotificationPublishResult>;
+} {
+  return {
+    async publish() {
+      throw new Error("notification unavailable");
+    },
+  };
+}
+
 export async function runOwnerSmokeChecks(): Promise<void> {
+  const notificationPublisher = createNotificationPublisher();
   const service = new OwnerService({
     repository: createRepository(),
     deliveryRepository: createDeliveryRepository(),
+    notificationPublisher,
   });
   const summary = await service.getTodaySummary(ownerContext);
 
@@ -387,6 +423,14 @@ export async function runOwnerSmokeChecks(): Promise<void> {
   });
   assert(accepted.appointment.status === "accepted", "appointment accepts");
   assert(accepted.task.id === "task_1", "accepted appointment returns task");
+  assert(
+    notificationPublisher.events[0]?.name === "appointment.accepted",
+    "accepted appointment should publish a notification event",
+  );
+  assert(
+    notificationPublisher.events[0]?.customerId === "customer_1",
+    "accepted appointment notification should target the customer",
+  );
 
   const replayedAccept = await service.acceptAppointment({
     authContext: ownerContext,
@@ -399,10 +443,16 @@ export async function runOwnerSmokeChecks(): Promise<void> {
     replayedAccept.task.id === "task_1",
     "accepted appointment replay should return existing task",
   );
+  assert(
+    notificationPublisher.events.length === 1,
+    "accepted appointment replay should not publish again",
+  );
 
+  const rejectNotificationPublisher = createNotificationPublisher();
   const rejected = await new OwnerService({
     repository: createRepository(),
     deliveryRepository: createDeliveryRepository(),
+    notificationPublisher: rejectNotificationPublisher,
   }).rejectAppointment({
     authContext: ownerContext,
     appointmentId: "appointment_1",
@@ -410,6 +460,28 @@ export async function runOwnerSmokeChecks(): Promise<void> {
   });
   assert(rejected.status === "cancelled", "pending appointment rejects");
   assert(rejected.cancellationReason === "No slot", "reject should store reason");
+  assert(
+    rejectNotificationPublisher.events[0]?.name === "appointment.rejected",
+    "rejected appointment should publish a notification event",
+  );
+  assert(
+    rejectNotificationPublisher.events[0]?.payload?.reason === "No slot",
+    "rejected appointment notification should include the reason",
+  );
+
+  const rejectedWithNotificationFailure = await new OwnerService({
+    repository: createRepository(),
+    deliveryRepository: createDeliveryRepository(),
+    notificationPublisher: createFailingNotificationPublisher(),
+  }).rejectAppointment({
+    authContext: ownerContext,
+    appointmentId: "appointment_1",
+    reason: "No slot",
+  });
+  assert(
+    rejectedWithNotificationFailure.status === "cancelled",
+    "notification failure should not block appointment rejection",
+  );
 
   await assertRejectsOwner(
     () =>

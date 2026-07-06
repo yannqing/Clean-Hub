@@ -91,6 +91,130 @@ export function orderCompletedEvent(input: {
   };
 }
 
+export function appointmentAcceptedEvent(input: {
+  tenantId: string;
+  branchId: string;
+  customerId: string;
+  appointmentId: string;
+  customerName?: string | null;
+  appointmentType: "pickup" | "dropoff";
+  expectedAt: string;
+  address: string;
+  taskId?: string | null;
+  locale?: string | null;
+}): NotificationEvent {
+  return {
+    name: "appointment.accepted",
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    customerId: input.customerId,
+    relatedType: "appointment",
+    relatedId: input.appointmentId,
+    locale: input.locale,
+    idempotencyKey: `appointment.accepted:${input.appointmentId}`,
+    payload: {
+      appointmentId: input.appointmentId,
+      customerName: input.customerName ?? null,
+      appointmentType: input.appointmentType,
+      expectedAt: input.expectedAt,
+      address: input.address,
+      taskId: input.taskId ?? null,
+    },
+  };
+}
+
+export function appointmentRejectedEvent(input: {
+  tenantId: string;
+  branchId: string;
+  customerId: string;
+  appointmentId: string;
+  customerName?: string | null;
+  appointmentType: "pickup" | "dropoff";
+  expectedAt: string;
+  address: string;
+  reason?: string | null;
+  locale?: string | null;
+}): NotificationEvent {
+  return {
+    name: "appointment.rejected",
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    customerId: input.customerId,
+    relatedType: "appointment",
+    relatedId: input.appointmentId,
+    locale: input.locale,
+    idempotencyKey: `appointment.rejected:${input.appointmentId}`,
+    payload: {
+      appointmentId: input.appointmentId,
+      customerName: input.customerName ?? null,
+      appointmentType: input.appointmentType,
+      expectedAt: input.expectedAt,
+      address: input.address,
+      reason: input.reason ?? null,
+    },
+  };
+}
+
+export function refundApprovedEvent(input: {
+  tenantId: string;
+  branchId: string;
+  customerId: string;
+  refundRequestId: string;
+  orderId: string;
+  amount: string;
+  reason: string;
+  status: string;
+  locale?: string | null;
+}): NotificationEvent {
+  return {
+    name: "refund.approved",
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    customerId: input.customerId,
+    relatedType: "refund_request",
+    relatedId: input.refundRequestId,
+    locale: input.locale,
+    idempotencyKey: `refund.approved:${input.refundRequestId}`,
+    payload: {
+      refundRequestId: input.refundRequestId,
+      orderId: input.orderId,
+      amount: input.amount,
+      reason: input.reason,
+      status: input.status,
+    },
+  };
+}
+
+export function refundRejectedEvent(input: {
+  tenantId: string;
+  branchId: string;
+  customerId: string;
+  refundRequestId: string;
+  orderId: string;
+  amount: string;
+  reason: string;
+  rejectionReason?: string | null;
+  locale?: string | null;
+}): NotificationEvent {
+  return {
+    name: "refund.rejected",
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    customerId: input.customerId,
+    relatedType: "refund_request",
+    relatedId: input.refundRequestId,
+    locale: input.locale,
+    idempotencyKey: `refund.rejected:${input.refundRequestId}`,
+    payload: {
+      refundRequestId: input.refundRequestId,
+      orderId: input.orderId,
+      amount: input.amount,
+      reason: input.reason,
+      rejectionReason: input.rejectionReason ?? null,
+    },
+  };
+}
+
 export function deliveryStatusChangedEvent(input: {
   tenantId: string;
   branchId: string;

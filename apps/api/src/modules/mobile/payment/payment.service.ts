@@ -1,7 +1,11 @@
 import { getDb, type Database } from "@cleanhub/db";
 import { createLogger, type AppLogger } from "@cleanhub/logger";
 
-import type { NotificationPublisher } from "../../notifications/index.js";
+import {
+  refundApprovedEvent,
+  refundRejectedEvent,
+  type NotificationPublisher,
+} from "../../notifications/index.js";
 import type { MobileAuthContext } from "../auth/auth.types.js";
 import { MockPaymentGateway } from "./mock-payment.gateway.js";
 import {
@@ -611,6 +615,8 @@ export class PaymentService {
       "Mobile refund request approved",
     );
 
+    await this.publishRefundApproved(approved);
+
     return {
       refundRequest: approved,
       gateway,
@@ -648,6 +654,8 @@ export class PaymentService {
     if (!rejected) {
       throw conflict("Refund request changed while rejecting.");
     }
+
+    await this.publishRefundRejected(rejected);
 
     return rejected;
   }
@@ -706,6 +714,66 @@ export class PaymentService {
       this.logger.error(
         { error, tenantId: transaction.tenantId, transactionId: transaction.id },
         "Payment notification event failed",
+      );
+    }
+  }
+
+  private async publishRefundApproved(refundRequest: RefundRequest): Promise<void> {
+    if (!this.notificationPublisher) {
+      return;
+    }
+
+    try {
+      await this.notificationPublisher.publish(
+        refundApprovedEvent({
+          tenantId: refundRequest.tenantId,
+          branchId: refundRequest.branchId,
+          customerId: refundRequest.customerId,
+          refundRequestId: refundRequest.id,
+          orderId: refundRequest.orderId,
+          amount: refundRequest.amount,
+          reason: refundRequest.reason,
+          status: refundRequest.status,
+        }),
+      );
+    } catch (error) {
+      this.logger.error(
+        {
+          error,
+          tenantId: refundRequest.tenantId,
+          refundRequestId: refundRequest.id,
+        },
+        "Refund approved notification event failed",
+      );
+    }
+  }
+
+  private async publishRefundRejected(refundRequest: RefundRequest): Promise<void> {
+    if (!this.notificationPublisher) {
+      return;
+    }
+
+    try {
+      await this.notificationPublisher.publish(
+        refundRejectedEvent({
+          tenantId: refundRequest.tenantId,
+          branchId: refundRequest.branchId,
+          customerId: refundRequest.customerId,
+          refundRequestId: refundRequest.id,
+          orderId: refundRequest.orderId,
+          amount: refundRequest.amount,
+          reason: refundRequest.reason,
+          rejectionReason: refundRequest.rejectionReason,
+        }),
+      );
+    } catch (error) {
+      this.logger.error(
+        {
+          error,
+          tenantId: refundRequest.tenantId,
+          refundRequestId: refundRequest.id,
+        },
+        "Refund rejected notification event failed",
       );
     }
   }
