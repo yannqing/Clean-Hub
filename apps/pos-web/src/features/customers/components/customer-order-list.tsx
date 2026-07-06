@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 
 import type { PosOrderSummary } from "@cleanhub/api-client";
 
-import { toast } from "@cleanhub/ui";
+import { useTranslation } from "@cleanhub/i18n/react";
+import { posToast as toast } from "@/lib/pos-toast";
 
 import {
   CUSTOMER_CURRENCY,
@@ -37,6 +38,7 @@ export function CustomerOrderList({
   pageSize = DEFAULT_PAGE_SIZE,
 }: CustomerOrderListProps) {
   const router = useRouter();
+  const { locale } = useTranslation();
   const [rows, setRows] = useState<PosOrderSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -139,7 +141,7 @@ export function CustomerOrderList({
                       {order.id.slice(-8).toUpperCase()}
                     </div>
                     <div className="text-xs text-slate-500">
-                      {formatDate(order.createdAt)}
+                      {formatDate(order.createdAt, locale)}
                     </div>
                   </div>
                   <div className="text-slate-700">
@@ -157,7 +159,7 @@ export function CustomerOrderList({
                     </span>
                   </div>
                   <div className="text-right font-semibold text-slate-950">
-                    {formatMoney(order.totalAmount)}
+                    {formatMoney(order.totalAmount, locale)}
                   </div>
                 </button>
               );
@@ -216,16 +218,19 @@ export function CustomerOrderList({
   );
 }
 
-function formatMoney(amount: string | number | null | undefined): string {
+function formatMoney(
+  amount: string | number | null | undefined,
+  locale: string,
+): string {
   const value = Number(amount ?? 0);
   if (!Number.isFinite(value)) return `${CUSTOMER_CURRENCY} 0`;
-  return `${CUSTOMER_CURRENCY} ${value.toLocaleString("en-US")}`;
+  return `${CUSTOMER_CURRENCY} ${value.toLocaleString(locale)}`;
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("zh-CN", {
+  return date.toLocaleString(locale, {
     month: "2-digit",
     day: "2-digit",
   });

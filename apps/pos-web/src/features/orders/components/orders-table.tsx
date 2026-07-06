@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslation } from "@cleanhub/i18n/react";
 
 import { Icon } from "@/components/app-shell";
 import { posRoutes } from "@/config";
@@ -19,6 +22,8 @@ type OrdersTableProps = {
 };
 
 export function OrdersTable({ orders, total }: OrdersTableProps) {
+  const { locale } = useTranslation();
+
   if (orders.length === 0) {
     return <OrdersEmptyState />;
   }
@@ -45,7 +50,7 @@ export function OrdersTable({ orders, total }: OrdersTableProps) {
             <div className="text-right">操作</div>
           </div>
           {orders.map((order) => (
-            <OrderRow key={order.id} order={order} />
+            <OrderRow key={order.id} locale={locale} order={order} />
           ))}
         </div>
       </div>
@@ -54,7 +59,13 @@ export function OrdersTable({ orders, total }: OrdersTableProps) {
   );
 }
 
-function OrderRow({ order }: { order: PosOrderSummary }) {
+function OrderRow({
+  locale,
+  order,
+}: {
+  locale: string;
+  order: PosOrderSummary;
+}) {
   const detailHref = posRoutes.orderDetail(order.id);
 
   return (
@@ -88,7 +99,7 @@ function OrderRow({ order }: { order: PosOrderSummary }) {
         <OrderPaymentStatusBadge status={order.paymentStatus} />
       </div>
       <div className="text-xs font-medium text-slate-600">
-        {formatOrderDateTime(order.createdAt)}
+        {formatOrderDateTime(order.createdAt, locale)}
       </div>
       <div className="flex justify-end gap-1">
         <Link

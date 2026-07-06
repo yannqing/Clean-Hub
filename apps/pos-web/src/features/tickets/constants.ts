@@ -15,6 +15,8 @@ import type {
   ServiceTicketType,
 } from "@cleanhub/api-client";
 
+import { getPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
+
 export const TICKETS_PAGE_TITLE = "工单管理";
 
 /** Tailwind tone token → concrete bg/text classes. Keeps badge components tiny. */
@@ -336,12 +338,13 @@ export const DEFAULT_TICKET_CURRENCY = "XOF";
 export function formatTicketMoney(
   amount: string | number | null | undefined,
   currency = DEFAULT_TICKET_CURRENCY,
+  locale = getPosRuntimeLocale(),
 ): string {
   const value = Number(amount ?? 0);
   if (!Number.isFinite(value)) {
     return `${currency} 0`;
   }
-  return `${currency} ${value.toLocaleString("en-US")}`;
+  return `${currency} ${value.toLocaleString(locale)}`;
 }
 
 /**
@@ -350,6 +353,7 @@ export function formatTicketMoney(
  */
 export function formatTicketDateTime(
   iso: string | null | undefined,
+  locale = "zh-CN",
   options: Intl.DateTimeFormatOptions = {
     month: "numeric",
     day: "numeric",
@@ -364,7 +368,7 @@ export function formatTicketDateTime(
   if (Number.isNaN(date.getTime())) {
     return "—";
   }
-  return date.toLocaleString("zh-CN", options);
+  return date.toLocaleString(locale, options);
 }
 
 export const TICKET_EMPTY_PLACEHOLDER = "—";

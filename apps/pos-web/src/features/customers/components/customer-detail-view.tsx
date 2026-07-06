@@ -8,7 +8,8 @@ import type {
   PosOrderSummary,
   ServiceTicketSummary,
 } from "@cleanhub/api-client";
-import { toast } from "@cleanhub/ui";
+import { useTranslation } from "@cleanhub/i18n/react";
+import { posToast as toast } from "@/lib/pos-toast";
 
 import { posApi } from "@/lib/api-client";
 
@@ -53,6 +54,7 @@ const TAB_LABELS: Record<DetailTab, string> = {
 
 export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps) {
   const router = useRouter();
+  const { locale } = useTranslation();
 
   // Whether this detail view was reached via 客户接待 (intake). Controls the
   // breadcrumb trail and the back-button destination so the clerk returns to
@@ -270,7 +272,11 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
             { label: "账户余额", value: `${CUSTOMER_CURRENCY} 0`, hint: "暂未实现" },
             { label: "历史工单", value: String(activeTicketCount), hint: "工单总数" },
             { label: "历史订单", value: String(orderCount), hint: "订单总数" },
-            { label: "累计消费", value: `${CUSTOMER_CURRENCY} ${totalPaid.toLocaleString("en-US")}`, hint: "已支付总额" },
+            {
+              label: "累计消费",
+              value: formatMoney(totalPaid, locale),
+              hint: "已支付总额",
+            },
           ].map((metric) => (
             <div
               className="border-r border-slate-100 px-5 py-4 last:border-r-0"
@@ -337,7 +343,7 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
                   查看工单
                 </button>
               </div>
-              <CurrentServiceCard ticket={recentTickets[0]} />
+              <CurrentServiceCard locale={locale} ticket={recentTickets[0]} />
             </section>
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-center justify-between">
@@ -351,6 +357,7 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
                 </button>
               </div>
               <RecentActivity
+                locale={locale}
                 tickets={recentTickets}
                 orders={recentOrders}
               />
@@ -365,7 +372,7 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
                 <Detail label="账户关系" value={relationshipLabel} />
                 <Detail
                   label="建档时间"
-                  value={formatDate(profile.createdAt)}
+                  value={formatDate(profile.createdAt, locale)}
                 />
                 <Detail label="地址" value={profile.address ?? "未填写"} />
               </div>
@@ -567,10 +574,10 @@ function initials(name: string): string {
   return [...trimmed][0]?.toUpperCase() ?? "?";
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleString("zh-CN", {
+  return date.toLocaleString(locale, {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -579,16 +586,19 @@ function formatDate(iso: string): string {
   });
 }
 
-function formatMoney(amount: string | number | null | undefined): string {
+function formatMoney(
+  amount: string | number | null | undefined,
+  locale: string,
+): string {
   const value = Number(amount ?? 0);
   if (!Number.isFinite(value)) return `${CUSTOMER_CURRENCY} 0`;
-  return `${CUSTOMER_CURRENCY} ${value.toLocaleString("en-US")}`;
+  return `${CUSTOMER_CURRENCY} ${value.toLocaleString(locale)}`;
 }
 
-function formatDateShort(iso: string): string {
+function formatDateShort(iso: string, locale: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("zh-CN", {
+  return date.toLocaleString(locale, {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
@@ -601,7 +611,13 @@ function formatDateShort(iso: string): string {
  * mirroring the prototype overview. Empty state when the customer has no
  * tickets.
  */
-function CurrentServiceCard({ ticket }: { ticket: ServiceTicketSummary | undefined }) {
+function CurrentServiceCard({
+  locale,
+  ticket,
+}: {
+  locale: string;
+  ticket: ServiceTicketSummary | undefined;
+}) {
   if (!ticket) {
     return (
       <div className="mt-4 rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
@@ -617,11 +633,14 @@ function CurrentServiceCard({ ticket }: { ticket: ServiceTicketSummary | undefin
           {CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType}
         </div>
         <div className="mt-1 text-xs text-slate-500">
-          工单 {ticket.ticketNo || "—"} · {ticket.itemCount} 个项目 · {formatDateShort(ticket.createdAt)}
+          工单 {ticket.ticketNo || "—"} · {ticket.itemCount} 个项目 ·{" "}
+          {formatDateShort(ticket.createdAt, locale)}
         </div>
       </div>
       <span className="text-sm text-slate-500">
-        {ticket.expectedPickupAt ? formatDateShort(ticket.expectedPickupAt) : "未设置取件"}
+        {ticket.expectedPickupAt
+          ? formatDateShort(ticket.expectedPickupAt, locale)
+          : "未设置取件"}
       </span>
       <span className={`justify-self-end rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}>
         {CUSTOMER_TICKET_STATUS_LABELS[ticket.ticketStatus] ?? ticket.ticketStatus}
@@ -642,26 +661,43 @@ type ActivityItem = {
  * Mirrors the prototype `activity()` rows.
  */
 function RecentActivity({
+  locale,
   tickets,
   orders,
 }: {
+  locale: string;
   tickets: ServiceTicketSummary[];
   orders: PosOrderSummary[];
 }) {
-  const items: ActivityItem[] = [
-    ...tickets.slice(0, 3).map<ActivityItem>((ticket) => ({
+  const items: Array<ActivityItem & { timestamp: string }> = [
+    ...tickets
+      .slice(0, 3)
+      .map<ActivityItem & { timestamp: string }>((ticket) => ({
       title: "工单创建",
       detail: `${CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType} · ${ticket.itemCount} 个项目`,
-      time: formatDateShort(ticket.createdAt),
-      amount: ticket.totalAmount ? formatMoney(ticket.totalAmount) : undefined,
+      time: formatDateShort(ticket.createdAt, locale),
+      timestamp: ticket.createdAt,
+      amount: ticket.totalAmount
+        ? formatMoney(ticket.totalAmount, locale)
+        : undefined,
     })),
-    ...orders.slice(0, 3).map<ActivityItem>((order) => ({
+    ...orders
+      .slice(0, 3)
+      .map<ActivityItem & { timestamp: string }>((order) => ({
       title: "订单记录",
       detail: `${CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ?? order.orderType} · ${CUSTOMER_ORDER_PAYMENT_LABELS[order.paymentStatus] ?? order.paymentStatus}`,
-      time: formatDateShort(order.createdAt),
-      amount: order.totalAmount ? formatMoney(order.totalAmount) : undefined,
+      time: formatDateShort(order.createdAt, locale),
+      timestamp: order.createdAt,
+      amount: order.totalAmount
+        ? formatMoney(order.totalAmount, locale)
+        : undefined,
     })),
-  ].sort((a, b) => b.time.localeCompare(a.time)).slice(0, 6);
+  ]
+    .sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    )
+    .slice(0, 6);
 
   if (items.length === 0) {
     return (

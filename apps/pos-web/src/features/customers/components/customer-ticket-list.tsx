@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 
 import type { ServiceTicketSummary, ServiceTicketType } from "@cleanhub/api-client";
 
-import { toast } from "@cleanhub/ui";
+import { useTranslation } from "@cleanhub/i18n/react";
+import { posToast as toast } from "@/lib/pos-toast";
 
 import {
   CUSTOMER_TICKET_STATUS_LABELS,
@@ -43,6 +44,7 @@ export function CustomerTicketList({
   pageSize = DEFAULT_PAGE_SIZE,
 }: CustomerTicketListProps) {
   const router = useRouter();
+  const { locale } = useTranslation();
   const [rows, setRows] = useState<ServiceTicketSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -177,7 +179,7 @@ export function CustomerTicketList({
                       {ticket.ticketNo || "—"}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
-                      {formatDate(ticket.createdAt)}
+                      {formatDate(ticket.createdAt, locale)}
                     </div>
                   </div>
                   <div className="font-medium text-slate-700">
@@ -194,7 +196,9 @@ export function CustomerTicketList({
                     </span>
                   </div>
                   <div className="text-slate-500">
-                    {ticket.expectedPickupAt ? formatDate(ticket.expectedPickupAt) : "未设置"}
+                    {ticket.expectedPickupAt
+                      ? formatDate(ticket.expectedPickupAt, locale)
+                      : "未设置"}
                   </div>
                 </button>
               );
@@ -278,10 +282,10 @@ function getCreatedDateRange(filter: string): {
   };
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("zh-CN", {
+  return date.toLocaleString(locale, {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",

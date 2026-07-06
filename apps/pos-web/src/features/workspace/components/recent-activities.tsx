@@ -1,7 +1,10 @@
+"use client";
+
 import type {
   PosRecentActivity,
   PosRecentActivityType,
 } from "@cleanhub/api-client";
+import { useTranslation } from "@cleanhub/i18n/react";
 import { Icon, type PosIconName } from "@/components/app-shell/icons";
 
 const ACTIVITY_META: Record<
@@ -30,22 +33,25 @@ const ACTIVITY_META: Record<
   },
 };
 
-/** 相对时间格式化：将时间戳转为友好的中文相对描述。 */
-function formatRelativeTime(timestamp: string): string {
+/** 相对时间格式化：将时间戳转为当前语言的友好相对描述。 */
+function formatRelativeTime(timestamp: string, locale: string): string {
   const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "—";
+
   const diffMs = Date.now() - date.getTime();
   const diffMin = Math.floor(diffMs / 60000);
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
 
-  if (diffMin < 1) return "刚刚";
-  if (diffMin < 60) return `${diffMin} 分钟前`;
+  if (diffMin < 1) return formatter.format(0, "minute");
+  if (diffMin < 60) return formatter.format(-diffMin, "minute");
 
   const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour} 小时前`;
+  if (diffHour < 24) return formatter.format(-diffHour, "hour");
 
   const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 7) return `${diffDay} 天前`;
+  if (diffDay < 7) return formatter.format(-diffDay, "day");
 
-  return date.toLocaleDateString("zh-CN", { month: "short", day: "numeric" });
+  return date.toLocaleDateString(locale, { month: "short", day: "numeric" });
 }
 
 function SectionHeader() {
@@ -60,6 +66,8 @@ function SectionHeader() {
 }
 
 export function RecentActivities({ activities }: { activities: PosRecentActivity[] }) {
+  const { locale } = useTranslation();
+
   if (activities.length === 0) {
     return (
       <section>
@@ -118,7 +126,7 @@ export function RecentActivities({ activities }: { activities: PosRecentActivity
                   )}
                   <p className="mt-1 inline-flex items-center gap-1 text-xs text-slate-400">
                     <Icon name="clock" className="h-3 w-3" />
-                    {formatRelativeTime(activity.timestamp)}
+                    {formatRelativeTime(activity.timestamp, locale)}
                   </p>
                 </div>
               </div>

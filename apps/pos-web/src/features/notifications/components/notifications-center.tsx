@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 
 import type { PosNotificationInboxItem } from "@cleanhub/api-client";
+import { useTranslation } from "@cleanhub/i18n/react";
 
 import { Icon } from "@/components/app-shell";
 import { posRoutes } from "@/config";
@@ -432,6 +433,8 @@ function NotificationRow({
   onMarkRead: (deliveryId: string) => void;
   onArchive: (deliveryId: string) => void;
 }) {
+  const { locale } = useTranslation();
+
   return (
     <div
       className={`border-b border-slate-100 px-5 py-4 ${
@@ -456,7 +459,7 @@ function NotificationRow({
             {notification.content}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-            <span>{formatNotificationDateTime(notification.sentAt)}</span>
+            <span>{formatNotificationDateTime(notification.sentAt, locale)}</span>
             {notification.relatedType ? (
               <span>
                 {NOTICE_RELATED_TYPE_LABELS[notification.relatedType]} ·{" "}
@@ -515,6 +518,8 @@ function NotificationDetailPanel({
   onMarkRead: (deliveryId: string) => void;
   onArchive: (deliveryId: string) => void;
 }) {
+  const { locale } = useTranslation();
+
   if (!notification) {
     return (
       <aside className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -532,7 +537,7 @@ function NotificationDetailPanel({
           <div>
             <h2 className="font-semibold text-slate-950">通知详情</h2>
             <p className="mt-1 text-xs text-slate-500">
-              {formatNotificationDateTime(notification.sentAt)}
+              {formatNotificationDateTime(notification.sentAt, locale)}
             </p>
           </div>
           <NotificationBadge

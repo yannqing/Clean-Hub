@@ -1,3 +1,7 @@
+"use client";
+
+import { useTranslation } from "@cleanhub/i18n/react";
+
 import {
   formatTicketDateTime,
   formatTicketMoney,
@@ -30,6 +34,8 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
  * ticket pickup transition depends on linked orders being settled.
  */
 export function TicketRelatedOrders({ orders }: TicketRelatedOrdersProps) {
+  const { locale } = useTranslation();
+
   return (
     <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex items-center justify-between">
@@ -52,7 +58,7 @@ export function TicketRelatedOrders({ orders }: TicketRelatedOrdersProps) {
                     {order.id.slice(-8).toUpperCase()}
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
-                    {formatTicketDateTime(order.createdAt)}
+                    {formatTicketDateTime(order.createdAt, locale)}
                   </div>
                 </div>
                 <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">

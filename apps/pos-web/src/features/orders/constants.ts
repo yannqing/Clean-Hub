@@ -5,6 +5,8 @@ import type {
   PosPaymentMethod,
 } from "@cleanhub/api-client";
 
+import { getPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
+
 export const ORDERS_PAGE_TITLE = "订单管理";
 export const DEFAULT_ORDER_PAGE_SIZE = 20;
 export const DEFAULT_ORDER_CURRENCY = "XOF";
@@ -95,16 +97,18 @@ export type OrderDateFilter = "all" | "today" | "last_7d" | "month";
 export function formatOrderMoney(
   amount: string | number | null | undefined,
   currency = DEFAULT_ORDER_CURRENCY,
+  locale = getPosRuntimeLocale(),
 ): string {
   const value = Number(amount ?? 0);
   if (!Number.isFinite(value)) {
     return `${currency} 0`;
   }
-  return `${currency} ${value.toLocaleString("en-US")}`;
+  return `${currency} ${value.toLocaleString(locale)}`;
 }
 
 export function formatOrderDateTime(
   iso: string | null | undefined,
+  locale = "zh-CN",
   options: Intl.DateTimeFormatOptions = {
     month: "numeric",
     day: "numeric",
@@ -119,7 +123,7 @@ export function formatOrderDateTime(
   if (Number.isNaN(date.getTime())) {
     return ORDER_EMPTY_PLACEHOLDER;
   }
-  return date.toLocaleString("zh-CN", options);
+  return date.toLocaleString(locale, options);
 }
 
 export function displayOrderCode(orderId: string): string {

@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { toast } from "@cleanhub/ui";
+import { posToast as toast } from "@/lib/pos-toast";
+import { useTranslation } from "@cleanhub/i18n/react";
 import { useRouter } from "next/navigation";
 import type { PosOrderDetail } from "@cleanhub/api-client";
 
@@ -11,6 +12,7 @@ import { updateOrderAction } from "../actions";
 import { formatOrderDateTime, formatOrderMoney } from "../constants";
 
 export function OrderInfoEditor({ order }: { order: PosOrderDetail }) {
+  const { locale } = useTranslation();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [expireAt, setExpireAt] = useState(toDateInput(order.expireAt));
@@ -59,8 +61,14 @@ export function OrderInfoEditor({ order }: { order: PosOrderDetail }) {
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <SummaryItem label="订单金额" value={formatOrderMoney(order.totalAmount)} />
         <SummaryItem label="已收金额" value={formatOrderMoney(order.paidAmount)} />
-        <SummaryItem label="创建时间" value={formatOrderDateTime(order.createdAt)} />
-        <SummaryItem label="过期时间" value={formatOrderDateTime(order.expireAt)} />
+        <SummaryItem
+          label="创建时间"
+          value={formatOrderDateTime(order.createdAt, locale)}
+        />
+        <SummaryItem
+          label="过期时间"
+          value={formatOrderDateTime(order.expireAt, locale)}
+        />
       </div>
 
       {editing ? (
