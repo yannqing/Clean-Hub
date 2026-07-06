@@ -4,8 +4,11 @@ import { useMemo } from "react";
 import type { SupportedLocale } from "@cleanhub/i18n";
 import {
   I18nProvider,
+  useTranslation,
   type LocaleStorageAdapter,
 } from "@cleanhub/i18n/react";
+
+import { setPosRuntimeLocale } from "./pos-runtime-text";
 
 export const posLocaleCookieName = "cleanhub.pos.locale";
 const posLocaleStorageKey = "cleanhub.pos.locale";
@@ -21,19 +24,22 @@ export function PosI18nProvider({
   initialLocale,
 }: PosI18nProviderProps) {
   const storage = useMemo(() => createPosLocaleStorage(), []);
-  const deviceLocale =
-    typeof navigator === "undefined" ? null : navigator.language;
 
   return (
     <I18nProvider
       defaultLocale={posDefaultLocale}
-      deviceLocale={deviceLocale}
       initialLocale={initialLocale}
       storage={storage}
     >
-      {children}
+      <PosRuntimeLocaleBridge>{children}</PosRuntimeLocaleBridge>
     </I18nProvider>
   );
+}
+
+function PosRuntimeLocaleBridge({ children }: { children: React.ReactNode }) {
+  const { locale } = useTranslation();
+  setPosRuntimeLocale(locale);
+  return <>{children}</>;
 }
 
 function createPosLocaleStorage(): LocaleStorageAdapter {

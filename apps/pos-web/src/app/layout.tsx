@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Toaster } from "@cleanhub/ui";
+import { isSupportedLocale } from "@cleanhub/i18n";
 import { cookies } from "next/headers";
 
-import { PosDomLocalizer, PosI18nProvider } from "@/components/i18n";
+import { PosI18nProvider, PosReactLocalizer } from "@/components/i18n";
 
 import "./globals.css";
 
@@ -13,6 +14,10 @@ export const metadata: Metadata = {
 
 const POS_LOCALE_COOKIE_NAME = "cleanhub.pos.locale";
 
+function resolveHtmlLang(locale: string | null): string {
+  return locale && isSupportedLocale(locale) ? locale : "zh-CN";
+}
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -20,14 +25,16 @@ export default async function RootLayout({
 }>) {
   const cookieStore = await cookies();
   const initialLocale = cookieStore.get(POS_LOCALE_COOKIE_NAME)?.value ?? null;
+  const htmlLang = resolveHtmlLang(initialLocale);
 
   return (
-    <html lang="zh-CN">
+    <html lang={htmlLang}>
       <body>
         <PosI18nProvider initialLocale={initialLocale}>
-          <PosDomLocalizer />
-          {children}
-          <Toaster />
+          <PosReactLocalizer>
+            {children}
+            <Toaster />
+          </PosReactLocalizer>
         </PosI18nProvider>
       </body>
     </html>

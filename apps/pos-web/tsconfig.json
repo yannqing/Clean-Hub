@@ -1,6 +1,7 @@
 {
   "extends": "../../packages/config/tsconfig.next.json",
   "compilerOptions": {
+    "jsxImportSource": "@/components/i18n/pos-jsx-runtime",
     "paths": {
       "@/components/ui/*": ["../../packages/ui/src/components/ui/*"],
       "@/lib/utils": ["../../packages/ui/src/lib/utils.ts"],

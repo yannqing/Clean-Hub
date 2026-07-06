@@ -1,6 +1,6 @@
-export type PosDomLocale = "en" | "fr";
+export type PosTextLocale = "en" | "fr";
 
-export const POS_DOM_TRANSLATIONS: Record<string, Record<PosDomLocale, string>> = {
+export const POS_TEXT_TRANSLATIONS: Record<string, Record<PosTextLocale, string>> = {
   "账户联系方式命中时，会同时展示该账户及其关联档案；档案联系方式命中时，直接展示对应档案。": { en: "When the account contact information is hit, the account and its associated files will be displayed at the same time; when the file contact information is hit, the corresponding file will be displayed directly.", fr: "Lorsque les informations de contact du compte sont atteintes, le compte et ses fichiers associés seront affichés en même temps ; lorsque les informations de contact du fichier sont atteintes, le fichier correspondant sera affiché directement." },
   "当前账号未分配到任何门店分店，请联系店主或店长在后台分配门店后再使用 POS。": { en: "The current account is not assigned to any store branch. Please contact the store owner or store manager to assign a store in the background before using POS.", fr: "Le compte courant n’est affecté à aucune succursale de magasin. Veuillez contacter le propriétaire ou le gérant du magasin pour attribuer un magasin en arrière-plan avant d'utiliser le point de vente." },
   "没有账户或档案联系方式匹配当前查询。请先创建客户账户，再添加第一个档案。": { en: "There are no accounts or profile contacts matching the current query. Please create a customer account before adding your first profile.", fr: "Il n'y a aucun compte ou contact de profil correspondant à la requête actuelle. Veuillez créer un compte client avant d'ajouter votre premier profil." },
