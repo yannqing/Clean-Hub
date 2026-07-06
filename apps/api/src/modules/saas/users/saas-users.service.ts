@@ -5,7 +5,7 @@ import type { AuthContext } from "../../auth/auth.types.js";
 import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js";
 import { hashPassword, hashPin } from "../../auth/password.service.js";
 import { resolveEffectiveSecurityPolicy } from "../security/security-policy.js";
-import { randomUUID } from "node:crypto";
+import { randomUUID, randomBytes } from "node:crypto";
 import { requireSaasRole, type SaasRole } from "../../auth/permission.helper.js";
 import { SaasUsersError } from "./saas-users.errors.js";
 import {
@@ -25,10 +25,12 @@ import {
   findSaasUsers,
   lockSaasUserForRoleUpdate,
   replaceSaasUserRolesRecord,
+  resetSaasUserPasswordRecord,
   revokeSaasUserRefreshTokens,
   updateSaasUserRecord,
   updateSaasUserStatusRecord,
   writeSaasUserCreatedAuditLog,
+  writeSaasUserPasswordResetAuditLog,
   writeSaasUserRolesUpdatedAuditLog,
   writeSaasUserStatusUpdatedAuditLog,
   writeSaasUserUpdatedAuditLog,
@@ -37,6 +39,8 @@ import type {
   CreateSaasUserInput,
   GetSaasUserDetailInput,
   ListSaasUsersInput,
+  ResetSaasUserPasswordInput,
+  ResetSaasUserPasswordResult,
   SaasRoleListItem,
   SaasUserDetail,
   SaasUserListItem,
@@ -394,6 +398,109 @@ export async function updateSaasUserStatus(
     }
 
     return user;
+  });
+}
+
+// Generates a strong, policy-compliant temporary password from a CSPRNG. The
+// character classes are pulled from cryptographically random bytes and then
+// shuffled, guaranteeing at least one lowercase letter, one uppercase letter,
+// one digit, and one symbol so it passes `assertPasswordMeetsPolicy` for any
+// policy where those flags are required. 24 chars comfortably exceeds the
+// longest plausible minimum length.
+const TEMP_PASSWORD_LOWER = "abcdefghijkmnpqrstuvwxyz";
+const TEMP_PASSWORD_UPPER = "ABCDEFGHJKMNPQRSTUVWXYZ";
+const TEMP_PASSWORD_DIGITS = "23456789";
+const TEMP_PASSWORD_SYMBOLS = "!@#$%^&*-_=+";
+
+function generateTemporaryPassword(): string {
+  const classes = [
+    TEMP_PASSWORD_LOWER,
+    TEMP_PASSWORD_UPPER,
+    TEMP_PASSWORD_DIGITS,
+    TEMP_PASSWORD_SYMBOLS,
+  ];
+  const all = classes.join("");
+  const pick = (alphabet: string): string => {
+    const index = randomBytes(4).readUInt32BE(0) % alphabet.length;
+
+    return alphabet[index];
+  };
+
+  // Guarantee at least one character from each required class, then fill the
+  // rest from the full alphabet to reach 24 characters.
+  const chars = [
+    pick(TEMP_PASSWORD_LOWER),
+    pick(TEMP_PASSWORD_UPPER),
+    pick(TEMP_PASSWORD_DIGITS),
+    pick(TEMP_PASSWORD_SYMBOLS),
+  ];
+  for (let i = chars.length; i < 24; i += 1) {
+    chars.push(pick(all));
+  }
+
+  // Fisher–Yates shuffle using a CSPRNG so the guaranteed-class positions are
+  // not predictable.
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = randomBytes(4).readUInt32BE(0) % (i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+
+  return chars.join("");
+}
+
+export async function resetSaasUserPassword(
+  input: ResetSaasUserPasswordInput,
+  db: Database = getDb(),
+): Promise<ResetSaasUserPasswordResult> {
+  requireSaasUsersAccess(input.authContext, ["super_admin"]);
+
+  if (input.userId === input.authContext.userId) {
+    throw new SaasUsersError(
+      "SAAS_USER_CANNOT_RESET_OWN_PASSWORD",
+      "Super admins cannot reset their own password from this console.",
+      422,
+    );
+  }
+
+  return db.transaction(async (tx) => {
+    const existing = await findSaasUserDetailById(tx, input.userId);
+
+    if (!existing) {
+      throw new SaasUsersError(
+        "SAAS_USER_NOT_FOUND",
+        "SaaS user was not found.",
+        404,
+      );
+    }
+
+    const securityPolicy = await resolveEffectiveSecurityPolicy(tx);
+    const temporaryPassword = generateTemporaryPassword();
+
+    // The generated password is built to satisfy the policy, but assert it so a
+    // future policy change (e.g. disallowed symbols) fails loudly instead of
+    // silently producing an unusable credential.
+    assertPasswordMeetsPolicy(temporaryPassword, securityPolicy);
+
+    const passwordHash = await hashPassword(temporaryPassword);
+
+    await resetSaasUserPasswordRecord(tx, {
+      userId: input.userId,
+      passwordHash,
+    });
+
+    // Invalidate existing sessions so the new password takes effect on next
+    // sign-in, mirroring the disable-user flow.
+    await revokeSaasUserRefreshTokens(tx, input.userId);
+
+    await writeSaasUserPasswordResetAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      userId: input.userId,
+      reason: input.reason,
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return { temporaryPassword };
   });
 }
 

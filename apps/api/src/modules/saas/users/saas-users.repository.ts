@@ -554,6 +554,29 @@ export async function updateSaasUserStatusRecord(
   return findSaasUserDetailById(db, input.userId);
 }
 
+export async function resetSaasUserPasswordRecord(
+  db: Database,
+  input: {
+    userId: string;
+    passwordHash: string;
+  },
+): Promise<void> {
+  await db
+    .update(users)
+    .set({
+      passwordHash: input.passwordHash,
+      updatedAt: new Date(),
+    })
+    .where(
+      and(
+        eq(users.id, input.userId),
+        eq(users.userType, "saas"),
+        isNull(users.tenantId),
+        isNull(users.deletedAt),
+      ),
+    );
+}
+
 export async function revokeSaasUserRefreshTokens(
   db: Database,
   userId: string,
@@ -597,6 +620,30 @@ export async function writeSaasUserStatusUpdatedAuditLog(
     userAgent: input.userAgent,
     before: input.before,
     after: input.after,
+  });
+}
+
+export async function writeSaasUserPasswordResetAuditLog(
+  db: Database,
+  input: {
+    actorUserId: string;
+    userId: string;
+    reason: string;
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: null,
+    actorUserId: input.actorUserId,
+    eventCategory: "saas_user",
+    eventType: "saas_user.password_reset",
+    entityType: "user",
+    entityId: input.userId,
+    success: true,
+    reason: input.reason,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
   });
 }
 
