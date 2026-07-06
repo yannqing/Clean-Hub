@@ -70,7 +70,7 @@ function getFallbackHref(query: string): string {
   if (/^ORD-|^[0-9A-HJKMNP-TV-Z]{20,26}$/i.test(query)) {
     return `${posRoutes.orders}?q=${encoded}`;
   }
-  return posRoutes.customers;
+  return `${posRoutes.customers}?q=${encoded}`;
 }
 
 function formatAmount(amount: string | null | undefined, locale: string): string {

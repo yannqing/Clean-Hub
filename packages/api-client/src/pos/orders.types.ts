@@ -100,7 +100,7 @@ export type CreateTicketBasedOrderRequest = {
 
 export type CreateManualOrderItemRequest = {
   sourceType: Exclude<PosOrderItemSourceType, "ticket_item">;
-  sourceId: string;
+  sourceId?: string;
   itemName: string;
   quantity: string;
   unitAmount: string;

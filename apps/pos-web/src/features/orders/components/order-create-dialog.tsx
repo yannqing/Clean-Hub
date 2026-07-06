@@ -1,11 +1,13 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type {
   CreateManualOrderItemRequest,
   CreatePosOrderRequest,
   PosOrderItemSourceType,
+  PosCustomerProfileWithAccount,
+  ServiceTicketSummary,
 } from "@cleanhub/api-client";
 import {
   Dialog,
@@ -18,6 +20,7 @@ import {
 
 import { Icon } from "@/components/app-shell";
 import { posRoutes } from "@/config";
+import { posApi } from "@/lib/api-client";
 
 import { createOrderAction } from "../actions";
 
@@ -38,7 +41,6 @@ function emptyItem(): ManualItemForm {
   return {
     key: `${Date.now()}-${Math.random()}`,
     sourceType: "product",
-    sourceId: "",
     itemName: "",
     quantity: "1",
     unitAmount: "0",
@@ -52,14 +54,6 @@ function toIsoOrNull(value: string): string | null {
   return new Date(`${value}T23:59:59`).toISOString();
 }
 
-function splitIds(value: string): string[] | undefined {
-  const ids = value
-    .split(/[\s,，]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-  return ids.length > 0 ? ids : undefined;
-}
-
 export function OrderCreateDialog({
   defaultBranchId,
 }: {
@@ -69,13 +63,29 @@ export function OrderCreateDialog({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [orderType, setOrderType] = useState<"manual" | "ticket">("manual");
-  const [branchId, setBranchId] = useState(defaultBranchId ?? "");
-  const [customerId, setCustomerId] = useState("");
-  const [ticketId, setTicketId] = useState("");
-  const [ticketItemIds, setTicketItemIds] = useState("");
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<PosCustomerProfileWithAccount | null>(null);
+  const [selectedTicket, setSelectedTicket] =
+    useState<ServiceTicketSummary | null>(null);
   const [expireAt, setExpireAt] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<ManualItemForm[]>([emptyItem()]);
+
+  function resetForm() {
+    setOrderType("manual");
+    setSelectedCustomer(null);
+    setSelectedTicket(null);
+    setExpireAt("");
+    setNotes("");
+    setItems([emptyItem()]);
+  }
+
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      resetForm();
+    }
+  }
 
   function updateItem(index: number, patch: Partial<ManualItemForm>) {
     setItems((current) =>
@@ -88,27 +98,30 @@ export function OrderCreateDialog({
   function buildPayload(): CreatePosOrderRequest | null {
     const normalizedNotes = notes.trim() || null;
     if (orderType === "ticket") {
-      if (!ticketId.trim()) {
-        toast.error("请填写工单 ID。");
+      if (!selectedTicket) {
+        toast.error("请选择要生成订单的工单。");
         return null;
       }
       return {
         orderType: "ticket",
-        ticketId: ticketId.trim(),
-        ticketItemIds: splitIds(ticketItemIds),
+        ticketId: selectedTicket.id,
         expireAt: toIsoOrNull(expireAt),
         notes: normalizedNotes,
       };
     }
 
-    if (!branchId.trim() || !customerId.trim()) {
-      toast.error("请填写门店 ID 和客户档案 ID。");
+    if (!defaultBranchId) {
+      toast.error("当前门店加载失败，无法创建普通订单。");
+      return null;
+    }
+
+    if (!selectedCustomer) {
+      toast.error("请选择客户档案。");
       return null;
     }
 
     const normalizedItems = items.map((item) => ({
       sourceType: item.sourceType,
-      sourceId: item.sourceId.trim(),
       itemName: item.itemName.trim(),
       quantity: item.quantity.trim(),
       unitAmount: item.unitAmount.trim(),
@@ -117,7 +130,6 @@ export function OrderCreateDialog({
     if (
       normalizedItems.some(
         (item) =>
-          !item.sourceId ||
           !item.itemName ||
           Number(item.quantity) <= 0 ||
           Number(item.unitAmount) <= 0,
@@ -129,8 +141,8 @@ export function OrderCreateDialog({
 
     return {
       orderType: "manual",
-      branchId: branchId.trim(),
-      customerId: customerId.trim(),
+      branchId: defaultBranchId,
+      customerId: selectedCustomer.id,
       items: normalizedItems,
       expireAt: toIsoOrNull(expireAt),
       notes: normalizedNotes,
@@ -147,7 +159,7 @@ export function OrderCreateDialog({
       const result = await createOrderAction(payload);
       if (result.ok && result.data) {
         toast.success("订单已创建。");
-        setOpen(false);
+        handleOpenChange(false);
         router.push(posRoutes.orderDetail(result.data.id));
       } else {
         toast.error(result.message);
@@ -166,7 +178,7 @@ export function OrderCreateDialog({
         新增订单
       </button>
 
-      <Dialog onOpenChange={setOpen} open={open}>
+      <Dialog onOpenChange={handleOpenChange} open={open}>
         <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>新增订单</DialogTitle>
@@ -192,12 +204,9 @@ export function OrderCreateDialog({
 
             {orderType === "manual" ? (
               <ManualOrderFields
-                branchId={branchId}
-                customerId={customerId}
+                selectedCustomer={selectedCustomer}
                 items={items}
                 onAddItem={() => setItems((current) => [...current, emptyItem()])}
-                onBranchIdChange={setBranchId}
-                onCustomerIdChange={setCustomerId}
                 onRemoveItem={(index) =>
                   setItems((current) =>
                     current.length === 1
@@ -205,14 +214,13 @@ export function OrderCreateDialog({
                       : current.filter((_, itemIndex) => itemIndex !== index),
                   )
                 }
+                onSelectCustomer={setSelectedCustomer}
                 onUpdateItem={updateItem}
               />
             ) : (
               <TicketOrderFields
-                ticketId={ticketId}
-                ticketItemIds={ticketItemIds}
-                onTicketIdChange={setTicketId}
-                onTicketItemIdsChange={setTicketItemIds}
+                selectedTicket={selectedTicket}
+                onSelectTicket={setSelectedTicket}
               />
             )}
 
@@ -240,7 +248,7 @@ export function OrderCreateDialog({
             <button
               className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
               disabled={isPending}
-              onClick={() => setOpen(false)}
+              onClick={() => handleOpenChange(false)}
               type="button"
             >
               取消
@@ -261,40 +269,26 @@ export function OrderCreateDialog({
 }
 
 function ManualOrderFields({
-  branchId,
-  customerId,
+  selectedCustomer,
   items,
-  onBranchIdChange,
-  onCustomerIdChange,
+  onSelectCustomer,
   onUpdateItem,
   onAddItem,
   onRemoveItem,
 }: {
-  branchId: string;
-  customerId: string;
+  selectedCustomer: PosCustomerProfileWithAccount | null;
   items: ManualItemForm[];
-  onBranchIdChange: (value: string) => void;
-  onCustomerIdChange: (value: string) => void;
+  onSelectCustomer: (customer: PosCustomerProfileWithAccount | null) => void;
   onUpdateItem: (index: number, patch: Partial<ManualItemForm>) => void;
   onAddItem: () => void;
   onRemoveItem: (index: number) => void;
 }) {
   return (
     <div className="grid gap-4">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <TextField
-          label="门店 ID"
-          onChange={onBranchIdChange}
-          placeholder="当前门店 ULID"
-          value={branchId}
-        />
-        <TextField
-          label="客户档案 ID"
-          onChange={onCustomerIdChange}
-          placeholder="客户档案 ULID"
-          value={customerId}
-        />
-      </div>
+      <CustomerProfilePicker
+        onSelect={onSelectCustomer}
+        selectedCustomer={selectedCustomer}
+      />
 
       <div className="rounded-lg border border-slate-200">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
@@ -335,12 +329,6 @@ function ManualOrderFields({
                 </select>
               </label>
               <TextField
-                label="来源 ID"
-                onChange={(value) => onUpdateItem(index, { sourceId: value })}
-                placeholder="ULID"
-                value={item.sourceId}
-              />
-              <TextField
                 label="项目名称"
                 onChange={(value) => onUpdateItem(index, { itemName: value })}
                 placeholder="如洗衣服务"
@@ -375,30 +363,227 @@ function ManualOrderFields({
 }
 
 function TicketOrderFields({
-  ticketId,
-  ticketItemIds,
-  onTicketIdChange,
-  onTicketItemIdsChange,
+  selectedTicket,
+  onSelectTicket,
 }: {
-  ticketId: string;
-  ticketItemIds: string;
-  onTicketIdChange: (value: string) => void;
-  onTicketItemIdsChange: (value: string) => void;
+  selectedTicket: ServiceTicketSummary | null;
+  onSelectTicket: (ticket: ServiceTicketSummary | null) => void;
 }) {
   return (
     <div className="grid gap-4">
-      <TextField
-        label="工单 ID"
-        onChange={onTicketIdChange}
-        placeholder="服务工单 ULID"
-        value={ticketId}
+      <ServiceTicketPicker
+        onSelect={onSelectTicket}
+        selectedTicket={selectedTicket}
       />
-      <TextField
-        label="工单项目 ID"
-        onChange={onTicketItemIdsChange}
-        placeholder="选填，多个 ID 用逗号或空格分隔"
-        value={ticketItemIds}
-      />
+      <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">
+        选择工单后，系统会自动把该工单中尚未生成订单的项目全部带入订单。
+      </div>
+    </div>
+  );
+}
+
+function CustomerProfilePicker({
+  selectedCustomer,
+  onSelect,
+}: {
+  selectedCustomer: PosCustomerProfileWithAccount | null;
+  onSelect: (customer: PosCustomerProfileWithAccount | null) => void;
+}) {
+  const [keyword, setKeyword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [options, setOptions] = useState<PosCustomerProfileWithAccount[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      void posApi.pos.customers
+        .list({
+          q: keyword.trim() || undefined,
+          resultType: "profile",
+          status: "active",
+          limit: 8,
+          offset: 0,
+        })
+        .then((result) => {
+          setOptions(
+            result.data
+              .filter((entry) => entry.kind === "profile")
+              .map((entry) => entry.profile),
+          );
+        })
+        .catch(() => setOptions([]))
+        .finally(() => setLoading(false));
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [keyword]);
+
+  return (
+    <Field label="客户档案">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <input
+          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+          onChange={(event) => setKeyword(event.target.value)}
+          placeholder="搜索客户姓名、手机号或邮箱"
+          value={keyword}
+        />
+        {selectedCustomer ? (
+          <SelectedPill
+            label={selectedCustomer.fullName}
+            meta={[
+              selectedCustomer.accountName,
+              selectedCustomer.phone,
+              selectedCustomer.email,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+            onClear={() => onSelect(null)}
+          />
+        ) : null}
+        <OptionList
+          emptyText={loading ? "加载客户中..." : "没有匹配的客户档案"}
+          options={options.map((customer) => ({
+            id: customer.id,
+            title: customer.fullName,
+            meta: [customer.accountName, customer.phone, customer.email]
+              .filter(Boolean)
+              .join(" · "),
+            onSelect: () => onSelect(customer),
+          }))}
+        />
+      </div>
+    </Field>
+  );
+}
+
+function ServiceTicketPicker({
+  selectedTicket,
+  onSelect,
+}: {
+  selectedTicket: ServiceTicketSummary | null;
+  onSelect: (ticket: ServiceTicketSummary | null) => void;
+}) {
+  const [keyword, setKeyword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [options, setOptions] = useState<ServiceTicketSummary[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setLoading(true);
+      void posApi.pos.serviceTickets
+        .list({
+          q: keyword.trim() || undefined,
+          status: ["pending", "in_progress", "ready_to_pick"],
+          limit: 8,
+          offset: 0,
+        })
+        .then((result) => setOptions(result.data))
+        .catch(() => setOptions([]))
+        .finally(() => setLoading(false));
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [keyword]);
+
+  return (
+    <Field label="服务工单">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <input
+          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+          onChange={(event) => setKeyword(event.target.value)}
+          placeholder="搜索工单号或客户名"
+          value={keyword}
+        />
+        {selectedTicket ? (
+          <SelectedPill
+            label={selectedTicket.ticketNo ?? selectedTicket.id}
+            meta={`${selectedTicket.customerName} · ${selectedTicket.itemCount} 个项目 · 合计 ${selectedTicket.totalAmount}`}
+            onClear={() => onSelect(null)}
+          />
+        ) : null}
+        <OptionList
+          emptyText={loading ? "加载工单中..." : "没有可生成订单的工单"}
+          options={options.map((ticket) => ({
+            id: ticket.id,
+            title: ticket.ticketNo ?? ticket.id,
+            meta: `${ticket.customerName} · ${ticket.itemCount} 个项目 · 合计 ${ticket.totalAmount}`,
+            onSelect: () => onSelect(ticket),
+          }))}
+        />
+      </div>
+    </Field>
+  );
+}
+
+function SelectedPill({
+  label,
+  meta,
+  onClear,
+}: {
+  label: string;
+  meta: string;
+  onClear: () => void;
+}) {
+  return (
+    <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2">
+      <div className="min-w-0">
+        <div className="truncate text-sm font-semibold text-blue-900">{label}</div>
+        <div className="mt-0.5 truncate text-xs font-medium text-blue-600">
+          {meta}
+        </div>
+      </div>
+      <button
+        className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-white"
+        onClick={onClear}
+        type="button"
+      >
+        清除
+      </button>
+    </div>
+  );
+}
+
+function OptionList({
+  emptyText,
+  options,
+}: {
+  emptyText: string;
+  options: Array<{
+    id: string;
+    title: string;
+    meta: string;
+    onSelect: () => void;
+  }>;
+}) {
+  if (options.length === 0) {
+    return <div className="mt-3 text-xs font-medium text-slate-400">{emptyText}</div>;
+  }
+
+  return (
+    <div className="mt-3 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+      {options.map((option) => (
+        <button
+          className="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+          key={option.id}
+          onClick={option.onSelect}
+          type="button"
+        >
+          <div className="truncate text-sm font-semibold text-slate-800">
+            {option.title}
+          </div>
+          <div className="mt-0.5 truncate text-xs text-slate-500">
+            {option.meta}
+          </div>
+        </button>
+      ))}
     </div>
   );
 }
