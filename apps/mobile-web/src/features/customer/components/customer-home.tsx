@@ -70,6 +70,7 @@ import {
   readMobileDetailUrlState,
   writeMobileDetailUrlState,
 } from "@/lib/detail-url";
+import { openExternalUrl } from "../lib/open-external";
 
 import {
   cancelCustomerAppointment,
@@ -1191,6 +1192,7 @@ export function CustomerHome({
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  const [pendingPaymentOrderId, setPendingPaymentOrderId] = useState<string | null>(null);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
   const [cancellingAppointmentId, setCancellingAppointmentId] = useState<string | null>(null);
   const [contactActionId, setContactActionId] = useState<string | null>(null);
@@ -1394,20 +1396,61 @@ export function CustomerHome({
     return () => window.removeEventListener("popstate", handlePopState);
   }, [closeActivityDetail, openActivityDetail]);
 
-  async function refreshSelectedOrder(orderId: string) {
+  const refreshSelectedOrder = useCallback(async (
+    orderId: string,
+  ): Promise<MobileCustomerOrderDetail> => {
     const [detail, nextActivity, nextRefundRequests] = await Promise.all([
       getCustomerActivityDetail({ kind: "order", id: orderId }),
       getCustomerOrdersAndTickets(),
       getCustomerRefundRequests(),
     ]);
+    const orderDetail = detail as MobileCustomerOrderDetail;
 
     setActivity(nextActivity.data);
     setRefundRequests(nextRefundRequests.data);
     setActivityDetail({
       kind: "order",
-      data: detail as MobileCustomerOrderDetail,
+      data: orderDetail,
     });
-  }
+
+    return orderDetail;
+  }, []);
+
+  useEffect(() => {
+    const refreshPendingPayment = () => {
+      if (
+        document.visibilityState !== "visible" ||
+        !pendingPaymentOrderId ||
+        !detailOpen ||
+        selectedActivity?.kind !== "order" ||
+        selectedActivity.id !== pendingPaymentOrderId
+      ) {
+        return;
+      }
+
+      void refreshSelectedOrder(pendingPaymentOrderId)
+        .then((order) => {
+          if (order.paymentStatus === "paid") {
+            setPendingPaymentOrderId(null);
+            setMessage(t("customer.paymentMock.paidTitle"));
+          } else if (order.paymentStatus === "failed") {
+            setPendingPaymentOrderId(null);
+            setError(t("customer.paymentMock.failedTitle"));
+          }
+        })
+        .catch((nextError) => {
+          setError(getErrorMessage(nextError, t("common.errors.genericAction")));
+        });
+    };
+
+    window.addEventListener("focus", refreshPendingPayment);
+    document.addEventListener("visibilitychange", refreshPendingPayment);
+
+    return () => {
+      window.removeEventListener("focus", refreshPendingPayment);
+      document.removeEventListener("visibilitychange", refreshPendingPayment);
+    };
+  }, [detailOpen, pendingPaymentOrderId, refreshSelectedOrder, selectedActivity, t]);
 
   async function handleCreatePayment(order: MobileCustomerOrderDetail) {
     const amount = getOrderBalance(order);
@@ -1427,7 +1470,8 @@ export function CustomerHome({
         amount,
       });
 
-      window.open(result.gateway.paymentUrl, "_blank", "noopener,noreferrer");
+      setPendingPaymentOrderId(order.id);
+      await openExternalUrl(result.gateway.paymentUrl);
       await refreshSelectedOrder(order.id);
       setMessage(
         result.idempotent
