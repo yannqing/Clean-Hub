@@ -4,39 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PrintLocale } from "@cleanhub/hardware";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
-import {
-  Badge,
-  Button,
-  Input,
-  Label,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  Textarea,
-  toast,
-} from "@cleanhub/ui";
-import {
-  AlertTriangle,
-  Camera,
-  Clock3,
-  FileText,
-  ImageIcon,
-  Loader2,
-  MapPin,
-  Navigation,
-  PackageCheck,
-  PenLine,
-  Phone,
-  Printer,
-  ReceiptText,
-  RefreshCw,
-  UserRound,
-} from "lucide-react";
+import { toast } from "@cleanhub/ui";
+import { Loader2 } from "lucide-react";
 
 import { WorkspaceHeader } from "@/components/workspace-header";
-import { formatTenantMoney, resolveTenantCurrency } from "@/lib/currency";
+import { resolveTenantCurrency } from "@/lib/currency";
 import {
   readMobileDetailUrlState,
   writeMobileDetailUrlState,
@@ -50,7 +22,6 @@ import {
   uploadDeliveryProof,
 } from "../actions";
 import { captureDeliveryPhoto, isOnline } from "../lib/device";
-import type { UploadableMedia } from "../lib/media-upload";
 import {
   connectPortablePrinter,
   initialDeliveryPrinterState,
@@ -72,6 +43,15 @@ import {
   DeliveryQueueBanner,
   DeliveryTaskList,
 } from "./delivery-task-list";
+import {
+  DeliveryTaskActionSheets,
+  type DeliveryCapturedProofPhoto,
+  type DeliverySheet,
+} from "./delivery-task-action-sheets";
+import {
+  DeliveryTaskDetailSheet,
+  type DeliveryPrimaryTaskAction,
+} from "./delivery-task-detail-sheet";
 
 type DeliveryHomeProps = {
   currency?: string;
@@ -81,25 +61,6 @@ type DeliveryHomeProps = {
 };
 
 type DataSource = "network" | "cache";
-
-type CapturedProofPhoto = {
-  media: UploadableMedia;
-  capturedAt: string;
-  previewUrl: string;
-};
-
-type DeliverySheet = "exception" | "proof" | "signature" | null;
-
-type PrimaryTaskAction =
-  | {
-      kind: "status";
-      status: DeliveryTaskStatus;
-      labelKey: TranslationKey;
-    }
-  | {
-      kind: "signature";
-      labelKey: TranslationKey;
-    };
 
 const statusTone: Record<DeliveryTaskStatus, string> = {
   pending_dispatch: "border-amber-200 bg-amber-50 text-amber-800",
@@ -167,17 +128,6 @@ const intlLocales: Record<PrintLocale, string> = {
 };
 
 const deliveryDetailUrlViews = ["task"] as const;
-
-function formatDateTime(value: string | null, locale: string, emptyLabel: string): string {
-  if (!value) {
-    return emptyLabel;
-  }
-
-  return new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
 
 function getErrorMessage(error: unknown, fallback: string, t: ReturnType<typeof useTranslation>["t"]): string {
   if (error instanceof Error) {
@@ -259,7 +209,7 @@ function canReportExceptionForStatus(status: DeliveryTaskStatus): boolean {
   return !isTerminalStatus(status);
 }
 
-function getPrimaryTaskAction(task: DeliveryTaskDetail): PrimaryTaskAction | null {
+function getPrimaryTaskAction(task: DeliveryTaskDetail): DeliveryPrimaryTaskAction | null {
   if (canRequestSignatureForStatus(task.status)) {
     return {
       kind: "signature",
@@ -314,7 +264,7 @@ export function DeliveryHome({
   const [exceptionReason, setExceptionReason] = useState("");
   const [proofType, setProofType] =
     useState<Exclude<DeliveryProofType, "signature">>("pickup");
-  const [proofPhoto, setProofPhoto] = useState<CapturedProofPhoto | null>(null);
+  const [proofPhoto, setProofPhoto] = useState<DeliveryCapturedProofPhoto | null>(null);
   const [signedByName, setSignedByName] = useState("");
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -963,8 +913,27 @@ export function DeliveryHome({
         onSelectTask={handleTaskSelect}
       />
 
-      <Sheet
+      <DeliveryTaskDetailSheet
+        activeAction={activeAction}
+        intlLocale={intlLocale}
+        notScheduledLabel={notScheduledLabel}
         open={detailOpen}
+        primaryTaskAction={primaryTaskAction}
+        printer={printer}
+        proofTypeLabelKeys={proofTypeLabelKeys}
+        selectedTask={selectedTask}
+        selectedTaskCanReportException={selectedTaskCanReportException}
+        selectedTaskCanUploadProof={selectedTaskCanUploadProof}
+        selectedTaskCanUsePrinter={selectedTaskCanUsePrinter}
+        selectedTaskPendingCount={selectedTaskPendingCount}
+        selectedTaskProofImages={selectedTaskProofImages}
+        selectedTaskSecondaryActionCount={selectedTaskSecondaryActionCount}
+        selectedTaskTerminalMessageKey={selectedTaskTerminalMessageKey}
+        statusLabelKeys={statusLabelKeys}
+        statusNote={statusNote}
+        statusTone={statusTone}
+        tenantCurrency={tenantCurrency}
+        onConnectPrinter={handleConnectPrinter}
         onOpenChange={(open) => {
           if (!open) {
             closeTaskDetail();
@@ -972,496 +941,53 @@ export function DeliveryHome({
             setDetailOpen(true);
           }
         }}
-      >
-        <SheetContent className="h-[92dvh] p-0">
-          {selectedTask ? (
-            <div className="flex h-full flex-col">
-              <div className="flex-1 space-y-4 overflow-y-auto px-5 pb-4 pt-2">
-                <SheetHeader className="pr-8 text-left">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusTone[selectedTask.status]}`}
-                    >
-                      {t(statusLabelKeys[selectedTask.status])}
-                    </span>
-                    {selectedTaskPendingCount > 0 ? (
-                      <Badge className="bg-amber-100 text-amber-900" variant="secondary">
-                        {t("delivery.pendingSync", { count: selectedTaskPendingCount })}
-                      </Badge>
-                    ) : null}
-                  </div>
-                  <SheetTitle>{selectedTask.customerName}</SheetTitle>
-                  <SheetDescription>
-                    {formatDateTime(selectedTask.expectedAt, intlLocale, notScheduledLabel)}
-                  </SheetDescription>
-                </SheetHeader>
+        onOpenExceptionSheet={() => setActiveSheet("exception")}
+        onOpenProofSheet={openProofSheet}
+        onPrintDocument={handlePrintDocument}
+        onPrimaryStatusUpdate={handleStatusUpdate}
+        onRequestSignature={() => setActiveSheet("signature")}
+        onStatusNoteChange={setStatusNote}
+      />
 
-                <div className="space-y-3 text-sm">
-                  <div className="flex gap-3">
-                    <Clock3 className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                    <span className="text-slate-700">
-                      {formatDateTime(selectedTask.expectedAt, intlLocale, notScheduledLabel)}
-                    </span>
-                  </div>
-                  <div className="flex gap-3">
-                    <MapPin className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                    <span className="text-slate-700">{selectedTask.address}</span>
-                  </div>
-                  {selectedTask.customerPhone ? (
-                    <a
-                      className="flex gap-3 text-sm text-blue-700"
-                      href={`tel:${selectedTask.customerPhone}`}
-                    >
-                      <Phone className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                      <span>{selectedTask.customerPhone}</span>
-                    </a>
-                  ) : null}
-                  {selectedTask.notes ? (
-                    <div className="flex gap-3">
-                      <FileText className="mt-0.5 size-4 shrink-0 text-slate-500" aria-hidden="true" />
-                      <span className="text-slate-700">{selectedTask.notes}</span>
-                    </div>
-                  ) : null}
-                </div>
-
-                <dl className="grid grid-cols-2 gap-3">
-                  <div className="rounded-md bg-slate-50 p-3">
-                    <dt className="text-xs font-medium text-slate-500">{t("delivery.order")}</dt>
-                    <dd className="mt-1 truncate text-sm font-semibold text-slate-950">
-                      {selectedTask.order?.id ?? selectedTask.orderId ?? "-"}
-                    </dd>
-                    {selectedTask.order ? (
-                      <p className="mt-1 text-xs text-slate-600">
-                        {selectedTask.order.status} ·{" "}
-                        {formatTenantMoney(
-                          selectedTask.order.totalAmount,
-                          intlLocale,
-                          tenantCurrency,
-                        )}
-                      </p>
-                    ) : null}
-                  </div>
-                  <div className="rounded-md bg-slate-50 p-3">
-                    <dt className="text-xs font-medium text-slate-500">{t("delivery.ticket")}</dt>
-                    <dd className="mt-1 truncate text-sm font-semibold text-slate-950">
-                      {selectedTask.ticket?.ticketNo ?? selectedTask.ticketId ?? "-"}
-                    </dd>
-                    {selectedTask.ticket ? (
-                      <p className="mt-1 text-xs text-slate-600">
-                        {selectedTask.ticket.ticketStatus}
-                      </p>
-                    ) : null}
-                  </div>
-                </dl>
-
-                {selectedTaskProofImages.length > 0 ? (
-                  <section className="space-y-3 rounded-md border border-slate-200 bg-white p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <h3 className="text-sm font-semibold text-slate-950">
-                        {t("delivery.proof.savedTitle")}
-                      </h3>
-                      <span className="text-xs text-slate-500">
-                        {t("delivery.proof.savedCount", {
-                          count: selectedTaskProofImages.length,
-                        })}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {selectedTaskProofImages.map((proof) => (
-                        <a
-                          className="group overflow-hidden rounded-md border border-slate-200 bg-slate-50"
-                          href={proof.mediaUrl}
-                          key={proof.id}
-                          rel="noreferrer"
-                          target="_blank"
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element -- Proof URLs are short-lived private media links. */}
-                          <img
-                            alt={t(proofTypeLabelKeys[proof.type])}
-                            className="aspect-[4/3] w-full object-cover transition group-active:scale-[0.98]"
-                            src={proof.mediaUrl}
-                          />
-                          <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-xs text-slate-600">
-                            <span>{t(proofTypeLabelKeys[proof.type])}</span>
-                            <span>{formatDateTime(proof.capturedAt ?? proof.createdAt, intlLocale, notScheduledLabel)}</span>
-                          </div>
-                        </a>
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-
-                {selectedTaskCanUsePrinter ? (
-                  <section className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-white text-blue-700">
-                          <Printer className="size-4" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-950">
-                            {t("delivery.printer.title")}
-                          </p>
-                          <p className="truncate text-xs text-slate-600">
-                            {printer.device?.name ??
-                              printer.device?.id ??
-                              (printer.status === "unavailable"
-                                ? t("delivery.printer.unavailable")
-                                : t("delivery.printer.notConnected"))}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        aria-label={t("delivery.printer.connect")}
-                        className="size-10 shrink-0 p-0"
-                        disabled={Boolean(activeAction)}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                        onClick={handleConnectPrinter}
-                      >
-                        {activeAction === "printer-connect" ? (
-                          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                        ) : (
-                          <RefreshCw className="size-4" aria-hidden="true" />
-                        )}
-                      </Button>
-                    </div>
-
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Button
-                        className="h-11"
-                        disabled={Boolean(activeAction) || !printer.device}
-                        type="button"
-                        variant="secondary"
-                        onClick={() => handlePrintDocument("receipt")}
-                      >
-                        {activeAction === "print-receipt" ? (
-                          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                        ) : (
-                          <ReceiptText className="size-4" aria-hidden="true" />
-                        )}
-                        {t("delivery.printer.receipt")}
-                      </Button>
-                      <Button
-                        className="h-11"
-                        disabled={Boolean(activeAction) || !printer.device}
-                        type="button"
-                        variant="secondary"
-                        onClick={() => handlePrintDocument("label")}
-                      >
-                        {activeAction === "print-label" ? (
-                          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                        ) : (
-                          <PackageCheck className="size-4" aria-hidden="true" />
-                        )}
-                        {t("delivery.printer.label")}
-                      </Button>
-                    </div>
-                  </section>
-                ) : null}
-
-                <div
-                  className={`grid gap-2 ${
-                    selectedTaskSecondaryActionCount > 1 ? "grid-cols-2" : "grid-cols-1"
-                  }`}
-                >
-                  {selectedTaskCanUploadProof ? (
-                    <Button
-                      className="h-12"
-                      type="button"
-                      variant="outline"
-                      onClick={() => openProofSheet(selectedTask)}
-                    >
-                      <Camera className="size-4" aria-hidden="true" />
-                      {t("delivery.proof.title")}
-                    </Button>
-                  ) : null}
-                  {selectedTaskCanReportException ? (
-                    <Button
-                      className="h-12"
-                      type="button"
-                      variant="outline"
-                      onClick={() => setActiveSheet("exception")}
-                    >
-                      <AlertTriangle className="size-4" aria-hidden="true" />
-                      {t("delivery.exception.title")}
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="sticky bottom-0 mt-auto space-y-3 border-t border-slate-200 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-9 items-center justify-center rounded-md bg-blue-50 text-blue-700">
-                    <Navigation className="size-4" aria-hidden="true" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-950">{t("delivery.workflow.title")}</p>
-                    <p className="text-xs text-slate-600">{t(statusLabelKeys[selectedTask.status])}</p>
-                  </div>
-                </div>
-
-                {selectedTaskTerminalMessageKey ? (
-                  <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                    {t(selectedTaskTerminalMessageKey)}
-                  </p>
-                ) : null}
-
-                {primaryTaskAction?.kind === "status" ? (
-                  <div className="space-y-2">
-                    <Label htmlFor="status-note">{t("common.note")}</Label>
-                    <Textarea
-                      id="status-note"
-                      className="min-h-16 text-base"
-                      placeholder={t("common.optional")}
-                      value={statusNote}
-                      onChange={(event) => setStatusNote(event.target.value)}
-                    />
-                  </div>
-                ) : null}
-
-                {primaryTaskAction ? (
-                  <div>
-                    <Button
-                      className="h-12 w-full"
-                      disabled={Boolean(activeAction)}
-                      type="button"
-                      onClick={() => {
-                        if (primaryTaskAction.kind === "signature") {
-                          setActiveSheet("signature");
-                          return;
-                        }
-
-                        handleStatusUpdate(primaryTaskAction.status);
-                      }}
-                    >
-                      {primaryTaskAction.kind === "status" &&
-                      activeAction === `status-${primaryTaskAction.status}` ? (
-                        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                      ) : primaryTaskAction.kind === "signature" ? (
-                        <PenLine className="size-4" aria-hidden="true" />
-                      ) : (
-                        <MapPin className="size-4" aria-hidden="true" />
-                      )}
-                      {t(primaryTaskAction.labelKey)}
-                    </Button>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            <div className="flex min-h-[50dvh] items-center justify-center px-5 text-sm text-slate-600">
-              <Loader2 className="mr-2 size-4 animate-spin text-blue-600" aria-hidden="true" />
-              {t("delivery.detailLoading")}
-            </div>
-          )}
-        </SheetContent>
-      </Sheet>
-
-      <Sheet
-        open={activeSheet === "exception"}
-        onOpenChange={(open) => {
+      <DeliveryTaskActionSheets
+        activeAction={activeAction}
+        exceptionOpen={activeSheet === "exception"}
+        exceptionReason={exceptionReason}
+        hasSignature={hasSignature}
+        proofOpen={activeSheet === "proof"}
+        proofPhoto={proofPhoto}
+        proofTypeLabelKeys={proofTypeLabelKeys}
+        selectedTask={selectedTask}
+        signatureCanvasRef={signatureCanvasRef}
+        signatureOpen={activeSheet === "signature"}
+        signedByName={signedByName}
+        onBeginSignature={beginSignature}
+        onCapturePhoto={handleCapturePhoto}
+        onClearSignature={clearSignature}
+        onDrawSignature={drawSignature}
+        onEndSignature={endSignature}
+        onExceptionOpenChange={(open) => {
           if (!open) {
             setActiveSheet(null);
           }
         }}
-      >
-        <SheetContent className="max-h-[72dvh] p-0">
-          <form className="flex min-h-full flex-col" onSubmit={(event) => {
-            event.preventDefault();
-            handleException();
-          }}>
-            <div className="space-y-4 px-5 pb-4 pt-2">
-              <SheetHeader className="pr-8 text-left">
-                <SheetTitle>{t("delivery.exception.title")}</SheetTitle>
-                <SheetDescription>{t("delivery.exception.description")}</SheetDescription>
-              </SheetHeader>
-              <div className="space-y-2">
-                <Label htmlFor="exception-reason">{t("delivery.exception.reason")}</Label>
-                <Textarea
-                  id="exception-reason"
-                  className="min-h-28 text-base"
-                  value={exceptionReason}
-                  onChange={(event) => setExceptionReason(event.target.value)}
-                />
-              </div>
-            </div>
-            <div className="sticky bottom-0 mt-auto border-t border-slate-200 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
-              <Button
-                className="h-12 w-full"
-                disabled={Boolean(activeAction) || !exceptionReason.trim()}
-                type="submit"
-                variant="destructive"
-              >
-                {activeAction === "exception" ? (
-                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <AlertTriangle className="size-4" aria-hidden="true" />
-                )}
-                {t("delivery.exception.submit")}
-              </Button>
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
-
-      <Sheet
-        open={activeSheet === "proof"}
-        onOpenChange={(open) => {
+        onExceptionReasonChange={setExceptionReason}
+        onExceptionSubmit={handleException}
+        onProofOpenChange={(open) => {
           if (!open) {
             setActiveSheet(null);
           }
         }}
-      >
-        <SheetContent className="max-h-[82dvh] p-0">
-          <form className="flex min-h-full flex-col" onSubmit={handleProofSubmit}>
-            <div className="space-y-4 px-5 pb-4 pt-2">
-              <SheetHeader className="pr-8 text-left">
-                <SheetTitle>{t("delivery.proof.title")}</SheetTitle>
-                <SheetDescription>{t("delivery.proof.description")}</SheetDescription>
-              </SheetHeader>
-
-              {selectedTask ? (
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <span className="font-medium text-slate-950">
-                    {t("delivery.proof.forTask")}
-                  </span>{" "}
-                  {t(proofTypeLabelKeys[selectedTask.type])}
-                </div>
-              ) : null}
-
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    className="h-12"
-                    disabled={Boolean(activeAction)}
-                    type="button"
-                    variant="secondary"
-                    onClick={() => handleCapturePhoto("camera")}
-                  >
-                    {activeAction === "camera" ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    ) : (
-                      <Camera className="size-4" aria-hidden="true" />
-                    )}
-                    {proofPhoto ? t("delivery.proof.retake") : t("delivery.proof.capture")}
-                  </Button>
-                  <Button
-                    className="h-12"
-                    disabled={Boolean(activeAction)}
-                    type="button"
-                    variant="secondary"
-                    onClick={() => handleCapturePhoto("gallery")}
-                  >
-                    {activeAction === "gallery" ? (
-                      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    ) : (
-                      <ImageIcon className="size-4" aria-hidden="true" />
-                    )}
-                    {t("delivery.proof.gallery")}
-                  </Button>
-                </div>
-
-                {proofPhoto ? (
-                  <div className="overflow-hidden rounded-md border border-emerald-200 bg-emerald-50">
-                    {/* eslint-disable-next-line @next/next/no-img-element -- Local blob previews cannot use Next image optimization. */}
-                    <img
-                      alt={t("delivery.proof.previewAlt")}
-                      className="aspect-[4/3] w-full object-cover"
-                      src={proofPhoto.previewUrl}
-                    />
-                    <p className="px-3 py-2 text-sm text-emerald-800">
-                      {t("delivery.proof.captured")}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="rounded-md border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500">
-                    {t("delivery.proof.empty")}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="sticky bottom-0 mt-auto border-t border-slate-200 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
-              <Button
-                className="h-12 w-full"
-                disabled={Boolean(activeAction) || !proofPhoto}
-                type="submit"
-              >
-                {activeAction === "proof" ? (
-                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <PackageCheck className="size-4" aria-hidden="true" />
-                )}
-                {t("delivery.proof.submit")}
-              </Button>
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
-
-      <Sheet
-        open={activeSheet === "signature"}
-        onOpenChange={(open) => {
+        onProofSubmit={handleProofSubmit}
+        onSignatureOpenChange={(open) => {
           if (!open) {
             setActiveSheet(null);
             clearSignature();
           }
         }}
-      >
-        <SheetContent className="max-h-[86dvh] p-0">
-          <form className="flex min-h-full flex-col" onSubmit={handleSignatureSubmit}>
-            <div className="space-y-4 px-5 pb-4 pt-2">
-              <SheetHeader className="pr-8 text-left">
-                <SheetTitle>{t("delivery.signature.title")}</SheetTitle>
-                <SheetDescription>{t("delivery.signature.description")}</SheetDescription>
-              </SheetHeader>
-
-              <div className="space-y-2">
-                <Label htmlFor="signed-by">{t("delivery.signature.signer")}</Label>
-                <Input
-                  id="signed-by"
-                  className="h-12 text-base"
-                  value={signedByName}
-                  onChange={(event) => setSignedByName(event.target.value)}
-                />
-              </div>
-
-              <canvas
-                aria-label={t("delivery.signature.canvasLabel")}
-                className="h-44 w-full touch-none rounded-md border border-slate-300 bg-white"
-                height={260}
-                ref={signatureCanvasRef}
-                width={680}
-                onPointerCancel={endSignature}
-                onPointerDown={beginSignature}
-                onPointerLeave={endSignature}
-                onPointerMove={drawSignature}
-                onPointerUp={endSignature}
-              />
-            </div>
-            <div className="sticky bottom-0 mt-auto grid grid-cols-2 gap-2 border-t border-slate-200 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
-              <Button
-                className="h-12"
-                disabled={!hasSignature || Boolean(activeAction)}
-                type="button"
-                variant="secondary"
-                onClick={clearSignature}
-              >
-                {t("delivery.signature.clear")}
-              </Button>
-              <Button className="h-12" disabled={Boolean(activeAction)} type="submit">
-                {activeAction === "signature" ? (
-                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <UserRound className="size-4" aria-hidden="true" />
-                )}
-                {t("delivery.signature.submit")}
-              </Button>
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
+        onSignatureSubmit={handleSignatureSubmit}
+        onSignedByNameChange={setSignedByName}
+      />
     </section>
   );
 }
