@@ -65,6 +65,7 @@ export const zhCNMessages = {
       identifier: "电话或邮箱",
       password: "密码",
       sendOtp: "发送",
+      resendIn: "重新发送（{seconds}s）",
       testCode: "测试码",
       recipeCode: "测试码：{code}",
       otpCode: "验证码",

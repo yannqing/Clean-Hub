@@ -66,6 +66,7 @@ export const enMessages = {
       identifier: "Phone or email",
       password: "Password",
       sendOtp: "Send",
+      resendIn: "Resend ({seconds}s)",
       testCode: "Test code",
       recipeCode: "Test code: {code}",
       otpCode: "OTP code",

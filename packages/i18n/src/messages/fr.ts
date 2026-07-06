@@ -66,6 +66,7 @@ export const frMessages = {
       identifier: "Téléphone ou email",
       password: "Mot de passe",
       sendOtp: "Envoyer",
+      resendIn: "Renvoyer ({seconds}s)",
       testCode: "Code test",
       recipeCode: "Code de recette: {code}",
       otpCode: "Code OTP",

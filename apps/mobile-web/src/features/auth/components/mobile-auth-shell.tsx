@@ -30,6 +30,8 @@ type SessionView = {
   authContext: MobileAuthContext;
 };
 
+const OTP_RESEND_COOLDOWN_SECONDS = 60;
+
 function getErrorMessage(error: unknown, fallback: string, t: ReturnType<typeof useTranslation>["t"]): string {
   if (error instanceof Error) {
     if (error.message.startsWith("auth.") || error.message.startsWith("common.")) {
@@ -55,6 +57,7 @@ export function MobileAuthShell() {
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [otpCooldownSeconds, setOtpCooldownSeconds] = useState(0);
   const [isBooting, setIsBooting] = useState(true);
   const [isPending, startTransition] = useTransition();
   const showTestOtp = mobileReleaseConfig.appEnvironment !== "prod";
@@ -97,6 +100,20 @@ export function MobileAuthShell() {
     };
   }, [t]);
 
+  useEffect(() => {
+    if (otpCooldownSeconds <= 0) {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setOtpCooldownSeconds((current) => Math.max(0, current - 1));
+    }, 1_000);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [otpCooldownSeconds]);
+
   const activeLoginTitle = useMemo(() => {
     switch (mode) {
       case "customer-password":
@@ -130,13 +147,14 @@ export function MobileAuthShell() {
   }
 
   function handleOtpRequest() {
-    if (!tenantCode) {
+    if (!tenantCode || otpCooldownSeconds > 0) {
       return;
     }
 
     runAction(async () => {
       const response = await requestCustomerOtp({ tenantCode, phone });
       setTestOtp(response.code ?? null);
+      setOtpCooldownSeconds(OTP_RESEND_COOLDOWN_SECONDS);
       setMessage(t("auth.login.otpSent"));
     });
   }
@@ -193,6 +211,7 @@ export function MobileAuthShell() {
       setTenantInput("");
       setSession(null);
       setTestOtp(null);
+      setOtpCooldownSeconds(0);
       setMessage(t("auth.tenant.reset"));
     });
   }
@@ -288,13 +307,14 @@ export function MobileAuthShell() {
             </Button>
           </div>
         )}
+
+        {!tenantCode && error ? (
+          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        ) : null}
       </section>
 
-      {error ? (
-        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      ) : null}
       {message ? (
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
           {message}
@@ -312,6 +332,12 @@ export function MobileAuthShell() {
               <p className="text-sm text-slate-600">{t("auth.login.localToken")}</p>
             </div>
           </div>
+
+          {error ? (
+            <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {error}
+            </p>
+          ) : null}
 
           <div className="mt-4 grid grid-cols-2 gap-2">
             {loginModes.map((loginMode) => (
@@ -350,8 +376,18 @@ export function MobileAuthShell() {
                   />
                 </div>
                 <div className={`grid gap-2 ${showTestOtp ? "grid-cols-2" : "grid-cols-1"}`}>
-                  <Button className="h-11" disabled={isPending || !phone.trim()} type="button" variant="secondary" onClick={handleOtpRequest}>
-                    {t("auth.login.sendOtp")}
+                  <Button
+                    className="h-11"
+                    disabled={isPending || !phone.trim() || otpCooldownSeconds > 0}
+                    type="button"
+                    variant="secondary"
+                    onClick={handleOtpRequest}
+                  >
+                    {otpCooldownSeconds > 0
+                      ? t("auth.login.resendIn", {
+                          seconds: String(otpCooldownSeconds),
+                        })
+                      : t("auth.login.sendOtp")}
                   </Button>
                   {showTestOtp ? (
                     <Button className="h-11" disabled={isPending || !phone.trim()} type="button" variant="outline" onClick={handleOtpTestFetch}>
@@ -371,9 +407,13 @@ export function MobileAuthShell() {
                     autoComplete="one-time-code"
                     className="h-12 text-base"
                     inputMode="numeric"
+                    maxLength={6}
+                    pattern="[0-9]*"
                     placeholder="123456"
                     value={otp}
-                    onChange={(event) => setOtp(event.target.value)}
+                    onChange={(event) =>
+                      setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))
+                    }
                   />
                 </div>
               </>
