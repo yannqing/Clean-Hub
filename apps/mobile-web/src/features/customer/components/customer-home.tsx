@@ -47,19 +47,14 @@ import {
   CheckCircle2,
   ChevronRight,
   CreditCard,
-  Edit3,
   Home,
   KeyRound,
   LocateFixed,
   Loader2,
-  Mail,
   MapPin,
-  Phone,
   Plus,
   ReceiptText,
   RotateCcw,
-  Star,
-  Trash2,
   TicketCheck,
   UserRound,
   XCircle,
@@ -74,6 +69,12 @@ import {
   writeMobileDetailUrlState,
 } from "@/lib/detail-url";
 import { openExternalUrl } from "../lib/open-external";
+import {
+  CustomerAccountCard,
+  CustomerAddressBookSection,
+  CustomerLinkedContactsSection,
+  CustomerProfileUnavailableState,
+} from "./customer-profile-sections";
 
 import {
   cancelCustomerAppointment,
@@ -901,21 +902,6 @@ function getRefundStatusView(
     label: t(refundStatusKeys[status]),
     className: refundStatusClasses[status],
   };
-}
-
-function getAccountStatusView(
-  t: Translator,
-  status: MobileCustomerProfile["account"]["status"],
-): StatusView {
-  return status === "active"
-    ? {
-        label: t("customer.profile.active"),
-        className: "border-emerald-200 bg-emerald-50 text-emerald-800",
-      }
-    : {
-        label: t("customer.profile.disabled"),
-        className: "border-red-200 bg-red-50 text-red-700",
-      };
 }
 
 function getActivityItems(activity: MobileCustomerActivityList, t: Translator): ActivityListItem[] {
@@ -3919,217 +3905,32 @@ function ProfileView({
   onOpenPassword: () => void;
   onSetDefaultAddress: (addressId: string) => void;
 }) {
-  const { t } = useTranslation();
-
   if (!profile) {
-    return (
-      <EmptyState
-        icon={UserRound}
-        title={t("customer.empty.profileUnavailableTitle")}
-        body={t("customer.empty.profileUnavailableBody")}
-      />
-    );
+    return <CustomerProfileUnavailableState />;
   }
 
   return (
     <div className="space-y-4">
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-start gap-3">
-          <div className="flex size-10 items-center justify-center rounded-md bg-blue-50 text-blue-700">
-            <UserRound className="size-5" aria-hidden="true" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="break-words text-base font-semibold text-slate-950">
-                {profile.account.accountName}
-              </h2>
-              <StatusBadge view={getAccountStatusView(t, profile.account.status)} />
-            </div>
-            <ContactLine icon={Phone} value={profile.account.phone} />
-            <ContactLine icon={Mail} value={profile.account.email} />
-          </div>
-        </div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <Button className="h-11" type="button" variant="outline" onClick={onEditProfile}>
-            <Edit3 className="size-4" aria-hidden="true" />
-            {t("common.edit")}
-          </Button>
-          <Button className="h-11" type="button" variant="outline" onClick={onOpenPassword}>
-            <KeyRound className="size-4" aria-hidden="true" />
-            {t("customer.profile.password")}
-          </Button>
-        </div>
-      </section>
-
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-slate-950">
-              {t("customer.profile.addressBook")}
-            </h2>
-            <p className="mt-1 text-sm text-slate-600">
-              {t("customer.profile.addressBookCount", { count: addressBook.length })}
-            </p>
-          </div>
-          <Button className="h-10 shrink-0 px-3" type="button" onClick={onCreateAddress}>
-            <Plus className="size-4" aria-hidden="true" />
-            {t("customer.profile.addAddress")}
-          </Button>
-        </div>
-      </section>
-
-      {addressBook.length ? (
-        <section className="space-y-3">
-          {addressBook.map((address) => (
-            <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm" key={address.id}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="break-words text-sm font-semibold text-slate-950">{address.label}</p>
-                    {address.isDefault ? (
-                      <Badge className="border-amber-200 bg-amber-50 text-amber-800" variant="outline">
-                        <Star className="size-3" aria-hidden="true" />
-                        {t("customer.profile.defaultAddress")}
-                      </Badge>
-                    ) : null}
-                  </div>
-                  {address.contactName ? (
-                    <p className="mt-1 text-xs font-medium text-slate-500">{address.contactName}</p>
-                  ) : null}
-                </div>
-              </div>
-
-              <div className="mt-4 space-y-2">
-                <ContactLine icon={MapPin} value={formatCustomerAddress(address)} />
-                <ContactLine icon={Phone} value={address.contactPhone} />
-              </div>
-
-              {address.notes ? (
-                <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-700">
-                  {address.notes}
-                </p>
-              ) : null}
-
-              <div className="mt-4 grid grid-cols-3 gap-2">
-                <Button className="h-10 px-2" type="button" variant="outline" onClick={() => onEditAddress(address)}>
-                  <Edit3 className="size-4" aria-hidden="true" />
-                </Button>
-                <Button
-                  className="h-10 px-2"
-                  disabled={address.isDefault || addressActionId === `default-${address.id}`}
-                  type="button"
-                  variant="outline"
-                  onClick={() => onSetDefaultAddress(address.id)}
-                >
-                  {addressActionId === `default-${address.id}` ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Star className="size-4" aria-hidden="true" />
-                  )}
-                </Button>
-                <Button
-                  className="h-10 px-2"
-                  disabled={addressActionId === `delete-${address.id}`}
-                  type="button"
-                  variant="outline"
-                  onClick={() => onDeleteAddress(address.id)}
-                >
-                  {addressActionId === `delete-${address.id}` ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Trash2 className="size-4" aria-hidden="true" />
-                  )}
-                </Button>
-              </div>
-            </article>
-          ))}
-        </section>
-      ) : (
-        <EmptyState
-          icon={MapPin}
-          title={t("customer.empty.noAddressTitle")}
-          body={t("customer.empty.noAddressBody")}
-        />
-      )}
-
-      {profile.addresses.length ? (
-        <section className="space-y-3">
-          <div className="flex items-center justify-between gap-3 px-1">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              {t("customer.profile.linkedContacts")}
-            </h2>
-            <Button className="h-9 shrink-0 px-3" type="button" variant="outline" onClick={onCreateContact}>
-              <Plus className="size-4" aria-hidden="true" />
-              {t("customer.profile.addContact")}
-            </Button>
-          </div>
-          {profile.addresses.map((address) => (
-            <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm" key={address.customerId}>
-              <div className="flex items-start gap-3">
-                <button
-                  className="min-w-0 flex-1 text-left"
-                  type="button"
-                  onClick={() => onEditContact(address)}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="break-words text-sm font-semibold text-slate-950">{address.fullName}</p>
-                      {address.relationship ? (
-                        <p className="mt-1 text-xs font-medium text-slate-500">{address.relationship}</p>
-                      ) : null}
-                    </div>
-                    <StatusBadge view={getAccountStatusView(t, address.status)} />
-                  </div>
-
-                  <div className="mt-4 space-y-2">
-                    <ContactLine icon={MapPin} value={address.address} />
-                    <ContactLine icon={Phone} value={address.phone} />
-                    <ContactLine icon={Mail} value={address.email} />
-                  </div>
-                </button>
-                <Button
-                  className="size-9 shrink-0 p-0"
-                  disabled={contactActionId === `delete-${address.customerId}`}
-                  type="button"
-                  variant="outline"
-                  onClick={() => onDeleteContact(address.customerId)}
-                >
-                  {contactActionId === `delete-${address.customerId}` ? (
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Trash2 className="size-4" aria-hidden="true" />
-                  )}
-                </Button>
-              </div>
-            </article>
-          ))}
-        </section>
-      ) : (
-        <EmptyState
-          icon={MapPin}
-          title={t("customer.empty.noAddressTitle")}
-          body={t("customer.empty.noLinkedAddressBody")}
-          action={
-            <Button className="mt-4 h-10" type="button" onClick={onCreateContact}>
-              <Plus className="size-4" aria-hidden="true" />
-              {t("customer.profile.addContact")}
-            </Button>
-          }
-        />
-      )}
-    </div>
-  );
-}
-
-function ContactLine({ icon: Icon, value }: { icon: typeof Phone; value: string | null }) {
-  if (!value) {
-    return null;
-  }
-
-  return (
-    <div className="mt-2 flex items-start gap-2 text-sm text-slate-600">
-      <Icon className="mt-0.5 size-4 shrink-0 text-slate-400" aria-hidden="true" />
-      <span className="break-words">{value}</span>
+      <CustomerAccountCard
+        profile={profile}
+        onEditProfile={onEditProfile}
+        onOpenPassword={onOpenPassword}
+      />
+      <CustomerAddressBookSection
+        addressActionId={addressActionId}
+        addressBook={addressBook}
+        onCreateAddress={onCreateAddress}
+        onDeleteAddress={onDeleteAddress}
+        onEditAddress={onEditAddress}
+        onSetDefaultAddress={onSetDefaultAddress}
+      />
+      <CustomerLinkedContactsSection
+        contactActionId={contactActionId}
+        contacts={profile.addresses}
+        onCreateContact={onCreateContact}
+        onDeleteContact={onDeleteContact}
+        onEditContact={onEditContact}
+      />
     </div>
   );
 }
