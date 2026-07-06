@@ -7,6 +7,7 @@ import { createPosNotificationsApi } from "./notifications";
 import { createPosOrdersApi } from "./orders";
 import { createPosOverviewApi } from "./overview";
 import { createPosReceptionApi } from "./reception";
+import { createPosSearchApi } from "./search";
 import { createPosServiceTicketsApi } from "./service-tickets";
 import { createPosStaffApi } from "./staff";
 import { createPosTerminalSettingsApi } from "./terminal-settings";
@@ -30,6 +31,8 @@ export * from "./overview";
 export * from "./overview.types";
 export * from "./reception";
 export * from "./reception.types";
+export * from "./search";
+export * from "./search.types";
 export * from "./service-tickets";
 export * from "./service-tickets.types";
 export * from "./staff";
@@ -50,6 +53,7 @@ export function createPosApi(client: ApiClient) {
     serviceTickets: createPosServiceTicketsApi(client),
     accounts: createPosAccountsApi(client),
     orders: createPosOrdersApi(client),
+    search: createPosSearchApi(client),
     overview: createPosOverviewApi(client),
     staff: createPosStaffApi(client),
     reception: createPosReceptionApi(client),
@@ -66,4 +70,3 @@ export function createPosApi(client: ApiClient) {
     workspace: createPosWorkspaceApi(client),
   };
 }
-

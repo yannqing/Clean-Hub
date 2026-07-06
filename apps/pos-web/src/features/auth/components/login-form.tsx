@@ -1,5 +1,6 @@
 "use client";
 
+import { useTranslation } from "@cleanhub/i18n/react";
 import { toast } from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -34,6 +35,7 @@ function resolvePostLoginPath(): string {
 
 export function LoginForm() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [formState, setFormState] = useState<LoginFormValues>(initialState);
   const [fieldErrors, setFieldErrors] = useState<LoginFormFieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -44,14 +46,16 @@ export function LoginForm() {
     setErrorMessage(null);
 
     if (!posTenantCode) {
-      const message =
-        "本终端尚未配置门店编码（POS_TENANT_CODE），请联系管理员。";
+      const message = t("pos.auth.missingTenantCode");
       setErrorMessage(message);
       toast.error(message);
       return;
     }
 
-    const validationErrors = validateLoginForm(formState);
+    const validationErrors = validateLoginForm(formState, {
+      identifierRequired: t("pos.auth.validation.identifierRequired"),
+      passwordRequired: t("pos.auth.validation.passwordRequired"),
+    });
     if (validationErrors) {
       setFieldErrors(validationErrors);
       return;
@@ -68,11 +72,11 @@ export function LoginForm() {
         deviceId: getOrCreatePosDeviceId(),
       });
 
-      toast.success("登录成功");
+      toast.success(t("pos.auth.loginSuccess"));
       router.replace(resolvePostLoginPath());
       router.refresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "登录失败，请重试。";
+      const message = error instanceof Error ? error.message : t("pos.auth.loginFailed");
       setErrorMessage(message);
       toast.error(message);
     } finally {
@@ -105,7 +109,7 @@ export function LoginForm() {
           className="text-sm font-semibold text-slate-700"
           htmlFor="identifier"
         >
-          手机号 / 邮箱
+          {t("pos.auth.identifier")}
         </label>
         <input
           aria-invalid={Boolean(fieldErrors.identifier)}
@@ -114,7 +118,7 @@ export function LoginForm() {
           id="identifier"
           name="identifier"
           onChange={(event) => updateField("identifier", event.target.value)}
-          placeholder="请输入手机号或邮箱"
+          placeholder={t("pos.auth.identifierPlaceholder")}
           required
           type="text"
           value={formState.identifier}
@@ -129,7 +133,7 @@ export function LoginForm() {
           className="text-sm font-semibold text-slate-700"
           htmlFor="password"
         >
-          密码
+          {t("pos.auth.password")}
         </label>
         <input
           aria-invalid={Boolean(fieldErrors.password)}
@@ -138,7 +142,7 @@ export function LoginForm() {
           id="password"
           name="password"
           onChange={(event) => updateField("password", event.target.value)}
-          placeholder="请输入密码"
+          placeholder={t("pos.auth.passwordPlaceholder")}
           required
           type="password"
           value={formState.password}
@@ -159,12 +163,12 @@ export function LoginForm() {
         disabled={submitting}
         type="submit"
       >
-        {submitting ? "登录中…" : "登录"}
+        {submitting ? t("pos.auth.submitting") : t("pos.auth.submit")}
       </button>
 
       {posTenantCode ? (
         <p className="text-center text-xs text-slate-400">
-          当前门店：
+          {t("pos.auth.currentStore")}
           <span className="font-semibold text-slate-500">
             {posTenantCode}
           </span>

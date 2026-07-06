@@ -26,10 +26,12 @@ const SCOPE_OPTIONS: ReadonlyArray<{ value: TicketListScope; label: string }> = 
 ];
 
 type TicketsToolbarProps = {
-  /** Total visible under the currently selected scope (already filtered). */
-  totalCount: number;
-  /** Count under the "mine" scope. Optional: hidden when undefined. */
-  mineCount?: number;
+  /** Total visible under the currently selected scope and filters. */
+  currentCount: number;
+  /** Count under the "mine" scope using the same filters, ignoring pagination. */
+  mineCount: number;
+  /** Count under the "all" scope using the same filters, ignoring pagination. */
+  allCount: number;
 };
 
 /**
@@ -37,7 +39,11 @@ type TicketsToolbarProps = {
  * component re-fetches; we never keep filter state locally beyond the input.
  * This keeps filters shareable/deep-linkable and avoids RSC/client drift.
  */
-export function TicketsToolbar({ mineCount, totalCount }: TicketsToolbarProps) {
+export function TicketsToolbar({
+  allCount,
+  currentCount,
+  mineCount,
+}: TicketsToolbarProps) {
   const router = useRouter();
   const params = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -51,8 +57,6 @@ export function TicketsToolbar({ mineCount, totalCount }: TicketsToolbarProps) {
   const type = params.get(TICKET_FILTER_KEYS.type) ?? "";
   const priority = params.get(TICKET_FILTER_KEYS.priority) ?? "";
   const date = (params.get(TICKET_FILTER_KEYS.date) as TicketListDateFilter) ?? "all";
-
-  const scopeCount = scope === "mine" ? mineCount : totalCount;
 
   const apply = useCallback(
     (next: Record<string, string | undefined>, resetPage = true) => {
@@ -81,13 +85,10 @@ export function TicketsToolbar({ mineCount, totalCount }: TicketsToolbarProps) {
       SCOPE_OPTIONS.map((option) => ({
         ...option,
         // Only show a count badge when we have one for that scope.
-        count:
-          option.value === "mine"
-            ? mineCount ?? null
-            : totalCount,
+        count: option.value === "mine" ? mineCount : allCount,
         active: scope === option.value,
       })),
-    [scope, mineCount, totalCount],
+    [allCount, mineCount, scope],
   );
 
   return (
@@ -125,7 +126,7 @@ export function TicketsToolbar({ mineCount, totalCount }: TicketsToolbarProps) {
           ))}
         </div>
         <div className="text-xs text-slate-500">
-          当前范围 · 共 {scopeCount} 条
+          当前范围 · 共 {currentCount} 条
         </div>
       </div>
 
