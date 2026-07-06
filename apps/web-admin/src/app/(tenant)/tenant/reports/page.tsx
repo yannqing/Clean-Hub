@@ -3,6 +3,7 @@ import {
   ReportSummaryView,
   type ReportSummaryQuery,
 } from "@/features/tenant/reports";
+import { getTenantSettingsQuery } from "@/features/tenant/settings/queries";
 
 type ReportsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -24,21 +25,33 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     to: getStringParam(params, "to"),
     branchId: getStringParam(params, "branchId"),
   };
-  const result = await getReportSummaryQuery(query)
-    .then((summary) => ({ summary, error: undefined }))
-    .catch((error: unknown) => ({
-      summary: undefined,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Report summary failed to load.",
-    }));
+
+  // Run the report summary and tenant settings lookups in parallel. Settings is
+  // fetched only to resolve the tenant's currency for display; if it fails we
+  // fall back to the platform default currency (`XOF`) instead of blocking the
+  // report. Both queries resolve their own request options so cookies/auth are
+  // handled consistently with the rest of the app.
+  const [reportResult, settingsResult] = await Promise.all([
+    getReportSummaryQuery(query)
+      .then((summary) => ({ summary, error: undefined as string | undefined }))
+      .catch((error: unknown) => ({
+        summary: undefined,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Report summary failed to load.",
+      })),
+    getTenantSettingsQuery()
+      .then((settings) => settings?.defaultCurrency)
+      .catch(() => undefined),
+  ]);
 
   return (
     <ReportSummaryView
-      error={result.error}
+      currency={settingsResult}
+      error={reportResult.error}
       query={query}
-      summary={result.summary}
+      summary={reportResult.summary}
     />
   );
 }

@@ -8,7 +8,7 @@ import { useForm, useWatch } from "react-hook-form";
 
 import { webAdminRoutes } from "@/config/routes";
 
-import { loginBrowserSessionAction } from "../actions/browser-session.action";
+import { loginAction } from "../actions/login.action";
 import { getOrCreateWebAdminDeviceId } from "../utils";
 import {
   loginFormSchema,
