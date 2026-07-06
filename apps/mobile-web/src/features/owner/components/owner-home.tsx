@@ -25,6 +25,7 @@ import {
 import {
   AlertCircle,
   CalendarDays,
+  ChevronDown,
   CheckCircle2,
   Clock3,
   Loader2,
@@ -90,6 +91,12 @@ type BoardState = {
   refundRequests: MobileRefundRequest[];
 };
 
+type BoardVisibleLimits = {
+  appointments: number;
+  tasks: number;
+  refundRequests: number;
+};
+
 type ActionTarget =
   | { kind: "accept-appointment"; appointment: OwnerAppointmentListItem }
   | { kind: "reject-appointment"; appointment: OwnerAppointmentListItem }
@@ -100,6 +107,12 @@ type ActionTarget =
   | { kind: "reject-refund"; refundRequest: MobileRefundRequest };
 
 const numberFormatter = new Intl.NumberFormat("fr-FR");
+const OWNER_BOARD_SHOW_MORE_INCREMENT = 10;
+const INITIAL_OWNER_BOARD_VISIBLE_LIMITS: BoardVisibleLimits = {
+  appointments: 5,
+  tasks: 8,
+  refundRequests: 5,
+};
 const intlLocales: Record<SupportedLocale, string> = {
   fr: "fr-FR",
   en: "en-US",
@@ -362,6 +375,43 @@ function OperationalCard({
       </div>
       {children}
     </section>
+  );
+}
+
+function ShowMoreFooter({
+  shown,
+  total,
+  onShowMore,
+}: {
+  shown: number;
+  total: number;
+  onShowMore: () => void;
+}) {
+  const { locale, t } = useTranslation();
+  const intlLocale = intlLocales[locale];
+  const clampedShown = Math.min(shown, total);
+
+  return (
+    <div className="mt-4 flex min-h-10 items-center justify-between gap-3 border-t border-slate-100 pt-3">
+      <p className="text-xs font-medium text-slate-500">
+        {t("owner.shownCount", {
+          shown: formatCount(clampedShown, intlLocale),
+          total: formatCount(total, intlLocale),
+        })}
+      </p>
+      {clampedShown < total ? (
+        <Button
+          className="h-9 shrink-0 px-3"
+          size="sm"
+          type="button"
+          variant="secondary"
+          onClick={onShowMore}
+        >
+          <ChevronDown className="size-4" aria-hidden />
+          {t("owner.showMore")}
+        </Button>
+      ) : null}
+    </div>
   );
 }
 
@@ -764,6 +814,9 @@ export function OwnerHome({
     dispatchBoard: null,
     refundRequests: [],
   });
+  const [visibleLimits, setVisibleLimits] = useState<BoardVisibleLimits>(
+    INITIAL_OWNER_BOARD_VISIBLE_LIMITS,
+  );
   const [branchId, setBranchId] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<
@@ -791,9 +844,23 @@ export function OwnerHome({
     () => getDispatchSummary(boardState.dispatchBoard),
     [boardState.dispatchBoard],
   );
-  const visibleAppointments = boardState.appointments.slice(0, 5);
-  const visibleTasks = boardState.dispatchBoard?.data.slice(0, 8) ?? [];
-  const visibleRefundRequests = boardState.refundRequests.slice(0, 5);
+  const totalAppointments = boardState.appointments.length;
+  const totalTasks = boardState.dispatchBoard?.data.length ?? 0;
+  const totalRefundRequests = boardState.refundRequests.length;
+  const visibleAppointments = boardState.appointments.slice(
+    0,
+    visibleLimits.appointments,
+  );
+  const visibleTasks = boardState.dispatchBoard?.data.slice(0, visibleLimits.tasks) ?? [];
+  const visibleRefundRequests = boardState.refundRequests.slice(
+    0,
+    visibleLimits.refundRequests,
+  );
+  const shouldShowAppointmentFooter =
+    totalAppointments > INITIAL_OWNER_BOARD_VISIBLE_LIMITS.appointments;
+  const shouldShowTaskFooter = totalTasks > INITIAL_OWNER_BOARD_VISIBLE_LIMITS.tasks;
+  const shouldShowRefundFooter =
+    totalRefundRequests > INITIAL_OWNER_BOARD_VISIBLE_LIMITS.refundRequests;
   const loadTime = formatLoadTime(lastLoadedAt, intlLocale);
   const tenantCurrency = resolveTenantCurrency(summary?.currency ?? currency);
 
@@ -910,6 +977,7 @@ export function OwnerHome({
               dispatchBoard: null,
               refundRequests: refundRequests.data,
             });
+            setVisibleLimits(INITIAL_OWNER_BOARD_VISIBLE_LIMITS);
             setLastLoadedAt(new Date());
           }
         } catch (nextError) {
@@ -950,6 +1018,7 @@ export function OwnerHome({
           dispatchBoard,
           refundRequests: refundRequests.data,
         });
+        setVisibleLimits(INITIAL_OWNER_BOARD_VISIBLE_LIMITS);
         setLastLoadedAt(new Date());
       } catch (nextError) {
         if (signal?.aborted) {
@@ -1280,6 +1349,19 @@ export function OwnerHome({
                 <EmptyState message={t("owner.messages.noAppointments")} />
               )}
             </div>
+            {shouldShowAppointmentFooter ? (
+              <ShowMoreFooter
+                shown={visibleAppointments.length}
+                total={totalAppointments}
+                onShowMore={() =>
+                  setVisibleLimits((current) => ({
+                    ...current,
+                    appointments:
+                      current.appointments + OWNER_BOARD_SHOW_MORE_INCREMENT,
+                  }))
+                }
+              />
+            ) : null}
           </OperationalCard>
 
           <OperationalCard
@@ -1310,6 +1392,18 @@ export function OwnerHome({
                 <EmptyState message={t("owner.messages.noDeliveryTasks")} />
               )}
             </div>
+            {shouldShowTaskFooter ? (
+              <ShowMoreFooter
+                shown={visibleTasks.length}
+                total={totalTasks}
+                onShowMore={() =>
+                  setVisibleLimits((current) => ({
+                    ...current,
+                    tasks: current.tasks + OWNER_BOARD_SHOW_MORE_INCREMENT,
+                  }))
+                }
+              />
+            ) : null}
           </OperationalCard>
 
           <OperationalCard
@@ -1335,6 +1429,19 @@ export function OwnerHome({
                 <EmptyState message={t("owner.messages.noRefunds")} />
               )}
             </div>
+            {shouldShowRefundFooter ? (
+              <ShowMoreFooter
+                shown={visibleRefundRequests.length}
+                total={totalRefundRequests}
+                onShowMore={() =>
+                  setVisibleLimits((current) => ({
+                    ...current,
+                    refundRequests:
+                      current.refundRequests + OWNER_BOARD_SHOW_MORE_INCREMENT,
+                  }))
+                }
+              />
+            ) : null}
           </OperationalCard>
 
           {loadTime ? (

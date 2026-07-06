@@ -495,6 +495,8 @@ export const enMessages = {
     updatedAt: "Updated at {time}",
     appointmentCount: "{count} appointment(s)",
     requestCount: "{count} request(s)",
+    shownCount: "Showing {shown} of {total}",
+    showMore: "Show more",
     deliveryActive: "Delivery service active",
     deliveryInactive: "Delivery service inactive",
     metrics: {

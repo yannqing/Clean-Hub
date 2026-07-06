@@ -491,6 +491,8 @@ export const zhCNMessages = {
     updatedAt: "更新于 {time}",
     appointmentCount: "{count} 个预约",
     requestCount: "{count} 个申请",
+    shownCount: "已显示 {shown} / 共 {total}",
+    showMore: "查看更多",
     deliveryActive: "配送服务已启用",
     deliveryInactive: "配送服务未启用",
     metrics: {

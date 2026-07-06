@@ -496,6 +496,8 @@ export const frMessages = {
     updatedAt: "Mis à jour à {time}",
     appointmentCount: "{count} rendez-vous",
     requestCount: "{count} demandes",
+    shownCount: "{shown} sur {total} affiches",
+    showMore: "Voir plus",
     deliveryActive: "Service livraison actif",
     deliveryInactive: "Service livraison inactif",
     metrics: {
