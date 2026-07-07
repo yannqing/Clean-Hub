@@ -475,7 +475,8 @@ export const tenantMessagesZhCN: TenantMessages = {
     description: "配置渠道偏好与运营模板 Key。",
     updatedBadge: "更新于",
     warningTitle: "未接入配送商。",
-    warningBody: "这些设置仅供初始化保存，本阶段不会发送消息或存储凭证。",
+    warningBody:
+      "请在下方 WhatsApp 区域保存凭证以启用发送。在配送商接入前，消息不会被发送，凭证仅供初始化保存。",
     labels: {
       defaultLanguage: "默认语言",
       channels: "渠道",
@@ -491,6 +492,67 @@ export const tenantMessagesZhCN: TenantMessages = {
     settingsUpdated: "通知设置已更新。",
     unavailable: "通知设置不可用。",
     requestFailed: "通知设置请求失败。",
+
+    credentials: {
+      title: "WhatsApp Business API",
+      description:
+        "绑定 WhatsApp Business 账户以发送订单与配送通知。在配送商接入前，凭证仅供初始化保存。",
+      statusConnected: "已连接",
+      statusNotConnected: "未连接",
+      saveButton: "保存凭证",
+      saving: "保存中...",
+      testConnection: "测试连接",
+      testing: "测试中...",
+      testSuccess: "测试消息已被配送商接受。",
+      testFailed: "测试消息发送失败。",
+      testResultOk: "配送商消息 ID：{messageId}",
+      testRecipientLabel: "测试收件人（E.164 号码）",
+      testRecipientPlaceholder: "+221770000000",
+      tokenMasked: "已存令牌末尾为：{tail}",
+      tokenPlaceholder: "粘贴新的访问令牌以替换",
+      tokenHidden: "已存储令牌，粘贴新值即可替换。",
+      saveSuccess: "WhatsApp 凭证已保存。",
+      requestFailed: "WhatsApp 凭证请求失败。",
+      fields: {
+        wabaId: "WhatsApp Business Account ID",
+        wabaIdPlaceholder: "1029384756102",
+        phoneNumberId: "Phone Number ID",
+        phoneNumberIdPlaceholder: "108000000000000",
+        accessToken: "访问令牌",
+        accessTokenPlaceholder: "EAAG...",
+        templateNamespace: "模板命名空间",
+        templateNamespacePlaceholder: "your_namespace",
+      },
+    },
+
+    templateVariables: {
+      title: "可用变量",
+      availableVars: "可在配送商模板正文中使用。",
+    },
+
+    log: {
+      title: "发送历史",
+      empty: "尚无投递记录。发送测试消息或等待订单事件以填充日志。",
+      requestFailed: "加载发送历史失败。",
+      statusFilter: "状态",
+      channelFilter: "渠道",
+      allStatuses: "全部状态",
+      allChannels: "全部渠道",
+      columns: {
+        sentAt: "发送时间",
+        event: "事件",
+        channel: "渠道",
+        recipient: "收件人",
+        status: "状态",
+        externalId: "消息 ID",
+        failedReason: "失败原因",
+      },
+      statusLabels: {
+        pending: "待发送",
+        sent: "已发送",
+        failed: "失败",
+      },
+    },
   },
 
   backups: {

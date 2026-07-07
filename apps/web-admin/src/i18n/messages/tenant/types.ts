@@ -502,6 +502,66 @@ export type TenantMessages = {
     settingsUpdated: string;
     unavailable: string;
     requestFailed: string;
+
+    credentials: {
+      title: string;
+      description: string;
+      statusConnected: string;
+      statusNotConnected: string;
+      saveButton: string;
+      saving: string;
+      testConnection: string;
+      testing: string;
+      testSuccess: string;
+      testFailed: string;
+      testResultOk: string;
+      testRecipientLabel: string;
+      testRecipientPlaceholder: string;
+      tokenMasked: string;
+      tokenPlaceholder: string;
+      tokenHidden: string;
+      saveSuccess: string;
+      requestFailed: string;
+      fields: {
+        wabaId: string;
+        wabaIdPlaceholder: string;
+        phoneNumberId: string;
+        phoneNumberIdPlaceholder: string;
+        accessToken: string;
+        accessTokenPlaceholder: string;
+        templateNamespace: string;
+        templateNamespacePlaceholder: string;
+      };
+    };
+
+    templateVariables: {
+      title: string;
+      availableVars: string;
+    };
+
+    log: {
+      title: string;
+      empty: string;
+      requestFailed: string;
+      statusFilter: string;
+      channelFilter: string;
+      allStatuses: string;
+      allChannels: string;
+      columns: {
+        sentAt: string;
+        event: string;
+        channel: string;
+        recipient: string;
+        status: string;
+        externalId: string;
+        failedReason: string;
+      };
+      statusLabels: {
+        pending: string;
+        sent: string;
+        failed: string;
+      };
+    };
   };
 
   backups: {

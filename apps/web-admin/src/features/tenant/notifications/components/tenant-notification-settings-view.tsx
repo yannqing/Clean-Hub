@@ -24,11 +24,15 @@ import { useEffect, useState } from "react";
 import { useTenantI18n } from "@/i18n";
 
 import { updateNotificationSettingsAction } from "../actions";
+import { NotificationLogList } from "./notification-log-list";
+import { TemplateVariablesHint } from "./template-variables-hint";
+import { WhatsAppCredentialsForm } from "./whatsapp-credentials-form";
 import {
   emptyNotificationSettingsForm,
   notificationChannelOptions,
   notificationEventOptions,
   notificationLanguageOptions,
+  templateVariableHints,
 } from "../constants";
 import { getNotificationSettingsQuery } from "../queries";
 import type {
@@ -308,6 +312,9 @@ export function TenantNotificationSettingsView() {
                         <p className="mt-1 text-xs text-muted-foreground">
                           {option.value}
                         </p>
+                        <TemplateVariablesHint
+                          variables={templateVariableHints[option.value]}
+                        />
                       </TableCell>
                       <TableCell>
                         <Checkbox
@@ -343,21 +350,16 @@ export function TenantNotificationSettingsView() {
           </div>
         </div>
 
-        <div className="grid gap-3 border-t pt-5">
-          <h2 className="text-sm font-semibold">
-            {m.notifications.sendingHistory}
-          </h2>
-          <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-            {m.notifications.sendingHistoryEmpty}
-          </div>
-        </div>
-
         <div className="flex justify-end border-t pt-5">
           <Button disabled={saving} type="submit">
             {saving ? m.common.saving : m.notifications.saveSettings}
           </Button>
         </div>
       </form>
+
+      <WhatsAppCredentialsForm />
+
+      <NotificationLogList />
     </section>
   );
 }

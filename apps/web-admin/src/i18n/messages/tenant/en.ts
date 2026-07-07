@@ -489,7 +489,7 @@ export const tenantMessagesEn: TenantMessages = {
     updatedBadge: "Updated",
     warningTitle: "Delivery providers are not connected.",
     warningBody:
-      "These settings are saved for setup only. This phase does not send messages or store provider credentials.",
+      "Save credentials in the WhatsApp section below to enable sending. Until a provider is connected, messages are not sent and credentials are stored for setup only.",
     labels: {
       defaultLanguage: "Default language",
       channels: "Channels",
@@ -507,6 +507,68 @@ export const tenantMessagesEn: TenantMessages = {
     settingsUpdated: "Notification settings updated.",
     unavailable: "Notification settings are unavailable.",
     requestFailed: "Notification settings request failed.",
+
+    credentials: {
+      title: "WhatsApp Business API",
+      description:
+        "Connect a WhatsApp Business Account to send order and delivery updates. Credentials are saved for setup only until the provider is wired up.",
+      statusConnected: "Connected",
+      statusNotConnected: "Not connected",
+      saveButton: "Save credentials",
+      saving: "Saving...",
+      testConnection: "Test connection",
+      testing: "Testing...",
+      testSuccess: "Test message accepted by the provider.",
+      testFailed: "Test message failed.",
+      testResultOk: "Provider message id: {messageId}",
+      testRecipientLabel: "Test recipient (E.164 phone)",
+      testRecipientPlaceholder: "+221770000000",
+      tokenMasked: "Stored token ends in: {tail}",
+      tokenPlaceholder: "Paste access token to replace",
+      tokenHidden: "A token is stored. Paste a new value to replace it.",
+      saveSuccess: "WhatsApp credentials saved.",
+      requestFailed: "WhatsApp credential request failed.",
+      fields: {
+        wabaId: "WhatsApp Business Account ID",
+        wabaIdPlaceholder: "1029384756102",
+        phoneNumberId: "Phone Number ID",
+        phoneNumberIdPlaceholder: "108000000000000",
+        accessToken: "Access token",
+        accessTokenPlaceholder: "EAAG...",
+        templateNamespace: "Template namespace",
+        templateNamespacePlaceholder: "your_namespace",
+      },
+    },
+
+    templateVariables: {
+      title: "Available variables",
+      availableVars: "Use these in your provider template body.",
+    },
+
+    log: {
+      title: "Sending history",
+      empty:
+        "No delivery attempts yet. Send a test message or wait for an order event to populate this log.",
+      requestFailed: "Failed to load sending history.",
+      statusFilter: "Status",
+      channelFilter: "Channel",
+      allStatuses: "All statuses",
+      allChannels: "All channels",
+      columns: {
+        sentAt: "Sent at",
+        event: "Event",
+        channel: "Channel",
+        recipient: "Recipient",
+        status: "Status",
+        externalId: "Message ID",
+        failedReason: "Failure reason",
+      },
+      statusLabels: {
+        pending: "Pending",
+        sent: "Sent",
+        failed: "Failed",
+      },
+    },
   },
 
   backups: {
