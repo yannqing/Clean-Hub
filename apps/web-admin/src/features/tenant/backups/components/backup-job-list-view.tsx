@@ -31,6 +31,7 @@ import {
 import type { BackupJobListItem, BackupJobStatus } from "../types";
 import { CreateBackupJobForm } from "./create-backup-job-form";
 import { CreateRestoreRequestForm } from "./create-restore-request-form";
+import { RestoreRequestList } from "./restore-request-list";
 
 type BackupJobListViewProps = {
   initialBackupJobs: BackupJobListItem[];
@@ -47,6 +48,8 @@ export function BackupJobListView({
   const [selectedBackupJobId, setSelectedBackupJobId] = useState<string | null>(
     initialBackupJobs[0]?.id ?? null,
   );
+  // Bumped whenever a restore request is created so <RestoreRequestList> refetches.
+  const [restoreRefreshKey, setRestoreRefreshKey] = useState(0);
 
   const filteredBackupJobs = useMemo(
     () =>
@@ -62,6 +65,10 @@ export function BackupJobListView({
   function handleBackupJobCreated(backupJob: BackupJobListItem) {
     setBackupJobs((current) => [backupJob, ...current]);
     setSelectedBackupJobId(backupJob.id);
+  }
+
+  function handleRestoreRequestCreated() {
+    setRestoreRefreshKey((current) => current + 1);
   }
 
   function getStatusVariant(status: BackupJobStatus) {
@@ -200,7 +207,13 @@ export function BackupJobListView({
       </Card>
 
       {selectedBackupJob ? (
-        <CreateRestoreRequestForm backupJobId={selectedBackupJob.id} />
+        <>
+          <CreateRestoreRequestForm
+            backupJobId={selectedBackupJob.id}
+            onCreated={handleRestoreRequestCreated}
+          />
+          <RestoreRequestList refreshKey={restoreRefreshKey} />
+        </>
       ) : (
         <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
           {m.backups.selectHint}

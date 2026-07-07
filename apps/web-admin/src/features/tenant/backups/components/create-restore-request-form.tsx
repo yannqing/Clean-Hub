@@ -9,10 +9,13 @@ import { createTenantRestoreRequestAction } from "../actions";
 
 type CreateRestoreRequestFormProps = {
   backupJobId: string;
+  /** Called after a successful submit so the parent can refresh its list. */
+  onCreated?: () => void;
 };
 
 export function CreateRestoreRequestForm({
   backupJobId,
+  onCreated,
 }: CreateRestoreRequestFormProps) {
   const { m } = useTenantI18n();
   const [reason, setReason] = useState("");
@@ -29,6 +32,7 @@ export function CreateRestoreRequestForm({
     if (result.ok) {
       toast.success(m.backups.restoreRequest.submittedToast);
       setReason("");
+      onCreated?.();
     } else {
       toast.error(result.error);
     }

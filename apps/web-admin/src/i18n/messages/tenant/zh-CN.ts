@@ -634,5 +634,22 @@ export const tenantMessagesZhCN: TenantMessages = {
       action: "提交恢复请求",
       submittedToast: "恢复请求已提交。",
     },
+    restoreStatusLabels: {
+      pending: "待审核",
+      approved: "已批准",
+      rejected: "已拒绝",
+      completed: "已完成",
+      cancelled: "已取消",
+    },
+    restoreList: {
+      title: "恢复请求",
+      empty: "尚无恢复请求。提交的请求将显示在此处。",
+      requestFailed: "加载恢复请求失败。",
+      columns: {
+        created: "创建时间",
+        status: "状态",
+        reason: "原因",
+      },
+    },
   },
 };

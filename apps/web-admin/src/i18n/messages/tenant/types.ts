@@ -642,5 +642,22 @@ export type TenantMessages = {
       action: string;
       submittedToast: string;
     };
+    restoreStatusLabels: {
+      pending: string;
+      approved: string;
+      rejected: string;
+      completed: string;
+      cancelled: string;
+    };
+    restoreList: {
+      title: string;
+      empty: string;
+      requestFailed: string;
+      columns: {
+        created: string;
+        status: string;
+        reason: string;
+      };
+    };
   };
 };

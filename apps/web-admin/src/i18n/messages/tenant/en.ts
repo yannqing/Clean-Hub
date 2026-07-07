@@ -652,5 +652,22 @@ export const tenantMessagesEn: TenantMessages = {
       action: "Submit restore request",
       submittedToast: "Restore request submitted.",
     },
+    restoreStatusLabels: {
+      pending: "Pending",
+      approved: "Approved",
+      rejected: "Rejected",
+      completed: "Completed",
+      cancelled: "Cancelled",
+    },
+    restoreList: {
+      title: "Restore requests",
+      empty: "No restore requests yet. Submitted requests appear here.",
+      requestFailed: "Failed to load restore requests.",
+      columns: {
+        created: "Created",
+        status: "Status",
+        reason: "Reason",
+      },
+    },
   },
 };
