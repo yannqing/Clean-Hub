@@ -117,6 +117,7 @@ export const zhCNMessages = {
         done: "已完成",
       },
       payment: {
+        unpaid: "未支付",
         pending: "待支付",
         paid: "已支付",
         partial: "部分支付",

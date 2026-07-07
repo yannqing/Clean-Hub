@@ -51,6 +51,7 @@ import {
   getNextOverviewItem,
   getOrderBalance,
   getOrderStatusView,
+  getPaymentStatusLabel,
   getReadyForPickupCount,
   getRefundStatusView,
   getTicketStatusView,
@@ -559,7 +560,10 @@ function ActivityDetailPanel({
         <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
           <DetailTerm label={t("customer.detail.total")} value={formatMoney(detail.data.totalAmount)} />
           <DetailTerm label={t("customer.detail.paid")} value={formatMoney(detail.data.paidAmount)} />
-          <DetailTerm label={t("customer.detail.payment")} value={detail.data.paymentStatus} />
+          <DetailTerm
+            label={t("customer.detail.payment")}
+            value={getPaymentStatusLabel(t, detail.data.paymentStatus)}
+          />
           <DetailTerm
             label={t("customer.detail.created")}
             value={formatDateTime(detail.data.createdAt, intlLocale)}

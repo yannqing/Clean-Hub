@@ -10,12 +10,25 @@ import {
   saveTenantCode,
 } from "@/lib/token-storage";
 
+function isSessionExpired(refreshTokenExpiresAt: string): boolean {
+  const expiresAt = new Date(refreshTokenExpiresAt).getTime();
+
+  return Number.isFinite(expiresAt) && expiresAt <= Date.now();
+}
+
 export async function loadStoredAuthState() {
-  const [tenantCode, session, deviceId] = await Promise.all([
+  const [tenantCode, storedSession, deviceId] = await Promise.all([
     getTenantCode(),
     getMobileSession(),
     getOrCreateDeviceId(),
   ]);
+
+  let session = storedSession;
+
+  if (session && isSessionExpired(session.refreshTokenExpiresAt)) {
+    await clearMobileSession();
+    session = null;
+  }
 
   return {
     tenantCode,

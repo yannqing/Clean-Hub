@@ -663,8 +663,14 @@ export class DeliveryRepository {
           "cancelled",
         ]);
     const rows = await this.db
-      .select({ ...getTableColumns(deliveryTasks) })
+      .select({
+        ...getTableColumns(deliveryTasks),
+        assigneeDisplayName: userProfiles.displayName,
+        assigneeEmail: users.email,
+      })
       .from(deliveryTasks)
+      .leftJoin(users, eq(users.id, deliveryTasks.assigneeUserId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
       .where(
         and(
           eq(deliveryTasks.tenantId, input.tenantId),

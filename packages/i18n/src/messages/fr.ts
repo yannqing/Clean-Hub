@@ -118,6 +118,7 @@ export const frMessages = {
         done: "Termine",
       },
       payment: {
+        unpaid: "Non payee",
         pending: "En attente",
         paid: "Payee",
         partial: "Partiel",

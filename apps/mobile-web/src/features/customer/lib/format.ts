@@ -243,6 +243,21 @@ export const appointmentTypeKeys: Record<MobileCustomerAppointmentType, Translat
   dropoff: "customer.appointmentTypes.dropoff",
 };
 
+const paymentStatusKeys: Record<string, TranslationKey> = {
+  unpaid: "customer.status.payment.unpaid",
+  pending: "customer.status.payment.pending",
+  paid: "customer.status.payment.paid",
+  partial: "customer.status.payment.partial",
+  failed: "customer.status.payment.failed",
+  refunded: "customer.status.payment.refunded",
+};
+
+export function getPaymentStatusLabel(t: Translator, status: string): string {
+  const key = paymentStatusKeys[status];
+
+  return key ? t(key) : status;
+}
+
 export function formatDateTime(value: string | null, locale = "fr-FR"): string {
   if (!value) {
     return "";
@@ -366,7 +381,7 @@ export function getActivityItems(
     kind: "order",
     id: order.id,
     title: t("customer.detail.orderPrefix", { id: order.id.slice(-6).toUpperCase() }),
-    subtitle: `${t("customer.detail.payment")} ${order.paymentStatus}`,
+    subtitle: `${t("customer.detail.payment")} ${getPaymentStatusLabel(t, order.paymentStatus)}`,
     status: order.status,
     createdAt: order.createdAt,
     amount: order.totalAmount,

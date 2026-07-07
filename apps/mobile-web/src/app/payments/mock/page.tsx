@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { Button } from "@cleanhub/ui";
@@ -19,22 +20,6 @@ const statusLabelKeys = {
   failed: "customer.status.payment.failed",
   refunded: "customer.status.payment.refunded",
 } satisfies Record<Exclude<PaymentState, "unknown">, TranslationKey>;
-
-function getPaymentId(): string {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  return new URLSearchParams(window.location.search).get("paymentId") ?? "";
-}
-
-function getExternalId(): string {
-  if (typeof window === "undefined") {
-    return "";
-  }
-
-  return new URLSearchParams(window.location.search).get("externalId") ?? "";
-}
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -82,9 +67,19 @@ function statusCopy(status: PaymentState): {
 }
 
 export default function MockPaymentPage() {
+  // useSearchParams needs a Suspense boundary under static export.
+  return (
+    <Suspense fallback={null}>
+      <MockPaymentView />
+    </Suspense>
+  );
+}
+
+function MockPaymentView() {
   const { t } = useTranslation();
-  const [paymentId] = useState(getPaymentId);
-  const [externalId] = useState(getExternalId);
+  const searchParams = useSearchParams();
+  const paymentId = searchParams.get("paymentId") ?? "";
+  const externalId = searchParams.get("externalId") ?? "";
   const [status, setStatus] = useState<PaymentState>("pending");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);

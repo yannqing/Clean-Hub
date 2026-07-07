@@ -118,6 +118,7 @@ export const enMessages = {
         done: "Done",
       },
       payment: {
+        unpaid: "Unpaid",
         pending: "Pending",
         paid: "Paid",
         partial: "Partial",

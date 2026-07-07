@@ -25,9 +25,14 @@ export async function openExternalUrl(url: string): Promise<void> {
     return;
   }
 
-  const opened = window.open(url, "_blank", "noopener,noreferrer");
+  // Passing "noopener" makes window.open always return null, which would make
+  // the popup-blocked fallback fire even on success; detach opener manually.
+  const opened = window.open(url, "_blank");
 
-  if (!opened) {
-    window.location.assign(url);
+  if (opened) {
+    opened.opener = null;
+    return;
   }
+
+  window.location.assign(url);
 }
