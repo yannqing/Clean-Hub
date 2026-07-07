@@ -21,6 +21,8 @@ import {
 } from "@cleanhub/ui";
 import { useEffect, useState } from "react";
 
+import { useTenantI18n } from "@/i18n";
+
 import { updateNotificationSettingsAction } from "../actions";
 import {
   emptyNotificationSettingsForm,
@@ -37,10 +39,8 @@ import type {
   TenantNotificationSettings,
 } from "../types";
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Notification settings request failed.";
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function toFormValues(
@@ -53,14 +53,8 @@ function toFormValues(
   };
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
 export function TenantNotificationSettingsView() {
+  const { m, formatDateTime } = useTenantI18n();
   const [settings, setSettings] = useState<TenantNotificationSettings | null>(
     null,
   );
@@ -85,7 +79,7 @@ export function TenantNotificationSettingsView() {
       })
       .catch((error: unknown) => {
         if (isCurrent) {
-          setLoadError(getErrorMessage(error));
+          setLoadError(getErrorMessage(error, m.notifications.requestFailed));
         }
       })
       .finally(() => {
@@ -97,7 +91,7 @@ export function TenantNotificationSettingsView() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [m.notifications.requestFailed]);
 
   async function reloadSettings() {
     setLoading(true);
@@ -108,7 +102,7 @@ export function TenantNotificationSettingsView() {
       setSettings(data);
       setForm(toFormValues(data));
     } catch (error) {
-      setLoadError(getErrorMessage(error));
+      setLoadError(getErrorMessage(error, m.notifications.requestFailed));
     } finally {
       setLoading(false);
     }
@@ -168,9 +162,9 @@ export function TenantNotificationSettingsView() {
       setSettings(result.data);
       setForm(toFormValues(result.data));
       setErrors({});
-      toast.success("Notification settings updated.");
+      toast.success(m.notifications.settingsUpdated);
     } catch (error) {
-      toast.error(getErrorMessage(error));
+      toast.error(getErrorMessage(error, m.notifications.requestFailed));
     } finally {
       setSaving(false);
     }
@@ -189,10 +183,10 @@ export function TenantNotificationSettingsView() {
     return (
       <section className="grid gap-3 p-5">
         <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-          {loadError ?? "Notification settings are unavailable."}
+          {loadError ?? m.notifications.unavailable}
         </div>
         <Button className="w-fit" onClick={reloadSettings} type="button" variant="outline">
-          Try again
+          {m.common.tryAgain}
         </Button>
       </section>
     );
@@ -202,32 +196,34 @@ export function TenantNotificationSettingsView() {
     <section className="grid gap-6 p-5">
       <div className="flex flex-col gap-3 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">Tenant communications</Badge>
+          <Badge variant="secondary">{m.notifications.eyebrow}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Notification settings
+            {m.notifications.title}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Configure channel preferences and operational template keys.
+            {m.notifications.description}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline">v{settings.version}</Badge>
-          <Badge variant="outline">Updated {formatDate(settings.updatedAt)}</Badge>
+          <Badge variant="outline">
+            {m.notifications.updatedBadge}{" "}
+            {formatDateTime(settings.updatedAt)}
+          </Badge>
         </div>
       </div>
 
       <div className="rounded-md border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
-        <p className="font-semibold">Delivery providers are not connected.</p>
-        <p className="mt-1">
-          These settings are saved for setup only. This phase does not send
-          messages or store provider credentials.
-        </p>
+        <p className="font-semibold">{m.notifications.warningTitle}</p>
+        <p className="mt-1">{m.notifications.warningBody}</p>
       </div>
 
       <form className="grid gap-6" onSubmit={handleSubmit}>
         <div className="grid gap-5 lg:grid-cols-[260px_1fr]">
           <div className="grid content-start gap-2">
-            <Label htmlFor="notification-language">Default language</Label>
+            <Label htmlFor="notification-language">
+              {m.notifications.labels.defaultLanguage}
+            </Label>
             <Select
               disabled={saving}
               onValueChange={(value) =>
@@ -249,7 +245,9 @@ export function TenantNotificationSettingsView() {
           </div>
 
           <div className="grid gap-3">
-            <h2 className="text-sm font-semibold">Channels</h2>
+            <h2 className="text-sm font-semibold">
+              {m.notifications.labels.channels}
+            </h2>
             <div className="grid gap-3 md:grid-cols-3">
               {notificationChannelOptions.map((option) => (
                 <label
@@ -279,19 +277,24 @@ export function TenantNotificationSettingsView() {
 
         <div className="grid gap-3">
           <div>
-            <h2 className="text-sm font-semibold">Templates</h2>
+            <h2 className="text-sm font-semibold">
+              {m.notifications.labels.templates}
+            </h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              Template keys identify the content that future delivery
-              integrations will use.
+              {m.notifications.templatesDesc}
             </p>
           </div>
           <div className="overflow-hidden rounded-md border">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Event</TableHead>
-                  <TableHead className="w-28">Enabled</TableHead>
-                  <TableHead>Template key</TableHead>
+                  <TableHead>{m.notifications.labels.event}</TableHead>
+                  <TableHead className="w-28">
+                    {m.notifications.labels.enabled}
+                  </TableHead>
+                  <TableHead>
+                    {m.notifications.labels.templateKey}
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -341,16 +344,17 @@ export function TenantNotificationSettingsView() {
         </div>
 
         <div className="grid gap-3 border-t pt-5">
-          <h2 className="text-sm font-semibold">Sending history</h2>
+          <h2 className="text-sm font-semibold">
+            {m.notifications.sendingHistory}
+          </h2>
           <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-            No messages have been sent. Sending records will appear here after
-            a delivery provider is integrated.
+            {m.notifications.sendingHistoryEmpty}
           </div>
         </div>
 
         <div className="flex justify-end border-t pt-5">
           <Button disabled={saving} type="submit">
-            {saving ? "Saving..." : "Save settings"}
+            {saving ? m.common.saving : m.notifications.saveSettings}
           </Button>
         </div>
       </form>
