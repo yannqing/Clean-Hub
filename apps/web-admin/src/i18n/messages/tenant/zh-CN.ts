@@ -337,6 +337,16 @@ export const tenantMessagesZhCN: TenantMessages = {
       to: "结束日期",
       branchId: "门店 ID",
       branchPlaceholder: "可选的门店 ULID",
+      preset: "日期范围",
+    },
+    presets: {
+      none: "自定义范围",
+      today: "今天",
+      yesterday: "昨天",
+      thisWeek: "本周",
+      lastWeek: "上周",
+      thisMonth: "本月",
+      lastMonth: "上月",
     },
     applyFilters: "应用筛选",
     cards: {
@@ -346,10 +356,34 @@ export const tenantMessagesZhCN: TenantMessages = {
       inProgress: "进行中",
     },
     paymentBreakdown: "支付明细",
+    paymentMethodLabels: {
+      cash: "现金",
+      mobile: "移动支付",
+      card: "银行卡",
+      other: "其它",
+    },
     exports: "导出",
     exportButtons: {
-      export: "导出",
-      zReport: "Z 单",
+      export: "导出 CSV",
+      zReport: "Z 单 (CSV)",
+    },
+    exportToasts: {
+      exported: "报表已导出为 CSV。",
+      zReportExported: "Z 单已导出为 CSV。",
+      failed: "导出失败。",
+      noData: "无可导出数据，请先加载报表。",
+    },
+    csv: {
+      metricHeader: "指标",
+      valueHeader: "数值",
+      generatedAt: "生成时间",
+    },
+    zReport: {
+      title: "Z 单 — 每日结账",
+      storeName: "门店",
+      period: "周期",
+      generatedAt: "生成时间",
+      totals: "合计",
     },
   },
 

@@ -349,6 +349,16 @@ export type TenantMessages = {
       to: string;
       branchId: string;
       branchPlaceholder: string;
+      preset: string;
+    };
+    presets: {
+      none: string;
+      today: string;
+      yesterday: string;
+      thisWeek: string;
+      lastWeek: string;
+      thisMonth: string;
+      lastMonth: string;
     };
     applyFilters: string;
     cards: {
@@ -358,10 +368,34 @@ export type TenantMessages = {
       inProgress: string;
     };
     paymentBreakdown: string;
+    paymentMethodLabels: {
+      cash: string;
+      mobile: string;
+      card: string;
+      other: string;
+    };
     exports: string;
     exportButtons: {
       export: string;
       zReport: string;
+    };
+    exportToasts: {
+      exported: string;
+      zReportExported: string;
+      failed: string;
+      noData: string;
+    };
+    csv: {
+      metricHeader: string;
+      valueHeader: string;
+      generatedAt: string;
+    };
+    zReport: {
+      title: string;
+      storeName: string;
+      period: string;
+      generatedAt: string;
+      totals: string;
     };
   };
 

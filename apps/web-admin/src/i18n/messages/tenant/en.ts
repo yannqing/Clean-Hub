@@ -346,6 +346,16 @@ export const tenantMessagesEn: TenantMessages = {
       to: "To",
       branchId: "Branch ID",
       branchPlaceholder: "Optional branch ULID",
+      preset: "Date range",
+    },
+    presets: {
+      none: "Custom range",
+      today: "Today",
+      yesterday: "Yesterday",
+      thisWeek: "This week",
+      lastWeek: "Last week",
+      thisMonth: "This month",
+      lastMonth: "Last month",
     },
     applyFilters: "Apply filters",
     cards: {
@@ -355,10 +365,34 @@ export const tenantMessagesEn: TenantMessages = {
       inProgress: "In Progress",
     },
     paymentBreakdown: "Payment Breakdown",
+    paymentMethodLabels: {
+      cash: "Cash",
+      mobile: "Mobile money",
+      card: "Card",
+      other: "Other",
+    },
     exports: "Exports",
     exportButtons: {
-      export: "Export",
-      zReport: "Z Report",
+      export: "Export CSV",
+      zReport: "Z Report (CSV)",
+    },
+    exportToasts: {
+      exported: "Report exported as CSV.",
+      zReportExported: "Z Report exported as CSV.",
+      failed: "Export failed.",
+      noData: "Nothing to export — load a report first.",
+    },
+    csv: {
+      metricHeader: "Metric",
+      valueHeader: "Value",
+      generatedAt: "Generated at",
+    },
+    zReport: {
+      title: "Z Report — Daily Close-out",
+      storeName: "Store",
+      period: "Period",
+      generatedAt: "Generated at",
+      totals: "Totals",
     },
   },
 
