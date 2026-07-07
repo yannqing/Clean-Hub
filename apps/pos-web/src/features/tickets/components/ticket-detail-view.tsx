@@ -1,6 +1,7 @@
 "use client";
 
-import { toast } from "@cleanhub/ui";
+import { useTranslation } from "@cleanhub/i18n/react";
+import { posToast as toast } from "@/lib/pos-toast";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -41,6 +42,7 @@ export function TicketDetailView({
   ticket,
   relatedOrders,
 }: TicketDetailViewProps) {
+  const { locale } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -82,7 +84,8 @@ export function TicketDetailView({
               <TicketPriorityBadge priority={ticket.priority} />
             </div>
             <div className="mt-1 text-sm text-slate-500">
-              工单 ID：{ticket.id} · 创建于 {formatTicketDateTime(ticket.createdAt)}
+              工单 ID：{ticket.id} · 创建于{" "}
+              {formatTicketDateTime(ticket.createdAt, locale)}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -134,7 +137,7 @@ export function TicketDetailView({
           />
           <HeaderMetric
             label="预计取件"
-            value={formatTicketDateTime(ticket.expectedPickupAt)}
+            value={formatTicketDateTime(ticket.expectedPickupAt, locale)}
             note={ticket.expectedPickupAt ? "请按时完成" : TICKET_EMPTY_PLACEHOLDER}
           />
           <HeaderMetric
@@ -169,15 +172,15 @@ export function TicketDetailView({
                 <Detail label="来源渠道" value={TICKET_SOURCE_LABELS[ticket.sourceChannel]} />
                 <Detail
                   label="预计取件"
-                  value={formatTicketDateTime(ticket.expectedPickupAt)}
+                  value={formatTicketDateTime(ticket.expectedPickupAt, locale)}
                 />
                 <Detail
                   label="完成时间"
-                  value={formatTicketDateTime(ticket.completedAt)}
+                  value={formatTicketDateTime(ticket.completedAt, locale)}
                 />
                 <Detail
                   label="取消时间"
-                  value={formatTicketDateTime(ticket.cancelledAt)}
+                  value={formatTicketDateTime(ticket.cancelledAt, locale)}
                 />
                 <Detail
                   label="备注"
@@ -227,11 +230,11 @@ export function TicketDetailView({
               />
               <Detail
                 label="创建时间"
-                value={formatTicketDateTime(ticket.createdAt)}
+                value={formatTicketDateTime(ticket.createdAt, locale)}
               />
               <Detail
                 label="最后更新"
-                value={formatTicketDateTime(ticket.updatedAt)}
+                value={formatTicketDateTime(ticket.updatedAt, locale)}
               />
             </dl>
           </section>

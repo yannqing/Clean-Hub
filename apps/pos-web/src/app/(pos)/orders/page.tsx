@@ -15,10 +15,12 @@ import {
   type OrderDateFilter,
 } from "@/features/orders/constants";
 import {
+  OrderCreateDialog,
   OrderMetrics,
   OrdersTable,
   OrdersToolbar,
 } from "@/features/orders/components";
+import { getMyBranchQuery } from "@/features/branches/queries";
 import {
   getOrderOverviewQuery,
   getOrdersListQuery,
@@ -136,9 +138,10 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   const query = buildOrderListQuery(normalized);
   const overviewPeriod = buildOverviewPeriod(normalized);
 
-  const [list, overview] = await Promise.all([
+  const [list, overview, branch] = await Promise.all([
     getOrdersListQuery(query),
     getOrderOverviewQuery({ period: overviewPeriod }),
+    getMyBranchQuery().catch(() => null),
   ]);
 
   return (
@@ -163,6 +166,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
             <Icon className="h-4 w-4 text-slate-400" name="wallet-cards" />
             本期仅开放现金收款
           </div>
+          <OrderCreateDialog defaultBranchId={branch?.id} />
         </div>
       </div>
 

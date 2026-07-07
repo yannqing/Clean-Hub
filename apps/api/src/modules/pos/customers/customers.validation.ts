@@ -53,6 +53,18 @@ export const listPosCustomersQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+export const listPosAccountProfilesQuerySchema = z.object({
+  q: z.string().trim().max(200).optional(),
+  limit: z.coerce.number().int().positive().max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const listPosCustomerServiceItemsQuerySchema = z.object({
+  q: z.string().trim().max(200).optional(),
+  limit: z.coerce.number().int().positive().max(1000).default(1000),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
 export const posAccountIdParamsSchema = z.object({
   accountId: ulidSchema,
 });

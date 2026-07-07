@@ -1,48 +1,61 @@
 import type { PosIconName } from "@/components/app-shell/icons";
+import type { TranslationKey } from "@cleanhub/i18n";
 
 import { posRoutes } from "./routes";
 
 export type PosNavItem = {
-  label: string;
+  labelKey: TranslationKey;
   href: string;
   icon: PosIconName;
 };
 
 export type PosNavSection = {
-  title: string;
+  titleKey: TranslationKey;
   items: PosNavItem[];
 };
 
 export const posSidebarNavigation: PosNavSection[] = [
   {
-    title: "业务操作",
+    titleKey: "pos.nav.operations",
     items: [
-      { label: "工作台", href: posRoutes.workspace, icon: "layout-dashboard" },
-      { label: "客户接待", href: posRoutes.newIntake, icon: "user-plus" },
-      { label: "扫描标签", href: posRoutes.scan, icon: "scan-line" },
+      {
+        labelKey: "pos.nav.workspace",
+        href: posRoutes.workspace,
+        icon: "layout-dashboard",
+      },
+      { labelKey: "pos.nav.newIntake", href: posRoutes.newIntake, icon: "user-plus" },
+      { labelKey: "pos.nav.scan", href: posRoutes.scan, icon: "scan-line" },
     ],
   },
   {
-    title: "业务记录",
+    titleKey: "pos.nav.records",
     items: [
-      { label: "客户管理", href: posRoutes.customers, icon: "users" },
-      { label: "工单管理", href: posRoutes.tickets, icon: "clipboard-list" },
-      { label: "订单管理", href: posRoutes.orders, icon: "receipt" },
-      { label: "统计数据", href: posRoutes.statistics, icon: "chart" },
-      { label: "衣物管理", href: posRoutes.garments, icon: "shirt" },
+      { labelKey: "pos.nav.customers", href: posRoutes.customers, icon: "users" },
+      {
+        labelKey: "pos.nav.tickets",
+        href: posRoutes.tickets,
+        icon: "clipboard-list",
+      },
+      { labelKey: "pos.nav.orders", href: posRoutes.orders, icon: "receipt" },
+      { labelKey: "pos.nav.statistics", href: posRoutes.statistics, icon: "chart" },
+      { labelKey: "pos.nav.garments", href: posRoutes.garments, icon: "shirt" },
     ],
   },
   {
-    title: "门店",
+    titleKey: "pos.nav.store",
     items: [
-      { label: "店员交接", href: posRoutes.shiftHandover, icon: "replace" },
-      { label: "通知中心", href: posRoutes.notifications, icon: "bell" },
-      { label: "设置", href: posRoutes.settings, icon: "settings" },
+      {
+        labelKey: "pos.nav.shiftHandover",
+        href: posRoutes.shiftHandover,
+        icon: "replace",
+      },
+      { labelKey: "pos.nav.notifications", href: posRoutes.notifications, icon: "bell" },
+      { labelKey: "pos.nav.settings", href: posRoutes.settings, icon: "settings" },
     ],
   },
 ];
 
 export const posShellCopy = {
   brandName: "CleanHub",
-  brandSuffix: "POS",
+  brandSuffixKey: "pos.app.brandSuffix",
 } as const;

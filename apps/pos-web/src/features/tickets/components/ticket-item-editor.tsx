@@ -1,6 +1,7 @@
 "use client";
 
-import { toast, Combobox } from "@cleanhub/ui";
+import { posToast as toast } from "@/lib/pos-toast";
+import { Combobox } from "@cleanhub/ui";
 import { useState, useTransition } from "react";
 
 import { Icon } from "@/components/app-shell";

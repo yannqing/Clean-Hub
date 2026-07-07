@@ -20,7 +20,10 @@ import {
   getTicketsListQuery,
 } from "@/features/tickets/queries";
 import type { TicketListDateFilter } from "@/features/tickets/types";
-import type { ServiceTicketStatus } from "@cleanhub/api-client";
+import type {
+  ServiceTicketListQuery,
+  ServiceTicketStatus,
+} from "@cleanhub/api-client";
 
 type TicketsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -36,7 +39,13 @@ type TicketsPageProps = {
 async function buildTicketListQuery(
   searchParams: Record<string, string | string[] | undefined>,
   currentUserId?: string,
-) {
+): Promise<{
+  current: ServiceTicketListQuery;
+  counts: {
+    mine: ServiceTicketListQuery;
+    all: ServiceTicketListQuery;
+  };
+}> {
   const get = (key: string): string | undefined => {
     const raw = searchParams[key];
     return Array.isArray(raw) ? raw[0] : raw;
@@ -76,18 +85,40 @@ async function buildTicketListQuery(
       ? [status]
       : undefined;
 
-  return {
+  const sharedFilters: Omit<
+    ServiceTicketListQuery,
+    "assistantId" | "limit" | "offset"
+  > = {
     q,
     status: statuses,
     ticketType: type,
     priority,
-    assistantId: scope === "mine" ? currentUserId : undefined,
     expectedPickupAfter:
       date === "overdue" ? undefined : expectedPickupAfter,
     expectedPickupBefore:
       date === "overdue" ? now.toISOString() : expectedPickupBefore,
-    limit: pageSize,
-    offset: (page - 1) * pageSize,
+  };
+
+  return {
+    current: {
+      ...sharedFilters,
+      assistantId: scope === "mine" ? currentUserId : undefined,
+      limit: pageSize,
+      offset: (page - 1) * pageSize,
+    },
+    counts: {
+      mine: {
+        ...sharedFilters,
+        assistantId: currentUserId,
+        limit: 1,
+        offset: 0,
+      },
+      all: {
+        ...sharedFilters,
+        limit: 1,
+        offset: 0,
+      },
+    },
   };
 }
 
@@ -100,8 +131,10 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
 
   const query = await buildTicketListQuery(normalized, user?.userId);
 
-  const [list, overview] = await Promise.all([
-    getTicketsListQuery(query),
+  const [list, mineCountResult, allCountResult, overview] = await Promise.all([
+    getTicketsListQuery(query.current),
+    getTicketsListQuery(query.counts.mine),
+    getTicketsListQuery(query.counts.all),
     getTicketOverviewQuery({}),
   ]);
 
@@ -135,10 +168,9 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
 
       <Suspense fallback={null}>
         <TicketsToolbar
-          // "mine" count is only meaningful under the mine scope; under "all"
-          // we show the full total. Both now come from the page-agnostic total.
-          mineCount={query.assistantId ? total : undefined}
-          totalCount={total}
+          allCount={allCountResult.total}
+          currentCount={total}
+          mineCount={mineCountResult.total}
         />
       </Suspense>
 

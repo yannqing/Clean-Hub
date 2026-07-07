@@ -1,5 +1,6 @@
 "use client";
 
+import { posToast as toast } from "@/lib/pos-toast";
 import { useState } from "react";
 
 import {
@@ -8,7 +9,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  toast,
 } from "@cleanhub/ui";
 
 import { CUSTOMER_PROFILE_RELATIONSHIPS, EMPTY_PROFILE_FORM } from "../constants";

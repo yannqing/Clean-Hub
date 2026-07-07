@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslation } from "@cleanhub/i18n/react";
 
 import { Icon } from "@/components/app-shell";
 import { posRoutes } from "@/config";
@@ -30,6 +33,8 @@ type TicketsTableProps = {
  * `page` and `pageSize` URL params, so the server component re-fetches.
  */
 export function TicketsTable({ tickets, total }: TicketsTableProps) {
+  const { locale } = useTranslation();
+
   if (tickets.length === 0) {
     return <TicketsEmptyState />;
   }
@@ -56,7 +61,7 @@ export function TicketsTable({ tickets, total }: TicketsTableProps) {
             <div className="text-right">操作</div>
           </div>
           {tickets.map((ticket) => (
-            <TicketRow key={ticket.id} ticket={ticket} />
+            <TicketRow key={ticket.id} locale={locale} ticket={ticket} />
           ))}
         </div>
       </div>
@@ -65,7 +70,13 @@ export function TicketsTable({ tickets, total }: TicketsTableProps) {
   );
 }
 
-function TicketRow({ ticket }: { ticket: ServiceTicketSummary }) {
+function TicketRow({
+  locale,
+  ticket,
+}: {
+  locale: string;
+  ticket: ServiceTicketSummary;
+}) {
   const overdue = isOverdue(ticket);
   const detailHref = posRoutes.ticketDetail(ticket.id);
   const sourceLabel = TICKET_SOURCE_LABELS[ticket.sourceChannel];
@@ -103,7 +114,7 @@ function TicketRow({ ticket }: { ticket: ServiceTicketSummary }) {
             overdue ? "text-red-700" : "text-slate-700"
           }`}
         >
-          {formatTicketDateTime(ticket.expectedPickupAt)}
+          {formatTicketDateTime(ticket.expectedPickupAt, locale)}
         </div>
         {overdue ? (
           <div className="mt-1 text-[11px] font-semibold text-red-600">

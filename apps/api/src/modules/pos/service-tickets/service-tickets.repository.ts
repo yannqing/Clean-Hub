@@ -4,8 +4,10 @@ import {
   desc,
   eq,
   gt,
+  gte,
   inArray,
   isNull,
+  lt,
   lte,
   or,
   sql,
@@ -295,9 +297,18 @@ function buildServiceTicketFilters(input: ServiceTicketListInput): SQL[] {
     filters.push(
       or(
         sql`${serviceTickets.ticketNo} ilike ${query} escape '\\'`,
+        sql`${serviceTickets.ticketType}::text ilike ${query} escape '\\'`,
         sql`${customers.fullName} ilike ${query} escape '\\'`,
       )!,
     );
+  }
+
+  if (input.createdAfter) {
+    filters.push(gte(serviceTickets.createdAt, new Date(input.createdAfter)));
+  }
+
+  if (input.createdBefore) {
+    filters.push(lt(serviceTickets.createdAt, new Date(input.createdBefore)));
   }
 
   if (input.expectedPickupBefore) {

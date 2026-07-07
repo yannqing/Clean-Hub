@@ -10,9 +10,11 @@ import {
   createPosProfile,
   deletePosAccount,
   deletePosProfile,
+  getPosCustomerOrderStats,
   getPosAccount,
   getPosProfile,
   getPosProfilesByAccount,
+  listPosCustomerServiceItems,
   listPosCustomers,
   updatePosAccount,
   updatePosProfile,
@@ -21,6 +23,8 @@ import {
   changePosCustomerStatusBodySchema,
   createPosAccountBodySchema,
   createPosProfileBodySchema,
+  listPosAccountProfilesQuerySchema,
+  listPosCustomerServiceItemsQuerySchema,
   listPosCustomersQuerySchema,
   posAccountIdParamsSchema,
   posCustomerIdParamsSchema,
@@ -62,6 +66,50 @@ export async function getPosProfileController(c: Context<AppBindings>) {
     });
 
     return c.json(profile);
+  } catch (error) {
+    if (error instanceof PosCustomerError) {
+      return createPosCustomerErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function getPosCustomerOrderStatsController(
+  c: Context<AppBindings>,
+) {
+  const params = posCustomerIdParamsSchema.parse(c.req.param());
+
+  try {
+    const stats = await getPosCustomerOrderStats({
+      authContext: c.get("authContext"),
+      customerId: params.customerId,
+    });
+
+    return c.json(stats);
+  } catch (error) {
+    if (error instanceof PosCustomerError) {
+      return createPosCustomerErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function listPosCustomerServiceItemsController(
+  c: Context<AppBindings>,
+) {
+  const params = posCustomerIdParamsSchema.parse(c.req.param());
+  const query = listPosCustomerServiceItemsQuerySchema.parse(c.req.query());
+
+  try {
+    const result = await listPosCustomerServiceItems({
+      authContext: c.get("authContext"),
+      customerId: params.customerId,
+      query,
+    });
+
+    return c.json(result);
   } catch (error) {
     if (error instanceof PosCustomerError) {
       return createPosCustomerErrorResponse(c, error);
@@ -162,14 +210,16 @@ export async function getPosProfilesByAccountController(
   c: Context<AppBindings>,
 ) {
   const params = posAccountIdParamsSchema.parse(c.req.param());
+  const query = listPosAccountProfilesQuerySchema.parse(c.req.query());
 
   try {
-    const profiles = await getPosProfilesByAccount({
+    const result = await getPosProfilesByAccount({
       authContext: c.get("authContext"),
       accountId: params.accountId,
+      query,
     });
 
-    return c.json({ data: profiles });
+    return c.json(result);
   } catch (error) {
     if (error instanceof PosCustomerError) {
       return createPosCustomerErrorResponse(c, error);

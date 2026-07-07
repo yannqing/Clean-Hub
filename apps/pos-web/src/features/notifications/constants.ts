@@ -75,7 +75,10 @@ export const NOTICE_RELATED_TYPE_OPTIONS: ReadonlyArray<{
   { value: "ticket", label: NOTICE_RELATED_TYPE_LABELS.ticket },
 ];
 
-export function formatNotificationDateTime(value: string | null): string {
+export function formatNotificationDateTime(
+  value: string | null,
+  locale = "zh-CN",
+): string {
   if (!value) {
     return "-";
   }
@@ -85,7 +88,7 @@ export function formatNotificationDateTime(value: string | null): string {
     return "-";
   }
 
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(locale, {
     month: "numeric",
     day: "numeric",
     hour: "2-digit",

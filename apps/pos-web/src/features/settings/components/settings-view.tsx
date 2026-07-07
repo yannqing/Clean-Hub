@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { PosHardwareDeviceSummary } from "@cleanhub/api-client";
-import { toast } from "@cleanhub/ui";
+import { posToast as toast } from "@/lib/pos-toast";
 
 import { posApi } from "@/lib/api-client";
 import { getPosDeviceIdSync } from "@/features/auth/utils/device-id";

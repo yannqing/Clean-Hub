@@ -277,6 +277,7 @@ export type SaasMessages = {
       roles: string;
       enable: string;
       disable: string;
+      resetPassword: string;
     };
     invite: {
       title: string;
@@ -317,6 +318,18 @@ export type SaasMessages = {
       disableSuccess: string;
       enableSuccess: string;
       noAction: string;
+    };
+    resetPassword: {
+      actionTitle: string;
+      title: string;
+      description: string;
+      reason: string;
+      reasonRequired: string;
+      submit: string;
+      success: string;
+      resultTitle: string;
+      resultWarning: string;
+      done: string;
     };
   };
   auditLogs: {

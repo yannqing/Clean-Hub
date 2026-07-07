@@ -6,6 +6,7 @@ import type {
 
 export type {
   AuthContext,
+  ResetSaasUserPasswordResult,
   SaasRoleSummary,
   SaasUserDetail,
   SaasUserLanguage,

@@ -12,6 +12,7 @@ import { createPosNotificationsRoutes } from "./notifications/notifications.rout
 import { createPosOrdersRoutes } from "./orders/orders.routes.js";
 import { createPosOverviewRoutes } from "./overview/overview.routes.js";
 import { createPosReceptionRoutes } from "./reception/reception.routes.js";
+import { createPosSearchRoutes } from "./search/search.routes.js";
 import { createPosStaffRoutes } from "./staff/staff.routes.js";
 import { createPosServiceTicketsRoutes } from "./service-tickets/service-tickets.routes.js";
 import { createPosTerminalSettingsRoutes } from "./terminal-settings/terminal-settings.routes.js";
@@ -38,6 +39,7 @@ export function createPosRoutes({
   routes.route("/service-tickets", createPosServiceTicketsRoutes());
   routes.route("/accounts", createPosAccountsRoutes());
   routes.route("/orders", createPosOrdersRoutes({ notificationPublisher }));
+  routes.route("/search", createPosSearchRoutes());
   routes.route("/overview", createPosOverviewRoutes());
   routes.route("/staff", createPosStaffRoutes());
   routes.route("/reception", createPosReceptionRoutes());

@@ -24,6 +24,7 @@ import {
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Pagination } from "@/components/pagination";
 import { useSaasI18n } from "@/i18n";
 import { getAuditEventDescription } from "@/features/audit/event-description";
 
@@ -34,7 +35,7 @@ import {
 } from "../queries";
 import type { AuditLogDetail, AuditLogListQuery, AuditLogSummary } from "../types";
 
-const limit = 10;
+const limit = 50;
 
 type SuccessFilter = "all" | "true" | "false";
 
@@ -133,9 +134,6 @@ export function SaasAuditLogListView() {
         setDetailLoading(false);
       });
   }, []);
-
-  const hasPrev = offset > 0;
-  const hasNext = offset + limit < total;
 
   return (
     <section className="min-h-[560px]">
@@ -321,33 +319,15 @@ export function SaasAuditLogListView() {
             </TableBody>
           </Table>
 
-          <div className="flex items-center justify-between border-t px-5 py-3">
-            <span className="text-sm text-muted-foreground">
-              {offset + 1}–{Math.min(offset + limit, total)} of {total}
-            </span>
-            <div className="flex gap-2">
-              <Button
-                disabled={!hasPrev}
-                onClick={() => {
-                  setOffset(Math.max(0, offset - limit));
-                }}
-                type="button"
-                variant="outline"
-              >
-                {m.common.previousPage}
-              </Button>
-              <Button
-                disabled={!hasNext}
-                onClick={() => {
-                  setOffset(offset + limit);
-                }}
-                type="button"
-                variant="outline"
-              >
-                {m.common.nextPage}
-              </Button>
-            </div>
-          </div>
+          <Pagination
+            currentPageCount={logs.length}
+            nextLabel={m.common.nextPage}
+            offset={offset}
+            onOffsetChange={setOffset}
+            pageSize={limit}
+            previousLabel={m.common.previousPage}
+            total={total}
+          />
         </>
       )}
 

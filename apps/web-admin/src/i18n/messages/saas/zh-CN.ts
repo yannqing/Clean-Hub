@@ -296,6 +296,7 @@ export const saasMessagesZhCN: SaasMessages = {
       roles: "角色",
       enable: "启用",
       disable: "禁用",
+      resetPassword: "重置密码",
     },
     invite: {
       title: "邀请平台成员",
@@ -337,6 +338,18 @@ export const saasMessagesZhCN: SaasMessages = {
       disableSuccess: "平台成员已禁用。",
       enableSuccess: "平台成员已启用。",
       noAction: "无操作",
+    },
+    resetPassword: {
+      actionTitle: "重置密码",
+      title: "重置平台成员密码",
+      description: "生成新的临时密码。该成员的所有活动会话将被吊销。",
+      reason: "原因",
+      reasonRequired: "请填写原因。",
+      submit: "重置密码",
+      success: "平台成员密码重置成功。",
+      resultTitle: "新的临时密码",
+      resultWarning: "请立即将该密码分享给该成员，它不会再次显示。",
+      done: "完成",
     },
   },
   auditLogs: {

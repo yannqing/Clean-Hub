@@ -299,6 +299,7 @@ export const saasMessagesEn: SaasMessages = {
       roles: "Roles",
       enable: "Enable",
       disable: "Disable",
+      resetPassword: "Reset password",
     },
     invite: {
       title: "Invite platform member",
@@ -342,6 +343,20 @@ export const saasMessagesEn: SaasMessages = {
       disableSuccess: "Platform member disabled successfully.",
       enableSuccess: "Platform member enabled successfully.",
       noAction: "No action",
+    },
+    resetPassword: {
+      actionTitle: "Reset password",
+      title: "Reset platform member password",
+      description:
+        "Generate a new temporary password. All active sessions for this member will be revoked.",
+      reason: "Reason",
+      reasonRequired: "Reason is required.",
+      submit: "Reset password",
+      success: "Platform member password reset successfully.",
+      resultTitle: "New temporary password",
+      resultWarning:
+        "Share this password with the member now. It will not be shown again.",
+      done: "Done",
     },
   },
   auditLogs: {

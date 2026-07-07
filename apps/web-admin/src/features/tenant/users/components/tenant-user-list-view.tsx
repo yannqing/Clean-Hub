@@ -25,6 +25,8 @@ import {
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { Pagination } from "@/components/pagination";
+
 import { tenantUserRoleOptions, tenantUserStatusOptions } from "../constants";
 import {
   getTenantBranchListQuery,
@@ -610,22 +612,14 @@ export function TenantUserListView({
         </Table>
       )}
 
-      <div className="flex gap-3">
-        <Button
-          disabled={offset === 0}
-          onClick={() => setOffset((prev) => Math.max(0, prev - PAGE_SIZE))}
-          variant="outline"
-        >
-          Previous
-        </Button>
-        <Button
-          disabled={users.length < PAGE_SIZE}
-          onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
-          variant="outline"
-        >
-          Next
-        </Button>
-      </div>
+      <Pagination
+        currentPageCount={users.length}
+        nextLabel="Next"
+        offset={offset}
+        onOffsetChange={setOffset}
+        pageSize={PAGE_SIZE}
+        previousLabel="Previous"
+      />
 
       {/* Detail dialog */}
       <Dialog

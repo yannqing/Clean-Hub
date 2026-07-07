@@ -6,7 +6,7 @@
 --
 -- Credentials (all accounts):
 --   Password: 123456
---   PIN:      1234
+--   PIN:      123456
 --
 -- SaaS accounts:
 --   saas.admin1@cleanhub.local
@@ -91,7 +91,7 @@ SET
   is_system = EXCLUDED.is_system,
   updated_at = now();
 
--- Password hash = scrypt of "123456"; pin_hash = scrypt of "1234".
+-- Password hash = scrypt of "123456"; pin_hash = scrypt of "123456".
 INSERT INTO users (
   id,
   tenant_id,
@@ -110,7 +110,7 @@ VALUES
     'saas.admin1@cleanhub.local',
     'saas.admin1@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
+    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
     'active'
   ),
   (
@@ -120,7 +120,7 @@ VALUES
     'saas.admin2@cleanhub.local',
     'saas.admin2@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
+    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
     'active'
   ),
   (
@@ -130,7 +130,7 @@ VALUES
     'saas.support1@cleanhub.local',
     'saas.support1@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
+    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
     'active'
   ),
   (
@@ -140,7 +140,7 @@ VALUES
     'tenant.admin1@cleanhub.local',
     'tenant.admin1@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
+    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
     'active'
   ),
   (
@@ -150,7 +150,7 @@ VALUES
     'tenant.admin2@cleanhub.local',
     'tenant.admin2@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
+    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
     'active'
   ),
   (
@@ -160,7 +160,7 @@ VALUES
     'tenant.admin3@cleanhub.local',
     'tenant.admin3@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$1rL2WhD7u7pABXpIKWzgew$-clsYJRVuXDZAK_rVKcEMP787BdWlxOxzbm99_Bf_z2mtXZ60byKXNUTXLVj0ZhdPQsd-zsbM9VyZuyeMczs-g',
+    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
     'active'
   )
 ON CONFLICT (id) DO UPDATE

@@ -17,8 +17,17 @@ export type {
 
 import type { PosCustomerProfileSummary } from "./customers.types";
 
+export type PosAccountProfilesQuery = {
+  q?: string;
+  limit?: number;
+  offset?: number;
+};
+
 export type PosAccountProfilesResponse = {
   data: PosCustomerProfileSummary[];
+  total: number;
+  limit: number;
+  offset: number;
 };
 
 export type CreatePosAccountRequest = {

@@ -93,6 +93,50 @@ export type PosCustomerStatusChangeRequest = {
   reason?: string;
 };
 
+export type PosCustomerOrderStats = {
+  orderCount: number;
+  totalPaid: string;
+};
+
+export type PosCustomerServiceItemSummary = {
+  id: string;
+  ticketId: string;
+  ticketNo: string | null;
+  ticketType: import("./service-tickets.types").ServiceTicketType;
+  itemType: import("./service-tickets.types").ServiceTicketItemType | null;
+  itemName: string;
+  itemCategory: string | null;
+  itemStatus: import("./service-tickets.types").ServiceTicketItemStatus;
+  itemColor: string | null;
+  itemBrand: string | null;
+  itemMaterial: string | null;
+  quantity: number;
+  unitAmount: string;
+  lineAmount: string;
+  serviceId: string | null;
+  labelCode: string | null;
+  defectNotes: string | null;
+  specialRequest: string | null;
+  remark: string | null;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+};
+
+export type PosCustomerServiceItemListQuery = {
+  q?: string;
+  limit?: number;
+  offset?: number;
+};
+
+export type PosCustomerServiceItemListResult = {
+  data: PosCustomerServiceItemSummary[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 // ---- profile body shapes --------------------------------------------------
 
 export type CreatePosProfileRequest = {

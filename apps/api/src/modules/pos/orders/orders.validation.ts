@@ -75,7 +75,7 @@ export const posOrderItemParamsSchema = z.object({
 
 const createManualOrderItemBodySchema = z.object({
   sourceType: posOrderItemSourceTypeSchema,
-  sourceId: ulidSchema,
+  sourceId: ulidSchema.optional(),
   itemName: z.string().trim().min(1).max(200),
   quantity: quantitySchema,
   unitAmount: amountSchema,

@@ -86,6 +86,8 @@ export type ServiceTicketListQuery = {
   branchId?: string;
   assistantId?: string;
   q?: string;
+  createdBefore?: string;
+  createdAfter?: string;
   expectedPickupBefore?: string;
   expectedPickupAfter?: string;
   limit?: number;

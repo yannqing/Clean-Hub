@@ -18,6 +18,7 @@ import {
   TableRow,
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pagination } from "@/components/pagination";
 import { getAuditEventDescription } from "@/features/audit/event-description";
 
 import {
@@ -81,6 +82,8 @@ function getCategoryLabel(value: string): string {
   return categoryOptions.find((option) => option.value === value)?.label ?? value;
 }
 
+const TENANT_AUDIT_LOG_PAGE_SIZE = 50;
+
 function getStatusVariant(success: boolean): "default" | "destructive" {
   return success ? "default" : "destructive";
 }
@@ -88,6 +91,7 @@ function getStatusVariant(success: boolean): "default" | "destructive" {
 export function TenantAuditLogView() {
   const [logs, setLogs] = useState<TenantAuditLogSummary[]>([]);
   const [total, setTotal] = useState(0);
+  const [offset, setOffset] = useState(0);
   const [category, setCategory] = useState<CategoryFilter>("all");
   const [eventType, setEventType] = useState("");
   const [branchId, setBranchId] = useState("");
@@ -100,6 +104,13 @@ export function TenantAuditLogView() {
   const [error, setError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
 
+  // Resetting to page 1 whenever a filter changes; otherwise the offset would
+  // point past the filtered result set.
+  const resetFiltersAndOffset = useCallback(() => {
+    setOffset(0);
+    setLoading(true);
+  }, []);
+
   const filters = useMemo<TenantAuditLogListFilters>(
     () => ({
       eventCategory: category === "all" ? undefined : category,
@@ -108,10 +119,10 @@ export function TenantAuditLogView() {
       success: success === "all" ? undefined : success === "true",
       dateFrom: toIsoStart(dateFrom),
       dateTo: toIsoEnd(dateTo),
-      limit: 50,
-      offset: 0,
+      limit: TENANT_AUDIT_LOG_PAGE_SIZE,
+      offset,
     }),
-    [branchId, category, dateFrom, dateTo, eventType, success],
+    [branchId, category, dateFrom, dateTo, eventType, offset, success],
   );
 
   const loadLogs = useCallback(async () => {
@@ -191,7 +202,7 @@ export function TenantAuditLogView() {
           <Label htmlFor="audit-category">Category</Label>
           <Select
             onValueChange={(value) => {
-              setLoading(true);
+              resetFiltersAndOffset();
               setCategory(value as CategoryFilter);
             }}
             value={category}
@@ -215,7 +226,7 @@ export function TenantAuditLogView() {
           <Input
             id="audit-event-type"
             onChange={(event) => {
-              setLoading(true);
+              resetFiltersAndOffset();
               setEventType(event.target.value);
             }}
             placeholder="service.updated"
@@ -228,7 +239,7 @@ export function TenantAuditLogView() {
           <Input
             id="audit-branch-id"
             onChange={(event) => {
-              setLoading(true);
+              resetFiltersAndOffset();
               setBranchId(event.target.value);
             }}
             placeholder="Optional"
@@ -240,7 +251,7 @@ export function TenantAuditLogView() {
           <Label htmlFor="audit-success">Result</Label>
           <Select
             onValueChange={(value) => {
-              setLoading(true);
+              resetFiltersAndOffset();
               setSuccess(value as SuccessFilter);
             }}
             value={success}
@@ -261,7 +272,7 @@ export function TenantAuditLogView() {
           <Input
             id="audit-date-from"
             onChange={(event) => {
-              setLoading(true);
+              resetFiltersAndOffset();
               setDateFrom(event.target.value);
             }}
             type="date"
@@ -274,7 +285,7 @@ export function TenantAuditLogView() {
           <Input
             id="audit-date-to"
             onChange={(event) => {
-              setLoading(true);
+              resetFiltersAndOffset();
               setDateTo(event.target.value);
             }}
             type="date"
@@ -283,9 +294,15 @@ export function TenantAuditLogView() {
         </div>
       </div>
 
-      <div className="border-b px-5 py-3 text-sm text-muted-foreground">
-        Showing {logs.length} of {total} tenant audit records
-      </div>
+      <Pagination
+        currentPageCount={logs.length}
+        nextLabel="Next"
+        offset={offset}
+        onOffsetChange={setOffset}
+        pageSize={TENANT_AUDIT_LOG_PAGE_SIZE}
+        previousLabel="Previous"
+        total={total}
+      />
 
       {loading ? (
         <div className="grid gap-3 p-5">

@@ -24,6 +24,8 @@ import {
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
+import { Pagination } from "@/components/pagination";
+
 import {
   hardwareConnectionTypeOptions,
   hardwareDeviceStatusOptions,
@@ -210,22 +212,14 @@ export function HardwareListView() {
         </Table>
       )}
 
-      <div className="flex gap-3">
-        <Button
-          variant="outline"
-          disabled={offset === 0}
-          onClick={() => setOffset((prev) => Math.max(0, prev - PAGE_SIZE))}
-        >
-          Previous
-        </Button>
-        <Button
-          variant="outline"
-          disabled={devices.length < PAGE_SIZE}
-          onClick={() => setOffset((prev) => prev + PAGE_SIZE)}
-        >
-          Next
-        </Button>
-      </div>
+      <Pagination
+        currentPageCount={devices.length}
+        nextLabel="Next"
+        offset={offset}
+        onOffsetChange={setOffset}
+        pageSize={PAGE_SIZE}
+        previousLabel="Previous"
+      />
 
       {/* Add device dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

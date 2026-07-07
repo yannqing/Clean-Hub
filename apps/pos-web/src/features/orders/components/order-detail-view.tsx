@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useTranslation } from "@cleanhub/i18n/react";
 import type {
   PosOrderDetail,
   PosPaymentTransaction,
@@ -72,6 +75,8 @@ function OrderPaymentsCard({
 }: {
   payments: PosPaymentTransaction[];
 }) {
+  const { locale } = useTranslation();
+
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="border-b border-slate-200 px-5 py-4">
@@ -94,7 +99,10 @@ function OrderPaymentsCard({
                   {PAYMENT_METHOD_LABELS[payment.paymentMethod]}
                 </div>
                 <div className="mt-1 text-xs text-slate-400">
-                  {formatOrderDateTime(payment.paidAt ?? payment.createdAt)}
+                  {formatOrderDateTime(
+                    payment.paidAt ?? payment.createdAt,
+                    locale,
+                  )}
                 </div>
               </div>
               <div className="font-semibold text-slate-900">

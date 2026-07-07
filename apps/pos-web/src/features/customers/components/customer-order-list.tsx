@@ -1,12 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
 import type { PosOrderSummary } from "@cleanhub/api-client";
 
-import { toast } from "@cleanhub/ui";
+import { useTranslation } from "@cleanhub/i18n/react";
+import { posToast as toast } from "@/lib/pos-toast";
 
 import {
   CUSTOMER_CURRENCY,
@@ -25,6 +26,7 @@ type CustomerOrderListProps = {
 };
 
 const DEFAULT_PAGE_SIZE = 10;
+const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
 /**
  * Order list scoped to one customer. Mirrors the prototype `orderRows`:
@@ -36,44 +38,51 @@ export function CustomerOrderList({
   pageSize = DEFAULT_PAGE_SIZE,
 }: CustomerOrderListProps) {
   const router = useRouter();
+  const { locale } = useTranslation();
   const [rows, setRows] = useState<PosOrderSummary[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
+  const [currentPageSize, setCurrentPageSize] = useState(pageSize);
   const [query, setQuery] = useState("");
+  const reloadRequestIdRef = useRef(0);
 
   const reload = useCallback(async () => {
+    const requestId = reloadRequestIdRef.current + 1;
+    reloadRequestIdRef.current = requestId;
     setLoading(true);
     try {
-      const result = await fetchCustomerOrders(customerId, 1, 100);
+      const result = await fetchCustomerOrders(
+        customerId,
+        page,
+        currentPageSize,
+        query,
+      );
+      if (reloadRequestIdRef.current !== requestId) return;
       setRows(result.rows);
+      setTotal(result.total);
     } catch (error) {
+      if (reloadRequestIdRef.current !== requestId) return;
       toast.error(
         error instanceof Error ? error.message : "加载订单失败，请重试。",
       );
       setRows([]);
+      setTotal(0);
     } finally {
-      setLoading(false);
+      if (reloadRequestIdRef.current === requestId) {
+        setLoading(false);
+      }
     }
-  }, [customerId]);
+  }, [customerId, page, currentPageSize, query]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch; setState happens in the async continuation.
     void reload();
   }, [reload]);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((order) =>
-      [order.id, order.orderType, order.status, order.paymentStatus]
-        .filter(Boolean)
-        .some((value) => value!.toLowerCase().includes(q)),
-    );
-  }, [rows, query]);
-
-  const total = filtered.length;
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const pageRows = filtered.slice((page - 1) * pageSize, page * pageSize);
+  const pageCount = Math.max(1, Math.ceil(total / currentPageSize));
+  const from = total === 0 ? 0 : (page - 1) * currentPageSize + 1;
+  const to = Math.min(total, (page - 1) * currentPageSize + rows.length);
 
   return (
     <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
@@ -108,12 +117,12 @@ export function CustomerOrderList({
             <div className="text-right">金额</div>
           </div>
 
-          {pageRows.length === 0 ? (
+          {rows.length === 0 ? (
             <div className="border-t border-slate-100 px-5 py-10 text-center text-sm text-slate-500">
               {loading ? "加载中…" : "没有符合当前条件的订单。"}
             </div>
           ) : (
-            pageRows.map((order) => {
+            rows.map((order) => {
               const statusTone =
                 CUSTOMER_ORDER_STATUS_TONES[order.status] ??
                 "bg-slate-100 text-slate-600";
@@ -132,7 +141,7 @@ export function CustomerOrderList({
                       {order.id.slice(-8).toUpperCase()}
                     </div>
                     <div className="text-xs text-slate-500">
-                      {formatDate(order.createdAt)}
+                      {formatDate(order.createdAt, locale)}
                     </div>
                   </div>
                   <div className="text-slate-700">
@@ -150,7 +159,7 @@ export function CustomerOrderList({
                     </span>
                   </div>
                   <div className="text-right font-semibold text-slate-950">
-                    {formatMoney(order.totalAmount)}
+                    {formatMoney(order.totalAmount, locale)}
                   </div>
                 </button>
               );
@@ -159,11 +168,34 @@ export function CustomerOrderList({
         </div>
       </div>
 
-      <div className="flex items-center justify-end border-t border-slate-200 px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <span>
+            第 {from}-{to} 条 / 共 {total} 条
+          </span>
+          <label className="flex items-center gap-1">
+            每页
+            <select
+              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none"
+              value={currentPageSize}
+              onChange={(event) => {
+                setCurrentPageSize(Number(event.target.value));
+                setPage(1);
+              }}
+            >
+              {PAGE_SIZE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            条
+          </label>
+        </div>
         <div className="flex items-center gap-1">
           <button
             className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
-            disabled={page === 1}
+            disabled={loading || page === 1}
             type="button"
             onClick={() => setPage((p) => p - 1)}
           >
@@ -174,7 +206,7 @@ export function CustomerOrderList({
           </span>
           <button
             className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
-            disabled={page === pageCount}
+            disabled={loading || page === pageCount}
             type="button"
             onClick={() => setPage((p) => p + 1)}
           >
@@ -186,16 +218,19 @@ export function CustomerOrderList({
   );
 }
 
-function formatMoney(amount: string | number | null | undefined): string {
+function formatMoney(
+  amount: string | number | null | undefined,
+  locale: string,
+): string {
   const value = Number(amount ?? 0);
   if (!Number.isFinite(value)) return `${CUSTOMER_CURRENCY} 0`;
-  return `${CUSTOMER_CURRENCY} ${value.toLocaleString("en-US")}`;
+  return `${CUSTOMER_CURRENCY} ${value.toLocaleString(locale)}`;
 }
 
-function formatDate(iso: string): string {
+function formatDate(iso: string, locale: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString("zh-CN", {
+  return date.toLocaleString(locale, {
     month: "2-digit",
     day: "2-digit",
   });

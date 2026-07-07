@@ -1,5 +1,7 @@
 "use client";
 
+import { useTranslation } from "@cleanhub/i18n/react";
+
 import type { IntakeProfileRow } from "../types";
 
 type IntakeProfileListProps = {
@@ -36,6 +38,8 @@ export function IntakeProfileList({
   onCreateProfile,
   onSelect,
 }: IntakeProfileListProps) {
+  const { locale } = useTranslation();
+
   if (rows.length === 0 && loading) {
     return (
       <div className="flex min-h-[360px] items-center justify-center px-6 text-sm text-slate-500">
@@ -154,7 +158,7 @@ export function IntakeProfileList({
               </div>
 
               <div className="text-slate-500">
-                {formatDisplayDate(row.createdAt)}
+                {formatDisplayDate(row.createdAt, locale)}
               </div>
 
               <div className="text-right font-semibold text-slate-950">
@@ -253,11 +257,11 @@ function profileTier(row: IntakeProfileRow): string {
   return "普通客户";
 }
 
-function formatDisplayDate(value: string): string {
+function formatDisplayDate(value: string, locale: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
 
-  return new Intl.DateTimeFormat("zh-CN", {
+  return new Intl.DateTimeFormat(locale, {
     year: "numeric",
     month: "short",
     day: "2-digit",

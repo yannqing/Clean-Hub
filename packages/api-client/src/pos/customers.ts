@@ -1,10 +1,13 @@
 import type { ApiClient } from "../types";
 import type {
   CreatePosProfileRequest,
+  PosCustomerOrderStats,
   PosCustomerListQuery,
   PosCustomerListResult,
   PosCustomerProfileDetail,
   PosCustomerProfileSummary,
+  PosCustomerServiceItemListQuery,
+  PosCustomerServiceItemListResult,
   PosCustomerStatusChangeRequest,
   UpdatePosProfileRequest,
 } from "./customers.types";
@@ -25,6 +28,22 @@ export function createPosCustomersApi(client: ApiClient) {
     /** Profile detail. GET /pos/customers/:customerId */
     get: (customerId: string) =>
       client.get<PosCustomerProfileDetail>(`/pos/customers/${customerId}`),
+
+    /** Profile lifetime order stats. GET /pos/customers/:customerId/order-stats */
+    orderStats: (customerId: string) =>
+      client.get<PosCustomerOrderStats>(
+        `/pos/customers/${customerId}/order-stats`,
+      ),
+
+    /** Profile service items across all tickets. GET /pos/customers/:customerId/service-items */
+    serviceItems: (
+      customerId: string,
+      query?: PosCustomerServiceItemListQuery,
+    ) =>
+      client.get<PosCustomerServiceItemListResult>(
+        `/pos/customers/${customerId}/service-items`,
+        { query },
+      ),
 
     /** Update profile basic info. PATCH /pos/customers/:customerId */
     update: (customerId: string, input: UpdatePosProfileRequest) =>

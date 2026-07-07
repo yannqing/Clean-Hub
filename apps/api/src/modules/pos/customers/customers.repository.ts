@@ -6,6 +6,7 @@ import {
   desc,
   eq,
   ilike,
+  inArray,
   isNull,
   or,
 } from "drizzle-orm";
@@ -14,16 +15,21 @@ import {
   type Database,
   customerAccounts,
   customers,
+  orders,
+  serviceTickets,
+  ticketItems,
 } from "@cleanhub/db";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import type {
   ListPosCustomersQuery,
+  ListPosAccountProfilesResult,
+  ListPosCustomerServiceItemsResult,
   PosAccountAuditSnapshot,
   PosCustomerAccountDetail,
   PosCustomerAccountSummary,
+  PosCustomerOrderStats,
   PosCustomerProfileDetail,
-  PosCustomerProfileSummary,
   PosCustomerProfileWithAccount,
   PosProfileAuditSnapshot,
 } from "./customers.types.js";
@@ -210,36 +216,58 @@ export async function findPosProfilesByAccount(
   db: Database,
   tenantId: string,
   accountId: string,
-): Promise<PosCustomerProfileSummary[]> {
-  const rows = await db
-    .select({
-      id: customers.id,
-      customerAccountId: customers.customerAccountId,
-      fullName: customers.fullName,
-      phone: customers.phone,
-      email: customers.email,
-      status: customers.status,
-      createdAt: customers.createdAt,
-    })
-    .from(customers)
-    .where(
-      and(
-        eq(customers.tenantId, tenantId),
-        eq(customers.customerAccountId, accountId),
-        isNull(customers.deletedAt),
-      ),
-    )
-    .orderBy(customers.createdAt);
+  query: { q?: string; limit: number; offset: number },
+): Promise<ListPosAccountProfilesResult> {
+  const searchQuery = normalizeSearchQuery(query.q);
+  const where = and(
+    eq(customers.tenantId, tenantId),
+    eq(customers.customerAccountId, accountId),
+    isNull(customers.deletedAt),
+    searchQuery
+      ? or(
+          ilike(customers.fullName, searchQuery),
+          ilike(customers.phone, searchQuery),
+          ilike(customers.email, searchQuery),
+        )
+      : undefined,
+  );
 
-  return rows.map((row) => ({
-    id: row.id,
-    customerAccountId: row.customerAccountId,
-    fullName: row.fullName,
-    phone: row.phone,
-    email: row.email,
-    status: row.status,
-    createdAt: row.createdAt.toISOString(),
-  }));
+  const [rows, countRows] = await Promise.all([
+    db
+      .select({
+        id: customers.id,
+        customerAccountId: customers.customerAccountId,
+        fullName: customers.fullName,
+        phone: customers.phone,
+        email: customers.email,
+        status: customers.status,
+        createdAt: customers.createdAt,
+      })
+      .from(customers)
+      .where(where)
+      .orderBy(desc(customers.createdAt))
+      .limit(query.limit)
+      .offset(query.offset),
+    db
+      .select({ value: count() })
+      .from(customers)
+      .where(where),
+  ]);
+
+  return {
+    data: rows.map((row) => ({
+      id: row.id,
+      customerAccountId: row.customerAccountId,
+      fullName: row.fullName,
+      phone: row.phone,
+      email: row.email,
+      status: row.status,
+      createdAt: row.createdAt.toISOString(),
+    })),
+    total: countRows[0]?.value ?? 0,
+    limit: query.limit,
+    offset: query.offset,
+  };
 }
 
 // ---- reads: hybrid list ---------------------------------------------------
@@ -435,6 +463,164 @@ export async function countPosProfiles(
     .from(customers)
     .where(where);
   return rows[0]?.value ?? 0;
+}
+
+export async function findPosCustomerOrderStats(
+  db: Database,
+  tenantId: string,
+  customerId: string,
+  allowedBranchIds?: string[],
+): Promise<PosCustomerOrderStats> {
+  if (allowedBranchIds?.length === 0) {
+    return { orderCount: 0, totalPaid: "0" };
+  }
+
+  const rows = await db
+    .select({
+      orderCount: sql<number>`count(${orders.id})::int`,
+      totalPaid: sql<string>`coalesce(sum(${orders.paidAmount}), 0)::text`,
+    })
+    .from(orders)
+    .where(
+      and(
+        eq(orders.tenantId, tenantId),
+        eq(orders.customerId, customerId),
+        allowedBranchIds ? inArray(orders.branchId, allowedBranchIds) : undefined,
+        isNull(orders.deletedAt),
+      ),
+    );
+
+  return {
+    orderCount: rows[0]?.orderCount ?? 0,
+    totalPaid: rows[0]?.totalPaid ?? "0",
+  };
+}
+
+export async function findPosCustomerServiceItems(
+  db: Database,
+  tenantId: string,
+  customerId: string,
+  query: {
+    q?: string;
+    limit: number;
+    offset: number;
+    allowedBranchIds?: string[];
+  },
+): Promise<ListPosCustomerServiceItemsResult> {
+  if (query.allowedBranchIds?.length === 0) {
+    return {
+      data: [],
+      total: 0,
+      limit: query.limit,
+      offset: query.offset,
+    };
+  }
+
+  const searchQuery = normalizeSearchQuery(query.q);
+  const where = and(
+    eq(serviceTickets.tenantId, tenantId),
+    eq(serviceTickets.customerId, customerId),
+    query.allowedBranchIds
+      ? inArray(serviceTickets.branchId, query.allowedBranchIds)
+      : undefined,
+    isNull(serviceTickets.deletedAt),
+    eq(ticketItems.tenantId, tenantId),
+    isNull(ticketItems.deletedAt),
+    searchQuery
+      ? or(
+          ilike(ticketItems.itemName, searchQuery),
+          ilike(ticketItems.itemCategory, searchQuery),
+          ilike(ticketItems.defectNotes, searchQuery),
+          ilike(ticketItems.specialRequest, searchQuery),
+          ilike(ticketItems.remark, searchQuery),
+          ilike(ticketItems.labelCode, searchQuery),
+          ilike(serviceTickets.ticketNo, searchQuery),
+        )
+      : undefined,
+  );
+
+  const [items, countRows] = await Promise.all([
+    db
+      .select({
+        id: ticketItems.id,
+        ticketId: ticketItems.ticketId,
+        ticketNo: serviceTickets.ticketNo,
+        ticketType: serviceTickets.ticketType,
+        itemType: ticketItems.itemType,
+        itemName: ticketItems.itemName,
+        itemCategory: ticketItems.itemCategory,
+        itemStatus: ticketItems.itemStatus,
+        itemColor: ticketItems.itemColor,
+        itemBrand: ticketItems.itemBrand,
+        itemMaterial: ticketItems.itemMaterial,
+        quantity: ticketItems.quantity,
+        unitAmount: ticketItems.unitAmount,
+        lineAmount: ticketItems.lineAmount,
+        serviceId: ticketItems.serviceId,
+        labelCode: ticketItems.labelCode,
+        defectNotes: ticketItems.defectNotes,
+        specialRequest: ticketItems.specialRequest,
+        remark: ticketItems.remark,
+        sortOrder: ticketItems.sortOrder,
+        createdAt: ticketItems.createdAt,
+        updatedAt: ticketItems.updatedAt,
+        version: ticketItems.version,
+      })
+      .from(ticketItems)
+      .innerJoin(
+        serviceTickets,
+        and(
+          eq(serviceTickets.id, ticketItems.ticketId),
+          eq(serviceTickets.tenantId, ticketItems.tenantId),
+        ),
+      )
+      .where(where)
+      .orderBy(desc(ticketItems.createdAt))
+      .limit(query.limit)
+      .offset(query.offset),
+    db
+      .select({ value: count() })
+      .from(ticketItems)
+      .innerJoin(
+        serviceTickets,
+        and(
+          eq(serviceTickets.id, ticketItems.ticketId),
+          eq(serviceTickets.tenantId, ticketItems.tenantId),
+        ),
+      )
+      .where(where),
+  ]);
+
+  return {
+    data: items.map((row) => ({
+      id: row.id,
+      ticketId: row.ticketId,
+      ticketNo: row.ticketNo,
+      ticketType: row.ticketType,
+      itemType: row.itemType,
+      itemName: row.itemName,
+      itemCategory: row.itemCategory,
+      itemStatus: row.itemStatus,
+      itemColor: row.itemColor,
+      itemBrand: row.itemBrand,
+      itemMaterial: row.itemMaterial,
+      quantity: row.quantity,
+      unitAmount: row.unitAmount,
+      lineAmount: row.lineAmount,
+      serviceId: row.serviceId,
+      labelCode: row.labelCode,
+      defectNotes: row.defectNotes,
+      specialRequest: row.specialRequest,
+      remark: row.remark,
+      sortOrder: row.sortOrder,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      version: row.version,
+    })),
+    total: countRows[0]?.value ?? 0,
+    limit: query.limit,
+    offset: query.offset,
+  };
 }
 
 // ---- writes: accounts -----------------------------------------------------

@@ -35,6 +35,7 @@ import { canManageSaasUsers, isPlatformSuperAdmin } from "@/lib/permissions";
 
 import {
   inviteSaasUserAction,
+  resetSaasUserPasswordAction,
   updateSaasUserAction,
   updateSaasUserRolesAction,
   updateSaasUserStatusAction,
@@ -93,6 +94,7 @@ const defaultRoleForm: UpdateSaasUserRolesFormInput = {
 };
 
 const maxStatusReasonLength = 300;
+const maxResetReasonLength = 500;
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "";
@@ -249,6 +251,14 @@ export function SaasUserListView() {
   const [statusUpdatingUserId, setStatusUpdatingUserId] = useState<
     string | null
   >(null);
+  const [pendingResetUser, setPendingResetUser] =
+    useState<SaasUserSummary | null>(null);
+  const [resetReason, setResetReason] = useState("");
+  const [resetFormError, setResetFormError] = useState<string | null>(null);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
+  const [temporaryPassword, setTemporaryPassword] = useState<string | null>(
+    null,
+  );
 
   const listQuery = useMemo(
     () => ({
@@ -486,6 +496,69 @@ export function SaasUserListView() {
       }
     },
     [loadUsers, m.users.loadError, m.users.status, pendingStatusUser, statusReason],
+  );
+
+  const openResetPasswordDialog = useCallback(
+    (user: SaasUserSummary) => {
+      // Self-protection: a super admin must not reset their own password from
+      // this console (mirrors the "cannot disable self" guard).
+      if (!canManageMembers || authContext?.userId === user.id) {
+        return;
+      }
+
+      setPendingResetUser(user);
+      setResetReason("");
+      setResetFormError(null);
+      setError(null);
+      setNotice(null);
+    },
+    [authContext?.userId, canManageMembers],
+  );
+
+  const handleResetPassword = useCallback(
+    async () => {
+      if (!pendingResetUser) {
+        return;
+      }
+
+      const reason = resetReason.trim();
+
+      if (!reason) {
+        setResetFormError(m.users.resetPassword.reasonRequired);
+        return;
+      }
+
+      setResetSubmitting(true);
+      setResetFormError(null);
+      setError(null);
+      setNotice(null);
+
+      try {
+        const result = await resetSaasUserPasswordAction(
+          pendingResetUser.id,
+          reason,
+        );
+
+        if (!result.ok) {
+          setResetFormError(
+            result.errors.reason ?? m.users.loadError,
+          );
+          return;
+        }
+
+        setNotice(m.users.resetPassword.success);
+        setPendingResetUser(null);
+        setResetReason("");
+        setTemporaryPassword(result.data.temporaryPassword);
+      } catch (resetError) {
+        setResetFormError(
+          getErrorMessage(resetError) || m.users.loadError,
+        );
+      } finally {
+        setResetSubmitting(false);
+      }
+    },
+    [m.users.loadError, m.users.resetPassword, pendingResetUser, resetReason],
   );
 
   const openEditForm = useCallback((user: SaasUserSummary) => {
@@ -893,6 +966,21 @@ export function SaasUserListView() {
                       variant={user.status === "active" ? "outline" : "default"}
                     >
                       {getStatusActionLabel(user.status, m)}
+                    </Button>
+                    <Button
+                      disabled={
+                        !canManageMembers ||
+                        authContext?.userId === user.id ||
+                        resetSubmitting
+                      }
+                      onClick={() => {
+                        openResetPasswordDialog(user);
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {m.users.actions.resetPassword}
                     </Button>
                   </div>
                 </TableCell>
@@ -1458,6 +1546,116 @@ export function SaasUserListView() {
               </DialogFooter>
             </div>
           ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(pendingResetUser)}
+        onOpenChange={(open) => {
+          if (!open && !resetSubmitting) {
+            setPendingResetUser(null);
+            setResetReason("");
+            setResetFormError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{m.users.resetPassword.title}</DialogTitle>
+            <DialogDescription>
+              {m.users.resetPassword.description}
+            </DialogDescription>
+          </DialogHeader>
+
+          {pendingResetUser ? (
+            <div className="grid gap-4">
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <div className="font-medium">
+                  {pendingResetUser.displayName}
+                </div>
+                <div className="text-muted-foreground">
+                  {pendingResetUser.email ??
+                    pendingResetUser.phone ??
+                    pendingResetUser.id}
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="reset-password-reason">
+                  {m.users.resetPassword.reason}
+                </Label>
+                <Textarea
+                  disabled={resetSubmitting}
+                  id="reset-password-reason"
+                  maxLength={maxResetReasonLength}
+                  onChange={(event) => {
+                    setResetReason(event.target.value);
+                    setResetFormError(null);
+                  }}
+                  required
+                  rows={4}
+                  value={resetReason}
+                />
+              </div>
+
+              {resetFormError ? (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                  {resetFormError}
+                </div>
+              ) : null}
+
+              <DialogFooter>
+                <Button
+                  disabled={resetSubmitting}
+                  onClick={() => {
+                    setPendingResetUser(null);
+                    setResetReason("");
+                    setResetFormError(null);
+                  }}
+                  type="button"
+                  variant="outline"
+                >
+                  {m.common.cancel}
+                </Button>
+                <Button
+                  disabled={resetSubmitting || !resetReason.trim()}
+                  onClick={() => void handleResetPassword()}
+                  type="button"
+                  variant="destructive"
+                >
+                  {resetSubmitting
+                    ? m.common.saving
+                    : m.users.resetPassword.submit}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={temporaryPassword !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTemporaryPassword(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{m.users.resetPassword.resultTitle}</DialogTitle>
+            <DialogDescription>
+              {m.users.resetPassword.resultWarning}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-4">
+            <span className="break-all text-center font-mono text-2xl font-bold tracking-wide">
+              {temporaryPassword}
+            </span>
+          </div>
+          <Button onClick={() => setTemporaryPassword(null)} type="button">
+            {m.users.resetPassword.done}
+          </Button>
         </DialogContent>
       </Dialog>
     </section>

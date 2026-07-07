@@ -5,6 +5,7 @@ import type {
   PosRecentActivity,
   PosWorkspaceOverview,
 } from "@cleanhub/api-client";
+import { useTranslation } from "@cleanhub/i18n/react";
 import type { PosSessionUser } from "@/lib/session";
 import { Icon } from "@/components/app-shell/icons";
 import { WorkspaceBranchCard } from "./workspace-branch-card";
@@ -32,8 +33,9 @@ export function WorkspaceView({
   recentActivities,
   pendingTasks,
 }: WorkspaceViewProps) {
+  const { locale } = useTranslation();
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : null;
-  const today = new Date().toLocaleDateString("zh-CN", {
+  const today = new Date().toLocaleDateString(locale, {
     year: "numeric",
     month: "long",
     day: "numeric",
