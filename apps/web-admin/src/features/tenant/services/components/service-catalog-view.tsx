@@ -3,6 +3,11 @@
 import {
   Badge,
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
   Input,
   Label,
   Select,
@@ -16,6 +21,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  toast,
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -88,6 +94,8 @@ export function ServiceCatalogView() {
   const [editingServiceId, setEditingServiceId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<ServiceSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -163,17 +171,18 @@ export function ServiceCatalogView() {
     }
   }
 
-  async function handleDelete(serviceId: string) {
-    setSaving(true);
-    setFormError(null);
+  async function handleDelete(service: ServiceSummary) {
+    setDeleting(true);
 
     try {
-      await deleteServiceAction(serviceId);
+      await deleteServiceAction(service.id);
+      toast.success(`Deleted "${service.name}".`);
+      setPendingDelete(null);
       await loadServices();
     } catch (deleteError) {
-      setFormError(getErrorMessage(deleteError));
+      toast.error(getErrorMessage(deleteError));
     } finally {
-      setSaving(false);
+      setDeleting(false);
     }
   }
 
@@ -432,8 +441,7 @@ export function ServiceCatalogView() {
                     {service.status === "active" ? "Deactivate" : "Activate"}
                   </Button>
                   <Button
-                    disabled={saving}
-                    onClick={() => void handleDelete(service.id)}
+                    onClick={() => setPendingDelete(service)}
                     size="sm"
                     type="button"
                     variant="outline"
@@ -446,6 +454,43 @@ export function ServiceCatalogView() {
           </TableBody>
         </Table>
       )}
+
+      {/* Delete confirmation */}
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+        open={pendingDelete !== null}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Service</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-medium text-foreground">
+                {pendingDelete?.name}
+              </span>
+              ? This cannot be undone and may affect existing prices and orders.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3">
+            <Button
+              disabled={deleting}
+              onClick={() => setPendingDelete(null)}
+              variant="outline"
+            >
+              Cancel
+            </Button>
+            <Button
+              disabled={deleting}
+              onClick={() => pendingDelete && void handleDelete(pendingDelete)}
+              variant="destructive"
+            >
+              {deleting ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

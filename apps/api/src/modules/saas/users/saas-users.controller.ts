@@ -7,6 +7,7 @@ import {
   getSaasUserDetail,
   listSaasRoles,
   listSaasUsers,
+  resetSaasUserPassword,
   updateSaasUser,
   updateSaasUserRoles,
   updateSaasUserStatus,
@@ -16,6 +17,7 @@ import {
   createSaasUserBodySchema,
   getSaasUserParamsSchema,
   listSaasUsersQuerySchema,
+  resetSaasUserPasswordBodySchema,
   updateSaasUserBodySchema,
   updateSaasUserRolesBodySchema,
   updateSaasUserStatusBodySchema,
@@ -174,6 +176,33 @@ export async function updateSaasUserRolesController(c: Context<AppBindings>) {
     });
 
     return c.json(user);
+  } catch (error) {
+    if (error instanceof SaasUsersError) {
+      return createSaasUsersErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function resetSaasUserPasswordController(
+  c: Context<AppBindings>,
+) {
+  const params = getSaasUserParamsSchema.parse(c.req.param());
+  const body = resetSaasUserPasswordBodySchema.parse(await c.req.json());
+
+  try {
+    const result = await resetSaasUserPassword({
+      authContext: c.get("authContext"),
+      requestMeta: {
+        ipAddress: getClientIp(c),
+        userAgent: c.req.header("user-agent"),
+      },
+      userId: params.userId,
+      reason: body.reason,
+    });
+
+    return c.json(result);
   } catch (error) {
     if (error instanceof SaasUsersError) {
       return createSaasUsersErrorResponse(c, error);

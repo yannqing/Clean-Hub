@@ -1,6 +1,8 @@
 import type { ApiClient, QueryParams } from "../../types";
 import type {
   CreateSaasUserRequest,
+  ResetSaasUserPasswordRequest,
+  ResetSaasUserPasswordResult,
   SaasUserDetail,
   SaasUserSummary,
   UpdateSaasUserRequest,
@@ -36,6 +38,14 @@ export function createSaasUsersApi(client: ApiClient) {
       `/saas/users/${encodeURIComponent(userId)}/roles`,
       input,
     );
+  const resetSaasUserPassword = (
+    userId: string,
+    input: ResetSaasUserPasswordRequest,
+  ) =>
+    client.patch<ResetSaasUserPasswordResult>(
+      `/saas/users/${encodeURIComponent(userId)}/reset-password`,
+      input,
+    );
 
   return {
     createSaasUser,
@@ -50,8 +60,11 @@ export function createSaasUsersApi(client: ApiClient) {
       updateSaasUserStatus(userId, input),
     updateRoles: (userId: string, input: UpdateSaasUserRolesRequest) =>
       updateSaasUserRoles(userId, input),
+    resetPassword: (userId: string, input: ResetSaasUserPasswordRequest) =>
+      resetSaasUserPassword(userId, input),
     updateSaasUser,
     updateSaasUserRoles,
     updateSaasUserStatus,
+    resetSaasUserPassword,
   };
 }

@@ -9,20 +9,21 @@ import {
   Label,
 } from "@cleanhub/ui";
 
+import { formatMoney } from "@/lib/format";
+
 import type { ReportSummary, ReportSummaryQuery } from "../types";
 
 type ReportSummaryViewProps = {
   query: ReportSummaryQuery;
   summary?: ReportSummary;
   error?: string;
+  /**
+   * ISO 4217 currency code to use when rendering monetary amounts. Falls back to
+   * the platform default (`XOF`) when undefined so the report never renders in
+   * a misleading currency such as USD.
+   */
+  currency?: string;
 };
-
-function formatMoney(value: number): string {
-  return new Intl.NumberFormat("en", {
-    currency: "USD",
-    style: "currency",
-  }).format(value);
-}
 
 function formatPercent(part: number, total: number): string {
   if (total <= 0) {
@@ -39,6 +40,7 @@ export function ReportSummaryView({
   query,
   summary,
   error,
+  currency,
 }: ReportSummaryViewProps) {
   const paymentTotal = summary
     ? Object.values(summary.paymentBreakdown).reduce(
@@ -103,7 +105,7 @@ export function ReportSummaryView({
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-semibold">
-                  {formatMoney(summary.grossSales)}
+                  {formatMoney(summary.grossSales, currency)}
                 </div>
               </CardContent>
             </Card>
@@ -153,7 +155,7 @@ export function ReportSummaryView({
                   >
                     <span className="capitalize text-sm">{method}</span>
                     <span className="text-sm font-medium">
-                      {formatMoney(amount)} · {formatPercent(amount, paymentTotal)}
+                      {formatMoney(amount, currency)} · {formatPercent(amount, paymentTotal)}
                     </span>
                   </div>
                 ))}

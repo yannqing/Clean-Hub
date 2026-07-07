@@ -28,6 +28,14 @@ export type UpdateSaasUserRolesRequest = {
   roleCodes: SaasUserRoleCode[];
 };
 
+export type ResetSaasUserPasswordRequest = {
+  reason: string;
+};
+
+export type ResetSaasUserPasswordResult = {
+  temporaryPassword: string;
+};
+
 export type SaasUserSummary = {
   id: string;
   tenantId: null;

@@ -86,6 +86,21 @@ export type UpdateSaasUserRolesInput = {
   data: UpdateSaasUserRolesRequest;
 };
 
+export type ResetSaasUserPasswordRequest = {
+  reason: string;
+};
+
+export type ResetSaasUserPasswordInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  userId: string;
+  reason: string;
+};
+
+export type ResetSaasUserPasswordResult = {
+  temporaryPassword: string;
+};
+
 export type SaasUserListItem = {
   id: string;
   tenantId: null;

@@ -72,3 +72,7 @@ export const updateSaasUserRolesBodySchema = z.object({
     z.array(z.enum(["super_admin", "support"])).min(1).max(2),
   ),
 });
+
+export const resetSaasUserPasswordBodySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+});
