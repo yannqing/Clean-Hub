@@ -16,7 +16,6 @@ import {
   createPaymentTransactionRecord,
   findCustomerForOrder,
   findPosOrderAuditSnapshot,
-  findPosOrderById,
   findPosOrderDetail,
   findPosOrderItemById,
   findPosOrderOverview,
