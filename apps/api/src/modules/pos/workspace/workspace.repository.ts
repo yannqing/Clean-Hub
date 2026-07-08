@@ -1,8 +1,7 @@
 import {
   type Database,
-  branches,
   customerAccounts,
-  getDb,
+  customers,
   orders,
   serviceTickets,
   userBranches,
@@ -11,8 +10,8 @@ import {
   type SQL,
   and,
   count,
+  desc,
   eq,
-  gte,
   isNull,
   sql,
 } from "drizzle-orm";
@@ -27,7 +26,6 @@ import type {
   PosWorkspaceBranch,
   PosWorkspaceOverview,
   PosWorkspaceRepositoryInput,
-  PosWorkspaceStatistics,
 } from "./workspace.types.js";
 
 // ---------------------------------------------------------------------------
@@ -154,7 +152,7 @@ export async function findRecentActivities(
     })
     .from(orders)
     .where(and(...orderFilters))
-    .orderBy(orders.createdAt)
+    .orderBy(desc(orders.createdAt))
     .limit(limit);
 
   for (const order of recentOrders) {
@@ -194,7 +192,7 @@ export async function findRecentActivities(
     })
     .from(serviceTickets)
     .where(and(...ticketFilters))
-    .orderBy(serviceTickets.createdAt)
+    .orderBy(desc(serviceTickets.createdAt))
     .limit(limit);
 
   for (const ticket of recentTickets) {
@@ -212,17 +210,26 @@ export async function findRecentActivities(
   const customerFilters: SQL[] = [
     eq(customerAccounts.tenantId, input.tenantId),
     isNull(customerAccounts.deletedAt),
+    isNull(customers.deletedAt),
   ];
 
   const recentCustomers = await db
     .select({
-      id: customerAccounts.id,
-      accountName: customerAccounts.accountName,
-      createdAt: customerAccounts.createdAt,
+      id: customers.id,
+      fullName: customers.fullName,
+      accountId: customerAccounts.id,
+      createdAt: customers.createdAt,
     })
     .from(customerAccounts)
+    .innerJoin(
+      customers,
+      and(
+        eq(customers.customerAccountId, customerAccounts.id),
+        eq(customers.tenantId, customerAccounts.tenantId),
+      ),
+    )
     .where(and(...customerFilters))
-    .orderBy(customerAccounts.createdAt)
+    .orderBy(desc(customers.createdAt))
     .limit(limit);
 
   for (const customer of recentCustomers) {
@@ -230,9 +237,9 @@ export async function findRecentActivities(
       id: customer.id,
       type: "customer",
       title: `新客户`,
-      description: `客户: ${customer.accountName}`,
+      description: `客户: ${customer.fullName}`,
       timestamp: customer.createdAt.toISOString(),
-      metadata: { customerId: customer.id },
+      metadata: { accountId: customer.accountId, customerId: customer.id },
     });
   }
 

@@ -11,11 +11,11 @@
 -- Coverage:
 --   tenant_feature_flags (1) — enables the business lines seeded below
 --   services (8) + prices (8)
---   customer_accounts (5) + customers (8)
---   service_tickets (8) + ticket_items (~20)
---   orders (8) + order_items (~15)
+--   customer_accounts (10) + customers (14)
+--   service_tickets (14) + ticket_items (~20)
+--   orders (14) + order_items (~20)
 --   payment_transactions (~12)
---   notifications (6) + notification_deliveries (6)
+--   notifications (10) + notification_deliveries (10)
 
 -- ───────────────────────────────────────────────
 -- 0) Shared constants for readability
@@ -97,7 +97,7 @@ VALUES
   ('01SEED0100ACC0000000000002', '01KRERJN800000000000000001', '李娜账户',     '13800000002', NULL, 'active'),
   ('01SEED0100ACC0000000000003', '01KRERJN800000000000000001', '王芳家庭账户', '13800000003', 'wang.fang@example.com', 'active'),
   ('01SEED0100ACC0000000000004', '01KRERJN800000000000000001', '刘洋账户',     '13800000004', NULL, 'active'),
-  ('01SEED0100ACC0000000000005', '01KRERJN800000000000000001', '公司账户-A 跨国', '13800000005', 'company.a@example.com', 'disabled')
+  ('01SEED0100ACC0000000000005', '01KRERJN800000000000000001', '公司账户-A 跨国', '13800000005', 'company.a@example.com', 'active')
 ON CONFLICT (id) DO UPDATE SET
   account_name = EXCLUDED.account_name,
   phone = EXCLUDED.phone,
@@ -494,4 +494,279 @@ ON CONFLICT (id) DO UPDATE SET
   priority = EXCLUDED.priority,
   sent_at = EXCLUDED.sent_at,
   read_at = EXCLUDED.read_at,
+  updated_at = now();
+
+-- ───────────────────────────────────────────────
+-- 11) Additional POS demo data for richer dashboards
+-- These rows are intentionally dated around 2026-07-08 so the POS home page
+-- has non-empty today metrics and recent activity after a fresh seed.
+-- ───────────────────────────────────────────────
+
+INSERT INTO customer_accounts (id, tenant_id, account_name, phone, email, status, created_at)
+VALUES
+  ('01SEED0100ACC0000000000006', '01KRERJN800000000000000001', '陈晨家庭账户', '13800000006', 'chen.chen@example.com', 'active', '2026-07-08 09:05:00+08'),
+  ('01SEED0100ACC0000000000007', '01KRERJN800000000000000001', '赵敏账户',     '13800000007', 'zhao.min@example.com',   'active', '2026-07-08 09:32:00+08'),
+  ('01SEED0100ACC0000000000008', '01KRERJN800000000000000001', '周杰账户',     '13800000008', NULL,                    'active', '2026-07-08 10:15:00+08'),
+  ('01SEED0100ACC0000000000009', '01KRERJN800000000000000001', '孙怡家庭账户', '13800000009', 'sun.yi@example.com',     'active', '2026-07-08 11:20:00+08'),
+  ('01SEED0100ACC0000000000010', '01KRERJN800000000000000001', '吴迪账户',     '13800000010', 'wu.di@example.com',      'active', '2026-07-08 12:10:00+08')
+ON CONFLICT (id) DO UPDATE SET
+  account_name = EXCLUDED.account_name,
+  phone = EXCLUDED.phone,
+  email = EXCLUDED.email,
+  status = EXCLUDED.status,
+  created_at = EXCLUDED.created_at,
+  updated_at = now();
+
+INSERT INTO customers (id, customer_account_id, tenant_id, full_name, phone, email, relationship, address, notes, status, created_at)
+VALUES
+  ('01SEED0100CPS0000000000009', '01SEED0100ACC0000000000006', '01KRERJN800000000000000001', '陈晨',   '13800000006', 'chen.chen@example.com', '本人', '上海市黄浦区北京东路 66 号', '偏好短信通知', 'active', '2026-07-08 09:05:00+08'),
+  ('01SEED0100CPS0000000000010', '01SEED0100ACC0000000000006', '01KRERJN800000000000000001', '陈小雨', '13800000061', NULL,                   '家人', '上海市黄浦区北京东路 66 号', NULL, 'active', '2026-07-08 09:08:00+08'),
+  ('01SEED0100CPS0000000000011', '01SEED0100ACC0000000000007', '01KRERJN800000000000000001', '赵敏',   '13800000007', 'zhao.min@example.com', '本人', '上海市浦东新区花木路 188 号', '高频洗衣客户', 'active', '2026-07-08 09:32:00+08'),
+  ('01SEED0100CPS0000000000012', '01SEED0100ACC0000000000008', '01KRERJN800000000000000001', '周杰',   '13800000008', NULL,                   '本人', '上海市静安区万航渡路 99 号', '车辆洗护客户', 'active', '2026-07-08 10:15:00+08'),
+  ('01SEED0100CPS0000000000013', '01SEED0100ACC0000000000009', '01KRERJN800000000000000001', '孙怡',   '13800000009', 'sun.yi@example.com',   '本人', '上海市徐汇区衡山路 200 号', NULL, 'active', '2026-07-08 11:20:00+08'),
+  ('01SEED0100CPS0000000000014', '01SEED0100ACC0000000000010', '01KRERJN800000000000000001', '吴迪',   '13800000010', 'wu.di@example.com',    '本人', '上海市长宁区天山路 88 号', '现金付款', 'active', '2026-07-08 12:10:00+08')
+ON CONFLICT (id) DO UPDATE SET
+  customer_account_id = EXCLUDED.customer_account_id,
+  full_name = EXCLUDED.full_name,
+  phone = EXCLUDED.phone,
+  email = EXCLUDED.email,
+  relationship = EXCLUDED.relationship,
+  address = EXCLUDED.address,
+  notes = EXCLUDED.notes,
+  status = EXCLUDED.status,
+  created_at = EXCLUDED.created_at,
+  updated_at = now();
+
+INSERT INTO service_tickets (
+  id, tenant_id, branch_id, customer_id, assistant_id, ticket_no, ticket_type, ticket_status,
+  expected_pickup_at, completed_at, cancelled_at, priority, remark, source_channel, created_by, created_at
+)
+VALUES
+  ('01SEED0100TKT0000000000009', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000009', '01KRERJN8F0000000000000031', 'T20260708001', 'laundry', 'pending',
+   '2026-07-09 18:00:00+08', NULL, NULL, 'normal', '今日新客,普通水洗', 'pos',
+   '01KRERJN8F0000000000000031', '2026-07-08 09:12:00+08'),
+  ('01SEED0100TKT0000000000010', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000011', '01KRERJN8F0000000000000032', 'T20260708002', 'laundry', 'in_progress',
+   '2026-07-10 18:00:00+08', NULL, NULL, 'urgent', '礼服加急护理', 'pos',
+   '01KRERJN8F0000000000000032', '2026-07-08 09:45:00+08'),
+  ('01SEED0100TKT0000000000011', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000012', '01KRERJN8F0000000000000031', 'T20260708003', 'car_wash', 'ready_to_pick',
+   '2026-07-08 17:00:00+08', '2026-07-08 14:40:00+08', NULL, 'normal', '车辆已完成精洗,等待取车', 'pos',
+   '01KRERJN8F0000000000000031', '2026-07-08 10:25:00+08'),
+  ('01SEED0100TKT0000000000012', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000013', '01KRERJN8F0000000000000032', 'T20260708004', 'laundry', 'exception',
+   '2026-07-09 12:00:00+08', NULL, NULL, 'critical', '丝绸裙摆污渍需要客户确认', 'phone',
+   '01KRERJN8F0000000000000032', '2026-07-08 11:35:00+08'),
+  ('01SEED0100TKT0000000000013', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000014', '01KRERJN8F0000000000000031', 'T20260708005', 'laundry', 'picked_up',
+   '2026-07-08 13:30:00+08', '2026-07-08 13:05:00+08', NULL, 'normal', '客户已取件', 'pos',
+   '01KRERJN8F0000000000000031', '2026-07-08 12:20:00+08'),
+  ('01SEED0100TKT0000000000014', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000010', '01KRERJN8F0000000000000032', 'T20260708006', 'laundry', 'draft',
+   NULL, NULL, NULL, 'normal', '亲子衣物待确认价格', 'pos',
+   '01KRERJN8F0000000000000032', '2026-07-08 13:15:00+08')
+ON CONFLICT (id) DO UPDATE SET
+  customer_id = EXCLUDED.customer_id,
+  assistant_id = EXCLUDED.assistant_id,
+  ticket_no = EXCLUDED.ticket_no,
+  ticket_type = EXCLUDED.ticket_type,
+  ticket_status = EXCLUDED.ticket_status,
+  expected_pickup_at = EXCLUDED.expected_pickup_at,
+  completed_at = EXCLUDED.completed_at,
+  cancelled_at = EXCLUDED.cancelled_at,
+  priority = EXCLUDED.priority,
+  remark = EXCLUDED.remark,
+  source_channel = EXCLUDED.source_channel,
+  created_at = EXCLUDED.created_at,
+  updated_at = now();
+
+INSERT INTO ticket_items (
+  id, ticket_id, tenant_id, branch_id, service_id,
+  item_type, item_name, item_category, item_status, item_color, item_brand, item_material,
+  quantity, unit_amount, line_amount, remark, defect_notes, special_request, label_code, sort_order
+)
+VALUES
+  ('01SEED0100T1T000000000013', '01SEED0100TKT0000000000009', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100SVC0000000000001',
+   'cloth', '蓝色衬衫', '上衣', 'washing', '蓝色', '海澜之家', '棉', 3, 15.00, 45.00, NULL, NULL, NULL, 'L-0013', 0),
+  ('01SEED0100T1T000000000014', '01SEED0100TKT0000000000009', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100SVC0000000000003',
+   'cloth', '浅灰夹克', '外套', 'washing', '浅灰', NULL, '聚酯纤维', 1, 25.00, 25.00, NULL, NULL, NULL, 'L-0014', 1),
+  ('01SEED0100T1T000000000015', '01SEED0100TKT0000000000010', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100SVC0000000000002',
+   'cloth', '黑色礼服', '礼服', 'washing', '黑色', NULL, '羊毛混纺', 1, 40.00, 40.00, NULL, NULL, '加急,单独包装', 'L-0015', 0),
+  ('01SEED0100T1T000000000016', '01SEED0100TKT0000000000010', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100SVC0000000000001',
+   'cloth', '白色衬衫', '上衣', 'washing', '白色', NULL, '棉', 2, 15.00, 30.00, NULL, NULL, NULL, 'L-0016', 1),
+  ('01SEED0100T1T000000000017', '01SEED0100TKT0000000000011', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100SVC0000000000006',
+   'car', 'Tesla Model 3', NULL, 'ready_to_pick', '白色', 'Tesla', NULL, 1, 50.00, 50.00, '外观精洗', NULL, NULL, 'L-0017', 0),
+  ('01SEED0100T1T000000000018', '01SEED0100TKT0000000000012', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100SVC0000000000002',
+   'cloth', '米白丝绸长裙', '裙装', 'exception', '米白', NULL, '丝绸', 1, 40.00, 40.00, NULL, '裙摆旧污渍扩散,需确认', '手洗', 'L-0018', 0),
+  ('01SEED0100T1T000000000019', '01SEED0100TKT0000000000013', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100SVC0000000000001',
+   'cloth', '商务衬衫', '上衣', 'done', '白色', NULL, '棉', 2, 15.00, 30.00, NULL, NULL, NULL, 'L-0019', 0),
+  ('01SEED0100T1T000000000020', '01SEED0100TKT0000000000014', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100SVC0000000000004',
+   'cloth', '儿童床品', '床品', 'washing', '粉色', NULL, '棉', 2, 8.00, 16.00, NULL, NULL, NULL, 'L-0020', 0)
+ON CONFLICT (id) DO UPDATE SET
+  service_id = EXCLUDED.service_id,
+  item_type = EXCLUDED.item_type,
+  item_name = EXCLUDED.item_name,
+  item_category = EXCLUDED.item_category,
+  item_status = EXCLUDED.item_status,
+  item_color = EXCLUDED.item_color,
+  item_brand = EXCLUDED.item_brand,
+  item_material = EXCLUDED.item_material,
+  quantity = EXCLUDED.quantity,
+  unit_amount = EXCLUDED.unit_amount,
+  line_amount = EXCLUDED.line_amount,
+  remark = EXCLUDED.remark,
+  defect_notes = EXCLUDED.defect_notes,
+  special_request = EXCLUDED.special_request,
+  label_code = EXCLUDED.label_code,
+  sort_order = EXCLUDED.sort_order,
+  updated_at = now();
+
+INSERT INTO orders (
+  id, tenant_id, branch_id, customer_id, order_type, status,
+  total_amount, payment_status, paid_amount, paid_at, expire_at, notes, created_by, created_at
+)
+VALUES
+  ('01SEED01000RD0000000000009', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000009', 'ticket', 'received',
+   70.00, 'unpaid', 0.00, NULL, '2026-07-09 18:00:00+08',
+   '基于工单 T20260708001,今日未收款', '01KRERJN8F0000000000000031', '2026-07-08 09:15:00+08'),
+  ('01SEED01000RD0000000000010', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000011', 'ticket', 'paid',
+   70.00, 'partial', 30.00, '2026-07-08 09:50:00+08', '2026-07-10 18:00:00+08',
+   '基于工单 T20260708002,已收定金', '01KRERJN8F0000000000000032', '2026-07-08 09:50:00+08'),
+  ('01SEED01000RD0000000000011', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000012', 'ticket', 'paid',
+   50.00, 'paid', 50.00, '2026-07-08 10:30:00+08', '2026-07-08 17:00:00+08',
+   '基于工单 T20260708003,车辆精洗', '01KRERJN8F0000000000000031', '2026-07-08 10:30:00+08'),
+  ('01SEED01000RD0000000000012', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000013', 'ticket', 'received',
+   40.00, 'unpaid', 0.00, NULL, '2026-07-09 12:00:00+08',
+   '基于工单 T20260708004,异常确认后付款', '01KRERJN8F0000000000000032', '2026-07-08 11:40:00+08'),
+  ('01SEED01000RD0000000000013', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000014', 'ticket', 'delivered',
+   30.00, 'paid', 30.00, '2026-07-08 12:35:00+08', '2026-07-08 13:30:00+08',
+   '基于工单 T20260708005,现金已结清', '01KRERJN8F0000000000000031', '2026-07-08 12:30:00+08'),
+  ('01SEED01000RD0000000000014', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
+   '01SEED0100CPS0000000000010', 'manual', 'paid',
+   12.00, 'paid', 12.00, '2026-07-08 13:25:00+08', '2026-07-09 18:00:00+08',
+   '零售:织物除味剂', '01KRERJN8F0000000000000032', '2026-07-08 13:20:00+08')
+ON CONFLICT (id) DO UPDATE SET
+  customer_id = EXCLUDED.customer_id,
+  order_type = EXCLUDED.order_type,
+  status = EXCLUDED.status,
+  total_amount = EXCLUDED.total_amount,
+  payment_status = EXCLUDED.payment_status,
+  paid_amount = EXCLUDED.paid_amount,
+  paid_at = EXCLUDED.paid_at,
+  expire_at = EXCLUDED.expire_at,
+  notes = EXCLUDED.notes,
+  created_at = EXCLUDED.created_at,
+  updated_at = now();
+
+INSERT INTO order_items (
+  id, order_id, ticket_id, tenant_id, branch_id, customer_id,
+  source_type, source_id, item_name, quantity, unit_amount, line_amount
+)
+VALUES
+  ('01SEED010001T000000000014', '01SEED01000RD0000000000009', '01SEED0100TKT0000000000009', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000009',
+   'ticket_item', '01SEED0100T1T000000000013', '蓝色衬衫', 3, 15.00, 45.00),
+  ('01SEED010001T000000000015', '01SEED01000RD0000000000009', '01SEED0100TKT0000000000009', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000009',
+   'ticket_item', '01SEED0100T1T000000000014', '浅灰夹克', 1, 25.00, 25.00),
+  ('01SEED010001T000000000016', '01SEED01000RD0000000000010', '01SEED0100TKT0000000000010', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000011',
+   'ticket_item', '01SEED0100T1T000000000015', '黑色礼服', 1, 40.00, 40.00),
+  ('01SEED010001T000000000017', '01SEED01000RD0000000000010', '01SEED0100TKT0000000000010', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000011',
+   'ticket_item', '01SEED0100T1T000000000016', '白色衬衫', 2, 15.00, 30.00),
+  ('01SEED010001T000000000018', '01SEED01000RD0000000000011', '01SEED0100TKT0000000000011', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000012',
+   'ticket_item', '01SEED0100T1T000000000017', 'Tesla Model 3', 1, 50.00, 50.00),
+  ('01SEED010001T000000000019', '01SEED01000RD0000000000012', '01SEED0100TKT0000000000012', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000013',
+   'ticket_item', '01SEED0100T1T000000000018', '米白丝绸长裙', 1, 40.00, 40.00),
+  ('01SEED010001T000000000020', '01SEED01000RD0000000000013', '01SEED0100TKT0000000000013', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000014',
+   'ticket_item', '01SEED0100T1T000000000019', '商务衬衫', 2, 15.00, 30.00),
+  ('01SEED010001T000000000021', '01SEED01000RD0000000000014', NULL, '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000010',
+   'product', '01SEED0100SVC0000000000008', '织物除味剂', 1, 12.00, 12.00)
+ON CONFLICT (id) DO UPDATE SET
+  ticket_id = EXCLUDED.ticket_id,
+  source_type = EXCLUDED.source_type,
+  source_id = EXCLUDED.source_id,
+  item_name = EXCLUDED.item_name,
+  quantity = EXCLUDED.quantity,
+  unit_amount = EXCLUDED.unit_amount,
+  line_amount = EXCLUDED.line_amount,
+  updated_at = now();
+
+INSERT INTO payment_transactions (
+  id, tenant_id, branch_id, customer_id, order_id,
+  payment_method, amount, payment_status, paid_at, created_by, created_at
+)
+VALUES
+  ('01SEED0100PTX0000000000007', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000011', '01SEED01000RD0000000000010',
+   'cash', 30.00, 'paid', '2026-07-08 09:50:00+08', '01KRERJN8F0000000000000032', '2026-07-08 09:50:00+08'),
+  ('01SEED0100PTX0000000000008', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000012', '01SEED01000RD0000000000011',
+   'card', 50.00, 'paid', '2026-07-08 10:30:00+08', '01KRERJN8F0000000000000031', '2026-07-08 10:30:00+08'),
+  ('01SEED0100PTX0000000000009', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000014', '01SEED01000RD0000000000013',
+   'cash', 30.00, 'paid', '2026-07-08 12:35:00+08', '01KRERJN8F0000000000000031', '2026-07-08 12:35:00+08'),
+  ('01SEED0100PTX0000000000010', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000010', '01SEED01000RD0000000000014',
+   'app', 12.00, 'paid', '2026-07-08 13:25:00+08', '01KRERJN8F0000000000000032', '2026-07-08 13:25:00+08')
+ON CONFLICT (id) DO UPDATE SET
+  payment_method = EXCLUDED.payment_method,
+  amount = EXCLUDED.amount,
+  payment_status = EXCLUDED.payment_status,
+  paid_at = EXCLUDED.paid_at,
+  created_at = EXCLUDED.created_at,
+  updated_at = now();
+
+INSERT INTO notifications (
+  id, tenant_id, scope, notice_type, config_id, template_id,
+  related_type, related_id, title, content, locale, payload, priority, idempotency_key, created_by, created_at
+)
+VALUES
+  ('01SEED0100N0T0000000000007', '01KRERJN800000000000000001', 'pos', 'business', NULL, NULL,
+   'ticket', '01SEED0100TKT0000000000011', '工单 T20260708003 已可取件',
+   '工单 T20260708003(客户:周杰)的车辆精洗已完成,等待客户取车。', 'zh-CN', NULL, 'normal', 'ticket:01SEED0100TKT0000000000011:ready_to_pick',
+   '01KRERJN8F0000000000000031', '2026-07-08 14:45:00+08'),
+  ('01SEED0100N0T0000000000008', '01KRERJN800000000000000001', 'pos', 'business', NULL, NULL,
+   'ticket', '01SEED0100TKT0000000000012', '工单 T20260708004 需要确认',
+   '工单 T20260708004(客户:孙怡)的丝绸长裙出现异常,请联系客户确认处理方式。', 'zh-CN', NULL, 'critical', 'ticket:01SEED0100TKT0000000000012:exception',
+   '01KRERJN8F0000000000000032', '2026-07-08 11:50:00+08'),
+  ('01SEED0100N0T0000000000009', '01KRERJN800000000000000001', 'pos', 'business', NULL, NULL,
+   'order', '01SEED01000RD0000000000009', '订单 T20260708001 待收款',
+   '陈晨的今日订单尚未收款,请在取件前结清。', 'zh-CN', NULL, 'high', 'order:01SEED01000RD0000000000009:unpaid',
+   '01KRERJN8F0000000000000031', '2026-07-08 09:20:00+08'),
+  ('01SEED0100N0T0000000000010', '01KRERJN800000000000000001', 'pos', 'business', NULL, NULL,
+   'order', '01SEED01000RD0000000000013', '现金收款已完成',
+   '吴迪的订单已完成现金收款并交付。', 'zh-CN', NULL, 'low', 'order:01SEED01000RD0000000000013:paid',
+   '01KRERJN8F0000000000000031', '2026-07-08 12:40:00+08')
+ON CONFLICT (id) DO UPDATE SET
+  title = EXCLUDED.title,
+  content = EXCLUDED.content,
+  locale = EXCLUDED.locale,
+  priority = EXCLUDED.priority,
+  notice_type = EXCLUDED.notice_type,
+  scope = EXCLUDED.scope,
+  related_type = EXCLUDED.related_type,
+  related_id = EXCLUDED.related_id,
+  created_at = EXCLUDED.created_at,
+  updated_at = now();
+
+INSERT INTO notification_deliveries (
+  id, tenant_id, notification_id, channel, recipient_type, recipient_id,
+  sender_type, sender_id, status, read_status, priority, sent_at, read_at, created_by, created_at
+)
+VALUES
+  ('01SEED0100DKV0000000000007', '01KRERJN800000000000000001', '01SEED0100N0T0000000000007', 'pos', 'user', '01KRERJN8F0000000000000031',
+   'system', NULL, 'sent', 'unread', 'normal', '2026-07-08 14:45:00+08', NULL, '01KRERJN8F0000000000000031', '2026-07-08 14:45:00+08'),
+  ('01SEED0100DKV0000000000008', '01KRERJN800000000000000001', '01SEED0100N0T0000000000008', 'pos', 'user', '01KRERJN8F0000000000000031',
+   'system', NULL, 'sent', 'unread', 'critical', '2026-07-08 11:50:00+08', NULL, '01KRERJN8F0000000000000032', '2026-07-08 11:50:00+08'),
+  ('01SEED0100DKV0000000000009', '01KRERJN800000000000000001', '01SEED0100N0T0000000000009', 'pos', 'user', '01KRERJN8F0000000000000031',
+   'system', NULL, 'sent', 'unread', 'high', '2026-07-08 09:20:00+08', NULL, '01KRERJN8F0000000000000031', '2026-07-08 09:20:00+08'),
+  ('01SEED0100DKV0000000000010', '01KRERJN800000000000000001', '01SEED0100N0T0000000000010', 'pos', 'user', '01KRERJN8F0000000000000031',
+   'system', NULL, 'sent', 'read', 'low', '2026-07-08 12:40:00+08', '2026-07-08 12:45:00+08', '01KRERJN8F0000000000000031', '2026-07-08 12:40:00+08')
+ON CONFLICT (id) DO UPDATE SET
+  status = EXCLUDED.status,
+  read_status = EXCLUDED.read_status,
+  priority = EXCLUDED.priority,
+  sent_at = EXCLUDED.sent_at,
+  read_at = EXCLUDED.read_at,
+  created_at = EXCLUDED.created_at,
   updated_at = now();
