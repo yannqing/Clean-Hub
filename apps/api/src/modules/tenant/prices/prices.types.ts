@@ -34,6 +34,8 @@ export type UpdatePriceRequest = {
   amount?: string;
   currency?: string;
   status?: PriceStatus;
+  /** Optimistic-concurrency version from the record the editor last read. */
+  version: number;
 };
 
 export type TenantPriceInput<TData> = {

@@ -251,6 +251,7 @@ export const tenantMessagesZhCN: TenantMessages = {
     deletedToast: "已删除「{name}」。",
     formFallbackError: "请检查服务表单。",
     requestFailed: "服务请求失败。",
+    versionConflict: "该服务已被其它请求更新，请刷新后重试。",
     delete: {
       title: "删除服务",
       description: "确定要删除此服务吗？此操作不可撤销，并可能影响已有价格和订单。",
@@ -285,6 +286,7 @@ export const tenantMessagesZhCN: TenantMessages = {
     empty: "暂无价格",
     requestFailed: "价格请求失败。",
     formFallbackError: "请检查价格表单。",
+    versionConflict: "该价格已被其它请求更新，请刷新后重试。",
     updatePrice: "更新价格",
   },
 

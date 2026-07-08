@@ -258,6 +258,8 @@ export const tenantMessagesEn: TenantMessages = {
     deletedToast: 'Deleted "{name}".',
     formFallbackError: "Check the service form.",
     requestFailed: "Service request failed.",
+    versionConflict:
+      "This service was updated by another request. Refresh and try again.",
     delete: {
       title: "Delete Service",
       description:
@@ -293,6 +295,8 @@ export const tenantMessagesEn: TenantMessages = {
     empty: "No prices yet",
     requestFailed: "Price request failed.",
     formFallbackError: "Check the price form.",
+    versionConflict:
+      "This price was updated by another request. Refresh and try again.",
     updatePrice: "Update price",
   },
 

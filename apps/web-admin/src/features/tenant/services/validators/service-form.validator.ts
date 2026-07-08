@@ -87,5 +87,25 @@ export function validateServiceForm(
 export function validateServiceUpdateForm(
   input: ServiceFormValues,
 ): ServiceFormValidationResult<UpdateServiceRequest> {
-  return validateServiceForm(input);
+  const result = validateBase(input);
+  const errors = { ...result.errors };
+
+  if (!Number.isInteger(input.version) || input.version < 1) {
+    errors.version = "Service version is required. Refresh and try again.";
+  }
+
+  if (Object.keys(errors).length > 0) {
+    return {
+      ok: false,
+      errors,
+    };
+  }
+
+  return {
+    ok: true,
+    data: {
+      ...result.data,
+      version: input.version,
+    },
+  };
 }

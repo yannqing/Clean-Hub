@@ -26,6 +26,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { interpolate, useTenantI18n } from "@/i18n";
+import { isVersionConflict } from "@/features/tenant/shared/version-conflict";
 
 import {
   createServiceAction,
@@ -57,6 +58,7 @@ const defaultFormValues: ServiceFormValues = {
   categoryId: "",
   pricingUnit: "per_item",
   status: "active",
+  version: 0,
 };
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -70,6 +72,7 @@ function toFormValues(service: ServiceSummary): ServiceFormValues {
     categoryId: service.categoryId ?? "",
     pricingUnit: service.pricingUnit,
     status: service.status,
+    version: service.version,
   };
 }
 
@@ -156,9 +159,16 @@ export function ServiceCatalogView() {
         : await createServiceAction(formValues);
 
       if (!result.ok) {
-        setFormError(
-          Object.values(result.errors)[0] ?? m.services.formFallbackError,
-        );
+        const conflict = isVersionConflict(result);
+        const nextMessage = conflict
+          ? m.services.versionConflict
+          : Object.values(result.errors)[0] ??
+            result.message ??
+            m.services.formFallbackError;
+        setFormError(nextMessage);
+        if (conflict) {
+          toast.error(nextMessage);
+        }
         return;
       }
 
@@ -175,33 +185,44 @@ export function ServiceCatalogView() {
   async function handleDelete(service: ServiceSummary) {
     setDeleting(true);
 
-    try {
-      await deleteServiceAction(service.id);
-      toast.success(interpolate(m.services.deletedToast, { name: service.name }));
-      setPendingDelete(null);
-      await loadServices();
-    } catch (deleteError) {
-      toast.error(getErrorMessage(deleteError, m.services.requestFailed));
-    } finally {
+    const result = await deleteServiceAction(service.id);
+
+    if (!result.ok) {
+      const nextMessage = isVersionConflict(result)
+        ? m.services.versionConflict
+        : (result.message ?? m.services.requestFailed);
+      toast.error(nextMessage);
       setDeleting(false);
+      return;
     }
+
+    toast.success(interpolate(m.services.deletedToast, { name: service.name }));
+    setPendingDelete(null);
+    await loadServices();
+    setDeleting(false);
   }
 
   async function handleStatusChange(service: ServiceSummary) {
     setSaving(true);
     setFormError(null);
 
-    try {
-      await updateServiceStatusAction(
-        service.id,
-        service.status === "active" ? "inactive" : "active",
+    const result = await updateServiceStatusAction(
+      service.id,
+      service.status === "active" ? "inactive" : "active",
+      service.version,
+    );
+
+    if (!result.ok) {
+      setFormError(
+        isVersionConflict(result)
+          ? m.services.versionConflict
+          : (result.message ?? m.services.requestFailed),
       );
+    } else {
       await loadServices();
-    } catch (statusError) {
-      setFormError(getErrorMessage(statusError, m.services.requestFailed));
-    } finally {
-      setSaving(false);
     }
+
+    setSaving(false);
   }
 
   return (

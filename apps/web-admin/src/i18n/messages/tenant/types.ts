@@ -263,6 +263,7 @@ export type TenantMessages = {
     deletedToast: string;
     formFallbackError: string;
     requestFailed: string;
+    versionConflict: string;
     delete: {
       title: string;
       description: string;
@@ -297,6 +298,7 @@ export type TenantMessages = {
     empty: string;
     requestFailed: string;
     formFallbackError: string;
+    versionConflict: string;
     updatePrice: string;
   };
 

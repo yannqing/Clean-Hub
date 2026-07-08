@@ -20,6 +20,7 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useTenantI18n } from "@/i18n";
+import { isVersionConflict } from "@/features/tenant/shared/version-conflict";
 
 import {
   updatePriceAction,
@@ -47,6 +48,7 @@ const defaultFormValues: PriceFormValues = {
   amount: "",
   currency: "XOF",
   status: "active",
+  version: 0,
 };
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -58,6 +60,7 @@ function toFormValues(price: PriceSummary): PriceFormValues {
     amount: price.amount,
     currency: price.currency,
     status: price.status,
+    version: price.version,
   };
 }
 
@@ -143,9 +146,17 @@ export function PriceCatalogView() {
       const result = await updatePriceAction(editingPriceId, formValues);
 
       if (!result.ok) {
-        setFormError(
-          Object.values(result.errors)[0] ?? m.prices.formFallbackError,
-        );
+        const conflict = isVersionConflict(result);
+        const nextMessage = conflict
+          ? m.prices.versionConflict
+          : Object.values(result.errors)[0] ??
+            result.message ??
+            m.prices.formFallbackError;
+        setFormError(nextMessage);
+        if (conflict) {
+          setEditingPriceId(null);
+          setFormValues(defaultFormValues);
+        }
         return;
       }
 
@@ -159,21 +170,31 @@ export function PriceCatalogView() {
     }
   }
 
-  async function handleStatusChange(priceId: string, currentStatus: PriceStatus) {
+  async function handleStatusChange(
+    priceId: string,
+    currentStatus: PriceStatus,
+    version: number,
+  ) {
     setSaving(true);
     setFormError(null);
 
-    try {
-      await updatePriceStatusAction(
-        priceId,
-        currentStatus === "active" ? "inactive" : "active",
+    const result = await updatePriceStatusAction(
+      priceId,
+      currentStatus === "active" ? "inactive" : "active",
+      version,
+    );
+
+    if (!result.ok) {
+      setFormError(
+        isVersionConflict(result)
+          ? m.prices.versionConflict
+          : (result.message ?? m.prices.requestFailed),
       );
+    } else {
       await loadPrices();
-    } catch (statusError) {
-      setFormError(getErrorMessage(statusError, m.prices.requestFailed));
-    } finally {
-      setSaving(false);
     }
+
+    setSaving(false);
   }
 
   return (
@@ -388,7 +409,9 @@ export function PriceCatalogView() {
                 <TableCell className="space-x-2 text-right">
                   <Button
                     disabled={saving}
-                    onClick={() => void handleStatusChange(price.id, price.status)}
+                    onClick={() =>
+                      void handleStatusChange(price.id, price.status, price.version)
+                    }
                     size="sm"
                     type="button"
                     variant="outline"

@@ -215,6 +215,7 @@ export async function updateTenantServiceStatus(
   authContext: AuthContext,
   serviceId: string,
   status: ServiceStatus,
+  version: number,
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
 ): Promise<ServiceSummary> {
@@ -242,6 +243,7 @@ export async function updateTenantServiceStatus(
       tenantId,
       serviceId,
       status,
+      version,
       actorUserId: authContext.userId,
     });
 
