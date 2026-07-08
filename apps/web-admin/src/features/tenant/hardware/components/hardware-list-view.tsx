@@ -33,8 +33,14 @@ import {
   hardwareDeviceTypeOptions,
 } from "../constants";
 import { getDeviceListQuery } from "../queries";
-import { bindDeviceAction, updateDeviceAction } from "../actions";
+import { getTenantBranchListQuery } from "../../users/queries";
+import {
+  bindDeviceAction,
+  deleteDeviceAction,
+  updateDeviceAction,
+} from "../actions";
 import type {
+  BranchSummary,
   CreateHardwareConfigRequest,
   HardwareConfigSummary,
   HardwareConnectionType,
@@ -44,8 +50,8 @@ import type {
 
 const PAGE_SIZE = 20;
 
-function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "";
 }
 
 function StatusBadge({
@@ -59,11 +65,56 @@ function StatusBadge({
   return <Badge variant={variant}>{label}</Badge>;
 }
 
+/**
+ * Single-select branch picker. Mirrors the multi-select used by the tenant
+ * users module so the two surfaces stay consistent.
+ */
+function BranchSelect({
+  branches,
+  disabled = false,
+  emptyLabel,
+  onChange,
+  selected,
+}: {
+  branches: BranchSummary[];
+  disabled?: boolean;
+  emptyLabel: string;
+  selected: string;
+  onChange: (branchId: string) => void;
+}) {
+  if (branches.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground px-1">{emptyLabel}</p>
+    );
+  }
+
+  return (
+    <Select
+      disabled={disabled}
+      onValueChange={(value) => onChange(value === "__none__" ? "" : value)}
+      value={selected || "__none__"}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none__">{emptyLabel}</SelectItem>
+        {branches.map((branch) => (
+          <SelectItem key={branch.id} value={branch.id}>
+            {branch.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 export function HardwareListView() {
   const isCurrent = useRef(true);
   const { m, formatDateTime } = useTenantI18n();
 
   const [devices, setDevices] = useState<HardwareConfigSummary[]>([]);
+  const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [offset, setOffset] = useState(0);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -79,15 +130,30 @@ export function HardwareListView() {
   const [createError, setCreateError] = useState<string | null>(null);
 
   const [editDevice, setEditDevice] = useState<HardwareConfigSummary | null>(null);
-  const [editForm, setEditForm] = useState<UpdateHardwareConfigRequest>({});
+  const [editForm, setEditForm] = useState<UpdateHardwareConfigRequest>({
+    version: 0,
+  });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [pendingDelete, setPendingDelete] = useState<HardwareConfigSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     isCurrent.current = true;
     return () => {
       isCurrent.current = false;
     };
+  }, []);
+
+  useEffect(() => {
+    getTenantBranchListQuery()
+      .then((result) => {
+        if (isCurrent.current) setBranches(result);
+      })
+      .catch(() => {
+        /* non-critical; branch pickers fall back to the empty state */
+      });
   }, []);
 
   const loadDevices = useCallback(() => {
@@ -101,7 +167,7 @@ export function HardwareListView() {
         setDevices(result);
       } catch (err) {
         if (!isCurrent.current) return;
-        setError(getErrorMessage(err, m.hardware.requestFailed));
+        setError(getErrorMessage(err) || m.hardware.requestFailed);
       }
     });
   }, [offset, m.hardware.requestFailed]);
@@ -109,6 +175,11 @@ export function HardwareListView() {
   useEffect(() => {
     loadDevices();
   }, [loadDevices]);
+
+  const getBranchName = useCallback(
+    (branchId: string) => branches.find((b) => b.id === branchId)?.name ?? branchId,
+    [branches],
+  );
 
   const handleCreate = useCallback(async () => {
     setCreateLoading(true);
@@ -133,8 +204,10 @@ export function HardwareListView() {
     setEditDevice(device);
     setEditForm({
       name: device.name,
+      branchId: device.branchId,
       connectionType: device.connectionType,
       status: device.status,
+      version: device.version,
     });
     setEditError(null);
   }, []);
@@ -158,6 +231,26 @@ export function HardwareListView() {
     setEditDevice(null);
     loadDevices();
   }, [editDevice, editForm, loadDevices]);
+
+  const handleDelete = useCallback(
+    async (device: HardwareConfigSummary) => {
+      setDeleting(true);
+
+      const result = await deleteDeviceAction(device.id, device.version);
+
+      if (!isCurrent.current) return;
+      setDeleting(false);
+
+      if (!result.ok) {
+        setError(result.error || m.hardware.requestFailed);
+        return;
+      }
+
+      setPendingDelete(null);
+      loadDevices();
+    },
+    [loadDevices, m.hardware.requestFailed],
+  );
 
   return (
     <div className="flex flex-col gap-6 p-6">
@@ -191,9 +284,17 @@ export function HardwareListView() {
             {devices.map((device) => (
               <TableRow key={device.id}>
                 <TableCell className="font-medium">{device.name}</TableCell>
-                <TableCell>{device.deviceType}</TableCell>
-                <TableCell>{device.connectionType}</TableCell>
-                <TableCell className="font-mono text-xs">{device.branchId}</TableCell>
+                <TableCell>
+                  {hardwareDeviceTypeOptions.find(
+                    (opt) => opt.value === device.deviceType,
+                  )?.label ?? device.deviceType}
+                </TableCell>
+                <TableCell>
+                  {hardwareConnectionTypeOptions.find(
+                    (opt) => opt.value === device.connectionType,
+                  )?.label ?? device.connectionType}
+                </TableCell>
+                <TableCell>{getBranchName(device.branchId)}</TableCell>
                 <TableCell>
                   <StatusBadge
                     status={device.status}
@@ -201,13 +302,20 @@ export function HardwareListView() {
                   />
                 </TableCell>
                 <TableCell>{formatDateTime(device.createdAt)}</TableCell>
-                <TableCell>
+                <TableCell className="space-x-2 text-right">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => handleOpenEdit(device)}
                   >
-                    {m.common.edit}
+                    {m.hardware.actions.edit}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setPendingDelete(device)}
+                  >
+                    {m.hardware.actions.delete}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -238,12 +346,13 @@ export function HardwareListView() {
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <Label>{m.hardware.create.labels.branchId} *</Label>
-              <Input
-                placeholder={m.hardware.create.labels.branchPlaceholder}
-                value={createForm.branchId}
-                onChange={(e) =>
-                  setCreateForm((prev) => ({ ...prev, branchId: e.target.value }))
+              <BranchSelect
+                branches={branches}
+                emptyLabel={m.hardware.noBranches}
+                onChange={(branchId) =>
+                  setCreateForm((prev) => ({ ...prev, branchId }))
                 }
+                selected={createForm.branchId}
               />
             </div>
             <div className="flex flex-col gap-1.5">
@@ -339,6 +448,30 @@ export function HardwareListView() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
+              <Label>{m.hardware.columns.type}</Label>
+              <p className="text-sm text-muted-foreground">
+                {editDevice
+                  ? hardwareDeviceTypeOptions.find(
+                      (opt) => opt.value === editDevice.deviceType,
+                    )?.label ?? editDevice.deviceType
+                  : ""}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {m.hardware.typeReadonlyHint}
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>{m.hardware.edit.labels.branchId}</Label>
+              <BranchSelect
+                branches={branches}
+                emptyLabel={m.hardware.noBranches}
+                onChange={(branchId) =>
+                  setEditForm((prev) => ({ ...prev, branchId }))
+                }
+                selected={editForm.branchId ?? ""}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
               <Label>{m.hardware.edit.labels.connectionType}</Label>
               <Select
                 value={editForm.connectionType ?? ""}
@@ -399,6 +532,37 @@ export function HardwareListView() {
                   : m.hardware.edit.saveChanges}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{m.hardware.delete.title}</DialogTitle>
+            <DialogDescription>{m.hardware.delete.description}</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3">
+            <Button
+              disabled={deleting}
+              onClick={() => setPendingDelete(null)}
+              variant="outline"
+            >
+              {m.common.cancel}
+            </Button>
+            <Button
+              disabled={deleting}
+              onClick={() => pendingDelete && void handleDelete(pendingDelete)}
+              variant="destructive"
+            >
+              {deleting ? m.hardware.delete.deleting : m.hardware.delete.action}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

@@ -295,6 +295,8 @@ export const tenantMessagesZhCN: TenantMessages = {
     title: "硬件设备",
     addDevice: "添加设备",
     noDevices: "未找到设备。",
+    noBranches: "暂无门店，请先创建门店。",
+    typeReadonlyHint: "设备类型创建后不可修改。",
     columns: {
       name: "名称",
       type: "类型",
@@ -308,8 +310,8 @@ export const tenantMessagesZhCN: TenantMessages = {
       title: "添加设备",
       description: "将硬件设备注册到某个门店。",
       labels: {
-        branchId: "门店 ID",
-        branchPlaceholder: "请输入门店 ULID",
+        branchId: "门店",
+        branchPlaceholder: "选择门店",
         deviceName: "设备名称",
         deviceType: "设备类型",
         connectionType: "连接类型",
@@ -321,11 +323,22 @@ export const tenantMessagesZhCN: TenantMessages = {
       title: "编辑设备",
       labels: {
         deviceName: "设备名称",
+        branchId: "门店",
         connectionType: "连接类型",
         status: "状态",
       },
       savingChanges: "保存中...",
       saveChanges: "保存修改",
+    },
+    delete: {
+      title: "删除设备",
+      description: "确定要删除此设备吗？记录会保留以供审计查阅。",
+      deleting: "删除中...",
+      action: "删除",
+    },
+    actions: {
+      edit: "编辑",
+      delete: "删除",
     },
     requestFailed: "发生了意外错误。",
   },

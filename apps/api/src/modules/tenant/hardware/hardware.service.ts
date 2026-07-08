@@ -7,10 +7,12 @@ import {
   findHardwareConfigById,
   findHardwareConfigs,
   insertHardwareConfig,
+  softDeleteHardwareConfig,
   updateHardwareConfigRecord,
 } from "./hardware.repository.js";
 import type {
   CreateHardwareConfigInput,
+  DeleteHardwareConfigInput,
   HardwareConfigSummary,
   ListHardwareConfigsInput,
   UpdateHardwareConfigInput,
@@ -89,9 +91,11 @@ export async function updateHardwareConfig(
       hardwareId: input.hardwareId,
       tenantId,
       name: input.data.name,
+      branchId: input.data.branchId,
       connectionType: input.data.connectionType,
       config: input.data.config,
       status: input.data.status,
+      version: input.data.version,
       actorUserId: input.authContext.userId,
     });
 
@@ -104,6 +108,7 @@ export async function updateHardwareConfig(
       entityId: input.hardwareId,
       before: {
         name: existing.name,
+        branchId: existing.branchId,
         connectionType: existing.connectionType,
         config: existing.config,
         status: existing.status,
@@ -116,5 +121,51 @@ export async function updateHardwareConfig(
     const updated = await findHardwareConfigById(tx, tenantId, input.hardwareId);
 
     return updated!;
+  });
+}
+
+export async function deleteHardwareConfig(
+  input: DeleteHardwareConfigInput,
+  db: Database = getDb(),
+): Promise<void> {
+  requireTenantRole(input.authContext, ["owner", "manager"]);
+
+  const tenantId = input.authContext.tenantId!;
+
+  await db.transaction(async (tx) => {
+    const existing = await findHardwareConfigById(tx, tenantId, input.hardwareId);
+
+    if (!existing) {
+      throw new HardwareError(
+        "HARDWARE_NOT_FOUND",
+        "Hardware config was not found.",
+        404,
+      );
+    }
+
+    await softDeleteHardwareConfig(tx, {
+      hardwareId: input.hardwareId,
+      tenantId,
+      version: input.version,
+      actorUserId: input.authContext.userId,
+    });
+
+    await writeAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      tenantId,
+      eventCategory: "tenant_hardware",
+      eventType: "tenant_hardware.deleted",
+      entityType: "hardware_config",
+      entityId: input.hardwareId,
+      before: {
+        name: existing.name,
+        deviceType: existing.deviceType,
+        connectionType: existing.connectionType,
+        branchId: existing.branchId,
+        status: existing.status,
+      },
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
   });
 }

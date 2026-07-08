@@ -40,7 +40,8 @@ type DeviceFormField =
   | "name"
   | "deviceType"
   | "connectionType"
-  | "status";
+  | "status"
+  | "version";
 
 type DeviceFormErrors = Partial<Record<DeviceFormField, string>>;
 
@@ -102,6 +103,10 @@ export function validateUpdateDeviceForm(
 ): ValidationResult<UpdateHardwareConfigRequest> {
   const errors: DeviceFormErrors = {};
 
+  if (!Number.isInteger(input.version) || input.version < 1) {
+    errors.version = "Device version is required. Refresh and try again.";
+  }
+
   if (input.name !== undefined) {
     const name = input.name.trim();
 
@@ -110,6 +115,13 @@ export function validateUpdateDeviceForm(
     } else if (name.length > 200) {
       errors.name = "Device name must be 200 characters or fewer.";
     }
+  }
+
+  if (
+    input.branchId !== undefined &&
+    !isUlid(input.branchId)
+  ) {
+    errors.branchId = "Select a valid branch.";
   }
 
   if (
@@ -126,7 +138,9 @@ export function validateUpdateDeviceForm(
     errors.status = "Choose a supported status.";
   }
 
-  const hasField = Object.values(input).some((value) => value !== undefined);
+  const hasField = (
+    ["name", "branchId", "connectionType", "status", "config"] as const
+  ).some((key) => input[key] !== undefined);
 
   if (!hasField && Object.keys(errors).length === 0) {
     return {
@@ -139,10 +153,14 @@ export function validateUpdateDeviceForm(
     return { ok: false, errors };
   }
 
-  const data: UpdateHardwareConfigRequest = {};
+  const data: UpdateHardwareConfigRequest = { version: input.version };
 
   if (input.name !== undefined) {
     data.name = input.name.trim();
+  }
+
+  if (input.branchId !== undefined) {
+    data.branchId = input.branchId;
   }
 
   if (input.connectionType !== undefined) {

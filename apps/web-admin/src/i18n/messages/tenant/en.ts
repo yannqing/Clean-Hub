@@ -305,6 +305,8 @@ export const tenantMessagesEn: TenantMessages = {
     title: "Hardware Devices",
     addDevice: "Add Device",
     noDevices: "No devices found.",
+    noBranches: "No branches available. Create a branch first.",
+    typeReadonlyHint: "Device type cannot be changed after creation.",
     columns: {
       name: "Name",
       type: "Type",
@@ -318,8 +320,8 @@ export const tenantMessagesEn: TenantMessages = {
       title: "Add Device",
       description: "Register a hardware device to a branch.",
       labels: {
-        branchId: "Branch ID",
-        branchPlaceholder: "Enter branch ULID",
+        branchId: "Branch",
+        branchPlaceholder: "Select a branch",
         deviceName: "Device Name",
         deviceType: "Device Type",
         connectionType: "Connection Type",
@@ -331,11 +333,23 @@ export const tenantMessagesEn: TenantMessages = {
       title: "Edit Device",
       labels: {
         deviceName: "Device Name",
+        branchId: "Branch",
         connectionType: "Connection Type",
         status: "Status",
       },
       savingChanges: "Saving...",
       saveChanges: "Save Changes",
+    },
+    delete: {
+      title: "Delete Device",
+      description:
+        "Are you sure you want to delete this device? The record is retained for audit history.",
+      deleting: "Deleting...",
+      action: "Delete",
+    },
+    actions: {
+      edit: "Edit",
+      delete: "Delete",
     },
     requestFailed: "An unexpected error occurred.",
   },

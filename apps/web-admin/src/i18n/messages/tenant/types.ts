@@ -307,6 +307,8 @@ export type TenantMessages = {
     title: string;
     addDevice: string;
     noDevices: string;
+    noBranches: string;
+    typeReadonlyHint: string;
     columns: {
       name: string;
       type: string;
@@ -333,11 +335,22 @@ export type TenantMessages = {
       title: string;
       labels: {
         deviceName: string;
+        branchId: string;
         connectionType: string;
         status: string;
       };
       savingChanges: string;
       saveChanges: string;
+    };
+    delete: {
+      title: string;
+      description: string;
+      deleting: string;
+      action: string;
+    };
+    actions: {
+      edit: string;
+      delete: string;
     };
     requestFailed: string;
   };
