@@ -106,7 +106,6 @@ export function PosShell({
     locale === "zh-CN"
       ? resolvedProfile.initials
       : (roleLabel.trim()[0]?.toUpperCase() ?? resolvedProfile.initials);
-
   return (
     <div className="flex h-screen overflow-hidden bg-[#F7F9FC] text-slate-900">
       <aside
@@ -241,13 +240,14 @@ export function PosShell({
               {t("pos.shell.synced")}
             </div>
             <LanguageSwitcher />
-            <button
+            <LogoutButton
+              aria-label={t("pos.shell.lockScreen")}
               className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              type="button"
+              signOutLabel={t("pos.shell.lockScreen")}
             >
               <Icon className="h-4 w-4 text-slate-500" name="lock" />
               {t("pos.shell.lockScreen")}
-            </button>
+            </LogoutButton>
             <HeaderNotificationsMenu
               onUnreadCountChange={setCurrentUnreadCount}
               unreadCount={currentUnreadCount}
