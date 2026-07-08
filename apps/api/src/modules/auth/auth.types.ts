@@ -20,6 +20,12 @@ export type LoginInput = AuthRequestMeta & {
   tenantCode?: string;
 };
 
+export type PosPinLoginInput = AuthRequestMeta & {
+  pin: string;
+  tenantCode: string;
+  deviceId: string;
+};
+
 export type RefreshInput = AuthRequestMeta & {
   refreshToken: string;
 };
@@ -70,6 +76,7 @@ export type AuthenticatedUser = {
   userType: "saas" | "tenant";
   email: string | null;
   passwordHash: string;
+  pinHash: string;
   status: "invited" | "active" | "disabled" | "suspended";
 };
 

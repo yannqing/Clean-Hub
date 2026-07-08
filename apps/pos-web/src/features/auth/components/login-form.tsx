@@ -3,7 +3,7 @@
 import { useTranslation } from "@cleanhub/i18n/react";
 import { posToast as toast } from "@/lib/pos-toast";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { posTenantCode } from "@/config/tenant";
 import { posApi } from "@/lib/api-client";
@@ -16,9 +16,11 @@ import {
 } from "../validators/login-form.validator";
 
 const initialState: LoginFormValues = {
-  identifier: "",
-  password: "",
+  pin: "",
 };
+
+const PIN_LENGTH = 6;
+const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 
 function isSafeInternalPath(path: string | null): path is string {
   return Boolean(path) && path!.startsWith("/") && !path!.startsWith("//");
@@ -40,23 +42,30 @@ export function LoginForm() {
   const [fieldErrors, setFieldErrors] = useState<LoginFormFieldErrors>({});
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittedPinRef = useRef<string | null>(null);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function submitPin(pin: string) {
+    if (submitting || submittedPinRef.current === pin) {
+      return;
+    }
+
+    submittedPinRef.current = pin;
     setErrorMessage(null);
 
     if (!posTenantCode) {
       const message = t("pos.auth.missingTenantCode");
+      submittedPinRef.current = null;
       setErrorMessage(message);
       toast.error(message);
       return;
     }
 
-    const validationErrors = validateLoginForm(formState, {
-      identifierRequired: t("pos.auth.validation.identifierRequired"),
-      passwordRequired: t("pos.auth.validation.passwordRequired"),
+    const validationErrors = validateLoginForm({ pin }, {
+      pinRequired: t("pos.auth.validation.pinRequired"),
+      pinInvalid: t("pos.auth.validation.pinInvalid"),
     });
     if (validationErrors) {
+      submittedPinRef.current = null;
       setFieldErrors(validationErrors);
       return;
     }
@@ -65,9 +74,8 @@ export function LoginForm() {
     setSubmitting(true);
 
     try {
-      await posApi.auth.login({
-        identifier: formState.identifier.trim(),
-        password: formState.password,
+      await posApi.auth.posPinLogin({
+        pin,
         tenantCode: posTenantCode,
         deviceId: getOrCreatePosDeviceId(),
       });
@@ -78,28 +86,47 @@ export function LoginForm() {
     } catch (error) {
       const message = error instanceof Error ? error.message : t("pos.auth.loginFailed");
       setErrorMessage(message);
+      setFormState(initialState);
+      submittedPinRef.current = null;
       toast.error(message);
     } finally {
       setSubmitting(false);
     }
   }
 
-  function updateField<K extends keyof LoginFormValues>(
-    field: K,
-    value: LoginFormValues[K],
-  ) {
-    setFormState((current) => ({
-      ...current,
-      [field]: value,
-    }));
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void submitPin(formState.pin);
+  }
 
-    if (fieldErrors[field]) {
-      setFieldErrors((current) => {
-        const next = { ...current };
-        delete next[field];
-        return next;
-      });
+  function updatePin(value: string) {
+    const pin = value.replace(/\D/g, "").slice(0, PIN_LENGTH);
+
+    setFormState({ pin });
+    setErrorMessage(null);
+
+    if (fieldErrors.pin) {
+      setFieldErrors({});
     }
+
+    if (pin.length < PIN_LENGTH) {
+      submittedPinRef.current = null;
+      return;
+    }
+
+    void submitPin(pin);
+  }
+
+  function appendDigit(digit: string) {
+    updatePin(`${formState.pin}${digit}`);
+  }
+
+  function removeLastDigit() {
+    updatePin(formState.pin.slice(0, -1));
+  }
+
+  function clearPin() {
+    updatePin("");
   }
 
   return (
@@ -107,49 +134,66 @@ export function LoginForm() {
       <div className="grid gap-2">
         <label
           className="text-sm font-semibold text-slate-700"
-          htmlFor="identifier"
+          htmlFor="pin"
         >
-          {t("pos.auth.identifier")}
+          {t("pos.auth.pin")}
         </label>
         <input
-          aria-invalid={Boolean(fieldErrors.identifier)}
-          autoComplete="username"
-          className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
-          id="identifier"
-          name="identifier"
-          onChange={(event) => updateField("identifier", event.target.value)}
-          placeholder={t("pos.auth.identifierPlaceholder")}
+          aria-invalid={Boolean(fieldErrors.pin)}
+          autoComplete="one-time-code"
+          className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-center text-xl font-semibold text-slate-900 outline-none transition placeholder:text-sm placeholder:font-medium placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
+          id="pin"
+          inputMode="numeric"
+          maxLength={PIN_LENGTH}
+          name="pin"
+          onChange={(event) => updatePin(event.target.value)}
+          pattern="[0-9]*"
+          placeholder={t("pos.auth.pinPlaceholder")}
           required
-          type="text"
-          value={formState.identifier}
+          type="password"
+          value={formState.pin}
         />
-        {fieldErrors.identifier ? (
-          <p className="text-xs text-red-500">{fieldErrors.identifier}</p>
+        {fieldErrors.pin ? (
+          <p className="text-xs text-red-500">{fieldErrors.pin}</p>
         ) : null}
       </div>
 
-      <div className="grid gap-2">
-        <label
-          className="text-sm font-semibold text-slate-700"
-          htmlFor="password"
+      <div className="grid grid-cols-3 gap-2">
+        {KEYPAD_KEYS.map((digit) => (
+          <button
+            className="flex h-12 items-center justify-center rounded-lg border border-slate-200 bg-white text-lg font-semibold text-slate-900 transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={submitting}
+            key={digit}
+            onClick={() => appendDigit(digit)}
+            type="button"
+          >
+            {digit}
+          </button>
+        ))}
+        <button
+          className="flex h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={submitting || formState.pin.length === 0}
+          onClick={clearPin}
+          type="button"
         >
-          {t("pos.auth.password")}
-        </label>
-        <input
-          aria-invalid={Boolean(fieldErrors.password)}
-          autoComplete="current-password"
-          className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
-          id="password"
-          name="password"
-          onChange={(event) => updateField("password", event.target.value)}
-          placeholder={t("pos.auth.passwordPlaceholder")}
-          required
-          type="password"
-          value={formState.password}
-        />
-        {fieldErrors.password ? (
-          <p className="text-xs text-red-500">{fieldErrors.password}</p>
-        ) : null}
+          {t("pos.auth.clearPin")}
+        </button>
+        <button
+          className="flex h-12 items-center justify-center rounded-lg border border-slate-200 bg-white text-lg font-semibold text-slate-900 transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={submitting}
+          onClick={() => appendDigit("0")}
+          type="button"
+        >
+          0
+        </button>
+        <button
+          className="flex h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={submitting || formState.pin.length === 0}
+          onClick={removeLastDigit}
+          type="button"
+        >
+          {t("pos.auth.deleteDigit")}
+        </button>
       </div>
 
       {errorMessage ? (
@@ -157,14 +201,6 @@ export function LoginForm() {
           {errorMessage}
         </p>
       ) : null}
-
-      <button
-        className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={submitting}
-        type="submit"
-      >
-        {submitting ? t("pos.auth.submitting") : t("pos.auth.submit")}
-      </button>
 
       {posTenantCode ? (
         <p className="text-center text-xs text-slate-400">

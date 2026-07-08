@@ -13,6 +13,7 @@ export function createAuthRoutes({ authService }: CreateAuthRoutesOptions) {
   const controller = createAuthController({ authService });
 
   routes.post("/login", controller.login);
+  routes.post("/pos-pin-login", controller.posPinLogin);
   routes.post("/refresh", controller.refresh);
   routes.post("/logout", controller.logout);
   routes.get("/me", controller.me);

@@ -43,14 +43,14 @@
 **登录方式:**
 
 ```
-POST /auth/login
+POST /auth/pos-pin-login
 ```
 
 ```json
 {
-  "identifier": "pos.cashier1@cleanhub.local",
-  "password": "123456",
-  "tenantCode": "CLEAN-001"
+  "pin": "111111",
+  "tenantCode": "CLEAN-001",
+  "deviceId": "pos-web-default"
 }
 ```
 

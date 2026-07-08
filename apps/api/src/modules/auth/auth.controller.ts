@@ -4,7 +4,10 @@ import { getRequestMeta } from "../../http/request-meta.js";
 import { appendSetCookieHeaders } from "../../http/response.js";
 import type { AppBindings } from "../../http/types.js";
 import type { AuthService } from "./auth.service.js";
-import { loginRequestSchema } from "./auth.validation.js";
+import {
+  loginRequestSchema,
+  posPinLoginRequestSchema,
+} from "./auth.validation.js";
 import {
   ACCESS_COOKIE_NAME,
   REFRESH_COOKIE_NAME,
@@ -22,6 +25,22 @@ export function createAuthController({ authService }: AuthControllerOptions) {
         identifier: body.identifier,
         password: body.password,
         tenantCode: body.tenantCode,
+        ...getRequestMeta(c, body.deviceId),
+      });
+
+      appendSetCookieHeaders(c, result.setCookieHeaders);
+
+      return c.json({
+        authContext: result.authContext,
+      });
+    },
+
+    posPinLogin: async (c: import("hono").Context<AppBindings>) => {
+      const body = posPinLoginRequestSchema.parse(await c.req.json());
+      const result = await authService.loginWithPosPin({
+        pin: body.pin,
+        tenantCode: body.tenantCode,
+        deviceId: body.deviceId,
         ...getRequestMeta(c, body.deviceId),
       });
 
