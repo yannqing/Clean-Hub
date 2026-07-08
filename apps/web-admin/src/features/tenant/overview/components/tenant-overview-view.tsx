@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { formatMoney } from "@/lib/format";
 import { useTenantI18n } from "@/i18n";
 
 import { BRANCH_LIST_LIMIT, getBranchListQuery } from "../../branches/queries";
@@ -244,14 +245,12 @@ export function TenantOverviewView({
           <div key={key} className="rounded-md border bg-background p-4">
             <p className="text-sm text-muted-foreground">{metricLabels[key]}</p>
             <p className="mt-3 text-2xl font-semibold">
-              {overview[key].toLocaleString()}
+              {key === "todayRevenueAmount"
+                ? formatMoney(overview[key], overview.currency)
+                : overview[key].toLocaleString()}
             </p>
           </div>
         ))}
-      </div>
-
-      <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-        {m.overview.placeholderNotice}
       </div>
 
       <div className="grid gap-3">

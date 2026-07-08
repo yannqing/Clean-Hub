@@ -3,6 +3,7 @@
 import { Badge, Button } from "@cleanhub/ui";
 import { useCallback, useEffect, useState } from "react";
 
+import { formatMoney } from "@/lib/format";
 import { useSaasI18n } from "@/i18n";
 
 import { getSaasOverviewQuery } from "../queries";
@@ -108,7 +109,11 @@ export function SaasOverviewView() {
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 {m.overview.metrics[key]}
               </p>
-              <p className="mt-2 text-2xl font-semibold">{value}</p>
+              <p className="mt-2 text-2xl font-semibold">
+                {key === "todayRevenue"
+                  ? formatMoney(value)
+                  : value.toLocaleString()}
+              </p>
             </div>
           ))}
         </div>

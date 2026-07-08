@@ -12,11 +12,15 @@ export type TenantOverviewFeatureFlags = {
   notificationsEnabled: boolean;
 };
 
-export type TenantOverview = {
+export type TenantOverviewBase = {
   tenantId: string;
   tenantName: string;
   tenantStatus: "active" | "suspended" | "disabled";
   featureFlags: TenantOverviewFeatureFlags;
+  currency: string;
+};
+
+export type TenantOverview = TenantOverviewBase & {
   todayOrderCount: number;
   todayRevenueAmount: number;
   pendingPickupCount: number;
