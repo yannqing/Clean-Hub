@@ -710,14 +710,18 @@ export const frMessages = {
       heroTitleLine1: "Pilotez le magasin",
       heroTitleLine2: "depuis cet écran",
       heroDescription:
-        "Caisse, accueil, scan, commandes et passation dans un seul espace magasin. Connectez-vous avec le code magasin et le compte employé.",
+        "Caisse, accueil, scan, commandes et passation dans un seul espace magasin. Saisissez le code PIN employé pour accéder au terminal.",
       loginTitle: "Connexion employé",
       loginDescription:
-        "Saisissez le code magasin et le compte employé pour continuer.",
+        "Saisissez le code PIN employé pour continuer.",
       identifier: "Téléphone / Email",
       identifierPlaceholder: "Saisir le téléphone ou l'email",
       password: "Mot de passe",
       passwordPlaceholder: "Saisir le mot de passe",
+      pin: "Code PIN",
+      pinPlaceholder: "Saisir le PIN à 6 chiffres",
+      clearPin: "Effacer",
+      deleteDigit: "Supprimer",
       submit: "Se connecter",
       submitting: "Connexion...",
       currentStore: "Magasin actuel :",
@@ -728,6 +732,8 @@ export const frMessages = {
       validation: {
         identifierRequired: "Saisissez le téléphone ou l'email",
         passwordRequired: "Saisissez le mot de passe",
+        pinRequired: "Saisissez le code PIN",
+        pinInvalid: "Le code PIN doit comporter exactement 6 chiffres",
       },
     },
     role: {
