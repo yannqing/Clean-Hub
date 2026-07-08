@@ -411,6 +411,36 @@ export type SaasMessages = {
       finished: string;
       failure: string;
     };
+    review: {
+      approve: string;
+      reject: string;
+      complete: string;
+      cancel: string;
+      reviewNote: string;
+      reviewNotePlaceholder: string;
+      applyNote: string;
+    };
+    reviewToasts: {
+      approved: string;
+      rejected: string;
+      completed: string;
+      cancelled: string;
+      failed: string;
+    };
+    restoreColumns: {
+      reviewer: string;
+      reviewedAt: string;
+      reviewNote: string;
+      actions: string;
+    };
+    storageMetadata: {
+      title: string;
+      dumpUrl: string;
+      sizeBytes: string;
+      checksum: string;
+      storageType: string;
+      notCaptured: string;
+    };
   };
   platformSettings: {
     badge: string;

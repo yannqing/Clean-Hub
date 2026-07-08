@@ -16,6 +16,7 @@ import {
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 
 import { webAdminApi } from "@/lib/api-client";
+import { useTenantI18n } from "@/i18n";
 
 import { updateTenantSettingsAction } from "../actions";
 import {
@@ -30,10 +31,8 @@ import type {
   TenantSettingsLanguage,
 } from "../types";
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : "Tenant settings failed to load.";
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function toFormValues(settings: TenantSettings): TenantSettingsFormValues {
@@ -67,23 +66,6 @@ function hasSettingsChange(
   );
 }
 
-function formatDate(value: string | null): string {
-  if (!value) {
-    return "Not updated";
-  }
-
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return "Invalid date";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
-
 const defaultFormValues: TenantSettingsFormValues = {
   defaultLanguage: "en",
   defaultCurrency: "XOF",
@@ -99,6 +81,7 @@ export function TenantSettingsView({
   initialAuthContext,
   initialSettings,
 }: TenantSettingsViewProps = {}) {
+  const { m, formatDateTime } = useTenantI18n();
   const [authContext, setAuthContext] = useState<AuthContext | null>(
     initialAuthContext ?? null,
   );
@@ -147,9 +130,7 @@ export function TenantSettingsView({
       authResult.status === "fulfilled" ? authResult.value : null,
     );
     setAuthError(
-      authResult.status === "fulfilled"
-        ? null
-        : "Permission could not be verified. Settings remain read-only.",
+      authResult.status === "fulfilled" ? null : m.settings.permissionDenied,
     );
     setAuthLoaded(true);
 
@@ -160,7 +141,9 @@ export function TenantSettingsView({
       setLoadError(null);
     } else {
       setSettings(null);
-      setLoadError(getErrorMessage(settingsResult.reason));
+      setLoadError(
+        getErrorMessage(settingsResult.reason, m.settings.requestFailed),
+      );
     }
 
     setLoading(false);
@@ -188,7 +171,7 @@ export function TenantSettingsView({
         setAuthError(
           authResult.status === "fulfilled"
             ? null
-            : "Permission could not be verified. Settings remain read-only.",
+            : m.settings.permissionDenied,
         );
         setAuthLoaded(true);
 
@@ -198,7 +181,9 @@ export function TenantSettingsView({
           setLoadError(null);
         } else {
           setSettings(null);
-          setLoadError(getErrorMessage(settingsResult.reason));
+          setLoadError(
+            getErrorMessage(settingsResult.reason, m.settings.requestFailed),
+          );
         }
       })
       .finally(() => {
@@ -210,7 +195,7 @@ export function TenantSettingsView({
     return () => {
       isCurrent = false;
     };
-  }, [initialAuthContext, initialSettings]);
+  }, [initialAuthContext, initialSettings, m.settings.permissionDenied, m.settings.requestFailed]);
 
   function updateForm<K extends keyof TenantSettingsFormValues>(
     key: K,
@@ -235,9 +220,8 @@ export function TenantSettingsView({
     }
 
     if (!canUpdateSettings) {
-      const message = "Only tenant owners can update tenant settings.";
-      setSaveError(message);
-      toast.error(message);
+      setSaveError(m.settings.onlyOwners);
+      toast.error(m.settings.onlyOwners);
       return;
     }
 
@@ -247,7 +231,7 @@ export function TenantSettingsView({
     if (!hasSettingsChange(settings, normalizedForm)) {
       setErrors({});
       setSaveError(null);
-      toast.success("Tenant settings are already up to date.");
+      toast.success(m.settings.settingsUpToDate);
       return;
     }
 
@@ -261,14 +245,14 @@ export function TenantSettingsView({
         setSettings(result.data);
         setForm(toFormValues(result.data));
         setErrors({});
-        toast.success("Tenant settings updated.");
+        toast.success(m.settings.settingsUpdated);
       } else {
         setErrors(result.errors);
         setSaveError(result.message);
         toast.error(result.message);
       }
     } catch (error) {
-      const message = getErrorMessage(error);
+      const message = getErrorMessage(error, m.settings.requestFailed);
       setErrors({});
       setSaveError(message);
       toast.error(message);
@@ -293,14 +277,14 @@ export function TenantSettingsView({
     return (
       <section className="p-5">
         <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
-          <span>{loadError ?? "Tenant settings are unavailable."}</span>
+          <span>{loadError ?? m.settings.unavailable}</span>
           <Button
             onClick={loadSettings}
             size="sm"
             type="button"
             variant="outline"
           >
-            Retry
+            {m.common.retry}
           </Button>
         </div>
       </section>
@@ -311,12 +295,12 @@ export function TenantSettingsView({
     <section className="grid gap-6 p-5">
       <div className="flex flex-col gap-3 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">Tenant Settings</Badge>
+          <Badge variant="secondary">{m.settings.eyebrow}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
             {settings.tenantName}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Tenant defaults and read-only feature flags for the current account.
+            {m.settings.description}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -326,7 +310,7 @@ export function TenantSettingsView({
           <Badge variant="outline">v{settings.version}</Badge>
           <Badge variant="outline">
             {enabledFeatureCount} / {tenantSettingsFeatureFlagOptions.length}{" "}
-            features
+            {m.settings.featuresCount}
           </Badge>
         </div>
       </div>
@@ -337,14 +321,16 @@ export function TenantSettingsView({
           onSubmit={handleSubmit}
         >
           <div className="grid gap-2 rounded-md border bg-muted/30 p-3">
-            <Label>Pilot status</Label>
+            <Label>{m.settings.labels.pilotStatus}</Label>
             <Badge className="w-fit" variant="outline">
               {tenantPilotStatusLabels[settings.pilotStatus]}
             </Badge>
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="tenant-default-language">Default language</Label>
+            <Label htmlFor="tenant-default-language">
+              {m.settings.labels.defaultLanguage}
+            </Label>
             <Select
               disabled={formDisabled}
               onValueChange={(value) =>
@@ -371,7 +357,9 @@ export function TenantSettingsView({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="tenant-default-currency">Default currency</Label>
+            <Label htmlFor="tenant-default-currency">
+              {m.settings.labels.defaultCurrency}
+            </Label>
             <Input
               aria-invalid={Boolean(errors.defaultCurrency)}
               disabled={formDisabled}
@@ -390,7 +378,7 @@ export function TenantSettingsView({
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="tenant-timezone">Timezone</Label>
+            <Label htmlFor="tenant-timezone">{m.settings.labels.timezone}</Label>
             <Input
               aria-invalid={Boolean(errors.timezone)}
               disabled={formDisabled}
@@ -412,36 +400,40 @@ export function TenantSettingsView({
 
           {authLoaded && !canUpdateSettings ? (
             <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-              {authError ??
-                "Only tenant owners can update these defaults. Managers can view settings and feature flags."}
+              {authError ?? m.settings.onlyOwnersReadonly}
             </div>
           ) : null}
 
           <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center sm:justify-between">
             {canUpdateSettings ? (
               <Button disabled={formDisabled} type="submit">
-                {saving ? "Saving..." : "Save settings"}
+                {saving ? m.common.saving : m.settings.saveSettings}
               </Button>
             ) : !authLoaded ? (
               <Badge className="w-fit" variant="outline">
-                Checking permissions
+                {m.settings.checkingPermissions}
               </Badge>
             ) : (
               <Badge className="w-fit" variant="outline">
-                {authError ? "Permission unavailable" : "Read-only"}
+                {authError
+                  ? m.settings.permissionUnavailable
+                  : m.settings.readOnly}
               </Badge>
             )}
             <p className="text-xs text-muted-foreground">
-              Updated {formatDate(settings.updatedAt)}
+              {m.settings.updatedLabel}{" "}
+              {settings.updatedAt
+                ? formatDateTime(settings.updatedAt) || m.settings.notUpdated
+                : m.settings.notUpdated}
             </p>
           </div>
         </form>
 
         <aside className="rounded-md border bg-background p-5">
           <div className="border-b pb-3">
-            <h2 className="text-base font-semibold">Feature flags</h2>
+            <h2 className="text-base font-semibold">{m.settings.featureFlags}</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Managed by SaaS administrators.
+              {m.settings.featureFlagsDesc}
             </p>
           </div>
           <div className="mt-4 grid gap-3">
@@ -456,7 +448,9 @@ export function TenantSettingsView({
                     settings.featureFlags[option.key] ? "default" : "outline"
                   }
                 >
-                  {settings.featureFlags[option.key] ? "Enabled" : "Disabled"}
+                  {settings.featureFlags[option.key]
+                    ? m.settings.flagStates.enabled
+                    : m.settings.flagStates.disabled}
                 </Badge>
               </div>
             ))}

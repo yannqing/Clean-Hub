@@ -47,3 +47,27 @@ export type TenantRestoreRequest = {
 export type CreateTenantRestoreRequestRequest = {
   reason: string;
 };
+
+/**
+ * Query for the tenant restore-request list endpoint.
+ *
+ * Target endpoint: `GET /tenant/restore-requests`. The api-client method
+ * currently returns an empty result until the backend route exists.
+ */
+export type TenantRestoreRequestListQuery = {
+  status?: TenantRestoreRequestStatus;
+  limit?: number;
+  offset?: number;
+};
+
+/**
+ * Result of the tenant restore-request list endpoint.
+ *
+ * Uses an `{ items, total }` envelope (rather than a bare array) so the tenant
+ * UI can render real pagination once the backend supports it, matching the
+ * tenant notification-log pattern.
+ */
+export type TenantRestoreRequestListResult = {
+  items: TenantRestoreRequest[];
+  total: number;
+};

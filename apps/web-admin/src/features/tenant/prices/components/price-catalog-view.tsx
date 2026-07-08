@@ -19,6 +19,8 @@ import {
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useTenantI18n } from "@/i18n";
+
 import {
   updatePriceAction,
   updatePriceStatusAction,
@@ -34,17 +36,12 @@ import type {
 type BusinessLineFilter = "all" | PriceBusinessLine;
 type StatusFilter = "all" | PriceStatus;
 
-const businessLineOptions: { label: string; value: PriceBusinessLine }[] = [
-  { label: "Laundry", value: "laundry" },
-  { label: "Car wash", value: "car_wash" },
-  { label: "Retail", value: "retail" },
-  { label: "Delivery", value: "delivery" },
+const businessLineValues: PriceBusinessLine[] = [
+  "laundry",
+  "car_wash",
+  "retail",
+  "delivery",
 ];
-
-const statusLabels = {
-  active: "Active",
-  inactive: "Inactive",
-};
 
 const defaultFormValues: PriceFormValues = {
   amount: "",
@@ -52,12 +49,8 @@ const defaultFormValues: PriceFormValues = {
   status: "active",
 };
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Price request failed.";
-}
-
-function formatBusinessLine(value: PriceBusinessLine): string {
-  return businessLineOptions.find((option) => option.value === value)?.label ?? value;
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function toFormValues(price: PriceSummary): PriceFormValues {
@@ -69,6 +62,16 @@ function toFormValues(price: PriceSummary): PriceFormValues {
 }
 
 export function PriceCatalogView() {
+  const { m } = useTenantI18n();
+
+  const businessLineOptions = useMemo(
+    () =>
+      businessLineValues.map((value) => ({
+        value,
+        label: m.common.businessLineLabels[value],
+      })),
+    [m],
+  );
   const [prices, setPrices] = useState<PriceSummary[]>([]);
   const [businessLine, setBusinessLine] = useState<BusinessLineFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -96,11 +99,11 @@ export function PriceCatalogView() {
     try {
       setPrices(await getPriceListQuery(filters));
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(getErrorMessage(loadError, m.prices.requestFailed));
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, m.prices.requestFailed]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -114,7 +117,7 @@ export function PriceCatalogView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(getErrorMessage(loadError, m.prices.requestFailed));
         }
       })
       .finally(() => {
@@ -126,7 +129,7 @@ export function PriceCatalogView() {
     return () => {
       isCurrent = false;
     };
-  }, [filters]);
+  }, [filters, m.prices.requestFailed]);
 
   async function handleSubmit() {
     if (!editingPriceId) {
@@ -140,7 +143,9 @@ export function PriceCatalogView() {
       const result = await updatePriceAction(editingPriceId, formValues);
 
       if (!result.ok) {
-        setFormError(Object.values(result.errors)[0] ?? "Check the price form.");
+        setFormError(
+          Object.values(result.errors)[0] ?? m.prices.formFallbackError,
+        );
         return;
       }
 
@@ -148,7 +153,7 @@ export function PriceCatalogView() {
       setEditingPriceId(null);
       await loadPrices();
     } catch (submitError) {
-      setFormError(getErrorMessage(submitError));
+      setFormError(getErrorMessage(submitError, m.prices.requestFailed));
     } finally {
       setSaving(false);
     }
@@ -165,7 +170,7 @@ export function PriceCatalogView() {
       );
       await loadPrices();
     } catch (statusError) {
-      setFormError(getErrorMessage(statusError));
+      setFormError(getErrorMessage(statusError, m.prices.requestFailed));
     } finally {
       setSaving(false);
     }
@@ -175,31 +180,35 @@ export function PriceCatalogView() {
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">Tenant pricing</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">Prices</h1>
+          <Badge variant="secondary">{m.prices.eyebrow}</Badge>
+          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
+            {m.prices.title}
+          </h1>
         </div>
 
         <Button onClick={loadPrices} type="button" variant="outline">
-          Refresh
+          {m.common.refresh}
         </Button>
       </div>
 
       <div className="grid gap-3 border-b p-5 lg:grid-cols-[1fr_180px_180px]">
         <div className="grid gap-2">
-          <Label htmlFor="price-search">Search</Label>
+          <Label htmlFor="price-search">{m.prices.formLabels.search}</Label>
           <Input
             id="price-search"
             onChange={(event) => {
               setLoading(true);
               setQuery(event.target.value);
             }}
-            placeholder="Service name"
+            placeholder={m.prices.searchPlaceholder}
             value={query}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="price-business-line">Business line</Label>
+          <Label htmlFor="price-business-line">
+            {m.prices.formLabels.businessLine}
+          </Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
@@ -211,7 +220,7 @@ export function PriceCatalogView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All lines</SelectItem>
+              <SelectItem value="all">{m.common.allLines}</SelectItem>
               {businessLineOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
@@ -222,7 +231,7 @@ export function PriceCatalogView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="price-status">Status</Label>
+          <Label htmlFor="price-status">{m.prices.formLabels.status}</Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
@@ -234,9 +243,11 @@ export function PriceCatalogView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="all">{m.common.allStatuses}</SelectItem>
+              <SelectItem value="active">{m.common.statusLabels.active}</SelectItem>
+              <SelectItem value="inactive">
+                {m.common.statusLabels.inactive}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -245,7 +256,7 @@ export function PriceCatalogView() {
       {editingPriceId ? (
         <div className="grid gap-4 border-b p-5 lg:grid-cols-[160px_160px_180px_auto] lg:items-end">
           <div className="grid gap-2">
-            <Label htmlFor="price-amount">Amount</Label>
+            <Label htmlFor="price-amount">{m.prices.formLabels.amount}</Label>
             <Input
               id="price-amount"
               min="0.01"
@@ -262,7 +273,7 @@ export function PriceCatalogView() {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="price-currency">Currency</Label>
+            <Label htmlFor="price-currency">{m.prices.formLabels.currency}</Label>
             <Input
               id="price-currency"
               maxLength={3}
@@ -277,7 +288,7 @@ export function PriceCatalogView() {
           </div>
 
           <div className="grid gap-2">
-            <Label htmlFor="price-form-status">Status</Label>
+            <Label htmlFor="price-form-status">{m.prices.formLabels.status}</Label>
             <Select
               onValueChange={(value) =>
                 setFormValues((current) => ({
@@ -291,15 +302,17 @@ export function PriceCatalogView() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="inactive">Inactive</SelectItem>
+                <SelectItem value="active">{m.common.statusLabels.active}</SelectItem>
+                <SelectItem value="inactive">
+                  {m.common.statusLabels.inactive}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <Button disabled={saving} onClick={handleSubmit} type="button">
-              Update price
+              {m.prices.updatePrice}
             </Button>
             <Button
               disabled={saving}
@@ -310,7 +323,7 @@ export function PriceCatalogView() {
               type="button"
               variant="outline"
             >
-              Cancel
+              {m.common.cancel}
             </Button>
             {formError ? (
               <p className="text-sm text-destructive">{formError}</p>
@@ -336,18 +349,18 @@ export function PriceCatalogView() {
       ) : prices.length === 0 ? (
         <div className="p-5">
           <div className="rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">No prices yet</h2>
+            <h2 className="text-base font-semibold">{m.prices.empty}</h2>
           </div>
         </div>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Service</TableHead>
-              <TableHead>Business line</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{m.prices.columns.service}</TableHead>
+              <TableHead>{m.prices.columns.businessLine}</TableHead>
+              <TableHead>{m.prices.columns.amount}</TableHead>
+              <TableHead>{m.prices.columns.status}</TableHead>
+              <TableHead className="text-right">{m.prices.columns.actions}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -359,7 +372,9 @@ export function PriceCatalogView() {
                     {price.serviceId}
                   </div>
                 </TableCell>
-                <TableCell>{formatBusinessLine(price.businessLine)}</TableCell>
+                <TableCell>
+                  {m.common.businessLineLabels[price.businessLine]}
+                </TableCell>
                 <TableCell>
                   {price.amount} {price.currency}
                 </TableCell>
@@ -367,7 +382,7 @@ export function PriceCatalogView() {
                   <Badge
                     variant={price.status === "active" ? "default" : "outline"}
                   >
-                    {statusLabels[price.status]}
+                    {m.common.statusLabels[price.status]}
                   </Badge>
                 </TableCell>
                 <TableCell className="space-x-2 text-right">
@@ -378,7 +393,9 @@ export function PriceCatalogView() {
                     type="button"
                     variant="outline"
                   >
-                    {price.status === "active" ? "Deactivate" : "Activate"}
+                    {price.status === "active"
+                      ? m.prices.actions.deactivate
+                      : m.prices.actions.activate}
                   </Button>
                   <Button
                     onClick={() => {
@@ -389,7 +406,7 @@ export function PriceCatalogView() {
                     type="button"
                     variant="outline"
                   >
-                    Edit
+                    {m.prices.actions.edit}
                   </Button>
                 </TableCell>
               </TableRow>

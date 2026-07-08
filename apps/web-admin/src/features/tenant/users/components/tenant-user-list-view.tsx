@@ -26,6 +26,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Pagination } from "@/components/pagination";
+import { useTenantI18n } from "@/i18n";
 
 import { tenantUserRoleOptions, tenantUserStatusOptions } from "../constants";
 import {
@@ -57,20 +58,17 @@ type TenantUserListViewProps = {
   initialUsers?: TenantUserSummary[];
 };
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "An unexpected error occurred.";
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
-function formatDate(value: string | null): string {
-  if (!value) return "Never";
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({
+  status,
+  label,
+}: {
+  status: string;
+  label: string;
+}) {
   const variant =
     status === "active"
       ? "default"
@@ -78,11 +76,11 @@ function StatusBadge({ status }: { status: string }) {
         ? "destructive"
         : "secondary";
 
-  return <Badge variant={variant}>{status}</Badge>;
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
-function RoleBadge({ role }: { role: string }) {
-  return <Badge variant="outline">{role}</Badge>;
+function RoleBadge({ label }: { label: string }) {
+  return <Badge variant="outline">{label}</Badge>;
 }
 
 function getTenantUserRoleCode(role: string): TenantUserRoleCode | undefined {
@@ -114,18 +112,20 @@ function createEditForm(
 function BranchSelect({
   branches,
   disabled = false,
+  emptyLabel,
   onChange,
   selected,
 }: {
   branches: BranchSummary[];
   disabled?: boolean;
+  emptyLabel: string;
   selected: string[];
   onChange: (ids: string[]) => void;
 }) {
   return (
     <div className="flex flex-col gap-2 max-h-48 overflow-y-auto border rounded-md p-2">
       {branches.length === 0 ? (
-        <p className="text-sm text-muted-foreground px-1">No branches found.</p>
+        <p className="text-sm text-muted-foreground px-1">{emptyLabel}</p>
       ) : (
         branches.map((branch) => (
           <label
@@ -161,6 +161,7 @@ export function TenantUserListView({
 }: TenantUserListViewProps) {
   const isCurrent = useRef(true);
   const editRequestSeq = useRef(0);
+  const { m, formatDateTime } = useTenantI18n();
 
   const [users, setUsers] = useState<TenantUserSummary[]>(initialUsers);
   const [offset, setOffset] = useState(0);
@@ -250,12 +251,12 @@ export function TenantUserListView({
       })
       .catch((err: unknown) => {
         if (!isCurrent.current) return;
-        setError(getErrorMessage(err));
+        setError(getErrorMessage(err, m.common.unexpectedError));
       })
       .finally(() => {
         if (isCurrent.current) setLoading(false);
       });
-  }, [listQuery, roleFilter, branchFilter]);
+  }, [listQuery, roleFilter, branchFilter, m.common.unexpectedError]);
 
   useEffect(() => {
     void loadUsers();
@@ -273,11 +274,11 @@ export function TenantUserListView({
       setDetail(result);
     } catch (err) {
       if (!isCurrent.current) return;
-      setDetailError(getErrorMessage(err));
+      setDetailError(getErrorMessage(err, m.common.unexpectedError));
     } finally {
       if (isCurrent.current) setDetailLoading(false);
     }
-  }, []);
+  }, [m.common.unexpectedError]);
 
   const handleCreate = useCallback(async () => {
     setCreateLoading(true);
@@ -327,14 +328,14 @@ export function TenantUserListView({
       })
       .catch((err: unknown) => {
         if (!isCurrent.current || editRequestSeq.current !== requestSeq) return;
-        setEditError(getErrorMessage(err));
+        setEditError(getErrorMessage(err, m.common.unexpectedError));
       })
       .finally(() => {
         if (isCurrent.current && editRequestSeq.current === requestSeq) {
           setEditDetailLoading(false);
         }
       });
-  }, []);
+  }, [m.common.unexpectedError]);
 
   const handleEdit = useCallback(async () => {
     if (!editUserId || editDetailLoading) return;
@@ -436,8 +437,8 @@ export function TenantUserListView({
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Team Members</h1>
-        <Button onClick={() => setCreateOpen(true)}>Add Member</Button>
+        <h1 className="text-2xl font-semibold">{m.users.title}</h1>
+        <Button onClick={() => setCreateOpen(true)}>{m.users.addMember}</Button>
       </div>
 
       {/* Filters */}
@@ -450,7 +451,7 @@ export function TenantUserListView({
             setSearch(e.target.value);
             setOffset(0);
           }}
-          placeholder="Search by name, email..."
+          placeholder={m.users.searchPlaceholder}
           value={search}
         />
         <Select
@@ -468,10 +469,10 @@ export function TenantUserListView({
           }}
         >
           <SelectTrigger className="w-40">
-            <SelectValue placeholder="All statuses" />
+            <SelectValue placeholder={m.common.allStatuses} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All statuses</SelectItem>
+            <SelectItem value="all">{m.common.allStatuses}</SelectItem>
             {tenantUserStatusOptions.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}
@@ -487,10 +488,10 @@ export function TenantUserListView({
           }}
         >
           <SelectTrigger className="w-36">
-            <SelectValue placeholder="All roles" />
+            <SelectValue placeholder={m.common.allRoles} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All roles</SelectItem>
+            <SelectItem value="all">{m.common.allRoles}</SelectItem>
             {tenantUserRoleOptions.map((opt) => (
               <SelectItem key={opt.value} value={opt.value}>
                 {opt.label}
@@ -507,10 +508,10 @@ export function TenantUserListView({
             }}
           >
             <SelectTrigger className="w-44">
-              <SelectValue placeholder="All branches" />
+              <SelectValue placeholder={m.common.allBranches} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All branches</SelectItem>
+              <SelectItem value="all">{m.common.allBranches}</SelectItem>
               {branches.map((branch) => (
                 <SelectItem key={branch.id} value={branch.id}>
                   {branch.name}
@@ -524,20 +525,20 @@ export function TenantUserListView({
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <p className="text-sm text-muted-foreground">{m.common.loading}</p>
       ) : users.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No team members found.</p>
+        <p className="text-sm text-muted-foreground">{m.users.noMembers}</p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Branches</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Last Login</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead>{m.users.columns.name}</TableHead>
+              <TableHead>{m.users.columns.email}</TableHead>
+              <TableHead>{m.users.columns.role}</TableHead>
+              <TableHead>{m.users.columns.branches}</TableHead>
+              <TableHead>{m.users.columns.status}</TableHead>
+              <TableHead>{m.users.columns.lastLogin}</TableHead>
+              <TableHead>{m.users.columns.created}</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -551,19 +552,24 @@ export function TenantUserListView({
                 <TableCell className="font-medium">{user.displayName}</TableCell>
                 <TableCell>{user.email ?? "—"}</TableCell>
                 <TableCell>
-                  <RoleBadge role={user.role} />
+                  <RoleBadge label={user.role} />
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                   {getBranchNames(user.branchIds)}
                 </TableCell>
                 <TableCell>
-                  <StatusBadge status={user.status} />
+                  <StatusBadge
+                    status={user.status}
+                    label={user.status}
+                  />
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {formatDate(user.lastLoginAt)}
+                  {user.lastLoginAt
+                    ? formatDateTime(user.lastLoginAt) || m.common.never
+                    : m.common.never}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {formatDate(user.createdAt)}
+                  {formatDateTime(user.createdAt)}
                 </TableCell>
                 <TableCell>
                   <div
@@ -575,7 +581,7 @@ export function TenantUserListView({
                       size="sm"
                       variant="outline"
                     >
-                      Edit
+                      {m.users.actions.edit}
                     </Button>
                     <Button
                       onClick={() => {
@@ -585,7 +591,7 @@ export function TenantUserListView({
                       size="sm"
                       variant="outline"
                     >
-                      Reset PIN
+                      {m.users.actions.resetPin}
                     </Button>
                     {user.status !== "disabled" ? (
                       <Button
@@ -593,7 +599,7 @@ export function TenantUserListView({
                         size="sm"
                         variant="destructive"
                       >
-                        Disable
+                        {m.common.disable}
                       </Button>
                     ) : (
                       <Button
@@ -601,7 +607,7 @@ export function TenantUserListView({
                         size="sm"
                         variant="outline"
                       >
-                        Enable
+                        {m.common.enable}
                       </Button>
                     )}
                   </div>
@@ -614,11 +620,11 @@ export function TenantUserListView({
 
       <Pagination
         currentPageCount={users.length}
-        nextLabel="Next"
+        nextLabel={m.common.next}
         offset={offset}
         onOffsetChange={setOffset}
         pageSize={PAGE_SIZE}
-        previousLabel="Previous"
+        previousLabel={m.common.previous}
       />
 
       {/* Detail dialog */}
@@ -633,12 +639,12 @@ export function TenantUserListView({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Member Detail</DialogTitle>
+            <DialogTitle>{m.users.detail.title}</DialogTitle>
             <DialogDescription>{selectedUser?.displayName}</DialogDescription>
           </DialogHeader>
 
           {detailLoading ? (
-            <p className="text-sm text-muted-foreground">Loading...</p>
+            <p className="text-sm text-muted-foreground">{m.common.loading}</p>
           ) : null}
           {detailError ? (
             <p className="text-sm text-destructive">{detailError}</p>
@@ -646,22 +652,42 @@ export function TenantUserListView({
           {detail ? (
             <div className="flex flex-col gap-3 text-sm">
               <div className="grid grid-cols-2 gap-2">
-                <span className="text-muted-foreground">Email</span>
+                <span className="text-muted-foreground">
+                  {m.users.detail.labels.email}
+                </span>
                 <span>{detail.email ?? "—"}</span>
-                <span className="text-muted-foreground">Phone</span>
+                <span className="text-muted-foreground">
+                  {m.users.detail.labels.phone}
+                </span>
                 <span>{detail.phone ?? "—"}</span>
-                <span className="text-muted-foreground">Role</span>
-                <RoleBadge role={detail.role} />
-                <span className="text-muted-foreground">Branches</span>
+                <span className="text-muted-foreground">
+                  {m.users.detail.labels.role}
+                </span>
+                <RoleBadge label={detail.role} />
+                <span className="text-muted-foreground">
+                  {m.users.detail.labels.branches}
+                </span>
                 <span>{getBranchNames(detail.branchIds)}</span>
-                <span className="text-muted-foreground">Status</span>
-                <StatusBadge status={detail.status} />
-                <span className="text-muted-foreground">Language</span>
+                <span className="text-muted-foreground">
+                  {m.users.detail.labels.status}
+                </span>
+                <StatusBadge status={detail.status} label={detail.status} />
+                <span className="text-muted-foreground">
+                  {m.users.detail.labels.language}
+                </span>
                 <span>{detail.language}</span>
-                <span className="text-muted-foreground">Last login</span>
-                <span>{formatDate(detail.lastLoginAt)}</span>
-                <span className="text-muted-foreground">Updated</span>
-                <span>{formatDate(detail.updatedAt)}</span>
+                <span className="text-muted-foreground">
+                  {m.users.detail.labels.lastLogin}
+                </span>
+                <span>
+                  {detail.lastLoginAt
+                    ? formatDateTime(detail.lastLoginAt) || m.common.never
+                    : m.common.never}
+                </span>
+                <span className="text-muted-foreground">
+                  {m.users.detail.labels.updated}
+                </span>
+                <span>{formatDateTime(detail.updatedAt)}</span>
               </div>
             </div>
           ) : null}
@@ -672,15 +698,13 @@ export function TenantUserListView({
       <Dialog onOpenChange={setCreateOpen} open={createOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Team Member</DialogTitle>
-            <DialogDescription>
-              Create a new staff account with a 6-digit PIN.
-            </DialogDescription>
+            <DialogTitle>{m.users.create.title}</DialogTitle>
+            <DialogDescription>{m.users.create.description}</DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label>Display Name *</Label>
+              <Label>{m.users.create.labels.displayName} *</Label>
               <Input
                 onChange={(e) =>
                   setCreateForm((prev) => ({ ...prev, displayName: e.target.value }))
@@ -689,7 +713,7 @@ export function TenantUserListView({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Email</Label>
+              <Label>{m.users.create.labels.email}</Label>
               <Input
                 onChange={(e) =>
                   setCreateForm((prev) => ({ ...prev, email: e.target.value }))
@@ -699,7 +723,7 @@ export function TenantUserListView({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Phone</Label>
+              <Label>{m.users.create.labels.phone}</Label>
               <Input
                 onChange={(e) =>
                   setCreateForm((prev) => ({ ...prev, phone: e.target.value }))
@@ -710,7 +734,7 @@ export function TenantUserListView({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Role *</Label>
+              <Label>{m.users.create.labels.role} *</Label>
               <Select
                 onValueChange={(value) =>
                   setCreateForm((prev) => ({
@@ -733,9 +757,10 @@ export function TenantUserListView({
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Branches</Label>
+              <Label>{m.users.create.labels.branches}</Label>
               <BranchSelect
                 branches={branches}
+                emptyLabel={m.users.noMembers}
                 onChange={(ids) =>
                   setCreateForm((prev) => ({ ...prev, branchIds: ids }))
                 }
@@ -743,7 +768,7 @@ export function TenantUserListView({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Initial PIN (6 digits) *</Label>
+              <Label>{m.users.create.labels.initialPin} *</Label>
               <Input
                 maxLength={6}
                 onChange={(e) =>
@@ -762,7 +787,9 @@ export function TenantUserListView({
               disabled={createLoading}
               onClick={() => void handleCreate()}
             >
-              {createLoading ? "Creating..." : "Create Member"}
+              {createLoading
+                ? m.users.create.creatingMember
+                : m.users.create.createMember}
             </Button>
           </div>
         </DialogContent>
@@ -784,18 +811,18 @@ export function TenantUserListView({
       >
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Member</DialogTitle>
-            <DialogDescription>Update member details.</DialogDescription>
+            <DialogTitle>{m.users.edit.title}</DialogTitle>
+            <DialogDescription>{m.users.edit.description}</DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
             {editDetailLoading ? (
               <p className="text-sm text-muted-foreground">
-                Loading current member details...
+                {m.users.edit.loadingCurrent}
               </p>
             ) : null}
             <div className="flex flex-col gap-1.5">
-              <Label>Display Name</Label>
+              <Label>{m.users.edit.labels.displayName}</Label>
               <Input
                 disabled={editDetailLoading}
                 onChange={(e) =>
@@ -805,7 +832,7 @@ export function TenantUserListView({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Phone</Label>
+              <Label>{m.users.edit.labels.phone}</Label>
               <Input
                 disabled={editDetailLoading}
                 onChange={(e) =>
@@ -820,7 +847,7 @@ export function TenantUserListView({
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Role</Label>
+              <Label>{m.users.edit.labels.role}</Label>
               <Select
                 disabled={editDetailLoading}
                 onValueChange={(value) =>
@@ -832,7 +859,7 @@ export function TenantUserListView({
                 value={editForm.roleCode ?? ""}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Keep current role" />
+                  <SelectValue placeholder={m.users.edit.keepCurrentRole} />
                 </SelectTrigger>
                 <SelectContent>
                   {tenantUserRoleOptions.map((opt) => (
@@ -844,10 +871,11 @@ export function TenantUserListView({
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Branches</Label>
+              <Label>{m.users.edit.labels.branches}</Label>
               <BranchSelect
                 branches={branches}
                 disabled={editDetailLoading}
+                emptyLabel={m.users.noMembers}
                 onChange={(ids) =>
                   setEditForm((prev) => ({ ...prev, branchIds: ids }))
                 }
@@ -861,13 +889,13 @@ export function TenantUserListView({
 
             <div className="flex justify-end gap-3">
               <Button onClick={() => setEditOpen(false)} variant="outline">
-                Cancel
+                {m.common.cancel}
               </Button>
               <Button
                 disabled={editLoading || editDetailLoading}
                 onClick={() => void handleEdit()}
               >
-                {editLoading ? "Saving..." : "Save"}
+                {editLoading ? m.common.saving : m.common.edit}
               </Button>
             </div>
           </div>
@@ -883,21 +911,19 @@ export function TenantUserListView({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Disable Member</DialogTitle>
-            <DialogDescription>
-              This will disable the account and revoke all active sessions.
-            </DialogDescription>
+            <DialogTitle>{m.users.disable.title}</DialogTitle>
+            <DialogDescription>{m.users.disable.description}</DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-3">
             <Button onClick={() => setDisableUserId(null)} variant="outline">
-              Cancel
+              {m.common.cancel}
             </Button>
             <Button
               disabled={disableLoading}
               onClick={() => disableUserId && void handleDisable(disableUserId)}
               variant="destructive"
             >
-              {disableLoading ? "Disabling..." : "Disable"}
+              {disableLoading ? m.users.disable.disabling : m.users.disable.action}
             </Button>
           </div>
         </DialogContent>
@@ -912,20 +938,18 @@ export function TenantUserListView({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Enable Member</DialogTitle>
-            <DialogDescription>
-              This will restore the member&apos;s access to the system.
-            </DialogDescription>
+            <DialogTitle>{m.users.enable.title}</DialogTitle>
+            <DialogDescription>{m.users.enable.description}</DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-3">
             <Button onClick={() => setEnableUserId(null)} variant="outline">
-              Cancel
+              {m.common.cancel}
             </Button>
             <Button
               disabled={enableLoading}
               onClick={() => enableUserId && void handleEnable(enableUserId)}
             >
-              {enableLoading ? "Enabling..." : "Enable"}
+              {enableLoading ? m.users.enable.enabling : m.users.enable.action}
             </Button>
           </div>
         </DialogContent>
@@ -943,18 +967,17 @@ export function TenantUserListView({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Reset PIN</DialogTitle>
+            <DialogTitle>{m.users.resetPin.title}</DialogTitle>
             <DialogDescription>
-              A new 6-digit PIN will be generated. Share it with the employee
-              immediately.
+              {m.users.resetPin.description}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label>Reason *</Label>
+              <Label>{m.users.resetPin.reason} *</Label>
               <Input
                 onChange={(e) => setResetPinReason(e.target.value)}
-                placeholder="e.g. Employee forgot PIN"
+                placeholder={m.users.resetPin.reasonPlaceholder}
                 value={resetPinReason}
               />
             </div>
@@ -963,7 +986,7 @@ export function TenantUserListView({
                 onClick={() => setResetPinUserId(null)}
                 variant="outline"
               >
-                Cancel
+                {m.common.cancel}
               </Button>
               <Button
                 disabled={resetPinLoading || !resetPinReason.trim()}
@@ -971,7 +994,7 @@ export function TenantUserListView({
                   resetPinUserId && void handleResetPin(resetPinUserId)
                 }
               >
-                {resetPinLoading ? "Resetting..." : "Reset PIN"}
+                {resetPinLoading ? m.users.resetPin.resetting : m.users.resetPin.action}
               </Button>
             </div>
           </div>
@@ -987,9 +1010,9 @@ export function TenantUserListView({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New Temporary PIN</DialogTitle>
+            <DialogTitle>{m.users.temporaryPin.title}</DialogTitle>
             <DialogDescription>
-              Share this PIN with the employee now. It will not be shown again.
+              {m.users.temporaryPin.description}
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center gap-4 py-4">
@@ -997,7 +1020,9 @@ export function TenantUserListView({
               {temporaryPin}
             </span>
           </div>
-          <Button onClick={() => setTemporaryPin(null)}>Done</Button>
+          <Button onClick={() => setTemporaryPin(null)}>
+            {m.users.temporaryPin.done}
+          </Button>
         </DialogContent>
       </Dialog>
     </div>

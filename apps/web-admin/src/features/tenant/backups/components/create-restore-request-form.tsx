@@ -3,15 +3,21 @@
 import { Button, Label, Textarea, toast } from "@cleanhub/ui";
 import { useState, type FormEvent } from "react";
 
+import { useTenantI18n } from "@/i18n";
+
 import { createTenantRestoreRequestAction } from "../actions";
 
 type CreateRestoreRequestFormProps = {
   backupJobId: string;
+  /** Called after a successful submit so the parent can refresh its list. */
+  onCreated?: () => void;
 };
 
 export function CreateRestoreRequestForm({
   backupJobId,
+  onCreated,
 }: CreateRestoreRequestFormProps) {
+  const { m } = useTenantI18n();
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -24,8 +30,9 @@ export function CreateRestoreRequestForm({
     });
 
     if (result.ok) {
-      toast.success("Restore request submitted.");
+      toast.success(m.backups.restoreRequest.submittedToast);
       setReason("");
+      onCreated?.();
     } else {
       toast.error(result.error);
     }
@@ -36,29 +43,32 @@ export function CreateRestoreRequestForm({
   return (
     <form className="grid gap-3 rounded-md border p-4" onSubmit={handleSubmit}>
       <div>
-        <h2 className="text-base font-semibold">Restore Request</h2>
+        <h2 className="text-base font-semibold">
+          {m.backups.restoreRequest.title}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          Submits a review request only. Tenant users cannot directly restore
-          production data.
+          {m.backups.restoreRequest.description}
         </p>
       </div>
 
       <div className="grid gap-2">
         <Label htmlFor={`tenant-restore-reason-${backupJobId}`}>
-          Restore reason
+          {m.backups.restoreRequest.reason}
         </Label>
         <Textarea
           id={`tenant-restore-reason-${backupJobId}`}
           maxLength={500}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="Explain why this backup should be restored"
+          placeholder={m.backups.restoreRequest.reasonPlaceholder}
           value={reason}
         />
       </div>
 
       <div className="flex justify-end">
         <Button disabled={submitting} type="submit">
-          {submitting ? "Submitting..." : "Submit restore request"}
+          {submitting
+            ? m.backups.restoreRequest.submitting
+            : m.backups.restoreRequest.action}
         </Button>
       </div>
     </form>

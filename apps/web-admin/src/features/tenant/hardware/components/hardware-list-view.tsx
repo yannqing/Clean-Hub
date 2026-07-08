@@ -25,6 +25,7 @@ import {
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { Pagination } from "@/components/pagination";
+import { useTenantI18n } from "@/i18n";
 
 import {
   hardwareConnectionTypeOptions,
@@ -43,24 +44,24 @@ import type {
 
 const PAGE_SIZE = 20;
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "An unexpected error occurred.";
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({
+  status,
+  label,
+}: {
+  status: string;
+  label: string;
+}) {
   const variant = status === "active" ? "default" : "secondary";
-  return <Badge variant={variant}>{status}</Badge>;
+  return <Badge variant={variant}>{label}</Badge>;
 }
 
 export function HardwareListView() {
   const isCurrent = useRef(true);
+  const { m, formatDateTime } = useTenantI18n();
 
   const [devices, setDevices] = useState<HardwareConfigSummary[]>([]);
   const [offset, setOffset] = useState(0);
@@ -100,10 +101,10 @@ export function HardwareListView() {
         setDevices(result);
       } catch (err) {
         if (!isCurrent.current) return;
-        setError(getErrorMessage(err));
+        setError(getErrorMessage(err, m.hardware.requestFailed));
       }
     });
-  }, [offset]);
+  }, [offset, m.hardware.requestFailed]);
 
   useEffect(() => {
     loadDevices();
@@ -161,8 +162,8 @@ export function HardwareListView() {
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Hardware Devices</h1>
-        <Button onClick={() => setCreateOpen(true)}>Add Device</Button>
+        <h1 className="text-2xl font-semibold">{m.hardware.title}</h1>
+        <Button onClick={() => setCreateOpen(true)}>{m.hardware.addDevice}</Button>
       </div>
 
       {error && (
@@ -170,19 +171,19 @@ export function HardwareListView() {
       )}
 
       {isPending ? (
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <p className="text-sm text-muted-foreground">{m.common.loading}</p>
       ) : devices.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No devices found.</p>
+        <p className="text-sm text-muted-foreground">{m.hardware.noDevices}</p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Connection</TableHead>
-              <TableHead>Branch</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead>{m.hardware.columns.name}</TableHead>
+              <TableHead>{m.hardware.columns.type}</TableHead>
+              <TableHead>{m.hardware.columns.connection}</TableHead>
+              <TableHead>{m.hardware.columns.branch}</TableHead>
+              <TableHead>{m.hardware.columns.status}</TableHead>
+              <TableHead>{m.hardware.columns.created}</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -194,16 +195,19 @@ export function HardwareListView() {
                 <TableCell>{device.connectionType}</TableCell>
                 <TableCell className="font-mono text-xs">{device.branchId}</TableCell>
                 <TableCell>
-                  <StatusBadge status={device.status} />
+                  <StatusBadge
+                    status={device.status}
+                    label={m.common.statusLabels[device.status] ?? device.status}
+                  />
                 </TableCell>
-                <TableCell>{formatDate(device.createdAt)}</TableCell>
+                <TableCell>{formatDateTime(device.createdAt)}</TableCell>
                 <TableCell>
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => handleOpenEdit(device)}
                   >
-                    Edit
+                    {m.common.edit}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -214,28 +218,28 @@ export function HardwareListView() {
 
       <Pagination
         currentPageCount={devices.length}
-        nextLabel="Next"
+        nextLabel={m.common.next}
         offset={offset}
         onOffsetChange={setOffset}
         pageSize={PAGE_SIZE}
-        previousLabel="Previous"
+        previousLabel={m.common.previous}
       />
 
       {/* Add device dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Device</DialogTitle>
+            <DialogTitle>{m.hardware.create.title}</DialogTitle>
             <DialogDescription>
-              Register a hardware device to a branch.
+              {m.hardware.create.description}
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label>Branch ID *</Label>
+              <Label>{m.hardware.create.labels.branchId} *</Label>
               <Input
-                placeholder="Enter branch ULID"
+                placeholder={m.hardware.create.labels.branchPlaceholder}
                 value={createForm.branchId}
                 onChange={(e) =>
                   setCreateForm((prev) => ({ ...prev, branchId: e.target.value }))
@@ -243,7 +247,7 @@ export function HardwareListView() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Device Name *</Label>
+              <Label>{m.hardware.create.labels.deviceName} *</Label>
               <Input
                 value={createForm.name}
                 onChange={(e) =>
@@ -252,7 +256,7 @@ export function HardwareListView() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Device Type *</Label>
+              <Label>{m.hardware.create.labels.deviceType} *</Label>
               <Select
                 value={createForm.deviceType}
                 onValueChange={(value) =>
@@ -275,7 +279,7 @@ export function HardwareListView() {
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Connection Type *</Label>
+              <Label>{m.hardware.create.labels.connectionType} *</Label>
               <Select
                 value={createForm.connectionType}
                 onValueChange={(value) =>
@@ -303,7 +307,7 @@ export function HardwareListView() {
             )}
 
             <Button disabled={createLoading} onClick={() => void handleCreate()}>
-              {createLoading ? "Adding..." : "Add Device"}
+              {createLoading ? m.hardware.create.adding : m.hardware.create.action}
             </Button>
           </div>
         </DialogContent>
@@ -318,7 +322,7 @@ export function HardwareListView() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Device</DialogTitle>
+            <DialogTitle>{m.hardware.edit.title}</DialogTitle>
             <DialogDescription>
               {editDevice?.name}
             </DialogDescription>
@@ -326,7 +330,7 @@ export function HardwareListView() {
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label>Device Name</Label>
+              <Label>{m.hardware.edit.labels.deviceName}</Label>
               <Input
                 value={editForm.name ?? ""}
                 onChange={(e) =>
@@ -335,7 +339,7 @@ export function HardwareListView() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Connection Type</Label>
+              <Label>{m.hardware.edit.labels.connectionType}</Label>
               <Select
                 value={editForm.connectionType ?? ""}
                 onValueChange={(value) =>
@@ -358,7 +362,7 @@ export function HardwareListView() {
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Status</Label>
+              <Label>{m.hardware.edit.labels.status}</Label>
               <Select
                 value={editForm.status ?? ""}
                 onValueChange={(value) =>
@@ -387,10 +391,12 @@ export function HardwareListView() {
 
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setEditDevice(null)}>
-                Cancel
+                {m.common.cancel}
               </Button>
               <Button disabled={editLoading} onClick={() => void handleUpdate()}>
-                {editLoading ? "Saving..." : "Save Changes"}
+                {editLoading
+                  ? m.hardware.edit.savingChanges
+                  : m.hardware.edit.saveChanges}
               </Button>
             </div>
           </div>

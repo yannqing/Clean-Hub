@@ -22,6 +22,8 @@ import {
 } from "@cleanhub/ui";
 import { useMemo, useState } from "react";
 
+import { useTenantI18n } from "@/i18n";
+
 import {
   backupJobStatusLabels,
   backupJobStatusOptions,
@@ -29,37 +31,16 @@ import {
 import type { BackupJobListItem, BackupJobStatus } from "../types";
 import { CreateBackupJobForm } from "./create-backup-job-form";
 import { CreateRestoreRequestForm } from "./create-restore-request-form";
+import { RestoreRequestList } from "./restore-request-list";
 
 type BackupJobListViewProps = {
   initialBackupJobs: BackupJobListItem[];
 };
 
-function formatDate(value: string | null): string {
-  if (!value) {
-    return "-";
-  }
-
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function getStatusVariant(status: BackupJobStatus) {
-  if (status === "succeeded") {
-    return "default";
-  }
-
-  if (status === "failed") {
-    return "destructive";
-  }
-
-  return "secondary";
-}
-
 export function BackupJobListView({
   initialBackupJobs,
 }: BackupJobListViewProps) {
+  const { m, formatDateTime } = useTenantI18n();
   const [backupJobs, setBackupJobs] = useState(initialBackupJobs);
   const [statusFilter, setStatusFilter] = useState<BackupJobStatus | "all">(
     "all",
@@ -67,6 +48,8 @@ export function BackupJobListView({
   const [selectedBackupJobId, setSelectedBackupJobId] = useState<string | null>(
     initialBackupJobs[0]?.id ?? null,
   );
+  // Bumped whenever a restore request is created so <RestoreRequestList> refetches.
+  const [restoreRefreshKey, setRestoreRefreshKey] = useState(0);
 
   const filteredBackupJobs = useMemo(
     () =>
@@ -84,22 +67,46 @@ export function BackupJobListView({
     setSelectedBackupJobId(backupJob.id);
   }
 
+  function handleRestoreRequestCreated() {
+    setRestoreRefreshKey((current) => current + 1);
+  }
+
+  function getStatusVariant(status: BackupJobStatus) {
+    if (status === "succeeded") {
+      return "default";
+    }
+
+    if (status === "failed") {
+      return "destructive";
+    }
+
+    return "secondary";
+  }
+
+  function formatCellDate(value: string | null): string {
+    if (!value) {
+      return m.backups.placeholders.none;
+    }
+    return formatDateTime(value);
+  }
+
   return (
     <div className="grid gap-6">
       <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
         <div>
-          <Badge variant="secondary">Tenant backups</Badge>
+          <Badge variant="secondary">{m.backups.eyebrow}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Data Backups
+            {m.backups.title}
           </h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Track tenant-scoped backup task records and submit restore review
-            requests without executing database dump or restore commands.
+            {m.backups.description}
           </p>
         </div>
 
         <div className="grid min-w-48 gap-2">
-          <Label htmlFor="tenant-backup-status-filter">Status</Label>
+          <Label htmlFor="tenant-backup-status-filter">
+            {m.backups.statusFilter}
+          </Label>
           <Select
             onValueChange={(value) =>
               setStatusFilter(value as BackupJobStatus | "all")
@@ -110,7 +117,7 @@ export function BackupJobListView({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="all">{m.common.allStatuses}</SelectItem>
               {backupJobStatusOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
@@ -125,14 +132,14 @@ export function BackupJobListView({
 
       <Card>
         <CardHeader>
-          <CardTitle>Backup Tasks</CardTitle>
+          <CardTitle>{m.backups.backupTasks}</CardTitle>
         </CardHeader>
         <CardContent>
           {filteredBackupJobs.length === 0 ? (
             <div className="rounded-md border border-dashed p-8 text-center">
-              <h2 className="text-base font-semibold">No backup tasks found</h2>
+              <h2 className="text-base font-semibold">{m.backups.emptyTitle}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Create a manual backup task record to start the review trail.
+                {m.backups.emptyBody}
               </p>
             </div>
           ) : (
@@ -140,34 +147,42 @@ export function BackupJobListView({
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Created</TableHead>
-                    <TableHead>Task ID</TableHead>
-                    <TableHead>Scope</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Requested by</TableHead>
-                    <TableHead>Started</TableHead>
-                    <TableHead>Finished</TableHead>
-                    <TableHead>Failure</TableHead>
-                    <TableHead className="text-right">Action</TableHead>
+                    <TableHead>{m.backups.columns.created}</TableHead>
+                    <TableHead>{m.backups.columns.taskId}</TableHead>
+                    <TableHead>{m.backups.columns.scope}</TableHead>
+                    <TableHead>{m.backups.columns.status}</TableHead>
+                    <TableHead>{m.backups.columns.requestedBy}</TableHead>
+                    <TableHead>{m.backups.columns.started}</TableHead>
+                    <TableHead>{m.backups.columns.finished}</TableHead>
+                    <TableHead>{m.backups.columns.failure}</TableHead>
+                    <TableHead className="text-right">
+                      {m.backups.columns.action}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredBackupJobs.map((backupJob) => (
                     <TableRow key={backupJob.id}>
-                      <TableCell>{formatDate(backupJob.createdAt)}</TableCell>
+                      <TableCell>{formatCellDate(backupJob.createdAt)}</TableCell>
                       <TableCell className="font-mono text-xs">
                         {backupJob.id}
                       </TableCell>
-                      <TableCell>Tenant</TableCell>
+                      <TableCell>{m.backups.scopeLabel}</TableCell>
                       <TableCell>
                         <Badge variant={getStatusVariant(backupJob.status)}>
                           {backupJobStatusLabels[backupJob.status]}
                         </Badge>
                       </TableCell>
-                      <TableCell>{backupJob.requestedBy ?? "System"}</TableCell>
-                      <TableCell>{formatDate(backupJob.startedAt)}</TableCell>
-                      <TableCell>{formatDate(backupJob.finishedAt)}</TableCell>
-                      <TableCell>{backupJob.failureReason ?? "-"}</TableCell>
+                      <TableCell>
+                        {backupJob.requestedBy ?? m.backups.placeholders.system}
+                      </TableCell>
+                      <TableCell>{formatCellDate(backupJob.startedAt)}</TableCell>
+                      <TableCell>
+                        {formatCellDate(backupJob.finishedAt)}
+                      </TableCell>
+                      <TableCell>
+                        {backupJob.failureReason ?? m.backups.placeholders.none}
+                      </TableCell>
                       <TableCell className="text-right">
                         <Button
                           onClick={() => setSelectedBackupJobId(backupJob.id)}
@@ -179,7 +194,7 @@ export function BackupJobListView({
                               : "outline"
                           }
                         >
-                          Select
+                          {m.backups.selectAction}
                         </Button>
                       </TableCell>
                     </TableRow>
@@ -192,10 +207,16 @@ export function BackupJobListView({
       </Card>
 
       {selectedBackupJob ? (
-        <CreateRestoreRequestForm backupJobId={selectedBackupJob.id} />
+        <>
+          <CreateRestoreRequestForm
+            backupJobId={selectedBackupJob.id}
+            onCreated={handleRestoreRequestCreated}
+          />
+          <RestoreRequestList refreshKey={restoreRefreshKey} />
+        </>
       ) : (
         <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground">
-          Select a backup task before submitting a restore request.
+          {m.backups.selectHint}
         </div>
       )}
     </div>

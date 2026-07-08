@@ -32,6 +32,8 @@ import type {
 } from "../types";
 import { CreateBackupJobForm } from "./create-backup-job-form";
 import { CreateRestoreRequestForm } from "./create-restore-request-form";
+import { RestoreRequestReviewActions } from "./restore-request-review-actions";
+import { BackupStorageMetadata } from "./backup-storage-metadata";
 import { useSaasI18n } from "@/i18n";
 
 type ScopeFilter = "all" | BackupJobScope;
@@ -139,6 +141,14 @@ export function BackupJobListView() {
 
   function handleRestoreRequestCreated(restoreRequest: RestoreRequest) {
     setRestoreRequests((current) => [restoreRequest, ...current]);
+  }
+
+  function handleRestoreRequestReviewed(updated: RestoreRequest) {
+    setRestoreRequests((current) =>
+      current.map((request) =>
+        request.id === updated.id ? updated : request,
+      ),
+    );
   }
 
   useEffect(() => {
@@ -393,6 +403,8 @@ export function BackupJobListView() {
                     </p>
                   ) : null}
                 </div>
+
+                <BackupStorageMetadata />
               </div>
 
               <CreateRestoreRequestForm
@@ -436,6 +448,10 @@ export function BackupJobListView() {
                       <TableHead>{m.backups.columns.created}</TableHead>
                       <TableHead>{m.common.status}</TableHead>
                       <TableHead>{m.systemLogs.columns.tenant}</TableHead>
+                      <TableHead>{m.backups.restoreColumns.reviewer}</TableHead>
+                      <TableHead>{m.backups.restoreColumns.reviewedAt}</TableHead>
+                      <TableHead>{m.backups.restoreColumns.reviewNote}</TableHead>
+                      <TableHead>{m.backups.restoreColumns.actions}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -445,12 +461,29 @@ export function BackupJobListView() {
                           {formatDate(restoreRequest.createdAt, m, formatDateTime)}
                         </TableCell>
                         <TableCell>
-                          <Badge variant="outline">
-                            {m.common.restoreStatusLabels[restoreRequest.status]}
-                          </Badge>
+                          <RestoreRequestReviewActions
+                            restoreRequest={restoreRequest}
+                            onReviewed={handleRestoreRequestReviewed}
+                          />
                         </TableCell>
                         <TableCell>
                           {restoreRequest.tenantId ?? m.common.platform}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {restoreRequest.reviewedBy ?? m.common.notSet}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {formatDate(
+                            restoreRequest.reviewedAt,
+                            m,
+                            formatDateTime,
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
+                          {restoreRequest.reviewNote ?? m.common.notSet}
+                        </TableCell>
+                        <TableCell className="text-xs text-muted-foreground">
+                          {restoreRequest.reason}
                         </TableCell>
                       </TableRow>
                     ))}

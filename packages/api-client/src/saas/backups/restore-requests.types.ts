@@ -26,3 +26,13 @@ export type RestoreRequest = {
   createdAt: string;
   updatedAt: string;
 };
+
+/**
+ * Input for the restore-request review endpoints (approve / reject).
+ *
+ * `reviewNote` is optional on complete/cancel and encouraged (but not required)
+ * on approve/reject so the reviewer can record a reason.
+ */
+export type ReviewRestoreRequestInput = {
+  reviewNote?: string;
+};

@@ -1,9 +1,11 @@
 import type {
   NotificationChannel,
+  NotificationDeliveryStatus,
   NotificationEvent,
   NotificationLanguage,
-  NotificationSettingsFormValues,
-} from "./types";
+} from "@cleanhub/api-client";
+
+import type { NotificationSettingsFormValues } from "./types";
 
 export const notificationLanguageOptions: {
   label: string;
@@ -72,3 +74,118 @@ export const emptyNotificationSettingsForm: NotificationSettingsFormValues = {
     },
   },
 };
+
+/* -------------------------------------------------------------------------- */
+/* WhatsApp credential form                                                   */
+/* -------------------------------------------------------------------------- */
+
+export type WhatsAppCredentialFieldId =
+  | "wabaId"
+  | "phoneNumberId"
+  | "accessToken"
+  | "templateNamespace";
+
+export type WhatsAppCredentialField = {
+  id: WhatsAppCredentialFieldId;
+  label: string;
+  placeholder: string;
+  /** Secret fields are masked on load and never echoed back from the API. */
+  secret: boolean;
+  required: boolean;
+};
+
+/**
+ * Field metadata for the credentials form. Labels/placeholders live in the i18n
+ * catalog (so this list only carries structural flags) — the view maps these
+ * ids to localized strings.
+ */
+export const whatsappCredentialFields: WhatsAppCredentialField[] = [
+  { id: "wabaId", label: "", placeholder: "", secret: false, required: true },
+  {
+    id: "phoneNumberId",
+    label: "",
+    placeholder: "",
+    secret: false,
+    required: true,
+  },
+  {
+    id: "accessToken",
+    label: "",
+    placeholder: "",
+    secret: true,
+    required: true,
+  },
+  {
+    id: "templateNamespace",
+    label: "",
+    placeholder: "",
+    secret: false,
+    required: false,
+  },
+];
+
+export const emptyWhatsAppCredentialsForm = {
+  wabaId: "",
+  phoneNumberId: "",
+  accessToken: "",
+  templateNamespace: "",
+} as const;
+
+/* -------------------------------------------------------------------------- */
+/* Template variable hints                                                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Per-event variables a tenant can interpolate into the matching WhatsApp /
+ * provider template body. These are the stable variable names the backend
+ * renderer will expose; they are surfaced in the UI as a hint so merchants
+ * know what they can author against.
+ */
+export const templateVariableHints: Record<NotificationEvent, string[]> = {
+  "order.created": [
+    "{{customer_name}}",
+    "{{order_code}}",
+    "{{branch_name}}",
+    "{{pickup_time}}",
+  ],
+  "order.ready": [
+    "{{customer_name}}",
+    "{{order_code}}",
+    "{{branch_name}}",
+    "{{ready_time}}",
+  ],
+  "order.overdue_pickup": [
+    "{{customer_name}}",
+    "{{order_code}}",
+    "{{branch_name}}",
+    "{{overdue_hours}}",
+  ],
+  "delivery.updated": [
+    "{{customer_name}}",
+    "{{order_code}}",
+    "{{courier_name}}",
+    "{{status}}",
+  ],
+};
+
+/* -------------------------------------------------------------------------- */
+/* Notification log                                                           */
+/* -------------------------------------------------------------------------- */
+
+export const notificationLogStatusOptions: {
+  value: NotificationDeliveryStatus;
+  label: string;
+}[] = [
+  { value: "pending", label: "" },
+  { value: "sent", label: "" },
+  { value: "failed", label: "" },
+];
+
+export const notificationLogChannelOptions: {
+  value: NotificationChannel;
+  label: string;
+}[] = [
+  { value: "whatsapp", label: "WhatsApp" },
+  { value: "sms", label: "SMS" },
+  { value: "email", label: "Email" },
+];
