@@ -10,6 +10,7 @@ export type MobileAuthContext = {
   subjectId: string;
   displayName: string;
   tenantId: string;
+  currency: string;
   branchIds: string[];
   role: MobileRole;
   roles: MobileRole[];
@@ -112,6 +113,6 @@ export type MobileStoredRefreshToken = {
 };
 
 export type MobileTestOtpResult = {
-  code: string;
+  code?: string;
   expiresAt: string;
 };

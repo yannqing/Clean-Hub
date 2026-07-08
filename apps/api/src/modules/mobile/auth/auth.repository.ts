@@ -6,6 +6,7 @@ import {
   getTableColumns,
   isNull,
   or,
+  sql,
 } from "drizzle-orm";
 
 import {
@@ -17,6 +18,7 @@ import {
   permissions,
   rolePermissions,
   roles,
+  tenantSettings,
   tenants,
   userProfiles,
   userRoles,
@@ -36,10 +38,16 @@ import type {
 export class MobileAuthRepository {
   constructor(private readonly db: Database) {}
 
-  async findActiveTenantByCode(tenantCode: string): Promise<{ id: string } | null> {
+  async findActiveTenantByCode(
+    tenantCode: string,
+  ): Promise<{ id: string; defaultCurrency: string } | null> {
     const rows = await this.db
-      .select({ id: tenants.id })
+      .select({
+        id: tenants.id,
+        defaultCurrency: sql<string>`coalesce(${tenantSettings.defaultCurrency}, 'XOF')`,
+      })
       .from(tenants)
+      .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))
       .where(
         and(
           eq(tenants.pressingCode, tenantCode.trim()),
@@ -47,6 +55,22 @@ export class MobileAuthRepository {
           isNull(tenants.deletedAt),
         ),
       )
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+
+  async findTenantById(
+    tenantId: string,
+  ): Promise<{ id: string; defaultCurrency: string } | null> {
+    const rows = await this.db
+      .select({
+        id: tenants.id,
+        defaultCurrency: sql<string>`coalesce(${tenantSettings.defaultCurrency}, 'XOF')`,
+      })
+      .from(tenants)
+      .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))
+      .where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
       .limit(1);
 
     return rows[0] ?? null;

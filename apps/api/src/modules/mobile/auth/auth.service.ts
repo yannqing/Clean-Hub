@@ -41,6 +41,7 @@ export type MobileAuthServiceOptions = {
   accessTokenSecret: string;
   accessTokenTtlSeconds?: number;
   refreshTokenTtlSeconds?: number;
+  testOtpEnabled?: boolean;
 };
 
 export type CreateMobileAuthServiceFromEnvOptions = {
@@ -56,6 +57,7 @@ const OTP_CODE_MAX = 1_000_000;
 export type MobileAuthRepositoryLike = Pick<
   MobileAuthRepository,
   | "findActiveTenantByCode"
+  | "findTenantById"
   | "findCustomerByPhone"
   | "findCustomerByIdentifier"
   | "findCustomerById"
@@ -159,6 +161,10 @@ function readOptionalPositiveInteger(value: string | undefined): number | undefi
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+function readBooleanFlag(value: string | undefined): boolean {
+  return value === "true";
+}
+
 export function createMobileAuthServiceFromEnv({
   db = getDb(),
   env = process.env,
@@ -181,6 +187,7 @@ export function createMobileAuthServiceFromEnv({
     refreshTokenTtlSeconds: readOptionalPositiveInteger(
       env.AUTH_REFRESH_TOKEN_TTL_SECONDS,
     ),
+    testOtpEnabled: readBooleanFlag(env.MOBILE_AUTH_TEST_OTP_ENABLED),
   });
 }
 
@@ -190,6 +197,7 @@ export class MobileAuthService {
   private readonly tokenService: TokenService;
   private readonly envRefreshTokenTtlSeconds: number;
   private readonly securityPolicy?: EffectiveSecurityPolicy;
+  private readonly testOtpEnabled: boolean;
 
   constructor({
     db,
@@ -198,10 +206,12 @@ export class MobileAuthService {
     accessTokenSecret,
     accessTokenTtlSeconds,
     refreshTokenTtlSeconds,
+    testOtpEnabled = false,
   }: MobileAuthServiceOptions) {
     this.db = db;
     this.repository = repository ?? new MobileAuthRepository(db);
     this.securityPolicy = securityPolicy;
+    this.testOtpEnabled = testOtpEnabled;
     this.envRefreshTokenTtlSeconds =
       refreshTokenTtlSeconds ?? 30 * 24 * 60 * 60;
     this.tokenService = new TokenService({
@@ -210,6 +220,10 @@ export class MobileAuthService {
       accessTokenTtlSeconds,
       refreshTokenTtlSeconds: this.envRefreshTokenTtlSeconds,
     });
+  }
+
+  isTestOtpEnabled(): boolean {
+    return this.testOtpEnabled;
   }
 
   async requestCustomerOtp(
@@ -240,7 +254,7 @@ export class MobileAuthService {
     });
 
     return {
-      code,
+      code: this.testOtpEnabled ? code : undefined,
       expiresAt: expiresAt.toISOString(),
     };
   }
@@ -248,6 +262,10 @@ export class MobileAuthService {
   async getCustomerTestOtp(
     input: MobileRequestOtpInput,
   ): Promise<MobileTestOtpResult> {
+    if (!this.testOtpEnabled) {
+      throw new AuthError("FEATURE_DISABLED", "Test OTP is disabled.");
+    }
+
     const tenant = await this.resolveTenant(input.tenantCode);
     const phone = normalizePhone(input.phone);
     const customer = await this.repository.findCustomerByPhone({
@@ -594,11 +612,13 @@ export class MobileAuthService {
     meta: MobileRequestOtpInput | MobileVerifyOtpInput | MobileCustomerPasswordLoginInput | MobileRefreshInput,
     options?: { familyId?: string },
   ): Promise<MobileAuthResult & { refreshTokenId: string }> {
+    const tenant = await this.resolveTenantById(customer.tenantId);
     const contextBase = {
       subjectType: "customer" as const,
       subjectId: customer.id,
       displayName: customer.accountName,
-      tenantId: customer.tenantId,
+      tenantId: tenant.id,
+      currency: tenant.defaultCurrency,
       branchIds: [],
       role: "customer" as const,
       roles: ["customer" as const],
@@ -609,7 +629,7 @@ export class MobileAuthService {
       {
         userId: customer.id,
         subjectType: "customer",
-        tenantId: customer.tenantId,
+        tenantId: tenant.id,
         role: "customer",
         roles: ["customer"],
         permissions: [],
@@ -628,7 +648,7 @@ export class MobileAuthService {
     );
     const refreshTokenId = await this.repository.createCustomerRefreshToken({
       customerAccountId: customer.id,
-      tenantId: customer.tenantId,
+      tenantId: tenant.id,
       tokenHash: hashOpaqueToken(rawRefreshToken),
       familyId: tokens.refreshTokenFamilyId,
       expiresAt: tokens.refreshTokenExpiresAt,
@@ -660,12 +680,13 @@ export class MobileAuthService {
       throw invalidCredentials();
     }
 
+    const tenant = await this.resolveTenantById(user.tenantId);
     const refreshTokenTtlSeconds = await this.getRefreshTokenTtlSeconds();
     const issuedTokens = await this.tokenService.issueTokenPair(
       {
         userId: user.id,
         subjectType: "staff",
-        tenantId: user.tenantId,
+        tenantId: tenant.id,
         role,
         roles: access.roles,
         permissions: access.permissions,
@@ -682,7 +703,7 @@ export class MobileAuthService {
     const rawRefreshToken = tokens.refreshToken.slice(STAFF_REFRESH_PREFIX.length);
     const refreshTokenId = await this.repository.createStaffRefreshToken({
       userId: user.id,
-      tenantId: user.tenantId,
+      tenantId: tenant.id,
       tokenHash: hashOpaqueToken(rawRefreshToken),
       familyId: tokens.refreshTokenFamilyId,
       expiresAt: tokens.refreshTokenExpiresAt,
@@ -698,7 +719,8 @@ export class MobileAuthService {
         subjectType: "staff",
         subjectId: user.id,
         displayName: access.displayName,
-        tenantId: user.tenantId,
+        tenantId: tenant.id,
+        currency: tenant.defaultCurrency,
         branchIds: access.branchIds,
         role,
         roles: access.roles.filter((candidate): candidate is MobileRole =>
@@ -712,10 +734,24 @@ export class MobileAuthService {
     };
   }
 
-  private async resolveTenant(tenantCode: string): Promise<{ id: string }> {
+  private async resolveTenant(
+    tenantCode: string,
+  ): Promise<{ id: string; defaultCurrency: string }> {
     const tenant = await this.repository.findActiveTenantByCode(
       normalizeTenantCode(tenantCode),
     );
+
+    if (!tenant) {
+      throw invalidCredentials();
+    }
+
+    return tenant;
+  }
+
+  private async resolveTenantById(
+    tenantId: string,
+  ): Promise<{ id: string; defaultCurrency: string }> {
+    const tenant = await this.repository.findTenantById(tenantId);
 
     if (!tenant) {
       throw invalidCredentials();
@@ -751,12 +787,14 @@ export class MobileAuthService {
     }
 
     assertActiveCustomer(resolvedCustomer);
+    const tenant = await this.resolveTenantById(resolvedCustomer.tenantId);
 
     return {
       subjectType: "customer",
       subjectId: resolvedCustomer.id,
       displayName: resolvedCustomer.accountName,
-      tenantId: resolvedCustomer.tenantId,
+      tenantId: tenant.id,
+      currency: tenant.defaultCurrency,
       branchIds: [],
       role: "customer",
       roles: ["customer"],
@@ -779,6 +817,7 @@ export class MobileAuthService {
     }
 
     assertActiveStaff(user);
+    const tenant = await this.resolveTenantById(claims.tenantId);
 
     const access = await this.repository.getStaffAccess(user.id);
     const role =
@@ -794,7 +833,8 @@ export class MobileAuthService {
       subjectType: "staff",
       subjectId: user.id,
       displayName: access.displayName,
-      tenantId: claims.tenantId,
+      tenantId: tenant.id,
+      currency: tenant.defaultCurrency,
       branchIds: access.branchIds,
       role,
       roles: access.roles.filter((candidate): candidate is MobileRole =>

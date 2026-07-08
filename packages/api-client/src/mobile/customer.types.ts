@@ -58,6 +58,13 @@ export type MobileCustomerAddress = {
   updatedAt: string;
 };
 
+export type MobileCustomerBranchOption = {
+  id: string;
+  name: string;
+  address: string | null;
+  status: "active" | "inactive";
+};
+
 export type MobileCustomerAddressInput = {
   customerId?: string | null;
   label: string;

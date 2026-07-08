@@ -207,6 +207,20 @@ export function createCustomerController({
       }
     },
 
+    listBranches: async (c: Context<AppBindings>) => {
+      try {
+        return c.json({
+          data: await customerService.listBranches(c.get("mobileAuthContext")),
+        });
+      } catch (error) {
+        if (error instanceof CustomerError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
     createAddress: async (c: Context<AppBindings>) => {
       const body = addressBodySchema.parse(await readJson(c));
 

@@ -25,6 +25,7 @@ const customerContext: MobileAuthContext = {
   subjectId: "account_1",
   displayName: "Customer One",
   tenantId: "tenant_1",
+  currency: "XOF",
   branchIds: [],
   role: "customer",
   roles: ["customer"],
@@ -42,6 +43,7 @@ const ownerContext: MobileAuthContext = {
   subjectId: "owner_1",
   displayName: "Owner One",
   tenantId: "tenant_1",
+  currency: "XOF",
   branchIds: ["branch_1"],
   role: "owner",
   roles: ["owner"],
@@ -590,6 +592,16 @@ function createNotificationPublisher(): {
   };
 }
 
+function createFailingNotificationPublisher(): {
+  publish(event: NotificationEvent): Promise<NotificationPublishResult>;
+} {
+  return {
+    async publish() {
+      throw new Error("notification unavailable");
+    },
+  };
+}
+
 async function sendSignedCallback(
   service: PaymentService,
   input: Parameters<MockPaymentGateway["createSignedCallbackPayload"]>[0],
@@ -864,6 +876,15 @@ export async function runPaymentSmokeChecks(): Promise<void> {
     approval.refundRequest.status === "processing",
     "approved refund should wait for callback",
   );
+  assert(
+    notificationPublisher.events.some(
+      (event) =>
+        event.name === "refund.approved" &&
+        event.relatedId === refund.id &&
+        event.customerId === "customer_1",
+    ),
+    "approved refund should publish a notification event",
+  );
 
   await assertRejectsPayment(
     () =>
@@ -923,6 +944,48 @@ export async function runPaymentSmokeChecks(): Promise<void> {
   });
 
   assert(rejected.status === "rejected", "owner should reject pending refund");
+  assert(
+    notificationPublisher.events.some(
+      (event) =>
+        event.name === "refund.rejected" &&
+        event.relatedId === rejectedRefund.id &&
+        event.payload?.rejectionReason === "Outside policy",
+    ),
+    "rejected refund should publish a notification event",
+  );
+
+  const failingRepository = createRepository();
+  failingRepository.refunds.set(
+    "refund_notification_failure",
+    makeRefund({
+      id: "refund_notification_failure",
+      orderId: "order_1",
+      amount: "10.00",
+      reason: "Notification failure path",
+    }),
+  );
+  const failingNotificationService = new PaymentService({
+    repository: failingRepository,
+    gateway,
+    config: {
+      gateway: "mock",
+      currency: "XOF",
+      mockSecret,
+      mockPaymentBaseUrl: "http://localhost:3002",
+    },
+    notificationPublisher: createFailingNotificationPublisher(),
+  });
+  const rejectedDespiteNotificationFailure =
+    await failingNotificationService.rejectRefundRequest({
+      authContext: ownerContext,
+      refundRequestId: "refund_notification_failure",
+      reason: "Outside policy",
+    });
+
+  assert(
+    rejectedDespiteNotificationFailure.status === "rejected",
+    "notification failure should not block refund rejection",
+  );
 }
 
 if (process.argv[1]?.endsWith("payment.smoke.ts")) {

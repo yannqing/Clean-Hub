@@ -9,12 +9,17 @@ import {
   type OwnerTodaySummary,
 } from "./owner.types.js";
 import type { MobileAuthContext } from "../auth/auth.types.js";
+import type {
+  NotificationEvent,
+  NotificationPublishResult,
+} from "../../notifications/index.js";
 
 const ownerContext: MobileAuthContext = {
   subjectType: "staff",
   subjectId: "owner_1",
   displayName: "Owner One",
   tenantId: "tenant_1",
+  currency: "XOF",
   branchIds: [],
   role: "owner",
   roles: ["owner"],
@@ -68,12 +73,16 @@ function makeAppointment(
     tenantId: "tenant_1",
     branchId: "branch_1",
     customerId: "customer_1",
+    customerName: "Customer One",
+    customerPhone: null,
     type: "pickup",
     status,
     expectedAt: now,
     address: "1 Main St",
     notes: null,
     deliveryTaskId: status === "accepted" ? "task_1" : null,
+    assigneeUserId: status === "accepted" ? "driver_1" : null,
+    assigneeName: status === "accepted" ? "Driver One" : null,
     acceptedAt: status === "accepted" ? now : null,
     acceptedBy: status === "accepted" ? "owner_1" : null,
     cancelledAt: null,
@@ -105,6 +114,61 @@ function createRepository(options?: {
   }
 
   return {
+    async listBranches({ tenantId, allowedBranchIds }) {
+      assertTenant(tenantId);
+
+      const branches = [
+        {
+          id: "branch_1",
+          name: "Main Branch",
+          address: "1 Main St",
+          status: "active" as const,
+        },
+        {
+          id: "branch_2",
+          name: "Second Branch",
+          address: "2 Main St",
+          status: "active" as const,
+        },
+      ];
+
+      return allowedBranchIds
+        ? branches.filter((branch) => allowedBranchIds.includes(branch.id))
+        : branches;
+    },
+    async listDrivers({ tenantId, branchId, allowedBranchIds }) {
+      assertTenant(tenantId);
+
+      const drivers = [
+        {
+          id: "driver_1",
+          displayName: "Driver One",
+          email: "driver@example.com",
+          phone: "+100000001",
+          status: "active" as const,
+          branchIds: ["branch_1"],
+        },
+        {
+          id: "driver_2",
+          displayName: "Driver Two",
+          email: "driver2@example.com",
+          phone: "+100000002",
+          status: "active" as const,
+          branchIds: ["branch_2"],
+        },
+      ];
+
+      return drivers.filter((driver) => {
+        const scopedByBranch = branchId
+          ? driver.branchIds.includes(branchId)
+          : true;
+        const scopedByOwner = allowedBranchIds
+          ? driver.branchIds.some((id) => allowedBranchIds.includes(id))
+          : true;
+
+        return scopedByBranch && scopedByOwner;
+      });
+    },
     async findTenantBase(tenantId) {
       assertTenant(tenantId);
 
@@ -116,6 +180,7 @@ function createRepository(options?: {
         tenantId,
         tenantName: "Demo Tenant",
         tenantStatus: "active",
+        currency: "XOF",
         featureFlags: {
           laundryEnabled: true,
           carWashEnabled: false,
@@ -125,7 +190,7 @@ function createRepository(options?: {
         },
       } satisfies Pick<
         OwnerTodaySummary,
-        "tenantId" | "tenantName" | "tenantStatus" | "featureFlags"
+        "tenantId" | "tenantName" | "tenantStatus" | "currency" | "featureFlags"
       >;
     },
     async countTodayOrders({ tenantId }) {
@@ -252,6 +317,7 @@ function createDeliveryRepository(options?: {
         branchId: "branch_1",
         appointmentId: "appointment_1",
         assigneeUserId: "driver_1",
+        assigneeName: "Driver One",
         type: "pickup",
         status: "pending_dispatch",
         expectedAt: now,
@@ -278,14 +344,47 @@ function createDeliveryRepository(options?: {
   };
 }
 
+function createNotificationPublisher(): {
+  events: NotificationEvent[];
+  publish(event: NotificationEvent): Promise<NotificationPublishResult>;
+} {
+  const events: NotificationEvent[] = [];
+
+  return {
+    events,
+    async publish(event) {
+      events.push(event);
+      return {
+        matched: 1,
+        enqueued: 1,
+        skipped: 0,
+        idempotent: 0,
+      };
+    },
+  };
+}
+
+function createFailingNotificationPublisher(): {
+  publish(event: NotificationEvent): Promise<NotificationPublishResult>;
+} {
+  return {
+    async publish() {
+      throw new Error("notification unavailable");
+    },
+  };
+}
+
 export async function runOwnerSmokeChecks(): Promise<void> {
+  const notificationPublisher = createNotificationPublisher();
   const service = new OwnerService({
     repository: createRepository(),
     deliveryRepository: createDeliveryRepository(),
+    notificationPublisher,
   });
   const summary = await service.getTodaySummary(ownerContext);
 
   assert(summary.tenantId === "tenant_1", "summary should use token tenant");
+  assert(summary.currency === "XOF", "summary should include tenant currency");
   assert(summary.todayOrderCount === 8, "summary should include order count");
   assert(
     summary.todayRevenueAmount === 12500,
@@ -299,6 +398,16 @@ export async function runOwnerSmokeChecks(): Promise<void> {
     summary.deliverySummary.inProgress === 2,
     "summary should include deliveries",
   );
+
+  const branches = await service.listBranches(ownerContext);
+  assert(branches.length === 2, "tenant owner should list tenant branches");
+
+  const drivers = await service.listDrivers({
+    authContext: ownerContext,
+    branchId: "branch_1",
+  });
+  assert(drivers.length === 1, "owner should list branch drivers");
+  assert(drivers[0]?.id === "driver_1", "branch driver should match filter");
 
   const appointments = await service.listAppointments({
     authContext: ownerContext,
@@ -314,6 +423,14 @@ export async function runOwnerSmokeChecks(): Promise<void> {
   });
   assert(accepted.appointment.status === "accepted", "appointment accepts");
   assert(accepted.task.id === "task_1", "accepted appointment returns task");
+  assert(
+    notificationPublisher.events[0]?.name === "appointment.accepted",
+    "accepted appointment should publish a notification event",
+  );
+  assert(
+    notificationPublisher.events[0]?.customerId === "customer_1",
+    "accepted appointment notification should target the customer",
+  );
 
   const replayedAccept = await service.acceptAppointment({
     authContext: ownerContext,
@@ -326,10 +443,16 @@ export async function runOwnerSmokeChecks(): Promise<void> {
     replayedAccept.task.id === "task_1",
     "accepted appointment replay should return existing task",
   );
+  assert(
+    notificationPublisher.events.length === 1,
+    "accepted appointment replay should not publish again",
+  );
 
+  const rejectNotificationPublisher = createNotificationPublisher();
   const rejected = await new OwnerService({
     repository: createRepository(),
     deliveryRepository: createDeliveryRepository(),
+    notificationPublisher: rejectNotificationPublisher,
   }).rejectAppointment({
     authContext: ownerContext,
     appointmentId: "appointment_1",
@@ -337,6 +460,28 @@ export async function runOwnerSmokeChecks(): Promise<void> {
   });
   assert(rejected.status === "cancelled", "pending appointment rejects");
   assert(rejected.cancellationReason === "No slot", "reject should store reason");
+  assert(
+    rejectNotificationPublisher.events[0]?.name === "appointment.rejected",
+    "rejected appointment should publish a notification event",
+  );
+  assert(
+    rejectNotificationPublisher.events[0]?.payload?.reason === "No slot",
+    "rejected appointment notification should include the reason",
+  );
+
+  const rejectedWithNotificationFailure = await new OwnerService({
+    repository: createRepository(),
+    deliveryRepository: createDeliveryRepository(),
+    notificationPublisher: createFailingNotificationPublisher(),
+  }).rejectAppointment({
+    authContext: ownerContext,
+    appointmentId: "appointment_1",
+    reason: "No slot",
+  });
+  assert(
+    rejectedWithNotificationFailure.status === "cancelled",
+    "notification failure should not block appointment rejection",
+  );
 
   await assertRejectsOwner(
     () =>
@@ -357,6 +502,24 @@ export async function runOwnerSmokeChecks(): Promise<void> {
         repository: createRepository({ branchId: "branch_1" }),
         deliveryRepository: createDeliveryRepository(),
       }).listAppointments({
+        authContext: restrictedOwnerContext,
+        branchId: "branch_1",
+      }),
+    403,
+  );
+
+  const restrictedBranches = await service.listBranches(restrictedOwnerContext);
+  assert(
+    restrictedBranches.every((branch) => branch.id === "branch_2"),
+    "restricted owner should only list allowed branches",
+  );
+
+  await assertRejectsOwner(
+    () =>
+      new OwnerService({
+        repository: createRepository(),
+        deliveryRepository: createDeliveryRepository(),
+      }).listDrivers({
         authContext: restrictedOwnerContext,
         branchId: "branch_1",
       }),

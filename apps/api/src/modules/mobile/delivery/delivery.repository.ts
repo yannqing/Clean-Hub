@@ -18,6 +18,7 @@ import {
   deliveryTaskEvents,
   deliveryTasks,
   users,
+  userProfiles,
   userRoles,
   roles,
   orders,
@@ -42,6 +43,7 @@ function toIsoString(value: Date | null): string | null {
 
 function toTaskListItem(
   row: typeof deliveryTasks.$inferSelect,
+  assigneeName: string | null = null,
 ): DeliveryTaskListItem {
   return {
     id: row.id,
@@ -49,6 +51,7 @@ function toTaskListItem(
     branchId: row.branchId,
     appointmentId: row.appointmentId,
     assigneeUserId: row.assigneeUserId,
+    assigneeName,
     type: row.type,
     status: row.status,
     expectedAt: toIsoString(row.expectedAt),
@@ -59,6 +62,14 @@ function toTaskListItem(
     ticketId: row.ticketId,
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function resolveAssigneeName(input: {
+  assigneeDisplayName?: string | null;
+  assigneeEmail?: string | null;
+  assigneeUserId?: string | null;
+}): string | null {
+  return input.assigneeDisplayName ?? input.assigneeEmail ?? input.assigneeUserId ?? null;
 }
 
 function toTaskDetail(
@@ -156,8 +167,14 @@ export class DeliveryRepository {
     end: Date;
   }): Promise<DeliveryTaskListItem[]> {
     const rows = await this.db
-      .select({ ...getTableColumns(deliveryTasks) })
+      .select({
+        ...getTableColumns(deliveryTasks),
+        assigneeDisplayName: userProfiles.displayName,
+        assigneeEmail: users.email,
+      })
       .from(deliveryTasks)
+      .leftJoin(users, eq(users.id, deliveryTasks.assigneeUserId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
       .where(
         and(
           eq(deliveryTasks.tenantId, tenantId),
@@ -169,7 +186,9 @@ export class DeliveryRepository {
       )
       .orderBy(asc(deliveryTasks.expectedAt), asc(deliveryTasks.createdAt));
 
-    return rows.map(toTaskListItem);
+    return rows.map((row) =>
+      toTaskListItem(row, resolveAssigneeName(row)),
+    );
   }
 
   async findOwnedTaskById({
@@ -620,7 +639,7 @@ export class DeliveryRepository {
       )
       .orderBy(asc(deliveryTasks.expectedAt), asc(deliveryTasks.createdAt));
 
-    return rows.map(toTaskListItem);
+    return rows.map((row) => toTaskListItem(row));
   }
 
   async listAssignedDispatchTasks(input: {
@@ -644,8 +663,14 @@ export class DeliveryRepository {
           "cancelled",
         ]);
     const rows = await this.db
-      .select({ ...getTableColumns(deliveryTasks) })
+      .select({
+        ...getTableColumns(deliveryTasks),
+        assigneeDisplayName: userProfiles.displayName,
+        assigneeEmail: users.email,
+      })
       .from(deliveryTasks)
+      .leftJoin(users, eq(users.id, deliveryTasks.assigneeUserId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
       .where(
         and(
           eq(deliveryTasks.tenantId, input.tenantId),
@@ -661,7 +686,9 @@ export class DeliveryRepository {
       )
       .orderBy(asc(deliveryTasks.expectedAt), desc(deliveryTasks.updatedAt));
 
-    return rows.map(toTaskListItem);
+    return rows.map((row) =>
+      toTaskListItem(row, resolveAssigneeName(row)),
+    );
   }
 
   async dispatchTask(input: {

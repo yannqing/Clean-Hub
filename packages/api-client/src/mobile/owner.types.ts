@@ -12,6 +12,7 @@ export type MobileOwnerTodaySummary = {
   tenantId: string;
   tenantName: string;
   tenantStatus: "active" | "suspended" | "disabled";
+  currency: string;
   businessDate: string;
   featureFlags: MobileOwnerSummaryFeatureFlags;
   todayOrderCount: number;
@@ -32,6 +33,34 @@ export type MobileOwnerTodaySummary = {
   };
 };
 
+export type MobileOwnerBranchOption = {
+  id: string;
+  name: string;
+  address: string | null;
+  status: "active" | "inactive";
+};
+
+export type MobileOwnerBranchListResponse = {
+  data: MobileOwnerBranchOption[];
+};
+
+export type MobileOwnerDriverOption = {
+  id: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  status: "active";
+  branchIds: string[];
+};
+
+export type MobileOwnerDriverListQuery = {
+  branchId?: string;
+};
+
+export type MobileOwnerDriverListResponse = {
+  data: MobileOwnerDriverOption[];
+};
+
 export type MobileOwnerAppointmentStatus =
   | "pending"
   | "accepted"
@@ -45,7 +74,11 @@ export type MobileOwnerAppointment = {
   tenantId: string;
   branchId: string;
   customerId: string;
+  customerName: string;
+  customerPhone: string | null;
   deliveryTaskId: string | null;
+  assigneeUserId: string | null;
+  assigneeName: string | null;
   type: MobileOwnerAppointmentType;
   status: MobileOwnerAppointmentStatus;
   expectedAt: string;

@@ -14,6 +14,10 @@ const appointmentListQuerySchema = z.object({
   status: z.enum(["pending", "accepted", "cancelled", "done"]).optional(),
 });
 
+const driverListQuerySchema = z.object({
+  branchId: z.string().trim().min(1).max(120).optional(),
+});
+
 const acceptAppointmentBodySchema = z.object({
   idempotencyKey: z.string().trim().min(1).max(120),
   assigneeUserId: z.string().trim().min(1).max(120).optional(),
@@ -53,6 +57,39 @@ export function createOwnerController({
         return c.json(
           await ownerService.getTodaySummary(c.get("mobileAuthContext")),
         );
+      } catch (error) {
+        if (error instanceof OwnerError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
+    listBranches: async (c: Context<AppBindings>) => {
+      try {
+        return c.json({
+          data: await ownerService.listBranches(c.get("mobileAuthContext")),
+        });
+      } catch (error) {
+        if (error instanceof OwnerError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
+    listDrivers: async (c: Context<AppBindings>) => {
+      const query = driverListQuerySchema.parse(c.req.query());
+
+      try {
+        return c.json({
+          data: await ownerService.listDrivers({
+            authContext: c.get("mobileAuthContext"),
+            branchId: query.branchId,
+          }),
+        });
       } catch (error) {
         if (error instanceof OwnerError) {
           return errorResponse(c, error);

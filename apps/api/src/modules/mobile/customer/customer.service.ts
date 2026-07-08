@@ -11,6 +11,7 @@ import type {
   CustomerAddress,
   CustomerAddressWriteInput,
   CustomerAppointment,
+  CustomerBranchOption,
   CustomerChangePasswordInput,
   CustomerContact,
   CustomerContactWriteInput,
@@ -59,6 +60,7 @@ export type CustomerRepositoryLike = {
     tenantId: string;
     customerAccountId: string;
   }): Promise<CustomerAddress[]>;
+  listBranches(input: { tenantId: string }): Promise<CustomerBranchOption[]>;
   findOwnedAddressById(input: {
     tenantId: string;
     customerAccountId: string;
@@ -187,8 +189,8 @@ function contactNotFound(): CustomerError {
   );
 }
 
-function validationError(message: string): CustomerError {
-  return new CustomerError("CUSTOMER_VALIDATION_ERROR", message, 422);
+function validationError(message: string, status: 400 | 422 = 422): CustomerError {
+  return new CustomerError("CUSTOMER_VALIDATION_ERROR", message, status);
 }
 
 function assertCustomerContext(
@@ -305,6 +307,14 @@ export class CustomerService {
       tenantId: customer.tenantId,
       customerAccountId: customer.subjectId,
     });
+  }
+
+  async listBranches(
+    authContext: MobileAuthContext,
+  ): Promise<CustomerBranchOption[]> {
+    const customer = assertCustomerContext(authContext);
+
+    return this.repository.listBranches({ tenantId: customer.tenantId });
   }
 
   async createAddress(
@@ -499,6 +509,15 @@ export class CustomerService {
     input: CreateCustomerAppointmentInput,
   ): Promise<CustomerAppointment> {
     const customer = assertCustomerContext(input.authContext);
+    const earliestExpectedAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    if (input.expectedAt.getTime() < earliestExpectedAt.getTime()) {
+      throw validationError(
+        "Appointment must be scheduled at least 30 minutes in the future.",
+        400,
+      );
+    }
+
     const customerId = await this.resolveCustomerId({
       tenantId: customer.tenantId,
       customerAccountId: customer.subjectId,

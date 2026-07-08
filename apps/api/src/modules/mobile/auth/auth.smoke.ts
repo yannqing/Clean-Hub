@@ -180,13 +180,29 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
     });
   }
 
-  async findActiveTenantByCode(tenantCode: string): Promise<{ id: string } | null> {
+  async findActiveTenantByCode(
+    tenantCode: string,
+  ): Promise<{ id: string; defaultCurrency: string } | null> {
     if (tenantCode === "CLEAN-001") {
-      return { id: "tenant_1" };
+      return { id: "tenant_1", defaultCurrency: "XOF" };
     }
 
     if (tenantCode === "CLEAN-002") {
-      return { id: "tenant_2" };
+      return { id: "tenant_2", defaultCurrency: "EUR" };
+    }
+
+    return null;
+  }
+
+  async findTenantById(
+    tenantId: string,
+  ): Promise<{ id: string; defaultCurrency: string } | null> {
+    if (tenantId === "tenant_1") {
+      return { id: "tenant_1", defaultCurrency: "XOF" };
+    }
+
+    if (tenantId === "tenant_2") {
+      return { id: "tenant_2", defaultCurrency: "EUR" };
     }
 
     return null;
@@ -521,6 +537,14 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
 async function createService(): Promise<{
   service: MobileAuthService;
   repository: FakeMobileAuthRepository;
+}>;
+async function createService(options: { testOtpEnabled: true }): Promise<{
+  service: MobileAuthService;
+  repository: FakeMobileAuthRepository;
+}>;
+async function createService(options?: { testOtpEnabled?: boolean }): Promise<{
+  service: MobileAuthService;
+  repository: FakeMobileAuthRepository;
 }> {
   const passwordHash = await hashPassword(GOOD_PASSWORD);
   const repository = new FakeMobileAuthRepository(passwordHash);
@@ -531,13 +555,34 @@ async function createService(): Promise<{
     accessTokenSecret: TEST_SECRET,
     accessTokenTtlSeconds: 60,
     refreshTokenTtlSeconds: 60 * 60,
+    testOtpEnabled: options?.testOtpEnabled ?? false,
   });
 
   return { service, repository };
 }
 
-async function assertCustomerOtpSuccess(): Promise<void> {
+async function assertCustomerOtpDoesNotExposeCodeByDefault(): Promise<void> {
   const { service } = await createService();
+
+  const requestedOtp = await service.requestCustomerOtp({
+    tenantCode: "CLEAN-001",
+    phone: "+100000000",
+    deviceId: "device_1",
+  });
+
+  assert(!requestedOtp.code, "OTP request must not expose code by default");
+  await assertRejectsAuth(
+    () =>
+      service.getCustomerTestOtp({
+        tenantCode: "CLEAN-001",
+        phone: "+100000000",
+      }),
+    "FEATURE_DISABLED",
+  );
+}
+
+async function assertCustomerOtpSuccess(): Promise<void> {
+  const { service } = await createService({ testOtpEnabled: true });
 
   const requestedOtp = await service.requestCustomerOtp({
     tenantCode: "CLEAN-001",
@@ -548,6 +593,14 @@ async function assertCustomerOtpSuccess(): Promise<void> {
     tenantCode: "CLEAN-001",
     phone: "+100000000",
   });
+
+  if (!requestedOtp.code) {
+    throw new Error("test-enabled OTP request should expose code");
+  }
+
+  if (!testOtp.code) {
+    throw new Error("test OTP should expose latest code");
+  }
 
   assert(testOtp.code === requestedOtp.code, "test OTP should expose latest code");
 
@@ -560,11 +613,13 @@ async function assertCustomerOtpSuccess(): Promise<void> {
 
   assert(login.authContext.subjectType === "customer", "OTP login is customer");
   assert(login.authContext.role === "customer", "OTP login role is customer");
+  assert(login.authContext.currency === "XOF", "OTP login includes tenant currency");
   assert(login.tokens.refreshToken.startsWith("cust_"), "customer refresh is wrapped");
 
   const context = await service.getMobileAuthContext(login.tokens.accessToken);
 
   assert(context.subjectId === "customer_account_1", "customer token resolves");
+  assert(context.currency === "XOF", "customer token resolves tenant currency");
   assert(context.roles.length === 1 && context.roles[0] === "customer", "customer role is isolated");
 }
 
@@ -649,6 +704,7 @@ async function assertStaffRoleIsolation(): Promise<void> {
 
   assert(driver.authContext.subjectType === "staff", "driver is staff");
   assert(driver.authContext.role === "driver", "driver role is selected");
+  assert(driver.authContext.currency === "XOF", "driver login includes tenant currency");
   assert(driver.authContext.branchIds[0] === "branch_1", "driver branch is included");
   assert(driver.tokens.refreshToken.startsWith("staff_"), "staff refresh is wrapped");
 
@@ -786,6 +842,7 @@ async function assertRefreshAndLogout(): Promise<void> {
 }
 
 export async function runMobileAuthSmokeChecks(): Promise<void> {
+  await assertCustomerOtpDoesNotExposeCodeByDefault();
   await assertCustomerOtpSuccess();
   await assertCustomerOtpAttemptLimit();
   await assertCustomerPasswordLockout();

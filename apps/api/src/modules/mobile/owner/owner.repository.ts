@@ -6,33 +6,43 @@ import {
   eq,
   getTableColumns,
   gte,
+  inArray,
   isNull,
   lt,
   sql,
+  type SQL,
 } from "drizzle-orm";
 import { createId } from "@cleanhub/id";
 
 import {
   appointments,
+  branches,
   customers,
   deliveryTasks,
   orders,
   paymentTransactions,
+  roles,
   serviceTickets,
   tenantFeatureFlags,
+  tenantSettings,
   tenants,
+  userProfiles,
+  userRoles,
+  users,
   type Database,
 } from "@cleanhub/db";
 
 import type {
   OwnerAppointment,
   OwnerAppointmentStatus,
+  OwnerBranchOption,
+  OwnerDriverOption,
   OwnerTodaySummary,
 } from "./owner.types.js";
 
 type TenantBase = Pick<
   OwnerTodaySummary,
-  "tenantId" | "tenantName" | "tenantStatus" | "featureFlags"
+  "tenantId" | "tenantName" | "tenantStatus" | "currency" | "featureFlags"
 >;
 
 function emptyAppointmentSummary(): OwnerTodaySummary["appointmentSummary"] {
@@ -69,18 +79,29 @@ function toIsoString(value: Date | null): string | null {
   return value ? value.toISOString() : null;
 }
 
-function toAppointment(row: typeof appointments.$inferSelect): OwnerAppointment {
+type OwnerAppointmentRow = typeof appointments.$inferSelect & {
+  customerName: string;
+  customerPhone: string | null;
+  assigneeUserId: string | null;
+  assigneeName: string | null;
+};
+
+function toAppointment(row: OwnerAppointmentRow): OwnerAppointment {
   return {
     id: row.id,
     tenantId: row.tenantId,
     branchId: row.branchId,
     customerId: row.customerId,
+    customerName: row.customerName,
+    customerPhone: row.customerPhone,
     type: row.type,
     status: row.status,
     expectedAt: row.expectedAt.toISOString(),
     address: row.address,
     notes: row.notes,
     deliveryTaskId: row.deliveryTaskId,
+    assigneeUserId: row.assigneeUserId,
+    assigneeName: row.assigneeName,
     acceptedAt: toIsoString(row.acceptedAt),
     acceptedBy: row.acceptedBy,
     cancelledAt: toIsoString(row.cancelledAt),
@@ -93,8 +114,115 @@ function toAppointment(row: typeof appointments.$inferSelect): OwnerAppointment 
   };
 }
 
+function toAppointmentRow(row: typeof appointments.$inferSelect): OwnerAppointmentRow {
+  return {
+    ...row,
+    customerName: row.customerId,
+    customerPhone: null,
+    assigneeUserId: null,
+    assigneeName: null,
+  };
+}
+
 export class OwnerRepository {
   constructor(private readonly db: Database) {}
+
+  async listBranches(input: {
+    tenantId: string;
+    allowedBranchIds?: string[];
+  }): Promise<OwnerBranchOption[]> {
+    if (input.allowedBranchIds?.length === 0) {
+      return [];
+    }
+
+    const filters: SQL[] = [
+      eq(branches.tenantId, input.tenantId),
+      isNull(branches.deletedAt),
+    ];
+
+    if (input.allowedBranchIds) {
+      filters.push(inArray(branches.id, input.allowedBranchIds));
+    }
+
+    const rows = await this.db
+      .select({
+        id: branches.id,
+        name: branches.name,
+        address: branches.address,
+        status: branches.status,
+      })
+      .from(branches)
+      .where(and(...filters))
+      .orderBy(asc(branches.name));
+
+    return rows;
+  }
+
+  async listDrivers(input: {
+    tenantId: string;
+    branchId?: string;
+    allowedBranchIds?: string[];
+  }): Promise<OwnerDriverOption[]> {
+    if (input.allowedBranchIds?.length === 0) {
+      return [];
+    }
+
+    const filters: SQL[] = [
+      eq(users.tenantId, input.tenantId),
+      eq(users.userType, "tenant"),
+      eq(users.status, "active"),
+      isNull(users.deletedAt),
+      eq(userRoles.tenantId, input.tenantId),
+      isNull(userRoles.revokedAt),
+      eq(roles.scope, "tenant"),
+      eq(roles.code, "driver"),
+      eq(roles.status, "active"),
+      isNull(roles.deletedAt),
+    ];
+
+    if (input.branchId) {
+      filters.push(eq(userRoles.branchId, input.branchId));
+    } else if (input.allowedBranchIds) {
+      filters.push(inArray(userRoles.branchId, input.allowedBranchIds));
+    }
+
+    const rows = await this.db
+      .select({
+        id: users.id,
+        displayName: userProfiles.displayName,
+        email: users.email,
+        phone: users.phone,
+        status: users.status,
+        branchId: userRoles.branchId,
+      })
+      .from(users)
+      .innerJoin(userRoles, eq(userRoles.userId, users.id))
+      .innerJoin(roles, eq(roles.id, userRoles.roleId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(...filters))
+      .orderBy(asc(userProfiles.displayName), asc(users.email), asc(users.id));
+
+    const driversById = new Map<string, OwnerDriverOption>();
+
+    for (const row of rows) {
+      const driver = driversById.get(row.id) ?? {
+        id: row.id,
+        displayName: row.displayName ?? row.email ?? row.id,
+        email: row.email,
+        phone: row.phone,
+        status: "active" as const,
+        branchIds: [],
+      };
+
+      if (row.branchId && !driver.branchIds.includes(row.branchId)) {
+        driver.branchIds.push(row.branchId);
+      }
+
+      driversById.set(row.id, driver);
+    }
+
+    return [...driversById.values()];
+  }
 
   async findTenantBase(tenantId: string): Promise<TenantBase | null> {
     const rows = await this.db
@@ -102,6 +230,7 @@ export class OwnerRepository {
         tenantId: tenants.id,
         tenantName: tenants.name,
         tenantStatus: tenants.status,
+        currency: sql<string>`coalesce(${tenantSettings.defaultCurrency}, 'XOF')`,
         laundryEnabled: tenantFeatureFlags.laundryEnabled,
         carWashEnabled: tenantFeatureFlags.carWashEnabled,
         retailProductsEnabled: tenantFeatureFlags.retailProductsEnabled,
@@ -110,6 +239,7 @@ export class OwnerRepository {
       })
       .from(tenants)
       .innerJoin(tenantFeatureFlags, eq(tenantFeatureFlags.tenantId, tenants.id))
+      .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))
       .where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
       .limit(1);
 
@@ -123,6 +253,7 @@ export class OwnerRepository {
       tenantId: row.tenantId,
       tenantName: row.tenantName,
       tenantStatus: row.tenantStatus,
+      currency: row.currency,
       featureFlags: {
         laundryEnabled: row.laundryEnabled,
         carWashEnabled: row.carWashEnabled,
@@ -285,8 +416,33 @@ export class OwnerRepository {
     status?: OwnerAppointmentStatus;
   }): Promise<OwnerAppointment[]> {
     const rows = await this.db
-      .select({ ...getTableColumns(appointments) })
+      .select({
+        ...getTableColumns(appointments),
+        customerName: customers.fullName,
+        customerPhone: customers.phone,
+        assigneeUserId: deliveryTasks.assigneeUserId,
+        assigneeDisplayName: userProfiles.displayName,
+        assigneeEmail: users.email,
+      })
       .from(appointments)
+      .innerJoin(
+        customers,
+        and(
+          eq(customers.id, appointments.customerId),
+          eq(customers.tenantId, appointments.tenantId),
+          isNull(customers.deletedAt),
+        ),
+      )
+      .leftJoin(
+        deliveryTasks,
+        and(
+          eq(deliveryTasks.id, appointments.deliveryTaskId),
+          eq(deliveryTasks.tenantId, appointments.tenantId),
+          isNull(deliveryTasks.deletedAt),
+        ),
+      )
+      .leftJoin(users, eq(users.id, deliveryTasks.assigneeUserId))
+      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
       .where(
         and(
           eq(appointments.tenantId, input.tenantId),
@@ -297,7 +453,12 @@ export class OwnerRepository {
       )
       .orderBy(asc(appointments.expectedAt), desc(appointments.createdAt));
 
-    return rows.map(toAppointment);
+    return rows.map((row) =>
+      toAppointment({
+        ...row,
+        assigneeName: row.assigneeDisplayName ?? row.assigneeEmail ?? row.assigneeUserId ?? null,
+      }),
+    );
   }
 
   async findAppointmentById(input: {
@@ -316,7 +477,7 @@ export class OwnerRepository {
       )
       .limit(1);
 
-    return rows[0] ? toAppointment(rows[0]) : null;
+    return rows[0] ? toAppointment(toAppointmentRow(rows[0])) : null;
   }
 
   async acceptAppointmentAndCreateTask(input: {
@@ -344,7 +505,10 @@ export class OwnerRepository {
       }
 
       if (appointment.deliveryTaskId && appointment.status === "accepted") {
-        return { appointment: toAppointment(appointment), taskId: appointment.deliveryTaskId };
+        return {
+          appointment: toAppointment(toAppointmentRow(appointment)),
+          taskId: appointment.deliveryTaskId,
+        };
       }
 
       if (appointment.status !== "pending") {
@@ -414,7 +578,9 @@ export class OwnerRepository {
         )
         .returning({ ...getTableColumns(appointments) });
 
-      return updated ? { appointment: toAppointment(updated), taskId } : null;
+      return updated
+        ? { appointment: toAppointment(toAppointmentRow(updated)), taskId }
+        : null;
     });
   }
 
@@ -446,7 +612,7 @@ export class OwnerRepository {
       )
       .returning({ ...getTableColumns(appointments) });
 
-    return rows[0] ? toAppointment(rows[0]) : null;
+    return rows[0] ? toAppointment(toAppointmentRow(rows[0])) : null;
   }
 
   async markAppointmentDoneFromDelivery(input: {

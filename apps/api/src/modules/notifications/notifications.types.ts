@@ -5,6 +5,10 @@ export type NotificationLocale = (typeof SUPPORTED_NOTIFICATION_LOCALES)[number]
 export type NotificationTriggerEvent =
   | "order.created"
   | "order.completed"
+  | "appointment.accepted"
+  | "appointment.rejected"
+  | "refund.approved"
+  | "refund.rejected"
   | "ticket.overdue"
   | "delivery.status_changed";
 

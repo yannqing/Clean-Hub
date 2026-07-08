@@ -7,6 +7,7 @@ import type {
   MobileCustomerAddress,
   MobileCustomerAddressInput,
   MobileCustomerAppointment,
+  MobileCustomerBranchOption,
   MobileCustomerContact,
   MobileCustomerContactInput,
   MobileCustomerOrderDetail,
@@ -58,6 +59,11 @@ export function createMobileCustomerApi(client: ApiClient) {
     listAddresses: (options?: RequestOptions) =>
       client.get<MobileCustomerListResponse<MobileCustomerAddress>>(
         "/mobile/customer/addresses",
+        options,
+      ),
+    listBranches: (options?: RequestOptions) =>
+      client.get<MobileCustomerListResponse<MobileCustomerBranchOption>>(
+        "/mobile/customer/branches",
         options,
       ),
     createAddress: (

@@ -39,7 +39,9 @@ export function createMobileRoutes({
 
   routes.route("/payment", createPaymentWebhookRoutes({ paymentService }));
   routes.use("/*", createMobileAuthMiddleware(mobileAuthService));
-  const ownerService = new OwnerService();
+  const ownerService = new OwnerService({
+    notificationPublisher: notificationsService,
+  });
   const deliveryService = new DeliveryService({
     appointmentOperations: ownerService,
     notificationPublisher: notificationsService,

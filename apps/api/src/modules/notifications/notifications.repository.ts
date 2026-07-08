@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm";
 
 import {
+  customerAccounts,
   customers,
   getDb,
   notificationConfigs,
@@ -342,7 +343,10 @@ export class NotificationsRepository {
     customerId: string;
   }): Promise<string | null> {
     const [row] = await this.db
-      .select({ email: customers.email })
+      .select({
+        email: customers.email,
+        customerAccountId: customers.customerAccountId,
+      })
       .from(customers)
       .where(
         and(
@@ -354,7 +358,28 @@ export class NotificationsRepository {
       )
       .limit(1);
 
-    return row?.email ?? null;
+    if (!row) {
+      return null;
+    }
+
+    if (row.email) {
+      return row.email;
+    }
+
+    const [account] = await this.db
+      .select({ email: customerAccounts.email })
+      .from(customerAccounts)
+      .where(
+        and(
+          eq(customerAccounts.tenantId, input.tenantId),
+          eq(customerAccounts.id, row.customerAccountId),
+          eq(customerAccounts.status, "active"),
+          isNull(customerAccounts.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return account?.email ?? null;
   }
 
   async findUserEmail(input: {

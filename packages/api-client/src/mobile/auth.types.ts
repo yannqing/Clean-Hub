@@ -6,6 +6,7 @@ export type MobileAuthContext = {
   subjectId: string;
   displayName: string;
   tenantId: string;
+  currency: string;
   branchIds: string[];
   role: MobileRole;
   roles: MobileRole[];
@@ -47,6 +48,6 @@ export type MobileRefreshRequest = {
 export type MobileLogoutRequest = MobileRefreshRequest;
 
 export type MobileTestOtpResponse = {
-  code: string;
+  code?: string;
   expiresAt: string;
 };

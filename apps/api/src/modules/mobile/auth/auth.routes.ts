@@ -15,7 +15,9 @@ export function createMobileAuthRoutes({
   const controller = createMobileAuthController({ mobileAuthService });
 
   routes.post("/customer/otp/request", controller.requestCustomerOtp);
-  routes.get("/customer/otp/test", controller.getCustomerTestOtp);
+  if (mobileAuthService.isTestOtpEnabled()) {
+    routes.get("/customer/otp/test", controller.getCustomerTestOtp);
+  }
   routes.post("/customer/otp/verify", controller.verifyCustomerOtp);
   routes.post("/customer/password", controller.loginCustomerWithPassword);
   routes.post("/staff/driver/login", controller.loginDriver);

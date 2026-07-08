@@ -19,6 +19,7 @@ export type DeliveryTaskListItem = {
   branchId: string;
   appointmentId: string | null;
   assigneeUserId: string | null;
+  assigneeName: string | null;
   type: DeliveryTaskType;
   status: DeliveryTaskStatus;
   expectedAt: string | null;

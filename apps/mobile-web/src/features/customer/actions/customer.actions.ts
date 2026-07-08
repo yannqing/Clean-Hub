@@ -8,6 +8,79 @@ import type {
 } from "@cleanhub/api-client";
 
 import { apiClient } from "@/lib/api-client";
+import { createCustomerLocalId } from "../lib/id";
+
+const PAYMENT_KEY_STORAGE_PREFIX = "cleanhub.mobile.payKey.";
+const TERMINAL_PAYMENT_STATUSES = new Set(["paid", "failed"]);
+
+type StoredPaymentKey = {
+  amount: string;
+  idempotencyKey: string;
+};
+
+function createPaymentKeyStorageKey(orderId: string): string {
+  return `${PAYMENT_KEY_STORAGE_PREFIX}${orderId}`;
+}
+
+function readStoredPaymentKey(orderId: string, amount: string): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const stored = window.sessionStorage.getItem(createPaymentKeyStorageKey(orderId));
+
+    if (!stored) {
+      return null;
+    }
+
+    const parsed = JSON.parse(stored) as Partial<StoredPaymentKey>;
+
+    return parsed.amount === amount && parsed.idempotencyKey
+      ? parsed.idempotencyKey
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredPaymentKey(orderId: string, amount: string, idempotencyKey: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    const payload: StoredPaymentKey = { amount, idempotencyKey };
+    window.sessionStorage.setItem(createPaymentKeyStorageKey(orderId), JSON.stringify(payload));
+  } catch {
+    // Storage can be disabled in private browsing or embedded webviews.
+  }
+}
+
+function clearStoredPaymentKey(orderId: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.removeItem(createPaymentKeyStorageKey(orderId));
+  } catch {
+    // Storage can be disabled in private browsing or embedded webviews.
+  }
+}
+
+function getPaymentIdempotencyKey(orderId: string, amount: string): string {
+  const storedKey = readStoredPaymentKey(orderId, amount);
+
+  if (storedKey) {
+    return storedKey;
+  }
+
+  const idempotencyKey = `mobile-pay-${orderId}-${createCustomerLocalId()}`;
+  writeStoredPaymentKey(orderId, amount, idempotencyKey);
+
+  return idempotencyKey;
+}
 
 export async function createCustomerAppointment(input: MobileCreateCustomerAppointmentRequest) {
   return apiClient.mobile.customer.createAppointment({
@@ -103,10 +176,16 @@ export async function createCustomerPayment(input: {
   orderId: string;
   amount: string;
 }) {
-  return apiClient.mobile.payment.createPayment(input.orderId, {
+  const result = await apiClient.mobile.payment.createPayment(input.orderId, {
     amount: input.amount,
-    idempotencyKey: `mobile-pay-${input.orderId}-${Date.now()}`,
+    idempotencyKey: getPaymentIdempotencyKey(input.orderId, input.amount),
   });
+
+  if (TERMINAL_PAYMENT_STATUSES.has(result.transaction.paymentStatus)) {
+    clearStoredPaymentKey(input.orderId);
+  }
+
+  return result;
 }
 
 export async function createCustomerRefundRequest(

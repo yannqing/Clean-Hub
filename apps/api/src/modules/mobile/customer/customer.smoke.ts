@@ -3,6 +3,7 @@ import { CustomerError } from "./customer.types.js";
 import type {
   CustomerAddress,
   CustomerAppointment,
+  CustomerBranchOption,
   CustomerProfile,
 } from "./customer.types.js";
 import type { MobileAuthContext } from "../auth/auth.types.js";
@@ -12,6 +13,7 @@ const customerContext: MobileAuthContext = {
   subjectId: "account_1",
   displayName: "Customer One",
   tenantId: "tenant_1",
+  currency: "XOF",
   branchIds: [],
   role: "customer",
   roles: ["customer"],
@@ -125,6 +127,15 @@ function makeAddress(overrides: Partial<CustomerAddress> = {}): CustomerAddress 
   };
 }
 
+function makeBranchOption(): CustomerBranchOption {
+  return {
+    id: "branch_1",
+    name: "Main Branch",
+    address: "1 Main St",
+    status: "active",
+  };
+}
+
 function createRepository(options?: {
   appointmentStatus?: CustomerAppointment["status"];
   denyCustomer?: boolean;
@@ -217,6 +228,10 @@ function createRepository(options?: {
         "addresses must be account scoped",
       );
       return [makeAddress()];
+    },
+    async listBranches({ tenantId }) {
+      assert(tenantId === "tenant_1", "branches must be tenant scoped");
+      return [makeBranchOption()];
     },
     async findOwnedAddressById({ tenantId, customerAccountId, addressId }) {
       assert(tenantId === "tenant_1", "address lookup must be tenant scoped");
@@ -387,6 +402,10 @@ export async function runCustomerSmokeChecks(): Promise<void> {
 
   assert(profile.account.id === "account_1", "profile should return account");
 
+  const branchOptions = await service.listBranches(customerContext);
+
+  assert(branchOptions[0]?.id === "branch_1", "branches should be tenant scoped");
+
   const contact = await service.updateContact(customerContext, "customer_1", {
     fullName: "Customer One Updated",
     phone: "+100000001",
@@ -408,7 +427,7 @@ export async function runCustomerSmokeChecks(): Promise<void> {
   const appointment = await service.createAppointment({
     authContext: customerContext,
     type: "pickup",
-    expectedAt: new Date(),
+    expectedAt: new Date(Date.now() + 60 * 60 * 1000),
     address: "1 Main St",
   });
 
@@ -440,10 +459,21 @@ export async function runCustomerSmokeChecks(): Promise<void> {
         authContext: customerContext,
         type: "pickup",
         customerId: "customer_2",
-        expectedAt: new Date(),
+        expectedAt: new Date(Date.now() + 60 * 60 * 1000),
         address: "1 Main St",
       }),
     404,
+  );
+
+  await assertRejectsCustomer(
+    () =>
+      service.createAppointment({
+        authContext: customerContext,
+        type: "pickup",
+        expectedAt: new Date(Date.now() + 5 * 60 * 1000),
+        address: "1 Main St",
+      }),
+    400,
   );
 
   await assertRejectsCustomer(

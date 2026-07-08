@@ -2,6 +2,9 @@ import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   MobileAcceptOwnerAppointmentRequest,
   MobileAcceptOwnerAppointmentResponse,
+  MobileOwnerBranchListResponse,
+  MobileOwnerDriverListQuery,
+  MobileOwnerDriverListResponse,
   MobileOwnerAppointment,
   MobileOwnerAppointmentListQuery,
   MobileOwnerAppointmentListResponse,
@@ -17,6 +20,19 @@ export function createMobileOwnerApi(client: ApiClient) {
       client.get<MobileOwnerTodaySummary>(
         "/mobile/owner/summary/today",
         options,
+      ),
+    listBranches: (options?: RequestOptions) =>
+      client.get<MobileOwnerBranchListResponse>(
+        "/mobile/owner/branches",
+        options,
+      ),
+    listDrivers: (
+      query?: MobileOwnerDriverListQuery,
+      options?: RequestOptions,
+    ) =>
+      client.get<MobileOwnerDriverListResponse>(
+        "/mobile/owner/drivers",
+        { ...options, query },
       ),
     listAppointments: (
       query?: MobileOwnerAppointmentListQuery,

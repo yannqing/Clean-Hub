@@ -1,21 +1,38 @@
 import { getDb, type Database } from "@cleanhub/db";
+import { logger } from "@cleanhub/logger";
 
 import type { MobileAuthContext } from "../auth/auth.types.js";
 import { DeliveryRepository } from "../delivery/delivery.repository.js";
+import {
+  appointmentAcceptedEvent,
+  appointmentRejectedEvent,
+  type NotificationPublisher,
+} from "../../notifications/index.js";
 import { OwnerRepository } from "./owner.repository.js";
 import type {
   OwnerAppointment,
   OwnerAppointmentAcceptResult,
   OwnerAppointmentStatus,
+  OwnerBranchOption,
+  OwnerDriverOption,
   OwnerMobileContext,
   OwnerTodaySummary,
 } from "./owner.types.js";
 import { OwnerError } from "./owner.types.js";
 
 export type OwnerRepositoryLike = {
+  listBranches(input: {
+    tenantId: string;
+    allowedBranchIds?: string[];
+  }): Promise<OwnerBranchOption[]>;
+  listDrivers(input: {
+    tenantId: string;
+    branchId?: string;
+    allowedBranchIds?: string[];
+  }): Promise<OwnerDriverOption[]>;
   findTenantBase(tenantId: string): Promise<Pick<
     OwnerTodaySummary,
-    "tenantId" | "tenantName" | "tenantStatus" | "featureFlags"
+    "tenantId" | "tenantName" | "tenantStatus" | "currency" | "featureFlags"
   > | null>;
   countTodayOrders(input: {
     tenantId: string;
@@ -99,6 +116,7 @@ export type OwnerServiceOptions = {
   db?: Database;
   repository?: OwnerRepositoryLike;
   deliveryRepository?: OwnerDeliveryRepositoryLike;
+  notificationPublisher?: NotificationPublisher;
 };
 
 function forbidden(): OwnerError {
@@ -155,8 +173,11 @@ function getTodayBounds(now = new Date()): { start: Date; end: Date } {
 export class OwnerService implements AppointmentOperationsServiceLike {
   private readonly repository: OwnerRepositoryLike;
   private readonly deliveryRepository: OwnerDeliveryRepositoryLike;
+  private readonly notificationPublisher?: NotificationPublisher;
 
   constructor(options: OwnerServiceOptions = {}) {
+    this.notificationPublisher = options.notificationPublisher;
+
     if (options.repository && options.deliveryRepository) {
       this.repository = options.repository;
       this.deliveryRepository = options.deliveryRepository;
@@ -227,6 +248,36 @@ export class OwnerService implements AppointmentOperationsServiceLike {
       appointmentSummary,
       deliverySummary,
     };
+  }
+
+  async listBranches(
+    authContext: MobileAuthContext,
+  ): Promise<OwnerBranchOption[]> {
+    const owner = assertOwnerContext(authContext);
+
+    return this.repository.listBranches({
+      tenantId: owner.tenantId,
+      allowedBranchIds:
+        owner.branchIds.length > 0 ? owner.branchIds : undefined,
+    });
+  }
+
+  async listDrivers(input: {
+    authContext: MobileAuthContext;
+    branchId?: string;
+  }): Promise<OwnerDriverOption[]> {
+    const owner = assertOwnerContext(input.authContext);
+
+    if (input.branchId) {
+      assertBranchAccess(owner, input.branchId);
+    }
+
+    return this.repository.listDrivers({
+      tenantId: owner.tenantId,
+      branchId: input.branchId,
+      allowedBranchIds:
+        owner.branchIds.length > 0 ? owner.branchIds : undefined,
+    });
   }
 
   async listAppointments(input: {
@@ -321,6 +372,11 @@ export class OwnerService implements AppointmentOperationsServiceLike {
       );
     }
 
+    await this.publishAppointmentAccepted({
+      appointment: accepted.appointment,
+      taskId: accepted.taskId,
+    });
+
     return {
       appointment: accepted.appointment,
       task,
@@ -366,6 +422,8 @@ export class OwnerService implements AppointmentOperationsServiceLike {
       );
     }
 
+    await this.publishAppointmentRejected(rejected);
+
     return rejected;
   }
 
@@ -393,6 +451,73 @@ export class OwnerService implements AppointmentOperationsServiceLike {
   ): Promise<void> {
     if (!(await this.deliveryRepository.isTenantDriver({ tenantId, userId }))) {
       throw forbidden();
+    }
+  }
+
+  private async publishAppointmentAccepted(input: {
+    appointment: OwnerAppointment;
+    taskId: string;
+  }): Promise<void> {
+    if (!this.notificationPublisher) {
+      return;
+    }
+
+    try {
+      await this.notificationPublisher.publish(
+        appointmentAcceptedEvent({
+          tenantId: input.appointment.tenantId,
+          branchId: input.appointment.branchId,
+          customerId: input.appointment.customerId,
+          appointmentId: input.appointment.id,
+          customerName: input.appointment.customerName,
+          appointmentType: input.appointment.type,
+          expectedAt: input.appointment.expectedAt,
+          address: input.appointment.address,
+          taskId: input.taskId,
+        }),
+      );
+    } catch (error) {
+      logger.error(
+        {
+          error,
+          tenantId: input.appointment.tenantId,
+          appointmentId: input.appointment.id,
+        },
+        "Appointment accepted notification event failed",
+      );
+    }
+  }
+
+  private async publishAppointmentRejected(
+    appointment: OwnerAppointment,
+  ): Promise<void> {
+    if (!this.notificationPublisher) {
+      return;
+    }
+
+    try {
+      await this.notificationPublisher.publish(
+        appointmentRejectedEvent({
+          tenantId: appointment.tenantId,
+          branchId: appointment.branchId,
+          customerId: appointment.customerId,
+          appointmentId: appointment.id,
+          customerName: appointment.customerName,
+          appointmentType: appointment.type,
+          expectedAt: appointment.expectedAt,
+          address: appointment.address,
+          reason: appointment.cancellationReason,
+        }),
+      );
+    } catch (error) {
+      logger.error(
+        {
+          error,
+          tenantId: appointment.tenantId,
+          appointmentId: appointment.id,
+        },
+        "Appointment rejected notification event failed",
+      );
     }
   }
 }

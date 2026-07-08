@@ -18,6 +18,7 @@ export type OwnerTodaySummary = {
   tenantId: string;
   tenantName: string;
   tenantStatus: "active" | "suspended" | "disabled";
+  currency: string;
   businessDate: string;
   featureFlags: OwnerSummaryFeatureFlags;
   todayOrderCount: number;
@@ -38,6 +39,22 @@ export type OwnerTodaySummary = {
   };
 };
 
+export type OwnerBranchOption = {
+  id: string;
+  name: string;
+  address: string | null;
+  status: "active" | "inactive";
+};
+
+export type OwnerDriverOption = {
+  id: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  status: "active";
+  branchIds: string[];
+};
+
 export type OwnerAppointmentStatus = "pending" | "accepted" | "cancelled" | "done";
 export type OwnerAppointmentType = "pickup" | "dropoff";
 
@@ -46,12 +63,16 @@ export type OwnerAppointment = {
   tenantId: string;
   branchId: string;
   customerId: string;
+  customerName: string;
+  customerPhone: string | null;
   type: OwnerAppointmentType;
   status: OwnerAppointmentStatus;
   expectedAt: string;
   address: string;
   notes: string | null;
   deliveryTaskId: string | null;
+  assigneeUserId: string | null;
+  assigneeName: string | null;
   acceptedAt: string | null;
   acceptedBy: string | null;
   cancelledAt: string | null;

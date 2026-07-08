@@ -17,6 +17,7 @@ export type MobileDeliveryTaskListItem = {
   branchId: string;
   appointmentId: string | null;
   assigneeUserId: string | null;
+  assigneeName: string | null;
   type: MobileDeliveryTaskType;
   status: MobileDeliveryTaskStatus;
   expectedAt: string | null;

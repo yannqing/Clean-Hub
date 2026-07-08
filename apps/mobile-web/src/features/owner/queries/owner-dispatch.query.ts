@@ -2,8 +2,11 @@ import type {
   ApiRequestOptions,
   MobileDeliveryDispatchBoardResponse,
   MobileDeliveryTaskListItem,
+  MobileOwnerBranchListResponse,
   MobileOwnerAppointment,
   MobileOwnerAppointmentListResponse,
+  MobileOwnerDriverListQuery,
+  MobileOwnerDriverListResponse,
   MobileRefundRequestListResponse,
 } from "@cleanhub/api-client";
 
@@ -34,7 +37,7 @@ function toDispatchTask(task: MobileDeliveryTaskListItem): OwnerDispatchTask {
     orderId: task.orderId,
     ticketId: task.ticketId,
     assigneeUserId: task.assigneeUserId,
-    assigneeName: null,
+    assigneeName: task.assigneeName,
     notes: null,
     updatedAt: task.updatedAt,
   };
@@ -70,14 +73,14 @@ function toAppointmentItem(
     tenantId: appointment.tenantId,
     branchId: appointment.branchId,
     status: appointment.status,
-    customerName: appointment.customerId,
-    customerPhone: null,
+    customerName: appointment.customerName || appointment.customerId,
+    customerPhone: appointment.customerPhone,
     address: appointment.address,
     requestedAt: appointment.createdAt,
     scheduledAt: appointment.expectedAt,
     serviceType: appointment.type,
     notes: appointment.notes,
-    assigneeUserId: null,
+    assigneeUserId: appointment.assigneeUserId,
     deliveryTaskId: appointment.deliveryTaskId,
     createdAt: appointment.createdAt,
     updatedAt: appointment.updatedAt,
@@ -106,6 +109,19 @@ export async function getOwnerDispatchBoard(
   );
 
   return toDispatchBoard(response);
+}
+
+export async function listOwnerBranches(
+  options?: QueryOptions,
+): Promise<MobileOwnerBranchListResponse> {
+  return apiClient.mobile.owner.listBranches(options);
+}
+
+export async function listOwnerDrivers(
+  query: MobileOwnerDriverListQuery = {},
+  options?: QueryOptions,
+): Promise<MobileOwnerDriverListResponse> {
+  return apiClient.mobile.owner.listDrivers(query, options);
 }
 
 export async function listOwnerAppointments(

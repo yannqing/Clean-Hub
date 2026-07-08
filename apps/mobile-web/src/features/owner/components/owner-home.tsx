@@ -1,45 +1,28 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ComponentType } from "react";
 import type {
   MobileDeliveryTaskStatus,
+  MobileOwnerBranchOption,
+  MobileOwnerDriverOption,
   MobileOwnerTodaySummary,
   MobileRefundRequest,
 } from "@cleanhub/api-client";
-import type { SupportedLocale, TranslationKey } from "@cleanhub/i18n";
+import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
-import {
-  Badge,
-  Button,
-  Input,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  Textarea,
-} from "@cleanhub/ui";
+import { Button, toast } from "@cleanhub/ui";
 import {
   AlertCircle,
   CalendarDays,
   CheckCircle2,
-  Clock3,
   Loader2,
-  PackageCheck,
   RefreshCcw,
-  Route,
   RotateCcw,
-  Send,
-  Shirt,
-  TrendingUp,
   Truck,
-  UserRoundCheck,
-  XCircle,
 } from "lucide-react";
 
 import { WorkspaceHeader } from "@/components/workspace-header";
+import { resolveTenantCurrency } from "@/lib/currency";
 
 import {
   acceptOwnerAppointment,
@@ -53,30 +36,39 @@ import {
 import {
   getOwnerDispatchBoard,
   getOwnerTodaySummary,
+  listOwnerBranches,
   listOwnerAppointments,
+  listOwnerDrivers,
   listOwnerRefundRequests,
 } from "../queries";
 import type {
   OwnerAppointmentListItem,
-  OwnerAppointmentStatus,
   OwnerDispatchBoard,
-  OwnerDispatchTask,
 } from "../types";
+import {
+  ActionSheet,
+  AppointmentItem,
+  DispatchTaskItem,
+  EmptyState,
+  MetricTile,
+  OperationalCard,
+  RefundRequestItem,
+  ShowMoreFooter,
+  SummaryRow,
+  createMetrics,
+  deliveryStatusLabelKeys,
+  formatBranchOption,
+  formatCount,
+  formatDriverOption,
+  ownerIntlLocales,
+  type ActionTarget,
+} from "./owner-board-components";
 
 type OwnerHomeProps = {
+  currency?: string;
   initialSummary?: MobileOwnerTodaySummary | null;
   isLoggingOut?: boolean;
   onLogout?: () => void;
-};
-
-type IconComponent = ComponentType<{ className?: string; "aria-hidden"?: true }>;
-
-type MetricItem = {
-  label: string;
-  value: string;
-  detail: string;
-  icon: IconComponent;
-  tone: "blue" | "emerald" | "amber" | "sky";
 };
 
 type BoardState = {
@@ -85,20 +77,17 @@ type BoardState = {
   refundRequests: MobileRefundRequest[];
 };
 
-type ActionTarget =
-  | { kind: "accept-appointment"; appointment: OwnerAppointmentListItem }
-  | { kind: "reject-appointment"; appointment: OwnerAppointmentListItem }
-  | { kind: "dispatch-task"; task: OwnerDispatchTask }
-  | { kind: "reassign-task"; task: OwnerDispatchTask }
-  | { kind: "cancel-task"; task: OwnerDispatchTask }
-  | { kind: "approve-refund"; refundRequest: MobileRefundRequest }
-  | { kind: "reject-refund"; refundRequest: MobileRefundRequest };
+type BoardVisibleLimits = {
+  appointments: number;
+  tasks: number;
+  refundRequests: number;
+};
 
-const numberFormatter = new Intl.NumberFormat("fr-FR");
-const intlLocales: Record<SupportedLocale, string> = {
-  fr: "fr-FR",
-  en: "en-US",
-  "zh-CN": "zh-CN",
+const OWNER_BOARD_SHOW_MORE_INCREMENT = 10;
+const INITIAL_OWNER_BOARD_VISIBLE_LIMITS: BoardVisibleLimits = {
+  appointments: 5,
+  tasks: 8,
+  refundRequests: 5,
 };
 
 const tenantStatusLabelKeys: Record<MobileOwnerTodaySummary["tenantStatus"], TranslationKey> = {
@@ -106,64 +95,6 @@ const tenantStatusLabelKeys: Record<MobileOwnerTodaySummary["tenantStatus"], Tra
   disabled: "owner.tenantStatus.disabled",
   suspended: "owner.tenantStatus.suspended",
 };
-
-const appointmentStatusLabelKeys: Record<OwnerAppointmentStatus, TranslationKey> = {
-  accepted: "owner.appointmentStatus.accepted",
-  cancelled: "owner.appointmentStatus.cancelled",
-  done: "owner.appointmentStatus.done",
-  pending: "owner.appointmentStatus.pending",
-  rejected: "owner.appointmentStatus.rejected",
-};
-
-const deliveryStatusLabelKeys: Record<MobileDeliveryTaskStatus, TranslationKey> = {
-  arrived: "owner.deliveryStatus.arrived",
-  cancelled: "owner.deliveryStatus.cancelled",
-  delivering: "owner.deliveryStatus.delivering",
-  en_route: "owner.deliveryStatus.en_route",
-  exception: "owner.deliveryStatus.exception",
-  pending_dispatch: "owner.deliveryStatus.pending_dispatch",
-  picked_up: "owner.deliveryStatus.picked_up",
-  signed: "owner.deliveryStatus.signed",
-};
-
-const taskTypeLabelKeys: Record<OwnerDispatchTask["type"], TranslationKey> = {
-  dropoff: "owner.taskType.dropoff",
-  pickup: "owner.taskType.pickup",
-};
-
-const toneClasses: Record<MetricItem["tone"], string> = {
-  amber: "bg-amber-50 text-amber-700",
-  emerald: "bg-emerald-50 text-emerald-700",
-  sky: "bg-sky-50 text-sky-700",
-  blue: "bg-blue-50 text-blue-700",
-};
-
-const statusBadgeClasses: Record<string, string> = {
-  accepted: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  arrived: "border-cyan-200 bg-cyan-50 text-cyan-700",
-  cancelled: "border-slate-200 bg-slate-100 text-slate-600",
-  delivering: "border-sky-200 bg-sky-50 text-sky-700",
-  done: "border-slate-200 bg-slate-100 text-slate-600",
-  en_route: "border-sky-200 bg-sky-50 text-sky-700",
-  exception: "border-red-200 bg-red-50 text-red-700",
-  pending: "border-amber-200 bg-amber-50 text-amber-700",
-  pending_dispatch: "border-amber-200 bg-amber-50 text-amber-700",
-  picked_up: "border-blue-200 bg-blue-50 text-blue-700",
-  rejected: "border-red-200 bg-red-50 text-red-700",
-  signed: "border-emerald-200 bg-emerald-50 text-emerald-700",
-};
-
-function formatCount(value: number, locale?: string): string {
-  return locale ? new Intl.NumberFormat(locale).format(value) : numberFormatter.format(value);
-}
-
-function formatMoney(value: number, locale: string): string {
-  return new Intl.NumberFormat(locale, {
-    style: "currency",
-    currency: "XOF",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
 
 function formatBusinessDate(value: string, locale: string): string {
   const [year, month, day] = value.split("-").map(Number);
@@ -181,22 +112,6 @@ function formatBusinessDate(value: string, locale: string): string {
   }).format(date);
 }
 
-function formatDateTime(value: string | null, locale: string, fallback: string): string {
-  if (!value) {
-    return fallback;
-  }
-
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat(locale, {
-        day: "2-digit",
-        month: "short",
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(date);
-}
-
 function formatLoadTime(value: Date | null, locale: string): string | null {
   return value
     ? new Intl.DateTimeFormat(locale, {
@@ -210,43 +125,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error
     ? error.message
     : fallback;
-}
-
-function createMetrics(
-  summary: MobileOwnerTodaySummary,
-  t: ReturnType<typeof useTranslation>["t"],
-  locale: string,
-): MetricItem[] {
-  return [
-    {
-      label: t("owner.metrics.orders"),
-      value: formatCount(summary.todayOrderCount, locale),
-      detail: t("owner.today"),
-      icon: PackageCheck,
-      tone: "blue",
-    },
-    {
-      label: t("owner.metrics.revenue"),
-      value: formatMoney(summary.todayRevenueAmount, locale),
-      detail: t("owner.today"),
-      icon: TrendingUp,
-      tone: "emerald",
-    },
-    {
-      label: t("owner.metrics.pickup"),
-      value: formatCount(summary.pendingPickupCount, locale),
-      detail: t("owner.waiting"),
-      icon: Shirt,
-      tone: "amber",
-    },
-    {
-      label: t("owner.metrics.progress"),
-      value: formatCount(summary.inProgressOrderCount, locale),
-      detail: t("owner.workshop"),
-      icon: Clock3,
-      tone: "sky",
-    },
-  ];
 }
 
 function getDispatchSummary(board: OwnerDispatchBoard | null) {
@@ -267,451 +145,25 @@ function getDispatchSummary(board: OwnerDispatchBoard | null) {
   };
 }
 
-function StatusBadge({
-  label,
-  status,
-}: {
-  label: string;
-  status: string;
-}) {
-  return (
-    <Badge
-      className={`${statusBadgeClasses[status] ?? "border-slate-200 bg-slate-50 text-slate-700"} rounded-md border px-2 py-1`}
-      variant="outline"
-    >
-      {label}
-    </Badge>
-  );
-}
-
-function MetricTile({ metric }: { metric: MetricItem }) {
-  const Icon = metric.icon;
-
-  return (
-    <div className="min-h-28 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium text-slate-600">{metric.label}</span>
-        <span className={`flex size-9 shrink-0 items-center justify-center rounded-md ${toneClasses[metric.tone]}`}>
-          <Icon className="size-4" aria-hidden />
-        </span>
-      </div>
-      <p className="mt-3 break-words text-2xl font-semibold leading-tight tabular-nums text-slate-950">
-        {metric.value}
-      </p>
-      <p className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
-        {metric.detail}
-      </p>
-    </div>
-  );
-}
-
-function SummaryRow({ label, value }: { label: string; value: number }) {
-  const { locale } = useTranslation();
-
-  return (
-    <div className="flex min-h-10 items-center justify-between gap-3 border-b border-slate-100 py-2 last:border-b-0">
-      <span className="text-sm text-slate-600">{label}</span>
-      <span className="text-base font-semibold tabular-nums text-slate-950">
-        {formatCount(value, intlLocales[locale])}
-      </span>
-    </div>
-  );
-}
-
-function OperationalCard({
-  children,
-  icon: Icon,
-  subtitle,
-  title,
-}: {
-  children: React.ReactNode;
-  icon: IconComponent;
-  subtitle: string;
-  title: string;
-}) {
-  return (
-    <section className="mt-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center gap-3">
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700">
-          <Icon className="size-5" aria-hidden />
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-base font-semibold text-slate-950">{title}</h2>
-          <p className="mt-1 truncate text-sm text-slate-600">{subtitle}</p>
-        </div>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function AppointmentItem({
-  appointment,
-  onAction,
-}: {
-  appointment: OwnerAppointmentListItem;
-  onAction: (target: ActionTarget) => void;
-}) {
-  const { locale, t } = useTranslation();
-  const intlLocale = intlLocales[locale];
-  const notScheduled = t("owner.notScheduled");
-  const isPending = appointment.status === "pending";
-
-  return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-950">
-            {appointment.customerName}
-          </p>
-          <p className="mt-1 truncate text-xs text-slate-600">
-            {formatDateTime(appointment.scheduledAt ?? appointment.requestedAt, intlLocale, notScheduled)}
-          </p>
-        </div>
-        <StatusBadge
-          label={t(appointmentStatusLabelKeys[appointment.status])}
-          status={appointment.status}
-        />
-      </div>
-      <p className="mt-3 line-clamp-2 text-sm text-slate-700">
-        {appointment.address || appointment.notes || t("owner.addressToConfirm")}
-      </p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button
-          className="w-full"
-          disabled={!isPending}
-          size="sm"
-          type="button"
-          onClick={() => onAction({ kind: "accept-appointment", appointment })}
-        >
-          <UserRoundCheck className="size-4" aria-hidden />
-          {t("owner.actions.accept")}
-        </Button>
-        <Button
-          className="w-full"
-          disabled={!isPending}
-          size="sm"
-          type="button"
-          variant="outline"
-          onClick={() => onAction({ kind: "reject-appointment", appointment })}
-        >
-          <XCircle className="size-4" aria-hidden />
-          {t("owner.actions.reject")}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function DispatchTaskItem({
-  onAction,
-  task,
-}: {
-  onAction: (target: ActionTarget) => void;
-  task: OwnerDispatchTask;
-}) {
-  const { locale, t } = useTranslation();
-  const intlLocale = intlLocales[locale];
-  const canAssign = task.status === "pending_dispatch";
-  const canCancel = task.status !== "cancelled" && task.status !== "signed";
-
-  return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{t(taskTypeLabelKeys[task.type])}</Badge>
-            <StatusBadge label={t(deliveryStatusLabelKeys[task.status])} status={task.status} />
-          </div>
-          <p className="mt-2 truncate text-sm font-semibold text-slate-950">
-            {task.customerName}
-          </p>
-          <p className="mt-1 truncate text-xs text-slate-600">
-            {formatDateTime(task.expectedAt, intlLocale, t("owner.notScheduled"))}
-          </p>
-        </div>
-      </div>
-      <p className="mt-3 line-clamp-2 text-sm text-slate-700">{task.address}</p>
-      <p className="mt-2 truncate text-xs text-slate-500">
-        {t("owner.assigned")}: {task.assigneeName || task.assigneeUserId || t("owner.unassigned")}
-      </p>
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <Button
-          className="w-full px-2"
-          disabled={!canAssign}
-          size="sm"
-          type="button"
-          onClick={() => onAction({ kind: "dispatch-task", task })}
-        >
-          <Send className="size-4" aria-hidden />
-          {t("owner.actions.dispatch")}
-        </Button>
-        <Button
-          className="w-full px-2"
-          disabled={task.status === "cancelled" || task.status === "signed"}
-          size="sm"
-          type="button"
-          variant="outline"
-          onClick={() => onAction({ kind: "reassign-task", task })}
-        >
-          <Route className="size-4" aria-hidden />
-          {t("owner.actions.reassign")}
-        </Button>
-        <Button
-          className="w-full px-2"
-          disabled={!canCancel}
-          size="sm"
-          type="button"
-          variant="outline"
-          onClick={() => onAction({ kind: "cancel-task", task })}
-        >
-          <XCircle className="size-4" aria-hidden />
-          {t("owner.actions.cancel")}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function RefundRequestItem({
-  onAction,
-  refundRequest,
-}: {
-  onAction: (target: ActionTarget) => void;
-  refundRequest: MobileRefundRequest;
-}) {
-  const { locale, t } = useTranslation();
-  const intlLocale = intlLocales[locale];
-
-  return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-950">
-            {t("customer.detail.orderPrefix", { id: refundRequest.orderId.slice(-6).toUpperCase() })}
-          </p>
-          <p className="mt-1 text-xs text-slate-600">
-            {formatDateTime(refundRequest.createdAt, intlLocale, t("owner.notScheduled"))}
-          </p>
-        </div>
-        <StatusBadge label={t("owner.actions.approveRefund")} status={refundRequest.status} />
-      </div>
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-700">{refundRequest.reason}</p>
-        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-950">
-          {refundRequest.amount}
-        </p>
-      </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <Button
-          className="w-full"
-          size="sm"
-          type="button"
-          onClick={() => onAction({ kind: "approve-refund", refundRequest })}
-        >
-          <CheckCircle2 className="size-4" aria-hidden />
-          {t("owner.actions.approveRefund")}
-        </Button>
-        <Button
-          className="w-full"
-          size="sm"
-          type="button"
-          variant="outline"
-          onClick={() => onAction({ kind: "reject-refund", refundRequest })}
-        >
-          <XCircle className="size-4" aria-hidden />
-          {t("owner.actions.rejectRefund")}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function EmptyState({ message }: { message: string }) {
-  return (
-    <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-5 text-center text-sm text-slate-600">
-      {message}
-    </div>
-  );
-}
-
-function getActionTitleKey(target: ActionTarget | null): TranslationKey {
-  if (!target) {
-    return "owner.actions.actionOwner";
-  }
-
-  if (target.kind === "accept-appointment") {
-    return "owner.actions.acceptAppointment";
-  }
-  if (target.kind === "reject-appointment") {
-    return "owner.actions.rejectAppointment";
-  }
-  if (target.kind === "dispatch-task") {
-    return "owner.actions.dispatchTask";
-  }
-  if (target.kind === "reassign-task") {
-    return "owner.actions.reassignTask";
-  }
-  if (target.kind === "approve-refund") {
-    return "owner.actions.approveRefundTitle";
-  }
-  if (target.kind === "reject-refund") {
-    return "owner.actions.rejectRefundTitle";
-  }
-
-  return "owner.actions.cancelTask";
-}
-
-function getActionSubject(target: ActionTarget | null, fallback: string): string {
-  if (!target) {
-    return fallback;
-  }
-
-  if (
-    target.kind === "accept-appointment" ||
-    target.kind === "reject-appointment"
-  ) {
-    return target.appointment.customerName;
-  }
-
-  if (
-    target.kind === "approve-refund" ||
-    target.kind === "reject-refund"
-  ) {
-    return `${target.refundRequest.amount} - ${target.refundRequest.reason}`;
-  }
-
-  return target.task.customerName;
-}
-
-function ActionSheet({
-  error,
-  isSubmitting,
-  note,
-  onNoteChange,
-  onOpenChange,
-  onSubmit,
-  open,
-  reason,
-  assigneeUserId,
-  onAssigneeUserIdChange,
-  onReasonChange,
-  target,
-}: {
-  error: string | null;
-  isSubmitting: boolean;
-  note: string;
-  onNoteChange: (value: string) => void;
-  onOpenChange: (open: boolean) => void;
-  onSubmit: () => void;
-  open: boolean;
-  reason: string;
-  assigneeUserId: string;
-  onAssigneeUserIdChange: (value: string) => void;
-  onReasonChange: (value: string) => void;
-  target: ActionTarget | null;
-}) {
-  const { t } = useTranslation();
-  const needsAssignee =
-    target?.kind === "accept-appointment" ||
-    target?.kind === "dispatch-task" ||
-    target?.kind === "reassign-task";
-  const needsReason =
-    target?.kind === "reject-appointment" ||
-    target?.kind === "cancel-task" ||
-    target?.kind === "reject-refund";
-
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="max-h-[88dvh] p-0">
-        <div className="flex max-h-[88dvh] flex-col">
-          <div className="p-5">
-            <SheetHeader className="pr-8 text-left">
-              <SheetTitle>{t(getActionTitleKey(target))}</SheetTitle>
-              <SheetDescription>{getActionSubject(target, t("owner.actions.selectItem"))}</SheetDescription>
-            </SheetHeader>
-
-            <div className="mt-5 space-y-4">
-              {needsAssignee ? (
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700">
-                    {t("owner.forms.assigneeId")}
-                  </span>
-                  <Input
-                    className="mt-2"
-                    placeholder="user_..."
-                    value={assigneeUserId}
-                    onChange={(event) => onAssigneeUserIdChange(event.target.value)}
-                  />
-                </label>
-              ) : null}
-
-              {needsReason ? (
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700">
-                    {t("owner.forms.reason")}
-                  </span>
-                  <Textarea
-                    className="mt-2 min-h-24"
-                    placeholder={t("owner.forms.reasonPlaceholder")}
-                    value={reason}
-                    onChange={(event) => onReasonChange(event.target.value)}
-                  />
-                </label>
-              ) : (
-                <label className="block">
-                  <span className="text-sm font-medium text-slate-700">
-                    {t("owner.forms.note")}
-                  </span>
-                  <Textarea
-                    className="mt-2 min-h-24"
-                    placeholder={t("owner.forms.notePlaceholder")}
-                    value={note}
-                    onChange={(event) => onNoteChange(event.target.value)}
-                  />
-                </label>
-              )}
-
-              {error ? (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  {error}
-                </div>
-              ) : null}
-            </div>
-          </div>
-
-          <SheetFooter className="sticky bottom-0 mt-auto border-t border-slate-200 bg-white p-5 pb-[max(16px,env(safe-area-inset-bottom))]">
-            <Button
-              className="w-full"
-              disabled={isSubmitting}
-              type="button"
-              onClick={onSubmit}
-            >
-              {isSubmitting ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : null}
-              {t("owner.actions.confirm")}
-            </Button>
-          </SheetFooter>
-        </div>
-      </SheetContent>
-    </Sheet>
-  );
-}
-
 export function OwnerHome({
+  currency,
   initialSummary = null,
   isLoggingOut = false,
   onLogout = () => undefined,
 }: OwnerHomeProps) {
   const { locale, t } = useTranslation();
-  const intlLocale = intlLocales[locale];
+  const intlLocale = ownerIntlLocales[locale];
   const [summary, setSummary] = useState<MobileOwnerTodaySummary | null>(initialSummary);
+  const [branches, setBranches] = useState<MobileOwnerBranchOption[]>([]);
+  const [drivers, setDrivers] = useState<MobileOwnerDriverOption[]>([]);
   const [boardState, setBoardState] = useState<BoardState>({
     appointments: [],
     dispatchBoard: null,
     refundRequests: [],
   });
+  const [visibleLimits, setVisibleLimits] = useState<BoardVisibleLimits>(
+    INITIAL_OWNER_BOARD_VISIBLE_LIMITS,
+  );
   const [branchId, setBranchId] = useState("");
   const [assigneeFilter, setAssigneeFilter] = useState("");
   const [deliveryStatusFilter, setDeliveryStatusFilter] = useState<
@@ -720,6 +172,7 @@ export function OwnerHome({
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(!initialSummary);
+  const [isDirectoryLoading, setIsDirectoryLoading] = useState(false);
   const [isBoardLoading, setIsBoardLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(
@@ -738,10 +191,25 @@ export function OwnerHome({
     () => getDispatchSummary(boardState.dispatchBoard),
     [boardState.dispatchBoard],
   );
-  const visibleAppointments = boardState.appointments.slice(0, 5);
-  const visibleTasks = boardState.dispatchBoard?.data.slice(0, 8) ?? [];
-  const visibleRefundRequests = boardState.refundRequests.slice(0, 5);
+  const totalAppointments = boardState.appointments.length;
+  const totalTasks = boardState.dispatchBoard?.data.length ?? 0;
+  const totalRefundRequests = boardState.refundRequests.length;
+  const visibleAppointments = boardState.appointments.slice(
+    0,
+    visibleLimits.appointments,
+  );
+  const visibleTasks = boardState.dispatchBoard?.data.slice(0, visibleLimits.tasks) ?? [];
+  const visibleRefundRequests = boardState.refundRequests.slice(
+    0,
+    visibleLimits.refundRequests,
+  );
+  const shouldShowAppointmentFooter =
+    totalAppointments > INITIAL_OWNER_BOARD_VISIBLE_LIMITS.appointments;
+  const shouldShowTaskFooter = totalTasks > INITIAL_OWNER_BOARD_VISIBLE_LIMITS.tasks;
+  const shouldShowRefundFooter =
+    totalRefundRequests > INITIAL_OWNER_BOARD_VISIBLE_LIMITS.refundRequests;
   const loadTime = formatLoadTime(lastLoadedAt, intlLocale);
+  const tenantCurrency = resolveTenantCurrency(summary?.currency ?? currency);
 
   const loadSummary = useCallback(async (signal?: AbortSignal) => {
     setIsLoading(true);
@@ -769,6 +237,76 @@ export function OwnerHome({
     }
   }, [t]);
 
+  const loadBranches = useCallback(async (signal?: AbortSignal) => {
+    setIsDirectoryLoading(true);
+
+    try {
+      const response = await listOwnerBranches({ signal });
+
+      if (signal?.aborted) {
+        return;
+      }
+
+      setBranches(response.data);
+      setBranchId((current) => current || (response.data[0]?.id ?? ""));
+    } catch (nextError) {
+      if (!signal?.aborted) {
+        setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
+      }
+    } finally {
+      if (!signal?.aborted) {
+        setIsDirectoryLoading(false);
+      }
+    }
+  }, [t]);
+
+  const loadDrivers = useCallback(
+    async (signal?: AbortSignal) => {
+      const cleanBranchId = branchId.trim();
+
+      if (!cleanBranchId) {
+        setDrivers([]);
+        setAssigneeFilter("");
+        setAssigneeUserId("");
+        return;
+      }
+
+      setIsDirectoryLoading(true);
+
+      try {
+        const response = await listOwnerDrivers(
+          { branchId: cleanBranchId },
+          { signal },
+        );
+
+        if (signal?.aborted) {
+          return;
+        }
+
+        setDrivers(response.data);
+        setAssigneeFilter((current) =>
+          current && response.data.some((driver) => driver.id === current)
+            ? current
+            : "",
+        );
+        setAssigneeUserId((current) =>
+          current && response.data.some((driver) => driver.id === current)
+            ? current
+            : "",
+        );
+      } catch (nextError) {
+        if (!signal?.aborted) {
+          setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setIsDirectoryLoading(false);
+        }
+      }
+    },
+    [branchId, t],
+  );
+
   const loadBoard = useCallback(
     async (signal?: AbortSignal) => {
       const cleanBranchId = branchId.trim();
@@ -786,6 +324,7 @@ export function OwnerHome({
               dispatchBoard: null,
               refundRequests: refundRequests.data,
             });
+            setVisibleLimits(INITIAL_OWNER_BOARD_VISIBLE_LIMITS);
             setLastLoadedAt(new Date());
           }
         } catch (nextError) {
@@ -826,6 +365,7 @@ export function OwnerHome({
           dispatchBoard,
           refundRequests: refundRequests.data,
         });
+        setVisibleLimits(INITIAL_OWNER_BOARD_VISIBLE_LIMITS);
         setLastLoadedAt(new Date());
       } catch (nextError) {
         if (signal?.aborted) {
@@ -857,6 +397,30 @@ export function OwnerHome({
       controller.abort();
     };
   }, [initialSummary, loadSummary]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      void loadBranches(controller.signal);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [loadBranches]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => {
+      void loadDrivers(controller.signal);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+      controller.abort();
+    };
+  }, [loadDrivers]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -955,6 +519,7 @@ export function OwnerHome({
 
       setActionTarget(null);
       await Promise.all([loadSummary(), loadBoard()]);
+      toast.success(t("owner.messages.actionDone"));
     } catch (nextError) {
       setActionError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
     } finally {
@@ -1036,24 +601,46 @@ export function OwnerHome({
                 <span className="text-sm font-medium text-slate-700">
                   {t("owner.branch")}
                 </span>
-                <Input
-                  className="mt-2"
-                  placeholder="branch_..."
+                <select
+                  className="mt-2 flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  disabled={isDirectoryLoading && !branches.length}
                   value={branchId}
-                  onChange={(event) => setBranchId(event.target.value)}
-                />
+                  onChange={(event) => {
+                    setBranchId(event.target.value);
+                    setAssigneeFilter("");
+                    setAssigneeUserId("");
+                  }}
+                >
+                  <option value="">
+                    {isDirectoryLoading && !branches.length
+                      ? t("common.loading")
+                      : t("owner.actions.selectBranch")}
+                  </option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {formatBranchOption(branch)}
+                    </option>
+                  ))}
+                </select>
               </label>
               <div className="grid grid-cols-2 gap-3">
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700">
                     {t("owner.driver")}
                   </span>
-                  <Input
-                    className="mt-2"
-                    placeholder={t("owner.all")}
+                  <select
+                    className="mt-2 flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                    disabled={!branchId.trim() || (isDirectoryLoading && !drivers.length)}
                     value={assigneeFilter}
                     onChange={(event) => setAssigneeFilter(event.target.value)}
-                  />
+                  >
+                    <option value="">{t("owner.all")}</option>
+                    {drivers.map((driver) => (
+                      <option key={driver.id} value={driver.id}>
+                        {formatDriverOption(driver)}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <label className="block">
                   <span className="text-sm font-medium text-slate-700">
@@ -1110,6 +697,19 @@ export function OwnerHome({
                 <EmptyState message={t("owner.messages.noAppointments")} />
               )}
             </div>
+            {shouldShowAppointmentFooter ? (
+              <ShowMoreFooter
+                shown={visibleAppointments.length}
+                total={totalAppointments}
+                onShowMore={() =>
+                  setVisibleLimits((current) => ({
+                    ...current,
+                    appointments:
+                      current.appointments + OWNER_BOARD_SHOW_MORE_INCREMENT,
+                  }))
+                }
+              />
+            ) : null}
           </OperationalCard>
 
           <OperationalCard
@@ -1140,6 +740,18 @@ export function OwnerHome({
                 <EmptyState message={t("owner.messages.noDeliveryTasks")} />
               )}
             </div>
+            {shouldShowTaskFooter ? (
+              <ShowMoreFooter
+                shown={visibleTasks.length}
+                total={totalTasks}
+                onShowMore={() =>
+                  setVisibleLimits((current) => ({
+                    ...current,
+                    tasks: current.tasks + OWNER_BOARD_SHOW_MORE_INCREMENT,
+                  }))
+                }
+              />
+            ) : null}
           </OperationalCard>
 
           <OperationalCard
@@ -1155,15 +767,29 @@ export function OwnerHome({
               ) : visibleRefundRequests.length ? (
                 visibleRefundRequests.map((refundRequest) => (
                   <RefundRequestItem
+                    currency={tenantCurrency}
                     key={refundRequest.id}
-                    refundRequest={refundRequest}
                     onAction={openAction}
+                    refundRequest={refundRequest}
                   />
                 ))
               ) : (
                 <EmptyState message={t("owner.messages.noRefunds")} />
               )}
             </div>
+            {shouldShowRefundFooter ? (
+              <ShowMoreFooter
+                shown={visibleRefundRequests.length}
+                total={totalRefundRequests}
+                onShowMore={() =>
+                  setVisibleLimits((current) => ({
+                    ...current,
+                    refundRequests:
+                      current.refundRequests + OWNER_BOARD_SHOW_MORE_INCREMENT,
+                  }))
+                }
+              />
+            ) : null}
           </OperationalCard>
 
           {loadTime ? (
@@ -1176,6 +802,8 @@ export function OwnerHome({
 
       <ActionSheet
         assigneeUserId={assigneeUserId}
+        currency={tenantCurrency}
+        drivers={drivers}
         error={actionError}
         isSubmitting={isSubmitting}
         note={note}
