@@ -400,6 +400,7 @@ export const tenantMessagesZhCN: TenantMessages = {
     },
     allCategories: "全部分类",
     allResults: "全部结果",
+    allEventTypes: "全部事件类型",
     successLabel: "成功",
     failedLabel: "失败",
     categoryLabels: {

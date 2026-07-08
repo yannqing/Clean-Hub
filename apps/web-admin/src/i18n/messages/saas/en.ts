@@ -365,6 +365,8 @@ export const saasMessagesEn: SaasMessages = {
     loadError: "Failed to load audit logs.",
     emptyTitle: "No audit logs found",
     category: "Category",
+    eventType: "Event type",
+    allEventTypes: "All event types",
     result: "Result",
     actorUserId: "Actor user ID",
     detail: {

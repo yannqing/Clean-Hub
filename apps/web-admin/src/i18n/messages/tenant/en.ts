@@ -409,6 +409,7 @@ export const tenantMessagesEn: TenantMessages = {
     },
     allCategories: "All categories",
     allResults: "All results",
+    allEventTypes: "All event types",
     successLabel: "Success",
     failedLabel: "Failed",
     categoryLabels: {

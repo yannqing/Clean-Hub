@@ -412,6 +412,7 @@ export type TenantMessages = {
     };
     allCategories: string;
     allResults: string;
+    allEventTypes: string;
     successLabel: string;
     failedLabel: string;
     categoryLabels: {

@@ -20,7 +20,10 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pagination } from "@/components/pagination";
 import { useTenantI18n } from "@/i18n";
-import { getAuditEventDescription } from "@/features/audit/event-description";
+import {
+  getAuditEventDescription,
+  getAuditEventTypesByCategory,
+} from "@/features/audit/event-description";
 
 import {
   getTenantAuditLogDetailQuery,
@@ -192,6 +195,23 @@ export function TenantAuditLogView() {
     [m.auditLogs.categoryLabels],
   );
 
+  // Cascading eventType options: when a category is picked, only its event
+  // types are offered. With "all" selected, every known event type is listed so
+  // operators can still pick a specific one without narrowing by category.
+  const eventTypeOptions = useMemo(
+    () =>
+      getAuditEventTypesByCategory(
+        category === "all" ? undefined : category,
+      ),
+    [category],
+  );
+
+  const handleCategoryChange = useCallback((value: string) => {
+    setCategory(value as CategoryFilter);
+    setEventType("");
+    resetFiltersAndOffset();
+  }, [resetFiltersAndOffset]);
+
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
@@ -212,8 +232,7 @@ export function TenantAuditLogView() {
           <Label htmlFor="audit-category">{m.auditLogs.formLabels.category}</Label>
           <Select
             onValueChange={(value) => {
-              resetFiltersAndOffset();
-              setCategory(value as CategoryFilter);
+              handleCategoryChange(value);
             }}
             value={category}
           >
@@ -235,15 +254,25 @@ export function TenantAuditLogView() {
           <Label htmlFor="audit-event-type">
             {m.auditLogs.formLabels.eventType}
           </Label>
-          <Input
-            id="audit-event-type"
-            onChange={(event) => {
+          <Select
+            onValueChange={(value) => {
               resetFiltersAndOffset();
-              setEventType(event.target.value);
+              setEventType(value === "all" ? "" : value);
             }}
-            placeholder="service.updated"
-            value={eventType}
-          />
+            value={eventType || "all"}
+          >
+            <SelectTrigger id="audit-event-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{m.auditLogs.allEventTypes}</SelectItem>
+              {eventTypeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="grid gap-2">

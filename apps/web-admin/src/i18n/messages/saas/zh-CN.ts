@@ -358,6 +358,8 @@ export const saasMessagesZhCN: SaasMessages = {
     loadError: "加载审计日志失败。",
     emptyTitle: "未找到审计日志",
     category: "分类",
+    eventType: "事件类型",
+    allEventTypes: "全部事件类型",
     result: "结果",
     actorUserId: "操作者用户 ID",
     detail: {

@@ -338,6 +338,8 @@ export type SaasMessages = {
     loadError: string;
     emptyTitle: string;
     category: string;
+    eventType: string;
+    allEventTypes: string;
     result: string;
     actorUserId: string;
     detail: {
