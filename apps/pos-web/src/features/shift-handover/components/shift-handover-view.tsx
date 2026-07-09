@@ -10,7 +10,7 @@ import type {
 } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 
-import { Icon, type PosIconName } from "@/components/app-shell/icons";
+import { Icon, PosBreadcrumb, type PosIconName } from "@/components/app-shell";
 import { posRoutes } from "@/config/routes";
 import type { PosSessionUser } from "@/lib/session";
 import { posToast as toast } from "@/lib/pos-toast";
@@ -600,11 +600,7 @@ export function ShiftHandoverView({
 
   return (
     <section className="space-y-5">
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-        <span>POS</span>
-        <Icon className="h-3.5 w-3.5" name="chevron-right" />
-        <span className="text-slate-600">{copy.breadcrumb}</span>
-      </div>
+      <PosBreadcrumb items={[{ label: copy.breadcrumb }]} />
 
       <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-4">

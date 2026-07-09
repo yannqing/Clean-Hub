@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { Icon } from "@/components/app-shell";
+import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { getCurrentUser } from "@/lib/auth";
 
 import { TicketMetrics } from "@/features/tickets/components/ticket-metrics";
@@ -143,11 +143,7 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
 
   return (
     <section>
-      <div className="mb-5 flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-        <span>POS</span>
-        <Icon className="h-3.5 w-3.5" name="chevron-right" />
-        <span className="text-slate-600">工单管理</span>
-      </div>
+      <PosBreadcrumb className="mb-5" items={[{ label: "工单管理" }]} />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>

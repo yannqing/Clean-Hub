@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 import type { PosNotificationInboxItem } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 
-import { Icon } from "@/components/app-shell";
+import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { posRoutes } from "@/config";
 
 import {
@@ -134,11 +134,7 @@ export function NotificationsCenter({
 
   return (
     <section>
-      <div className="mb-5 flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-        <span>POS</span>
-        <Icon className="h-3.5 w-3.5" name="chevron-right" />
-        <span className="text-slate-600">通知中心</span>
-      </div>
+      <PosBreadcrumb className="mb-5" items={[{ label: "通知中心" }]} />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>

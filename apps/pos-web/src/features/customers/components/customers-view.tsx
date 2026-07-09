@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
+import { PosBreadcrumb } from "@/components/app-shell";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import { customerDetailPath } from "@/config";
@@ -248,27 +249,16 @@ export function CustomersView({ initialQuery = "" }: CustomersViewProps) {
     <div className="px-6 py-5">
       <div className="mb-5 flex items-end justify-between gap-5">
         <div>
-          <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-            <span>POS</span>
-            <span>›</span>
-            {currentAccount ? (
-              <>
-                <button
-                  className="hover:text-blue-700"
-                  type="button"
-                  onClick={handleBackToList}
-                >
-                  客户管理
-                </button>
-                <span>›</span>
-                <span className="rounded-md bg-blue-50 px-2 py-1 text-blue-700">
-                  {currentAccount.accountName}
-                </span>
-              </>
-            ) : (
-              <span className="text-slate-600">客户管理</span>
-            )}
-          </div>
+          {currentAccount ? (
+            <PosBreadcrumb
+              items={[
+                { label: "客户管理", onClick: handleBackToList },
+                { label: currentAccount.accountName },
+              ]}
+            />
+          ) : (
+            <PosBreadcrumb items={[{ label: "客户管理" }]} />
+          )}
           <h1 className="mt-2 text-2xl font-semibold text-slate-950">
             {currentAccount ? `${currentAccount.accountName}的客户档案` : "客户管理"}
           </h1>

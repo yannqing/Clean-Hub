@@ -4,7 +4,7 @@ import { cn } from "@cleanhub/ui";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { LogoutButton } from "@/features/auth/components";
@@ -83,6 +83,15 @@ export function PosShell({
   profile,
 }: PosShellProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const entrySource = searchParams.get("from");
+  const activePathname =
+    entrySource === "intake" &&
+    (pathname.startsWith("/customers/") || pathname.startsWith("/tickets/"))
+      ? posRoutes.newIntake
+      : entrySource === "customer" && pathname.startsWith("/tickets/")
+        ? posRoutes.customers
+      : pathname;
   const { locale, t } = useTranslation();
   const [currentUnreadCount, setCurrentUnreadCount] = useState(
     notificationUnreadCount,
@@ -151,7 +160,7 @@ export function PosShell({
                 </div>
                 <div className="space-y-1">
                   {section.items.map((item) => {
-                    const active = isActivePath(pathname, item.href);
+                    const active = isActivePath(activePathname, item.href);
                     const label = t(item.labelKey);
                     const showUnreadIndicator =
                       hasUnreadNotifications &&

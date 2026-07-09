@@ -9,12 +9,17 @@ import {
 
 type TicketDetailPageProps = {
   params: Promise<{ ticketId: string }>;
+  searchParams: Promise<{ from?: string; q?: string }>;
 };
 
 export default async function TicketDetailPage({
   params,
+  searchParams,
 }: TicketDetailPageProps) {
-  const { ticketId } = await params;
+  const [{ ticketId }, { from, q }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
 
   const [ticket, relatedOrders] = await Promise.all([
     getTicketDetailQuery(ticketId),
@@ -26,7 +31,14 @@ export default async function TicketDetailPage({
     notFound();
   }
 
-  return <TicketDetailView relatedOrders={relatedOrders?.data ?? []} ticket={ticket} />;
+  return (
+    <TicketDetailView
+      from={from}
+      intakeQuery={q}
+      relatedOrders={relatedOrders?.data ?? []}
+      ticket={ticket}
+    />
+  );
 }
 
 export function generateMetadata() {

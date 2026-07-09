@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { PosHardwareDeviceSummary } from "@cleanhub/api-client";
+import { PosBreadcrumb } from "@/components/app-shell";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import { posApi } from "@/lib/api-client";
@@ -179,11 +180,7 @@ export function SettingsView() {
     <div className="px-6 py-5 space-y-5">
       {/* Page header */}
       <div>
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-          <span>POS</span>
-          <span>›</span>
-          <span className="text-slate-600">{SETTINGS_PAGE_TITLE}</span>
-        </div>
+        <PosBreadcrumb items={[{ label: SETTINGS_PAGE_TITLE }]} />
         <h1 className="mt-2 text-2xl font-semibold text-slate-950">
           {SETTINGS_PAGE_TITLE}
         </h1>
