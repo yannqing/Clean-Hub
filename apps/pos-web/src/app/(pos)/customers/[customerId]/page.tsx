@@ -2,7 +2,7 @@ import { CustomerDetailView } from "@/features/customers";
 
 type CustomerDetailPageProps = {
   params: Promise<{ customerId: string }>;
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; q?: string }>;
 };
 
 export default async function CustomerDetailPage({
@@ -10,8 +10,8 @@ export default async function CustomerDetailPage({
   searchParams,
 }: CustomerDetailPageProps) {
   const { customerId } = await params;
-  const { from } = await searchParams;
+  const { from, q } = await searchParams;
   return (
-    <CustomerDetailView customerId={customerId} from={from} />
+    <CustomerDetailView customerId={customerId} from={from} intakeQuery={q} />
   );
 }

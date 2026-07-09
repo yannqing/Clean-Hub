@@ -37,24 +37,6 @@ export function IntakeCustomerSearch({
         </div>
       </div>
 
-      <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-        <span>示例：</span>
-        <button
-          className="font-semibold text-blue-700"
-          type="button"
-          onClick={() => onDraftQueryChange("+221 77 000 0000")}
-        >
-          共享账户手机号
-        </button>
-        <span>·</span>
-        <button
-          className="font-semibold text-blue-700"
-          type="button"
-          onClick={() => onDraftQueryChange("mamadou.diop@example.com")}
-        >
-          档案邮箱兜底查询
-        </button>
-      </div>
     </div>
   );
 }

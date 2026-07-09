@@ -7,11 +7,27 @@
 export type { PosReceptionEvent } from "@cleanhub/api-client";
 
 /**
+ * A flattened account row for the intake lookup. Accounts may exist before
+ * their first service profile is created, so they must be visible in intake
+ * search results.
+ */
+export type IntakeAccountRow = {
+  kind: "account";
+  id: string;
+  accountName: string;
+  phone: string | null;
+  email: string | null;
+  status: "active" | "disabled";
+  createdAt: string;
+};
+
+/**
  * A flattened profile row for the intake lookup. Mirrors the profile variant
  * of the customer-management `CustomerListRow`, but kept local so the intake
  * feature does not depend on the customers feature's internal types.
  */
 export type IntakeProfileRow = {
+  kind: "profile";
   id: string;
   customerAccountId: string;
   accountName: string;
@@ -21,6 +37,8 @@ export type IntakeProfileRow = {
   status: "active" | "disabled";
   createdAt: string;
 };
+
+export type IntakeLookupRow = IntakeAccountRow | IntakeProfileRow;
 
 /** Query + pagination state for the intake profile search. */
 export type IntakeProfileQuery = {

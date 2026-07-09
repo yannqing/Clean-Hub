@@ -21,6 +21,7 @@ type CustomerServiceItemListProps = {
   customerId: string;
   /** Max rows per page. */
   pageSize?: number;
+  ticketDetailHref?: (ticketId: string) => string;
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -42,6 +43,7 @@ const GRID_COLS = "grid-cols-[1.1fr_1fr_1fr_120px_120px]";
 export function CustomerServiceItemList({
   customerId,
   pageSize = DEFAULT_PAGE_SIZE,
+  ticketDetailHref,
 }: CustomerServiceItemListProps) {
   const router = useRouter();
   const { locale } = useTranslation();
@@ -157,7 +159,12 @@ export function CustomerServiceItemList({
                     <button
                       className="block truncate font-mono text-xs text-blue-700 hover:underline"
                       type="button"
-                      onClick={() => router.push(`/tickets/${item.ticketId}`)}
+                      onClick={() =>
+                        router.push(
+                          ticketDetailHref?.(item.ticketId) ??
+                            `/tickets/${item.ticketId}`,
+                        )
+                      }
                     >
                       {item.ticketNo || item.ticketId.slice(-8).toUpperCase()}
                     </button>

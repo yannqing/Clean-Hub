@@ -1,5 +1,6 @@
 "use client";
 
+import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import { useEffect, useState } from "react";
 
@@ -11,17 +12,18 @@ import {
   DialogTitle,
 } from "@cleanhub/ui";
 
-import {
-  INTAKE_EMPTY_PROFILE_FORM,
-  INTAKE_RELATIONSHIP_OPTIONS,
-} from "../constants";
+import { INTAKE_RELATIONSHIP_OPTIONS } from "../constants";
 import { createIntakeProfile, searchIntakeAccounts } from "../queries";
+import type { IntakeAccountOption, IntakeCreatedProfile } from "../queries";
 import type { IntakeCreateProfileInput } from "../types";
 
 type IntakeCreateProfileDialogProps = {
+  initialAccount: IntakeAccountOption | null;
+  initialAccountKeyword: string;
+  initialForm: IntakeCreateProfileInput;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: () => void;
+  onCreated: (profile: IntakeCreatedProfile) => void;
 };
 
 /**
@@ -32,17 +34,18 @@ type IntakeCreateProfileDialogProps = {
  * labels).
  */
 export function IntakeCreateProfileDialog({
+  initialAccount,
+  initialAccountKeyword,
+  initialForm,
   open,
   onOpenChange,
   onCreated,
 }: IntakeCreateProfileDialogProps) {
-  const [form, setForm] = useState<IntakeCreateProfileInput>(
-    INTAKE_EMPTY_PROFILE_FORM,
+  const [form, setForm] = useState<IntakeCreateProfileInput>(initialForm);
+  const [accountKeyword, setAccountKeyword] = useState(initialAccountKeyword);
+  const [accounts, setAccounts] = useState<IntakeAccountOption[]>(
+    initialAccount ? [initialAccount] : [],
   );
-  const [accountKeyword, setAccountKeyword] = useState("");
-  const [accounts, setAccounts] = useState<
-    { id: string; accountName: string; phone: string | null; email: string | null }[]
-  >([]);
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -54,10 +57,22 @@ export function IntakeCreateProfileDialog({
     let cancelled = false;
     searchIntakeAccounts(accountKeyword)
       .then((result) => {
-        if (!cancelled) setAccounts(result);
+        if (cancelled) return;
+
+        if (
+          initialAccount &&
+          !result.some((account) => account.id === initialAccount.id)
+        ) {
+          setAccounts([initialAccount, ...result]);
+          return;
+        }
+
+        setAccounts(result);
       })
       .catch(() => {
-        if (!cancelled) setAccounts([]);
+        if (!cancelled) {
+          setAccounts(initialAccount ? [initialAccount] : []);
+        }
       })
       .finally(() => {
         if (!cancelled) setAccountsLoading(false);
@@ -65,7 +80,7 @@ export function IntakeCreateProfileDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, accountKeyword]);
+  }, [open, accountKeyword, initialAccount]);
 
   function update<K extends keyof IntakeCreateProfileInput>(
     key: K,
@@ -90,20 +105,20 @@ export function IntakeCreateProfileDialog({
 
     setSubmitting(true);
     try {
-      await createIntakeProfile(form);
+      const profile = await createIntakeProfile(form);
       toast.success("新增客户档案已保存");
-      onCreated();
       onOpenChange(false);
+      onCreated(profile);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "保存失败，请重试。",
-      );
+      toast.error(getPosApiErrorMessage(error, "保存失败，请重试。"));
     } finally {
       setSubmitting(false);
     }
   }
 
-  const selectedAccount = accounts.find((item) => item.id === form.accountId);
+  const selectedAccount =
+    accounts.find((item) => item.id === form.accountId) ??
+    (initialAccount?.id === form.accountId ? initialAccount : undefined);
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>

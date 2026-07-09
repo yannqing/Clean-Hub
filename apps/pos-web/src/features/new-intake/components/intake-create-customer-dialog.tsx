@@ -1,5 +1,6 @@
 "use client";
 
+import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import { useState } from "react";
 
@@ -11,14 +12,15 @@ import {
   DialogTitle,
 } from "@cleanhub/ui";
 
-import { INTAKE_EMPTY_ACCOUNT_FORM } from "../constants";
 import { createIntakeAccount } from "../queries";
+import type { IntakeCreatedAccount } from "../queries";
 import type { IntakeCreateAccountInput } from "../types";
 
 type IntakeCreateCustomerDialogProps = {
+  initialForm: IntakeCreateAccountInput;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onCreated: () => void;
+  onCreated: (account: IntakeCreatedAccount) => void;
 };
 
 /**
@@ -31,13 +33,12 @@ type IntakeCreateCustomerDialogProps = {
  * so form state initializes from the empty form without an effect.
  */
 export function IntakeCreateCustomerDialog({
+  initialForm,
   open,
   onOpenChange,
   onCreated,
 }: IntakeCreateCustomerDialogProps) {
-  const [form, setForm] = useState<IntakeCreateAccountInput>(
-    INTAKE_EMPTY_ACCOUNT_FORM,
-  );
+  const [form, setForm] = useState<IntakeCreateAccountInput>(initialForm);
   const [submitting, setSubmitting] = useState(false);
 
   function update<K extends keyof IntakeCreateAccountInput>(
@@ -59,14 +60,12 @@ export function IntakeCreateCustomerDialog({
 
     setSubmitting(true);
     try {
-      await createIntakeAccount(form);
+      const account = await createIntakeAccount(form);
       toast.success("新增客户账户已保存");
-      onCreated();
       onOpenChange(false);
+      onCreated(account);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "保存失败，请重试。",
-      );
+      toast.error(getPosApiErrorMessage(error, "保存失败，请重试。"));
     } finally {
       setSubmitting(false);
     }
