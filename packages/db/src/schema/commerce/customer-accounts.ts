@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   index,
   integer,
@@ -42,14 +43,14 @@ export const customerAccounts = pgTable(
     version: integer("version").notNull().default(1),
   },
   (table) => [
-    uniqueIndex("customer_accounts_tenant_phone_unique").on(
+    index("customer_accounts_tenant_phone_idx").on(
       table.tenantId,
       table.phone,
     ),
     uniqueIndex("customer_accounts_tenant_email_unique").on(
       table.tenantId,
       table.email,
-    ),
+    ).where(sql`${table.deletedAt} is null`),
     index("customer_accounts_tenant_id_idx").on(table.tenantId),
     index("customer_accounts_tenant_status_idx").on(
       table.tenantId,
