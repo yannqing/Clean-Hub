@@ -594,4 +594,36 @@ export type SaasMessages = {
       items: string[];
     };
   };
+  todoCenter: {
+    /** Header bell icon accessible label. */
+    openTodoCenter: string;
+    /** Tooltip/label shown when there is nothing actionable. */
+    emptyTitle: string;
+    emptyBody: string;
+    badge: string;
+    title: string;
+    description: string;
+    loadError: string;
+    total: string;
+    /** Singular fallback for a queue sample when it has no title. */
+    untitled: string;
+    feedbackQueue: {
+      title: string;
+      description: string;
+      empty: string;
+      viewAll: string;
+    };
+    restoreQueue: {
+      title: string;
+      description: string;
+      empty: string;
+      viewAll: string;
+    };
+    securityQueue: {
+      title: string;
+      description: string;
+      empty: string;
+      viewAll: string;
+    };
+  };
 };

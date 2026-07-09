@@ -626,4 +626,34 @@ export const saasMessagesEn: SaasMessages = {
       items: ["Languages", "Currencies", "Timezones", "Regional formats"],
     },
   },
+  todoCenter: {
+    openTodoCenter: "Open My Todo",
+    emptyTitle: "You're all caught up",
+    emptyBody: "No actionable items across feedback, restore requests, or security events.",
+    badge: "My Todo",
+    title: "My Todo",
+    description:
+      "Actionable items across feedback tickets, restore requests awaiting review, and high-severity security events.",
+    loadError: "Failed to load your todo items.",
+    total: "Total actionable",
+    untitled: "Untitled",
+    feedbackQueue: {
+      title: "Open feedback tickets",
+      description: "Tickets awaiting a response or still in progress.",
+      empty: "No open feedback tickets.",
+      viewAll: "View all feedback tickets",
+    },
+    restoreQueue: {
+      title: "Restore requests awaiting review",
+      description: "Pending restore requests that need approval or rejection.",
+      empty: "No restore requests awaiting review.",
+      viewAll: "View all restore requests",
+    },
+    securityQueue: {
+      title: "High-severity security events",
+      description: "High and critical security events requiring attention.",
+      empty: "No high-severity security events.",
+      viewAll: "View all security events",
+    },
+  },
 };

@@ -614,4 +614,33 @@ export const saasMessagesZhCN: SaasMessages = {
       items: ["语言", "货币", "时区", "区域格式"],
     },
   },
+  todoCenter: {
+    openTodoCenter: "打开我的待办",
+    emptyTitle: "已处理完毕",
+    emptyBody: "反馈工单、恢复请求和安全事件均无待处理项。",
+    badge: "我的待办",
+    title: "我的待办",
+    description: "聚合待处理反馈工单、待审批恢复请求与高危安全事件的待办事项。",
+    loadError: "加载待办事项失败。",
+    total: "合计待办",
+    untitled: "无标题",
+    feedbackQueue: {
+      title: "待处理反馈工单",
+      description: "等待响应或仍在进行中的工单。",
+      empty: "暂无待处理反馈工单。",
+      viewAll: "查看全部反馈工单",
+    },
+    restoreQueue: {
+      title: "待审批恢复请求",
+      description: "等待批准或拒绝的恢复请求。",
+      empty: "暂无待审批恢复请求。",
+      viewAll: "查看全部恢复请求",
+    },
+    securityQueue: {
+      title: "高危安全事件",
+      description: "需要关注的高危与紧急安全事件。",
+      empty: "暂无高危安全事件。",
+      viewAll: "查看全部安全事件",
+    },
+  },
 };
