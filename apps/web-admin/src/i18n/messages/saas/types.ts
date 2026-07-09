@@ -508,6 +508,7 @@ export type SaasMessages = {
       tenant: string;
       assignee: string;
       created: string;
+      sla: string;
     };
     detail: string;
     detailTitle: string;
@@ -532,6 +533,48 @@ export type SaasMessages = {
       label: string;
       placeholder: string;
       submit: string;
+    };
+    batch: {
+      selected: string;
+      selectAll: string;
+      clear: string;
+      applyStatus: string;
+      reassign: string;
+      close: string;
+      noneSelected: string;
+      statusLabel: string;
+      assigneeLabel: string;
+      submitStatus: string;
+      submitAssignee: string;
+      reason: string;
+      reasonPlaceholder: string;
+      closeReason: string;
+      closeReasonPlaceholder: string;
+      statusApplied: string;
+      statusPartial: string;
+      statusFailed: string;
+      assigneeApplied: string;
+      assigneePartial: string;
+      assigneeFailed: string;
+      closed: string;
+      closedPartial: string;
+      closedFailed: string;
+    };
+    sla: {
+      label: string;
+      met: string;
+      onTrack: string;
+      left: string;
+      overdue: string;
+      lessThanHourLeft: string;
+      overDueAria: string;
+      dueSoonAria: string;
+    };
+    timeline: {
+      title: string;
+      empty: string;
+      created: string;
+      updated: string;
     };
   };
   placeholders: {
