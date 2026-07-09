@@ -263,6 +263,7 @@ export type TenantMessages = {
     deletedToast: string;
     formFallbackError: string;
     requestFailed: string;
+    versionConflict: string;
     delete: {
       title: string;
       description: string;
@@ -297,6 +298,7 @@ export type TenantMessages = {
     empty: string;
     requestFailed: string;
     formFallbackError: string;
+    versionConflict: string;
     updatePrice: string;
   };
 
@@ -305,6 +307,8 @@ export type TenantMessages = {
     title: string;
     addDevice: string;
     noDevices: string;
+    noBranches: string;
+    typeReadonlyHint: string;
     columns: {
       name: string;
       type: string;
@@ -331,11 +335,22 @@ export type TenantMessages = {
       title: string;
       labels: {
         deviceName: string;
+        branchId: string;
         connectionType: string;
         status: string;
       };
       savingChanges: string;
       saveChanges: string;
+    };
+    delete: {
+      title: string;
+      description: string;
+      deleting: string;
+      action: string;
+    };
+    actions: {
+      edit: string;
+      delete: string;
     };
     requestFailed: string;
   };
@@ -412,6 +427,7 @@ export type TenantMessages = {
     };
     allCategories: string;
     allResults: string;
+    allEventTypes: string;
     successLabel: string;
     failedLabel: string;
     categoryLabels: {

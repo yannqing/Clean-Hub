@@ -3,7 +3,8 @@ export type TenantServicesErrorCode =
   | "TENANT_NOT_ACTIVE"
   | "FEATURE_DISABLED"
   | "SERVICE_NOT_FOUND"
-  | "SERVICE_NAME_DUPLICATE";
+  | "SERVICE_NAME_DUPLICATE"
+  | "SERVICE_VERSION_CONFLICT";
 
 export class TenantServicesError extends Error {
   constructor(

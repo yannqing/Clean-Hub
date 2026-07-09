@@ -22,6 +22,11 @@ export type PriceFormValues = {
   amount: string;
   currency: string;
   status: PriceStatus;
+  /**
+   * Optimistic-concurrency version captured when a price is loaded for
+   * editing. Required for updates.
+   */
+  version: number;
 };
 
 export type PriceListFilters = {

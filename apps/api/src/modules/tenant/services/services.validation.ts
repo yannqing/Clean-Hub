@@ -32,11 +32,17 @@ export const createServiceBodySchema = z.object({
   status: serviceStatusSchema.default("active"),
 });
 
-export const updateServiceBodySchema = createServiceBodySchema.partial().refine(
-  (value) => Object.keys(value).length > 0,
-  "At least one service field must be provided.",
-);
+export const updateServiceBodySchema = createServiceBodySchema
+  .partial()
+  .extend({
+    version: z.number().int().positive(),
+  })
+  .refine(
+    (value) => Object.keys(value).some((key) => key !== "version"),
+    "At least one service field must be provided.",
+  );
 
 export const updateServiceStatusBodySchema = z.object({
   status: serviceStatusSchema,
+  version: z.number().int().positive(),
 });

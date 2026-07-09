@@ -13,6 +13,7 @@ export type HardwareConfigSummary = {
   status: HardwareDeviceStatus;
   createdAt: string;
   updatedAt: string;
+  version: number;
 };
 
 export type CreateHardwareConfigRequest = {
@@ -25,7 +26,16 @@ export type CreateHardwareConfigRequest = {
 
 export type UpdateHardwareConfigRequest = {
   name?: string;
+  /** Allows relocating a device to another branch (device move scenario). */
+  branchId?: string;
   connectionType?: HardwareConnectionType;
   config?: Record<string, unknown>;
   status?: HardwareDeviceStatus;
+  /** Optimistic-concurrency version from the record the editor last read. */
+  version: number;
+};
+
+export type DeleteHardwareConfigRequest = {
+  /** Optimistic-concurrency version from the record the editor last read. */
+  version: number;
 };

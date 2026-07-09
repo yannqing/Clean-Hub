@@ -1,6 +1,12 @@
-import { and, count, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull, sql, sum } from "drizzle-orm";
 
-import { feedbackTickets, tenants, type Database } from "@cleanhub/db";
+import {
+  branches,
+  feedbackTickets,
+  orders,
+  tenants,
+  type Database,
+} from "@cleanhub/db";
 
 export async function findTenantCounts(db: Database): Promise<{
   total: number;
@@ -37,4 +43,42 @@ export async function findPendingFeedbackCount(db: Database): Promise<number> {
     .where(and(eq(feedbackTickets.status, "open"), isNull(feedbackTickets.deletedAt)));
 
   return rows[0]?.value ?? 0;
+}
+
+export async function findBranchCount(db: Database): Promise<number> {
+  const rows = await db
+    .select({ value: count() })
+    .from(branches)
+    .where(isNull(branches.deletedAt));
+
+  return rows[0]?.value ?? 0;
+}
+
+/**
+ * Returns the count and total revenue of non-cancelled orders created today
+ * (UTC day boundary). `paidAmount` is summed so partially paid orders are
+ * reflected accurately in platform revenue.
+ */
+export async function findTodayOrderMetrics(db: Database): Promise<{
+  orderCount: number;
+  revenueAmount: number;
+}> {
+  const rows = await db
+    .select({
+      orderCount: count(),
+      revenueAmount: sum(orders.paidAmount),
+    })
+    .from(orders)
+    .where(
+      and(
+        isNull(orders.deletedAt),
+        sql`${orders.createdAt} >= date_trunc('day', now())`,
+        sql`${orders.status} <> 'cancelled'`,
+      ),
+    );
+
+  const orderCount = rows[0]?.orderCount ?? 0;
+  const revenueAmount = Number(rows[0]?.revenueAmount ?? 0);
+
+  return { orderCount, revenueAmount };
 }

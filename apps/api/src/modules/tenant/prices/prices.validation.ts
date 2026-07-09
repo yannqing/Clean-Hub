@@ -37,8 +37,9 @@ export const updatePriceBodySchema = z
       .optional(),
     currency: z.string().trim().length(3).toUpperCase().optional(),
     status: priceStatusSchema.optional(),
+    version: z.number().int().positive(),
   })
   .refine(
-    (value) => Object.keys(value).length > 0,
+    (value) => Object.keys(value).some((key) => key !== "version"),
     "At least one price field must be provided.",
   );

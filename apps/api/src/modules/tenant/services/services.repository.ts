@@ -11,6 +11,7 @@ import type {
   ServiceSummary,
   UpdateServiceRequest,
 } from "./services.types.js";
+import { TenantServicesError } from "./services.errors.js";
 
 function normalizeNullable(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
@@ -187,7 +188,7 @@ export async function updateServiceRecord(
     return null;
   }
 
-  await db
+  const updatedRows = await db
     .update(services)
     .set({
       businessLine: input.businessLine ?? existing.businessLine,
@@ -206,9 +207,19 @@ export async function updateServiceRecord(
       and(
         eq(services.id, input.serviceId),
         eq(services.tenantId, input.tenantId),
+        eq(services.version, input.version),
         isNull(services.deletedAt),
       ),
+    )
+    .returning({ id: services.id });
+
+  if (!updatedRows[0]) {
+    throw new TenantServicesError(
+      "SERVICE_VERSION_CONFLICT",
+      "Service has been modified. Refresh and try again.",
+      409,
     );
+  }
 
   return findServiceById(db, input);
 }
@@ -220,9 +231,10 @@ export async function updateServiceStatusRecord(
     serviceId: string;
     status: ServiceStatus;
     actorUserId: string;
+    version: number;
   },
 ): Promise<ServiceSummary | null> {
-  await db
+  const updatedRows = await db
     .update(services)
     .set({
       status: input.status,
@@ -234,9 +246,19 @@ export async function updateServiceStatusRecord(
       and(
         eq(services.id, input.serviceId),
         eq(services.tenantId, input.tenantId),
+        eq(services.version, input.version),
         isNull(services.deletedAt),
       ),
+    )
+    .returning({ id: services.id });
+
+  if (!updatedRows[0]) {
+    throw new TenantServicesError(
+      "SERVICE_VERSION_CONFLICT",
+      "Service has been modified. Refresh and try again.",
+      409,
     );
+  }
 
   return findServiceById(db, input);
 }

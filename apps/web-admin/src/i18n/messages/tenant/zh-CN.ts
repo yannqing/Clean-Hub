@@ -251,6 +251,7 @@ export const tenantMessagesZhCN: TenantMessages = {
     deletedToast: "已删除「{name}」。",
     formFallbackError: "请检查服务表单。",
     requestFailed: "服务请求失败。",
+    versionConflict: "该服务已被其它请求更新，请刷新后重试。",
     delete: {
       title: "删除服务",
       description: "确定要删除此服务吗？此操作不可撤销，并可能影响已有价格和订单。",
@@ -285,6 +286,7 @@ export const tenantMessagesZhCN: TenantMessages = {
     empty: "暂无价格",
     requestFailed: "价格请求失败。",
     formFallbackError: "请检查价格表单。",
+    versionConflict: "该价格已被其它请求更新，请刷新后重试。",
     updatePrice: "更新价格",
   },
 
@@ -293,6 +295,8 @@ export const tenantMessagesZhCN: TenantMessages = {
     title: "硬件设备",
     addDevice: "添加设备",
     noDevices: "未找到设备。",
+    noBranches: "暂无门店，请先创建门店。",
+    typeReadonlyHint: "设备类型创建后不可修改。",
     columns: {
       name: "名称",
       type: "类型",
@@ -306,8 +310,8 @@ export const tenantMessagesZhCN: TenantMessages = {
       title: "添加设备",
       description: "将硬件设备注册到某个门店。",
       labels: {
-        branchId: "门店 ID",
-        branchPlaceholder: "请输入门店 ULID",
+        branchId: "门店",
+        branchPlaceholder: "选择门店",
         deviceName: "设备名称",
         deviceType: "设备类型",
         connectionType: "连接类型",
@@ -319,11 +323,22 @@ export const tenantMessagesZhCN: TenantMessages = {
       title: "编辑设备",
       labels: {
         deviceName: "设备名称",
+        branchId: "门店",
         connectionType: "连接类型",
         status: "状态",
       },
       savingChanges: "保存中...",
       saveChanges: "保存修改",
+    },
+    delete: {
+      title: "删除设备",
+      description: "确定要删除此设备吗？记录会保留以供审计查阅。",
+      deleting: "删除中...",
+      action: "删除",
+    },
+    actions: {
+      edit: "编辑",
+      delete: "删除",
     },
     requestFailed: "发生了意外错误。",
   },
@@ -400,6 +415,7 @@ export const tenantMessagesZhCN: TenantMessages = {
     },
     allCategories: "全部分类",
     allResults: "全部结果",
+    allEventTypes: "全部事件类型",
     successLabel: "成功",
     failedLabel: "失败",
     categoryLabels: {

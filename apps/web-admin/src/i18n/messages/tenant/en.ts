@@ -258,6 +258,8 @@ export const tenantMessagesEn: TenantMessages = {
     deletedToast: 'Deleted "{name}".',
     formFallbackError: "Check the service form.",
     requestFailed: "Service request failed.",
+    versionConflict:
+      "This service was updated by another request. Refresh and try again.",
     delete: {
       title: "Delete Service",
       description:
@@ -293,6 +295,8 @@ export const tenantMessagesEn: TenantMessages = {
     empty: "No prices yet",
     requestFailed: "Price request failed.",
     formFallbackError: "Check the price form.",
+    versionConflict:
+      "This price was updated by another request. Refresh and try again.",
     updatePrice: "Update price",
   },
 
@@ -301,6 +305,8 @@ export const tenantMessagesEn: TenantMessages = {
     title: "Hardware Devices",
     addDevice: "Add Device",
     noDevices: "No devices found.",
+    noBranches: "No branches available. Create a branch first.",
+    typeReadonlyHint: "Device type cannot be changed after creation.",
     columns: {
       name: "Name",
       type: "Type",
@@ -314,8 +320,8 @@ export const tenantMessagesEn: TenantMessages = {
       title: "Add Device",
       description: "Register a hardware device to a branch.",
       labels: {
-        branchId: "Branch ID",
-        branchPlaceholder: "Enter branch ULID",
+        branchId: "Branch",
+        branchPlaceholder: "Select a branch",
         deviceName: "Device Name",
         deviceType: "Device Type",
         connectionType: "Connection Type",
@@ -327,11 +333,23 @@ export const tenantMessagesEn: TenantMessages = {
       title: "Edit Device",
       labels: {
         deviceName: "Device Name",
+        branchId: "Branch",
         connectionType: "Connection Type",
         status: "Status",
       },
       savingChanges: "Saving...",
       saveChanges: "Save Changes",
+    },
+    delete: {
+      title: "Delete Device",
+      description:
+        "Are you sure you want to delete this device? The record is retained for audit history.",
+      deleting: "Deleting...",
+      action: "Delete",
+    },
+    actions: {
+      edit: "Edit",
+      delete: "Delete",
     },
     requestFailed: "An unexpected error occurred.",
   },
@@ -409,6 +427,7 @@ export const tenantMessagesEn: TenantMessages = {
     },
     allCategories: "All categories",
     allResults: "All results",
+    allEventTypes: "All event types",
     successLabel: "Success",
     failedLabel: "Failed",
     categoryLabels: {
