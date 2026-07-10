@@ -16,10 +16,15 @@ async function refreshSessionOnce(): Promise<"retry" | "logout"> {
   }
 
   try {
-    const nextSession = await apiClient.mobile.auth.refresh({
-      refreshToken,
-      deviceId: await getOrCreateDeviceId(),
-    });
+    // skipAuthRefresh: a 401 from the refresh call itself must not re-enter
+    // onUnauthorized, otherwise it awaits its own in-flight promise forever.
+    const nextSession = await apiClient.mobile.auth.refresh(
+      {
+        refreshToken,
+        deviceId: await getOrCreateDeviceId(),
+      },
+      { skipAuthRefresh: true },
+    );
     await saveMobileSession(nextSession);
     return "retry";
   } catch {
