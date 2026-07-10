@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "@cleanhub/ui";
 
-import { Icon } from "@/components/app-shell";
+import { Icon, type PosIconName } from "@/components/app-shell";
 import { posRoutes } from "@/config";
 import { posApi } from "@/lib/api-client";
 
@@ -54,27 +54,42 @@ function toIsoOrNull(value: string): string | null {
   return new Date(`${value}T23:59:59`).toISOString();
 }
 
+type OrderCreateDialogProps = {
+  defaultBranchId?: string;
+  initialTicket?: ServiceTicketSummary;
+  orderDetailHref?: (orderId: string) => string;
+  triggerClassName?: string;
+  triggerIcon?: PosIconName;
+  triggerLabel?: string;
+};
+
 export function OrderCreateDialog({
   defaultBranchId,
-}: {
-  defaultBranchId?: string;
-}) {
+  initialTicket,
+  orderDetailHref,
+  triggerClassName,
+  triggerIcon = "plus",
+  triggerLabel = "新增订单",
+}: OrderCreateDialogProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const [orderType, setOrderType] = useState<"manual" | "ticket">("manual");
+  const [orderType, setOrderType] = useState<"manual" | "ticket">(
+    initialTicket ? "ticket" : "manual",
+  );
   const [selectedCustomer, setSelectedCustomer] =
     useState<PosCustomerProfileWithAccount | null>(null);
   const [selectedTicket, setSelectedTicket] =
-    useState<ServiceTicketSummary | null>(null);
+    useState<ServiceTicketSummary | null>(initialTicket ?? null);
   const [expireAt, setExpireAt] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<ManualItemForm[]>([emptyItem()]);
+  const ticketModeLocked = Boolean(initialTicket);
 
   function resetForm() {
-    setOrderType("manual");
+    setOrderType(initialTicket ? "ticket" : "manual");
     setSelectedCustomer(null);
-    setSelectedTicket(null);
+    setSelectedTicket(initialTicket ?? null);
     setExpireAt("");
     setNotes("");
     setItems([emptyItem()]);
@@ -160,7 +175,10 @@ export function OrderCreateDialog({
       if (result.ok && result.data) {
         toast.success("订单已创建。");
         handleOpenChange(false);
-        router.push(posRoutes.orderDetail(result.data.id));
+        router.push(
+          orderDetailHref?.(result.data.id) ??
+            posRoutes.orderDetail(result.data.id),
+        );
       } else {
         toast.error(result.message);
       }
@@ -170,12 +188,15 @@ export function OrderCreateDialog({
   return (
     <>
       <button
-        className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+        className={
+          triggerClassName ??
+          "flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+        }
         onClick={() => setOpen(true)}
         type="button"
       >
-        <Icon className="h-4 w-4" name="plus" />
-        新增订单
+        <Icon className="h-4 w-4" name={triggerIcon} />
+        {triggerLabel}
       </button>
 
       <Dialog onOpenChange={handleOpenChange} open={open}>
@@ -185,22 +206,24 @@ export function OrderCreateDialog({
           </DialogHeader>
 
           <div className="grid gap-5">
-            <div className="inline-grid w-fit grid-cols-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
-              {(["manual", "ticket"] as const).map((value) => (
-                <button
-                  className={`h-9 rounded-md px-4 text-sm font-semibold ${
-                    orderType === value
-                      ? "bg-white text-blue-700 shadow-sm"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                  key={value}
-                  onClick={() => setOrderType(value)}
-                  type="button"
-                >
-                  {value === "manual" ? "普通订单" : "工单订单"}
-                </button>
-              ))}
-            </div>
+            {ticketModeLocked ? null : (
+              <div className="inline-grid w-fit grid-cols-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
+                {(["manual", "ticket"] as const).map((value) => (
+                  <button
+                    className={`h-9 rounded-md px-4 text-sm font-semibold ${
+                      orderType === value
+                        ? "bg-white text-blue-700 shadow-sm"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                    key={value}
+                    onClick={() => setOrderType(value)}
+                    type="button"
+                  >
+                    {value === "manual" ? "普通订单" : "工单订单"}
+                  </button>
+                ))}
+              </div>
+            )}
 
             {orderType === "manual" ? (
               <ManualOrderFields
@@ -219,6 +242,7 @@ export function OrderCreateDialog({
               />
             ) : (
               <TicketOrderFields
+                locked={ticketModeLocked}
                 selectedTicket={selectedTicket}
                 onSelectTicket={setSelectedTicket}
               />
@@ -363,15 +387,18 @@ function ManualOrderFields({
 }
 
 function TicketOrderFields({
+  locked = false,
   selectedTicket,
   onSelectTicket,
 }: {
+  locked?: boolean;
   selectedTicket: ServiceTicketSummary | null;
   onSelectTicket: (ticket: ServiceTicketSummary | null) => void;
 }) {
   return (
     <div className="grid gap-4">
       <ServiceTicketPicker
+        locked={locked}
         onSelect={onSelectTicket}
         selectedTicket={selectedTicket}
       />
@@ -461,9 +488,11 @@ function CustomerProfilePicker({
 }
 
 function ServiceTicketPicker({
+  locked = false,
   selectedTicket,
   onSelect,
 }: {
+  locked?: boolean;
   selectedTicket: ServiceTicketSummary | null;
   onSelect: (ticket: ServiceTicketSummary | null) => void;
 }) {
@@ -472,6 +501,10 @@ function ServiceTicketPicker({
   const [options, setOptions] = useState<ServiceTicketSummary[]>([]);
 
   useEffect(() => {
+    if (locked) {
+      return;
+    }
+
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setLoading(true);
@@ -491,33 +524,37 @@ function ServiceTicketPicker({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [keyword]);
+  }, [keyword, locked]);
 
   return (
     <Field label="服务工单">
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <input
-          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
-          onChange={(event) => setKeyword(event.target.value)}
-          placeholder="搜索工单号或客户名"
-          value={keyword}
-        />
+        {locked ? null : (
+          <input
+            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="搜索工单号或客户名"
+            value={keyword}
+          />
+        )}
         {selectedTicket ? (
           <SelectedPill
             label={selectedTicket.ticketNo ?? selectedTicket.id}
             meta={`${selectedTicket.customerName} · ${selectedTicket.itemCount} 个项目 · 合计 ${selectedTicket.totalAmount}`}
-            onClear={() => onSelect(null)}
+            onClear={locked ? undefined : () => onSelect(null)}
           />
         ) : null}
-        <OptionList
-          emptyText={loading ? "加载工单中..." : "没有可生成订单的工单"}
-          options={options.map((ticket) => ({
-            id: ticket.id,
-            title: ticket.ticketNo ?? ticket.id,
-            meta: `${ticket.customerName} · ${ticket.itemCount} 个项目 · 合计 ${ticket.totalAmount}`,
-            onSelect: () => onSelect(ticket),
-          }))}
-        />
+        {locked ? null : (
+          <OptionList
+            emptyText={loading ? "加载工单中..." : "没有可生成订单的工单"}
+            options={options.map((ticket) => ({
+              id: ticket.id,
+              title: ticket.ticketNo ?? ticket.id,
+              meta: `${ticket.customerName} · ${ticket.itemCount} 个项目 · 合计 ${ticket.totalAmount}`,
+              onSelect: () => onSelect(ticket),
+            }))}
+          />
+        )}
       </div>
     </Field>
   );
@@ -530,7 +567,7 @@ function SelectedPill({
 }: {
   label: string;
   meta: string;
-  onClear: () => void;
+  onClear?: () => void;
 }) {
   return (
     <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2">
@@ -540,13 +577,15 @@ function SelectedPill({
           {meta}
         </div>
       </div>
-      <button
-        className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-white"
-        onClick={onClear}
-        type="button"
-      >
-        清除
-      </button>
+      {onClear ? (
+        <button
+          className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-white"
+          onClick={onClear}
+          type="button"
+        >
+          清除
+        </button>
+      ) : null}
     </div>
   );
 }

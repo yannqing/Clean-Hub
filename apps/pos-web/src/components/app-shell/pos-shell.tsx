@@ -77,6 +77,37 @@ function localizeProfileName(
   return name;
 }
 
+function resolveActivePathname(
+  pathname: string,
+  searchParams: Pick<URLSearchParams, "get">,
+): string {
+  const entrySource = searchParams.get("from");
+  const ticketEntrySource = searchParams.get("ticketFrom");
+
+  if (
+    entrySource === "intake" &&
+    (pathname.startsWith("/customers/") || pathname.startsWith("/tickets/"))
+  ) {
+    return posRoutes.newIntake;
+  }
+
+  if (entrySource === "customer" && pathname.startsWith("/tickets/")) {
+    return posRoutes.customers;
+  }
+
+  if (entrySource === "ticket" && pathname.startsWith("/orders/")) {
+    if (ticketEntrySource === "intake") {
+      return posRoutes.newIntake;
+    }
+    if (ticketEntrySource === "customer") {
+      return posRoutes.customers;
+    }
+    return posRoutes.tickets;
+  }
+
+  return pathname;
+}
+
 export function PosShell({
   children,
   notificationUnreadCount = 0,
@@ -84,14 +115,7 @@ export function PosShell({
 }: PosShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const entrySource = searchParams.get("from");
-  const activePathname =
-    entrySource === "intake" &&
-    (pathname.startsWith("/customers/") || pathname.startsWith("/tickets/"))
-      ? posRoutes.newIntake
-      : entrySource === "customer" && pathname.startsWith("/tickets/")
-        ? posRoutes.customers
-      : pathname;
+  const activePathname = resolveActivePathname(pathname, searchParams);
   const { locale, t } = useTranslation();
   const [currentUnreadCount, setCurrentUnreadCount] = useState(
     notificationUnreadCount,

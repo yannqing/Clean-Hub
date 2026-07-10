@@ -7,6 +7,7 @@ import { useState } from "react";
 
 import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { customerDetailPath, posRoutes } from "@/config";
+import { OrderCreateDialog } from "@/features/orders/components/order-create-dialog";
 
 import {
   formatTicketDateTime,
@@ -120,16 +121,19 @@ export function TicketDetailView({
               <Icon className="h-4 w-4" name="printer" />
               打印标签
             </button>
-            <button
-              className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
-              onClick={() =>
-                toast.info("创建订单功能尚在开发中，敬请期待。")
+            <OrderCreateDialog
+              initialTicket={ticket}
+              orderDetailHref={(orderId) =>
+                buildOrderDetailHref(orderId, {
+                  intakeQuery,
+                  ticketFrom: from,
+                  ticketId: ticket.id,
+                })
               }
-              type="button"
-            >
-              <Icon className="h-4 w-4" name="receipt" />
-              创建订单
-            </button>
+              triggerClassName="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+              triggerIcon="receipt"
+              triggerLabel="创建订单"
+            />
             <button
               className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               onClick={() => setStatusOpen(true)}
@@ -222,19 +226,31 @@ export function TicketDetailView({
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <h2 className="font-semibold text-slate-950">客户与取件信息</h2>
             <dl className="mt-4 space-y-3">
-              <Detail label="客户姓名" value={ticket.customerName} />
               <Detail
-                label="客户档案"
-                value={ticket.customerId.slice(-8).toUpperCase()}
+                label="客户姓名"
+                value={ticket.customerProfileName ?? ticket.customerName}
+              />
+              <Detail
+                label="所属账户"
+                value={ticket.customerAccountName ?? ticket.customerName}
               />
               <Detail
                 label="接待店员"
-                value={ticket.assistantId ?? TICKET_EMPTY_PLACEHOLDER}
+                value={ticket.assistantName ?? TICKET_EMPTY_PLACEHOLDER}
               />
             </dl>
           </section>
 
-          <TicketRelatedOrders orders={relatedOrders ?? []} />
+          <TicketRelatedOrders
+            orderDetailHref={(orderId) =>
+              buildOrderDetailHref(orderId, {
+                intakeQuery,
+                ticketFrom: from,
+                ticketId: ticket.id,
+              })
+            }
+            orders={relatedOrders ?? []}
+          />
 
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
             <h2 className="font-semibold text-slate-950">状态与时间</h2>
@@ -307,6 +323,31 @@ function buildCustomerDetailHref(
   }
 
   return `${base}?${params.toString()}`;
+}
+
+function buildOrderDetailHref(
+  orderId: string,
+  context: {
+    ticketId: string;
+    ticketFrom: string | undefined;
+    intakeQuery: string | undefined;
+  },
+): string {
+  const params = new URLSearchParams({
+    from: "ticket",
+    ticketId: context.ticketId,
+  });
+
+  if (context.ticketFrom === "intake" || context.ticketFrom === "customer") {
+    params.set("ticketFrom", context.ticketFrom);
+  }
+
+  const keyword = context.intakeQuery?.trim();
+  if (context.ticketFrom === "intake" && keyword) {
+    params.set("q", keyword);
+  }
+
+  return `${posRoutes.orderDetail(orderId)}?${params.toString()}`;
 }
 
 function HeaderMetric({

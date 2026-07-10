@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "@cleanhub/i18n/react";
+import Link from "next/link";
 
 import {
   formatTicketDateTime,
@@ -10,6 +11,7 @@ import {
 import type { RelatedOrderSummary } from "@cleanhub/api-client";
 
 type TicketRelatedOrdersProps = {
+  orderDetailHref?: (orderId: string) => string;
   orders: RelatedOrderSummary[];
 };
 
@@ -33,7 +35,10 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
  * payment happen on the orders page. We surface payment status because the
  * ticket pickup transition depends on linked orders being settled.
  */
-export function TicketRelatedOrders({ orders }: TicketRelatedOrdersProps) {
+export function TicketRelatedOrders({
+  orderDetailHref,
+  orders,
+}: TicketRelatedOrdersProps) {
   const { locale } = useTranslation();
 
   return (
@@ -48,8 +53,9 @@ export function TicketRelatedOrders({ orders }: TicketRelatedOrdersProps) {
       ) : (
         <div className="mt-4 space-y-3">
           {orders.map((order) => (
-            <div
-              className="rounded-lg border border-slate-200 p-3"
+            <Link
+              className="block rounded-lg border border-slate-200 p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
+              href={orderDetailHref?.(order.id) ?? `/orders/${order.id}`}
               key={order.id}
             >
               <div className="flex items-center justify-between">
@@ -73,7 +79,7 @@ export function TicketRelatedOrders({ orders }: TicketRelatedOrdersProps) {
                   {formatTicketMoney(order.paidAmount)} / {formatTicketMoney(order.totalAmount)}
                 </span>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

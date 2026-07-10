@@ -9,12 +9,19 @@ import {
 
 type OrderDetailPageProps = {
   params: Promise<{ orderId: string }>;
+  searchParams: Promise<{
+    from?: string;
+    q?: string;
+    ticketFrom?: string;
+    ticketId?: string;
+  }>;
 };
 
 export default async function OrderDetailPage({
   params,
+  searchParams,
 }: OrderDetailPageProps) {
-  const { orderId } = await params;
+  const [{ orderId }, source] = await Promise.all([params, searchParams]);
   let order: Awaited<ReturnType<typeof getOrderDetailQuery>>;
   let payments: Awaited<ReturnType<typeof getOrderPaymentsQuery>>;
 
@@ -30,5 +37,11 @@ export default async function OrderDetailPage({
     throw error;
   }
 
-  return <OrderDetailView order={order} payments={payments.data} />;
+  return (
+    <OrderDetailView
+      order={order}
+      payments={payments.data}
+      source={source}
+    />
+  );
 }
