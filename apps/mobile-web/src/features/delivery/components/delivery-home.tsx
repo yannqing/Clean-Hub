@@ -4,9 +4,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PrintLocale } from "@cleanhub/hardware";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
-import { toast } from "@cleanhub/ui";
-import { Loader2 } from "lucide-react";
+import { Button, toast } from "@cleanhub/ui";
+import {
+  ClipboardList,
+  DatabaseZap,
+  LogOut,
+  UserRound,
+  Wifi,
+  WifiOff,
+} from "lucide-react";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { MobilePageSkeleton } from "@/components/mobile-skeleton";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
+import { SectionCard } from "@/components/section-card";
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { resolveTenantCurrency } from "@/lib/currency";
 import {
@@ -61,6 +72,7 @@ type DeliveryHomeProps = {
 };
 
 type DataSource = "network" | "cache";
+type DeliveryTab = "tasks" | "profile";
 
 const statusTone: Record<DeliveryTaskStatus, string> = {
   pending_dispatch: "border-amber-200 bg-amber-50 text-amber-800",
@@ -251,6 +263,7 @@ export function DeliveryHome({
     [t],
   );
   const [tasks, setTasks] = useState<DeliveryTaskListItem[]>([]);
+  const [activeTab, setActiveTab] = useState<DeliveryTab>("tasks");
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<DeliveryTaskDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -864,54 +877,60 @@ export function DeliveryHome({
     Number(selectedTaskCanReportException);
 
   if (isBooting) {
-    return (
-      <section className="flex min-h-[70dvh] items-center justify-center px-5">
-        <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-          <Loader2 className="size-4 animate-spin text-blue-600" aria-hidden="true" />
-          {t("delivery.loading")}
-        </div>
-      </section>
-    );
+    return <MobilePageSkeleton label={t("delivery.loading")} />;
   }
 
   return (
-    <section className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-8 pt-[max(20px,env(safe-area-inset-top))]">
+    <section className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))]">
       <WorkspaceHeader
         eyebrow={t("delivery.title")}
         isLoggingOut={isLoggingOut}
         logoutLabel={t("auth.logout")}
+        showMenu={false}
         subtitle={driverName}
         title={t("delivery.subtitle")}
         onLogout={onLogout}
       />
 
-      <DeliveryQueueBanner
-        canSync={canSync}
-        count={queue.count}
-        isSyncing={activeAction === "sync"}
-        onSync={() => void replayQueue()}
-      />
+      {activeTab === "tasks" ? (
+        <>
+          <DeliveryQueueBanner
+            canSync={canSync}
+            count={queue.count}
+            isSyncing={activeAction === "sync"}
+            onSync={() => void replayQueue()}
+          />
 
-      {dataSource === "cache" ? (
-        <DeliveryMessageBanner message={t("delivery.localData")} tone="cache" />
-      ) : null}
-      {error ? (
-        <DeliveryMessageBanner message={error} tone="error" />
-      ) : null}
-      {warning ? (
-        <DeliveryMessageBanner message={warning} tone="warning" />
-      ) : null}
+          {dataSource === "cache" ? (
+            <DeliveryMessageBanner message={t("delivery.localData")} tone="cache" />
+          ) : null}
+          {error ? (
+            <DeliveryMessageBanner message={error} tone="error" />
+          ) : null}
+          {warning ? (
+            <DeliveryMessageBanner message={warning} tone="warning" />
+          ) : null}
 
-      <DeliveryTaskList
-        activeAction={activeAction}
-        queue={queue}
-        selectedTaskId={selectedTaskId}
-        statusLabelKeys={statusLabelKeys}
-        statusTone={statusTone}
-        tasks={orderedTasks}
-        onRefresh={() => void runAction("refresh", () => refreshTasks(selectedTaskId))}
-        onSelectTask={handleTaskSelect}
-      />
+          <DeliveryTaskList
+            activeAction={activeAction}
+            queue={queue}
+            selectedTaskId={selectedTaskId}
+            statusLabelKeys={statusLabelKeys}
+            statusTone={statusTone}
+            tasks={orderedTasks}
+            onRefresh={() => void runAction("refresh", () => refreshTasks(selectedTaskId))}
+            onSelectTask={handleTaskSelect}
+          />
+        </>
+      ) : (
+        <DeliveryProfileTab
+          dataSource={dataSource}
+          driverName={driverName}
+          isLoggingOut={isLoggingOut}
+          onLogout={onLogout}
+          queue={queue}
+        />
+      )}
 
       <DeliveryTaskDetailSheet
         activeAction={activeAction}
@@ -988,6 +1007,101 @@ export function DeliveryHome({
         onSignatureSubmit={handleSignatureSubmit}
         onSignedByNameChange={setSignedByName}
       />
+
+      <MobileTabBar
+        activeValue={activeTab}
+        ariaLabel={t("common.mainNavigation")}
+        items={[
+          {
+            badgeCount: orderedTasks.length,
+            icon: ClipboardList,
+            label: t("delivery.tabs.tasks"),
+            value: "tasks",
+          },
+          {
+            badgeCount: queue.count,
+            icon: UserRound,
+            label: t("delivery.tabs.profile"),
+            value: "profile",
+          },
+        ]}
+        onChange={setActiveTab}
+      />
     </section>
+  );
+}
+
+function DeliveryProfileTab({
+  dataSource,
+  driverName,
+  isLoggingOut,
+  onLogout,
+  queue,
+}: {
+  dataSource: DataSource;
+  driverName?: string;
+  isLoggingOut: boolean;
+  onLogout: () => void;
+  queue: DeliveryQueueSummary;
+}) {
+  const { t } = useTranslation();
+  const online = isOnline();
+
+  return (
+    <div className="space-y-4">
+      <SectionCard
+        icon={UserRound}
+        subtitle={driverName ?? t("delivery.profile.driverFallback")}
+        title={t("delivery.profile.title")}
+      >
+        <div className="grid gap-3 text-sm">
+          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+            <span className="text-slate-600">{t("delivery.profile.network")}</span>
+            <span
+              className={`inline-flex items-center gap-1.5 font-semibold ${
+                online ? "text-emerald-700" : "text-amber-800"
+              }`}
+            >
+              {online ? (
+                <Wifi className="size-4" aria-hidden />
+              ) : (
+                <WifiOff className="size-4" aria-hidden />
+              )}
+              {online ? t("delivery.profile.online") : t("delivery.profile.offline")}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+            <span className="text-slate-600">{t("delivery.profile.dataSource")}</span>
+            <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800">
+              <DatabaseZap className="size-4 text-slate-500" aria-hidden />
+              {dataSource === "cache"
+                ? t("delivery.profile.localData")
+                : t("delivery.profile.liveData")}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+            <span className="text-slate-600">{t("delivery.profile.pendingQueue")}</span>
+            <span className="font-semibold tabular-nums text-slate-950">
+              {queue.count}
+            </span>
+          </div>
+        </div>
+      </SectionCard>
+
+      <SectionCard title={t("delivery.profile.preferences")}>
+        <LanguageSwitcher className="w-full" />
+      </SectionCard>
+
+      <Button
+        className="h-11 w-full"
+        disabled={isLoggingOut}
+        type="button"
+        variant="outline"
+        onClick={onLogout}
+      >
+        <LogOut className="size-4" aria-hidden />
+        {t("auth.logout")}
+      </Button>
+    </div>
   );
 }

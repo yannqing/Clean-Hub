@@ -37,6 +37,9 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { AlertBanner } from "@/components/alert-banner";
+import { EmptyState } from "@/components/empty-state";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { formatTenantMoney } from "@/lib/currency";
 
 import { getIntlLocale } from "../lib/country";
@@ -100,47 +103,17 @@ export function CustomerTabBar({
   );
 
   return (
-    <nav
-      aria-label={t("common.mainNavigation")}
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md border-t border-slate-200 bg-[#F7F9FC]/95 px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur"
-    >
-      <div className="grid grid-cols-4 gap-2 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.value;
-
-          return (
-            <button
-              aria-current={isActive ? "page" : undefined}
-              className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs font-medium transition ${
-                isActive ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"
-              }`}
-              key={tab.value}
-              type="button"
-              onClick={() => onChange(tab.value)}
-            >
-              <Icon className="size-4" aria-hidden="true" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
+    <MobileTabBar
+      activeValue={activeTab}
+      ariaLabel={t("common.mainNavigation")}
+      items={tabs}
+      onChange={onChange}
+    />
   );
 }
 
 export function AlertMessage({ message, tone }: { message: string; tone: "error" | "success" }) {
-  return (
-    <p
-      className={`mb-4 rounded-md border px-3 py-2 text-sm ${
-        tone === "error"
-          ? "border-red-200 bg-red-50 text-red-700"
-          : "border-emerald-200 bg-emerald-50 text-emerald-800"
-      }`}
-    >
-      {message}
-    </p>
-  );
+  return <AlertBanner message={message} tone={tone} />;
 }
 
 export function CustomerOverviewView({
@@ -960,29 +933,6 @@ export function ProfileView({
         onEditContact={onEditContact}
       />
     </div>
-  );
-}
-
-function EmptyState({
-  action,
-  body,
-  icon: Icon,
-  title,
-}: {
-  action?: React.ReactNode;
-  body: string;
-  icon: typeof ReceiptText;
-  title: string;
-}) {
-  return (
-    <section className="rounded-md border border-dashed border-slate-300 bg-white p-5 text-center">
-      <div className="mx-auto flex size-11 items-center justify-center rounded-md bg-slate-100 text-slate-600">
-        <Icon className="size-5" aria-hidden="true" />
-      </div>
-      <h2 className="mt-3 text-base font-semibold text-slate-950">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
-      {action}
-    </section>
   );
 }
 

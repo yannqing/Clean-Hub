@@ -359,6 +359,22 @@ export const zhCNMessages = {
   delivery: {
     title: "配送",
     subtitle: "路线和客户凭证。",
+    tabs: {
+      tasks: "任务",
+      profile: "我的",
+    },
+    profile: {
+      title: "我的工作台",
+      driverFallback: "配送员",
+      network: "网络",
+      online: "在线",
+      offline: "离线",
+      dataSource: "数据",
+      localData: "本地缓存",
+      liveData: "实时",
+      pendingQueue: "待同步",
+      preferences: "偏好设置",
+    },
     today: "今天",
     loading: "正在加载路线",
     taskCount: "{count} 个任务",
@@ -487,6 +503,17 @@ export const zhCNMessages = {
   owner: {
     title: "店主",
     subtitle: "门店管理和配送调度。",
+    tabs: {
+      overview: "概览",
+      dispatch: "派单",
+      refunds: "退款",
+      profile: "我的",
+    },
+    profile: {
+      title: "门店资料",
+      lastUpdated: "最近更新",
+      preferences: "偏好设置",
+    },
     dispatchOwner: "店主调度",
     operationsToday: "今日运营",
     loadingTenant: "正在加载门店",

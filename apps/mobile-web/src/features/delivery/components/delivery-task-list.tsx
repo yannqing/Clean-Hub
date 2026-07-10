@@ -11,6 +11,8 @@ import {
   WifiOff,
 } from "lucide-react";
 
+import { AlertBanner } from "@/components/alert-banner";
+
 import type {
   DeliveryQueueSummary,
   DeliveryTaskListItem,
@@ -77,16 +79,7 @@ export function DeliveryMessageBanner({
   message: string;
   tone: "cache" | "error" | "warning";
 }) {
-  const toneClass =
-    tone === "error"
-      ? "border-red-200 bg-red-50 text-red-700"
-      : "border-amber-200 bg-amber-50 text-amber-900";
-
-  return (
-    <p className={`mb-4 rounded-md border px-3 py-2 text-sm ${toneClass}`}>
-      {message}
-    </p>
-  );
+  return <AlertBanner message={message} tone={tone} />;
 }
 
 export function DeliveryTaskList({

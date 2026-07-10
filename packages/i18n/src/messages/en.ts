@@ -360,6 +360,22 @@ export const enMessages = {
   delivery: {
     title: "Deliveries",
     subtitle: "Route and customer proofs.",
+    tabs: {
+      tasks: "Tasks",
+      profile: "Profile",
+    },
+    profile: {
+      title: "My workspace",
+      driverFallback: "Driver",
+      network: "Network",
+      online: "Online",
+      offline: "Offline",
+      dataSource: "Data",
+      localData: "Local cache",
+      liveData: "Live",
+      pendingQueue: "Pending sync",
+      preferences: "Preferences",
+    },
     today: "Today",
     loading: "Loading route",
     taskCount: "{count} task(s)",
@@ -491,6 +507,17 @@ export const enMessages = {
   owner: {
     title: "Owner",
     subtitle: "Store control and dispatch.",
+    tabs: {
+      overview: "Overview",
+      dispatch: "Dispatch",
+      refunds: "Refunds",
+      profile: "Profile",
+    },
+    profile: {
+      title: "Store profile",
+      lastUpdated: "Last updated",
+      preferences: "Preferences",
+    },
     dispatchOwner: "Owner dispatch",
     operationsToday: "Today's operations",
     loadingTenant: "Loading store",

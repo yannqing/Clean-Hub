@@ -16,11 +16,17 @@ import {
   CalendarDays,
   CheckCircle2,
   Loader2,
+  LogOut,
   RefreshCcw,
   RotateCcw,
   Truck,
+  UserRound,
 } from "lucide-react";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { MobilePageSkeleton } from "@/components/mobile-skeleton";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
+import { SectionCard } from "@/components/section-card";
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { resolveTenantCurrency } from "@/lib/currency";
 
@@ -82,6 +88,8 @@ type BoardVisibleLimits = {
   tasks: number;
   refundRequests: number;
 };
+
+type OwnerTab = "overview" | "dispatch" | "refunds" | "profile";
 
 const OWNER_BOARD_SHOW_MORE_INCREMENT = 10;
 const INITIAL_OWNER_BOARD_VISIBLE_LIMITS: BoardVisibleLimits = {
@@ -154,6 +162,7 @@ export function OwnerHome({
   const { locale, t } = useTranslation();
   const intlLocale = ownerIntlLocales[locale];
   const [summary, setSummary] = useState<MobileOwnerTodaySummary | null>(initialSummary);
+  const [activeTab, setActiveTab] = useState<OwnerTab>("overview");
   const [branches, setBranches] = useState<MobileOwnerBranchOption[]>([]);
   const [drivers, setDrivers] = useState<MobileOwnerDriverOption[]>([]);
   const [boardState, setBoardState] = useState<BoardState>({
@@ -231,9 +240,7 @@ export function OwnerHome({
 
       setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
     } finally {
-      if (!signal?.aborted) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
   }, [t]);
 
@@ -254,9 +261,7 @@ export function OwnerHome({
         setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
       }
     } finally {
-      if (!signal?.aborted) {
-        setIsDirectoryLoading(false);
-      }
+      setIsDirectoryLoading(false);
     }
   }, [t]);
 
@@ -299,9 +304,7 @@ export function OwnerHome({
           setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
         }
       } finally {
-        if (!signal?.aborted) {
-          setIsDirectoryLoading(false);
-        }
+        setIsDirectoryLoading(false);
       }
     },
     [branchId, t],
@@ -332,9 +335,7 @@ export function OwnerHome({
             setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
           }
         } finally {
-          if (!signal?.aborted) {
-            setIsBoardLoading(false);
-          }
+          setIsBoardLoading(false);
         }
         return;
       }
@@ -374,9 +375,7 @@ export function OwnerHome({
 
         setError(getErrorMessage(nextError, t("owner.messages.loadFailed")));
       } finally {
-        if (!signal?.aborted) {
-          setIsBoardLoading(false);
-        }
+        setIsBoardLoading(false);
       }
     },
     [assigneeFilter, branchId, deliveryStatusFilter, t],
@@ -527,12 +526,17 @@ export function OwnerHome({
     }
   }
 
+  if (isLoading && !summary) {
+    return <MobilePageSkeleton label={t("owner.loadingMetrics")} />;
+  }
+
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[max(32px,env(safe-area-inset-bottom))] pt-[max(24px,env(safe-area-inset-top))]">
+    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(24px,env(safe-area-inset-top))]">
       <WorkspaceHeader
         eyebrow={t("owner.dispatchOwner")}
         isLoggingOut={isLoggingOut}
         logoutLabel={t("auth.logout")}
+        showMenu={false}
         subtitle={summary ? summary.tenantName : t("owner.loadingTenant")}
         title={t("owner.operationsToday")}
         onLogout={onLogout}
@@ -578,15 +582,9 @@ export function OwnerHome({
         </div>
       ) : null}
 
-      {isLoading && !summary ? (
-        <div className="mt-8 flex items-center justify-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-6 text-sm text-slate-700 shadow-sm">
-          <Loader2 className="size-4 animate-spin text-blue-600" aria-hidden />
-          {t("owner.loadingMetrics")}
-        </div>
-      ) : null}
-
       {summary ? (
         <>
+          {activeTab === "overview" ? (
           <section className="mt-5">
             <div className="grid grid-cols-2 gap-3">
               {metrics.map((metric) => (
@@ -594,7 +592,9 @@ export function OwnerHome({
               ))}
             </div>
           </section>
+          ) : null}
 
+          {activeTab === "dispatch" ? (
           <section className="mt-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
             <div className="grid gap-3">
               <label className="block">
@@ -666,7 +666,40 @@ export function OwnerHome({
               </div>
             </div>
           </section>
+          ) : null}
 
+          {activeTab === "overview" ? (
+            <section className="mt-5 grid gap-4">
+              <SectionCard
+                icon={CalendarDays}
+                subtitle={t("owner.appointmentCount", {
+                  count: formatCount(boardState.appointments.length, intlLocale),
+                })}
+                title={t("owner.sections.appointments")}
+              >
+                <SummaryRow label={t("owner.appointmentStatus.pending")} value={summary.appointmentSummary.pending} />
+                <SummaryRow label={t("owner.appointmentStatus.accepted")} value={summary.appointmentSummary.accepted} />
+                <SummaryRow label={t("owner.appointmentStatus.done")} value={summary.appointmentSummary.done} />
+                <SummaryRow label={t("owner.appointmentStatus.cancelled")} value={summary.appointmentSummary.cancelled} />
+              </SectionCard>
+              <SectionCard
+                icon={Truck}
+                subtitle={
+                  summary.featureFlags.deliveryEnabled
+                    ? t("owner.deliveryActive")
+                    : t("owner.deliveryInactive")
+                }
+                title={t("owner.sections.dispatch")}
+              >
+                <SummaryRow label={t("owner.deliveryStatus.pending_dispatch")} value={dispatchSummary.pendingDispatch} />
+                <SummaryRow label={t("owner.assigned")} value={dispatchSummary.assigned} />
+                <SummaryRow label={t("owner.metrics.progress")} value={dispatchSummary.inProgress} />
+                <SummaryRow label={t("owner.deliveryStatus.exception")} value={dispatchSummary.exception} />
+              </SectionCard>
+            </section>
+          ) : null}
+
+          {activeTab === "dispatch" ? (
           <OperationalCard
             icon={CalendarDays}
             subtitle={t("owner.appointmentCount", {
@@ -711,7 +744,9 @@ export function OwnerHome({
               />
             ) : null}
           </OperationalCard>
+          ) : null}
 
+          {activeTab === "dispatch" ? (
           <OperationalCard
             icon={Truck}
             subtitle={
@@ -753,7 +788,9 @@ export function OwnerHome({
               />
             ) : null}
           </OperationalCard>
+          ) : null}
 
+          {activeTab === "refunds" ? (
           <OperationalCard
             icon={RotateCcw}
             subtitle={t("owner.requestCount", {
@@ -791,6 +828,19 @@ export function OwnerHome({
               />
             ) : null}
           </OperationalCard>
+          ) : null}
+
+          {activeTab === "profile" ? (
+            <OwnerProfileTab
+              branchCount={branches.length}
+              driverCount={drivers.length}
+              isLoggingOut={isLoggingOut}
+              loadTime={loadTime}
+              onLogout={onLogout}
+              summary={summary}
+              tenantStatusLabel={t(tenantStatusLabelKeys[summary.tenantStatus])}
+            />
+          ) : null}
 
           {loadTime ? (
             <p className="mt-4 text-center text-xs text-slate-500">
@@ -822,6 +872,102 @@ export function OwnerHome({
           void submitAction();
         }}
       />
+
+      <MobileTabBar
+        activeValue={activeTab}
+        ariaLabel={t("common.mainNavigation")}
+        items={[
+          {
+            icon: CalendarDays,
+            label: t("owner.tabs.overview"),
+            value: "overview",
+          },
+          {
+            badgeCount: dispatchSummary.pendingDispatch,
+            icon: Truck,
+            label: t("owner.tabs.dispatch"),
+            value: "dispatch",
+          },
+          {
+            badgeCount: boardState.refundRequests.length,
+            icon: RotateCcw,
+            label: t("owner.tabs.refunds"),
+            value: "refunds",
+          },
+          {
+            icon: UserRound,
+            label: t("owner.tabs.profile"),
+            value: "profile",
+          },
+        ]}
+        onChange={setActiveTab}
+      />
     </main>
+  );
+}
+
+function OwnerProfileTab({
+  branchCount,
+  driverCount,
+  isLoggingOut,
+  loadTime,
+  onLogout,
+  summary,
+  tenantStatusLabel,
+}: {
+  branchCount: number;
+  driverCount: number;
+  isLoggingOut: boolean;
+  loadTime: string | null;
+  onLogout: () => void;
+  summary: MobileOwnerTodaySummary;
+  tenantStatusLabel: string;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="mt-5 space-y-4">
+      <SectionCard
+        icon={UserRound}
+        subtitle={summary.tenantName}
+        title={t("owner.profile.title")}
+      >
+        <div className="grid gap-3 text-sm">
+          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+            <span className="text-slate-600">{t("common.status")}</span>
+            <span className="font-semibold text-emerald-700">{tenantStatusLabel}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+            <span className="text-slate-600">{t("owner.branch")}</span>
+            <span className="font-semibold tabular-nums text-slate-950">{branchCount}</span>
+          </div>
+          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+            <span className="text-slate-600">{t("owner.driver")}</span>
+            <span className="font-semibold tabular-nums text-slate-950">{driverCount}</span>
+          </div>
+          {loadTime ? (
+            <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+              <span className="text-slate-600">{t("owner.profile.lastUpdated")}</span>
+              <span className="font-semibold text-slate-950">{loadTime}</span>
+            </div>
+          ) : null}
+        </div>
+      </SectionCard>
+
+      <SectionCard title={t("owner.profile.preferences")}>
+        <LanguageSwitcher className="w-full" />
+      </SectionCard>
+
+      <Button
+        className="h-11 w-full"
+        disabled={isLoggingOut}
+        type="button"
+        variant="outline"
+        onClick={onLogout}
+      >
+        <LogOut className="size-4" aria-hidden />
+        {t("auth.logout")}
+      </Button>
+    </div>
   );
 }

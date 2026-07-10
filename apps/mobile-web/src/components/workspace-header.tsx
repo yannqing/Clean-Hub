@@ -17,6 +17,7 @@ type WorkspaceHeaderProps = {
   eyebrow?: string;
   isLoggingOut?: boolean;
   logoutLabel: string;
+  showMenu?: boolean;
   subtitle?: string | null;
   title: string;
   onLogout: () => void;
@@ -26,6 +27,7 @@ export function WorkspaceHeader({
   eyebrow = "CleanHub",
   isLoggingOut = false,
   logoutLabel,
+  showMenu = true,
   subtitle,
   title,
   onLogout,
@@ -40,39 +42,41 @@ export function WorkspaceHeader({
             <p className="mt-2 truncate text-sm text-slate-600">{subtitle}</p>
           ) : null}
         </div>
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button
-              aria-label={logoutLabel}
-              className="size-9 shrink-0 border-transparent bg-transparent text-slate-800 shadow-none hover:bg-white/70 hover:text-slate-950"
-              size="icon"
-              type="button"
-              variant="ghost"
-            >
-              <Menu className="size-5" aria-hidden="true" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent className="max-h-[58dvh] p-5">
-            <SheetHeader className="pr-8 text-left">
-              <SheetTitle>CleanHub</SheetTitle>
-            </SheetHeader>
-            <div className="mt-5">
-              <LanguageSwitcher className="w-full justify-between" />
-            </div>
-            <SheetFooter className="mt-4">
+        {showMenu ? (
+          <Sheet>
+            <SheetTrigger asChild>
               <Button
-                className="h-11 w-full"
-                disabled={isLoggingOut}
+                aria-label={logoutLabel}
+                className="size-9 shrink-0 border-transparent bg-transparent text-slate-800 shadow-none hover:bg-white/70 hover:text-slate-950"
+                size="icon"
                 type="button"
-                variant="outline"
-                onClick={onLogout}
+                variant="ghost"
               >
-                <LogOut className="size-4" aria-hidden="true" />
-                {logoutLabel}
+                <Menu className="size-5" aria-hidden="true" />
               </Button>
-            </SheetFooter>
-          </SheetContent>
-        </Sheet>
+            </SheetTrigger>
+            <SheetContent className="max-h-[58dvh] p-5">
+              <SheetHeader className="pr-8 text-left">
+                <SheetTitle>CleanHub</SheetTitle>
+              </SheetHeader>
+              <div className="mt-5">
+                <LanguageSwitcher className="w-full justify-between" />
+              </div>
+              <SheetFooter className="mt-4">
+                <Button
+                  className="h-11 w-full"
+                  disabled={isLoggingOut}
+                  type="button"
+                  variant="outline"
+                  onClick={onLogout}
+                >
+                  <LogOut className="size-4" aria-hidden="true" />
+                  {logoutLabel}
+                </Button>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+        ) : null}
       </div>
     </header>
   );

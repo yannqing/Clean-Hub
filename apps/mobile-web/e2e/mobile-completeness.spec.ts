@@ -458,6 +458,7 @@ test.describe("mobile web completeness", () => {
 
     await expect(page.getByText(/今日运营|Today's operations/)).toBeVisible();
     await expect(page.locator("body")).not.toContainText(/XOF|EUR/);
+    await page.getByRole("tab", { name: /派单|Dispatch/ }).click();
 
     const branchSelect = page
       .locator("label")

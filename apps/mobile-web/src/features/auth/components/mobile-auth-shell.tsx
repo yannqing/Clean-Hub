@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import type { MobileAuthContext } from "@cleanhub/api-client";
+import { isApiHttpError, type MobileAuthContext } from "@cleanhub/api-client";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { Button, Input, Label } from "@cleanhub/ui";
@@ -11,7 +11,9 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { CustomerHome } from "@/features/customer";
 import { DeliveryHome } from "@/features/delivery";
 import { OwnerHome } from "@/features/owner";
+import { apiClient } from "@/lib/api-client";
 import { mobileReleaseConfig } from "@/lib/mobile-release-config";
+import { clearMobileSession } from "@/lib/token-storage";
 import {
   enterTenantContext,
   getCustomerTestOtp,
@@ -42,6 +44,10 @@ function getErrorMessage(error: unknown, fallback: string, t: ReturnType<typeof 
   }
 
   return fallback;
+}
+
+function isUnauthorizedSessionError(error: unknown): boolean {
+  return isApiHttpError(error) && error.status === 401;
 }
 
 export function MobileAuthShell() {
@@ -77,17 +83,36 @@ export function MobileAuthShell() {
     let mounted = true;
 
     loadStoredAuthState()
-      .then((state) => {
+      .then(async (state) => {
+        let nextSession = state.session
+          ? { authContext: state.session.authContext }
+          : null;
+
+        if (state.session) {
+          try {
+            nextSession = {
+              authContext: await apiClient.mobile.auth.me(),
+            };
+          } catch (nextError) {
+            if (isUnauthorizedSessionError(nextError)) {
+              await clearMobileSession();
+              nextSession = null;
+            }
+          }
+        }
+
         if (!mounted) {
           return;
         }
 
         setTenantCode(state.tenantCode);
         setTenantInput(state.tenantCode ?? "");
-        setSession(state.session ? { authContext: state.session.authContext } : null);
+        setSession(nextSession);
       })
       .catch(() => {
-        setError(t("auth.login.sessionReadFailed"));
+        if (mounted) {
+          setError(t("auth.login.sessionReadFailed"));
+        }
       })
       .finally(() => {
         if (mounted) {

@@ -360,6 +360,22 @@ export const frMessages = {
   delivery: {
     title: "Livraisons",
     subtitle: "Tournee et preuves client.",
+    tabs: {
+      tasks: "Taches",
+      profile: "Profil",
+    },
+    profile: {
+      title: "Mon espace",
+      driverFallback: "Livreur",
+      network: "Reseau",
+      online: "En ligne",
+      offline: "Hors ligne",
+      dataSource: "Donnees",
+      localData: "Cache local",
+      liveData: "Direct",
+      pendingQueue: "Sync en attente",
+      preferences: "Preferences",
+    },
     today: "Aujourd'hui",
     loading: "Chargement de la tournée",
     taskCount: "{count} tâche(s)",
@@ -492,6 +508,17 @@ export const frMessages = {
   owner: {
     title: "Owner",
     subtitle: "Pilotage boutique et dispatch.",
+    tabs: {
+      overview: "Vue",
+      dispatch: "Dispatch",
+      refunds: "Remboursements",
+      profile: "Profil",
+    },
+    profile: {
+      title: "Profil boutique",
+      lastUpdated: "Derniere mise a jour",
+      preferences: "Preferences",
+    },
     dispatchOwner: "Dispatch owner",
     operationsToday: "Opérations du jour",
     loadingTenant: "Chargement du pressing",
