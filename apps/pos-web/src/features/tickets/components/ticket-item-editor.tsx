@@ -304,6 +304,11 @@ function ItemForm({
     onChange({ ...form, [key]: value });
   }
 
+  function handleNumberInputWheel(event: React.WheelEvent<HTMLInputElement>) {
+    event.preventDefault();
+    event.currentTarget.blur();
+  }
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
     const errors = validateTicketItemForm(form);
@@ -414,6 +419,7 @@ function ItemForm({
             className={inputClass}
             min={1}
             onChange={(event) => update("quantity", event.target.value)}
+            onWheel={handleNumberInputWheel}
             type="number"
             value={form.quantity}
           />
@@ -423,6 +429,7 @@ function ItemForm({
             className={inputClass}
             min={0}
             onChange={(event) => update("unitAmount", event.target.value)}
+            onWheel={handleNumberInputWheel}
             type="number"
             value={form.unitAmount}
           />
