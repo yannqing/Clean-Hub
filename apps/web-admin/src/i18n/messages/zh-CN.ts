@@ -32,6 +32,7 @@ export const zhCNMessages: WebAdminMessages = {
         title: "主菜单",
         items: [
           { label: "仪表盘", href: webAdminRoutes.saas.home },
+          { label: "我的待办", href: webAdminRoutes.saas.todos },
           { label: "用户管理", href: webAdminRoutes.saas.users },
           { label: "反馈工单", href: webAdminRoutes.saas.feedbackTickets },
         ],

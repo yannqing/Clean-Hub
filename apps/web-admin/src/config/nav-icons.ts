@@ -5,6 +5,7 @@ import {
   Flag,
   Globe,
   LayoutDashboard,
+  ListChecks,
   MessageSquareWarning,
   ScrollText,
   Settings,
@@ -29,6 +30,7 @@ import { webAdminRoutes } from "./routes";
 const navIconByHref: Record<string, LucideIcon> = {
   // SaaS
   [webAdminRoutes.saas.home]: LayoutDashboard,
+  [webAdminRoutes.saas.todos]: ListChecks,
   [webAdminRoutes.saas.users]: Users,
   [webAdminRoutes.saas.feedbackTickets]: MessageSquareWarning,
   [webAdminRoutes.saas.config.tenants]: Building2,
