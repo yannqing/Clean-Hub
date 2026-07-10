@@ -102,7 +102,6 @@ export const createServiceTicketBodySchema = z.object({
   ticketType: serviceTicketTypeSchema,
   priority: serviceTicketPrioritySchema.default("normal"),
   sourceChannel: serviceTicketSourceChannelSchema.default("pos"),
-  assistantId: optionalUlid.nullable().optional(),
   expectedPickupAt: isoTimestampSchema.nullable().optional(),
   remark: z.string().trim().max(2000).optional(),
 });
