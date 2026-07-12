@@ -105,7 +105,7 @@ export function AppointmentFormSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="max-h-[92dvh] p-5">
+      <SheetContent className="h-[96dvh] max-h-[96dvh] overflow-y-auto rounded-t-md p-5">
         <SheetHeader className="pr-8 text-left">
           <SheetTitle>{t("customer.appointments.newTitle")}</SheetTitle>
           <SheetDescription>{t("customer.appointments.newDescription")}</SheetDescription>

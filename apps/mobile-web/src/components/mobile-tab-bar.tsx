@@ -28,7 +28,7 @@ export function MobileTabBar<TValue extends string>({
   return (
     <nav
       aria-label={ariaLabel}
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md border-t border-slate-200 bg-white/95 px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur"
+      className="fixed inset-x-0 bottom-0 z-40 mx-auto w-[calc(100%-24px)] max-w-[420px] rounded-t-[24px] border border-b-0 border-slate-200/80 bg-white/95 px-3 pb-[max(10px,env(safe-area-inset-bottom))] pt-2 shadow-[0_-12px_36px_rgba(15,23,42,0.10)] backdrop-blur-xl"
     >
       <div
         className="grid gap-1"
@@ -46,7 +46,7 @@ export function MobileTabBar<TValue extends string>({
           return (
             <button
               aria-selected={isActive}
-              className={`relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] font-medium transition active:bg-slate-100 ${
+                className={`relative flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-xl px-1 text-xs font-medium transition active:bg-slate-100 ${
                 isActive ? "text-blue-700" : "text-slate-500"
               }`}
               key={item.value}
@@ -61,7 +61,7 @@ export function MobileTabBar<TValue extends string>({
               />
               <span className="relative">
                 <Icon
-                  className={`size-5 ${isActive ? "stroke-[2.25]" : ""}`}
+                  className={`size-[22px] ${isActive ? "stroke-[2.4]" : ""}`}
                   aria-hidden
                 />
                 {typeof item.badgeCount === "number" && item.badgeCount > 0 ? (

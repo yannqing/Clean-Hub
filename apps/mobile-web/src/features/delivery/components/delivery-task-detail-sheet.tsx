@@ -130,7 +130,7 @@ export function DeliveryTaskDetailSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="h-[92dvh] p-0">
+      <SheetContent className="h-[92dvh] rounded-t-md p-0">
         {selectedTask ? (
           <div className="flex h-full flex-col">
             <div className="flex-1 space-y-4 overflow-y-auto px-5 pb-4 pt-2">

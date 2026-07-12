@@ -17,6 +17,7 @@ import {
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { MobilePageSkeleton } from "@/components/mobile-skeleton";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
+import { MobilePullToRefresh } from "@/components/mobile-pull-to-refresh";
 import { SectionCard } from "@/components/section-card";
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { resolveTenantCurrency } from "@/lib/currency";
@@ -881,7 +882,12 @@ export function DeliveryHome({
   }
 
   return (
-    <section className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))]">
+    <MobilePullToRefresh
+      isRefreshing={activeAction === "refresh"}
+      label={t("common.refresh")}
+      onRefresh={() => runAction("refresh", () => refreshTasks(selectedTaskId))}
+    >
+    <section className="mobile-page mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(28px,env(safe-area-inset-top))]">
       <WorkspaceHeader
         eyebrow={t("delivery.title")}
         isLoggingOut={isLoggingOut}
@@ -912,13 +918,11 @@ export function DeliveryHome({
           ) : null}
 
           <DeliveryTaskList
-            activeAction={activeAction}
             queue={queue}
             selectedTaskId={selectedTaskId}
             statusLabelKeys={statusLabelKeys}
             statusTone={statusTone}
             tasks={orderedTasks}
-            onRefresh={() => void runAction("refresh", () => refreshTasks(selectedTaskId))}
             onSelectTask={handleTaskSelect}
           />
         </>
@@ -1028,6 +1032,7 @@ export function DeliveryHome({
         onChange={setActiveTab}
       />
     </section>
+    </MobilePullToRefresh>
   );
 }
 

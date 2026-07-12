@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type {
   MobileCustomerAddress,
   MobileCustomerAppointment,
@@ -278,14 +279,14 @@ function OverviewMetric({
   value: number;
 }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <Icon className="size-4 text-blue-600" aria-hidden="true" />
-        <span className="text-lg font-semibold tabular-nums text-slate-950">
-          {value}
-        </span>
-      </div>
-      <p className="mt-2 min-h-8 text-xs font-medium leading-4 text-slate-600">
+    <div className="min-h-32 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+      <span className="flex size-9 items-center justify-center rounded-md bg-blue-50 text-blue-600">
+        <Icon className="size-5" aria-hidden="true" />
+      </span>
+      <span className="mt-4 block text-3xl font-bold tabular-nums text-blue-600">
+        {value}
+      </span>
+      <p className="mt-1 min-h-8 text-xs font-medium leading-4 text-slate-600">
         {label}
       </p>
     </div>
@@ -774,6 +775,11 @@ export function AppointmentsView({
   onOpenCreateAppointment: () => void;
 }) {
   const { t } = useTranslation();
+  const [statusFilter, setStatusFilter] = useState<"all" | MobileCustomerAppointment["status"]>("all");
+  const visibleAppointments = appointments.filter(
+    (appointment) => statusFilter === "all" || appointment.status === statusFilter,
+  );
+  const filters = ["all", "pending", "accepted", "cancelled"] as const;
 
   return (
     <div className="space-y-4">
@@ -797,9 +803,32 @@ export function AppointmentsView({
         </div>
       </section>
 
-      {appointments.length ? (
+      <div className="grid grid-cols-4 rounded-md border border-slate-200 bg-slate-50 p-1" role="tablist">
+        {filters.map((filter) => {
+          const active = statusFilter === filter;
+          const label = filter === "all"
+            ? t("customer.filters.all")
+            : getAppointmentStatusView(t, filter).label;
+          return (
+            <button
+              aria-selected={active}
+              className={`min-h-10 rounded-md px-1 text-xs font-semibold transition ${
+                active ? "bg-white text-blue-700 shadow-sm" : "text-slate-600"
+              }`}
+              key={filter}
+              role="tab"
+              type="button"
+              onClick={() => setStatusFilter(filter)}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {visibleAppointments.length ? (
         <section className="space-y-3">
-          {appointments.map((appointment) => (
+          {visibleAppointments.map((appointment) => (
             <AppointmentCard
               appointment={appointment}
               cancellingAppointmentId={cancellingAppointmentId}

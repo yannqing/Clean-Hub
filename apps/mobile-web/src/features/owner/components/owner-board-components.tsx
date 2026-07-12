@@ -217,17 +217,17 @@ export function MetricTile({ metric }: { metric: MetricItem }) {
   const Icon = metric.icon;
 
   return (
-    <div className="min-h-28 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+    <div className="min-h-32 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-slate-600">{metric.label}</span>
         <span className={`flex size-9 shrink-0 items-center justify-center rounded-md ${toneClasses[metric.tone]}`}>
           <Icon className="size-4" aria-hidden />
         </span>
       </div>
-      <p className="mt-3 break-words text-2xl font-semibold leading-tight tabular-nums text-slate-950">
+      <p className="mt-4 break-words text-3xl font-bold leading-tight tabular-nums text-slate-950">
         {metric.value}
       </p>
-      <p className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
+      <p className="mt-1 text-sm font-medium text-slate-500">
         {metric.detail}
       </p>
     </div>

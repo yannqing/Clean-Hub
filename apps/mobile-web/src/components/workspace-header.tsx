@@ -33,13 +33,13 @@ export function WorkspaceHeader({
   onLogout,
 }: WorkspaceHeaderProps) {
   return (
-    <header className="mb-4">
+    <header className="mb-6">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase text-blue-700">{eyebrow}</p>
-          <h1 className="mt-1 text-3xl font-semibold leading-tight text-slate-950">{title}</h1>
+          <p className="text-sm font-bold uppercase text-blue-600">{eyebrow}</p>
+          <h1 className="mt-1 text-[34px] font-bold leading-[1.08] text-slate-950">{title}</h1>
           {subtitle ? (
-            <p className="mt-2 truncate text-sm text-slate-600">{subtitle}</p>
+            <p className="mt-2 truncate text-base text-slate-600">{subtitle}</p>
           ) : null}
         </div>
         {showMenu ? (
@@ -47,12 +47,12 @@ export function WorkspaceHeader({
             <SheetTrigger asChild>
               <Button
                 aria-label={logoutLabel}
-                className="size-9 shrink-0 border-transparent bg-transparent text-slate-800 shadow-none hover:bg-white/70 hover:text-slate-950"
+                className="size-11 shrink-0 border-transparent bg-transparent text-slate-800 shadow-none hover:bg-white/70 hover:text-slate-950"
                 size="icon"
                 type="button"
                 variant="ghost"
               >
-                <Menu className="size-5" aria-hidden="true" />
+                <Menu className="size-7" aria-hidden="true" />
               </Button>
             </SheetTrigger>
             <SheetContent className="max-h-[58dvh] p-5">

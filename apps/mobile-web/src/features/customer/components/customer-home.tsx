@@ -20,6 +20,7 @@ import { toast } from "@cleanhub/ui";
 import { getMobileSession } from "@/lib/token-storage";
 import { ConfirmSheet } from "@/components/confirm-sheet";
 import { MobilePageSkeleton } from "@/components/mobile-skeleton";
+import { MobilePullToRefresh } from "@/components/mobile-pull-to-refresh";
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { resolveTenantCurrency } from "@/lib/currency";
 import {
@@ -1041,7 +1042,12 @@ export function CustomerHome({
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))]">
+    <MobilePullToRefresh
+      isRefreshing={isRefreshing}
+      label={t("common.refresh")}
+      onRefresh={() => loadCustomerData("refresh")}
+    >
+    <main className="mobile-page mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(28px,env(safe-area-inset-top))]">
       <WorkspaceHeader
         isLoggingOut={isLoggingOut}
         logoutLabel={t("auth.logout")}
@@ -1254,5 +1260,6 @@ export function CustomerHome({
 
       <CustomerTabBar activeTab={activeTab} onChange={setActiveTab} />
     </main>
+    </MobilePullToRefresh>
   );
 }

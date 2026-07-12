@@ -14,10 +14,7 @@ import { Button, toast } from "@cleanhub/ui";
 import {
   AlertCircle,
   CalendarDays,
-  CheckCircle2,
-  Loader2,
   LogOut,
-  RefreshCcw,
   RotateCcw,
   Truck,
   UserRound,
@@ -26,6 +23,7 @@ import {
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { MobilePageSkeleton } from "@/components/mobile-skeleton";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
+import { MobilePullToRefresh } from "@/components/mobile-pull-to-refresh";
 import { SectionCard } from "@/components/section-card";
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { resolveTenantCurrency } from "@/lib/currency";
@@ -103,22 +101,6 @@ const tenantStatusLabelKeys: Record<MobileOwnerTodaySummary["tenantStatus"], Tra
   disabled: "owner.tenantStatus.disabled",
   suspended: "owner.tenantStatus.suspended",
 };
-
-function formatBusinessDate(value: string, locale: string): string {
-  const [year, month, day] = value.split("-").map(Number);
-  const date =
-    year && month && day ? new Date(year, month - 1, day) : new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat(locale, {
-    weekday: "long",
-    day: "2-digit",
-    month: "long",
-  }).format(date);
-}
 
 function formatLoadTime(value: Date | null, locale: string): string | null {
   return value
@@ -531,7 +513,12 @@ export function OwnerHome({
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(24px,env(safe-area-inset-top))]">
+    <MobilePullToRefresh
+      isRefreshing={isLoading || isBoardLoading}
+      label={t("common.refresh")}
+      onRefresh={() => Promise.all([loadSummary(), loadBoard()])}
+    >
+    <main className="mobile-page mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(28px,env(safe-area-inset-top))]">
       <WorkspaceHeader
         eyebrow={t("owner.dispatchOwner")}
         isLoggingOut={isLoggingOut}
@@ -541,37 +528,6 @@ export function OwnerHome({
         title={t("owner.operationsToday")}
         onLogout={onLogout}
       />
-
-      {summary ? (
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm">
-          <span className="min-w-0 truncate text-slate-600">
-            {formatBusinessDate(summary.businessDate, intlLocale)}
-          </span>
-          <div className="flex shrink-0 items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-              <CheckCircle2 className="size-3.5" aria-hidden />
-              {t(tenantStatusLabelKeys[summary.tenantStatus])}
-            </span>
-            <Button
-              aria-label={t("common.refresh")}
-              className="size-9 p-0"
-              disabled={isLoading || isBoardLoading}
-              size="icon"
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                void Promise.all([loadSummary(), loadBoard()]);
-              }}
-            >
-              {isLoading || isBoardLoading ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden />
-              ) : (
-                <RefreshCcw className="size-4" aria-hidden />
-              )}
-            </Button>
-          </div>
-        </div>
-      ) : null}
 
       {error ? (
         <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -842,11 +798,6 @@ export function OwnerHome({
             />
           ) : null}
 
-          {loadTime ? (
-            <p className="mt-4 text-center text-xs text-slate-500">
-              {t("owner.updatedAt", { time: loadTime })}
-            </p>
-          ) : null}
         </>
       ) : null}
 
@@ -903,6 +854,7 @@ export function OwnerHome({
         onChange={setActiveTab}
       />
     </main>
+    </MobilePullToRefresh>
   );
 }
 
@@ -932,25 +884,24 @@ function OwnerProfileTab({
         subtitle={summary.tenantName}
         title={t("owner.profile.title")}
       >
-        <div className="grid gap-3 text-sm">
-          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
-            <span className="text-slate-600">{t("common.status")}</span>
-            <span className="font-semibold text-emerald-700">{tenantStatusLabel}</span>
+        <div className="flex justify-end">
+          <span className="rounded-md bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
+            {tenantStatusLabel}
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-3 divide-x divide-slate-200 text-center">
+          <div className="px-2">
+            <p className="text-xs text-slate-500">{t("owner.branch")}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-slate-950">{branchCount}</p>
           </div>
-          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
-            <span className="text-slate-600">{t("owner.branch")}</span>
-            <span className="font-semibold tabular-nums text-slate-950">{branchCount}</span>
+          <div className="px-2">
+            <p className="text-xs text-slate-500">{t("owner.driver")}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-slate-950">{driverCount}</p>
           </div>
-          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
-            <span className="text-slate-600">{t("owner.driver")}</span>
-            <span className="font-semibold tabular-nums text-slate-950">{driverCount}</span>
+          <div className="px-2">
+            <p className="text-xs text-slate-500">{t("owner.profile.lastUpdated")}</p>
+            <p className="mt-1 text-sm font-bold text-slate-950">{loadTime ?? "-"}</p>
           </div>
-          {loadTime ? (
-            <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
-              <span className="text-slate-600">{t("owner.profile.lastUpdated")}</span>
-              <span className="font-semibold text-slate-950">{loadTime}</span>
-            </div>
-          ) : null}
         </div>
       </SectionCard>
 
