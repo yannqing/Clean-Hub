@@ -934,6 +934,15 @@ export async function runPaymentSmokeChecks(): Promise<void> {
     ),
     "approved refund should publish a notification event",
   );
+  assert(
+    notificationPublisher.events.some(
+      (event) =>
+        event.name === "refund.approved" &&
+        event.relatedId === refund.id &&
+        event.customerId === "customer_1",
+    ),
+    "approved refund should publish a notification event",
+  );
 
   await assertRejectsPayment(
     () =>

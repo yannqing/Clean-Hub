@@ -770,13 +770,17 @@ export const enMessages = {
       heroTitleLine1: "Run the store",
       heroTitleLine2: "from here",
       heroDescription:
-        "Cashier, intake, scanning, orders, and shift handover in one store workspace. Sign in with the store code and staff account.",
+        "Cashier, intake, scanning, orders, and shift handover in one store workspace. Enter the staff PIN to access this POS terminal.",
       loginTitle: "Staff sign in",
-      loginDescription: "Enter the store code and staff account to continue.",
+      loginDescription: "Enter the staff PIN to continue.",
       identifier: "Phone / Email",
       identifierPlaceholder: "Enter phone or email",
       password: "Password",
       passwordPlaceholder: "Enter password",
+      pin: "PIN",
+      pinPlaceholder: "Enter 6-digit PIN",
+      clearPin: "Clear",
+      deleteDigit: "Delete",
       submit: "Sign in",
       submitting: "Signing in...",
       currentStore: "Current store:",
@@ -787,6 +791,8 @@ export const enMessages = {
       validation: {
         identifierRequired: "Enter phone or email",
         passwordRequired: "Enter password",
+        pinRequired: "Enter PIN",
+        pinInvalid: "PIN must be exactly 6 digits",
       },
     },
     role: {

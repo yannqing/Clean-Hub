@@ -5,31 +5,23 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { formatMoney } from "@/lib/format";
+import { useTenantI18n } from "@/i18n";
 
 import { BRANCH_LIST_LIMIT, getBranchListQuery } from "../../branches/queries";
 import { getTenantOverviewQuery } from "../queries";
 import type { TenantOverview } from "../types";
 
-const metricLabels = [
-  ["todayOrderCount", "Today's orders"],
-  ["todayRevenueAmount", "Today's revenue"],
-  ["pendingPickupCount", "Pending pickup"],
-  ["inProgressOrderCount", "In progress"],
-  ["pendingTasksCount", "Pending tasks"],
+const metricKeys = [
+  "todayOrderCount",
+  "todayRevenueAmount",
+  "pendingPickupCount",
+  "inProgressOrderCount",
+  "pendingTasksCount",
 ] as const;
 
-const quickLinks = [
-  ["Create branch", `${webAdminRoutes.tenant.branches}/new`],
-  ["Settings", webAdminRoutes.tenant.system.settings],
-  ["Branches", webAdminRoutes.tenant.branches],
-  ["Users", webAdminRoutes.tenant.users],
-  ["Services", webAdminRoutes.tenant.services],
-  ["Prices", webAdminRoutes.tenant.prices],
-  ["Reports", webAdminRoutes.tenant.reports],
-] as const;
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Tenant overview failed to load.";
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 export type TenantOverviewViewProps = {
@@ -43,6 +35,7 @@ export function TenantOverviewView({
   initialBranchCountReachedLimit,
   initialOverview,
 }: TenantOverviewViewProps = {}) {
+  const { m } = useTenantI18n();
   const [overview, setOverview] = useState<TenantOverview | null>(
     initialOverview ?? null,
   );
@@ -59,6 +52,52 @@ export function TenantOverviewView({
 
     return Object.values(overview.featureFlags).filter(Boolean).length;
   }, [overview]);
+
+  const metricLabels = useMemo(
+    () => ({
+      todayOrderCount: m.overview.metrics.todayOrders,
+      todayRevenueAmount: m.overview.metrics.todayRevenue,
+      pendingPickupCount: m.overview.metrics.pendingPickup,
+      inProgressOrderCount: m.overview.metrics.inProgress,
+      pendingTasksCount: m.overview.metrics.pendingTasks,
+    }),
+    [m.overview.metrics],
+  );
+
+  const quickLinks = useMemo(
+    () =>
+      [
+        {
+          label: m.overview.quickLinks.createBranch,
+          href: `${webAdminRoutes.tenant.branches}/new`,
+        },
+        {
+          label: m.overview.quickLinks.settings,
+          href: webAdminRoutes.tenant.system.settings,
+        },
+        {
+          label: m.overview.quickLinks.branches,
+          href: webAdminRoutes.tenant.branches,
+        },
+        {
+          label: m.overview.quickLinks.users,
+          href: webAdminRoutes.tenant.users,
+        },
+        {
+          label: m.overview.quickLinks.services,
+          href: webAdminRoutes.tenant.services,
+        },
+        {
+          label: m.overview.quickLinks.prices,
+          href: webAdminRoutes.tenant.prices,
+        },
+        {
+          label: m.overview.quickLinks.reports,
+          href: webAdminRoutes.tenant.reports,
+        },
+      ] as const,
+    [m.overview.quickLinks],
+  );
 
   async function loadOverview() {
     setLoading(true);
@@ -86,7 +125,7 @@ export function TenantOverviewView({
       );
     } catch (error) {
       setOverview(null);
-      setErrorMessage(getErrorMessage(error));
+      setErrorMessage(getErrorMessage(error, m.overview.requestFailed));
     } finally {
       setLoading(false);
     }
@@ -127,7 +166,7 @@ export function TenantOverviewView({
         }
 
         setOverview(null);
-        setErrorMessage(getErrorMessage(error));
+        setErrorMessage(getErrorMessage(error, m.overview.requestFailed));
       })
       .finally(() => {
         if (isCurrent) {
@@ -138,14 +177,14 @@ export function TenantOverviewView({
     return () => {
       isCurrent = false;
     };
-  }, [initialOverview]);
+  }, [initialOverview, m.overview.requestFailed]);
 
   if (loading) {
     return (
       <section className="grid gap-5 p-5">
         <div className="h-28 animate-pulse rounded-md bg-muted" />
         <div className="grid gap-4 md:grid-cols-5">
-          {metricLabels.map(([key]) => (
+          {metricKeys.map((key) => (
             <div key={key} className="h-24 animate-pulse rounded-md bg-muted" />
           ))}
         </div>
@@ -157,14 +196,14 @@ export function TenantOverviewView({
     return (
       <section className="p-5">
         <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
-          <span>{errorMessage ?? "Tenant overview is unavailable."}</span>
+          <span>{errorMessage ?? m.overview.unavailable}</span>
           <Button
             onClick={loadOverview}
             size="sm"
             type="button"
             variant="outline"
           >
-            Retry
+            {m.common.retry}
           </Button>
         </div>
       </section>
@@ -175,50 +214,51 @@ export function TenantOverviewView({
     <section className="grid gap-6 p-5">
       <div className="flex flex-col gap-3 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">Tenant Admin</Badge>
+          <Badge variant="secondary">{m.overview.eyebrow}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
             {overview.tenantName}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Daily operating snapshot for the current tenant.
+            {m.overview.description}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Badge>{overview.tenantStatus}</Badge>
-          <Badge variant="outline">{enabledFeatureCount} features enabled</Badge>
+          <Badge variant="outline">
+            {enabledFeatureCount} {m.overview.featuresEnabled}
+          </Badge>
         </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
         <div className="rounded-md border bg-background p-4">
-          <p className="text-sm text-muted-foreground">Visible branches</p>
+          <p className="text-sm text-muted-foreground">
+            {m.overview.metrics.visibleBranches}
+          </p>
           <p className="mt-3 text-2xl font-semibold">
             {branchCountReachedLimit
-              ? `${branchCount} shown`
-              : (branchCount?.toLocaleString() ?? "Unavailable")}
+              ? `${branchCount} ${m.overview.metrics.shown}`
+              : (branchCount?.toLocaleString() ?? m.overview.metrics.unavailable)}
           </p>
         </div>
-        {metricLabels.map(([key, label]) => (
+        {metricKeys.map((key) => (
           <div key={key} className="rounded-md border bg-background p-4">
-            <p className="text-sm text-muted-foreground">{label}</p>
+            <p className="text-sm text-muted-foreground">{metricLabels[key]}</p>
             <p className="mt-3 text-2xl font-semibold">
-              {overview[key].toLocaleString()}
+              {key === "todayRevenueAmount"
+                ? formatMoney(overview[key], overview.currency)
+                : overview[key].toLocaleString()}
             </p>
           </div>
         ))}
       </div>
 
-      <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-        Order, revenue, pickup, progress, and task metrics are placeholders
-        until the order API is connected.
-      </div>
-
       <div className="grid gap-3">
-        <h2 className="text-base font-semibold">Quick actions</h2>
+        <h2 className="text-base font-semibold">{m.overview.quickActions}</h2>
         <div className="flex flex-wrap gap-2">
-          {quickLinks.map(([label, href]) => (
-            <Button asChild key={href} variant="outline">
-              <Link href={href}>{label}</Link>
+          {quickLinks.map((link) => (
+            <Button asChild key={link.href} variant="outline">
+              <Link href={link.href}>{link.label}</Link>
             </Button>
           ))}
         </div>

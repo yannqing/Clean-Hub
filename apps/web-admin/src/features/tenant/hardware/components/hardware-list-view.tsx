@@ -25,6 +25,7 @@ import {
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import { Pagination } from "@/components/pagination";
+import { useTenantI18n } from "@/i18n";
 
 import {
   hardwareConnectionTypeOptions,
@@ -32,8 +33,14 @@ import {
   hardwareDeviceTypeOptions,
 } from "../constants";
 import { getDeviceListQuery } from "../queries";
-import { bindDeviceAction, updateDeviceAction } from "../actions";
+import { getTenantBranchListQuery } from "../../users/queries";
+import {
+  bindDeviceAction,
+  deleteDeviceAction,
+  updateDeviceAction,
+} from "../actions";
 import type {
+  BranchSummary,
   CreateHardwareConfigRequest,
   HardwareConfigSummary,
   HardwareConnectionType,
@@ -44,25 +51,70 @@ import type {
 const PAGE_SIZE = 20;
 
 function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "An unexpected error occurred.";
+  return error instanceof Error ? error.message : "";
 }
 
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({
+  status,
+  label,
+}: {
+  status: string;
+  label: string;
+}) {
   const variant = status === "active" ? "default" : "secondary";
-  return <Badge variant={variant}>{status}</Badge>;
+  return <Badge variant={variant}>{label}</Badge>;
+}
+
+/**
+ * Single-select branch picker. Mirrors the multi-select used by the tenant
+ * users module so the two surfaces stay consistent.
+ */
+function BranchSelect({
+  branches,
+  disabled = false,
+  emptyLabel,
+  onChange,
+  selected,
+}: {
+  branches: BranchSummary[];
+  disabled?: boolean;
+  emptyLabel: string;
+  selected: string;
+  onChange: (branchId: string) => void;
+}) {
+  if (branches.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground px-1">{emptyLabel}</p>
+    );
+  }
+
+  return (
+    <Select
+      disabled={disabled}
+      onValueChange={(value) => onChange(value === "__none__" ? "" : value)}
+      value={selected || "__none__"}
+    >
+      <SelectTrigger className="w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="__none__">{emptyLabel}</SelectItem>
+        {branches.map((branch) => (
+          <SelectItem key={branch.id} value={branch.id}>
+            {branch.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
 }
 
 export function HardwareListView() {
   const isCurrent = useRef(true);
+  const { m, formatDateTime } = useTenantI18n();
 
   const [devices, setDevices] = useState<HardwareConfigSummary[]>([]);
+  const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [offset, setOffset] = useState(0);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -78,15 +130,30 @@ export function HardwareListView() {
   const [createError, setCreateError] = useState<string | null>(null);
 
   const [editDevice, setEditDevice] = useState<HardwareConfigSummary | null>(null);
-  const [editForm, setEditForm] = useState<UpdateHardwareConfigRequest>({});
+  const [editForm, setEditForm] = useState<UpdateHardwareConfigRequest>({
+    version: 0,
+  });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
+
+  const [pendingDelete, setPendingDelete] = useState<HardwareConfigSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     isCurrent.current = true;
     return () => {
       isCurrent.current = false;
     };
+  }, []);
+
+  useEffect(() => {
+    getTenantBranchListQuery()
+      .then((result) => {
+        if (isCurrent.current) setBranches(result);
+      })
+      .catch(() => {
+        /* non-critical; branch pickers fall back to the empty state */
+      });
   }, []);
 
   const loadDevices = useCallback(() => {
@@ -100,14 +167,19 @@ export function HardwareListView() {
         setDevices(result);
       } catch (err) {
         if (!isCurrent.current) return;
-        setError(getErrorMessage(err));
+        setError(getErrorMessage(err) || m.hardware.requestFailed);
       }
     });
-  }, [offset]);
+  }, [offset, m.hardware.requestFailed]);
 
   useEffect(() => {
     loadDevices();
   }, [loadDevices]);
+
+  const getBranchName = useCallback(
+    (branchId: string) => branches.find((b) => b.id === branchId)?.name ?? branchId,
+    [branches],
+  );
 
   const handleCreate = useCallback(async () => {
     setCreateLoading(true);
@@ -132,8 +204,10 @@ export function HardwareListView() {
     setEditDevice(device);
     setEditForm({
       name: device.name,
+      branchId: device.branchId,
       connectionType: device.connectionType,
       status: device.status,
+      version: device.version,
     });
     setEditError(null);
   }, []);
@@ -158,11 +232,31 @@ export function HardwareListView() {
     loadDevices();
   }, [editDevice, editForm, loadDevices]);
 
+  const handleDelete = useCallback(
+    async (device: HardwareConfigSummary) => {
+      setDeleting(true);
+
+      const result = await deleteDeviceAction(device.id, device.version);
+
+      if (!isCurrent.current) return;
+      setDeleting(false);
+
+      if (!result.ok) {
+        setError(result.error || m.hardware.requestFailed);
+        return;
+      }
+
+      setPendingDelete(null);
+      loadDevices();
+    },
+    [loadDevices, m.hardware.requestFailed],
+  );
+
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Hardware Devices</h1>
-        <Button onClick={() => setCreateOpen(true)}>Add Device</Button>
+        <h1 className="text-2xl font-semibold">{m.hardware.title}</h1>
+        <Button onClick={() => setCreateOpen(true)}>{m.hardware.addDevice}</Button>
       </div>
 
       {error && (
@@ -170,19 +264,19 @@ export function HardwareListView() {
       )}
 
       {isPending ? (
-        <p className="text-sm text-muted-foreground">Loading...</p>
+        <p className="text-sm text-muted-foreground">{m.common.loading}</p>
       ) : devices.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No devices found.</p>
+        <p className="text-sm text-muted-foreground">{m.hardware.noDevices}</p>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Connection</TableHead>
-              <TableHead>Branch</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead>{m.hardware.columns.name}</TableHead>
+              <TableHead>{m.hardware.columns.type}</TableHead>
+              <TableHead>{m.hardware.columns.connection}</TableHead>
+              <TableHead>{m.hardware.columns.branch}</TableHead>
+              <TableHead>{m.hardware.columns.status}</TableHead>
+              <TableHead>{m.hardware.columns.created}</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -190,20 +284,38 @@ export function HardwareListView() {
             {devices.map((device) => (
               <TableRow key={device.id}>
                 <TableCell className="font-medium">{device.name}</TableCell>
-                <TableCell>{device.deviceType}</TableCell>
-                <TableCell>{device.connectionType}</TableCell>
-                <TableCell className="font-mono text-xs">{device.branchId}</TableCell>
                 <TableCell>
-                  <StatusBadge status={device.status} />
+                  {hardwareDeviceTypeOptions.find(
+                    (opt) => opt.value === device.deviceType,
+                  )?.label ?? device.deviceType}
                 </TableCell>
-                <TableCell>{formatDate(device.createdAt)}</TableCell>
                 <TableCell>
+                  {hardwareConnectionTypeOptions.find(
+                    (opt) => opt.value === device.connectionType,
+                  )?.label ?? device.connectionType}
+                </TableCell>
+                <TableCell>{getBranchName(device.branchId)}</TableCell>
+                <TableCell>
+                  <StatusBadge
+                    status={device.status}
+                    label={m.common.statusLabels[device.status] ?? device.status}
+                  />
+                </TableCell>
+                <TableCell>{formatDateTime(device.createdAt)}</TableCell>
+                <TableCell className="space-x-2 text-right">
                   <Button
                     size="sm"
                     variant="outline"
                     onClick={() => handleOpenEdit(device)}
                   >
-                    Edit
+                    {m.hardware.actions.edit}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => setPendingDelete(device)}
+                  >
+                    {m.hardware.actions.delete}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -214,36 +326,37 @@ export function HardwareListView() {
 
       <Pagination
         currentPageCount={devices.length}
-        nextLabel="Next"
+        nextLabel={m.common.next}
         offset={offset}
         onOffsetChange={setOffset}
         pageSize={PAGE_SIZE}
-        previousLabel="Previous"
+        previousLabel={m.common.previous}
       />
 
       {/* Add device dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Device</DialogTitle>
+            <DialogTitle>{m.hardware.create.title}</DialogTitle>
             <DialogDescription>
-              Register a hardware device to a branch.
+              {m.hardware.create.description}
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label>Branch ID *</Label>
-              <Input
-                placeholder="Enter branch ULID"
-                value={createForm.branchId}
-                onChange={(e) =>
-                  setCreateForm((prev) => ({ ...prev, branchId: e.target.value }))
+              <Label>{m.hardware.create.labels.branchId} *</Label>
+              <BranchSelect
+                branches={branches}
+                emptyLabel={m.hardware.noBranches}
+                onChange={(branchId) =>
+                  setCreateForm((prev) => ({ ...prev, branchId }))
                 }
+                selected={createForm.branchId}
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Device Name *</Label>
+              <Label>{m.hardware.create.labels.deviceName} *</Label>
               <Input
                 value={createForm.name}
                 onChange={(e) =>
@@ -252,7 +365,7 @@ export function HardwareListView() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Device Type *</Label>
+              <Label>{m.hardware.create.labels.deviceType} *</Label>
               <Select
                 value={createForm.deviceType}
                 onValueChange={(value) =>
@@ -275,7 +388,7 @@ export function HardwareListView() {
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Connection Type *</Label>
+              <Label>{m.hardware.create.labels.connectionType} *</Label>
               <Select
                 value={createForm.connectionType}
                 onValueChange={(value) =>
@@ -303,7 +416,7 @@ export function HardwareListView() {
             )}
 
             <Button disabled={createLoading} onClick={() => void handleCreate()}>
-              {createLoading ? "Adding..." : "Add Device"}
+              {createLoading ? m.hardware.create.adding : m.hardware.create.action}
             </Button>
           </div>
         </DialogContent>
@@ -318,7 +431,7 @@ export function HardwareListView() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Device</DialogTitle>
+            <DialogTitle>{m.hardware.edit.title}</DialogTitle>
             <DialogDescription>
               {editDevice?.name}
             </DialogDescription>
@@ -326,7 +439,7 @@ export function HardwareListView() {
 
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label>Device Name</Label>
+              <Label>{m.hardware.edit.labels.deviceName}</Label>
               <Input
                 value={editForm.name ?? ""}
                 onChange={(e) =>
@@ -335,7 +448,31 @@ export function HardwareListView() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Connection Type</Label>
+              <Label>{m.hardware.columns.type}</Label>
+              <p className="text-sm text-muted-foreground">
+                {editDevice
+                  ? hardwareDeviceTypeOptions.find(
+                      (opt) => opt.value === editDevice.deviceType,
+                    )?.label ?? editDevice.deviceType
+                  : ""}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {m.hardware.typeReadonlyHint}
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>{m.hardware.edit.labels.branchId}</Label>
+              <BranchSelect
+                branches={branches}
+                emptyLabel={m.hardware.noBranches}
+                onChange={(branchId) =>
+                  setEditForm((prev) => ({ ...prev, branchId }))
+                }
+                selected={editForm.branchId ?? ""}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>{m.hardware.edit.labels.connectionType}</Label>
               <Select
                 value={editForm.connectionType ?? ""}
                 onValueChange={(value) =>
@@ -358,7 +495,7 @@ export function HardwareListView() {
               </Select>
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label>Status</Label>
+              <Label>{m.hardware.edit.labels.status}</Label>
               <Select
                 value={editForm.status ?? ""}
                 onValueChange={(value) =>
@@ -387,12 +524,45 @@ export function HardwareListView() {
 
             <div className="flex justify-end gap-3">
               <Button variant="outline" onClick={() => setEditDevice(null)}>
-                Cancel
+                {m.common.cancel}
               </Button>
               <Button disabled={editLoading} onClick={() => void handleUpdate()}>
-                {editLoading ? "Saving..." : "Save Changes"}
+                {editLoading
+                  ? m.hardware.edit.savingChanges
+                  : m.hardware.edit.saveChanges}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation */}
+      <Dialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{m.hardware.delete.title}</DialogTitle>
+            <DialogDescription>{m.hardware.delete.description}</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3">
+            <Button
+              disabled={deleting}
+              onClick={() => setPendingDelete(null)}
+              variant="outline"
+            >
+              {m.common.cancel}
+            </Button>
+            <Button
+              disabled={deleting}
+              onClick={() => pendingDelete && void handleDelete(pendingDelete)}
+              variant="destructive"
+            >
+              {deleting ? m.hardware.delete.deleting : m.hardware.delete.action}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

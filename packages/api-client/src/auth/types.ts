@@ -30,6 +30,12 @@ export type LoginRequest = {
   deviceId?: string;
 };
 
+export type AuthPosPinLoginRequest = {
+  pin: string;
+  tenantCode: string;
+  deviceId: string;
+};
+
 export type LoginResponse = {
   authContext: AuthContext;
 };

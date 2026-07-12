@@ -1,5 +1,5 @@
 {
-  "id": "9ea43e37-bda3-448b-8549-43a566ddb5a5",
+  "id": "1b4abe98-c1e5-4fa8-a1ab-e9143cd54391",
   "prevId": "a7b457ed-2402-47d0-9a6a-9ea73a6c41a0",
   "version": "7",
   "dialect": "postgresql",
@@ -911,8 +911,8 @@
         }
       },
       "indexes": {
-        "customer_accounts_tenant_phone_unique": {
-          "name": "customer_accounts_tenant_phone_unique",
+        "customer_accounts_tenant_phone_idx": {
+          "name": "customer_accounts_tenant_phone_idx",
           "columns": [
             {
               "expression": "tenant_id",
@@ -927,7 +927,7 @@
               "nulls": "last"
             }
           ],
-          "isUnique": true,
+          "isUnique": false,
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -949,6 +949,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"customer_accounts\".\"deleted_at\" is null",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -3582,28 +3583,6 @@
         }
       },
       "indexes": {
-        "refund_requests_active_order_unique": {
-          "name": "refund_requests_active_order_unique",
-          "columns": [
-            {
-              "expression": "tenant_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "order_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"refund_requests\".\"deleted_at\" is null and \"refund_requests\".\"status\" in ('pending', 'processing')",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
         "refund_requests_tenant_status_idx": {
           "name": "refund_requests_tenant_status_idx",
           "columns": [

@@ -35,6 +35,7 @@ export const enMessages: WebAdminMessages = {
         title: "Main",
         items: [
           { label: "Dashboard", href: webAdminRoutes.saas.home },
+          { label: "My Todo", href: webAdminRoutes.saas.todos },
           { label: "User Management", href: webAdminRoutes.saas.users },
           {
             label: "Feedback Tickets",

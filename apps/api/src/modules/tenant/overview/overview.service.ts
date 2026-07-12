@@ -5,7 +5,13 @@ import {
   requireTenantRole,
 } from "../../auth/permission.helper.js";
 import { TenantOverviewError } from "./overview.errors.js";
-import { findTenantOverviewBase } from "./overview.repository.js";
+import {
+  findTenantInProgressOrderCount,
+  findTenantOverviewBase,
+  findTenantPendingPickupCount,
+  findTenantPendingTasksCount,
+  findTenantTodayOrderMetrics,
+} from "./overview.repository.js";
 import type { TenantOverview, TenantOverviewInput } from "./overview.types.js";
 
 export async function getTenantOverview(
@@ -26,12 +32,24 @@ export async function getTenantOverview(
     );
   }
 
+  const [
+    todayOrderMetrics,
+    inProgressOrderCount,
+    pendingPickupCount,
+    pendingTasksCount,
+  ] = await Promise.all([
+    findTenantTodayOrderMetrics(db, tenantId),
+    findTenantInProgressOrderCount(db, tenantId),
+    findTenantPendingPickupCount(db, tenantId),
+    findTenantPendingTasksCount(db, tenantId),
+  ]);
+
   return {
     ...overview,
-    todayOrderCount: 0,
-    todayRevenueAmount: 0,
-    pendingPickupCount: 0,
-    inProgressOrderCount: 0,
-    pendingTasksCount: 0,
+    todayOrderCount: todayOrderMetrics.orderCount,
+    todayRevenueAmount: todayOrderMetrics.revenueAmount,
+    pendingPickupCount,
+    inProgressOrderCount,
+    pendingTasksCount,
   };
 }

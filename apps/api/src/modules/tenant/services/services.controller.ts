@@ -123,6 +123,7 @@ export async function updateTenantServiceStatusController(
       c.get("authContext"),
       params.serviceId,
       data.status,
+      data.version,
       {
         ipAddress: getClientIp(c),
         userAgent: c.req.header("user-agent"),

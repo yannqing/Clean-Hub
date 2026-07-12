@@ -16,10 +16,12 @@ import {
 
 import {
   customers,
+  customerAccounts,
   orders,
   orderItems,
   serviceTickets,
   ticketItems,
+  userProfiles,
   type Database,
 } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
@@ -74,7 +76,10 @@ export function toTicketItem(
 }
 
 type TicketJoinedRow = typeof serviceTickets.$inferSelect & {
+  customerAccountName: string | null;
   customerName: string | null;
+  customerProfileName: string | null;
+  assistantName: string | null;
   itemCount: string | number | null;
   totalAmount: string | null;
 };
@@ -86,7 +91,10 @@ function toTicketSummary(row: TicketJoinedRow): ServiceTicketSummary {
     branchId: row.branchId,
     customerId: row.customerId,
     customerName: row.customerName ?? "",
+    customerAccountName: row.customerAccountName,
+    customerProfileName: row.customerProfileName ?? row.customerName,
     assistantId: row.assistantId,
+    assistantName: row.assistantName,
     ticketNo: row.ticketNo,
     ticketType: row.ticketType,
     ticketStatus: row.ticketStatus,
@@ -202,6 +210,9 @@ export async function findServiceTickets(
     .select({
       ticket: serviceTickets,
       customerName: customers.fullName,
+      customerAccountName: customerAccounts.accountName,
+      customerProfileName: customers.fullName,
+      assistantName: userProfiles.displayName,
       itemCount: sql<number>`(
         select count(*)::int from ${ticketItems}
         where ${ticketItems.ticketId} = ${serviceTickets.id}
@@ -215,6 +226,11 @@ export async function findServiceTickets(
     })
     .from(serviceTickets)
     .leftJoin(customers, eq(customers.id, serviceTickets.customerId))
+    .leftJoin(
+      customerAccounts,
+      eq(customerAccounts.id, customers.customerAccountId),
+    )
+    .leftJoin(userProfiles, eq(userProfiles.userId, serviceTickets.assistantId))
     .where(and(...filters))
     .orderBy(desc(serviceTickets.createdAt))
     .limit(input.limit)
@@ -334,6 +350,9 @@ export async function findServiceTicketById(
     .select({
       ticket: serviceTickets,
       customerName: customers.fullName,
+      customerAccountName: customerAccounts.accountName,
+      customerProfileName: customers.fullName,
+      assistantName: userProfiles.displayName,
       itemCount: sql<number>`(
         select count(*)::int from ${ticketItems}
         where ${ticketItems.ticketId} = ${serviceTickets.id}
@@ -347,6 +366,11 @@ export async function findServiceTicketById(
     })
     .from(serviceTickets)
     .leftJoin(customers, eq(customers.id, serviceTickets.customerId))
+    .leftJoin(
+      customerAccounts,
+      eq(customerAccounts.id, customers.customerAccountId),
+    )
+    .leftJoin(userProfiles, eq(userProfiles.userId, serviceTickets.assistantId))
     .where(
       and(
         eq(serviceTickets.id, input.ticketId),
@@ -430,6 +454,7 @@ export async function createServiceTicketRecord(
   db: Database,
   input: CreateServiceTicketRequest & {
     tenantId: string;
+    assistantId: string;
     actorUserId: string;
   },
 ): Promise<ServiceTicketSummary> {
@@ -446,7 +471,7 @@ export async function createServiceTicketRecord(
     tenantId: input.tenantId,
     branchId: input.branchId,
     customerId: input.customerId,
-    assistantId: normalizeNullable(input.assistantId ?? null),
+    assistantId: normalizeNullable(input.assistantId),
     ticketNo,
     ticketType: input.ticketType,
     ticketStatus: "draft",

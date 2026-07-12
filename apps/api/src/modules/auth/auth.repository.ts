@@ -2,6 +2,7 @@ import {
   and,
   eq,
   getTableColumns,
+  inArray,
   isNull,
   or,
 } from "drizzle-orm";
@@ -9,9 +10,11 @@ import {
 import {
   authRefreshTokens,
   permissions,
+  posTerminalSettings,
   rolePermissions,
   roles,
   tenants,
+  userBranches,
   userProfiles,
   userRoles,
   users,
@@ -25,6 +28,20 @@ import type {
   AuthenticatedUser,
   UserAccess,
 } from "./auth.types.js";
+
+export type PosTerminalLoginContext = {
+  tenantId: string;
+  branchId: string | null;
+  status: "active" | "inactive" | null;
+  deviceRegistered: boolean;
+};
+
+type PosPinLoginCandidateAggregate = {
+  user: AuthenticatedUser;
+  roleCodes: Set<string>;
+  roleBranchIds: Set<string>;
+  userBranchIds: Set<string>;
+};
 
 export type StoredRefreshToken = {
   id: string;
@@ -106,6 +123,11 @@ export class AuthRepository {
       .where(eq(userProfiles.userId, userId))
       .limit(1);
 
+    const branchRows = await this.db
+      .select({ branchId: userBranches.branchId })
+      .from(userBranches)
+      .where(eq(userBranches.userId, userId));
+
     const displayName = profileRows[0]?.displayName ?? userId;
 
     return {
@@ -119,13 +141,146 @@ export class AuthRepository {
       ],
       branchIds: [
         ...new Set(
-          rows
-            .map((row) => row.branchId)
+          [
+            ...rows.map((row) => row.branchId),
+            ...branchRows.map((row) => row.branchId),
+          ]
             .filter((branchId): branchId is string => Boolean(branchId)),
         ),
       ],
       displayName,
     };
+  }
+
+  async findPosTerminalLoginContext({
+    tenantCode,
+    deviceId,
+  }: {
+    tenantCode: string;
+    deviceId: string;
+  }): Promise<PosTerminalLoginContext | null> {
+    const rows = await this.db
+      .select({
+        tenantId: tenants.id,
+        tenantStatus: tenants.status,
+        terminalId: posTerminalSettings.id,
+        terminalBranchId: posTerminalSettings.branchId,
+        terminalStatus: posTerminalSettings.status,
+      })
+      .from(tenants)
+      .leftJoin(
+        posTerminalSettings,
+        and(
+          eq(posTerminalSettings.tenantId, tenants.id),
+          eq(posTerminalSettings.deviceId, deviceId),
+        ),
+      )
+      .where(
+        and(
+          eq(tenants.pressingCode, tenantCode.trim()),
+          isNull(tenants.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    const row = rows[0];
+
+    if (!row || row.tenantStatus !== "active") {
+      return null;
+    }
+
+    return {
+      tenantId: row.tenantId,
+      branchId: row.terminalBranchId,
+      status: row.terminalStatus,
+      deviceRegistered: Boolean(row.terminalId),
+    };
+  }
+
+  async findPosPinLoginCandidates({
+    tenantId,
+    branchId,
+  }: {
+    tenantId: string;
+    branchId?: string | null;
+  }): Promise<AuthenticatedUser[]> {
+    const rows = await this.db
+      .select({
+        ...getTableColumns(users),
+        roleCode: roles.code,
+        roleBranchId: userRoles.branchId,
+      })
+      .from(users)
+      .innerJoin(userRoles, eq(userRoles.userId, users.id))
+      .innerJoin(roles, eq(userRoles.roleId, roles.id))
+      .where(
+        and(
+          eq(users.tenantId, tenantId),
+          eq(users.userType, "tenant"),
+          isNull(users.deletedAt),
+          eq(userRoles.tenantId, tenantId),
+          isNull(userRoles.revokedAt),
+          eq(roles.scope, "tenant"),
+          inArray(roles.code, ["owner", "manager", "cashier"]),
+          eq(roles.status, "active"),
+          isNull(roles.deletedAt),
+        ),
+      );
+
+    const aggregates = new Map<string, PosPinLoginCandidateAggregate>();
+
+    for (const row of rows) {
+      const { roleCode, roleBranchId, ...user } = row;
+      const existing = aggregates.get(user.id);
+
+      if (existing) {
+        existing.roleCodes.add(roleCode);
+        if (roleBranchId) existing.roleBranchIds.add(roleBranchId);
+        continue;
+      }
+
+      aggregates.set(user.id, {
+        user,
+        roleCodes: new Set([roleCode]),
+        roleBranchIds: new Set(roleBranchId ? [roleBranchId] : []),
+        userBranchIds: new Set(),
+      });
+    }
+
+    const userIds = [...aggregates.keys()];
+
+    if (userIds.length > 0) {
+      const branchRows = await this.db
+        .select({
+          userId: userBranches.userId,
+          branchId: userBranches.branchId,
+        })
+        .from(userBranches)
+        .where(
+          and(
+            eq(userBranches.tenantId, tenantId),
+            inArray(userBranches.userId, userIds),
+          ),
+        );
+
+      for (const row of branchRows) {
+        aggregates.get(row.userId)?.userBranchIds.add(row.branchId);
+      }
+    }
+
+    return [...aggregates.values()]
+      .filter((candidate) => {
+        if (!branchId) {
+          return true;
+        }
+
+        return (
+          candidate.roleCodes.has("owner") ||
+          candidate.roleBranchIds.has(branchId) ||
+          candidate.userBranchIds.has(branchId)
+        );
+      })
+      .map((candidate) => candidate.user);
   }
 
   async updateLastLoginAt(userId: string): Promise<void> {

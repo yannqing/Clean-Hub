@@ -13,6 +13,7 @@ import { webAdminWorkspaceTabs } from "@/config/navigation";
 import { webAdminRoutes } from "@/config/routes";
 import { LogoutButton } from "@/features/auth/components";
 import { getAuthSessionQuery } from "@/features/auth/queries";
+import { TodoCenterBell } from "@/features/saas/todo-center/components";
 import { useWebAdminLocale } from "@/i18n";
 
 type AdminDashboardShellProps = {
@@ -226,7 +227,10 @@ export function AdminDashboardShell({
               </div>
 
               {scope === "saas" ? (
-                <LanguageSwitcher />
+                <div className="flex items-center gap-2">
+                  <TodoCenterBell />
+                  <LanguageSwitcher />
+                </div>
               ) : (
                 <div
                   aria-label={`${scope} tabs`}

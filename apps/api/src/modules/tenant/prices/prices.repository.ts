@@ -165,6 +165,7 @@ export async function updatePriceRecord(
       and(
         eq(prices.id, input.priceId),
         eq(prices.tenantId, input.tenantId),
+        eq(prices.version, input.version),
         isNull(prices.deletedAt),
       ),
     )
@@ -172,9 +173,9 @@ export async function updatePriceRecord(
 
   if (!updatedRows[0]) {
     throw new TenantPricesError(
-      "PRICE_NOT_FOUND",
-      "Price was not found.",
-      404,
+      "PRICE_VERSION_CONFLICT",
+      "Price has been modified. Refresh and try again.",
+      409,
     );
   }
 

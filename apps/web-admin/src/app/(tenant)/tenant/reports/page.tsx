@@ -42,16 +42,20 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             : "Report summary failed to load.",
       })),
     getTenantSettingsQuery()
-      .then((settings) => settings?.defaultCurrency)
-      .catch(() => undefined),
+      .then((settings) => ({
+        currency: settings?.defaultCurrency,
+        tenantName: settings?.tenantName,
+      }))
+      .catch(() => ({ currency: undefined, tenantName: undefined })),
   ]);
 
   return (
     <ReportSummaryView
-      currency={settingsResult}
+      currency={settingsResult.currency}
       error={reportResult.error}
       query={query}
       summary={reportResult.summary}
+      tenantName={settingsResult.tenantName}
     />
   );
 }

@@ -12,7 +12,6 @@ import {
 import {
   authRefreshTokens,
   roles,
-  userBranches,
   userProfiles,
   userRoles,
   users,

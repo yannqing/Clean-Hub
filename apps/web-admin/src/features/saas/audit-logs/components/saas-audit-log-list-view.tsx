@@ -26,7 +26,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Pagination } from "@/components/pagination";
 import { useSaasI18n } from "@/i18n";
-import { getAuditEventDescription } from "@/features/audit/event-description";
+import {
+  getAuditEventDescription,
+  getAuditEventTypesByCategory,
+} from "@/features/audit/event-description";
 
 import { auditEventCategoryOptions } from "../constants";
 import {
@@ -49,6 +52,7 @@ export function SaasAuditLogListView() {
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
   const [eventCategory, setEventCategory] = useState("");
+  const [eventType, setEventType] = useState("");
   const [actorUserId, setActorUserId] = useState("");
   const [success, setSuccess] = useState<SuccessFilter>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -65,12 +69,20 @@ export function SaasAuditLogListView() {
       limit,
       offset,
       eventCategory: eventCategory.trim() || undefined,
+      eventType: eventType.trim() || undefined,
       actorUserId: actorUserId.trim() || undefined,
       success: success === "all" ? undefined : success,
       dateFrom: dateFrom ? new Date(dateFrom).toISOString() : undefined,
       dateTo: dateTo ? new Date(dateTo).toISOString() : undefined,
     }),
-    [actorUserId, dateFrom, dateTo, eventCategory, offset, success],
+    [actorUserId, dateFrom, dateTo, eventCategory, eventType, offset, success],
+  );
+
+  // Cascading eventType options: picking a category narrows the list to that
+  // category's events; "all" exposes every known event type.
+  const eventTypeOptions = useMemo(
+    () => getAuditEventTypesByCategory(eventCategory.trim() || undefined),
+    [eventCategory],
   );
 
   const loadLogs = useCallback(async () => {
@@ -150,7 +162,7 @@ export function SaasAuditLogListView() {
         </Button>
       </div>
 
-      <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-6">
         <div className="grid gap-2">
           <Label htmlFor="audit-category-filter">{m.auditLogs.category}</Label>
           <Select
@@ -158,6 +170,10 @@ export function SaasAuditLogListView() {
               setOffset(0);
               setLoading(true);
               setEventCategory(value === "all" ? "" : value);
+              // Reset the cascading eventType filter whenever the category
+              // changes, otherwise a stale event type could be hidden in the
+              // new option set.
+              setEventType("");
             }}
             value={eventCategory || "all"}
           >
@@ -175,6 +191,30 @@ export function SaasAuditLogListView() {
                       : option.value === "saas_tenant"
                         ? m.common.auditCategoryLabels.saasTenant
                         : m.common.auditCategoryLabels.saasUser}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="audit-event-type-filter">{m.auditLogs.eventType}</Label>
+          <Select
+            onValueChange={(value) => {
+              setOffset(0);
+              setLoading(true);
+              setEventType(value === "all" ? "" : value);
+            }}
+            value={eventType || "all"}
+          >
+            <SelectTrigger className="w-full" id="audit-event-type-filter">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{m.auditLogs.allEventTypes}</SelectItem>
+              {eventTypeOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>

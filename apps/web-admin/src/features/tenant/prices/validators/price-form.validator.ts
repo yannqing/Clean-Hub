@@ -33,6 +33,10 @@ export function validatePriceUpdateForm(
     errors.status = "Choose a supported status.";
   }
 
+  if (!Number.isInteger(input.version) || input.version < 1) {
+    errors.version = "Price version is required. Refresh and try again.";
+  }
+
   if (Object.keys(errors).length > 0) {
     return {
       ok: false,
@@ -46,6 +50,7 @@ export function validatePriceUpdateForm(
       amount,
       currency,
       status: input.status,
+      version: input.version,
     },
   };
 }

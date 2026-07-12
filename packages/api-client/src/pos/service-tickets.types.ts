@@ -56,7 +56,10 @@ export type ServiceTicketSummary = {
   branchId: string;
   customerId: string;
   customerName: string;
+  customerAccountName: string | null;
+  customerProfileName: string | null;
   assistantId: string | null;
+  assistantName: string | null;
   ticketNo: string | null;
   ticketType: ServiceTicketType;
   ticketStatus: ServiceTicketStatus;
@@ -115,7 +118,6 @@ export type CreateServiceTicketRequest = {
   ticketType: ServiceTicketType;
   priority?: ServiceTicketPriority;
   sourceChannel?: ServiceTicketSourceChannel;
-  assistantId?: string | null;
   expectedPickupAt?: string | null;
   remark?: string;
 };

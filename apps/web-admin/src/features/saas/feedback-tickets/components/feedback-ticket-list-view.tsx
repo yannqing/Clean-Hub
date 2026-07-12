@@ -3,6 +3,7 @@
 import {
   Badge,
   Button,
+  Checkbox,
   Input,
   Label,
   Select,
@@ -16,8 +17,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  cn,
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
+
+import { useSaasI18n } from "@/i18n";
 
 import {
   feedbackTicketPriorityOptions,
@@ -27,14 +31,17 @@ import {
   getFeedbackTicketDetailQuery,
   getFeedbackTicketListQuery,
 } from "../queries";
+import { computeTicketSla } from "../sla";
 import type {
   FeedbackTicketDetail,
   FeedbackTicketListItem,
   FeedbackTicketStatus,
 } from "../types";
 import { FeedbackTicketAssigneeControl } from "./feedback-ticket-assignee-control";
+import { FeedbackTicketBatchToolbar } from "./feedback-ticket-batch-toolbar";
+import { FeedbackTicketSlaBadge } from "./feedback-ticket-sla-badge";
 import { FeedbackTicketStatusControl } from "./feedback-ticket-status-control";
-import { useSaasI18n } from "@/i18n";
+import { FeedbackTicketTimeline } from "./feedback-ticket-timeline";
 
 type StatusFilter = "all" | FeedbackTicketStatus;
 type PriorityFilter = "all" | string;
@@ -75,11 +82,40 @@ function getSelectedTicket(
     : detail;
 }
 
+function statusLabel(
+  m: ReturnType<typeof useSaasI18n>["m"],
+  status: FeedbackTicketStatus,
+): string {
+  switch (status) {
+    case "open":
+      return m.common.statusLabels.open;
+    case "in_progress":
+      return m.common.statusLabels.inProgress;
+    case "resolved":
+      return m.common.statusLabels.resolved;
+    case "closed":
+      return m.common.statusLabels.closed;
+    default:
+      return status;
+  }
+}
+
+function priorityLabel(
+  m: ReturnType<typeof useSaasI18n>["m"],
+  priority: string,
+): string {
+  return (
+    m.common.priorityLabels[priority as keyof typeof m.common.priorityLabels] ??
+    priority
+  );
+}
+
 export function FeedbackTicketListView() {
   const { m, formatDateTime } = useSaasI18n();
   const [tickets, setTickets] = useState<FeedbackTicketListItem[]>([]);
   const [selectedTicket, setSelectedTicket] =
     useState<FeedbackTicketDetail | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<StatusFilter>("all");
   const [priority, setPriority] = useState<PriorityFilter>("all");
   const [tenantId, setTenantId] = useState("");
@@ -153,6 +189,87 @@ export function FeedbackTicketListView() {
     );
   }
 
+  function toggleSelected(id: string, checked: boolean) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (checked) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+
+      return next;
+    });
+  }
+
+  const visibleTicketIds = useMemo(
+    () => new Set(tickets.map((t) => t.id)),
+    [tickets],
+  );
+
+  /**
+   * Selection is scoped to the currently visible list. We derive the pruned
+   * selection at render time instead of mutating state in an effect (which
+   * would trigger cascading renders), so stale IDs left over from filter
+   * changes never reach the batch toolbar or the "select all" checkbox.
+   */
+  const selectedVisibleIds = useMemo(
+    () =>
+      [...selectedIds].filter((id) => visibleTicketIds.has(id)),
+    [selectedIds, visibleTicketIds],
+  );
+
+  const allVisibleChecked =
+    tickets.length > 0 && tickets.every((t) => selectedIds.has(t.id));
+  const someVisibleChecked =
+    !allVisibleChecked && tickets.some((t) => selectedIds.has(t.id));
+
+  function toggleSelectAll(checked: boolean) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      if (checked) {
+        for (const t of tickets) {
+          next.add(t.id);
+        }
+      } else {
+        for (const t of tickets) {
+          next.delete(t.id);
+        }
+      }
+
+      return next;
+    });
+  }
+
+  /**
+   * After a batch operation, drop stale IDs, re-load the list to reflect the
+   * server state, and refresh the open detail (if it was in the batch).
+   */
+  async function handleBatchOutcome(succeededIds: string[]) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+
+      for (const id of succeededIds) {
+        next.delete(id);
+      }
+
+      return next;
+    });
+
+    await loadTickets();
+
+    setSelectedTicket((current) => {
+      if (current && succeededIds.includes(current.id)) {
+        // Re-hydrate the detail panel with the updated ticket.
+        void loadTicketDetail(current.id);
+      }
+
+      return current;
+    });
+  }
+
   useEffect(() => {
     let isCurrent = true;
 
@@ -213,13 +330,7 @@ export function FeedbackTicketListView() {
               <SelectItem value="all">{m.common.allStatuses}</SelectItem>
               {feedbackTicketStatusOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.value === "open"
-                    ? m.common.statusLabels.open
-                    : option.value === "in_progress"
-                      ? m.common.statusLabels.inProgress
-                      : option.value === "resolved"
-                        ? m.common.statusLabels.resolved
-                        : m.common.statusLabels.closed}
+                  {statusLabel(m, option.value)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -242,9 +353,7 @@ export function FeedbackTicketListView() {
               <SelectItem value="all">{m.common.allPriorities}</SelectItem>
               {feedbackTicketPriorityOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {m.common.priorityLabels[
-                    option.value as keyof typeof m.common.priorityLabels
-                  ] ?? option.label}
+                  {priorityLabel(m, option.value)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -278,6 +387,11 @@ export function FeedbackTicketListView() {
         </div>
       </div>
 
+      <FeedbackTicketBatchToolbar
+        onOutcome={handleBatchOutcome}
+        selectedIds={selectedVisibleIds}
+      />
+
       <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="border-b xl:border-b-0 xl:border-r">
           {loading ? (
@@ -307,9 +421,25 @@ export function FeedbackTicketListView() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-9">
+                    <Checkbox
+                      aria-label={m.feedbackTickets.batch.selectAll}
+                      checked={
+                        allVisibleChecked
+                          ? true
+                          : someVisibleChecked
+                            ? "indeterminate"
+                            : false
+                      }
+                      onCheckedChange={(value) =>
+                        toggleSelectAll(value === true)
+                      }
+                    />
+                  </TableHead>
                   <TableHead>{m.feedbackTickets.columns.ticket}</TableHead>
                   <TableHead>{m.common.status}</TableHead>
                   <TableHead>{m.feedbackTickets.priority}</TableHead>
+                  <TableHead>{m.feedbackTickets.columns.sla}</TableHead>
                   <TableHead>{m.feedbackTickets.columns.tenant}</TableHead>
                   <TableHead>{m.feedbackTickets.columns.assignee}</TableHead>
                   <TableHead>{m.feedbackTickets.columns.created}</TableHead>
@@ -317,49 +447,78 @@ export function FeedbackTicketListView() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tickets.map((ticket) => (
-                  <TableRow key={ticket.id}>
-                    <TableCell>
-                      <div className="font-medium">{ticket.title}</div>
-                      <div className="text-xs text-muted-foreground">
-                        {ticket.id}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(ticket.status)}>
-                        {ticket.status === "open"
-                          ? m.common.statusLabels.open
-                          : ticket.status === "in_progress"
-                            ? m.common.statusLabels.inProgress
-                            : ticket.status === "resolved"
-                              ? m.common.statusLabels.resolved
-                              : m.common.statusLabels.closed}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {m.common.priorityLabels[
-                        ticket.priority as keyof typeof m.common.priorityLabels
-                      ] ?? ticket.priority}
-                    </TableCell>
-                    <TableCell>{ticket.tenantId ?? m.common.platform}</TableCell>
-                    <TableCell>
-                      {ticket.assigneeUserId ?? m.common.roleLabels.unassigned}
-                    </TableCell>
-                    <TableCell>
-                      {formatDateTime(ticket.createdAt) || m.common.invalidDate}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        onClick={() => loadTicketDetail(ticket.id)}
-                        size="sm"
-                        type="button"
-                        variant="outline"
+                {tickets.map((ticket) => {
+                  const checked = selectedIds.has(ticket.id);
+                  const sla = computeTicketSla(ticket);
+                  const isUrgent = ticket.priority === "urgent";
+                  const isOverdue = sla.status === "overdue";
+                  // Urgent tickets get a red left edge; overdue ones get a
+                  // destructive-tinted row. Both highlight together when both apply.
+                  const rowAccent = cn(
+                    isUrgent &&
+                      "border-l-2 border-l-destructive/70 bg-destructive/5",
+                    isOverdue &&
+                      !isUrgent &&
+                      "bg-amber-500/5",
+                  );
+
+                  return (
+                    <TableRow
+                      className={rowAccent}
+                      data-priority={isUrgent ? "urgent" : undefined}
+                      data-sla={sla.status}
+                      key={ticket.id}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          aria-label={`${m.feedbackTickets.batch.selectAll}: ${ticket.title}`}
+                          checked={checked}
+                          onCheckedChange={(value) =>
+                            toggleSelected(ticket.id, value === true)
+                          }
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium">{ticket.title}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {ticket.id}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusVariant(ticket.status)}>
+                          {statusLabel(m, ticket.status)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          isUrgent && "font-semibold text-destructive",
+                        )}
                       >
-                        {m.feedbackTickets.detail}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        {priorityLabel(m, ticket.priority)}
+                      </TableCell>
+                      <TableCell>
+                        <FeedbackTicketSlaBadge ticket={ticket} />
+                      </TableCell>
+                      <TableCell>{ticket.tenantId ?? m.common.platform}</TableCell>
+                      <TableCell>
+                        {ticket.assigneeUserId ?? m.common.roleLabels.unassigned}
+                      </TableCell>
+                      <TableCell>
+                        {formatDateTime(ticket.createdAt) || m.common.invalidDate}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          onClick={() => loadTicketDetail(ticket.id)}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          {m.feedbackTickets.detail}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}
@@ -424,6 +583,8 @@ export function FeedbackTicketListView() {
                 onUpdated={handleTicketUpdated}
                 ticketId={selectedTicket.id}
               />
+
+              <FeedbackTicketTimeline detail={selectedTicket} />
             </>
           ) : (
             <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">

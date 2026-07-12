@@ -5,6 +5,8 @@ import type {
   TenantBackupJobListItem,
   TenantBackupJobListQuery,
   TenantRestoreRequest,
+  TenantRestoreRequestListQuery,
+  TenantRestoreRequestListResult,
 } from "./backups.types";
 
 type TenantBackupRequestOptions = Omit<
@@ -36,5 +38,28 @@ export function createTenantBackupsApi(client: ApiClient) {
         input,
         options,
       ),
+
+    /**
+     * List the tenant's restore requests.
+     *
+     * Target endpoint: `GET /tenant/restore-requests`
+     *
+     * MOCK: returns an empty result set until the backend tenant restore-list
+     * route exists.
+     */
+    async listRestoreRequests(
+      query?: TenantRestoreRequestListQuery,
+      options: TenantBackupRequestOptions = {},
+    ): Promise<TenantRestoreRequestListResult> {
+      // MOCK — wire to backend later:
+      //   client.get<TenantRestoreRequestListResult>("/tenant/restore-requests", {
+      //     ...options,
+      //     query,
+      //   })
+      void client;
+      void options;
+      void query;
+      return { items: [], total: 0 };
+    },
   };
 }

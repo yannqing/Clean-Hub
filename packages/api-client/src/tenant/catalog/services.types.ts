@@ -25,10 +25,15 @@ export type CreateServiceRequest = {
   status?: ServiceStatus;
 };
 
-export type UpdateServiceRequest = Partial<CreateServiceRequest>;
+export type UpdateServiceRequest = Partial<CreateServiceRequest> & {
+  /** Optimistic-concurrency version from the record the editor last read. */
+  version: number;
+};
 
 export type UpdateServiceStatusRequest = {
   status: ServiceStatus;
+  /** Optimistic-concurrency version from the record the editor last read. */
+  version: number;
 };
 
 export type ServiceListQuery = {

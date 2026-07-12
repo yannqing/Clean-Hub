@@ -1,5 +1,6 @@
 "use client";
 
+import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import { useState } from "react";
 
@@ -72,9 +73,7 @@ export function AccountFormDialog({
       onSaved(result);
       onOpenChange(false);
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "保存失败，请重试。",
-      );
+      toast.error(getPosApiErrorMessage(error, "保存失败，请重试。"));
     } finally {
       setSubmitting(false);
     }

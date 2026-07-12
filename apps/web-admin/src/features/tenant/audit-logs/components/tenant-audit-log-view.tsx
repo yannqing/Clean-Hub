@@ -19,7 +19,11 @@ import {
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pagination } from "@/components/pagination";
-import { getAuditEventDescription } from "@/features/audit/event-description";
+import { useTenantI18n } from "@/i18n";
+import {
+  getAuditEventDescription,
+  getAuditEventTypesByCategory,
+} from "@/features/audit/event-description";
 
 import {
   getTenantAuditLogDetailQuery,
@@ -44,19 +48,30 @@ type CategoryFilter =
 
 type SuccessFilter = "all" | "true" | "false";
 
-const categoryOptions: { label: string; value: Exclude<CategoryFilter, "all"> }[] = [
-  { label: "Branches", value: "tenant_branch" },
-  { label: "Users", value: "tenant_user" },
-  { label: "Services", value: "tenant_service" },
-  { label: "Prices", value: "tenant_price" },
-  { label: "Hardware", value: "tenant_hardware" },
-  { label: "Notifications", value: "tenant_notification" },
-  { label: "Settings", value: "tenant_settings" },
-  { label: "Backups", value: "tenant_backup" },
-];
+const categoryEntries = [
+  { key: "branches", value: "tenant_branch" },
+  { key: "users", value: "tenant_user" },
+  { key: "services", value: "tenant_service" },
+  { key: "prices", value: "tenant_price" },
+  { key: "hardware", value: "tenant_hardware" },
+  { key: "notifications", value: "tenant_notification" },
+  { key: "settings", value: "tenant_settings" },
+  { key: "backups", value: "tenant_backup" },
+] as const satisfies {
+  key:
+    | "branches"
+    | "users"
+    | "services"
+    | "prices"
+    | "hardware"
+    | "notifications"
+    | "settings"
+    | "backups";
+  value: Exclude<CategoryFilter, "all">;
+}[];
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Failed to load audit logs.";
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function toIsoStart(value: string): string | undefined {
@@ -67,19 +82,8 @@ function toIsoEnd(value: string): string | undefined {
   return value ? new Date(`${value}T23:59:59.999`).toISOString() : undefined;
 }
 
-function formatDateTime(value: string): string {
-  return new Intl.DateTimeFormat("en", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function formatJson(value: Record<string, unknown> | null): string {
-  return value ? JSON.stringify(value, null, 2) : "None";
-}
-
-function getCategoryLabel(value: string): string {
-  return categoryOptions.find((option) => option.value === value)?.label ?? value;
+function formatJson(value: Record<string, unknown> | null, fallback: string): string {
+  return value ? JSON.stringify(value, null, 2) : fallback;
 }
 
 const TENANT_AUDIT_LOG_PAGE_SIZE = 50;
@@ -89,6 +93,7 @@ function getStatusVariant(success: boolean): "default" | "destructive" {
 }
 
 export function TenantAuditLogView() {
+  const { m, formatDateTime } = useTenantI18n();
   const [logs, setLogs] = useState<TenantAuditLogSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -134,11 +139,11 @@ export function TenantAuditLogView() {
       setLogs(result.items);
       setTotal(result.total);
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(getErrorMessage(loadError, m.auditLogs.requestFailed));
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, m.auditLogs.requestFailed]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -155,7 +160,7 @@ export function TenantAuditLogView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(getErrorMessage(loadError, m.auditLogs.requestFailed));
         }
       })
       .finally(() => {
@@ -167,7 +172,7 @@ export function TenantAuditLogView() {
     return () => {
       isCurrent = false;
     };
-  }, [filters]);
+  }, [filters, m.auditLogs.requestFailed]);
 
   async function handleSelectLog(logId: string) {
     setDetailLoading(true);
@@ -176,34 +181,58 @@ export function TenantAuditLogView() {
     try {
       setSelectedLog(await getTenantAuditLogDetailQuery(logId));
     } catch (selectError) {
-      setDetailError(getErrorMessage(selectError));
+      setDetailError(getErrorMessage(selectError, m.auditLogs.requestFailed));
     } finally {
       setDetailLoading(false);
     }
   }
 
+  const getCategoryLabel = useCallback(
+    (value: string): string => {
+      const entry = categoryEntries.find((option) => option.value === value);
+      return entry ? m.auditLogs.categoryLabels[entry.key] : value;
+    },
+    [m.auditLogs.categoryLabels],
+  );
+
+  // Cascading eventType options: when a category is picked, only its event
+  // types are offered. With "all" selected, every known event type is listed so
+  // operators can still pick a specific one without narrowing by category.
+  const eventTypeOptions = useMemo(
+    () =>
+      getAuditEventTypesByCategory(
+        category === "all" ? undefined : category,
+      ),
+    [category],
+  );
+
+  const handleCategoryChange = useCallback((value: string) => {
+    setCategory(value as CategoryFilter);
+    setEventType("");
+    resetFiltersAndOffset();
+  }, [resetFiltersAndOffset]);
+
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">Tenant audit</Badge>
+          <Badge variant="secondary">{m.auditLogs.eyebrow}</Badge>
           <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            Operation Logs
+            {m.auditLogs.title}
           </h1>
         </div>
 
         <Button onClick={loadLogs} type="button" variant="outline">
-          Refresh
+          {m.common.refresh}
         </Button>
       </div>
 
       <div className="grid gap-3 border-b p-5 lg:grid-cols-[180px_1fr_1fr_160px_160px_160px]">
         <div className="grid gap-2">
-          <Label htmlFor="audit-category">Category</Label>
+          <Label htmlFor="audit-category">{m.auditLogs.formLabels.category}</Label>
           <Select
             onValueChange={(value) => {
-              resetFiltersAndOffset();
-              setCategory(value as CategoryFilter);
+              handleCategoryChange(value);
             }}
             value={category}
           >
@@ -211,8 +240,33 @@ export function TenantAuditLogView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
-              {categoryOptions.map((option) => (
+              <SelectItem value="all">{m.auditLogs.allCategories}</SelectItem>
+              {categoryEntries.map((entry) => (
+                <SelectItem key={entry.value} value={entry.value}>
+                  {m.auditLogs.categoryLabels[entry.key]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-2">
+          <Label htmlFor="audit-event-type">
+            {m.auditLogs.formLabels.eventType}
+          </Label>
+          <Select
+            onValueChange={(value) => {
+              resetFiltersAndOffset();
+              setEventType(value === "all" ? "" : value);
+            }}
+            value={eventType || "all"}
+          >
+            <SelectTrigger id="audit-event-type">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{m.auditLogs.allEventTypes}</SelectItem>
+              {eventTypeOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
@@ -222,33 +276,21 @@ export function TenantAuditLogView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="audit-event-type">Event type</Label>
-          <Input
-            id="audit-event-type"
-            onChange={(event) => {
-              resetFiltersAndOffset();
-              setEventType(event.target.value);
-            }}
-            placeholder="service.updated"
-            value={eventType}
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="audit-branch-id">Branch ID</Label>
+          <Label htmlFor="audit-branch-id">
+            {m.auditLogs.formLabels.branchId}
+          </Label>
           <Input
             id="audit-branch-id"
             onChange={(event) => {
               resetFiltersAndOffset();
               setBranchId(event.target.value);
             }}
-            placeholder="Optional"
             value={branchId}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="audit-success">Result</Label>
+          <Label htmlFor="audit-success">{m.auditLogs.formLabels.result}</Label>
           <Select
             onValueChange={(value) => {
               resetFiltersAndOffset();
@@ -260,15 +302,15 @@ export function TenantAuditLogView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All results</SelectItem>
-              <SelectItem value="true">Success</SelectItem>
-              <SelectItem value="false">Failed</SelectItem>
+              <SelectItem value="all">{m.auditLogs.allResults}</SelectItem>
+              <SelectItem value="true">{m.auditLogs.successLabel}</SelectItem>
+              <SelectItem value="false">{m.auditLogs.failedLabel}</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="audit-date-from">From</Label>
+          <Label htmlFor="audit-date-from">{m.auditLogs.formLabels.from}</Label>
           <Input
             id="audit-date-from"
             onChange={(event) => {
@@ -281,7 +323,7 @@ export function TenantAuditLogView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="audit-date-to">To</Label>
+          <Label htmlFor="audit-date-to">{m.auditLogs.formLabels.to}</Label>
           <Input
             id="audit-date-to"
             onChange={(event) => {
@@ -296,11 +338,11 @@ export function TenantAuditLogView() {
 
       <Pagination
         currentPageCount={logs.length}
-        nextLabel="Next"
+        nextLabel={m.common.next}
         offset={offset}
         onOffsetChange={setOffset}
         pageSize={TENANT_AUDIT_LOG_PAGE_SIZE}
-        previousLabel="Previous"
+        previousLabel={m.common.previous}
         total={total}
       />
 
@@ -319,20 +361,22 @@ export function TenantAuditLogView() {
       ) : logs.length === 0 ? (
         <div className="p-5">
           <div className="rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">No audit logs found</h2>
+            <h2 className="text-base font-semibold">{m.auditLogs.empty}</h2>
           </div>
         </div>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Time</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Event</TableHead>
-              <TableHead>Entity</TableHead>
-              <TableHead>Actor</TableHead>
-              <TableHead>Result</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{m.auditLogs.columns.time}</TableHead>
+              <TableHead>{m.auditLogs.columns.category}</TableHead>
+              <TableHead>{m.auditLogs.columns.event}</TableHead>
+              <TableHead>{m.auditLogs.columns.entity}</TableHead>
+              <TableHead>{m.auditLogs.columns.actor}</TableHead>
+              <TableHead>{m.auditLogs.columns.result}</TableHead>
+              <TableHead className="text-right">
+                {m.auditLogs.columns.actions}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -342,20 +386,28 @@ export function TenantAuditLogView() {
                 <TableCell>{getCategoryLabel(log.eventCategory)}</TableCell>
                 <TableCell>{getAuditEventDescription(log.eventType)}</TableCell>
                 <TableCell>
-                  <div>{log.entityType ?? "Unknown"}</div>
+                  <div>
+                    {log.entityType ?? m.auditLogs.placeholders.unknownEntity}
+                  </div>
                   <div className="text-xs text-muted-foreground">
-                    {log.entityId ?? "No entity"}
+                    {log.entityId ?? m.auditLogs.placeholders.noEntity}
                   </div>
                 </TableCell>
                 <TableCell>
-                  <div>{log.actorDisplayName ?? log.actorUserId ?? "System"}</div>
+                  <div>
+                    {log.actorDisplayName ??
+                      log.actorUserId ??
+                      m.auditLogs.placeholders.systemActor}
+                  </div>
                   <div className="text-xs text-muted-foreground">
-                    {log.ipAddress ?? "No IP"}
+                    {log.ipAddress ?? m.auditLogs.placeholders.noIp}
                   </div>
                 </TableCell>
                 <TableCell>
                   <Badge variant={getStatusVariant(log.success)}>
-                    {log.success ? "Success" : "Failed"}
+                    {log.success
+                      ? m.auditLogs.successLabel
+                      : m.auditLogs.failedLabel}
                   </Badge>
                 </TableCell>
                 <TableCell className="text-right">
@@ -366,7 +418,7 @@ export function TenantAuditLogView() {
                     type="button"
                     variant="outline"
                   >
-                    Detail
+                    {m.common.details}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -376,7 +428,7 @@ export function TenantAuditLogView() {
       )}
 
       <div className="border-t p-5">
-        <h2 className="text-base font-semibold">Selected log detail</h2>
+        <h2 className="text-base font-semibold">{m.auditLogs.selectedDetail}</h2>
         {detailError ? (
           <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
             {detailError}
@@ -385,7 +437,7 @@ export function TenantAuditLogView() {
           <div className="mt-3 grid gap-4 lg:grid-cols-3">
             <div className="rounded-md border p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Event
+                {m.auditLogs.detailLabels.event}
               </p>
               <p className="mt-2 font-medium">
                 {getAuditEventDescription(selectedLog.eventType)}
@@ -396,33 +448,33 @@ export function TenantAuditLogView() {
             </div>
             <div className="rounded-md border p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Branch
+                {m.auditLogs.detailLabels.branch}
               </p>
               <p className="mt-2 font-medium">
-                {selectedLog.branchId ?? "Tenant scope"}
+                {selectedLog.branchId ?? m.auditLogs.detailLabels.tenantScope}
               </p>
             </div>
             <div className="rounded-md border p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                User agent
+                {m.auditLogs.detailLabels.userAgent}
               </p>
               <p className="mt-2 truncate text-sm">
-                {selectedLog.userAgent ?? "Not captured"}
+                {selectedLog.userAgent ?? m.auditLogs.detailLabels.notCaptured}
               </p>
             </div>
             <pre className="max-h-80 overflow-auto rounded-md border bg-muted/40 p-4 text-xs lg:col-span-1">
-              {formatJson(selectedLog.before)}
+              {formatJson(selectedLog.before, m.auditLogs.detailLabels.noJson)}
             </pre>
             <pre className="max-h-80 overflow-auto rounded-md border bg-muted/40 p-4 text-xs lg:col-span-1">
-              {formatJson(selectedLog.after)}
+              {formatJson(selectedLog.after, m.auditLogs.detailLabels.noJson)}
             </pre>
             <pre className="max-h-80 overflow-auto rounded-md border bg-muted/40 p-4 text-xs lg:col-span-1">
-              {formatJson(selectedLog.metadata)}
+              {formatJson(selectedLog.metadata, m.auditLogs.detailLabels.noJson)}
             </pre>
           </div>
         ) : (
           <p className="mt-3 text-sm text-muted-foreground">
-            Select a log row to inspect before, after, and metadata payloads.
+            {m.auditLogs.selectLogHint}
           </p>
         )}
       </div>

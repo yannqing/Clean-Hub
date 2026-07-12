@@ -4,7 +4,7 @@ import { cn } from "@cleanhub/ui";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { LogoutButton } from "@/features/auth/components";
@@ -77,12 +77,45 @@ function localizeProfileName(
   return name;
 }
 
+function resolveActivePathname(
+  pathname: string,
+  searchParams: Pick<URLSearchParams, "get">,
+): string {
+  const entrySource = searchParams.get("from");
+  const ticketEntrySource = searchParams.get("ticketFrom");
+
+  if (
+    entrySource === "intake" &&
+    (pathname.startsWith("/customers/") || pathname.startsWith("/tickets/"))
+  ) {
+    return posRoutes.newIntake;
+  }
+
+  if (entrySource === "customer" && pathname.startsWith("/tickets/")) {
+    return posRoutes.customers;
+  }
+
+  if (entrySource === "ticket" && pathname.startsWith("/orders/")) {
+    if (ticketEntrySource === "intake") {
+      return posRoutes.newIntake;
+    }
+    if (ticketEntrySource === "customer") {
+      return posRoutes.customers;
+    }
+    return posRoutes.tickets;
+  }
+
+  return pathname;
+}
+
 export function PosShell({
   children,
   notificationUnreadCount = 0,
   profile,
 }: PosShellProps) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activePathname = resolveActivePathname(pathname, searchParams);
   const { locale, t } = useTranslation();
   const [currentUnreadCount, setCurrentUnreadCount] = useState(
     notificationUnreadCount,
@@ -106,7 +139,6 @@ export function PosShell({
     locale === "zh-CN"
       ? resolvedProfile.initials
       : (roleLabel.trim()[0]?.toUpperCase() ?? resolvedProfile.initials);
-
   return (
     <div className="flex h-screen overflow-hidden bg-[#F7F9FC] text-slate-900">
       <aside
@@ -152,7 +184,7 @@ export function PosShell({
                 </div>
                 <div className="space-y-1">
                   {section.items.map((item) => {
-                    const active = isActivePath(pathname, item.href);
+                    const active = isActivePath(activePathname, item.href);
                     const label = t(item.labelKey);
                     const showUnreadIndicator =
                       hasUnreadNotifications &&
@@ -241,13 +273,14 @@ export function PosShell({
               {t("pos.shell.synced")}
             </div>
             <LanguageSwitcher />
-            <button
+            <LogoutButton
+              aria-label={t("pos.shell.lockScreen")}
               className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              type="button"
+              signOutLabel={t("pos.shell.lockScreen")}
             >
               <Icon className="h-4 w-4 text-slate-500" name="lock" />
               {t("pos.shell.lockScreen")}
-            </button>
+            </LogoutButton>
             <HeaderNotificationsMenu
               onUnreadCountChange={setCurrentUnreadCount}
               unreadCount={currentUnreadCount}

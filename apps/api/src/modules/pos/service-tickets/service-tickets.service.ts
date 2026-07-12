@@ -253,6 +253,7 @@ export async function createPosServiceTicket(
   return db.transaction(async (tx) => {
     const summary = await createServiceTicketRecord(tx, {
       ...data,
+      assistantId: authContext.userId,
       tenantId,
       actorUserId: authContext.userId,
     });

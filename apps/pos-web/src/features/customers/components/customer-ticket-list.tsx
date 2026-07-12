@@ -20,6 +20,7 @@ type CustomerTicketListProps = {
   customerId: string;
   /** Max rows per page. */
   pageSize?: number;
+  ticketDetailHref?: (ticketId: string) => string;
 };
 
 const DEFAULT_PAGE_SIZE = 10;
@@ -42,6 +43,7 @@ const SERVICE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
 export function CustomerTicketList({
   customerId,
   pageSize = DEFAULT_PAGE_SIZE,
+  ticketDetailHref,
 }: CustomerTicketListProps) {
   const router = useRouter();
   const { locale } = useTranslation();
@@ -172,7 +174,9 @@ export function CustomerTicketList({
                   className="grid w-full grid-cols-[1.2fr_1.1fr_90px_130px_150px] items-center border-t border-slate-100 px-5 py-4 text-left text-sm transition hover:bg-blue-50/40"
                   key={ticket.id}
                   type="button"
-                  onClick={() => router.push(`/tickets/${ticket.id}`)}
+                  onClick={() =>
+                    router.push(ticketDetailHref?.(ticket.id) ?? `/tickets/${ticket.id}`)
+                  }
                 >
                   <div>
                     <div className="font-mono text-xs font-semibold text-blue-700">

@@ -2,14 +2,14 @@ import {
   type Database,
   customerAccounts,
   customers,
-  getDb,
+  orders,
+  serviceTickets,
 } from "@cleanhub/db";
 import {
   type SQL,
   and,
-  count,
   eq,
-  gte,
+  inArray,
   isNull,
   sql,
 } from "drizzle-orm";
@@ -24,28 +24,23 @@ import type {
 } from "./statistics.types.js";
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function getPeriodStart(period?: string): Date | null {
-  if (!period || period === "all") {
-    return null;
-  }
-  const now = new Date();
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  if (period === "today") {
-    return today;
-  }
-  if (period === "week") {
-    return new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000);
-  }
-  // month
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
-}
-
-// ---------------------------------------------------------------------------
 // Customer statistics
 // ---------------------------------------------------------------------------
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function getLastSevenUtcDates(): string[] {
+  const now = new Date();
+  const todayUtc = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate(),
+  );
+
+  return Array.from({ length: 7 }, (_, index) =>
+    new Date(todayUtc - (6 - index) * DAY_MS).toISOString().slice(0, 10),
+  );
+}
 
 export async function findCustomerStatistics(
   db: Database,
@@ -59,28 +54,136 @@ export async function findCustomerStatistics(
     eq(customerAccounts.tenantId, input.tenantId),
     isNull(customerAccounts.deletedAt),
   ];
+  const profileFilters: SQL[] = [
+    eq(customers.tenantId, input.tenantId),
+    isNull(customers.deletedAt),
+  ];
 
-  // Total customer count
-  const totalRows = await db
-    .select({ value: count() })
+  const accountSummaryRows = await db
+    .select({
+      totalCount: sql<number>`count(*)::int`,
+      activeCount: sql<number>`count(*) filter (where ${customerAccounts.status} = 'active')::int`,
+      disabledCount: sql<number>`count(*) filter (where ${customerAccounts.status} = 'disabled')::int`,
+    })
     .from(customerAccounts)
     .where(and(...baseFilters));
 
-  // Today's new customers
   const todayUtcStart = sql`date_trunc('day', now() AT TIME ZONE 'UTC')`;
-  const todayRows = await db
-    .select({ value: count() })
-    .from(customerAccounts)
-    .where(
-      and(
-        ...baseFilters,
-        sql`${customerAccounts.createdAt} >= ${todayUtcStart}`,
+  const sevenDayUtcStart = sql`date_trunc('day', now() AT TIME ZONE 'UTC') - interval '6 days'`;
+  const accountCreatedDate = sql<string>`to_char(${customerAccounts.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`;
+
+  const [todayRows, profileSummaryRows, dailyRows] = await Promise.all([
+    db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(customerAccounts)
+      .where(
+        and(
+          ...baseFilters,
+          sql`${customerAccounts.createdAt} >= ${todayUtcStart}`,
+        ),
       ),
-    );
+    db
+      .select({
+        profileCount: sql<number>`count(*)::int`,
+        activeProfileCount: sql<number>`count(*) filter (where ${customers.status} = 'active')::int`,
+        disabledProfileCount: sql<number>`count(*) filter (where ${customers.status} = 'disabled')::int`,
+        todayNewProfileCount: sql<number>`count(*) filter (where ${customers.createdAt} >= ${todayUtcStart})::int`,
+      })
+      .from(customers)
+      .where(and(...profileFilters)),
+    db
+      .select({
+        date: accountCreatedDate,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(customerAccounts)
+      .where(
+        and(
+          ...baseFilters,
+          sql`${customerAccounts.createdAt} >= ${sevenDayUtcStart}`,
+        ),
+      )
+      .groupBy(accountCreatedDate),
+  ]);
+
+  const orderFilters: SQL[] = [
+    eq(orders.tenantId, input.tenantId),
+    isNull(orders.deletedAt),
+  ];
+  const ticketFilters: SQL[] = [
+    eq(serviceTickets.tenantId, input.tenantId),
+    isNull(serviceTickets.deletedAt),
+  ];
+  let hasBranchScope = true;
+
+  if (input.allowedBranchIds !== undefined) {
+    if (input.allowedBranchIds.length === 0) {
+      hasBranchScope = false;
+    } else {
+      orderFilters.push(inArray(orders.branchId, input.allowedBranchIds));
+      ticketFilters.push(
+        inArray(serviceTickets.branchId, input.allowedBranchIds),
+      );
+    }
+  }
+
+  if (input.branchId) {
+    orderFilters.push(eq(orders.branchId, input.branchId));
+    ticketFilters.push(eq(serviceTickets.branchId, input.branchId));
+  }
+
+  const [orderCustomerRows, ticketCustomerRows] = hasBranchScope
+    ? await Promise.all([
+        db
+          .select({
+            customerId: orders.customerId,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(orders)
+          .where(and(...orderFilters))
+          .groupBy(orders.customerId),
+        db
+          .select({
+            customerId: serviceTickets.customerId,
+            count: sql<number>`count(*)::int`,
+          })
+          .from(serviceTickets)
+          .where(and(...ticketFilters))
+          .groupBy(serviceTickets.customerId),
+      ])
+    : [[], []];
+
+  const accountSummary = accountSummaryRows[0];
+  const profileSummary = profileSummaryRows[0];
+  const dailyCounts = new Map(dailyRows.map((row) => [row.date, row.count]));
+  const engagedCustomerIds = new Set<string>();
+  for (const row of orderCustomerRows) {
+    engagedCustomerIds.add(row.customerId);
+  }
+  for (const row of ticketCustomerRows) {
+    engagedCustomerIds.add(row.customerId);
+  }
 
   return {
-    totalCount: totalRows[0]?.value ?? 0,
+    totalCount: accountSummary?.totalCount ?? 0,
     todayNewCount: todayRows[0]?.value ?? 0,
+    activeCount: accountSummary?.activeCount ?? 0,
+    disabledCount: accountSummary?.disabledCount ?? 0,
+    profileCount: profileSummary?.profileCount ?? 0,
+    activeProfileCount: profileSummary?.activeProfileCount ?? 0,
+    disabledProfileCount: profileSummary?.disabledProfileCount ?? 0,
+    todayNewProfileCount: profileSummary?.todayNewProfileCount ?? 0,
+    orderedCustomerCount: orderCustomerRows.length,
+    ticketedCustomerCount: ticketCustomerRows.length,
+    engagedCustomerCount: engagedCustomerIds.size,
+    repeatOrderCustomerCount: orderCustomerRows.filter((row) => row.count >= 2)
+      .length,
+    repeatTicketCustomerCount: ticketCustomerRows.filter((row) => row.count >= 2)
+      .length,
+    sevenDayNewAccounts: getLastSevenUtcDates().map((date) => ({
+      date,
+      count: dailyCounts.get(date) ?? 0,
+    })),
   };
 }
 

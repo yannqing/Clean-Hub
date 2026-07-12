@@ -7,7 +7,7 @@ import type {
   PosOrderType,
 } from "@cleanhub/api-client";
 
-import { Icon } from "@/components/app-shell";
+import { Icon, PosBreadcrumb } from "@/components/app-shell";
 
 import {
   DEFAULT_ORDER_PAGE_SIZE,
@@ -146,11 +146,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
   return (
     <section>
-      <div className="mb-5 flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-        <span>POS</span>
-        <Icon className="h-3.5 w-3.5" name="chevron-right" />
-        <span className="text-slate-600">订单管理</span>
-      </div>
+      <PosBreadcrumb className="mb-5" items={[{ label: "订单管理" }]} />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>

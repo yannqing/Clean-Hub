@@ -181,7 +181,7 @@ http://localhost:3001
 ```
 
 POS Web 采用与 Web Admin 一致的双 Token（access + refresh）登录。POS 终端为单店设备，
-门店编码（tenantCode）从环境变量读取，无需在登录页输入。完成数据库 seed 后即可使用收银员账号登录。
+门店编码（tenantCode）从环境变量读取，无需在登录页输入。完成数据库 seed 后即可使用收银员 PIN 登录。
 
 初始化收银员 seed 数据（需先执行 `pnpm db:up` + `pnpm db:migrate`）：
 
@@ -189,11 +189,12 @@ POS Web 采用与 Web Admin 一致的双 Token（access + refresh）登录。POS
 pnpm db:seed
 ```
 
-登录账号（四个账号密码相同）：
+登录凭据：
 
 ```text
 邮箱：    pos.cashier1@cleanhub.local   （以及 cashier2 / cashier3 / cashier4）
 密码：    123456
+PIN：     cashier1=111111，cashier2=222222，cashier3=333333，cashier4=444444
 门店编码：CLEAN-001  （通过 POS_TENANT_CODE 配置，见下）
 ```
 

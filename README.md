@@ -182,7 +182,7 @@ http://localhost:3001
 
 POS Web uses dual-token (access + refresh) authentication shared with Web Admin.
 The terminal is single-store, so the tenant binding is read from env, not entered
-per login. After seeding the database, sign in with a cashier account.
+per login. After seeding the database, sign in with a cashier PIN.
 
 Seed cashier accounts (requires `pnpm db:up` + `pnpm db:migrate` first):
 
@@ -190,11 +190,12 @@ Seed cashier accounts (requires `pnpm db:up` + `pnpm db:migrate` first):
 pnpm db:seed
 ```
 
-Sign-in credentials (all four accounts share the same password):
+Sign-in credentials:
 
 ```text
 Email:    pos.cashier1@cleanhub.local   (also cashier2 / cashier3 / cashier4)
 Password: 123456
+PIN:      cashier1=111111, cashier2=222222, cashier3=333333, cashier4=444444
 Tenant:   CLEAN-001  (configured via POS_TENANT_CODE, see below)
 ```
 

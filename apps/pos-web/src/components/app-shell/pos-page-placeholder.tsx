@@ -1,6 +1,7 @@
 import type { PosIconName } from "./icons";
 
 import { Icon } from "./icons";
+import { PosBreadcrumb } from "./pos-breadcrumb";
 
 type PosPagePlaceholderProps = {
   icon: PosIconName;
@@ -17,11 +18,7 @@ export function PosPagePlaceholder({
 }: PosPagePlaceholderProps) {
   return (
     <section>
-      <div className="mb-5 flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-        <span>POS</span>
-        <Icon className="h-3.5 w-3.5" name="chevron-right" />
-        <span className="text-slate-600">{breadcrumb}</span>
-      </div>
+      <PosBreadcrumb className="mb-5" items={[{ label: breadcrumb }]} />
 
       <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">

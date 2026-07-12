@@ -8,6 +8,8 @@ import {
 } from "@cleanhub/ui";
 import { useState, type FormEvent } from "react";
 
+import { useTenantI18n } from "@/i18n";
+
 import { createTenantBackupJobAction } from "../actions";
 import type { BackupJobListItem } from "../types";
 
@@ -16,6 +18,7 @@ type CreateBackupJobFormProps = {
 };
 
 export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
+  const { m } = useTenantI18n();
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -28,7 +31,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
     });
 
     if (result.ok) {
-      toast.success("Backup task record created.");
+      toast.success(m.backups.manualBackup.createdToast);
       setReason("");
       onCreated(result.data);
     } else {
@@ -41,27 +44,32 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
   return (
     <form className="grid gap-4 rounded-md border p-4" onSubmit={handleSubmit}>
       <div>
-        <h2 className="text-base font-semibold">Manual Backup</h2>
+        <h2 className="text-base font-semibold">
+          {m.backups.manualBackup.title}
+        </h2>
         <p className="text-sm text-muted-foreground">
-          Creates a tenant-scoped task record only. Database dump execution is
-          handled outside this tenant console.
+          {m.backups.manualBackup.description}
         </p>
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="tenant-backup-reason">Reason</Label>
+        <Label htmlFor="tenant-backup-reason">
+          {m.backups.manualBackup.reason}
+        </Label>
         <Textarea
           id="tenant-backup-reason"
           maxLength={500}
           onChange={(event) => setReason(event.target.value)}
-          placeholder="Optional note for this backup task"
+          placeholder={m.backups.manualBackup.reasonPlaceholder}
           value={reason}
         />
       </div>
 
       <div className="flex justify-end">
         <Button disabled={submitting} type="submit">
-          {submitting ? "Creating..." : "Create backup task"}
+          {submitting
+            ? m.backups.manualBackup.creating
+            : m.backups.manualBackup.action}
         </Button>
       </div>
     </form>

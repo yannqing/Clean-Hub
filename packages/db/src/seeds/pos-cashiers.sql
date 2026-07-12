@@ -6,9 +6,14 @@
 -- Idempotent: safe to run repeatedly via ON CONFLICT ... DO UPDATE.
 -- Run after dev-accounts.sql (this file assumes the tenant row exists).
 --
--- Credentials (all 4 accounts):
+-- Credentials:
 --   Password: 123456   (scrypt$16384$8$1$...)
---   PIN:      123456   (same value as dev-accounts.sql; column is NOT NULL)
+--   PINs are unique inside the demo store so PIN-only POS login can identify
+--   one cashier without asking for an email:
+--     cashier1: 111111
+--     cashier2: 222222
+--     cashier3: 333333
+--     cashier4: 444444
 --
 -- Accounts (tenantCode: CLEAN-001):
 --   pos.cashier1@cleanhub.local
@@ -16,10 +21,9 @@
 --   pos.cashier3@cleanhub.local
 --   pos.cashier4@cleanhub.local
 
--- Reuse the exact scrypt hashes used by dev-accounts.sql so the credentials
--- match the documented "Password: 123456 / PIN: 123456".
+-- Reuse the exact password hash used by dev-accounts.sql while keeping
+-- per-cashier PIN hashes unique.
 --   password_hash = scrypt of "123456"
---   pin_hash      = scrypt of "123456"
 
 -- 1) Cashier role for Demo Tenant 1 (absent from dev-accounts.sql).
 INSERT INTO roles (id, tenant_id, scope, code, name, description, status, is_system)
@@ -101,7 +105,7 @@ VALUES
     'pos.cashier1@cleanhub.local',
     'pos.cashier1@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
+    'scrypt$16384$8$1$7ugUwkZpcy6LP3VgB0KPsw$5t0vJzCFF9emiEphspE9eyUKiOqhb90uWtPziVLDyaOrN6ZloVmIJ4nmIqhdu0-5qUSyQabA6Rc7AmSSTWYnJg',
     'active'
   ),
   (
@@ -111,7 +115,7 @@ VALUES
     'pos.cashier2@cleanhub.local',
     'pos.cashier2@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
+    'scrypt$16384$8$1$pS_-EXvVi_eAbcoazT8WgA$44Hz_hg6WZ2PsaAJerwjZGqQ1WUxYiiKnRV-tE6wfHLxNXSgfsHaUPiPgGx9hWgeTOLUBwbE0vKTkhV3hZ_wTQ',
     'active'
   ),
   (
@@ -121,7 +125,7 @@ VALUES
     'pos.cashier3@cleanhub.local',
     'pos.cashier3@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
+    'scrypt$16384$8$1$T2X9vBzDLGgM4-tJ1pbDZQ$b59hH78n4adrWDpfMpv8SEL48Ner__sVYUnEGalzxcura0D-KIQJ5xBAOJk7YFdeNCPMWjdI2I_Wu2gg1X1bIg',
     'active'
   ),
   (
@@ -131,7 +135,7 @@ VALUES
     'pos.cashier4@cleanhub.local',
     'pos.cashier4@cleanhub.local',
     'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
-    'scrypt$16384$8$1$O7xxPy2DQrG9YMNu-u_xog$G7NCynZTZJSR7BIhTSKeS3HZ2j1ndbqocnAiB7KNg6lSnRW3pvuoriUZ6fiIrkL8GDI1E77IoL6zGKf4YHLZjA',
+    'scrypt$16384$8$1$H4ynKAmeCRh3ecwQzj3Pjg$OEoejBuNwZnZKkr8-g42uUb5jioSa-VgHRmlGklmVTeIMsyWwHdr_QYRP9ULHK0OCTThOgAYHhfL6sVoBgavxQ',
     'active'
   )
 ON CONFLICT (id) DO UPDATE

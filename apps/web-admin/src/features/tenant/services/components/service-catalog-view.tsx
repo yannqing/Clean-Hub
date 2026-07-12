@@ -25,6 +25,9 @@ import {
 } from "@cleanhub/ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { interpolate, useTenantI18n } from "@/i18n";
+import { isVersionConflict } from "@/features/tenant/shared/version-conflict";
+
 import {
   createServiceAction,
   deleteServiceAction,
@@ -42,22 +45,12 @@ import type {
 type BusinessLineFilter = "all" | ServiceBusinessLine;
 type StatusFilter = "all" | ServiceStatus;
 
-const businessLineOptions: { label: string; value: ServiceBusinessLine }[] = [
-  { label: "Laundry", value: "laundry" },
-  { label: "Car wash", value: "car_wash" },
-  { label: "Retail", value: "retail" },
-  { label: "Delivery", value: "delivery" },
+const businessLineValues: ServiceBusinessLine[] = [
+  "laundry",
+  "car_wash",
+  "retail",
+  "delivery",
 ];
-
-const pricingUnitLabels = {
-  per_item: "Per item",
-  per_kg: "Per kg",
-};
-
-const statusLabels = {
-  active: "Active",
-  inactive: "Inactive",
-};
 
 const defaultFormValues: ServiceFormValues = {
   businessLine: "laundry",
@@ -65,10 +58,11 @@ const defaultFormValues: ServiceFormValues = {
   categoryId: "",
   pricingUnit: "per_item",
   status: "active",
+  version: 0,
 };
 
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Service request failed.";
+function getErrorMessage(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
 
 function toFormValues(service: ServiceSummary): ServiceFormValues {
@@ -78,14 +72,22 @@ function toFormValues(service: ServiceSummary): ServiceFormValues {
     categoryId: service.categoryId ?? "",
     pricingUnit: service.pricingUnit,
     status: service.status,
+    version: service.version,
   };
 }
 
-function formatBusinessLine(value: ServiceBusinessLine): string {
-  return businessLineOptions.find((option) => option.value === value)?.label ?? value;
-}
-
 export function ServiceCatalogView() {
+  const { m } = useTenantI18n();
+
+  const businessLineOptions = useMemo(
+    () =>
+      businessLineValues.map((value) => ({
+        value,
+        label: m.common.businessLineLabels[value],
+      })),
+    [m],
+  );
+
   const [services, setServices] = useState<ServiceSummary[]>([]);
   const [businessLine, setBusinessLine] = useState<BusinessLineFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -115,11 +117,11 @@ export function ServiceCatalogView() {
     try {
       setServices(await getServiceListQuery(filters));
     } catch (loadError) {
-      setError(getErrorMessage(loadError));
+      setError(getErrorMessage(loadError, m.services.requestFailed));
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters, m.services.requestFailed]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -133,7 +135,7 @@ export function ServiceCatalogView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setError(getErrorMessage(loadError));
+          setError(getErrorMessage(loadError, m.services.requestFailed));
         }
       })
       .finally(() => {
@@ -145,7 +147,7 @@ export function ServiceCatalogView() {
     return () => {
       isCurrent = false;
     };
-  }, [filters]);
+  }, [filters, m.services.requestFailed]);
 
   async function handleSubmit() {
     setSaving(true);
@@ -157,7 +159,16 @@ export function ServiceCatalogView() {
         : await createServiceAction(formValues);
 
       if (!result.ok) {
-        setFormError(Object.values(result.errors)[0] ?? "Check the service form.");
+        const conflict = isVersionConflict(result);
+        const nextMessage = conflict
+          ? m.services.versionConflict
+          : Object.values(result.errors)[0] ??
+            result.message ??
+            m.services.formFallbackError;
+        setFormError(nextMessage);
+        if (conflict) {
+          toast.error(nextMessage);
+        }
         return;
       }
 
@@ -165,7 +176,7 @@ export function ServiceCatalogView() {
       setEditingServiceId(null);
       await loadServices();
     } catch (submitError) {
-      setFormError(getErrorMessage(submitError));
+      setFormError(getErrorMessage(submitError, m.services.requestFailed));
     } finally {
       setSaving(false);
     }
@@ -174,64 +185,79 @@ export function ServiceCatalogView() {
   async function handleDelete(service: ServiceSummary) {
     setDeleting(true);
 
-    try {
-      await deleteServiceAction(service.id);
-      toast.success(`Deleted "${service.name}".`);
-      setPendingDelete(null);
-      await loadServices();
-    } catch (deleteError) {
-      toast.error(getErrorMessage(deleteError));
-    } finally {
+    const result = await deleteServiceAction(service.id);
+
+    if (!result.ok) {
+      const nextMessage = isVersionConflict(result)
+        ? m.services.versionConflict
+        : (result.message ?? m.services.requestFailed);
+      toast.error(nextMessage);
       setDeleting(false);
+      return;
     }
+
+    toast.success(interpolate(m.services.deletedToast, { name: service.name }));
+    setPendingDelete(null);
+    await loadServices();
+    setDeleting(false);
   }
 
   async function handleStatusChange(service: ServiceSummary) {
     setSaving(true);
     setFormError(null);
 
-    try {
-      await updateServiceStatusAction(
-        service.id,
-        service.status === "active" ? "inactive" : "active",
+    const result = await updateServiceStatusAction(
+      service.id,
+      service.status === "active" ? "inactive" : "active",
+      service.version,
+    );
+
+    if (!result.ok) {
+      setFormError(
+        isVersionConflict(result)
+          ? m.services.versionConflict
+          : (result.message ?? m.services.requestFailed),
       );
+    } else {
       await loadServices();
-    } catch (statusError) {
-      setFormError(getErrorMessage(statusError));
-    } finally {
-      setSaving(false);
     }
+
+    setSaving(false);
   }
 
   return (
     <section className="min-h-[560px]">
       <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <Badge variant="secondary">Tenant catalog</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">Services</h1>
+          <Badge variant="secondary">{m.services.eyebrow}</Badge>
+          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
+            {m.services.title}
+          </h1>
         </div>
 
         <Button onClick={loadServices} type="button" variant="outline">
-          Refresh
+          {m.common.refresh}
         </Button>
       </div>
 
       <div className="grid gap-3 border-b p-5 lg:grid-cols-[1fr_180px_180px]">
         <div className="grid gap-2">
-          <Label htmlFor="service-search">Search</Label>
+          <Label htmlFor="service-search">{m.services.formLabels.search}</Label>
           <Input
             id="service-search"
             onChange={(event) => {
               setLoading(true);
               setQuery(event.target.value);
             }}
-            placeholder="Service name"
+            placeholder={m.services.searchPlaceholder}
             value={query}
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="service-business-line">Business line</Label>
+          <Label htmlFor="service-business-line">
+            {m.services.formLabels.businessLine}
+          </Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
@@ -243,7 +269,7 @@ export function ServiceCatalogView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All lines</SelectItem>
+              <SelectItem value="all">{m.common.allLines}</SelectItem>
               {businessLineOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
@@ -254,7 +280,7 @@ export function ServiceCatalogView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="service-status">Status</Label>
+          <Label htmlFor="service-status">{m.services.formLabels.status}</Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
@@ -266,9 +292,11 @@ export function ServiceCatalogView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="all">{m.common.allStatuses}</SelectItem>
+              <SelectItem value="active">{m.common.statusLabels.active}</SelectItem>
+              <SelectItem value="inactive">
+                {m.common.statusLabels.inactive}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -276,7 +304,7 @@ export function ServiceCatalogView() {
 
       <div className="grid gap-4 border-b p-5 lg:grid-cols-[1fr_180px_180px_180px]">
         <div className="grid gap-2">
-          <Label htmlFor="service-name">Name</Label>
+          <Label htmlFor="service-name">{m.services.formLabels.name}</Label>
           <Input
             id="service-name"
             onChange={(event) =>
@@ -287,7 +315,9 @@ export function ServiceCatalogView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="service-form-business-line">Business line</Label>
+          <Label htmlFor="service-form-business-line">
+            {m.services.formLabels.businessLine}
+          </Label>
           <Select
             onValueChange={(value) =>
               setFormValues((current) => ({
@@ -311,7 +341,9 @@ export function ServiceCatalogView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="service-pricing-unit">Pricing</Label>
+          <Label htmlFor="service-pricing-unit">
+            {m.services.formLabels.pricing}
+          </Label>
           <Select
             onValueChange={(value) =>
               setFormValues((current) => ({
@@ -325,14 +357,14 @@ export function ServiceCatalogView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="per_item">Per item</SelectItem>
-              <SelectItem value="per_kg">Per kg</SelectItem>
+              <SelectItem value="per_item">{m.common.pricingUnitLabels.per_item}</SelectItem>
+              <SelectItem value="per_kg">{m.common.pricingUnitLabels.per_kg}</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="service-form-status">Status</Label>
+          <Label htmlFor="service-form-status">{m.services.formLabels.status}</Label>
           <Select
             onValueChange={(value) =>
               setFormValues((current) => ({
@@ -346,15 +378,19 @@ export function ServiceCatalogView() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
+              <SelectItem value="active">{m.common.statusLabels.active}</SelectItem>
+              <SelectItem value="inactive">
+                {m.common.statusLabels.inactive}
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="flex flex-col gap-3 lg:col-span-4 lg:flex-row lg:items-center">
           <Button disabled={saving} onClick={handleSubmit} type="button">
-            {editingServiceId ? "Update service" : "Create service"}
+            {editingServiceId
+              ? m.services.formButtons.updateService
+              : m.services.formButtons.createService}
           </Button>
           {editingServiceId ? (
             <Button
@@ -366,7 +402,7 @@ export function ServiceCatalogView() {
               type="button"
               variant="outline"
             >
-              Cancel edit
+              {m.services.formButtons.cancelEdit}
             </Button>
           ) : null}
           {formError ? (
@@ -390,18 +426,20 @@ export function ServiceCatalogView() {
       ) : services.length === 0 ? (
         <div className="p-5">
           <div className="rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">No services yet</h2>
+            <h2 className="text-base font-semibold">{m.services.empty}</h2>
           </div>
         </div>
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Service</TableHead>
-              <TableHead>Business line</TableHead>
-              <TableHead>Pricing</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead>{m.services.columns.service}</TableHead>
+              <TableHead>{m.services.columns.businessLine}</TableHead>
+              <TableHead>{m.services.columns.pricing}</TableHead>
+              <TableHead>{m.services.columns.status}</TableHead>
+              <TableHead className="text-right">
+                {m.services.columns.actions}
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -410,13 +448,15 @@ export function ServiceCatalogView() {
                 <TableCell>
                   <div className="font-medium">{service.name}</div>
                 </TableCell>
-                <TableCell>{formatBusinessLine(service.businessLine)}</TableCell>
-                <TableCell>{pricingUnitLabels[service.pricingUnit]}</TableCell>
+                <TableCell>
+                  {m.common.businessLineLabels[service.businessLine]}
+                </TableCell>
+                <TableCell>{m.common.pricingUnitLabels[service.pricingUnit]}</TableCell>
                 <TableCell>
                   <Badge
                     variant={service.status === "active" ? "default" : "outline"}
                   >
-                    {statusLabels[service.status]}
+                    {m.common.statusLabels[service.status]}
                   </Badge>
                 </TableCell>
                 <TableCell className="space-x-2 text-right">
@@ -429,7 +469,7 @@ export function ServiceCatalogView() {
                     type="button"
                     variant="outline"
                   >
-                    Edit
+                    {m.services.actions.edit}
                   </Button>
                   <Button
                     disabled={saving}
@@ -438,7 +478,9 @@ export function ServiceCatalogView() {
                     type="button"
                     variant="outline"
                   >
-                    {service.status === "active" ? "Deactivate" : "Activate"}
+                    {service.status === "active"
+                      ? m.services.actions.deactivate
+                      : m.services.actions.activate}
                   </Button>
                   <Button
                     onClick={() => setPendingDelete(service)}
@@ -446,7 +488,7 @@ export function ServiceCatalogView() {
                     type="button"
                     variant="outline"
                   >
-                    Delete
+                    {m.services.actions.delete}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -464,13 +506,9 @@ export function ServiceCatalogView() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete Service</DialogTitle>
+            <DialogTitle>{m.services.delete.title}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete{" "}
-              <span className="font-medium text-foreground">
-                {pendingDelete?.name}
-              </span>
-              ? This cannot be undone and may affect existing prices and orders.
+              {m.services.delete.description}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-3">
@@ -479,14 +517,14 @@ export function ServiceCatalogView() {
               onClick={() => setPendingDelete(null)}
               variant="outline"
             >
-              Cancel
+              {m.common.cancel}
             </Button>
             <Button
               disabled={deleting}
               onClick={() => pendingDelete && void handleDelete(pendingDelete)}
               variant="destructive"
             >
-              {deleting ? "Deleting..." : "Delete"}
+              {deleting ? m.services.delete.deleting : m.services.delete.action}
             </Button>
           </div>
         </DialogContent>

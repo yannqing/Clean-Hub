@@ -31,6 +31,21 @@ export type PosTicketStatistics = {
 export type PosCustomerStatistics = {
   totalCount: number;
   todayNewCount: number;
+  activeCount: number;
+  disabledCount: number;
+  profileCount: number;
+  activeProfileCount: number;
+  disabledProfileCount: number;
+  todayNewProfileCount: number;
+  orderedCustomerCount: number;
+  ticketedCustomerCount: number;
+  engagedCustomerCount: number;
+  repeatOrderCustomerCount: number;
+  repeatTicketCustomerCount: number;
+  sevenDayNewAccounts: Array<{
+    date: string;
+    count: number;
+  }>;
 };
 
 export type PosStatisticsOverview = {

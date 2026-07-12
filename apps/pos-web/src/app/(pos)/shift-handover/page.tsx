@@ -1,12 +1,20 @@
-import { PosPagePlaceholder } from "@/components/app-shell";
+import { getMyBranchQuery } from "@/features/branches/queries";
+import { ShiftHandoverView } from "@/features/shift-handover/components";
+import { getShiftHandoverSummaryQuery } from "@/features/shift-handover/queries";
+import { getCurrentUser } from "@/lib/auth";
 
-export default function ShiftHandoverPage() {
+export default async function ShiftHandoverPage() {
+  const [user, branch, summary] = await Promise.all([
+    getCurrentUser(),
+    getMyBranchQuery().catch(() => null),
+    getShiftHandoverSummaryQuery(),
+  ]);
+
   return (
-    <PosPagePlaceholder
-      breadcrumb="交接班"
-      description="结束当前班次：核对现金、确认待处理支付，并交接给下一位收银员。"
-      icon="replace"
-      title="交接班"
+    <ShiftHandoverView
+      branch={branch}
+      summary={summary}
+      user={user}
     />
   );
 }

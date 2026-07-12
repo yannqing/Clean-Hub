@@ -338,6 +338,8 @@ export type SaasMessages = {
     loadError: string;
     emptyTitle: string;
     category: string;
+    eventType: string;
+    allEventTypes: string;
     result: string;
     actorUserId: string;
     detail: {
@@ -411,6 +413,36 @@ export type SaasMessages = {
       finished: string;
       failure: string;
     };
+    review: {
+      approve: string;
+      reject: string;
+      complete: string;
+      cancel: string;
+      reviewNote: string;
+      reviewNotePlaceholder: string;
+      applyNote: string;
+    };
+    reviewToasts: {
+      approved: string;
+      rejected: string;
+      completed: string;
+      cancelled: string;
+      failed: string;
+    };
+    restoreColumns: {
+      reviewer: string;
+      reviewedAt: string;
+      reviewNote: string;
+      actions: string;
+    };
+    storageMetadata: {
+      title: string;
+      dumpUrl: string;
+      sizeBytes: string;
+      checksum: string;
+      storageType: string;
+      notCaptured: string;
+    };
   };
   platformSettings: {
     badge: string;
@@ -476,6 +508,7 @@ export type SaasMessages = {
       tenant: string;
       assignee: string;
       created: string;
+      sla: string;
     };
     detail: string;
     detailTitle: string;
@@ -501,6 +534,48 @@ export type SaasMessages = {
       placeholder: string;
       submit: string;
     };
+    batch: {
+      selected: string;
+      selectAll: string;
+      clear: string;
+      applyStatus: string;
+      reassign: string;
+      close: string;
+      noneSelected: string;
+      statusLabel: string;
+      assigneeLabel: string;
+      submitStatus: string;
+      submitAssignee: string;
+      reason: string;
+      reasonPlaceholder: string;
+      closeReason: string;
+      closeReasonPlaceholder: string;
+      statusApplied: string;
+      statusPartial: string;
+      statusFailed: string;
+      assigneeApplied: string;
+      assigneePartial: string;
+      assigneeFailed: string;
+      closed: string;
+      closedPartial: string;
+      closedFailed: string;
+    };
+    sla: {
+      label: string;
+      met: string;
+      onTrack: string;
+      left: string;
+      overdue: string;
+      lessThanHourLeft: string;
+      overDueAria: string;
+      dueSoonAria: string;
+    };
+    timeline: {
+      title: string;
+      empty: string;
+      created: string;
+      updated: string;
+    };
   };
   placeholders: {
     profile: {
@@ -517,6 +592,38 @@ export type SaasMessages = {
       title: string;
       description: string;
       items: string[];
+    };
+  };
+  todoCenter: {
+    /** Header bell icon accessible label. */
+    openTodoCenter: string;
+    /** Tooltip/label shown when there is nothing actionable. */
+    emptyTitle: string;
+    emptyBody: string;
+    badge: string;
+    title: string;
+    description: string;
+    loadError: string;
+    total: string;
+    /** Singular fallback for a queue sample when it has no title. */
+    untitled: string;
+    feedbackQueue: {
+      title: string;
+      description: string;
+      empty: string;
+      viewAll: string;
+    };
+    restoreQueue: {
+      title: string;
+      description: string;
+      empty: string;
+      viewAll: string;
+    };
+    securityQueue: {
+      title: string;
+      description: string;
+      empty: string;
+      viewAll: string;
     };
   };
 };

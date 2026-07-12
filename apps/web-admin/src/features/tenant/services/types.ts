@@ -24,6 +24,11 @@ export type ServiceFormValues = {
   categoryId: string;
   pricingUnit: ServicePricingUnit;
   status: ServiceStatus;
+  /**
+   * Optimistic-concurrency version captured when a service is loaded for
+   * editing. Required for updates; ignored on create.
+   */
+  version: number;
 };
 
 export type ServiceListFilters = {

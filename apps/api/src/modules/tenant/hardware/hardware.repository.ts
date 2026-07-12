@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, type SQL } from "drizzle-orm";
+import { and, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
 
 import { createId } from "@cleanhub/id";
 import { hardwareConfigs, type Database } from "@cleanhub/db";
@@ -10,6 +10,7 @@ import type {
   HardwareDeviceType,
   ListHardwareConfigsQuery,
 } from "./hardware.types.js";
+import { HardwareError } from "./hardware.errors.js";
 
 function toHardwareConfigSummary(row: {
   id: string;
@@ -22,6 +23,7 @@ function toHardwareConfigSummary(row: {
   status: HardwareDeviceStatus;
   createdAt: Date;
   updatedAt: Date;
+  version: number;
 }): HardwareConfigSummary {
   return {
     id: row.id,
@@ -34,6 +36,7 @@ function toHardwareConfigSummary(row: {
     status: row.status,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    version: row.version,
   };
 }
 
@@ -69,6 +72,7 @@ export async function findHardwareConfigs(
       status: hardwareConfigs.status,
       createdAt: hardwareConfigs.createdAt,
       updatedAt: hardwareConfigs.updatedAt,
+      version: hardwareConfigs.version,
     })
     .from(hardwareConfigs)
     .where(buildWhereClause(tenantId, query))
@@ -96,6 +100,7 @@ export async function findHardwareConfigById(
       status: hardwareConfigs.status,
       createdAt: hardwareConfigs.createdAt,
       updatedAt: hardwareConfigs.updatedAt,
+      version: hardwareConfigs.version,
     })
     .from(hardwareConfigs)
     .where(
@@ -153,6 +158,7 @@ export async function insertHardwareConfig(
       status: hardwareConfigs.status,
       createdAt: hardwareConfigs.createdAt,
       updatedAt: hardwareConfigs.updatedAt,
+      version: hardwareConfigs.version,
     });
 
   return toHardwareConfigSummary(rows[0]!);
@@ -162,9 +168,11 @@ export type UpdateHardwareConfigRecordInput = {
   hardwareId: string;
   tenantId: string;
   name?: string;
+  branchId?: string;
   connectionType?: HardwareConnectionType;
   config?: Record<string, unknown>;
   status?: HardwareDeviceStatus;
+  version: number;
   actorUserId: string | null;
 };
 
@@ -175,7 +183,9 @@ export async function updateHardwareConfigRecord(
   type UpdateSet = {
     updatedAt: Date;
     updatedBy: string | null;
+    version: SQL;
     name?: string;
+    branchId?: string;
     connectionType?: HardwareConnectionType;
     config?: Record<string, unknown>;
     status?: HardwareDeviceStatus;
@@ -184,20 +194,92 @@ export async function updateHardwareConfigRecord(
   const setValues: UpdateSet = {
     updatedAt: new Date(),
     updatedBy: input.actorUserId,
+    version: sql`${hardwareConfigs.version} + 1`,
   };
 
   if (input.name !== undefined) setValues.name = input.name;
+  if (input.branchId !== undefined) setValues.branchId = input.branchId;
   if (input.connectionType !== undefined) setValues.connectionType = input.connectionType;
   if (input.config !== undefined) setValues.config = input.config;
   if (input.status !== undefined) setValues.status = input.status;
 
-  await db
+  const updatedRows = await db
     .update(hardwareConfigs)
     .set(setValues)
     .where(
       and(
         eq(hardwareConfigs.id, input.hardwareId),
         eq(hardwareConfigs.tenantId, input.tenantId),
+        eq(hardwareConfigs.version, input.version),
+        isNull(hardwareConfigs.deletedAt),
       ),
+    )
+    .returning({ id: hardwareConfigs.id });
+
+  if (!updatedRows[0]) {
+    const existing = await findHardwareConfigById(db, input.tenantId, input.hardwareId);
+
+    if (!existing) {
+      throw new HardwareError(
+        "HARDWARE_NOT_FOUND",
+        "Hardware config was not found.",
+        404,
+      );
+    }
+
+    throw new HardwareError(
+      "HARDWARE_VERSION_CONFLICT",
+      "Hardware config has been modified. Refresh and try again.",
+      409,
     );
+  }
+}
+
+export type SoftDeleteHardwareConfigInput = {
+  hardwareId: string;
+  tenantId: string;
+  version: number;
+  actorUserId: string | null;
+};
+
+export async function softDeleteHardwareConfig(
+  db: Database,
+  input: SoftDeleteHardwareConfigInput,
+): Promise<void> {
+  const updatedRows = await db
+    .update(hardwareConfigs)
+    .set({
+      deletedAt: new Date(),
+      deletedBy: input.actorUserId,
+      updatedAt: new Date(),
+      updatedBy: input.actorUserId,
+      version: sql`${hardwareConfigs.version} + 1`,
+    })
+    .where(
+      and(
+        eq(hardwareConfigs.id, input.hardwareId),
+        eq(hardwareConfigs.tenantId, input.tenantId),
+        eq(hardwareConfigs.version, input.version),
+        isNull(hardwareConfigs.deletedAt),
+      ),
+    )
+    .returning({ id: hardwareConfigs.id });
+
+  if (!updatedRows[0]) {
+    const existing = await findHardwareConfigById(db, input.tenantId, input.hardwareId);
+
+    if (!existing) {
+      throw new HardwareError(
+        "HARDWARE_NOT_FOUND",
+        "Hardware config was not found.",
+        404,
+      );
+    }
+
+    throw new HardwareError(
+      "HARDWARE_VERSION_CONFLICT",
+      "Hardware config has been modified. Refresh and try again.",
+      409,
+    );
+  }
 }

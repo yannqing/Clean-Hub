@@ -9,6 +9,9 @@ import type {
   ServiceTicketSummary,
 } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
+import { PosBreadcrumb } from "@/components/app-shell";
+import { posRoutes } from "@/config";
+import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import { posApi } from "@/lib/api-client";
@@ -40,6 +43,8 @@ type CustomerDetailViewProps = {
   customerId: string;
   /** Entry source. `intake` = arrived from 客户接待; otherwise 客户管理. */
   from?: string;
+  /** Original intake search keyword so returning to 客户接待 can restore results. */
+  intakeQuery?: string;
 };
 
 type DetailTab = "overview" | "tickets" | "orders" | "items" | "notes";
@@ -52,7 +57,11 @@ const TAB_LABELS: Record<DetailTab, string> = {
   notes: "备注",
 };
 
-export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps) {
+export function CustomerDetailView({
+  customerId,
+  from,
+  intakeQuery,
+}: CustomerDetailViewProps) {
   const router = useRouter();
   const { locale } = useTranslation();
 
@@ -60,6 +69,17 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
   // breadcrumb trail and the back-button destination so the clerk returns to
   // the intake page rather than the customer-management list.
   const fromIntake = from === "intake";
+  const intakeReturnPath = fromIntake
+    ? buildIntakeReturnPath(intakeQuery)
+    : "/customers";
+  const buildScopedTicketDetailHref = useCallback(
+    (ticketId: string) =>
+      buildTicketDetailPath(ticketId, {
+        fromIntake,
+        intakeQuery,
+      }),
+    [fromIntake, intakeQuery],
+  );
 
   const [profile, setProfile] = useState<PosCustomerProfileDetail | null>(null);
   const [account, setAccount] = useState<PosCustomerAccountDetail | null>(null);
@@ -144,9 +164,7 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
       setProfile(updated);
       toast.success(nextStatus === "active" ? "已恢复正常" : "已停用");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "操作失败，请重试。",
-      );
+      toast.error(getPosApiErrorMessage(error, "操作失败，请重试。"));
     }
   }
 
@@ -157,9 +175,7 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
       setProfile(updated);
       toast.success("备注已保存");
     } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "保存失败，请重试。",
-      );
+      toast.error(getPosApiErrorMessage(error, "保存失败，请重试。"));
     } finally {
       setSavingNotes(false);
     }
@@ -173,7 +189,7 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
     // Refresh the detail (ticket count/overview) then open the new ticket so
     // the clerk can add items and pricing next.
     void loadDetail();
-    router.push(`/tickets/${ticketId}`);
+    router.push(buildScopedTicketDetailHref(ticketId));
   }
 
   if (loading) {
@@ -199,31 +215,19 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
   return (
     <div className="px-6 py-5">
       <div className="mb-5 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
-          <span>POS</span>
-          <span>&gt;</span>
-          <button
-            className="hover:text-blue-700"
-            type="button"
-            onClick={() => router.push(fromIntake ? "/new-intake" : "/customers")}
-          >
-            {fromIntake ? "客户接待" : "客户管理"}
-          </button>
-          <span>&gt;</span>
-          {fromIntake && (
-            <>
-              <span className="text-slate-400">客户服务</span>
-              <span>&gt;</span>
-            </>
-          )}
-          <span className="rounded-md bg-blue-50 px-2 py-1 text-blue-700">
-            {profile.fullName}
-          </span>
-        </div>
+        <PosBreadcrumb
+          items={[
+            {
+              href: intakeReturnPath,
+              label: fromIntake ? "客户接待" : "客户管理",
+            },
+            { label: profile.fullName },
+          ]}
+        />
         <button
           className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
           type="button"
-          onClick={() => router.push(fromIntake ? "/new-intake" : "/customers")}
+          onClick={() => router.push(intakeReturnPath)}
         >
           {fromIntake ? "返回客户接待" : "返回账户档案"}
         </button>
@@ -427,7 +431,10 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
       ) : null}
 
       {tab === "tickets" ? (
-        <CustomerTicketList customerId={customerId} />
+        <CustomerTicketList
+          customerId={customerId}
+          ticketDetailHref={buildScopedTicketDetailHref}
+        />
       ) : null}
 
       {tab === "orders" ? (
@@ -435,7 +442,10 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
       ) : null}
 
       {tab === "items" ? (
-        <CustomerServiceItemList customerId={customerId} />
+        <CustomerServiceItemList
+          customerId={customerId}
+          ticketDetailHref={buildScopedTicketDetailHref}
+        />
       ) : null}
 
       <ProfileFormDialog
@@ -487,6 +497,31 @@ export function CustomerDetailView({ customerId, from }: CustomerDetailViewProps
       />
     </div>
   );
+}
+
+function buildIntakeReturnPath(query: string | undefined): string {
+  const keyword = query?.trim();
+  if (!keyword) return "/new-intake";
+
+  return `/new-intake?q=${encodeURIComponent(keyword)}`;
+}
+
+function buildTicketDetailPath(
+  ticketId: string,
+  context: {
+    fromIntake: boolean;
+    intakeQuery: string | undefined;
+  },
+): string {
+  const params = new URLSearchParams({
+    from: context.fromIntake ? "intake" : "customer",
+  });
+  const keyword = context.intakeQuery?.trim();
+  if (context.fromIntake && keyword) {
+    params.set("q", keyword);
+  }
+
+  return `${posRoutes.ticketDetail(ticketId)}?${params.toString()}`;
 }
 
 function Detail({

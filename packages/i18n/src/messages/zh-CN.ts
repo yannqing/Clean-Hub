@@ -766,13 +766,17 @@ export const zhCNMessages = {
       heroTitleLine1: "门店高效运营",
       heroTitleLine2: "从这里开始",
       heroDescription:
-        "收银、受理、扫描、订单与交接班，一站式协作前台。请使用门店编码与店员账号登录。",
+        "收银、受理、扫描、订单与交接班，一站式协作前台。请输入店员 PIN 进入门店终端。",
       loginTitle: "店员登录",
-      loginDescription: "请输入门店编码与店员账号信息以继续。",
+      loginDescription: "请输入店员 PIN 码以继续。",
       identifier: "手机号 / 邮箱",
       identifierPlaceholder: "请输入手机号或邮箱",
       password: "密码",
       passwordPlaceholder: "请输入密码",
+      pin: "PIN 码",
+      pinPlaceholder: "请输入 6 位 PIN",
+      clearPin: "清空",
+      deleteDigit: "删除",
       submit: "登录",
       submitting: "登录中...",
       currentStore: "当前门店：",
@@ -783,6 +787,8 @@ export const zhCNMessages = {
       validation: {
         identifierRequired: "请输入手机号或邮箱",
         passwordRequired: "请输入密码",
+        pinRequired: "请输入 PIN 码",
+        pinInvalid: "PIN 码必须是 6 位数字",
       },
     },
     role: {
