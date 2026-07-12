@@ -68,7 +68,7 @@ import {
   MetricTile,
   RefundRequestItem,
   RefundOrderDetailSheet,
-  ShowMoreFooter,
+  InfiniteScrollSentinel,
   appointmentStatusLabelKeys,
   createMetrics,
   deliveryStatusLabelKeys,
@@ -206,9 +206,7 @@ export function OwnerHome({
     () => getDispatchSummary(boardState.dispatchBoard),
     [boardState.dispatchBoard],
   );
-  const totalAppointments = boardState.appointments.length;
   const totalTasks = boardState.dispatchBoard?.data.length ?? 0;
-  const totalRefundRequests = boardState.refundRequests.length;
   const filteredAppointments = boardState.appointments.filter(
     (appointment) => !appointmentStatusFilter || appointment.status === appointmentStatusFilter,
   );
@@ -225,10 +223,10 @@ export function OwnerHome({
     visibleLimits.refundRequests,
   );
   const shouldShowAppointmentFooter =
-    totalAppointments > INITIAL_OWNER_BOARD_VISIBLE_LIMITS.appointments;
+    filteredAppointments.length > INITIAL_OWNER_BOARD_VISIBLE_LIMITS.appointments;
   const shouldShowTaskFooter = totalTasks > INITIAL_OWNER_BOARD_VISIBLE_LIMITS.tasks;
   const shouldShowRefundFooter =
-    totalRefundRequests > INITIAL_OWNER_BOARD_VISIBLE_LIMITS.refundRequests;
+    filteredRefundRequests.length > INITIAL_OWNER_BOARD_VISIBLE_LIMITS.refundRequests;
   const loadTime = formatLoadTime(lastLoadedAt, intlLocale);
   const tenantCurrency = resolveTenantCurrency(summary?.currency ?? currency);
   const pageTitle = activeTab === "overview"
@@ -762,10 +760,10 @@ export function OwnerHome({
               )}
             </div>
             {shouldShowAppointmentFooter ? (
-              <ShowMoreFooter
+              <InfiniteScrollSentinel
                 shown={visibleAppointments.length}
-                total={totalAppointments}
-                onShowMore={() =>
+                total={filteredAppointments.length}
+                onLoadMore={() =>
                   setVisibleLimits((current) => ({
                     ...current,
                     appointments:
@@ -811,10 +809,10 @@ export function OwnerHome({
               )}
             </div>
             {shouldShowTaskFooter ? (
-              <ShowMoreFooter
+              <InfiniteScrollSentinel
                 shown={visibleTasks.length}
                 total={totalTasks}
-                onShowMore={() =>
+                onLoadMore={() =>
                   setVisibleLimits((current) => ({
                     ...current,
                     tasks: current.tasks + OWNER_BOARD_SHOW_MORE_INCREMENT,
@@ -864,10 +862,10 @@ export function OwnerHome({
               )}
             </div>
             {shouldShowRefundFooter ? (
-              <ShowMoreFooter
+              <InfiniteScrollSentinel
                 shown={visibleRefundRequests.length}
-                total={totalRefundRequests}
-                onShowMore={() =>
+                total={filteredRefundRequests.length}
+                onLoadMore={() =>
                   setVisibleLimits((current) => ({
                     ...current,
                     refundRequests:

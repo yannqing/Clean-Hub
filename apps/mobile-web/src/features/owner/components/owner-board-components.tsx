@@ -1,6 +1,6 @@
 "use client";
 
-import type { ComponentType, ReactNode } from "react";
+import { type ComponentType, type ReactNode, useEffect, useRef } from "react";
 import type {
   MobileDeliveryTaskStatus,
   MobileOwnerBranchOption,
@@ -30,7 +30,6 @@ import {
 import {
   CalendarDays,
   CheckCircle2,
-  ChevronDown,
   ChevronRight,
   Clock3,
   Eye,
@@ -286,39 +285,42 @@ export function OperationalCard({
   );
 }
 
-export function ShowMoreFooter({
+export function InfiniteScrollSentinel({
   shown,
   total,
-  onShowMore,
+  onLoadMore,
 }: {
   shown: number;
   total: number;
-  onShowMore: () => void;
+  onLoadMore: () => void;
 }) {
-  const { locale, t } = useTranslation();
-  const intlLocale = ownerIntlLocales[locale];
-  const clampedShown = Math.min(shown, total);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const hasMore = shown < total;
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          observer.unobserve(sentinel);
+          onLoadMore();
+        }
+      },
+      { rootMargin: "0px 0px 240px 0px", threshold: 0.01 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMore, onLoadMore, shown]);
 
   return (
-    <div className="mt-4 flex min-h-10 items-center justify-between gap-3 border-t border-slate-100 pt-3">
-      <p className="text-xs font-medium text-slate-500">
-        {t("owner.shownCount", {
-          shown: formatCount(clampedShown, intlLocale),
-          total: formatCount(total, intlLocale),
-        })}
-      </p>
-      {clampedShown < total ? (
-        <Button
-          className="h-9 shrink-0 px-3"
-          size="sm"
-          type="button"
-          variant="secondary"
-          onClick={onShowMore}
-        >
-          <ChevronDown className="size-4" aria-hidden />
-          {t("owner.showMore")}
-        </Button>
-      ) : null}
+    <div
+      aria-hidden={!hasMore}
+      className="mt-2 flex h-10 items-center justify-center"
+      ref={sentinelRef}
+    >
+      {hasMore ? <Loader2 className="size-4 animate-spin text-blue-500" aria-hidden /> : null}
     </div>
   );
 }
