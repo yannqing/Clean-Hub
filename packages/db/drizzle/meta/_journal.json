@@ -43,6 +43,13 @@
       "when": 1783852646327,
       "tag": "0005_petite_scream",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783859554530,
+      "tag": "0006_cold_the_phantom",
+      "breakpoints": true
     }
   ]
 }

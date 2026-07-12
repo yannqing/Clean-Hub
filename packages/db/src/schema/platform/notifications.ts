@@ -35,6 +35,18 @@ export const noticeChannelEnum = pgEnum("notice_channel", [
   "sms",
   "whatsapp",
   "email",
+  "push",
+]);
+
+export const mobilePushSubjectTypeEnum = pgEnum("mobile_push_subject_type", [
+  "customer",
+  "staff",
+]);
+
+export const mobilePushPlatformEnum = pgEnum("mobile_push_platform", [
+  "android",
+  "ios",
+  "web",
 ]);
 
 export const noticePriorityEnum = pgEnum("notice_priority", [
@@ -289,7 +301,51 @@ export const notificationDeliveries = pgTable(
 );
 
 // ──────────────────────────────────────────────
-// 5. notification_preferences
+// 5. mobile_push_tokens
+// ──────────────────────────────────────────────
+//
+// FCM device tokens registered by the Capacitor mobile app. `subject_id`
+// references either `customer_accounts.id` (subject_type = "customer") or
+// `users.id` (subject_type = "staff"), matching the mobile auth context.
+
+export const mobilePushTokens = pgTable(
+  "mobile_push_tokens",
+  {
+    id: ulidPrimaryKey(),
+    tenantId: ulidColumn("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    subjectType: mobilePushSubjectTypeEnum("subject_type").notNull(),
+    subjectId: ulidColumn("subject_id").notNull(),
+    platform: mobilePushPlatformEnum("platform").notNull(),
+    token: text("token").notNull(),
+    deviceId: varchar("device_id", { length: 120 }),
+    locale: varchar("locale", { length: 16 }),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    version: integer("version").notNull().default(1),
+  },
+  (table) => [
+    uniqueIndex("mobile_push_tokens_token_unique").on(table.token),
+    index("mobile_push_tokens_subject_idx").on(
+      table.tenantId,
+      table.subjectType,
+      table.subjectId,
+    ),
+    index("mobile_push_tokens_device_id_idx").on(table.deviceId),
+  ],
+);
+
+// ──────────────────────────────────────────────
+// 6. notification_preferences
 // ──────────────────────────────────────────────
 
 export const notificationPreferences = pgTable(
@@ -329,7 +385,7 @@ export const notificationPreferences = pgTable(
 );
 
 // ──────────────────────────────────────────────
-// 6. notification_settings
+// 7. notification_settings
 // ──────────────────────────────────────────────
 
 export const notificationSettings = pgTable(

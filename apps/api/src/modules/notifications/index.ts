@@ -2,6 +2,8 @@ export * from "./channel-adapter.js";
 export * from "./email.adapter.js";
 export * from "./email-config.js";
 export * from "./notification-events.js";
+export * from "./push.adapter.js";
+export * from "./push-config.js";
 export * from "./notification-renderer.js";
 export * from "./notifications.repository.js";
 export * from "./notifications.service.js";

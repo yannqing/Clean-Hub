@@ -12,6 +12,7 @@ import type {
   NotificationRecord,
   NotificationTemplateRecord,
   OverdueTicketEventSource,
+  PushTokenRecord,
 } from "./notifications.types.js";
 
 const tenantId = "tenant_1";
@@ -137,6 +138,7 @@ class MemoryNotificationsRepository implements NotificationsRepositoryLike {
   recentDeliveryCount = 0;
   overdueSources: OverdueTicketEventSource[] = [];
   tenantDefaultLocale = "fr";
+  pushTokens: PushTokenRecord[] = [];
 
   async listEnabledConfigsForEvent(input: {
     tenantId: string;
@@ -270,6 +272,20 @@ class MemoryNotificationsRepository implements NotificationsRepositoryLike {
           frequencyWindowMinutes: null,
         },
       }));
+  }
+
+  async listClaimablePushDeliveries(): Promise<EmailDeliveryWorkItem[]> {
+    return [];
+  }
+
+  async listPushTokensForDelivery(): Promise<PushTokenRecord[]> {
+    return this.pushTokens;
+  }
+
+  async softDeletePushTokens(input: { tokenIds: string[] }): Promise<void> {
+    this.pushTokens = this.pushTokens.filter(
+      (token) => !input.tokenIds.includes(token.id),
+    );
   }
 
   async markDeliverySent(input: {

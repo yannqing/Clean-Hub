@@ -17,6 +17,7 @@ import {
   customerAccounts,
   customers,
   getDb,
+  mobilePushTokens,
   notificationConfigs,
   notificationDeliveries,
   notificationPreferences,
@@ -31,7 +32,8 @@ import {
 } from "@cleanhub/db";
 
 import type {
-  EmailDeliveryWorkItem,
+  DeliveryWorkItem,
+  NotificationChannel,
   NotificationConfigRecord,
   NotificationDeliveryRecord,
   NotificationDeliveryStatus,
@@ -40,6 +42,7 @@ import type {
   NotificationRecipientType,
   NotificationTemplateRecord,
   OverdueTicketEventSource,
+  PushTokenRecord,
 } from "./notifications.types.js";
 
 function toConfig(row: {
@@ -54,7 +57,7 @@ function toConfig(row: {
     configName: row.config.configName,
     noticeType: row.config.noticeType,
     triggerEvent: row.config.triggerEvent,
-    channel: row.config.channel as "email",
+    channel: row.config.channel as NotificationChannel,
     recipientType: row.config.recipientType,
     recipientRole: row.config.recipientRole,
     recipientUserId: row.config.recipientUserId,
@@ -105,7 +108,7 @@ function toDelivery(
     id: row.id,
     tenantId: row.tenantId ?? "",
     notificationId: row.notificationId,
-    channel: row.channel as "email",
+    channel: row.channel as NotificationChannel,
     recipientType: row.recipientType,
     recipientId: row.recipientId,
     status: row.status,
@@ -143,7 +146,7 @@ export class NotificationsRepository {
           eq(notificationConfigs.tenantId, input.tenantId),
           eq(notificationConfigs.triggerType, "event"),
           eq(notificationConfigs.triggerEvent, input.triggerEvent),
-          eq(notificationConfigs.channel, "email"),
+          inArray(notificationConfigs.channel, ["email", "push"]),
           eq(notificationConfigs.isEnabled, true),
           isNull(notificationConfigs.deletedAt),
           eq(notificationTemplates.isEnabled, true),
@@ -406,7 +409,7 @@ export class NotificationsRepository {
     tenantId: string;
     userId: string;
     noticeType: "system" | "business";
-    channel: "email";
+    channel: NotificationChannel;
   }): Promise<boolean> {
     const [row] = await this.db
       .select({ isEnabled: notificationPreferences.isEnabled })
@@ -464,14 +467,116 @@ export class NotificationsRepository {
     now: Date;
     limit: number;
     leaseUntil: Date;
-  }): Promise<EmailDeliveryWorkItem[]> {
+  }): Promise<DeliveryWorkItem[]> {
+    return this.listClaimableDeliveries("email", input);
+  }
+
+  async listClaimablePushDeliveries(input: {
+    now: Date;
+    limit: number;
+    leaseUntil: Date;
+  }): Promise<DeliveryWorkItem[]> {
+    return this.listClaimableDeliveries("push", input);
+  }
+
+  async listPushTokensForDelivery(input: {
+    tenantId: string;
+    recipientType: NotificationRecipientType;
+    recipientId: string;
+  }): Promise<PushTokenRecord[]> {
+    let subjectType: "customer" | "staff";
+    let subjectId: string;
+
+    if (input.recipientType === "customer") {
+      // Delivery recipients reference customers.id while mobile push tokens
+      // are bound to the login subject (customer_accounts.id).
+      const [customer] = await this.db
+        .select({ customerAccountId: customers.customerAccountId })
+        .from(customers)
+        .where(
+          and(
+            eq(customers.tenantId, input.tenantId),
+            eq(customers.id, input.recipientId),
+            isNull(customers.deletedAt),
+          ),
+        )
+        .limit(1);
+
+      if (!customer?.customerAccountId) {
+        return [];
+      }
+
+      subjectType = "customer";
+      subjectId = customer.customerAccountId;
+    } else if (input.recipientType === "user") {
+      subjectType = "staff";
+      subjectId = input.recipientId;
+    } else {
+      return [];
+    }
+
+    const rows = await this.db
+      .select({
+        id: mobilePushTokens.id,
+        tenantId: mobilePushTokens.tenantId,
+        subjectType: mobilePushTokens.subjectType,
+        subjectId: mobilePushTokens.subjectId,
+        platform: mobilePushTokens.platform,
+        token: mobilePushTokens.token,
+        deviceId: mobilePushTokens.deviceId,
+        locale: mobilePushTokens.locale,
+      })
+      .from(mobilePushTokens)
+      .where(
+        and(
+          eq(mobilePushTokens.tenantId, input.tenantId),
+          eq(mobilePushTokens.subjectType, subjectType),
+          eq(mobilePushTokens.subjectId, subjectId),
+          isNull(mobilePushTokens.deletedAt),
+        ),
+      )
+      .orderBy(desc(mobilePushTokens.lastSeenAt));
+
+    return rows;
+  }
+
+  async softDeletePushTokens(input: {
+    tokenIds: string[];
+    now: Date;
+  }): Promise<void> {
+    if (input.tokenIds.length === 0) {
+      return;
+    }
+
+    await this.db
+      .update(mobilePushTokens)
+      .set({
+        deletedAt: input.now,
+        updatedAt: input.now,
+      })
+      .where(
+        and(
+          inArray(mobilePushTokens.id, input.tokenIds),
+          isNull(mobilePushTokens.deletedAt),
+        ),
+      );
+  }
+
+  private async listClaimableDeliveries(
+    channel: NotificationChannel,
+    input: {
+      now: Date;
+      limit: number;
+      leaseUntil: Date;
+    },
+  ): Promise<DeliveryWorkItem[]> {
     return this.db.transaction(async (tx) => {
       const rows = await tx
         .select({ id: notificationDeliveries.id })
         .from(notificationDeliveries)
         .where(
           and(
-            eq(notificationDeliveries.channel, "email"),
+            eq(notificationDeliveries.channel, channel),
             or(
               eq(notificationDeliveries.status, "pending"),
               and(
