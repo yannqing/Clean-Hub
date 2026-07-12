@@ -32,6 +32,7 @@ import {
 } from "lucide-react";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
+import { MobileOptionSheet } from "@/components/mobile-option-sheet";
 import { MobilePageSkeleton } from "@/components/mobile-skeleton";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { MobilePullToRefresh } from "@/components/mobile-pull-to-refresh";
@@ -633,47 +634,48 @@ export function OwnerHome({
               </button>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-              <label className="block">
-                <span className="sr-only">{t("owner.branch")}</span>
-                <select
-                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                  disabled={isDirectoryLoading && !branches.length}
-                  value={branchId}
-                  onChange={(event) => {
-                    setBranchId(event.target.value);
-                    setAssigneeFilter("");
-                    setAssigneeUserId("");
-                  }}
-                >
-                  <option value="">
-                    {isDirectoryLoading && !branches.length
+            <div className="grid min-w-0 grid-cols-2 gap-2 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+              <MobileOptionSheet
+                ariaLabel={t("owner.branch")}
+                className="h-10 text-sm"
+                disabled={!branches.length}
+                options={[
+                  {
+                    value: "",
+                    label: isDirectoryLoading && !branches.length
                       ? t("common.loading")
-                      : t("owner.actions.selectBranch")}
-                  </option>
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {formatBranchOption(branch)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="block">
-                  <span className="sr-only">{t("owner.driver")}</span>
-                  <select
-                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
-                    disabled={!branchId.trim() || (isDirectoryLoading && !drivers.length)}
-                    value={assigneeFilter}
-                    onChange={(event) => setAssigneeFilter(event.target.value)}
-                  >
-                    <option value="">{t("owner.all")}</option>
-                    {drivers.map((driver) => (
-                      <option key={driver.id} value={driver.id}>
-                        {formatDriverOption(driver)}
-                      </option>
-                    ))}
-                  </select>
-              </label>
+                      : t("owner.actions.selectBranch"),
+                  },
+                  ...branches.map((branch) => ({
+                    value: branch.id,
+                    label: formatBranchOption(branch),
+                  })),
+                ]}
+                placeholder={t("owner.actions.selectBranch")}
+                title={t("owner.branch")}
+                value={branchId}
+                onValueChange={(value) => {
+                  setBranchId(value);
+                  setAssigneeFilter("");
+                  setAssigneeUserId("");
+                }}
+              />
+              <MobileOptionSheet
+                ariaLabel={t("owner.driver")}
+                className="h-10 text-sm"
+                disabled={!branchId.trim() || (isDirectoryLoading && !drivers.length)}
+                options={[
+                  { value: "", label: t("owner.all") },
+                  ...drivers.map((driver) => ({
+                    value: driver.id,
+                    label: formatDriverOption(driver),
+                  })),
+                ]}
+                placeholder={t("owner.all")}
+                title={t("owner.driver")}
+                value={assigneeFilter}
+                onValueChange={setAssigneeFilter}
+              />
             </div>
           </section>
           ) : null}

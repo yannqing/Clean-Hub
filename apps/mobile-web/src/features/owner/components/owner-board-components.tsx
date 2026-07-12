@@ -14,11 +14,6 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Badge,
   Button,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -47,6 +42,7 @@ import {
 } from "lucide-react";
 
 import { formatTenantMoney } from "@/lib/currency";
+import { MobileOptionSheet } from "@/components/mobile-option-sheet";
 
 import type {
   OwnerAppointmentListItem,
@@ -840,21 +836,18 @@ export function ActionSheet({
                   <span className="text-sm font-medium text-slate-700">
                     {t("owner.forms.assignee")}
                   </span>
-                  <Select
+                  <MobileOptionSheet
+                    className="mt-2 h-11"
+                    disabled={!drivers.length}
+                    options={drivers.map((driver) => ({
+                      value: driver.id,
+                      label: formatDriverOption(driver),
+                    }))}
+                    placeholder={t("owner.actions.selectDriver")}
+                    title={t("owner.forms.assignee")}
                     value={assigneeUserId}
                     onValueChange={onAssigneeUserIdChange}
-                  >
-                    <SelectTrigger className="mt-2 h-11 w-full">
-                      <SelectValue placeholder={t("owner.actions.selectDriver")} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {drivers.map((driver) => (
-                        <SelectItem key={driver.id} value={driver.id}>
-                          {formatDriverOption(driver)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  />
                 </div>
               ) : null}
 

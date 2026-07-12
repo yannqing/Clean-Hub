@@ -460,24 +460,17 @@ test.describe("mobile web completeness", () => {
     await expect(page.locator("body")).not.toContainText(/XOF|EUR/);
     await page.getByRole("tab", { name: /派单|Dispatch/ }).click();
 
-    const branchSelect = page
-      .locator("label")
-      .filter({ hasText: /分店|Branch/ })
-      .locator("select")
-      .first();
-    await expect(branchSelect).toBeEnabled();
-    await expect.poll(() => branchSelect.locator("option").count()).toBeGreaterThan(1);
+    const branchSelector = page.getByRole("button", { name: /^(分店|Branch)$/ });
+    await expect(branchSelector).toBeEnabled();
+    await branchSelector.click();
 
-    const branchValue = await branchSelect.locator("option").nth(1).getAttribute("value");
-    expect(branchValue, "Branch selector should expose a real branch id").toBeTruthy();
-    await branchSelect.selectOption(branchValue ?? "");
+    const branchOptions = page.getByRole("radio");
+    await expect.poll(() => branchOptions.count()).toBeGreaterThan(1);
+    await branchOptions.nth(1).click();
 
-    const driverSelect = page
-      .locator("label")
-      .filter({ hasText: /配送员|Driver/ })
-      .locator("select")
-      .first();
-    await expect(driverSelect).toBeEnabled();
-    await expect.poll(() => driverSelect.locator("option").count()).toBeGreaterThan(1);
+    const driverSelector = page.getByRole("button", { name: /^(配送员|Driver)$/ });
+    await expect(driverSelector).toBeEnabled();
+    await driverSelector.click();
+    await expect.poll(() => page.getByRole("radio").count()).toBeGreaterThan(1);
   });
 });
