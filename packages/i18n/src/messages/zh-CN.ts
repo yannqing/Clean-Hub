@@ -481,6 +481,7 @@ export const zhCNMessages = {
       connectFirst: "打印前请先连接便携打印机。",
       missingInfo: "任务缺少必要信息。",
       missingDocument: "打印前请先关联订单或工单。",
+      noDeviceFound: "附近未发现便携打印机。",
       webUnavailable: "当前 WebView 无法使用蓝牙连接。请在 Capacitor 同步后使用原生应用。",
       popupBlocked: "打印窗口被拦截。",
     },

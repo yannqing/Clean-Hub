@@ -484,6 +484,7 @@ export const enMessages = {
       connectFirst: "Connect a portable printer before printing.",
       missingInfo: "The task is missing required information.",
       missingDocument: "Add an order or ticket before printing.",
+      noDeviceFound: "No portable printer was found nearby.",
       webUnavailable:
         "Bluetooth connection is unavailable in this web view. Use the native app after Capacitor sync.",
       popupBlocked: "The print window was blocked.",

@@ -1,6 +1,14 @@
 "use client";
 
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import type { PrintLocale } from "@cleanhub/hardware";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
@@ -44,6 +52,7 @@ import { captureDeliveryPhoto, isOnline } from "../lib/device";
 import {
   connectPortablePrinter,
   initialDeliveryPrinterState,
+  isNativePortablePrintingAvailable,
   printDeliveryDocument,
   validateDeliveryPrintTask,
   type DeliveryPrintDocument,
@@ -248,6 +257,14 @@ function getPrimaryTaskAction(task: DeliveryTaskDetail): DeliveryPrimaryTaskActi
     : null;
 }
 
+function subscribeToNothing(): () => void {
+  return () => undefined;
+}
+
+function returnFalse(): boolean {
+  return false;
+}
+
 export function DeliveryHome({
   currency,
   driverName,
@@ -263,6 +280,7 @@ export function DeliveryHome({
       connectFirst: t("delivery.printer.connectFirst"),
       missingDocument: t("delivery.printer.missingDocument"),
       missingInfo: t("delivery.printer.missingInfo"),
+      noDeviceFound: t("delivery.printer.noDeviceFound"),
       popupBlocked: t("delivery.printer.popupBlocked"),
       readyLabel: t("delivery.printer.readyLabel"),
       readyReceipt: t("delivery.printer.readyReceipt"),
@@ -290,6 +308,11 @@ export function DeliveryHome({
   const [warning, setWarning] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [printer, setPrinter] = useState(initialDeliveryPrinterState);
+  const printerConnectionRequired = useSyncExternalStore(
+    subscribeToNothing,
+    isNativePortablePrintingAvailable,
+    returnFalse,
+  );
   const [isBooting, setIsBooting] = useState(true);
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const signatureCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -820,7 +843,7 @@ export function DeliveryHome({
 
   function handleConnectPrinter() {
     void runAction("printer-connect", async () => {
-      const nextPrinter = await connectPortablePrinter(printMessages);
+      const nextPrinter = await connectPortablePrinter(printMessages, setPrinter);
       setPrinter(nextPrinter);
 
       if (nextPrinter.error) {
@@ -848,7 +871,7 @@ export function DeliveryHome({
       return;
     }
 
-    if (!printer.device) {
+    if (printerConnectionRequired && !printer.device) {
       setWarning(t("delivery.printer.connectFirst"));
       return;
     }
@@ -951,6 +974,7 @@ export function DeliveryHome({
         open={detailOpen}
         primaryTaskAction={primaryTaskAction}
         printer={printer}
+        printerConnectionRequired={printerConnectionRequired}
         proofTypeLabelKeys={proofTypeLabelKeys}
         selectedTask={selectedTask}
         selectedTaskCanReportException={selectedTaskCanReportException}
