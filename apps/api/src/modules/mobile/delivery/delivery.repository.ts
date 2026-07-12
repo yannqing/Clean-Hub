@@ -9,6 +9,7 @@ import {
   inArray,
   isNull,
   lt,
+  notInArray,
   ne,
   sql,
 } from "drizzle-orm";
@@ -155,7 +156,7 @@ function getStatusTimestamps(status: DeliveryTaskStatus, now: Date) {
 export class DeliveryRepository {
   constructor(private readonly db: Database) {}
 
-  async listTodayTasks({
+  async listDriverTasks({
     tenantId,
     driverUserId,
     start,
@@ -163,8 +164,8 @@ export class DeliveryRepository {
   }: {
     tenantId: string;
     driverUserId: string;
-    start: Date;
-    end: Date;
+    start?: Date;
+    end?: Date;
   }): Promise<DeliveryTaskListItem[]> {
     const rows = await this.db
       .select({
@@ -180,8 +181,9 @@ export class DeliveryRepository {
           eq(deliveryTasks.tenantId, tenantId),
           eq(deliveryTasks.assigneeUserId, driverUserId),
           isNull(deliveryTasks.deletedAt),
-          gte(deliveryTasks.expectedAt, start),
-          lt(deliveryTasks.expectedAt, end),
+          notInArray(deliveryTasks.status, ["signed", "cancelled"]),
+          start ? gte(deliveryTasks.expectedAt, start) : undefined,
+          end ? lt(deliveryTasks.expectedAt, end) : undefined,
         ),
       )
       .orderBy(asc(deliveryTasks.expectedAt), asc(deliveryTasks.createdAt));

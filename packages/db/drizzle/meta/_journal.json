@@ -29,6 +29,13 @@
       "when": 1782747381594,
       "tag": "0003_add_mobile_merge_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783792301339,
+      "tag": "0004_superb_proteus",
+      "breakpoints": true
     }
   ]
 }

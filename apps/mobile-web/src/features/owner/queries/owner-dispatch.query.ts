@@ -8,6 +8,7 @@ import type {
   MobileOwnerDriverListQuery,
   MobileOwnerDriverListResponse,
   MobileRefundRequestListResponse,
+  MobileRefundOrderDetail,
 } from "@cleanhub/api-client";
 
 import { apiClient } from "@/lib/api-client";
@@ -146,4 +147,11 @@ export async function listOwnerRefundRequests(
     { status: "pending" },
     options,
   );
+}
+
+export async function getOwnerRefundOrderDetail(
+  refundRequestId: string,
+  options?: QueryOptions,
+): Promise<MobileRefundOrderDetail> {
+  return apiClient.mobile.payment.getRefundOrderDetail(refundRequestId, options);
 }

@@ -30,6 +30,10 @@ export function createPaymentRoutes({
   routes.post("/payments/:paymentId/mock-callback", controller.simulateMockPayment);
   routes.post("/orders/:orderId/refund-requests", controller.createRefundRequest);
   routes.get("/refund-requests", controller.listRefundRequests);
+  routes.get(
+    "/refund-requests/:refundRequestId/order",
+    controller.getRefundOrderDetail,
+  );
   routes.post(
     "/refund-requests/:refundRequestId/approve",
     controller.approveRefundRequest,

@@ -408,7 +408,10 @@ export function CustomerHome({
     };
   }, [t]);
 
-  const activityItems = useMemo(() => getActivityItems(activity, t), [activity, t]);
+  const activityItems = useMemo(
+    () => getActivityItems(activity, t, refundRequests),
+    [activity, refundRequests, t],
+  );
   const filteredActivityItems = useMemo(
     () => filterActivityItems(activityItems, activityFilter),
     [activityFilter, activityItems],

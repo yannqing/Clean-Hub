@@ -7,6 +7,7 @@ import type {
   MobileDeliveryMutationResult,
   MobileDeliveryTaskDetail,
   MobileDeliveryTaskListItem,
+  MobileDeliveryTaskListQuery,
   MobileDeliveryListResponse,
   MobileDispatchDeliveryTaskRequest,
   MobileReassignDeliveryTaskRequest,
@@ -19,6 +20,14 @@ type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
 
 export function createMobileDeliveryApi(client: ApiClient) {
   return {
+    listTasks: (
+      query?: MobileDeliveryTaskListQuery,
+      options?: RequestOptions,
+    ) =>
+      client.get<MobileDeliveryListResponse<MobileDeliveryTaskListItem>>(
+        "/mobile/delivery/tasks",
+        { ...options, query },
+      ),
     listTodayTasks: (options?: RequestOptions) =>
       client.get<MobileDeliveryListResponse<MobileDeliveryTaskListItem>>(
         "/mobile/delivery/tasks/today",

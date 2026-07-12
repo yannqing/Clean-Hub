@@ -7,9 +7,9 @@ import {
   saveCachedDeliveryTasks,
 } from "../lib/offline-store";
 
-export async function getTodayDeliveryTasks() {
+export async function getDeliveryTasks() {
   try {
-    const response = await apiClient.mobile.delivery.listTodayTasks();
+    const response = await apiClient.mobile.delivery.listTasks();
     await saveCachedDeliveryTasks(response.data);
 
     return {

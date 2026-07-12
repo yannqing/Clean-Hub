@@ -205,7 +205,7 @@ function createRepository(options?: {
   }
 
   return {
-    async listTodayTasks() {
+    async listDriverTasks() {
       return [currentDetail()];
     },
     async findOwnedTaskById({ driverUserId }) {

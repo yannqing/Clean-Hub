@@ -6,6 +6,7 @@ import type {
   MobileCreateRefundRequest,
   MobilePaymentStatusResponse,
   MobilePaymentWebhookResponse,
+  MobileRefundOrderDetail,
   MobileRefundRequest,
   MobileRefundRequestListQuery,
   MobileRefundRequestListResponse,
@@ -59,6 +60,14 @@ export function createMobilePaymentApi(client: ApiClient) {
       client.get<MobileRefundRequestListResponse>(
         "/mobile/payment/refund-requests",
         { ...options, query },
+      ),
+    getRefundOrderDetail: (
+      refundRequestId: string,
+      options?: RequestOptions,
+    ) =>
+      client.get<MobileRefundOrderDetail>(
+        `/mobile/payment/refund-requests/${encodeURIComponent(refundRequestId)}/order`,
+        options,
       ),
     approveRefundRequest: (
       refundRequestId: string,

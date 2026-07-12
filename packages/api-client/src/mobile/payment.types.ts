@@ -88,6 +88,27 @@ export type MobileRefundRequest = {
   updatedAt: string;
 };
 
+export type MobileRefundOrderDetail = {
+  id: string;
+  branchId: string;
+  customerId: string;
+  orderType: string;
+  status: string;
+  paymentStatus: string;
+  totalAmount: string;
+  paidAmount: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: Array<{
+    id: string;
+    itemName: string;
+    quantity: string;
+    unitAmount: string;
+    lineAmount: string;
+  }>;
+};
+
 export type MobileCreateRefundRequest = {
   amount: string;
   reason: string;

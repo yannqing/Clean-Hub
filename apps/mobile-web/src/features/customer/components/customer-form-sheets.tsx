@@ -147,6 +147,15 @@ export function AppointmentForm({
   const selectedAddressId = addressBook.some((address) => address.id === form.addressId)
     ? form.addressId
     : CUSTOM_APPOINTMENT_ADDRESS_ID;
+  const [appointmentDate = "", appointmentTime = ""] = form.expectedAt.split("T");
+  const minimumDate = getMinimumAppointmentDateValue().split("T")[0] ?? "";
+
+  function updateExpectedAt(date: string, time: string) {
+    onFormChange((current) => ({
+      ...current,
+      expectedAt: date && time ? `${date}T${time}` : date ? `${date}T` : "",
+    }));
+  }
 
   function handleAddressSourceChange(addressId: string) {
     if (addressId === CUSTOM_APPOINTMENT_ADDRESS_ID) {
@@ -210,17 +219,25 @@ export function AppointmentForm({
       ) : null}
 
       <div className="space-y-2">
-        <Label htmlFor="appointment-expected-at">{t("customer.forms.expectedAt")}</Label>
-        <Input
-          className="h-12 text-base"
-          id="appointment-expected-at"
-          min={getMinimumAppointmentDateValue()}
-          type="datetime-local"
-          value={form.expectedAt}
-          onChange={(event) =>
-            onFormChange((current) => ({ ...current, expectedAt: event.target.value }))
-          }
-        />
+        <Label htmlFor="appointment-date">{t("customer.forms.expectedAt")}</Label>
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.72fr)] gap-2">
+          <Input
+            className="h-12 min-w-0 w-full text-base"
+            id="appointment-date"
+            min={minimumDate}
+            type="date"
+            value={appointmentDate}
+            onChange={(event) => updateExpectedAt(event.target.value, appointmentTime)}
+          />
+          <Input
+            aria-label={t("customer.forms.appointmentTime")}
+            className="h-12 min-w-0 w-full text-base"
+            id="appointment-time"
+            type="time"
+            value={appointmentTime}
+            onChange={(event) => updateExpectedAt(appointmentDate, event.target.value)}
+          />
+        </div>
       </div>
 
       {addressBook.length > 0 ? (

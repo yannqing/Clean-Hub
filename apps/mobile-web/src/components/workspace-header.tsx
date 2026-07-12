@@ -14,7 +14,7 @@ import { LogOut, Menu } from "lucide-react";
 import { LanguageSwitcher } from "@/components/language-switcher";
 
 type WorkspaceHeaderProps = {
-  eyebrow?: string;
+  eyebrow?: string | null;
   isLoggingOut?: boolean;
   logoutLabel: string;
   showMenu?: boolean;
@@ -36,7 +36,9 @@ export function WorkspaceHeader({
     <header className="mb-6">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-bold uppercase text-blue-600">{eyebrow}</p>
+          {eyebrow ? (
+            <p className="text-sm font-bold uppercase text-blue-600">{eyebrow}</p>
+          ) : null}
           <h1 className="mt-1 text-[34px] font-bold leading-[1.08] text-slate-950">{title}</h1>
           {subtitle ? (
             <p className="mt-2 truncate text-base text-slate-600">{subtitle}</p>

@@ -1,14 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PrintLocale } from "@cleanhub/hardware";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { Button, toast } from "@cleanhub/ui";
 import {
+  Bell,
+  ChevronRight,
+  CircleHelp,
   ClipboardList,
   DatabaseZap,
+  Headphones,
+  Languages,
   LogOut,
+  Navigation,
+  ShieldCheck,
+  Truck,
   UserRound,
   Wifi,
   WifiOff,
@@ -18,7 +26,6 @@ import { LanguageSwitcher } from "@/components/language-switcher";
 import { MobilePageSkeleton } from "@/components/mobile-skeleton";
 import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { MobilePullToRefresh } from "@/components/mobile-pull-to-refresh";
-import { SectionCard } from "@/components/section-card";
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { resolveTenantCurrency } from "@/lib/currency";
 import {
@@ -41,7 +48,7 @@ import {
   validateDeliveryPrintTask,
   type DeliveryPrintDocument,
 } from "../lib/printing";
-import { getDeliveryTaskDetail, getTodayDeliveryTasks } from "../queries";
+import { getDeliveryTaskDetail, getDeliveryTasks } from "../queries";
 import type {
   DeliveryActionResult,
   DeliveryProofType,
@@ -342,7 +349,7 @@ export function DeliveryHome({
 
   const refreshTasks = useCallback(
     async (preferredTaskId?: string | null) => {
-      const response = await getTodayDeliveryTasks();
+      const response = await getDeliveryTasks();
       setDataSource(response.source);
       setTasks(response.tasks);
 
@@ -933,6 +940,7 @@ export function DeliveryHome({
           isLoggingOut={isLoggingOut}
           onLogout={onLogout}
           queue={queue}
+          tasks={orderedTasks}
         />
       )}
 
@@ -1042,25 +1050,39 @@ function DeliveryProfileTab({
   isLoggingOut,
   onLogout,
   queue,
+  tasks,
 }: {
   dataSource: DataSource;
   driverName?: string;
   isLoggingOut: boolean;
   onLogout: () => void;
   queue: DeliveryQueueSummary;
+  tasks: DeliveryTaskListItem[];
 }) {
   const { t } = useTranslation();
   const online = isOnline();
+  const completedCount = tasks.filter((task) => task.status === "signed").length;
+  const activeCount = tasks.filter((task) => ["en_route", "arrived", "picked_up", "delivering"].includes(task.status)).length;
 
   return (
     <div className="space-y-4">
-      <SectionCard
-        icon={UserRound}
-        subtitle={driverName ?? t("delivery.profile.driverFallback")}
-        title={t("delivery.profile.title")}
-      >
-        <div className="grid gap-3 text-sm">
-          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="text-base font-bold text-slate-950">{t("delivery.profile.title")}</h2>
+        <div className="mt-4 flex items-center gap-3">
+          <span className="flex size-14 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700">
+            <UserRound className="size-7" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-lg font-bold text-slate-950">{driverName ?? t("delivery.profile.driverFallback")}</p>
+            <span className="mt-1 inline-flex rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">
+              <ShieldCheck className="mr-1 size-3.5" aria-hidden />
+              {t("delivery.profile.verified")}
+            </span>
+          </div>
+          <ChevronRight className="size-5 text-slate-400" aria-hidden />
+        </div>
+        <div className="mt-4 divide-y divide-slate-100 rounded-md border border-slate-200 px-3 text-sm">
+          <div className="flex min-h-12 items-center justify-between gap-3">
             <span className="text-slate-600">{t("delivery.profile.network")}</span>
             <span
               className={`inline-flex items-center gap-1.5 font-semibold ${
@@ -1075,7 +1097,7 @@ function DeliveryProfileTab({
               {online ? t("delivery.profile.online") : t("delivery.profile.offline")}
             </span>
           </div>
-          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+          <div className="flex min-h-12 items-center justify-between gap-3">
             <span className="text-slate-600">{t("delivery.profile.dataSource")}</span>
             <span className="inline-flex items-center gap-1.5 font-semibold text-slate-800">
               <DatabaseZap className="size-4 text-slate-500" aria-hidden />
@@ -1084,21 +1106,33 @@ function DeliveryProfileTab({
                 : t("delivery.profile.liveData")}
             </span>
           </div>
-          <div className="flex items-center justify-between gap-3 rounded-md bg-slate-50 px-3 py-2">
+          <div className="flex min-h-12 items-center justify-between gap-3">
             <span className="text-slate-600">{t("delivery.profile.pendingQueue")}</span>
             <span className="font-semibold tabular-nums text-slate-950">
               {queue.count}
             </span>
           </div>
         </div>
-      </SectionCard>
+      </section>
 
-      <SectionCard title={t("delivery.profile.preferences")}>
-        <LanguageSwitcher className="w-full" />
-      </SectionCard>
+      <div className="grid grid-cols-2 gap-3">
+        <DeliveryProfileMetric icon={ClipboardList} label={t("delivery.profile.completedToday")} tone="blue" value={completedCount} />
+        <DeliveryProfileMetric icon={Truck} label={t("delivery.profile.activeTasks")} tone="green" value={activeCount} />
+      </div>
+
+      <DeliveryProfileGroup title={t("delivery.profile.preferences")}>
+        <DeliveryProfileRow icon={Languages} label={t("common.language")} trailing={<LanguageSwitcher />} />
+        <DeliveryProfileRow icon={Bell} label={t("delivery.profile.notifications")} onClick={() => toast.info(t("delivery.profile.notAvailable"))} />
+        <DeliveryProfileRow icon={Navigation} label={t("delivery.profile.navigationPreference")} onClick={() => toast.info(t("delivery.profile.notAvailable"))} />
+      </DeliveryProfileGroup>
+
+      <DeliveryProfileGroup title={t("delivery.profile.helpSupport")}>
+        <DeliveryProfileRow icon={Headphones} label={t("delivery.profile.contactSupport")} href="mailto:support@cleanhub.local" />
+        <DeliveryProfileRow icon={CircleHelp} label={t("delivery.profile.feedback")} onClick={() => toast.info(t("delivery.profile.notAvailable"))} />
+      </DeliveryProfileGroup>
 
       <Button
-        className="h-11 w-full"
+        className="h-12 w-full border-red-100 text-red-600 hover:bg-red-50 hover:text-red-700"
         disabled={isLoggingOut}
         type="button"
         variant="outline"
@@ -1109,4 +1143,38 @@ function DeliveryProfileTab({
       </Button>
     </div>
   );
+}
+
+function DeliveryProfileMetric({ icon: Icon, label, tone, value }: { icon: typeof ClipboardList; label: string; tone: "blue" | "green"; value: number }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+      <span className={`flex size-10 items-center justify-center rounded-md ${tone === "blue" ? "bg-blue-50 text-blue-700" : "bg-emerald-50 text-emerald-700"}`}>
+        <Icon className="size-5" aria-hidden />
+      </span>
+      <p className="mt-3 text-xs text-slate-500">{label}</p>
+      <p className={`mt-1 text-2xl font-bold tabular-nums ${tone === "blue" ? "text-blue-700" : "text-emerald-700"}`}>{value}</p>
+    </div>
+  );
+}
+
+function DeliveryProfileGroup({ children, title }: { children: ReactNode; title: string }) {
+  return (
+    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-base font-bold text-slate-950">{title}</h2>
+      <div className="mt-2 divide-y divide-slate-100">{children}</div>
+    </section>
+  );
+}
+
+function DeliveryProfileRow({ href, icon: Icon, label, onClick, trailing }: { href?: string; icon: typeof ClipboardList; label: string; onClick?: () => void; trailing?: ReactNode }) {
+  const content = (
+    <>
+      <Icon className="size-5 shrink-0 text-blue-600" aria-hidden />
+      <span className="min-w-0 flex-1 text-left text-sm font-medium text-slate-800">{label}</span>
+      {trailing ?? <ChevronRight className="size-4 text-slate-400" aria-hidden />}
+    </>
+  );
+  if (href) return <a className="flex min-h-14 items-center gap-3" href={href}>{content}</a>;
+  if (onClick) return <button className="flex min-h-14 w-full items-center gap-3" type="button" onClick={onClick}>{content}</button>;
+  return <div className="flex min-h-14 items-center gap-3">{content}</div>;
 }

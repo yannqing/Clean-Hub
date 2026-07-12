@@ -371,7 +371,9 @@ export function ActivityView({
                   <div className="flex shrink-0 items-center gap-2">
                     <StatusBadge
                       view={
-                        item.kind === "order"
+                        item.kind === "order" && item.refundStatus
+                          ? getRefundStatusView(t, item.refundStatus)
+                          : item.kind === "order"
                           ? getOrderStatusView(t, item.status)
                           : getTicketStatusView(t, item.status)
                       }
@@ -511,11 +513,14 @@ function ActivityDetailPanel({
       (refundRequest) => refundRequest.orderId === detail.data.id,
     );
     const balance = getOrderBalance(detail.data);
+    const activeRefund = orderRefundRequests.find(
+      (request) => request.status === "pending" || request.status === "processing",
+    );
     const canPay =
       amountToCents(balance) > 0 &&
       detail.data.paymentStatus !== "paid" &&
       detail.data.paymentStatus !== "refunded";
-    const canRefund = amountToCents(detail.data.paidAmount) > 0;
+    const canRefund = amountToCents(detail.data.paidAmount) > 0 && !activeRefund;
     const formatMoney = (value: string | number) =>
       formatTenantMoney(value, intlLocale, currency);
 
@@ -536,7 +541,11 @@ function ActivityDetailPanel({
           <DetailTerm label={t("customer.detail.paid")} value={formatMoney(detail.data.paidAmount)} />
           <DetailTerm
             label={t("customer.detail.payment")}
-            value={getPaymentStatusLabel(t, detail.data.paymentStatus)}
+            value={
+              activeRefund
+                ? getRefundStatusView(t, activeRefund.status).label
+                : getPaymentStatusLabel(t, detail.data.paymentStatus)
+            }
           />
           <DetailTerm
             label={t("customer.detail.created")}

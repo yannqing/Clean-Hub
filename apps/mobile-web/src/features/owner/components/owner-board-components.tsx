@@ -6,6 +6,7 @@ import type {
   MobileOwnerBranchOption,
   MobileOwnerDriverOption,
   MobileOwnerTodaySummary,
+  MobileRefundOrderDetail,
   MobileRefundRequest,
 } from "@cleanhub/api-client";
 import type { SupportedLocale, TranslationKey } from "@cleanhub/i18n";
@@ -13,6 +14,11 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Badge,
   Button,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -22,11 +28,17 @@ import {
   Textarea,
 } from "@cleanhub/ui";
 import {
+  CalendarDays,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   Clock3,
+  Eye,
+  FileText,
   Loader2,
+  MapPin,
   PackageCheck,
+  Phone,
   Route,
   Send,
   Shirt,
@@ -70,7 +82,7 @@ export const ownerIntlLocales: Record<SupportedLocale, string> = {
   "zh-CN": "zh-CN",
 };
 
-const appointmentStatusLabelKeys: Record<OwnerAppointmentStatus, TranslationKey> = {
+export const appointmentStatusLabelKeys: Record<OwnerAppointmentStatus, TranslationKey> = {
   accepted: "owner.appointmentStatus.accepted",
   cancelled: "owner.appointmentStatus.cancelled",
   done: "owner.appointmentStatus.done",
@@ -89,7 +101,7 @@ export const deliveryStatusLabelKeys: Record<MobileDeliveryTaskStatus, Translati
   signed: "owner.deliveryStatus.signed",
 };
 
-const refundStatusLabelKeys: Record<MobileRefundRequest["status"], TranslationKey> = {
+export const refundStatusLabelKeys: Record<MobileRefundRequest["status"], TranslationKey> = {
   approved: "owner.refundStatus.approved",
   failed: "owner.refundStatus.failed",
   pending: "owner.refundStatus.pending",
@@ -324,27 +336,48 @@ export function AppointmentItem({
   const isPending = appointment.status === "pending";
 
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+    <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-slate-950">
-            {appointment.customerName}
-          </p>
-          <p className="mt-1 truncate text-xs text-slate-600">
-            {formatDateTime(appointment.scheduledAt ?? appointment.requestedAt, intlLocale, notScheduled)}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="truncate text-base font-bold text-slate-950">{appointment.customerName}</p>
+            {appointment.customerPhone ? (
+              <a className="flex min-w-0 items-center gap-1 text-xs text-slate-500" href={`tel:${appointment.customerPhone}`}>
+                <Phone className="size-3.5 shrink-0" aria-hidden />
+                <span className="truncate">{appointment.customerPhone}</span>
+              </a>
+            ) : null}
+          </div>
         </div>
         <StatusBadge
           label={t(appointmentStatusLabelKeys[appointment.status])}
           status={appointment.status}
         />
       </div>
-      <p className="mt-3 line-clamp-2 text-sm text-slate-700">
-        {appointment.address || appointment.notes || t("owner.addressToConfirm")}
-      </p>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-4 grid gap-2 text-sm text-slate-600">
+        <p className="flex items-start gap-2">
+          <CalendarDays className="mt-0.5 size-4 shrink-0 text-blue-600" aria-hidden />
+          <span>{formatDateTime(appointment.scheduledAt ?? appointment.requestedAt, intlLocale, notScheduled)}</span>
+        </p>
+        <p className="flex items-start gap-2">
+          <MapPin className="mt-0.5 size-4 shrink-0 text-blue-600" aria-hidden />
+          <span className="line-clamp-2">{appointment.address || t("owner.addressToConfirm")}</span>
+        </p>
+        {appointment.serviceType ? (
+          <p className="flex items-center gap-2">
+            <span className="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">{appointment.serviceType}</span>
+          </p>
+        ) : null}
+        {appointment.notes ? (
+          <p className="flex items-start gap-2 text-slate-500">
+            <FileText className="mt-0.5 size-4 shrink-0" aria-hidden />
+            <span className="line-clamp-2">{appointment.notes}</span>
+          </p>
+        ) : null}
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
         <Button
-          className="w-full"
+          className="h-11 w-full"
           disabled={!isPending}
           size="sm"
           type="button"
@@ -354,7 +387,7 @@ export function AppointmentItem({
           {t("owner.actions.accept")}
         </Button>
         <Button
-          className="w-full"
+          className="h-11 w-full"
           disabled={!isPending}
           size="sm"
           type="button"
@@ -365,7 +398,7 @@ export function AppointmentItem({
           {t("owner.actions.reject")}
         </Button>
       </div>
-    </div>
+    </article>
   );
 }
 
@@ -378,29 +411,40 @@ export function DispatchTaskItem({
 }) {
   const { locale, t } = useTranslation();
   const intlLocale = ownerIntlLocales[locale];
-  const canAssign = task.status === "pending_dispatch";
+  const canAssign = task.status === "pending_dispatch" && !task.assigneeUserId;
+  const canReassign =
+    task.status === "pending_dispatch" && Boolean(task.assigneeUserId);
   const canCancel = task.status !== "cancelled" && task.status !== "signed";
 
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+    <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{t(taskTypeLabelKeys[task.type])}</Badge>
-            <StatusBadge label={t(deliveryStatusLabelKeys[task.status])} status={task.status} />
-          </div>
-          <p className="mt-2 truncate text-sm font-semibold text-slate-950">
-            {task.customerName}
-          </p>
-          <p className="mt-1 truncate text-xs text-slate-600">
-            {formatDateTime(task.expectedAt, intlLocale, t("owner.notScheduled"))}
-          </p>
+          <p className="truncate text-base font-bold text-slate-950">{task.customerName}</p>
+          {task.customerPhone ? (
+            <a className="mt-1 flex items-center gap-1 text-xs text-slate-500" href={`tel:${task.customerPhone}`}>
+              <Phone className="size-3.5" aria-hidden />
+              {task.customerPhone}
+            </a>
+          ) : null}
         </div>
+        <StatusBadge label={t(deliveryStatusLabelKeys[task.status])} status={task.status} />
       </div>
-      <p className="mt-3 line-clamp-2 text-sm text-slate-700">{task.address}</p>
-      <p className="mt-2 truncate text-xs text-slate-500">
-        {t("owner.assigned")}: {task.assigneeName || task.assigneeUserId || t("owner.unassigned")}
-      </p>
+      <div className="mt-4 grid gap-2 text-sm text-slate-600">
+        <p className="flex items-start gap-2">
+          <CalendarDays className="mt-0.5 size-4 shrink-0 text-blue-600" aria-hidden />
+          {formatDateTime(task.expectedAt, intlLocale, t("owner.notScheduled"))}
+        </p>
+        <p className="flex items-start gap-2">
+          <MapPin className="mt-0.5 size-4 shrink-0 text-blue-600" aria-hidden />
+          <span className="line-clamp-2">{task.address}</span>
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge className="border-blue-100 bg-blue-50 text-blue-700" variant="outline">{t(taskTypeLabelKeys[task.type])}</Badge>
+          <span className="text-xs">{t("owner.assigned")}: {task.assigneeName || task.assigneeUserId || t("owner.unassigned")}</span>
+        </div>
+        {task.notes ? <p className="line-clamp-2 text-xs text-slate-500">{task.notes}</p> : null}
+      </div>
       <div className="mt-3 grid grid-cols-3 gap-2">
         <Button
           className="w-full px-2"
@@ -414,7 +458,7 @@ export function DispatchTaskItem({
         </Button>
         <Button
           className="w-full px-2"
-          disabled={task.status === "cancelled" || task.status === "signed"}
+          disabled={!canReassign}
           size="sm"
           type="button"
           variant="outline"
@@ -435,44 +479,63 @@ export function DispatchTaskItem({
           {t("owner.actions.cancel")}
         </Button>
       </div>
-    </div>
+    </article>
   );
 }
 
 export function RefundRequestItem({
   currency,
   onAction,
+  onViewOrder,
   refundRequest,
 }: {
   currency: string;
   onAction: (target: ActionTarget) => void;
+  onViewOrder: (refundRequest: MobileRefundRequest) => void;
   refundRequest: MobileRefundRequest;
 }) {
   const { locale, t } = useTranslation();
   const intlLocale = ownerIntlLocales[locale];
 
   return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+    <article className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <span className={`flex size-11 shrink-0 items-center justify-center rounded-md ${statusBadgeClasses[refundRequest.status] ?? "bg-slate-100 text-slate-600"}`}>
+            <Clock3 className="size-5" aria-hidden />
+          </span>
+          <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-slate-950">
             {t("customer.detail.orderPrefix", { id: refundRequest.orderId.slice(-6).toUpperCase() })}
           </p>
           <p className="mt-1 text-xs text-slate-600">
             {formatDateTime(refundRequest.createdAt, intlLocale, t("owner.notScheduled"))}
           </p>
+          </div>
         </div>
         <StatusBadge label={t(refundStatusLabelKeys[refundRequest.status])} status={refundRequest.status} />
       </div>
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <p className="text-sm text-slate-700">{refundRequest.reason}</p>
-        <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-950">
+      <div className="mt-3 flex items-end justify-between gap-3 pl-14">
+        <p className="line-clamp-2 text-sm text-slate-600">{refundRequest.reason}</p>
+        <p className="shrink-0 text-lg font-bold tabular-nums text-slate-950">
           {formatTenantMoney(refundRequest.amount, intlLocale, currency)}
         </p>
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <Button
+        className="mt-3 w-full"
+        size="sm"
+        type="button"
+        variant="outline"
+        onClick={() => onViewOrder(refundRequest)}
+      >
+        <Eye className="size-4" aria-hidden />
+        {t("owner.actions.viewOrder")}
+        <ChevronRight className="size-4" aria-hidden />
+      </Button>
+      <div className="mt-2 grid grid-cols-2 gap-2">
         <Button
           className="w-full"
+          disabled={refundRequest.status !== "pending"}
           size="sm"
           type="button"
           onClick={() => onAction({ kind: "approve-refund", refundRequest })}
@@ -482,6 +545,7 @@ export function RefundRequestItem({
         </Button>
         <Button
           className="w-full"
+          disabled={refundRequest.status !== "pending"}
           size="sm"
           type="button"
           variant="outline"
@@ -491,7 +555,155 @@ export function RefundRequestItem({
           {t("owner.actions.rejectRefund")}
         </Button>
       </div>
-    </div>
+    </article>
+  );
+}
+
+export function RefundOrderDetailSheet({
+  currency,
+  error,
+  isLoading,
+  onApprove,
+  onOpenChange,
+  onReject,
+  open,
+  order,
+  refundRequest,
+}: {
+  currency: string;
+  error: string | null;
+  isLoading: boolean;
+  onApprove: (request: MobileRefundRequest) => void;
+  onOpenChange: (open: boolean) => void;
+  onReject: (request: MobileRefundRequest) => void;
+  open: boolean;
+  order: MobileRefundOrderDetail | null;
+  refundRequest: MobileRefundRequest | null;
+}) {
+  const { locale, t } = useTranslation();
+  const intlLocale = ownerIntlLocales[locale];
+
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="flex h-[92dvh] max-h-[92dvh] flex-col overflow-hidden p-0">
+        <div className="flex-1 overflow-y-auto p-5">
+        <SheetHeader className="pr-8 text-left">
+          <SheetTitle>{t("owner.refundOrder.title")}</SheetTitle>
+          <SheetDescription>
+            {order
+              ? t("customer.detail.orderPrefix", {
+                  id: order.id.slice(-6).toUpperCase(),
+                })
+              : t("owner.refundOrder.description")}
+          </SheetDescription>
+        </SheetHeader>
+        {refundRequest ? (
+          <div className="mt-5 flex items-center justify-between gap-3 rounded-md bg-slate-50 p-4">
+            <div className="flex items-center gap-3">
+              <span className={`flex size-11 items-center justify-center rounded-md ${statusBadgeClasses[refundRequest.status] ?? "bg-slate-100 text-slate-600"}`}>
+                <Clock3 className="size-5" aria-hidden />
+              </span>
+              <div>
+                <p className="text-base font-bold text-slate-950">{t(refundStatusLabelKeys[refundRequest.status])}</p>
+                <p className="mt-0.5 text-xs text-slate-500">{formatDateTime(refundRequest.createdAt, intlLocale, "-")}</p>
+              </div>
+            </div>
+            <p className="text-xl font-bold tabular-nums text-slate-950">{formatTenantMoney(refundRequest.amount, intlLocale, currency)}</p>
+          </div>
+        ) : null}
+        {refundRequest ? (
+          <section className="mt-4 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+            <h3 className="text-sm font-bold text-slate-950">{t("owner.refundOrder.reason")}</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{refundRequest.reason}</p>
+          </section>
+        ) : null}
+        {isLoading ? (
+          <div className="flex min-h-40 items-center justify-center">
+            <Loader2 className="size-5 animate-spin text-slate-500" aria-hidden />
+          </div>
+        ) : error ? (
+          <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </div>
+        ) : order ? (
+          <div className="mt-5 space-y-5">
+            <dl className="grid grid-cols-2 gap-4 rounded-md border border-slate-200 bg-white p-4 text-sm shadow-sm">
+              <div>
+                <dt className="text-slate-500">{t("customer.detail.total")}</dt>
+                <dd className="mt-1 font-semibold">
+                  {formatTenantMoney(order.totalAmount, intlLocale, currency)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">{t("customer.detail.paid")}</dt>
+                <dd className="mt-1 font-semibold">
+                  {formatTenantMoney(order.paidAmount, intlLocale, currency)}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">{t("customer.detail.payment")}</dt>
+                <dd className="mt-1 font-semibold">{order.paymentStatus}</dd>
+              </div>
+              <div>
+                <dt className="text-slate-500">{t("customer.detail.created")}</dt>
+                <dd className="mt-1 font-semibold">
+                  {formatDateTime(order.createdAt, intlLocale, "-")}
+                </dd>
+              </div>
+            </dl>
+            {order.notes ? (
+              <p className="rounded-md bg-slate-50 p-3 text-sm text-slate-700">
+                {order.notes}
+              </p>
+            ) : null}
+            <div>
+              <h3 className="text-sm font-semibold text-slate-950">
+                {t("customer.detail.articles")}
+              </h3>
+              <div className="mt-2 divide-y divide-slate-200 rounded-md border border-slate-200">
+                {order.items.length ? (
+                  order.items.map((item) => (
+                    <div
+                      className="flex items-center justify-between gap-3 p-3 text-sm"
+                      key={item.id}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-900">
+                          {item.itemName}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {item.quantity} x {formatTenantMoney(item.unitAmount, intlLocale, currency)}
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-semibold tabular-nums">
+                        {formatTenantMoney(item.lineAmount, intlLocale, currency)}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <p className="p-3 text-sm text-slate-500">
+                    {t("customer.detail.noItems")}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : null}
+        </div>
+        {refundRequest?.status === "pending" ? (
+          <div className="grid grid-cols-2 gap-3 border-t border-slate-200 bg-white p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-[0_-8px_24px_rgba(15,23,42,0.08)]">
+            <Button className="h-12" type="button" variant="outline" onClick={() => onReject(refundRequest)}>
+              <XCircle className="size-4" aria-hidden />
+              {t("owner.actions.rejectRefund")}
+            </Button>
+            <Button className="h-12" type="button" onClick={() => onApprove(refundRequest)}>
+              <CheckCircle2 className="size-4" aria-hidden />
+              {t("owner.actions.approveRefund")}
+            </Button>
+          </div>
+        ) : null}
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -622,23 +834,26 @@ export function ActionSheet({
 
             <div className="mt-5 space-y-4">
               {needsAssignee ? (
-                <label className="block">
+                <div className="block">
                   <span className="text-sm font-medium text-slate-700">
                     {t("owner.forms.assignee")}
                   </span>
-                  <select
-                    className="mt-2 flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none transition-[color,box-shadow] focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
+                  <Select
                     value={assigneeUserId}
-                    onChange={(event) => onAssigneeUserIdChange(event.target.value)}
+                    onValueChange={onAssigneeUserIdChange}
                   >
-                    <option value="">{t("owner.actions.selectDriver")}</option>
-                    {drivers.map((driver) => (
-                      <option key={driver.id} value={driver.id}>
-                        {formatDriverOption(driver)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                    <SelectTrigger className="mt-2 h-11 w-full">
+                      <SelectValue placeholder={t("owner.actions.selectDriver")} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {drivers.map((driver) => (
+                        <SelectItem key={driver.id} value={driver.id}>
+                          {formatDriverOption(driver)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               ) : null}
 
               {needsReason ? (

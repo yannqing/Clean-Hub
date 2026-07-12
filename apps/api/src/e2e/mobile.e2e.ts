@@ -855,7 +855,7 @@ async function verifyPaymentFlow(input: {
     token: input.owner.accessToken,
   });
 
-  assert.equal(approved.body.refundRequest.status, "processing");
+  assert.equal(approved.body.refundRequest.status, "refunded");
 
   await sendMockPaymentWebhook({
     gateway: "mock",

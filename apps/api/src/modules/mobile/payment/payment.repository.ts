@@ -13,6 +13,7 @@ import {
 
 import {
   customers,
+  orderItems,
   orders,
   paymentCallbacks,
   paymentTransactions,
@@ -33,6 +34,7 @@ import type {
   PaymentGatewayCallbackVerification,
   PaymentGatewayName,
   PaymentTransactionStatus,
+  RefundOrderDetail,
   RefundRequest,
   RefundRequestStatus,
 } from "./payment.types.js";
@@ -535,7 +537,7 @@ export class PaymentRepository {
     amount: string;
     reason: string;
     paymentTransactionId?: string | null;
-  }): Promise<RefundRequest> {
+  }): Promise<RefundRequest | null> {
     const [created] = await this.db
       .insert(refundRequests)
       .values({
@@ -550,13 +552,13 @@ export class PaymentRepository {
         reason: input.reason,
         status: "pending",
       })
+      .onConflictDoNothing({
+        target: [refundRequests.tenantId, refundRequests.orderId],
+        where: sql`${refundRequests.deletedAt} is null and ${refundRequests.status} in ('pending', 'processing')`,
+      })
       .returning({ ...getTableColumns(refundRequests) });
 
-    if (!created) {
-      throw new Error("Refund request insert failed.");
-    }
-
-    return toRefundRequest(created);
+    return created ? toRefundRequest(created) : null;
   }
 
   async listRefundRequests(input: {
@@ -628,6 +630,60 @@ export class PaymentRepository {
       .limit(1);
 
     return row ? toRefundRequest(row) : null;
+  }
+
+  async getRefundOrderDetail(input: {
+    tenantId: string;
+    orderId: string;
+  }): Promise<RefundOrderDetail | null> {
+    const [order] = await this.db
+      .select({ ...getTableColumns(orders) })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.id, input.orderId),
+          eq(orders.tenantId, input.tenantId),
+          isNull(orders.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    if (!order) {
+      return null;
+    }
+
+    const items = await this.db
+      .select({
+        id: orderItems.id,
+        itemName: orderItems.itemName,
+        quantity: orderItems.quantity,
+        unitAmount: orderItems.unitAmount,
+        lineAmount: orderItems.lineAmount,
+      })
+      .from(orderItems)
+      .where(
+        and(
+          eq(orderItems.tenantId, input.tenantId),
+          eq(orderItems.orderId, order.id),
+          isNull(orderItems.deletedAt),
+        ),
+      )
+      .orderBy(asc(orderItems.createdAt));
+
+    return {
+      id: order.id,
+      branchId: order.branchId,
+      customerId: order.customerId,
+      orderType: order.orderType,
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      totalAmount: order.totalAmount,
+      paidAmount: order.paidAmount,
+      notes: order.notes,
+      createdAt: order.createdAt.toISOString(),
+      updatedAt: order.updatedAt.toISOString(),
+      items,
+    };
   }
 
   async startRefundProcessing(input: {

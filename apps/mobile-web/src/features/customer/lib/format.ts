@@ -33,6 +33,7 @@ export type ActivityListItem =
       status: MobileCustomerOrderStatus;
       createdAt: string;
       amount: string;
+      refundStatus?: MobileRefundRequest["status"];
       source: MobileCustomerOrderListItem;
     }
   | {
@@ -376,17 +377,29 @@ export function getRefundStatusView(
 export function getActivityItems(
   activity: MobileCustomerActivityList,
   t: Translator,
+  refundRequests: MobileRefundRequest[] = [],
 ): ActivityListItem[] {
-  const orders: ActivityListItem[] = activity.orders.map((order) => ({
-    kind: "order",
-    id: order.id,
-    title: t("customer.detail.orderPrefix", { id: order.id.slice(-6).toUpperCase() }),
-    subtitle: `${t("customer.detail.payment")} ${getPaymentStatusLabel(t, order.paymentStatus)}`,
-    status: order.status,
-    createdAt: order.createdAt,
-    amount: order.totalAmount,
-    source: order,
-  }));
+  const orders: ActivityListItem[] = activity.orders.map((order) => {
+    const refundStatus = refundRequests.find(
+      (request) =>
+        request.orderId === order.id &&
+        (request.status === "pending" || request.status === "processing"),
+    )?.status;
+
+    return {
+      kind: "order",
+      id: order.id,
+      title: t("customer.detail.orderPrefix", { id: order.id.slice(-6).toUpperCase() }),
+      subtitle: refundStatus
+        ? t(refundStatusKeys[refundStatus])
+        : `${t("customer.detail.payment")} ${getPaymentStatusLabel(t, order.paymentStatus)}`,
+      status: order.status,
+      createdAt: order.createdAt,
+      amount: order.totalAmount,
+      refundStatus,
+      source: order,
+    };
+  });
   const tickets: ActivityListItem[] = activity.tickets.map((ticket) => ({
     kind: "ticket",
     id: ticket.id,

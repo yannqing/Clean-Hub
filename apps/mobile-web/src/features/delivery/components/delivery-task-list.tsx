@@ -143,7 +143,7 @@ export function DeliveryTaskList({
           </button>
         ))}
       </div>
-    <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+    <section>
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="text-base font-semibold text-slate-950">
@@ -155,7 +155,7 @@ export function DeliveryTaskList({
         </div>
       </div>
 
-      <div className="mt-4 space-y-2">
+      <div className="mt-3 space-y-3">
         {visibleTasks.length === 0 ? (
           <div className="rounded-md border border-dashed border-slate-300 px-3 py-6 text-center text-sm text-slate-500">
             {t("delivery.noTasks")}
