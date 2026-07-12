@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 
-import { logoutBrowserSessionAction } from "../actions/browser-session.action";
+import { logoutAction } from "../actions/logout.action";
 
 type LogoutButtonProps = {
   className?: string;
@@ -26,8 +26,13 @@ export function LogoutButton({
     setSubmitting(true);
 
     try {
-      await logoutBrowserSessionAction();
-      toast.success("Signed out.");
+      const result = await logoutAction();
+
+      if (result.ok) {
+        toast.success("Signed out.");
+      } else {
+        toast.error(result.message);
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to sign out cleanly.";
@@ -53,4 +58,3 @@ export function LogoutButton({
     </Button>
   );
 }
-

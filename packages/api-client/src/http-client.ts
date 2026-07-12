@@ -381,6 +381,12 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
           ok: response.ok,
           response,
         });
+        await options.afterResponse?.(response, {
+          ...context,
+          status: response.status,
+          ok: response.ok,
+          response,
+        });
 
         if (response.ok) {
           return parseResponseBody<TResponse>(

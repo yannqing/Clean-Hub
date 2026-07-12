@@ -9,6 +9,7 @@ import {
   type LoginFormFieldErrors,
   type LoginFormValues,
 } from "../validators/login-form.validator";
+import { applyAuthCookies } from "./auth-cookie.helper";
 
 type LoginActionResult =
   | {
@@ -54,12 +55,30 @@ export async function loginAction(
   }
 
   try {
-    const result = await webAdminApi.auth.login({
-      identifier: input.identifier,
-      password: input.password,
-      tenantCode: input.loginMode === "tenant" ? input.tenantCode.trim() : undefined,
-      deviceId: input.deviceId,
-    });
+    let appliedCookieNames = new Set<string>();
+    const result = await webAdminApi.auth.login(
+      {
+        identifier: input.identifier,
+        password: input.password,
+        tenantCode:
+          input.loginMode === "tenant" ? input.tenantCode.trim() : undefined,
+        deviceId: input.deviceId,
+      },
+      {
+        afterResponse: async (response) => {
+          appliedCookieNames = await applyAuthCookies(response);
+        },
+      },
+    );
+
+    if (
+      !appliedCookieNames.has("cleanhub_access_token") ||
+      !appliedCookieNames.has("cleanhub_refresh_token")
+    ) {
+      throw new Error(
+        "The API did not establish an authenticated browser session.",
+      );
+    }
 
     return {
       ok: true,
