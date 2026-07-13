@@ -9,7 +9,6 @@ export function loadPaymentConfig(
 ): PaymentConfig {
   return {
     gateway: readGateway(env.PAYMENT_GATEWAY),
-    currency: env.PAYMENT_CURRENCY ?? "XOF",
     mockSecret: env.PAYMENT_MOCK_SECRET ?? "cleanhub-mock-payment-secret",
     mockPaymentBaseUrl:
       env.PAYMENT_MOCK_PAYMENT_BASE_URL ??

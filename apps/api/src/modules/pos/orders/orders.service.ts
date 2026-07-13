@@ -6,6 +6,7 @@ import {
   requirePosBranchId,
 } from "../../auth/permission.helper.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { findBranchById } from "../../tenant/branches/branches.repository.js";
 import { PosOrderError } from "./orders.errors.js";
 import {
   changeOrderStatusRecord,
@@ -275,6 +276,7 @@ async function createTicketOrder(
   const orderId = await createOrderRecord(db, {
     tenantId,
     branchId: ticket.branchId,
+    currency: ticket.currency,
     customerId: ticket.customerId,
     orderType: "ticket",
     status: "received",
@@ -319,6 +321,14 @@ async function createManualOrder(
     tenantId,
     customerId: input.data.customerId,
   });
+  const branch = await findBranchById(db, {
+    tenantId,
+    branchId: input.data.branchId,
+  });
+
+  if (!branch) {
+    throw new PosOrderError("BRANCH_NOT_ALLOWED", "Branch was not found.", 404);
+  }
 
   const totalAmount = sumOrderItemAmounts(
     input.data.items.map((item) => ({
@@ -328,6 +338,7 @@ async function createManualOrder(
   const orderId = await createOrderRecord(db, {
     tenantId,
     branchId: input.data.branchId,
+    currency: branch.defaultCurrency,
     customerId: input.data.customerId,
     orderType: "manual",
     status: "received",
@@ -603,6 +614,7 @@ export async function createPosOrderPayment(
       orderId,
       paymentMethod: data.paymentMethod,
       amount: data.amount,
+      currency: before.currency,
       actorUserId: authContext.userId,
     });
 

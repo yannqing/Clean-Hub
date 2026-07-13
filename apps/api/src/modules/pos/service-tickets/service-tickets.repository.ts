@@ -89,6 +89,7 @@ function toTicketSummary(row: TicketJoinedRow): ServiceTicketSummary {
     id: row.id,
     tenantId: row.tenantId,
     branchId: row.branchId,
+    currency: row.currency,
     customerId: row.customerId,
     customerName: row.customerName ?? "",
     customerAccountName: row.customerAccountName,
@@ -119,6 +120,7 @@ function toTicketAuditSnapshot(
   return {
     tenantId: ticket.tenantId,
     branchId: ticket.branchId,
+    currency: ticket.currency,
     customerId: ticket.customerId,
     ticketType: ticket.ticketType,
     ticketStatus: ticket.ticketStatus,
@@ -454,6 +456,7 @@ export async function createServiceTicketRecord(
   db: Database,
   input: CreateServiceTicketRequest & {
     tenantId: string;
+    currency: string;
     assistantId: string;
     actorUserId: string;
   },
@@ -470,6 +473,7 @@ export async function createServiceTicketRecord(
     id: ticketId,
     tenantId: input.tenantId,
     branchId: input.branchId,
+    currency: input.currency,
     customerId: input.customerId,
     assistantId: normalizeNullable(input.assistantId),
     ticketNo,
@@ -662,6 +666,7 @@ export async function findRelatedOrders(
   const rows = await db
     .select({
       id: orders.id,
+      currency: orders.currency,
       orderType: orders.orderType,
       status: orders.status,
       paymentStatus: orders.paymentStatus,
@@ -683,6 +688,7 @@ export async function findRelatedOrders(
 
   return rows.map((row) => ({
     id: row.id,
+    currency: row.currency,
     orderType: row.orderType,
     status: row.status,
     paymentStatus: row.paymentStatus,

@@ -12,11 +12,13 @@ import {
 } from "drizzle-orm";
 
 import {
+  branches,
   customers,
   orderItems,
   orders,
   paymentTransactions,
   serviceTickets,
+  tenantSettings,
   ticketItems,
   type Database,
 } from "@cleanhub/db";
@@ -86,6 +88,7 @@ function toOrderSummary(row: OrderJoinedRow): PosOrderSummary {
     id: row.id,
     tenantId: row.tenantId,
     branchId: row.branchId,
+    currency: row.currency,
     customerId: row.customerId,
     customerName: row.customerName ?? "",
     orderType: row.orderType,
@@ -111,6 +114,7 @@ function toPaymentTransaction(
     orderId: row.orderId,
     paymentMethod: row.paymentMethod,
     amount: row.amount,
+    currency: row.currency,
     paymentStatus: row.paymentStatus,
     paidAt: row.paidAt ? row.paidAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
@@ -432,6 +436,7 @@ export async function createOrderRecord(
   input: {
     tenantId: string;
     branchId: string;
+    currency: string;
     customerId: string;
     orderType: PosOrderType;
     status: "draft" | "received";
@@ -447,6 +452,7 @@ export async function createOrderRecord(
     id: orderId,
     tenantId: input.tenantId,
     branchId: input.branchId,
+    currency: input.currency,
     customerId: input.customerId,
     orderType: input.orderType,
     status: input.status,
@@ -662,6 +668,7 @@ export async function createPaymentTransactionRecord(
     orderId: string;
     paymentMethod: PosPaymentMethod;
     amount: string;
+    currency: string;
     actorUserId: string;
   },
 ): Promise<PosPaymentTransaction> {
@@ -676,6 +683,7 @@ export async function createPaymentTransactionRecord(
     orderId: input.orderId,
     paymentMethod: input.paymentMethod,
     amount: input.amount,
+    currency: input.currency,
     paymentStatus: "paid",
     paidAt,
     createdBy: input.actorUserId,
@@ -934,6 +942,27 @@ export async function findPosOrderOverview(
     period: PosOrderOverviewPeriod;
   },
 ): Promise<PosOrderOverview> {
+  const effectiveBranchId =
+    input.branchId ??
+    (input.allowedBranchIds?.length === 1 ? input.allowedBranchIds[0] : undefined);
+  const currencyRows = effectiveBranchId
+    ? await db
+        .select({ currency: branches.defaultCurrency })
+        .from(branches)
+        .where(
+          and(
+            eq(branches.id, effectiveBranchId),
+            eq(branches.tenantId, input.tenantId),
+            isNull(branches.deletedAt),
+          ),
+        )
+        .limit(1)
+    : await db
+        .select({ currency: tenantSettings.defaultCurrency })
+        .from(tenantSettings)
+        .where(eq(tenantSettings.tenantId, input.tenantId))
+        .limit(1);
+  const currency = currencyRows[0]?.currency ?? "XOF";
   const start = getPeriodStart(input.period);
   const orderFilters: SQL[] = [
     eq(orders.tenantId, input.tenantId),
@@ -955,6 +984,7 @@ export async function findPosOrderOverview(
       return {
         tenantId: input.tenantId,
         branchId: input.branchId ?? null,
+        currency,
         period: input.period,
         orderCount: 0,
         totalAmount: "0.00",
@@ -1013,6 +1043,7 @@ export async function findPosOrderOverview(
   return {
     tenantId: input.tenantId,
     branchId: input.branchId ?? null,
+    currency,
     period: input.period,
     orderCount: totals?.orderCount ?? 0,
     totalAmount: Number(totals?.totalAmount ?? "0").toFixed(2),

@@ -43,6 +43,13 @@
       "when": 1783852646327,
       "tag": "0005_petite_scream",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783913181567,
+      "tag": "0006_wandering_hellion",
+      "breakpoints": true
     }
   ]
 }

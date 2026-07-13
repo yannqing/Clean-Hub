@@ -59,6 +59,7 @@ export type ServiceTicketSummary = {
   id: string;
   tenantId: string;
   branchId: string;
+  currency: string;
   customerId: string;
   customerName: string;
   customerAccountName: string | null;
@@ -197,6 +198,7 @@ export type ServiceTicketOverview = {
 
 export type RelatedOrderSummary = {
   id: string;
+  currency: string;
   orderType: string;
   status: string;
   paymentStatus: string;
@@ -227,6 +229,7 @@ export type ServiceTicketItemListInput = {
 export type ServiceTicketAuditSnapshot = {
   tenantId: string;
   branchId: string;
+  currency: string;
   customerId: string;
   ticketType: ServiceTicketType;
   ticketStatus: ServiceTicketStatus;

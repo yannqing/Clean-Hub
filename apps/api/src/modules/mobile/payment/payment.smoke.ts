@@ -85,6 +85,7 @@ function makeTransaction(input: {
   id: string;
   orderId: string;
   amount: string;
+  currency?: string;
   idempotencyKey: string;
 }): CustomerPaymentTransaction {
   return {
@@ -94,6 +95,7 @@ function makeTransaction(input: {
     customerId: "customer_1",
     orderId: input.orderId,
     amount: input.amount,
+    currency: input.currency ?? "XOF",
     paymentStatus: "pending",
     idempotencyKey: input.idempotencyKey,
     gateway: null,
@@ -108,6 +110,7 @@ function makeRefund(input: {
   id: string;
   orderId: string;
   amount: string;
+  currency?: string;
   reason: string;
   paymentTransactionId?: string | null;
 }): RefundRequest {
@@ -120,6 +123,7 @@ function makeRefund(input: {
     orderId: input.orderId,
     paymentTransactionId: input.paymentTransactionId ?? null,
     amount: input.amount,
+    currency: input.currency ?? "XOF",
     reason: input.reason,
     status: "pending",
     gateway: null,
@@ -162,6 +166,7 @@ function createRepository(): PaymentRepositoryLike & {
         id: "order_1",
         tenantId: "tenant_1",
         branchId: "branch_1",
+        currency: "XOF",
         customerId: "customer_1",
         customerAccountId: "account_1",
         status: "received",
@@ -266,6 +271,7 @@ function createRepository(): PaymentRepositoryLike & {
         id: `tx_${transactionCount}`,
         orderId: input.orderId,
         amount: input.amount,
+        currency: input.currency,
         idempotencyKey: input.idempotencyKey,
       });
 
@@ -419,6 +425,7 @@ function createRepository(): PaymentRepositoryLike & {
         id: `refund_${refundCount}`,
         orderId: input.orderId,
         amount: input.amount,
+        currency: input.currency,
         reason: input.reason,
         paymentTransactionId: input.paymentTransactionId,
       });
@@ -461,6 +468,7 @@ function createRepository(): PaymentRepositoryLike & {
       return {
         id: order.id,
         branchId: order.branchId,
+        currency: order.currency,
         customerId: order.customerId,
         orderType: "manual",
         status: order.status,
@@ -661,7 +669,6 @@ export async function runPaymentSmokeChecks(): Promise<void> {
     gateway,
     config: {
       gateway: "mock",
-      currency: "XOF",
       mockSecret,
       mockPaymentBaseUrl: "http://localhost:3002",
     },
@@ -1027,7 +1034,6 @@ export async function runPaymentSmokeChecks(): Promise<void> {
     gateway,
     config: {
       gateway: "mock",
-      currency: "XOF",
       mockSecret,
       mockPaymentBaseUrl: "http://localhost:3002",
     },

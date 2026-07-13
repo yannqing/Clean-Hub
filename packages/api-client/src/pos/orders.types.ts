@@ -43,6 +43,7 @@ export type PosPaymentTransaction = {
   orderId: string;
   paymentMethod: PosPaymentMethod;
   amount: string;
+  currency: string;
   paymentStatus: PosPaymentTransactionStatus;
   paidAt: string | null;
   createdAt: string;
@@ -52,6 +53,7 @@ export type PosOrderSummary = {
   id: string;
   tenantId: string;
   branchId: string;
+  currency: string;
   customerId: string;
   customerName: string;
   orderType: PosOrderType;
@@ -166,6 +168,7 @@ export type PosOrderOverviewPaymentMethod = {
 export type PosOrderOverview = {
   tenantId: string;
   branchId: string | null;
+  currency: string;
   period: PosOrderOverviewPeriod;
   orderCount: number;
   totalAmount: string;
