@@ -67,7 +67,7 @@ export function OrderMetrics({ overview }: { overview: PosOrderOverview }) {
         label="已收金额"
         note="成功支付流水"
         tone="emerald"
-        value={formatOrderMoney(overview.paidAmount)}
+        value={formatOrderMoney(overview.paidAmount, overview.currency)}
       />
       <MetricCard
         icon="clock"

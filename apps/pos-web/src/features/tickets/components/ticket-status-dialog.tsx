@@ -73,7 +73,7 @@ export function TicketStatusDialog({
         }
       }}
     >
-      <div className="w-full max-w-lg rounded-xl bg-white shadow-2xl">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-xl bg-white shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-200 p-5">
           <div>
             <h2 className="text-lg font-semibold text-slate-950">更新工单状态</h2>
@@ -82,7 +82,7 @@ export function TicketStatusDialog({
             </p>
           </div>
           <button
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
             onClick={onClose}
             type="button"
           >
@@ -127,7 +127,7 @@ export function TicketStatusDialog({
         </div>
         <div className="flex justify-end border-t border-slate-200 p-4">
           <button
-            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
             onClick={onClose}
             type="button"
           >

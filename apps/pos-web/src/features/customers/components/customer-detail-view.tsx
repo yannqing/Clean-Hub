@@ -10,14 +10,15 @@ import type {
 } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { PosBreadcrumb } from "@/components/app-shell";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posToast as toast } from "@/lib/pos-toast";
+import { formatPosMoney } from "@/lib/money";
 
 import { posApi } from "@/lib/api-client";
 
 import {
-  CUSTOMER_CURRENCY,
   CUSTOMER_PROFILE_RELATIONSHIPS,
   CUSTOMER_TICKET_STATUS_LABELS,
   CUSTOMER_TICKET_STATUS_TONES,
@@ -64,6 +65,7 @@ export function CustomerDetailView({
 }: CustomerDetailViewProps) {
   const router = useRouter();
   const { locale } = useTranslation();
+  const { currency } = usePosRuntimeConfig();
 
   // Whether this detail view was reached via 客户接待 (intake). Controls the
   // breadcrumb trail and the back-button destination so the clerk returns to
@@ -225,7 +227,7 @@ export function CustomerDetailView({
           ]}
         />
         <button
-          className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
           type="button"
           onClick={() => router.push(intakeReturnPath)}
         >
@@ -254,14 +256,14 @@ export function CustomerDetailView({
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button
-              className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+              className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
               type="button"
               onClick={() => setDialog({ type: "edit-profile", customerId })}
             >
               编辑档案
             </button>
             <button
-              className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+              className="flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
               type="button"
               onClick={handleCreateServiceTicket}
             >
@@ -273,12 +275,16 @@ export function CustomerDetailView({
 
         <div className="grid grid-cols-2 border-t border-slate-200 sm:grid-cols-4">
           {[
-            { label: "账户余额", value: `${CUSTOMER_CURRENCY} 0`, hint: "暂未实现" },
+            {
+              label: "账户余额",
+              value: formatPosMoney(0, currency, locale),
+              hint: "暂未实现",
+            },
             { label: "历史工单", value: String(activeTicketCount), hint: "工单总数" },
             { label: "历史订单", value: String(orderCount), hint: "订单总数" },
             {
               label: "累计消费",
-              value: formatMoney(totalPaid, locale),
+              value: formatMoney(totalPaid, locale, currency),
               hint: "已支付总额",
             },
           ].map((metric) => (
@@ -307,10 +313,10 @@ export function CustomerDetailView({
             />
           </div>
         </div>
-        <div className="flex flex-wrap border-t border-slate-200 px-5">
+        <div className="pos-scrollbar flex overflow-x-auto border-t border-slate-200 px-5">
           {(Object.keys(TAB_LABELS) as DetailTab[]).map((tabKey) => (
             <button
-              className={`relative h-12 px-4 text-sm font-semibold ${
+              className={`relative h-12 shrink-0 px-4 text-sm font-semibold ${
                 tab === tabKey
                   ? "text-blue-700"
                   : "text-slate-500 hover:text-slate-800"
@@ -624,10 +630,9 @@ function formatDate(iso: string, locale: string): string {
 function formatMoney(
   amount: string | number | null | undefined,
   locale: string,
+  currency: string,
 ): string {
-  const value = Number(amount ?? 0);
-  if (!Number.isFinite(value)) return `${CUSTOMER_CURRENCY} 0`;
-  return `${CUSTOMER_CURRENCY} ${value.toLocaleString(locale)}`;
+  return formatPosMoney(amount, currency, locale);
 }
 
 function formatDateShort(iso: string, locale: string): string {
@@ -662,7 +667,7 @@ function CurrentServiceCard({
   }
   const tone = CUSTOMER_TICKET_STATUS_TONES[ticket.ticketStatus] ?? "bg-slate-100 text-slate-600";
   return (
-    <div className="mt-4 grid grid-cols-[1fr_130px_120px] items-center rounded-lg border border-slate-200 p-4">
+    <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-[minmax(0,1fr)_130px_120px] sm:items-center">
       <div className="min-w-0">
         <div className="font-semibold text-slate-950">
           {CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType}
@@ -713,7 +718,7 @@ function RecentActivity({
       time: formatDateShort(ticket.createdAt, locale),
       timestamp: ticket.createdAt,
       amount: ticket.totalAmount
-        ? formatMoney(ticket.totalAmount, locale)
+        ? formatMoney(ticket.totalAmount, locale, ticket.currency)
         : undefined,
     })),
     ...orders
@@ -724,7 +729,7 @@ function RecentActivity({
       time: formatDateShort(order.createdAt, locale),
       timestamp: order.createdAt,
       amount: order.totalAmount
-        ? formatMoney(order.totalAmount, locale)
+        ? formatMoney(order.totalAmount, locale, order.currency)
         : undefined,
     })),
   ]

@@ -16,6 +16,7 @@ import type {
 } from "@cleanhub/api-client";
 
 import { getPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
+import { DEFAULT_POS_CURRENCY, formatPosMoney } from "@/lib/money";
 
 export const TICKETS_PAGE_TITLE = "工单管理";
 
@@ -328,7 +329,7 @@ export const TICKET_ITEM_TYPE_OPTIONS: ReadonlyArray<{
 // --- 格式化 --------------------------------------------------------------
 
 /** Default currency shown when the active branch does not expose one. */
-export const DEFAULT_TICKET_CURRENCY = "XOF";
+export const DEFAULT_TICKET_CURRENCY = DEFAULT_POS_CURRENCY;
 
 /**
  * Format a wire money string (`"45.00"`) into a compact display string.
@@ -340,11 +341,7 @@ export function formatTicketMoney(
   currency = DEFAULT_TICKET_CURRENCY,
   locale = getPosRuntimeLocale(),
 ): string {
-  const value = Number(amount ?? 0);
-  if (!Number.isFinite(value)) {
-    return `${currency} 0`;
-  }
-  return `${currency} ${value.toLocaleString(locale)}`;
+  return formatPosMoney(amount, currency, locale);
 }
 
 /**

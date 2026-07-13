@@ -57,7 +57,7 @@ export function TicketDeleteDialog({
         }
       }}
     >
-      <div className="w-full max-w-md rounded-xl bg-white shadow-2xl">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl bg-white shadow-2xl">
         <div className="border-b border-slate-200 p-5">
           <h2 className="text-lg font-semibold text-slate-950">删除工单</h2>
           <p className="mt-1 text-sm text-slate-500">
@@ -70,7 +70,7 @@ export function TicketDeleteDialog({
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-200 p-4">
           <button
-            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
             disabled={isPending}
             onClick={onClose}
             type="button"
@@ -78,7 +78,7 @@ export function TicketDeleteDialog({
             取消
           </button>
           <button
-            className="h-10 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+            className="h-11 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
             disabled={isPending}
             onClick={confirm}
             type="button"

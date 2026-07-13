@@ -6,10 +6,11 @@ import type {
 } from "@cleanhub/api-client";
 
 import { getPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
+import { DEFAULT_POS_CURRENCY, formatPosMoney } from "@/lib/money";
 
 export const ORDERS_PAGE_TITLE = "订单管理";
 export const DEFAULT_ORDER_PAGE_SIZE = 20;
-export const DEFAULT_ORDER_CURRENCY = "XOF";
+export const DEFAULT_ORDER_CURRENCY = DEFAULT_POS_CURRENCY;
 export const ORDER_EMPTY_PLACEHOLDER = "—";
 
 export type BadgeTone = "slate" | "blue" | "violet" | "emerald" | "amber" | "red";
@@ -99,11 +100,7 @@ export function formatOrderMoney(
   currency = DEFAULT_ORDER_CURRENCY,
   locale = getPosRuntimeLocale(),
 ): string {
-  const value = Number(amount ?? 0);
-  if (!Number.isFinite(value)) {
-    return `${currency} 0`;
-  }
-  return `${currency} ${value.toLocaleString(locale)}`;
+  return formatPosMoney(amount, currency, locale);
 }
 
 export function formatOrderDateTime(

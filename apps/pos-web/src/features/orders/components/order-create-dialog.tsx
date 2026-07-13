@@ -190,7 +190,7 @@ export function OrderCreateDialog({
       <button
         className={
           triggerClassName ??
-          "flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+          "flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
         }
         onClick={() => setOpen(true)}
         type="button"
@@ -200,7 +200,7 @@ export function OrderCreateDialog({
       </button>
 
       <Dialog onOpenChange={handleOpenChange} open={open}>
-        <DialogContent className="max-h-[calc(100vh-2rem)] overflow-y-auto sm:max-w-5xl">
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>新增订单</DialogTitle>
           </DialogHeader>
@@ -210,7 +210,7 @@ export function OrderCreateDialog({
               <div className="inline-grid w-fit grid-cols-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
                 {(["manual", "ticket"] as const).map((value) => (
                   <button
-                    className={`h-9 rounded-md px-4 text-sm font-semibold ${
+                    className={`h-11 rounded-md px-4 text-sm font-semibold ${
                       orderType === value
                         ? "bg-white text-blue-700 shadow-sm"
                         : "text-slate-500 hover:text-slate-800"
@@ -229,7 +229,9 @@ export function OrderCreateDialog({
               <ManualOrderFields
                 selectedCustomer={selectedCustomer}
                 items={items}
-                onAddItem={() => setItems((current) => [...current, emptyItem()])}
+                onAddItem={() =>
+                  setItems((current) => [...current, emptyItem()])
+                }
                 onRemoveItem={(index) =>
                   setItems((current) =>
                     current.length === 1
@@ -318,7 +320,7 @@ function ManualOrderFields({
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
           <div className="text-sm font-semibold text-slate-800">订单条目</div>
           <button
-            className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
             onClick={onAddItem}
             type="button"
           >
@@ -340,7 +342,8 @@ function ManualOrderFields({
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none"
                   onChange={(event) =>
                     onUpdateItem(index, {
-                      sourceType: event.target.value as ManualItemForm["sourceType"],
+                      sourceType: event.target
+                        .value as ManualItemForm["sourceType"],
                     })
                   }
                   value={item.sourceType}
@@ -370,7 +373,7 @@ function ManualOrderFields({
               />
               <button
                 aria-label="删除条目"
-                className="mt-5 flex h-10 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 md:mt-0 md:self-end xl:mt-5"
+                className="mt-5 flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 md:mt-0 md:self-end xl:mt-5"
                 disabled={items.length === 1}
                 onClick={() => onRemoveItem(index)}
                 title="删除条目"
@@ -572,7 +575,9 @@ function SelectedPill({
   return (
     <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2">
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-blue-900">{label}</div>
+        <div className="truncate text-sm font-semibold text-blue-900">
+          {label}
+        </div>
         <div className="mt-0.5 truncate text-xs font-medium text-blue-600">
           {meta}
         </div>
@@ -603,7 +608,9 @@ function OptionList({
   }>;
 }) {
   if (options.length === 0) {
-    return <div className="mt-3 text-xs font-medium text-slate-400">{emptyText}</div>;
+    return (
+      <div className="mt-3 text-xs font-medium text-slate-400">{emptyText}</div>
+    );
   }
 
   return (
@@ -627,13 +634,7 @@ function OptionList({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
       <span className="mb-1.5 block text-xs font-semibold text-slate-600">

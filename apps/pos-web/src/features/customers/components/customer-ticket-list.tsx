@@ -4,7 +4,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import type { ServiceTicketSummary, ServiceTicketType } from "@cleanhub/api-client";
+import type {
+  ServiceTicketSummary,
+  ServiceTicketType,
+} from "@cleanhub/api-client";
 
 import { useTranslation } from "@cleanhub/i18n/react";
 import { posToast as toast } from "@/lib/pos-toast";
@@ -63,15 +66,20 @@ export function CustomerTicketList({
     setLoading(true);
     try {
       const dateRange = getCreatedDateRange(dateFilter);
-      const result = await fetchCustomerTickets(customerId, page, currentPageSize, {
-        q: query,
-        ticketType:
-          serviceFilter === "all"
-            ? undefined
-            : (serviceFilter as ServiceTicketType),
-        createdAfter: dateRange.createdAfter,
-        createdBefore: dateRange.createdBefore,
-      });
+      const result = await fetchCustomerTickets(
+        customerId,
+        page,
+        currentPageSize,
+        {
+          q: query,
+          ticketType:
+            serviceFilter === "all"
+              ? undefined
+              : (serviceFilter as ServiceTicketType),
+          createdAfter: dateRange.createdAfter,
+          createdBefore: dateRange.createdBefore,
+        },
+      );
       if (reloadRequestIdRef.current !== requestId) return;
       setRows(result.rows);
       setTotal(result.total);
@@ -150,7 +158,25 @@ export function CustomerTicketList({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="divide-y divide-slate-100 min-[1400px]:hidden">
+        {rows.length === 0 ? (
+          <div className="px-5 py-10 text-center text-sm text-slate-500">
+            {loading ? "加载中…" : "没有符合当前筛选条件的工单。"}
+          </div>
+        ) : (
+          rows.map((ticket) => (
+            <CustomerTicketCard
+              href={ticketDetailHref?.(ticket.id) ?? `/tickets/${ticket.id}`}
+              key={ticket.id}
+              locale={locale}
+              onOpen={(href) => router.push(href)}
+              ticket={ticket}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-x-auto min-[1400px]:block">
         <div className="min-w-[760px]">
           <div className="grid grid-cols-[1.2fr_1.1fr_90px_130px_150px] bg-slate-50 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
             <div>工单</div>
@@ -175,7 +201,9 @@ export function CustomerTicketList({
                   key={ticket.id}
                   type="button"
                   onClick={() =>
-                    router.push(ticketDetailHref?.(ticket.id) ?? `/tickets/${ticket.id}`)
+                    router.push(
+                      ticketDetailHref?.(ticket.id) ?? `/tickets/${ticket.id}`,
+                    )
                   }
                 >
                   <div>
@@ -219,7 +247,7 @@ export function CustomerTicketList({
           <label className="flex items-center gap-1">
             每页
             <select
-              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none"
+              className="h-10 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none"
               value={currentPageSize}
               onChange={(event) => {
                 setCurrentPageSize(Number(event.target.value));
@@ -237,7 +265,7 @@ export function CustomerTicketList({
         </div>
         <div className="flex items-center gap-1">
           <button
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
+            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
             disabled={loading || page === 1}
             type="button"
             onClick={() => setPage((p) => p - 1)}
@@ -248,7 +276,7 @@ export function CustomerTicketList({
             {page} / {pageCount}
           </span>
           <button
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
+            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
             disabled={loading || page === pageCount}
             type="button"
             onClick={() => setPage((p) => p + 1)}
@@ -258,6 +286,82 @@ export function CustomerTicketList({
         </div>
       </div>
     </section>
+  );
+}
+
+function CustomerTicketCard({
+  ticket,
+  locale,
+  href,
+  onOpen,
+}: {
+  ticket: ServiceTicketSummary;
+  locale: string;
+  href: string;
+  onOpen: (href: string) => void;
+}) {
+  const tone =
+    CUSTOMER_TICKET_STATUS_TONES[ticket.ticketStatus] ??
+    "bg-slate-100 text-slate-600";
+
+  return (
+    <button
+      className="w-full p-4 text-left transition hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:p-5"
+      onClick={() => onOpen(href)}
+      type="button"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-mono text-sm font-semibold text-blue-700">
+            {ticket.ticketNo || "—"}
+          </div>
+          <div className="mt-1 text-sm font-medium text-slate-800">
+            {CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ??
+              ticket.ticketType}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            {formatDate(ticket.createdAt, locale)}
+          </div>
+        </div>
+        <span
+          className={`rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}
+        >
+          {CUSTOMER_TICKET_STATUS_LABELS[ticket.ticketStatus] ??
+            ticket.ticketStatus}
+        </span>
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3">
+        <CustomerTicketCardDetail
+          label="项目数"
+          value={String(ticket.itemCount)}
+        />
+        <CustomerTicketCardDetail
+          label="预计取件"
+          value={
+            ticket.expectedPickupAt
+              ? formatDate(ticket.expectedPickupAt, locale)
+              : "未设置"
+          }
+        />
+        <CustomerTicketCardDetail label="操作" value="查看工单详情" />
+      </dl>
+    </button>
+  );
+}
+
+function CustomerTicketCardDetail({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <dt className="text-xs text-slate-400">{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-slate-700">{value}</dd>
+    </div>
   );
 }
 

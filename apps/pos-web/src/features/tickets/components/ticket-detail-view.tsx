@@ -85,7 +85,7 @@ export function TicketDetailView({
       <div className="flex items-center justify-between">
         <PosBreadcrumb items={breadcrumbItems} />
         <Link
-          className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
           href={backHref}
         >
           <Icon className="h-4 w-4" name="arrow-left" />
@@ -114,7 +114,7 @@ export function TicketDetailView({
           </div>
           <div className="flex flex-wrap gap-2">
             <button
-              className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               onClick={() => toast.info("打印能力尚未接入，敬请期待。")}
               type="button"
             >
@@ -130,19 +130,19 @@ export function TicketDetailView({
                   ticketId: ticket.id,
                 })
               }
-              triggerClassName="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+              triggerClassName="flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
               triggerIcon="receipt"
               triggerLabel="创建订单"
             />
             <button
-              className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               onClick={() => setStatusOpen(true)}
               type="button"
             >
               更新工单状态
             </button>
             <button
-              className="flex h-10 items-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50"
+              className="flex h-11 items-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50"
               onClick={() => setDeleteOpen(true)}
               type="button"
             >
@@ -169,7 +169,7 @@ export function TicketDetailView({
           />
           <HeaderMetric
             label="工单金额"
-            value={formatTicketMoney(ticket.totalAmount)}
+            value={formatTicketMoney(ticket.totalAmount, ticket.currency)}
             note="项目金额合计"
           />
         </div>
@@ -185,7 +185,7 @@ export function TicketDetailView({
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-slate-950">工单信息</h2>
                 <button
-                  className="flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+                  className="flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
                   onClick={() => setEditing(true)}
                   type="button"
                 >
@@ -218,7 +218,11 @@ export function TicketDetailView({
             </section>
           )}
 
-          <TicketItemEditor items={ticket.items ?? []} ticketId={ticket.id} />
+          <TicketItemEditor
+            currency={ticket.currency}
+            items={ticket.items ?? []}
+            ticketId={ticket.id}
+          />
         </div>
 
         {/* Right column: customer, related orders, status meta */}

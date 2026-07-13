@@ -202,7 +202,7 @@ function OrderPaymentsCard({
                 </div>
               </div>
               <div className="font-semibold text-slate-900">
-                {formatOrderMoney(payment.amount)}
+                {formatOrderMoney(payment.amount, payment.currency)}
               </div>
             </div>
           ))}

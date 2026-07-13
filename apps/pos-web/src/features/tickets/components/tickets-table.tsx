@@ -49,7 +49,14 @@ export function TicketsTable({ tickets, total }: TicketsTableProps) {
           </p>
         </div>
       </div>
-      <div className="overflow-x-auto">
+
+      <div className="divide-y divide-slate-100 min-[1400px]:hidden">
+        {tickets.map((ticket) => (
+          <TicketCard key={ticket.id} locale={locale} ticket={ticket} />
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto min-[1400px]:block">
         <div className="min-w-[1080px]">
           <div className="grid grid-cols-[130px_minmax(190px,1.2fr)_100px_110px_110px_150px_90px] bg-slate-50 px-5 py-3 text-[11px] font-semibold tracking-[0.1em] text-slate-400 uppercase">
             <div>工单 / 来源</div>
@@ -67,6 +74,95 @@ export function TicketsTable({ tickets, total }: TicketsTableProps) {
       </div>
       <TicketPagination total={total} />
     </section>
+  );
+}
+
+function TicketCard({
+  locale,
+  ticket,
+}: {
+  locale: string;
+  ticket: ServiceTicketSummary;
+}) {
+  const overdue = isOverdue(ticket);
+  const detailHref = posRoutes.ticketDetail(ticket.id);
+
+  return (
+    <article className="p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Link
+            className="inline-flex min-h-11 items-center font-mono text-sm font-semibold text-blue-700"
+            href={detailHref}
+          >
+            {ticket.ticketNo ?? ticket.id.slice(-8).toUpperCase()}
+          </Link>
+          <div className="truncate text-base font-semibold text-slate-900">
+            {ticket.customerName}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            {TICKET_SOURCE_LABELS[ticket.sourceChannel]} · {ticket.itemCount}{" "}
+            个项目
+          </div>
+        </div>
+        <TicketStatusBadge status={ticket.ticketStatus} />
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3">
+        <CardDetail
+          label="工单类型"
+          value={TICKET_TYPE_LABELS[ticket.ticketType]}
+        />
+        <div>
+          <dt className="text-xs text-slate-400">优先级</dt>
+          <dd className="mt-1">
+            <TicketPriorityBadge priority={ticket.priority} />
+          </dd>
+        </div>
+        <CardDetail
+          danger={overdue}
+          label="预计取件"
+          value={formatTicketDateTime(ticket.expectedPickupAt, locale)}
+        />
+      </dl>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-xs text-slate-400">工单金额</div>
+          <div className="mt-0.5 font-semibold text-slate-950">
+            {formatTicketMoney(ticket.totalAmount, ticket.currency)}
+          </div>
+        </div>
+        <Link
+          className="flex h-11 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700"
+          href={detailHref}
+        >
+          <Icon className="h-4 w-4" name="eye" />
+          查看详情
+        </Link>
+      </div>
+    </article>
+  );
+}
+
+function CardDetail({
+  danger,
+  label,
+  value,
+}: {
+  danger?: boolean;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <dt className="text-xs text-slate-400">{label}</dt>
+      <dd
+        className={`mt-1 text-sm font-medium ${danger ? "text-red-700" : "text-slate-700"}`}
+      >
+        {value}
+      </dd>
+    </div>
   );
 }
 
@@ -98,7 +194,8 @@ function TicketRow({
           {ticket.customerName}
         </div>
         <div className="mt-1 truncate text-xs text-slate-500">
-          {ticket.itemCount} 个项目 · 合计 {formatTicketMoney(ticket.totalAmount)}
+          {ticket.itemCount} 个项目 · 合计{" "}
+          {formatTicketMoney(ticket.totalAmount, ticket.currency)}
         </div>
       </div>
       <div className="text-xs font-medium text-slate-600">{typeLabel}</div>

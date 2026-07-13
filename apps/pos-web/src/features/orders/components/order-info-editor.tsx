@@ -47,7 +47,7 @@ export function OrderInfoEditor({ order }: { order: PosOrderDetail }) {
       <div className="flex items-start justify-between gap-3">
         <h2 className="font-semibold text-slate-950">订单信息</h2>
         <button
-          className="flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!canEdit || isPending}
           onClick={() => setEditing((current) => !current)}
           title={canEdit ? "编辑订单信息" : "当前订单不可编辑"}
@@ -59,8 +59,14 @@ export function OrderInfoEditor({ order }: { order: PosOrderDetail }) {
       </div>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryItem label="订单金额" value={formatOrderMoney(order.totalAmount)} />
-        <SummaryItem label="已收金额" value={formatOrderMoney(order.paidAmount)} />
+        <SummaryItem
+          label="订单金额"
+          value={formatOrderMoney(order.totalAmount, order.currency)}
+        />
+        <SummaryItem
+          label="已收金额"
+          value={formatOrderMoney(order.paidAmount, order.currency)}
+        />
         <SummaryItem
           label="创建时间"
           value={formatOrderDateTime(order.createdAt, locale)}

@@ -94,14 +94,14 @@ export function CustomerServiceItemList({
 
   return (
     <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between border-b border-slate-200 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5">
         <div>
           <h2 className="font-semibold text-slate-950">服务项目</h2>
           <p className="mt-1 text-sm text-slate-500">
             仅展示该客户档案名下工单的服务项目记录。
           </p>
         </div>
-        <div className="flex h-10 w-[300px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3">
+        <div className="flex h-10 w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-3 sm:w-[300px]">
           <span className="mr-2 text-slate-400">🔍</span>
           <input
             className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
@@ -115,7 +115,27 @@ export function CustomerServiceItemList({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="divide-y divide-slate-100 min-[1400px]:hidden">
+        {rows.length === 0 ? (
+          <div className="px-5 py-10 text-center text-sm text-slate-500">
+            {loading ? "加载中…" : "没有符合当前条件的服务项目。"}
+          </div>
+        ) : (
+          rows.map((item) => (
+            <CustomerServiceItemCard
+              href={
+                ticketDetailHref?.(item.ticketId) ?? `/tickets/${item.ticketId}`
+              }
+              item={item}
+              key={item.id}
+              locale={locale}
+              onOpen={(href) => router.push(href)}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-x-auto min-[1400px]:block">
         <div className="min-w-[820px]">
           <div
             className={`grid ${GRID_COLS} bg-slate-50 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400`}
@@ -150,10 +170,10 @@ export function CustomerServiceItemList({
                   <div className="text-slate-700">
                     {item.itemCategory ??
                       (item.itemType
-                        ? CUSTOMER_TICKET_ITEM_TYPE_LABELS[item.itemType] ??
-                          item.itemType
-                        : CUSTOMER_TICKET_TYPE_LABELS[item.ticketType] ??
-                          item.ticketType)}
+                        ? (CUSTOMER_TICKET_ITEM_TYPE_LABELS[item.itemType] ??
+                          item.itemType)
+                        : (CUSTOMER_TICKET_TYPE_LABELS[item.ticketType] ??
+                          item.ticketType))}
                   </div>
                   <div className="min-w-0">
                     <button
@@ -200,7 +220,7 @@ export function CustomerServiceItemList({
           <label className="flex items-center gap-1">
             每页
             <select
-              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none"
+              className="h-10 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none"
               value={currentPageSize}
               onChange={(event) => {
                 setCurrentPageSize(Number(event.target.value));
@@ -218,7 +238,7 @@ export function CustomerServiceItemList({
         </div>
         <div className="flex items-center gap-1">
           <button
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
+            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
             disabled={loading || page === 1}
             type="button"
             onClick={() => setPage((p) => p - 1)}
@@ -229,7 +249,7 @@ export function CustomerServiceItemList({
             {page} / {pageCount}
           </span>
           <button
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
+            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
             disabled={loading || page === pageCount}
             type="button"
             onClick={() => setPage((p) => p + 1)}
@@ -239,6 +259,67 @@ export function CustomerServiceItemList({
         </div>
       </div>
     </section>
+  );
+}
+
+function CustomerServiceItemCard({
+  item,
+  locale,
+  href,
+  onOpen,
+}: {
+  item: ServiceItemRow;
+  locale: string;
+  href: string;
+  onOpen: (href: string) => void;
+}) {
+  const tone =
+    CUSTOMER_TICKET_ITEM_STATUS_TONES[item.itemStatus] ??
+    "bg-slate-100 text-slate-600";
+  const note = item.defectNotes || item.specialRequest || item.remark;
+  const service =
+    item.itemCategory ??
+    (item.itemType
+      ? (CUSTOMER_TICKET_ITEM_TYPE_LABELS[item.itemType] ?? item.itemType)
+      : (CUSTOMER_TICKET_TYPE_LABELS[item.ticketType] ?? item.ticketType));
+
+  return (
+    <article className="p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-base font-semibold text-slate-950">
+            {item.itemName}
+            {item.quantity > 1 ? ` × ${item.quantity}` : ""}
+          </div>
+          <div className="mt-1 text-sm text-slate-600">{service}</div>
+          {note ? (
+            <div className="mt-1 text-xs text-slate-500">{note}</div>
+          ) : null}
+        </div>
+        <span
+          className={`rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}
+        >
+          {CUSTOMER_TICKET_ITEM_STATUS_LABELS[item.itemStatus] ??
+            item.itemStatus}
+        </span>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-slate-50 p-3">
+        <div>
+          <div className="text-xs text-slate-400">创建日期</div>
+          <div className="mt-1 text-sm font-medium text-slate-700">
+            {formatDate(item.createdAt, locale)}
+          </div>
+        </div>
+        <button
+          className="h-11 rounded-lg border border-blue-200 bg-white px-4 font-mono text-xs font-semibold text-blue-700"
+          onClick={() => onOpen(href)}
+          type="button"
+        >
+          工单 {item.ticketNo || item.ticketId.slice(-8).toUpperCase()}
+        </button>
+      </div>
+    </article>
   );
 }
 

@@ -28,7 +28,7 @@ export function IntakeCustomerSearch({
             value={draftQuery}
           />
           <button
-            className="h-9 rounded-md bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-700"
+            className="h-11 rounded-md bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-700"
             type="button"
             onClick={onSearch}
           >
@@ -36,7 +36,6 @@ export function IntakeCustomerSearch({
           </button>
         </div>
       </div>
-
     </div>
   );
 }

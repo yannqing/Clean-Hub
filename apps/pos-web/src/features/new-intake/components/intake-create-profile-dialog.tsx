@@ -122,7 +122,7 @@ export function IntakeCreateProfileDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle>新建客户档案</DialogTitle>
         </DialogHeader>
@@ -157,9 +157,7 @@ export function IntakeCreateProfileDialog({
                 return (
                   <button
                     className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition ${
-                      active
-                        ? "bg-blue-50 text-blue-700"
-                        : "hover:bg-slate-50"
+                      active ? "bg-blue-50 text-blue-700" : "hover:bg-slate-50"
                     }`}
                     key={account.id}
                     type="button"

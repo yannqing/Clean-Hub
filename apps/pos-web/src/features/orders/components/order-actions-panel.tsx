@@ -97,18 +97,18 @@ export function OrderActionsPanel({ order }: { order: PosOrderDetail }) {
       <div className="mt-5 rounded-lg bg-slate-50 p-4">
         <div className="text-xs font-medium text-slate-500">待收金额</div>
         <div className="mt-1 text-xl font-semibold text-slate-950">
-          {formatOrderMoney(outstanding)}
+          {formatOrderMoney(outstanding, order.currency)}
         </div>
         <div className="mt-3 flex gap-2">
           <input
-            className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-300"
+            className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-300"
             disabled={!canPay || isPending}
             inputMode="decimal"
             onChange={(event) => setAmount(event.target.value)}
             value={amount}
           />
           <button
-            className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!canPay || isPending || Number(amount) <= 0}
             onClick={pay}
             type="button"
@@ -127,7 +127,7 @@ export function OrderActionsPanel({ order }: { order: PosOrderDetail }) {
         ) : (
           transitions.map((status) => (
             <button
-              className="flex h-10 items-center justify-between rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-11 items-center justify-between rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isPending}
               key={status}
               onClick={() => changeStatus(status)}
@@ -140,7 +140,7 @@ export function OrderActionsPanel({ order }: { order: PosOrderDetail }) {
         )}
 
         <button
-          className="mt-2 flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-2 flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!canDelete || isPending}
           onClick={remove}
           type="button"

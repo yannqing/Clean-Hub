@@ -22,10 +22,12 @@ import type { PosStatisticsOverview } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 
 import { Icon, type PosIconName } from "@/components/app-shell/icons";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import {
   PosChartContainer,
   PosChartTooltip,
 } from "@/components/charts/pos-chart";
+import { formatPosMoney } from "@/lib/money";
 
 type StatisticsViewProps = {
   overview: PosStatisticsOverview | null;
@@ -67,12 +69,12 @@ function formatNumber(value: number, locale: string): string {
   }).format(value);
 }
 
-function formatCurrency(value: number, locale: string): string {
-  return new Intl.NumberFormat(locale, {
-    currency: "CNY",
-    maximumFractionDigits: value % 1 === 0 ? 0 : 2,
-    style: "currency",
-  }).format(value);
+function formatCurrency(
+  value: number,
+  locale: string,
+  currency: string,
+): string {
+  return formatPosMoney(value, currency, locale);
 }
 
 function formatTrimmedDecimal(
@@ -1118,6 +1120,7 @@ function EmptyState() {
 
 export function StatisticsView({ overview }: StatisticsViewProps) {
   const { locale } = useTranslation();
+  const { currency } = usePosRuntimeConfig();
 
   if (!overview) {
     return <EmptyState />;
@@ -1160,7 +1163,7 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
             <div className="rounded-lg bg-slate-50 p-3 text-right">
               <p className="text-xs font-medium text-slate-500">今日销售额</p>
               <p className="mt-1 truncate text-xl font-bold text-slate-950">
-                {formatCurrency(totalAmount, locale)}
+                {formatCurrency(totalAmount, locale, currency)}
               </p>
             </div>
             <div className="rounded-lg bg-slate-50 p-3 text-right">
@@ -1196,10 +1199,10 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
           />
           <MetricCard
             color={CHART_COLORS.paid}
-            helper={`已收金额 ${formatCurrency(paidAmount, locale)}`}
+            helper={`已收金额 ${formatCurrency(paidAmount, locale, currency)}`}
             icon="wallet-cards"
             label="今日销售额"
-            value={formatCurrency(totalAmount, locale)}
+            value={formatCurrency(totalAmount, locale, currency)}
           />
           <MetricCard
             color={CHART_COLORS.risk}

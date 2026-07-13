@@ -68,15 +68,11 @@ export function CustomerDeleteDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
         <DialogHeader>
-          <DialogTitle>
-            删除{isAccount ? "客户账户" : "客户档案"}
-          </DialogTitle>
+          <DialogTitle>删除{isAccount ? "客户账户" : "客户档案"}</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-slate-700">
-          确认删除“{name}”吗？
-        </p>
+        <p className="text-sm text-slate-700">确认删除“{name}”吗？</p>
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
           {warning}
         </div>

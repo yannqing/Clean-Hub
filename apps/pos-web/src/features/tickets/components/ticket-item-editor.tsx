@@ -1,7 +1,13 @@
 "use client";
 
 import { posToast as toast } from "@/lib/pos-toast";
-import { Combobox } from "@cleanhub/ui";
+import {
+  Combobox,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@cleanhub/ui";
 import { useState, useTransition } from "react";
 
 import { Icon } from "@/components/app-shell";
@@ -21,10 +27,7 @@ import {
   TICKET_ITEM_TYPE_OPTIONS,
   formatTicketMoney,
 } from "../constants";
-import {
-  coerceTicketItemType,
-  validateTicketItemForm,
-} from "../validators";
+import { coerceTicketItemType, validateTicketItemForm } from "../validators";
 import type { TicketItemFormValues } from "../types";
 import { TicketItemStatusBadge } from "./ticket-badges";
 import type {
@@ -34,6 +37,7 @@ import type {
 
 type TicketItemEditorProps = {
   ticketId: string;
+  currency: string;
   items: ServiceTicketItem[];
 };
 
@@ -54,14 +58,18 @@ const EMPTY_ITEM_FORM: TicketItemFormValues = {
 /**
  * Full CRUD surface for ticket items on the detail page:
  * - create new items (backend auto-generates `labelCode`)
- * - inline-edit an existing item's fields
+ * - edit an existing item's fields
  * - transition item status (washing → done → ready_to_pick)
  * - soft-delete an item
  *
  * Every mutation goes through a server action; on success we let the page's
  * `revalidatePath` refresh the data, so this component stays a thin controller.
  */
-export function TicketItemEditor({ ticketId, items }: TicketItemEditorProps) {
+export function TicketItemEditor({
+  ticketId,
+  currency,
+  items,
+}: TicketItemEditorProps) {
   const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<TicketItemFormValues>(EMPTY_ITEM_FORM);
@@ -96,17 +104,20 @@ export function TicketItemEditor({ ticketId, items }: TicketItemEditorProps) {
     setForm(EMPTY_ITEM_FORM);
   }
 
+  const formOpen = creating || editingId !== null;
+
   return (
     <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex items-center justify-between border-b border-slate-200 p-5">
         <div>
           <h2 className="font-semibold text-slate-950">工单项目</h2>
           <p className="mt-1 text-sm text-slate-500">
-            {items.length} 个项目 · 数量 {items.reduce((n, x) => n + x.quantity, 0)}
+            {items.length} 个项目 · 数量{" "}
+            {items.reduce((n, x) => n + x.quantity, 0)}
           </p>
         </div>
         <button
-          className="flex h-9 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+          className="flex h-11 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-100"
           onClick={startCreate}
           type="button"
         >
@@ -115,52 +126,59 @@ export function TicketItemEditor({ ticketId, items }: TicketItemEditorProps) {
         </button>
       </div>
 
-      {creating ? (
-        <ItemForm
-          form={form}
-          onCancel={cancel}
-          onChange={setForm}
-          onSubmit="create"
-          ticketId={ticketId}
-        />
-      ) : null}
-
       <div className="divide-y divide-slate-100">
-        {items.length === 0 && !creating ? (
+        {items.length === 0 ? (
           <div className="px-5 py-10 text-center text-sm text-slate-400">
             该工单暂无项目，点击「添加项目」开始录入。
           </div>
         ) : null}
-        {items.map((item) =>
-          editingId === item.id ? (
-            <ItemForm
-              form={form}
-              itemId={item.id}
-              key={item.id}
-              onCancel={cancel}
-              onChange={setForm}
-              onSubmit="update"
-              ticketId={ticketId}
-            />
-          ) : (
-            <ItemRow
-              item={item}
-              key={item.id}
-              onEdit={() => startEdit(item)}
-              ticketId={ticketId}
-            />
-          ),
-        )}
+        {items.map((item) => (
+          <ItemRow
+            currency={currency}
+            item={item}
+            key={item.id}
+            onEdit={() => startEdit(item)}
+            ticketId={ticketId}
+          />
+        ))}
       </div>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) {
+            cancel();
+          }
+        }}
+        open={formOpen}
+      >
+        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>
+              {creating ? "添加工单项目" : "编辑工单项目"}
+            </DialogTitle>
+          </DialogHeader>
+          <ItemForm
+            currency={currency}
+            form={form}
+            itemId={editingId ?? undefined}
+            onCancel={cancel}
+            onChange={setForm}
+            onSubmit={creating ? "create" : "update"}
+            ticketId={ticketId}
+          />
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
 
 function ItemRow({
+  currency,
   item,
   onEdit,
   ticketId,
 }: {
+  currency: string;
   item: ServiceTicketItem;
   onEdit: () => void;
   ticketId: string;
@@ -195,92 +213,113 @@ function ItemRow({
   }
 
   const reachable = TICKET_ITEM_STATUS_TRANSITIONS[item.itemStatus] ?? [];
-  const details = [item.itemCategory, item.itemColor, item.itemBrand, item.itemMaterial]
+  const details = [
+    item.itemCategory,
+    item.itemColor,
+    item.itemBrand,
+    item.itemMaterial,
+  ]
     .filter(Boolean)
     .join(" · ");
 
   return (
-    <article className="grid grid-cols-[minmax(0,1fr)_120px_120px_120px] items-start gap-3 p-5">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-slate-950">{item.itemName}</span>
+    <article className="p-4 sm:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-base font-semibold text-slate-950">
+            {item.itemName}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">{details || "—"}</div>
+          {item.labelCode ? (
+            <div className="mt-1 font-mono text-[11px] text-blue-600">
+              标签 {item.labelCode}
+            </div>
+          ) : null}
         </div>
-        <div className="mt-1 truncate text-xs text-slate-500">
-          {details || "—"}
-        </div>
-        {item.labelCode ? (
-          <div className="mt-1 font-mono text-[11px] text-blue-600">
-            标签 {item.labelCode}
-          </div>
-        ) : null}
-        {item.defectNotes ? (
-          <div className="mt-1 text-xs text-slate-500">
-            <span className="font-semibold text-slate-700">瑕疵：</span>
-            {item.defectNotes}
-          </div>
-        ) : null}
-        {item.specialRequest ? (
-          <div className="mt-1 text-xs text-slate-500">
-            <span className="font-semibold text-slate-700">要求：</span>
-            {item.specialRequest}
-          </div>
-        ) : null}
-      </div>
-      <div>
-        <TicketItemStatusBadge status={item.itemStatus} />
-        {reachable.length > 0 ? (
-          <select
-            className="mt-2 h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none"
+        <div className="flex shrink-0 gap-2">
+          <button
+            aria-label="修改项目"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700"
             disabled={isPending}
-            onChange={(event) =>
-              changeStatus(event.target.value as ServiceTicketItemStatus)
-            }
-            value=""
+            onClick={onEdit}
+            title="修改项目"
+            type="button"
           >
-            <option value="">流转状态…</option>
-            {reachable.map((status) => (
-              <option key={status} value={status}>
-                → {TICKET_ITEM_STATUS_LABELS[status]}
-              </option>
-            ))}
-          </select>
-        ) : null}
-      </div>
-      <div className="text-right">
-        <div className="font-semibold text-slate-950">
-          {formatTicketMoney(item.lineAmount)}
-        </div>
-        <div className="mt-1 text-[11px] text-slate-400">
-          {item.quantity} × {formatTicketMoney(item.unitAmount)}
+            <Icon className="h-4 w-4" name="square-pen" />
+          </button>
+          <button
+            aria-label="删除项目"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+            disabled={isPending}
+            onClick={remove}
+            title="删除项目"
+            type="button"
+          >
+            <Icon className="h-4 w-4" name="trash" />
+          </button>
         </div>
       </div>
-      <div className="flex justify-end gap-1">
-        <button
-          aria-label="修改项目"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-blue-50 hover:text-blue-700"
-          disabled={isPending}
-          onClick={onEdit}
-          title="修改项目"
-          type="button"
-        >
-          <Icon className="h-4 w-4" name="square-pen" />
-        </button>
-        <button
-          aria-label="删除项目"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-700"
-          disabled={isPending}
-          onClick={remove}
-          title="删除项目"
-          type="button"
-        >
-          <Icon className="h-4 w-4" name="trash" />
-        </button>
+
+      {item.defectNotes || item.specialRequest ? (
+        <div className="mt-3 space-y-1 rounded-lg border border-amber-100 bg-amber-50/60 p-3">
+          {item.defectNotes ? (
+            <div className="text-xs text-slate-600">
+              <span className="font-semibold text-slate-700">瑕疵：</span>
+              {item.defectNotes}
+            </div>
+          ) : null}
+          {item.specialRequest ? (
+            <div className="text-xs text-slate-600">
+              <span className="font-semibold text-slate-700">要求：</span>
+              {item.specialRequest}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3">
+        <div>
+          <div className="text-xs text-slate-400">项目状态</div>
+          <div className="mt-1">
+            <TicketItemStatusBadge status={item.itemStatus} />
+          </div>
+          {reachable.length > 0 ? (
+            <select
+              className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none"
+              disabled={isPending}
+              onChange={(event) =>
+                changeStatus(event.target.value as ServiceTicketItemStatus)
+              }
+              value=""
+            >
+              <option value="">流转状态…</option>
+              {reachable.map((status) => (
+                <option key={status} value={status}>
+                  → {TICKET_ITEM_STATUS_LABELS[status]}
+                </option>
+              ))}
+            </select>
+          ) : null}
+        </div>
+        <div>
+          <div className="text-xs text-slate-400">数量 / 单价</div>
+          <div className="mt-1 text-sm font-medium text-slate-700">
+            {item.quantity} × {formatTicketMoney(item.unitAmount, currency)}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs text-slate-400">项目金额</div>
+          <div className="mt-1 font-semibold text-slate-950">
+            {formatTicketMoney(item.lineAmount, currency)}
+          </div>
+        </div>
       </div>
     </article>
   );
 }
 
 function ItemForm({
+  currency,
   form,
   onChange,
   onCancel,
@@ -288,6 +327,7 @@ function ItemForm({
   ticketId,
   itemId,
 }: {
+  currency: string;
   form: TicketItemFormValues;
   onChange: (next: TicketItemFormValues) => void;
   onCancel: () => void;
@@ -349,10 +389,7 @@ function ItemForm({
   }
 
   return (
-    <form
-      className="border-t border-slate-100 bg-slate-50/70 p-5"
-      onSubmit={submit}
-    >
+    <form onSubmit={submit}>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
         <Field label="物品名称（必填）">
           <input
@@ -440,6 +477,7 @@ function ItemForm({
             disabled
             value={formatTicketMoney(
               (Number(form.quantity) || 0) * (Number(form.unitAmount) || 0),
+              currency,
             )}
           />
         </Field>
@@ -465,9 +503,9 @@ function ItemForm({
           />
         </Field>
       </div>
-      <div className="mt-4 flex justify-end gap-2">
+      <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
         <button
-          className="h-9 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          className="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
           disabled={isPending}
           onClick={onCancel}
           type="button"
@@ -475,7 +513,7 @@ function ItemForm({
           取消
         </button>
         <button
-          className="flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          className="flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
           disabled={isPending}
           type="submit"
         >

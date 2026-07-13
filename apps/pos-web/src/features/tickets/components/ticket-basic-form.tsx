@@ -150,7 +150,7 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <button
-          className="h-9 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          className="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
           disabled={isPending}
           onClick={onCancel}
           type="button"
@@ -158,7 +158,7 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
           取消
         </button>
         <button
-          className="flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          className="flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
           disabled={isPending}
           type="submit"
         >

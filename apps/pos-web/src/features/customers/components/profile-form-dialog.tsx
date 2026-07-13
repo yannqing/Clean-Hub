@@ -12,7 +12,10 @@ import {
   DialogTitle,
 } from "@cleanhub/ui";
 
-import { CUSTOMER_PROFILE_RELATIONSHIPS, EMPTY_PROFILE_FORM } from "../constants";
+import {
+  CUSTOMER_PROFILE_RELATIONSHIPS,
+  EMPTY_PROFILE_FORM,
+} from "../constants";
 import { createProfile, updateProfile } from "../queries";
 import type {
   PosCustomerAccountSummary,
@@ -105,7 +108,7 @@ export function ProfileFormDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle>
             {mode === "edit" ? "编辑客户档案" : "新增客户档案"}
