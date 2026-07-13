@@ -6,6 +6,7 @@ import {
   getOrderDetailQuery,
   getOrderPaymentsQuery,
 } from "@/features/orders/queries";
+import { getCurrentUser } from "@/lib/auth";
 
 type OrderDetailPageProps = {
   params: Promise<{ orderId: string }>;
@@ -24,6 +25,7 @@ export default async function OrderDetailPage({
   const [{ orderId }, source] = await Promise.all([params, searchParams]);
   let order: Awaited<ReturnType<typeof getOrderDetailQuery>>;
   let payments: Awaited<ReturnType<typeof getOrderPaymentsQuery>>;
+  const userPromise = getCurrentUser();
 
   try {
     [order, payments] = await Promise.all([
@@ -37,8 +39,13 @@ export default async function OrderDetailPage({
     throw error;
   }
 
+  const user = await userPromise;
+
   return (
     <OrderDetailView
+      canResolveManualPayments={
+        user?.role === "owner" || user?.role === "manager"
+      }
       order={order}
       payments={payments.data}
       source={source}

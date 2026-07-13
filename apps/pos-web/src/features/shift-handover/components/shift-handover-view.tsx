@@ -258,6 +258,16 @@ const PAYMENT_METHOD_LABELS: Record<string, Record<"zh-CN" | "en" | "fr", string
     en: "Cash",
     fr: "Espèces",
   },
+  orange_money: {
+    "zh-CN": "Orange Money",
+    en: "Orange Money",
+    fr: "Orange Money",
+  },
+  wave: {
+    "zh-CN": "Wave",
+    en: "Wave",
+    fr: "Wave",
+  },
 };
 
 function resolveLocale(locale: string): "zh-CN" | "en" | "fr" {
@@ -799,11 +809,12 @@ export function ShiftHandoverView({
                 summary.orders.paymentMethods.map((item) => (
                   <div
                     className="flex items-center justify-between gap-3 text-sm"
-                    key={item.method}
+                    key={`${item.method}:${item.provider ?? "default"}`}
                   >
                     <span className="font-medium text-slate-600">
-                      {PAYMENT_METHOD_LABELS[item.method]?.[resolvedLocale] ??
-                        item.method}
+                      {PAYMENT_METHOD_LABELS[item.provider ?? item.method]?.[
+                        resolvedLocale
+                      ] ?? item.provider ?? item.method}
                     </span>
                     <span className="font-semibold text-slate-950">
                       {formatMoney(toNumber(item.amount), currency, locale)}

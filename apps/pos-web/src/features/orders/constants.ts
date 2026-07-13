@@ -2,7 +2,9 @@ import type {
   PosOrderPaymentStatus,
   PosOrderStatus,
   PosOrderType,
+  PosMobileMoneyProvider,
   PosPaymentMethod,
+  PosPaymentTransactionStatus,
 } from "@cleanhub/api-client";
 
 import { getPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
@@ -68,7 +70,35 @@ export const ORDER_TYPE_LABELS: Record<PosOrderType, string> = {
 export const PAYMENT_METHOD_LABELS: Record<PosPaymentMethod, string> = {
   cash: "现金",
   card: "银行卡",
-  app: "App",
+  app: "移动支付",
+};
+
+export const MOBILE_MONEY_PROVIDER_LABELS: Record<
+  PosMobileMoneyProvider,
+  string
+> = {
+  wave: "Wave",
+  orange_money: "Orange Money",
+};
+
+export const PAYMENT_TRANSACTION_STATUS_LABELS: Record<
+  PosPaymentTransactionStatus,
+  string
+> = {
+  pending: "待确认",
+  paid: "已支付",
+  refunded: "已退款",
+  failed: "失败",
+};
+
+export const PAYMENT_TRANSACTION_STATUS_TONES: Record<
+  PosPaymentTransactionStatus,
+  string
+> = {
+  pending: "bg-amber-50 text-amber-700",
+  paid: "bg-emerald-50 text-emerald-700",
+  refunded: "bg-violet-50 text-violet-700",
+  failed: "bg-red-50 text-red-700",
 };
 
 export const ORDER_STATUS_OPTIONS = (
