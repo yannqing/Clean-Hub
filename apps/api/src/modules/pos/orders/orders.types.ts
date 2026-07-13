@@ -23,6 +23,8 @@ export type PosOrderItemSourceType =
 
 export type PosPaymentMethod = "cash" | "card" | "app";
 
+export type PosMobileMoneyProvider = "wave" | "orange_money";
+
 export type PosPaymentTransactionStatus =
   | "pending"
   | "paid"
@@ -51,8 +53,11 @@ export type PosPaymentTransaction = {
   amount: string;
   currency: string;
   paymentStatus: PosPaymentTransactionStatus;
+  provider: PosMobileMoneyProvider | null;
+  externalReference: string | null;
   paidAt: string | null;
   createdAt: string;
+  updatedAt: string;
 };
 
 export type PosOrderSummary = {
@@ -140,9 +145,22 @@ export type ChangePosOrderStatusRequest = {
   version: number;
 };
 
-export type CreatePosPaymentRequest = {
-  paymentMethod: PosPaymentMethod;
-  amount: string;
+export type CreatePosPaymentRequest =
+  | {
+      paymentMethod: "cash";
+      amount: string;
+      idempotencyKey?: string;
+    }
+  | {
+      paymentMethod: "app";
+      amount: string;
+      provider: PosMobileMoneyProvider;
+      externalReference: string;
+      idempotencyKey: string;
+    };
+
+export type ResolvePosPaymentRequest = {
+  reason?: string;
 };
 
 export type CreatePosOrderItemRequest = CreateManualOrderItemRequest;
@@ -163,6 +181,7 @@ export type PosOrderOverviewQuery = {
 
 export type PosOrderOverviewPaymentMethod = {
   method: PosPaymentMethod;
+  provider: PosMobileMoneyProvider | null;
   amount: string;
   count: number;
 };

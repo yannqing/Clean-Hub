@@ -16,6 +16,10 @@ import {
   createOrderRecord,
   createPaymentTransactionRecord,
   findCustomerForOrder,
+  findPaymentTransactionByIdempotencyKey,
+  findPaymentTransactionByProviderReference,
+  findPaymentTransactionForUpdate,
+  findPendingManualPaymentForOrder,
   findPosOrderAuditSnapshot,
   findPosOrderDetail,
   findPosOrderItemById,
@@ -30,6 +34,7 @@ import {
   listPaymentTransactions,
   recalculateOrderPaymentState,
   recalculateOrderTotalFromItems,
+  resolveManualPaymentTransaction,
   softDeleteOrderItemRecord,
   softDeleteOrderRecord,
   sumOrderItemAmounts,
@@ -49,6 +54,7 @@ import type {
   PosOrderOverviewQuery,
   PosOrderStatus,
   PosPaymentTransaction,
+  ResolvePosPaymentRequest,
   UpdatePosOrderItemRequest,
   UpdatePosOrderRequest,
 } from "./orders.types.js";
@@ -56,6 +62,16 @@ import type {
 function requirePosContext(authContext: AuthContext): string {
   assertPosContext(authContext);
   return authContext.tenantId!;
+}
+
+function requireManualPaymentConfirmationRole(authContext: AuthContext): void {
+  if (authContext.role !== "owner" && authContext.role !== "manager") {
+    throw new PosOrderError(
+      "PAYMENT_CONFIRMATION_FORBIDDEN",
+      "Only an owner or manager can resolve a manual mobile payment.",
+      403,
+    );
+  }
 }
 
 function resolveListBranchScope(
@@ -574,14 +590,6 @@ export async function createPosOrderPayment(
     const before = await lockOrderOrThrow(tx, { tenantId, orderId });
     await requirePosBranchId(authContext, before.branchId, tx);
 
-    if (data.paymentMethod !== "cash") {
-      throw new PosOrderError(
-        "PAYMENT_NOT_SUPPORTED",
-        "Only cash payments are supported in this milestone.",
-        422,
-      );
-    }
-
     if (before.status === "cancelled" || before.status === "delivered") {
       throw new PosOrderError(
         "INVALID_STATUS_TRANSITION",
@@ -595,6 +603,64 @@ export async function createPosOrderPayment(
         "ORDER_ALREADY_PAID",
         "Order is already fully paid.",
         422,
+      );
+    }
+
+    if (data.paymentMethod === "app") {
+      const existingIdempotent = await findPaymentTransactionByIdempotencyKey(
+        tx,
+        {
+          tenantId,
+          idempotencyKey: data.idempotencyKey,
+        },
+      );
+
+      if (existingIdempotent) {
+        if (
+          existingIdempotent.orderId !== orderId ||
+          existingIdempotent.provider !== data.provider ||
+          existingIdempotent.externalReference !== data.externalReference ||
+          Number(existingIdempotent.amount) !== Number(data.amount)
+        ) {
+          throw new PosOrderError(
+            "PAYMENT_REFERENCE_CONFLICT",
+            "The idempotency key is already used by another payment.",
+            409,
+          );
+        }
+
+        const detail = await findPosOrderDetail(tx, { tenantId, orderId });
+        if (!detail) {
+          throw new Error("Idempotent payment order could not be loaded.");
+        }
+        return detail;
+      }
+
+      const existingReference =
+        await findPaymentTransactionByProviderReference(tx, {
+          tenantId,
+          provider: data.provider,
+          externalReference: data.externalReference,
+        });
+      if (existingReference) {
+        throw new PosOrderError(
+          "PAYMENT_REFERENCE_CONFLICT",
+          "This provider transaction reference has already been recorded.",
+          409,
+        );
+      }
+
+    }
+
+    const pending = await findPendingManualPaymentForOrder(tx, {
+      tenantId,
+      orderId,
+    });
+    if (pending) {
+      throw new PosOrderError(
+        "PAYMENT_ALREADY_PENDING",
+        "Resolve the pending mobile payment before recording another payment.",
+        409,
       );
     }
 
@@ -616,13 +682,19 @@ export async function createPosOrderPayment(
       amount: data.amount,
       currency: before.currency,
       actorUserId: authContext.userId,
+      provider: data.paymentMethod === "app" ? data.provider : undefined,
+      externalReference:
+        data.paymentMethod === "app" ? data.externalReference : undefined,
+      idempotencyKey: data.idempotencyKey,
     });
 
-    await recalculateOrderPaymentState(tx, {
-      tenantId,
-      orderId,
-      actorUserId: authContext.userId,
-    });
+    if (payment.paymentStatus === "paid") {
+      await recalculateOrderPaymentState(tx, {
+        tenantId,
+        orderId,
+        actorUserId: authContext.userId,
+      });
+    }
 
     const detail = await findPosOrderDetail(tx, { tenantId, orderId });
     if (!detail) {
@@ -631,7 +703,10 @@ export async function createPosOrderPayment(
 
     await writeOrderAudit(tx, authContext, requestMeta, {
       branchId: before.branchId,
-      eventType: "pos.order.payment_created",
+      eventType:
+        payment.paymentStatus === "pending"
+          ? "pos.order.mobile_payment_recorded"
+          : "pos.order.payment_created",
       entityId: orderId,
       before: {
         paidAmount: before.paidAmount,
@@ -643,11 +718,167 @@ export async function createPosOrderPayment(
         paymentStatus: detail.paymentStatus,
         status: detail.status,
         paymentId: payment.id,
+        paymentMethod: payment.paymentMethod,
+        provider: payment.provider,
+        externalReference: payment.externalReference,
+        transactionStatus: payment.paymentStatus,
       },
     });
 
     return detail;
   });
+}
+
+async function resolvePosManualPayment(
+  authContext: AuthContext,
+  orderId: string,
+  paymentId: string,
+  data: ResolvePosPaymentRequest,
+  status: "paid" | "failed",
+  requestMeta: AuthRequestMeta = {},
+  db: Database = getDb(),
+): Promise<PosOrderDetail> {
+  const tenantId = requirePosContext(authContext);
+  requireManualPaymentConfirmationRole(authContext);
+
+  return db.transaction(async (tx) => {
+    const before = await lockOrderOrThrow(tx, { tenantId, orderId });
+    await requirePosBranchId(authContext, before.branchId, tx);
+    const payment = await findPaymentTransactionForUpdate(tx, {
+      tenantId,
+      orderId,
+      paymentId,
+    });
+
+    if (!payment) {
+      throw new PosOrderError(
+        "PAYMENT_NOT_FOUND",
+        "Payment transaction was not found.",
+        404,
+      );
+    }
+    if (
+      payment.paymentMethod !== "app" ||
+      (payment.provider !== "wave" && payment.provider !== "orange_money")
+    ) {
+      throw new PosOrderError(
+        "PAYMENT_NOT_SUPPORTED",
+        "Only manual Wave or Orange Money payments can be resolved here.",
+        422,
+      );
+    }
+    if (payment.paymentStatus !== "pending") {
+      throw new PosOrderError(
+        "PAYMENT_ALREADY_RESOLVED",
+        "This payment has already been resolved.",
+        409,
+      );
+    }
+
+    if (status === "paid") {
+      const outstanding = Number(before.totalAmount) - Number(before.paidAmount);
+      if (Number(payment.amount) > outstanding) {
+        throw new PosOrderError(
+          "VALIDATION_ERROR",
+          "Payment amount exceeds the current outstanding balance.",
+          422,
+        );
+      }
+    }
+
+    const resolved = await resolveManualPaymentTransaction(tx, {
+      tenantId,
+      paymentId,
+      status,
+      actorUserId: authContext.userId,
+    });
+    if (!resolved) {
+      throw new PosOrderError(
+        "PAYMENT_ALREADY_RESOLVED",
+        "This payment has already been resolved.",
+        409,
+      );
+    }
+
+    if (status === "paid") {
+      await recalculateOrderPaymentState(tx, {
+        tenantId,
+        orderId,
+        actorUserId: authContext.userId,
+      });
+    }
+
+    const detail = await findPosOrderDetail(tx, { tenantId, orderId });
+    if (!detail) {
+      throw new Error("Resolved payment order could not be loaded.");
+    }
+
+    await writeOrderAudit(tx, authContext, requestMeta, {
+      branchId: before.branchId,
+      eventType:
+        status === "paid"
+          ? "pos.order.mobile_payment_confirmed"
+          : "pos.order.mobile_payment_failed",
+      entityId: orderId,
+      reason: data.reason,
+      before: {
+        paidAmount: before.paidAmount,
+        paymentStatus: before.paymentStatus,
+        status: before.status,
+        paymentId,
+        transactionStatus: payment.paymentStatus,
+      },
+      after: {
+        paidAmount: detail.paidAmount,
+        paymentStatus: detail.paymentStatus,
+        status: detail.status,
+        paymentId,
+        provider: payment.provider,
+        externalReference: payment.externalReference,
+        transactionStatus: resolved.paymentStatus,
+      },
+    });
+
+    return detail;
+  });
+}
+
+export async function confirmPosManualPayment(
+  authContext: AuthContext,
+  orderId: string,
+  paymentId: string,
+  data: ResolvePosPaymentRequest,
+  requestMeta: AuthRequestMeta = {},
+  db: Database = getDb(),
+): Promise<PosOrderDetail> {
+  return resolvePosManualPayment(
+    authContext,
+    orderId,
+    paymentId,
+    data,
+    "paid",
+    requestMeta,
+    db,
+  );
+}
+
+export async function failPosManualPayment(
+  authContext: AuthContext,
+  orderId: string,
+  paymentId: string,
+  data: ResolvePosPaymentRequest,
+  requestMeta: AuthRequestMeta = {},
+  db: Database = getDb(),
+): Promise<PosOrderDetail> {
+  return resolvePosManualPayment(
+    authContext,
+    orderId,
+    paymentId,
+    data,
+    "failed",
+    requestMeta,
+    db,
+  );
 }
 
 export async function createPosOrderItem(
@@ -857,6 +1088,7 @@ async function writeOrderAudit(
     branchId: string;
     eventType: string;
     entityId: string;
+    reason?: string;
     before?: Record<string, unknown> | null;
     after?: Record<string, unknown> | null;
     metadata?: Record<string, unknown>;
@@ -870,6 +1102,7 @@ async function writeOrderAudit(
     eventType: input.eventType,
     entityType: "order",
     entityId: input.entityId,
+    reason: input.reason,
     before: input.before,
     after: input.after,
     metadata: input.metadata,

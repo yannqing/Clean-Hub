@@ -11,11 +11,13 @@ import { getRequestMeta } from "../request-meta.helper.js";
 import { PosOrderError } from "./orders.errors.js";
 import {
   changePosOrderStatus,
+  confirmPosManualPayment,
   createPosOrder,
   createPosOrderItem,
   createPosOrderPayment,
   deletePosOrder,
   deletePosOrderItem,
+  failPosManualPayment,
   getPosOrder,
   getPosOrderOverview,
   listPosOrderPayments,
@@ -28,10 +30,13 @@ import {
   createPosOrderBodySchema,
   createPosOrderItemBodySchema,
   createPosPaymentBodySchema,
+  failPosPaymentBodySchema,
   posOrderItemParamsSchema,
   posOrderListQuerySchema,
   posOrderOverviewQuerySchema,
   posOrderParamsSchema,
+  posPaymentParamsSchema,
+  resolvePosPaymentBodySchema,
   updatePosOrderBodySchema,
   updatePosOrderItemBodySchema,
 } from "./orders.validation.js";
@@ -219,6 +224,52 @@ export async function createPosOrderPaymentController(
       getRequestMeta(c),
     );
     return c.json(order, 201);
+  } catch (error) {
+    if (error instanceof PosOrderError) {
+      return createErrorResponse(c, error);
+    }
+    throw error;
+  }
+}
+
+export async function confirmPosManualPaymentController(
+  c: Context<AppBindings>,
+) {
+  const params = posPaymentParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = resolvePosPaymentBodySchema.parse(rawBody);
+
+  try {
+    const order = await confirmPosManualPayment(
+      c.get("authContext"),
+      params.orderId,
+      params.paymentId,
+      data,
+      getRequestMeta(c),
+    );
+    return c.json(order);
+  } catch (error) {
+    if (error instanceof PosOrderError) {
+      return createErrorResponse(c, error);
+    }
+    throw error;
+  }
+}
+
+export async function failPosManualPaymentController(c: Context<AppBindings>) {
+  const params = posPaymentParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = failPosPaymentBodySchema.parse(rawBody);
+
+  try {
+    const order = await failPosManualPayment(
+      c.get("authContext"),
+      params.orderId,
+      params.paymentId,
+      data,
+      getRequestMeta(c),
+    );
+    return c.json(order);
   } catch (error) {
     if (error instanceof PosOrderError) {
       return createErrorResponse(c, error);

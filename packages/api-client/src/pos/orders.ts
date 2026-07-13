@@ -10,6 +10,7 @@ import type {
   PosOrderOverview,
   PosOrderOverviewQuery,
   PosOrderPaymentsResponse,
+  ResolvePosPaymentRequest,
   UpdatePosOrderItemRequest,
   UpdatePosOrderRequest,
 } from "./orders.types";
@@ -61,6 +62,28 @@ export function createPosOrdersApi(client: ApiClient) {
     ) =>
       client.post<PosOrderDetail>(
         `/pos/orders/${orderId}/payments`,
+        input,
+        options,
+      ),
+    confirmManualPayment: (
+      orderId: string,
+      paymentId: string,
+      input: ResolvePosPaymentRequest = {},
+      options?: RequestOptions,
+    ) =>
+      client.post<PosOrderDetail>(
+        `/pos/orders/${orderId}/payments/${paymentId}/confirm`,
+        input,
+        options,
+      ),
+    failManualPayment: (
+      orderId: string,
+      paymentId: string,
+      input: Required<ResolvePosPaymentRequest>,
+      options?: RequestOptions,
+    ) =>
+      client.post<PosOrderDetail>(
+        `/pos/orders/${orderId}/payments/${paymentId}/fail`,
         input,
         options,
       ),
