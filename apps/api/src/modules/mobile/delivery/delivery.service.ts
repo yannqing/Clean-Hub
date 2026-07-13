@@ -61,11 +61,11 @@ type DeliveryTaskRecord = {
 };
 
 export type DeliveryRepositoryLike = {
-  listTodayTasks(input: {
+  listDriverTasks(input: {
     tenantId: string;
     driverUserId: string;
-    start: Date;
-    end: Date;
+    start?: Date;
+    end?: Date;
   }): Promise<DeliveryTaskListItem[]>;
   findOwnedTaskById(input: {
     tenantId: string;
@@ -332,11 +332,25 @@ export class DeliveryService {
     const driver = assertDriverContext(authContext);
     const { start, end } = getTodayBounds();
 
-    return this.repository.listTodayTasks({
+    return this.repository.listDriverTasks({
       tenantId: driver.tenantId,
       driverUserId: driver.subjectId,
       start,
       end,
+    });
+  }
+
+  async listTasks(
+    authContext: MobileAuthContext,
+    range: { from?: Date; to?: Date } = {},
+  ): Promise<DeliveryTaskListItem[]> {
+    const driver = assertDriverContext(authContext);
+
+    return this.repository.listDriverTasks({
+      tenantId: driver.tenantId,
+      driverUserId: driver.subjectId,
+      start: range.from,
+      end: range.to,
     });
   }
 
@@ -757,6 +771,14 @@ export class DeliveryService {
         event: existingEvent,
         idempotent: true,
       };
+    }
+
+    if (!task.assigneeUserId) {
+      throw conflict(
+        "Only assigned delivery tasks can be reassigned.",
+        task.status,
+        ["pending_dispatch"],
+      );
     }
 
     if (TERMINAL_STATUSES.has(task.status)) {

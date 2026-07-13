@@ -403,6 +403,17 @@ function createRepository(): PaymentRepositoryLike & {
       return updated;
     },
     async createRefundRequest(input) {
+      const hasActiveRefund = [...refunds.values()].some(
+        (refund) =>
+          refund.tenantId === input.tenantId &&
+          refund.orderId === input.orderId &&
+          (refund.status === "pending" || refund.status === "processing"),
+      );
+
+      if (hasActiveRefund) {
+        return null;
+      }
+
       refundCount += 1;
       const refund = makeRefund({
         id: `refund_${refundCount}`,
@@ -439,6 +450,28 @@ function createRepository(): PaymentRepositoryLike & {
       const refund = refunds.get(refundRequestId);
 
       return refund?.tenantId === tenantId ? refund : null;
+    },
+    async getRefundOrderDetail({ tenantId, orderId }) {
+      const order = orders.get(orderId);
+
+      if (!order || order.tenantId !== tenantId) {
+        return null;
+      }
+
+      return {
+        id: order.id,
+        branchId: order.branchId,
+        customerId: order.customerId,
+        orderType: "manual",
+        status: order.status,
+        paymentStatus: order.paymentStatus,
+        totalAmount: order.totalAmount,
+        paidAmount: order.paidAmount,
+        notes: null,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        items: [],
+      };
     },
     async startRefundProcessing({ tenantId, refundRequestId, operatorUserId }) {
       const refund = refunds.get(refundRequestId);
@@ -517,6 +550,11 @@ function createRepository(): PaymentRepositoryLike & {
       ) {
         await this.markCallback({ callbackId, status: "failed" });
         return null;
+      }
+
+      if (refund.status === "refunded") {
+        await this.markCallback({ callbackId, status: "processed" });
+        return refund;
       }
 
       const updated = {
@@ -852,6 +890,17 @@ export async function runPaymentSmokeChecks(): Promise<void> {
       service.createRefundRequest({
         authContext: customerContext,
         orderId: "order_1",
+        amount: "10.00",
+        reason: "Duplicate active request",
+      }),
+    409,
+  );
+
+  await assertRejectsPayment(
+    () =>
+      service.createRefundRequest({
+        authContext: customerContext,
+        orderId: "order_1",
         amount: "80.00",
         reason: "Already reserved",
       }),
@@ -873,8 +922,17 @@ export async function runPaymentSmokeChecks(): Promise<void> {
   });
 
   assert(
-    approval.refundRequest.status === "processing",
-    "approved refund should wait for callback",
+    approval.refundRequest.status === "refunded",
+    "mock refund approval should complete its signed callback",
+  );
+  assert(
+    notificationPublisher.events.some(
+      (event) =>
+        event.name === "refund.approved" &&
+        event.relatedId === refund.id &&
+        event.customerId === "customer_1",
+    ),
+    "approved refund should publish a notification event",
   );
   assert(
     notificationPublisher.events.some(
@@ -907,7 +965,7 @@ export async function runPaymentSmokeChecks(): Promise<void> {
   });
 
   assert(
-    repository.orders.get("order_1")?.paidAmount === "100.00",
+    repository.orders.get("order_1")?.paidAmount === "70.00",
     "amount-mismatched refund callback must not update the order",
   );
 

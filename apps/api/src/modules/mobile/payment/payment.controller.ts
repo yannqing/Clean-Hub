@@ -192,6 +192,25 @@ export function createPaymentController({
       }
     },
 
+    getRefundOrderDetail: async (c: Context<AppBindings>) => {
+      const params = refundParamsSchema.parse(c.req.param());
+
+      try {
+        return c.json(
+          await paymentService.getRefundOrderDetail(
+            c.get("mobileAuthContext"),
+            params.refundRequestId,
+          ),
+        );
+      } catch (error) {
+        if (error instanceof PaymentError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
     approveRefundRequest: async (c: Context<AppBindings>) => {
       const params = refundParamsSchema.parse(c.req.param());
 

@@ -17,8 +17,77 @@ body {
 
 body {
   margin: 0;
-  background: #f7f9fc;
+  background:
+    radial-gradient(circle at 18% 8%, rgb(219 234 254 / 0.32), transparent 28rem),
+    #f8fafc;
   color: var(--foreground);
+  letter-spacing: 0;
+  overscroll-behavior-y: none;
+}
+
+.mobile-pull-root {
+  min-height: 100dvh;
+}
+
+.mobile-refresh-indicator {
+  position: fixed;
+  z-index: 60;
+  top: max(10px, env(safe-area-inset-top));
+  left: 50%;
+  display: flex;
+  height: 36px;
+  align-items: center;
+  gap: 8px;
+  transform: translate(-50%, -56px);
+  border: 1px solid rgb(226 232 240 / 0.9);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.96);
+  padding: 0 14px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgb(15 23 42 / 0.12);
+  backdrop-filter: blur(18px);
+  transition: transform 180ms ease, opacity 180ms ease;
+}
+
+.mobile-refresh-indicator.is-visible {
+  transform: translate(-50%, 0);
+}
+
+.mobile-page > header + [class*="rounded-md"],
+.mobile-page section.rounded-md,
+.mobile-page article.rounded-md,
+.mobile-page div.rounded-md.border.bg-white,
+.mobile-page button.rounded-md.border.bg-white {
+  border-color: rgb(226 232 240 / 0.86);
+  box-shadow: 0 8px 26px rgb(15 23 42 / 0.065);
+}
+
+.mobile-page section.rounded-md,
+.mobile-page article.rounded-md {
+  padding: 18px;
+}
+
+.mobile-page [role="tablist"] button[aria-selected="true"] {
+  box-shadow: 0 6px 18px rgb(37 99 235 / 0.2);
+}
+
+.mobile-page h2,
+.mobile-page h3 {
+  letter-spacing: 0;
+}
+
+.mobile-page input,
+.mobile-page textarea,
+.mobile-page select {
+  background-color: rgb(255 255 255 / 0.9);
+}
+
+@media (min-width: 480px) {
+  body {
+    background-color: #eef3f9;
+  }
 }
 
 button,

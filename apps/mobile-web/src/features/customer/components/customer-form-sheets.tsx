@@ -11,11 +11,6 @@ import {
   Button,
   Input,
   Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -35,6 +30,7 @@ import {
 } from "lucide-react";
 
 import { formatTenantMoney } from "@/lib/currency";
+import { MobileOptionSheet } from "@/components/mobile-option-sheet";
 import {
   getCountryFlag,
   getCountryOptions,
@@ -105,7 +101,7 @@ export function AppointmentFormSheet({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="max-h-[92dvh] p-5">
+      <SheetContent className="h-[96dvh] max-h-[96dvh] overflow-y-auto rounded-t-md p-5">
         <SheetHeader className="pr-8 text-left">
           <SheetTitle>{t("customer.appointments.newTitle")}</SheetTitle>
           <SheetDescription>{t("customer.appointments.newDescription")}</SheetDescription>
@@ -147,6 +143,15 @@ export function AppointmentForm({
   const selectedAddressId = addressBook.some((address) => address.id === form.addressId)
     ? form.addressId
     : CUSTOM_APPOINTMENT_ADDRESS_ID;
+  const [appointmentDate = "", appointmentTime = ""] = form.expectedAt.split("T");
+  const minimumDate = getMinimumAppointmentDateValue().split("T")[0] ?? "";
+
+  function updateExpectedAt(date: string, time: string) {
+    onFormChange((current) => ({
+      ...current,
+      expectedAt: date && time ? `${date}T${time}` : date ? `${date}T` : "",
+    }));
+  }
 
   function handleAddressSourceChange(addressId: string) {
     if (addressId === CUSTOM_APPOINTMENT_ADDRESS_ID) {
@@ -189,38 +194,43 @@ export function AppointmentForm({
       {branches.length > 1 ? (
         <div className="space-y-2">
           <Label htmlFor="appointment-branch">{t("customer.appointments.branch")}</Label>
-          <Select
+          <MobileOptionSheet
+            id="appointment-branch"
+            options={branches.map((branch) => ({
+              value: branch.id,
+              label: branch.name,
+              description: branch.address || undefined,
+            }))}
+            placeholder={t("customer.appointments.branchPlaceholder")}
+            title={t("customer.appointments.branch")}
             value={form.branchId}
             onValueChange={(branchId) =>
               onFormChange((current) => ({ ...current, branchId }))
             }
-          >
-            <SelectTrigger className="h-12 text-base" id="appointment-branch">
-              <SelectValue placeholder={t("customer.appointments.branchPlaceholder")} />
-            </SelectTrigger>
-            <SelectContent>
-              {branches.map((branch) => (
-                <SelectItem key={branch.id} value={branch.id}>
-                  {branch.address ? `${branch.name} - ${branch.address}` : branch.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         </div>
       ) : null}
 
       <div className="space-y-2">
-        <Label htmlFor="appointment-expected-at">{t("customer.forms.expectedAt")}</Label>
-        <Input
-          className="h-12 text-base"
-          id="appointment-expected-at"
-          min={getMinimumAppointmentDateValue()}
-          type="datetime-local"
-          value={form.expectedAt}
-          onChange={(event) =>
-            onFormChange((current) => ({ ...current, expectedAt: event.target.value }))
-          }
-        />
+        <Label htmlFor="appointment-date">{t("customer.forms.expectedAt")}</Label>
+        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_minmax(0,0.72fr)] gap-2">
+          <Input
+            className="h-12 min-w-0 w-full text-base"
+            id="appointment-date"
+            min={minimumDate}
+            type="date"
+            value={appointmentDate}
+            onChange={(event) => updateExpectedAt(event.target.value, appointmentTime)}
+          />
+          <Input
+            aria-label={t("customer.forms.appointmentTime")}
+            className="h-12 min-w-0 w-full text-base"
+            id="appointment-time"
+            type="time"
+            value={appointmentTime}
+            onChange={(event) => updateExpectedAt(appointmentDate, event.target.value)}
+          />
+        </div>
       </div>
 
       {addressBook.length > 0 ? (
@@ -228,21 +238,24 @@ export function AppointmentForm({
           <Label htmlFor="appointment-address-source">
             {t("customer.appointments.addressSource")}
           </Label>
-          <Select value={selectedAddressId} onValueChange={handleAddressSourceChange}>
-            <SelectTrigger className="h-12 text-base" id="appointment-address-source">
-              <SelectValue placeholder={t("customer.appointments.addressSourcePlaceholder")} />
-            </SelectTrigger>
-            <SelectContent>
-              {addressBook.map((address) => (
-                <SelectItem key={address.id} value={address.id}>
-                  {[address.label, formatCustomerAddress(address)].filter(Boolean).join(" - ")}
-                </SelectItem>
-              ))}
-              <SelectItem value={CUSTOM_APPOINTMENT_ADDRESS_ID}>
-                {t("customer.appointments.customAddress")}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <MobileOptionSheet
+            id="appointment-address-source"
+            options={[
+              ...addressBook.map((address) => ({
+                value: address.id,
+                label: address.label || formatCustomerAddress(address),
+                description: address.label ? formatCustomerAddress(address) : undefined,
+              })),
+              {
+                value: CUSTOM_APPOINTMENT_ADDRESS_ID,
+                label: t("customer.appointments.customAddress"),
+              },
+            ]}
+            placeholder={t("customer.appointments.addressSourcePlaceholder")}
+            title={t("customer.appointments.addressSource")}
+            value={selectedAddressId}
+            onValueChange={handleAddressSourceChange}
+          />
         </div>
       ) : null}
 
@@ -644,44 +657,38 @@ export function AddressFormSheet({
             </div>
             <div className="space-y-2">
               <Label htmlFor="address-country">{t("customer.forms.country")}</Label>
-              <Select
+              <MobileOptionSheet
+                ariaLabel={`${t("customer.forms.country")}: ${selectedCountry.fallbackLabel}`}
+                id="address-country"
+                options={countryOptions.map((country) => ({
+                  value: country.code,
+                  label: (
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span aria-hidden="true" className="text-base leading-none">
+                        {getCountryFlag(country.code)}
+                      </span>
+                      <span className="min-w-0 flex-1 break-words">{country.fallbackLabel}</span>
+                      <span className="shrink-0 text-xs font-semibold text-slate-500">
+                        {country.code}
+                      </span>
+                    </span>
+                  ),
+                  selectedLabel: (
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span aria-hidden="true" className="text-lg leading-none">
+                        {getCountryFlag(country.code)}
+                      </span>
+                      <span className="font-semibold text-slate-900">{country.code}</span>
+                    </span>
+                  ),
+                }))}
+                placeholder={t("customer.forms.country")}
+                title={t("customer.forms.country")}
                 value={normalizeCountryCode(form.country)}
                 onValueChange={(country) =>
                   onFormChange((current) => ({ ...current, country }))
                 }
-              >
-                <SelectTrigger
-                  aria-label={`${t("customer.forms.country")}: ${selectedCountry.fallbackLabel}`}
-                  className="h-12 w-full min-w-0 text-base"
-                  id="address-country"
-                >
-                  <SelectValue asChild>
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span aria-hidden="true" className="text-lg leading-none">
-                        {getCountryFlag(selectedCountry.code)}
-                      </span>
-                      <span className="font-semibold tracking-normal text-slate-900">
-                        {selectedCountry.code}
-                      </span>
-                    </span>
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent className="max-h-72 w-[min(20rem,calc(100vw-2rem))]" position="popper">
-                  {countryOptions.map((country) => (
-                    <SelectItem className="min-w-0 py-2" key={country.code} value={country.code}>
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span aria-hidden="true" className="text-base leading-none">
-                          {getCountryFlag(country.code)}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate">{country.fallbackLabel}</span>
-                        <span className="shrink-0 text-xs font-semibold text-slate-500">
-                          {country.code}
-                        </span>
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
           </div>
 

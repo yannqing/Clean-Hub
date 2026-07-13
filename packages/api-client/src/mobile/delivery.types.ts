@@ -164,3 +164,8 @@ export type MobileCancelDeliveryTaskRequest = {
 export type MobileDeliveryListResponse<T> = {
   data: T[];
 };
+
+export type MobileDeliveryTaskListQuery = {
+  from?: string;
+  to?: string;
+};

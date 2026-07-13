@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type {
   MobileCustomerAddress,
   MobileCustomerAppointment,
@@ -37,6 +38,9 @@ import {
   XCircle,
 } from "lucide-react";
 
+import { AlertBanner } from "@/components/alert-banner";
+import { EmptyState } from "@/components/empty-state";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
 import { formatTenantMoney } from "@/lib/currency";
 
 import { getIntlLocale } from "../lib/country";
@@ -100,47 +104,17 @@ export function CustomerTabBar({
   );
 
   return (
-    <nav
-      aria-label={t("common.mainNavigation")}
-      className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-md border-t border-slate-200 bg-[#F7F9FC]/95 px-5 pb-[max(12px,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur"
-    >
-      <div className="grid grid-cols-4 gap-2 rounded-md border border-slate-200 bg-white p-1 shadow-sm">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.value;
-
-          return (
-            <button
-              aria-current={isActive ? "page" : undefined}
-              className={`flex min-h-12 flex-col items-center justify-center gap-1 rounded-md px-1 text-xs font-medium transition ${
-                isActive ? "bg-blue-600 text-white" : "text-slate-600 hover:bg-slate-50"
-              }`}
-              key={tab.value}
-              type="button"
-              onClick={() => onChange(tab.value)}
-            >
-              <Icon className="size-4" aria-hidden="true" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
+    <MobileTabBar
+      activeValue={activeTab}
+      ariaLabel={t("common.mainNavigation")}
+      items={tabs}
+      onChange={onChange}
+    />
   );
 }
 
 export function AlertMessage({ message, tone }: { message: string; tone: "error" | "success" }) {
-  return (
-    <p
-      className={`mb-4 rounded-md border px-3 py-2 text-sm ${
-        tone === "error"
-          ? "border-red-200 bg-red-50 text-red-700"
-          : "border-emerald-200 bg-emerald-50 text-emerald-800"
-      }`}
-    >
-      {message}
-    </p>
-  );
+  return <AlertBanner message={message} tone={tone} />;
 }
 
 export function CustomerOverviewView({
@@ -305,14 +279,14 @@ function OverviewMetric({
   value: number;
 }) {
   return (
-    <div className="rounded-md border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-2">
-        <Icon className="size-4 text-blue-600" aria-hidden="true" />
-        <span className="text-lg font-semibold tabular-nums text-slate-950">
-          {value}
-        </span>
-      </div>
-      <p className="mt-2 min-h-8 text-xs font-medium leading-4 text-slate-600">
+    <div className="min-h-32 rounded-md border border-slate-200 bg-white p-3 shadow-sm">
+      <span className="flex size-9 items-center justify-center rounded-md bg-blue-50 text-blue-600">
+        <Icon className="size-5" aria-hidden="true" />
+      </span>
+      <span className="mt-4 block text-3xl font-bold tabular-nums text-blue-600">
+        {value}
+      </span>
+      <p className="mt-1 min-h-8 text-xs font-medium leading-4 text-slate-600">
         {label}
       </p>
     </div>
@@ -397,7 +371,9 @@ export function ActivityView({
                   <div className="flex shrink-0 items-center gap-2">
                     <StatusBadge
                       view={
-                        item.kind === "order"
+                        item.kind === "order" && item.refundStatus
+                          ? getRefundStatusView(t, item.refundStatus)
+                          : item.kind === "order"
                           ? getOrderStatusView(t, item.status)
                           : getTicketStatusView(t, item.status)
                       }
@@ -537,11 +513,14 @@ function ActivityDetailPanel({
       (refundRequest) => refundRequest.orderId === detail.data.id,
     );
     const balance = getOrderBalance(detail.data);
+    const activeRefund = orderRefundRequests.find(
+      (request) => request.status === "pending" || request.status === "processing",
+    );
     const canPay =
       amountToCents(balance) > 0 &&
       detail.data.paymentStatus !== "paid" &&
       detail.data.paymentStatus !== "refunded";
-    const canRefund = amountToCents(detail.data.paidAmount) > 0;
+    const canRefund = amountToCents(detail.data.paidAmount) > 0 && !activeRefund;
     const formatMoney = (value: string | number) =>
       formatTenantMoney(value, intlLocale, currency);
 
@@ -562,7 +541,11 @@ function ActivityDetailPanel({
           <DetailTerm label={t("customer.detail.paid")} value={formatMoney(detail.data.paidAmount)} />
           <DetailTerm
             label={t("customer.detail.payment")}
-            value={getPaymentStatusLabel(t, detail.data.paymentStatus)}
+            value={
+              activeRefund
+                ? getRefundStatusView(t, activeRefund.status).label
+                : getPaymentStatusLabel(t, detail.data.paymentStatus)
+            }
           />
           <DetailTerm
             label={t("customer.detail.created")}
@@ -801,6 +784,11 @@ export function AppointmentsView({
   onOpenCreateAppointment: () => void;
 }) {
   const { t } = useTranslation();
+  const [statusFilter, setStatusFilter] = useState<"all" | MobileCustomerAppointment["status"]>("all");
+  const visibleAppointments = appointments.filter(
+    (appointment) => statusFilter === "all" || appointment.status === statusFilter,
+  );
+  const filters = ["all", "pending", "accepted", "cancelled"] as const;
 
   return (
     <div className="space-y-4">
@@ -824,9 +812,32 @@ export function AppointmentsView({
         </div>
       </section>
 
-      {appointments.length ? (
+      <div className="grid grid-cols-4 rounded-md border border-slate-200 bg-slate-50 p-1" role="tablist">
+        {filters.map((filter) => {
+          const active = statusFilter === filter;
+          const label = filter === "all"
+            ? t("customer.filters.all")
+            : getAppointmentStatusView(t, filter).label;
+          return (
+            <button
+              aria-selected={active}
+              className={`min-h-10 rounded-md px-1 text-xs font-semibold transition ${
+                active ? "bg-white text-blue-700 shadow-sm" : "text-slate-600"
+              }`}
+              key={filter}
+              role="tab"
+              type="button"
+              onClick={() => setStatusFilter(filter)}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+
+      {visibleAppointments.length ? (
         <section className="space-y-3">
-          {appointments.map((appointment) => (
+          {visibleAppointments.map((appointment) => (
             <AppointmentCard
               appointment={appointment}
               cancellingAppointmentId={cancellingAppointmentId}
@@ -960,29 +971,6 @@ export function ProfileView({
         onEditContact={onEditContact}
       />
     </div>
-  );
-}
-
-function EmptyState({
-  action,
-  body,
-  icon: Icon,
-  title,
-}: {
-  action?: React.ReactNode;
-  body: string;
-  icon: typeof ReceiptText;
-  title: string;
-}) {
-  return (
-    <section className="rounded-md border border-dashed border-slate-300 bg-white p-5 text-center">
-      <div className="mx-auto flex size-11 items-center justify-center rounded-md bg-slate-100 text-slate-600">
-        <Icon className="size-5" aria-hidden="true" />
-      </div>
-      <h2 className="mt-3 text-base font-semibold text-slate-950">{title}</h2>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
-      {action}
-    </section>
   );
 }
 

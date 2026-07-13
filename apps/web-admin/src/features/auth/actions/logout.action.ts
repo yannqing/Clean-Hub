@@ -2,6 +2,11 @@
 
 import { webAdminApi } from "@/lib/api-client";
 
+import {
+  applyAuthCookies,
+  getForwardedCookieHeader,
+} from "./auth-cookie.helper";
+
 type LogoutActionResult =
   | { ok: true }
   | {
@@ -24,7 +29,14 @@ function getLogoutErrorMessage(error: unknown): string {
  */
 export async function logoutAction(): Promise<LogoutActionResult> {
   try {
-    await webAdminApi.auth.logout();
+    const cookie = await getForwardedCookieHeader();
+
+    await webAdminApi.auth.logout({
+      headers: cookie ? { cookie } : undefined,
+      afterResponse: async (response) => {
+        await applyAuthCookies(response);
+      },
+    });
     return { ok: true };
   } catch (error) {
     return {

@@ -14,7 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { useTenantI18n } from "@/i18n";
 
-import { getTenantRestoreRequestListQuery } from "../queries";
+import { getTenantRestoreRequestListQuery } from "../queries/get-restore-request-list.query";
 import type { RestoreRequest, RestoreRequestStatus } from "../types";
 
 type RestoreRequestListProps = {

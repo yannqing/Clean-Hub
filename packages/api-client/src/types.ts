@@ -43,6 +43,10 @@ export type ApiRequestOptions = {
   requestId?: string;
   skipAuthRefresh?: boolean;
   metadata?: Record<string, unknown>;
+  afterResponse?: (
+    response: Response,
+    context: ApiResponseContext,
+  ) => Promise<void> | void;
 };
 
 export type ApiRequestContext = {

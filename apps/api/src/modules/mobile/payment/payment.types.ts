@@ -183,6 +183,27 @@ export type RefundRequest = {
   updatedAt: string;
 };
 
+export type RefundOrderDetail = {
+  id: string;
+  branchId: string;
+  customerId: string;
+  orderType: string;
+  status: string;
+  paymentStatus: string;
+  totalAmount: string;
+  paidAmount: string;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: Array<{
+    id: string;
+    itemName: string;
+    quantity: string;
+    unitAmount: string;
+    lineAmount: string;
+  }>;
+};
+
 export type CreateRefundRequestInput = {
   authContext: MobileAuthContext;
   orderId: string;

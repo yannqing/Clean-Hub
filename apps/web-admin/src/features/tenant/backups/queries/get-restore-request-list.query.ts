@@ -1,3 +1,5 @@
+"use server";
+
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";

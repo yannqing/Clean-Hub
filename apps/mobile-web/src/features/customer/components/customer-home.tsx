@@ -16,10 +16,11 @@ import type {
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { toast } from "@cleanhub/ui";
-import { Loader2 } from "lucide-react";
 
 import { getMobileSession } from "@/lib/token-storage";
 import { ConfirmSheet } from "@/components/confirm-sheet";
+import { MobilePageSkeleton } from "@/components/mobile-skeleton";
+import { MobilePullToRefresh } from "@/components/mobile-pull-to-refresh";
 import { WorkspaceHeader } from "@/components/workspace-header";
 import { resolveTenantCurrency } from "@/lib/currency";
 import {
@@ -133,7 +134,37 @@ type CustomerSnapshot = {
   errorKey: TranslationKey | null;
 };
 
-async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
+type CustomerSnapshotFallback = Omit<CustomerSnapshot, "authContext" | "errorKey">;
+
+function getSettledValue<T>(
+  result: PromiseSettledResult<T>,
+  fallback: T,
+): T {
+  return result.status === "fulfilled" ? result.value : fallback;
+}
+
+function hasCustomerSnapshotData(snapshot: CustomerSnapshotFallback): boolean {
+  return Boolean(
+    snapshot.profile ||
+      snapshot.addressBook.length ||
+      snapshot.branches.length ||
+      snapshot.activity.orders.length ||
+      snapshot.activity.tickets.length ||
+      snapshot.appointments.length ||
+      snapshot.refundRequests.length,
+  );
+}
+
+async function fetchCustomerSnapshot(
+  fallback: CustomerSnapshotFallback = {
+    profile: null,
+    addressBook: [],
+    branches: [],
+    activity: emptyActivity,
+    appointments: [],
+    refundRequests: [],
+  },
+): Promise<CustomerSnapshot> {
   const session = await getMobileSession();
 
   if (!session || session.authContext.role !== "customer") {
@@ -149,7 +180,7 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
     };
   }
 
-  const [profile, addressBook, branches, activity, appointments, refundRequests] = await Promise.all([
+  const [profile, addressBook, branches, activity, appointments, refundRequests] = await Promise.allSettled([
     getCustomerProfile(),
     getCustomerAddresses(),
     getCustomerBranches(),
@@ -158,15 +189,46 @@ async function fetchCustomerSnapshot(): Promise<CustomerSnapshot> {
     getCustomerRefundRequests(),
   ]);
 
+  const hasFailedRequest = [
+    profile,
+    addressBook,
+    branches,
+    activity,
+    appointments,
+    refundRequests,
+  ].some((result) => result.status === "rejected");
+  const nextProfile = getSettledValue(profile, fallback.profile);
+  const nextAddressBook = getSettledValue(addressBook, {
+    data: fallback.addressBook,
+  }).data;
+  const nextBranches = getSettledValue(branches, {
+    data: fallback.branches,
+  }).data;
+  const nextActivity = getSettledValue(activity, {
+    data: fallback.activity,
+  }).data;
+  const nextAppointments = sortAppointments(
+    getSettledValue(appointments, { data: fallback.appointments }).data,
+  );
+  const nextRefundRequests = getSettledValue(refundRequests, {
+    data: fallback.refundRequests,
+  }).data;
+  const nextSnapshotData = {
+    profile: nextProfile,
+    addressBook: nextAddressBook,
+    branches: nextBranches,
+    activity: nextActivity,
+    appointments: nextAppointments,
+    refundRequests: nextRefundRequests,
+  };
+
   return {
     authContext: session.authContext,
-    profile,
-    addressBook: addressBook.data,
-    branches: branches.data,
-    activity: activity.data,
-    appointments: sortAppointments(appointments.data),
-    refundRequests: refundRequests.data,
-    errorKey: null,
+    ...nextSnapshotData,
+    errorKey:
+      hasFailedRequest && !hasCustomerSnapshotData(nextSnapshotData)
+        ? "common.errors.genericLoad"
+        : null,
   };
 }
 
@@ -247,6 +309,15 @@ export function CustomerHome({
           : false;
 
   const loadCustomerData = useCallback(async (mode: "boot" | "refresh" = "refresh") => {
+    const currentSnapshotData: CustomerSnapshotFallback = {
+      profile,
+      addressBook,
+      branches,
+      activity,
+      appointments,
+      refundRequests,
+    };
+
     if (mode === "boot") {
       setIsLoading(true);
     } else {
@@ -256,7 +327,9 @@ export function CustomerHome({
     setError(null);
 
     try {
-      const snapshot = await fetchCustomerSnapshot();
+      const snapshot = await fetchCustomerSnapshot(
+        mode === "refresh" ? currentSnapshotData : undefined,
+      );
       setAuthContext(snapshot.authContext);
       setProfile(snapshot.profile);
       setAddressBook(snapshot.addressBook);
@@ -279,12 +352,14 @@ export function CustomerHome({
           getPrimaryAddress(snapshot.profile),
       }));
     } catch (nextError) {
-      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
+      if (mode === "boot" || !hasCustomerSnapshotData(currentSnapshotData)) {
+        setError(getErrorMessage(nextError, t("common.errors.genericAction")));
+      }
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [t]);
+  }, [activity, addressBook, appointments, branches, profile, refundRequests, t]);
 
   useEffect(() => {
     let mounted = true;
@@ -333,7 +408,10 @@ export function CustomerHome({
     };
   }, [t]);
 
-  const activityItems = useMemo(() => getActivityItems(activity, t), [activity, t]);
+  const activityItems = useMemo(
+    () => getActivityItems(activity, t, refundRequests),
+    [activity, refundRequests, t],
+  );
   const filteredActivityItems = useMemo(
     () => filterActivityItems(activityItems, activityFilter),
     [activityFilter, activityItems],
@@ -963,18 +1041,16 @@ export function CustomerHome({
   }
 
   if (isLoading) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center px-5">
-        <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
-          <Loader2 className="size-4 animate-spin text-blue-600" aria-hidden="true" />
-          {t("customer.home.loading")}
-        </div>
-      </main>
-    );
+    return <MobilePageSkeleton label={t("customer.home.loading")} />;
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(20px,env(safe-area-inset-top))]">
+    <MobilePullToRefresh
+      isRefreshing={isRefreshing}
+      label={t("common.refresh")}
+      onRefresh={() => loadCustomerData("refresh")}
+    >
+    <main className="mobile-page mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-[calc(104px+env(safe-area-inset-bottom))] pt-[max(28px,env(safe-area-inset-top))]">
       <WorkspaceHeader
         isLoggingOut={isLoggingOut}
         logoutLabel={t("auth.logout")}
@@ -1187,5 +1263,6 @@ export function CustomerHome({
 
       <CustomerTabBar activeTab={activeTab} onChange={setActiveTab} />
     </main>
+    </MobilePullToRefresh>
   );
 }

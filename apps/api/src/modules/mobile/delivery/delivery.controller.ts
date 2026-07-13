@@ -29,6 +29,11 @@ const dispatchBoardQuerySchema = z.object({
   to: z.string().datetime().optional(),
 });
 
+const taskListQuerySchema = z.object({
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+});
+
 const idempotencyKeySchema = z.string().trim().min(1).max(120);
 const coordinateSchema = z
   .union([z.string().trim().min(1).max(32), z.number()])
@@ -140,6 +145,25 @@ export function createDeliveryController({
   deliveryService,
 }: DeliveryControllerOptions) {
   return {
+    listTasks: async (c: Context<AppBindings>) => {
+      const query = taskListQuerySchema.parse(c.req.query());
+
+      try {
+        const data = await deliveryService.listTasks(
+          c.get("mobileAuthContext"),
+          { from: parseDate(query.from), to: parseDate(query.to) },
+        );
+
+        return c.json({ data });
+      } catch (error) {
+        if (error instanceof DeliveryError) {
+          return errorResponse(c, error);
+        }
+
+        throw error;
+      }
+    },
+
     getDispatchBoard: async (c: Context<AppBindings>) => {
       const query = dispatchBoardQuerySchema.parse(c.req.query());
 

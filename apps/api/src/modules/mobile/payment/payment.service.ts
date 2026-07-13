@@ -31,6 +31,7 @@ import type {
   PaymentStatusResult,
   PaymentWebhookInput,
   PaymentWebhookResult,
+  RefundOrderDetail,
   RefundRequest,
   RefundApprovalResult,
   RejectRefundRequestInput,
@@ -54,6 +55,7 @@ export type PaymentRepositoryLike = Pick<
   | "listRefundRequests"
   | "sumOpenRefundRequests"
   | "findRefundRequest"
+  | "getRefundOrderDetail"
   | "startRefundProcessing"
   | "attachRefundGateway"
   | "rejectRefundRequest"
@@ -489,7 +491,7 @@ export class PaymentService {
     });
     const paymentTransaction = paidTransactions[0] ?? null;
 
-    return this.repository.createRefundRequest({
+    const refundRequest = await this.repository.createRefundRequest({
       tenantId: customer.tenantId,
       branchId: order.branchId,
       customerAccountId: customer.subjectId,
@@ -499,6 +501,14 @@ export class PaymentService {
       reason: input.reason,
       paymentTransactionId: paymentTransaction?.id ?? null,
     });
+
+    if (!refundRequest) {
+      throw conflict("An active refund request already exists for this order.", {
+        orderId: order.id,
+      });
+    }
+
+    return refundRequest;
   }
 
   async listRefundRequests(
@@ -521,6 +531,33 @@ export class PaymentService {
       branchIds: owner.branchIds,
       status: input.status,
     });
+  }
+
+  async getRefundOrderDetail(
+    authContext: MobileAuthContext,
+    refundRequestId: string,
+  ): Promise<RefundOrderDetail> {
+    const owner = assertOwnerContext(authContext);
+    const refundRequest = await this.repository.findRefundRequest({
+      tenantId: owner.tenantId,
+      refundRequestId,
+    });
+
+    if (!refundRequest) {
+      throw refundNotFound();
+    }
+
+    assertBranchAccess(owner, refundRequest.branchId);
+    const order = await this.repository.getRefundOrderDetail({
+      tenantId: owner.tenantId,
+      orderId: refundRequest.orderId,
+    });
+
+    if (!order) {
+      throw orderNotFound();
+    }
+
+    return order;
   }
 
   async approveRefundRequest(
@@ -615,10 +652,36 @@ export class PaymentService {
       "Mobile refund request approved",
     );
 
-    await this.publishRefundApproved(approved);
+    let completed = approved;
+
+    if (this.gateway instanceof MockPaymentGateway) {
+      const callback = this.gateway.createSignedCallbackPayload({
+        action: "refund",
+        tenantId: approved.tenantId,
+        externalId: gateway.externalId,
+        event: `mock.refund.refunded.${approved.id}`,
+        status: "refunded",
+        amount: approved.amount,
+        transactionId: paymentTransactionId,
+        refundRequestId: approved.id,
+      });
+
+      await this.handleWebhook({
+        gateway: "mock",
+        payload: callback.payload,
+        headers: callback.headers,
+      });
+      completed =
+        (await this.repository.findRefundRequest({
+          tenantId: owner.tenantId,
+          refundRequestId: approved.id,
+        })) ?? approved;
+    }
+
+    await this.publishRefundApproved(completed);
 
     return {
-      refundRequest: approved,
+      refundRequest: completed,
       gateway,
     };
   }

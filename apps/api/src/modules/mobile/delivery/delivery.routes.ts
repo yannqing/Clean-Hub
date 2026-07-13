@@ -15,6 +15,7 @@ export function createDeliveryRoutes({
   const controller = createDeliveryController({ deliveryService });
 
   routes.get("/dispatch/board", controller.getDispatchBoard);
+  routes.get("/tasks", controller.listTasks);
   routes.get("/tasks/today", controller.listTodayTasks);
   routes.post("/tasks", controller.createAssignedTask);
   routes.get("/tasks/:taskId", controller.getTaskDetail);

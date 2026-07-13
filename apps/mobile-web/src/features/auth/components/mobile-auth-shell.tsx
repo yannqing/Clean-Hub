@@ -1,17 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import type { MobileAuthContext } from "@cleanhub/api-client";
+import { isApiHttpError, type MobileAuthContext } from "@cleanhub/api-client";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { Button, Input, Label } from "@cleanhub/ui";
-import { Building2, ChevronRight, Loader2, LockKeyhole, PackageCheck, ShieldCheck } from "lucide-react";
+import { Building2, ChevronRight, Loader2, PackageCheck, ShieldCheck } from "lucide-react";
 
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { CustomerHome } from "@/features/customer";
 import { DeliveryHome } from "@/features/delivery";
 import { OwnerHome } from "@/features/owner";
+import { apiClient } from "@/lib/api-client";
 import { mobileReleaseConfig } from "@/lib/mobile-release-config";
+import { clearMobileSession } from "@/lib/token-storage";
 import {
   enterTenantContext,
   getCustomerTestOtp,
@@ -44,6 +46,10 @@ function getErrorMessage(error: unknown, fallback: string, t: ReturnType<typeof 
   return fallback;
 }
 
+function isUnauthorizedSessionError(error: unknown): boolean {
+  return isApiHttpError(error) && error.status === 401;
+}
+
 export function MobileAuthShell() {
   const { t } = useTranslation();
   const [tenantCode, setTenantCode] = useState<string | null>(null);
@@ -62,13 +68,12 @@ export function MobileAuthShell() {
   const [isPending, startTransition] = useTransition();
   const showTestOtp = mobileReleaseConfig.appEnvironment !== "prod";
 
-  const loginModes = useMemo(
+  const accountRoles = useMemo(
     () =>
       [
-        { value: "customer-otp", label: t("auth.login.customerOtp") },
         { value: "customer-password", label: t("auth.login.customerPassword") },
-        { value: "driver", label: t("auth.login.driver") },
         { value: "owner", label: t("auth.login.owner") },
+        { value: "driver", label: t("auth.login.driver") },
       ] satisfies { value: LoginMode; label: string }[],
     [t],
   );
@@ -77,17 +82,36 @@ export function MobileAuthShell() {
     let mounted = true;
 
     loadStoredAuthState()
-      .then((state) => {
+      .then(async (state) => {
+        let nextSession = state.session
+          ? { authContext: state.session.authContext }
+          : null;
+
+        if (state.session) {
+          try {
+            nextSession = {
+              authContext: await apiClient.mobile.auth.me(),
+            };
+          } catch (nextError) {
+            if (isUnauthorizedSessionError(nextError)) {
+              await clearMobileSession();
+              nextSession = null;
+            }
+          }
+        }
+
         if (!mounted) {
           return;
         }
 
         setTenantCode(state.tenantCode);
         setTenantInput(state.tenantCode ?? "");
-        setSession(state.session ? { authContext: state.session.authContext } : null);
+        setSession(nextSession);
       })
       .catch(() => {
-        setError(t("auth.login.sessionReadFailed"));
+        if (mounted) {
+          setError(t("auth.login.sessionReadFailed"));
+        }
       })
       .finally(() => {
         if (mounted) {
@@ -251,21 +275,27 @@ export function MobileAuthShell() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-8 pt-[max(24px,env(safe-area-inset-top))]">
-      <header className="mb-7 flex items-center justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">CleanHub</p>
-          <h1 className="mt-1 text-3xl font-semibold text-slate-950">Mobile</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <LanguageSwitcher />
-          <div className="flex size-11 items-center justify-center rounded-md bg-blue-600 text-white shadow-sm">
-            <PackageCheck className="size-5" aria-hidden="true" />
+    <main className="mobile-page mx-auto flex min-h-dvh w-full max-w-md flex-col px-5 pb-8 pt-[max(28px,env(safe-area-inset-top))]">
+      <header className="mb-12 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex size-11 items-center justify-center rounded-md bg-blue-600 text-white shadow-lg shadow-blue-600/20">
+            <PackageCheck className="size-6" aria-hidden="true" />
           </div>
+          <p className="text-lg font-bold uppercase text-blue-700">CleanHub</p>
         </div>
+        <LanguageSwitcher />
       </header>
 
-      <section className="rounded-md border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="mb-7">
+        <h1 className="text-[36px] font-bold leading-tight text-slate-950">
+          {tenantCode ? activeLoginTitle : t("auth.tenant.title")}
+        </h1>
+        <p className="mt-3 text-lg leading-7 text-slate-600">
+          {tenantCode ? t("auth.tenant.active", { tenantCode }) : t("auth.tenant.prompt")}
+        </p>
+      </div>
+
+      <section className="rounded-md border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 flex size-9 items-center justify-center rounded-md bg-blue-50 text-blue-700">
             <Building2 className="size-4" aria-hidden="true" />
@@ -322,16 +352,8 @@ export function MobileAuthShell() {
       ) : null}
 
       {tenantCode && !session ? (
-        <section className="mt-5 rounded-md border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-md bg-slate-100 text-slate-700">
-              <LockKeyhole className="size-4" aria-hidden="true" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-950">{activeLoginTitle}</p>
-              <p className="text-sm text-slate-600">{t("auth.login.localToken")}</p>
-            </div>
-          </div>
+        <section className="mt-5 rounded-md border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm font-medium text-slate-600">{t("auth.login.identifier")}</p>
 
           {error ? (
             <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -339,11 +361,15 @@ export function MobileAuthShell() {
             </p>
           ) : null}
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {loginModes.map((loginMode) => (
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {accountRoles.map((loginMode) => {
+              const selected = loginMode.value === "customer-password"
+                ? mode === "customer-password" || mode === "customer-otp"
+                : mode === loginMode.value;
+              return (
               <button
                 className={`min-h-11 rounded-md border px-3 text-sm font-medium transition ${
-                  mode === loginMode.value
+                  selected
                     ? "border-blue-600 bg-blue-50 text-blue-900"
                     : "border-slate-200 bg-white text-slate-700"
                 }`}
@@ -357,8 +383,28 @@ export function MobileAuthShell() {
               >
                 {loginMode.label}
               </button>
-            ))}
+              );
+            })}
           </div>
+
+          {mode === "customer-password" || mode === "customer-otp" ? (
+            <div className="mt-5 grid grid-cols-2 border-b border-slate-200" role="tablist">
+              {(["customer-otp", "customer-password"] as const).map((loginMode) => (
+                <button
+                  aria-selected={mode === loginMode}
+                  className={`min-h-11 border-b-2 text-sm font-semibold ${
+                    mode === loginMode ? "border-blue-600 text-blue-700" : "border-transparent text-slate-500"
+                  }`}
+                  key={loginMode}
+                  role="tab"
+                  type="button"
+                  onClick={() => setMode(loginMode)}
+                >
+                  {t(loginMode === "customer-otp" ? "auth.login.customerOtp" : "auth.login.customerPassword")}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <form className="mt-5 space-y-4" onSubmit={handleLogin}>
             {mode === "customer-otp" ? (
