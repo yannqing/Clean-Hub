@@ -188,7 +188,7 @@ export function HeaderNotificationsMenu({
             ? t("pos.shell.unreadMessages", { count: unreadCount })
             : t("pos.shell.messageCenter")
         }
-        className="relative z-50 flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+        className="relative z-50 flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
         onClick={() => {
           void toggleMenu();
         }}
@@ -327,7 +327,7 @@ export function HeaderNotificationsMenu({
 
           <div className="border-t border-slate-100 p-3">
             <Link
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-slate-900 text-sm font-bold text-white transition hover:bg-slate-800"
+              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-900 text-sm font-bold text-white transition hover:bg-slate-800"
               href={posRoutes.notifications}
               onClick={closeMenu}
             >

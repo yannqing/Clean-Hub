@@ -8,6 +8,16 @@ const POS_API_ERROR_MESSAGES: Record<
   string,
   Record<PosErrorLocale, string>
 > = {
+  INVALID_CREDENTIALS: {
+    "zh-CN": "PIN 码不正确，请重新输入。",
+    en: "The PIN is incorrect. Try again.",
+    fr: "Le code PIN est incorrect. Réessayez.",
+  },
+  ACCOUNT_LOCKED: {
+    "zh-CN": "登录失败次数过多，请稍后再试。",
+    en: "Too many failed sign-in attempts. Try again later.",
+    fr: "Trop de tentatives de connexion ont échoué. Réessayez plus tard.",
+  },
   POS_PHONE_CONFLICT: {
     "zh-CN": "该手机号已存在客户账户。",
     en: "A customer account with this phone already exists.",

@@ -1,4 +1,6 @@
 import { PosShell, type PosShellProfile } from "@/components/app-shell";
+import { PosRuntimeConfigProvider } from "@/components/runtime/pos-runtime-config";
+import { getMyBranchQuery } from "@/features/branches/queries";
 import { getNotificationsOverviewQuery } from "@/features/notifications/queries";
 import { getCurrentUser } from "@/lib/auth";
 
@@ -7,9 +9,10 @@ export default async function PosLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [user, notificationsOverview] = await Promise.all([
+  const [user, notificationsOverview, branch] = await Promise.all([
     getCurrentUser(),
     getNotificationsOverviewQuery().catch(() => null),
+    getMyBranchQuery().catch(() => null),
   ]);
 
   const profile: PosShellProfile | undefined = user
@@ -23,11 +26,16 @@ export default async function PosLayout({
     : undefined;
 
   return (
-    <PosShell
-      notificationUnreadCount={notificationsOverview?.unreadCount ?? 0}
-      profile={profile}
+    <PosRuntimeConfigProvider
+      branchId={branch?.id}
+      currency={branch?.defaultCurrency}
     >
-      {children}
-    </PosShell>
+      <PosShell
+        notificationUnreadCount={notificationsOverview?.unreadCount ?? 0}
+        profile={profile}
+      >
+        {children}
+      </PosShell>
+    </PosRuntimeConfigProvider>
   );
 }

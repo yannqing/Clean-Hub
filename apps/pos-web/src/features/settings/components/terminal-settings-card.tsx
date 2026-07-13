@@ -84,6 +84,7 @@ export function TerminalSettingsCard({
           <div className="space-y-1.5">
             <Label htmlFor="terminal-label">设备标签</Label>
             <Input
+              className="h-11"
               id="terminal-label"
               maxLength={64}
               onChange={(e) => updateField("label", e.target.value)}
@@ -107,7 +108,7 @@ export function TerminalSettingsCard({
               }
               value={form.defaultPaymentMethod}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -132,7 +133,7 @@ export function TerminalSettingsCard({
               }
               value={form.roundingRule}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -168,7 +169,7 @@ export function TerminalSettingsCard({
               }
               value={String(form.printCopies)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -193,7 +194,7 @@ export function TerminalSettingsCard({
               }
               value={String(form.lockTimeoutSeconds)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="h-11 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -214,7 +215,7 @@ export function TerminalSettingsCard({
         </CardContent>
         <CardFooter className="mt-4">
           <button
-            className="rounded-lg bg-blue-600 px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            className="h-11 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white disabled:opacity-50"
             disabled={saving}
             type="submit"
           >

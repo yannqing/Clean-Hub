@@ -52,7 +52,7 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
       <button
         aria-expanded={open}
         aria-label={t("pos.language.switcherLabel")}
-        className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
@@ -76,7 +76,7 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
               <button
                 aria-pressed={selected}
                 className={cn(
-                  "flex h-9 w-full items-center justify-between rounded-md px-3 text-sm font-medium transition",
+                  "flex h-11 w-full items-center justify-between rounded-md px-3 text-sm font-medium transition",
                   selected
                     ? "bg-blue-50 text-blue-700"
                     : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",

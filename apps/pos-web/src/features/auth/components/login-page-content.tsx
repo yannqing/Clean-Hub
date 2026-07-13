@@ -12,7 +12,7 @@ export function LoginPageContent() {
 
   return (
     <main
-      className="flex min-h-screen bg-[#F7F9FC] text-slate-900"
+      className="flex min-h-screen min-h-dvh bg-[#F7F9FC] pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-slate-900"
       data-pos-i18n-managed="true"
     >
       <aside className="relative hidden w-[440px] shrink-0 flex-col justify-between overflow-hidden bg-gradient-to-br from-blue-600 via-blue-500 to-violet-500 p-10 text-white lg:flex">
