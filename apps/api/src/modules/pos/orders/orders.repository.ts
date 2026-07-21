@@ -12,11 +12,13 @@ import {
 } from "drizzle-orm";
 
 import {
+  branches,
   customers,
   orderItems,
   orders,
   paymentTransactions,
   serviceTickets,
+  tenantSettings,
   ticketItems,
   type Database,
 } from "@cleanhub/db";
@@ -32,6 +34,7 @@ import type {
   PosOrderPaymentStatus,
   PosOrderSummary,
   PosOrderType,
+  PosMobileMoneyProvider,
   PosPaymentMethod,
   PosPaymentTransaction,
   UpdatePosOrderItemRequest,
@@ -86,6 +89,7 @@ function toOrderSummary(row: OrderJoinedRow): PosOrderSummary {
     id: row.id,
     tenantId: row.tenantId,
     branchId: row.branchId,
+    currency: row.currency,
     customerId: row.customerId,
     customerName: row.customerName ?? "",
     orderType: row.orderType,
@@ -111,9 +115,16 @@ function toPaymentTransaction(
     orderId: row.orderId,
     paymentMethod: row.paymentMethod,
     amount: row.amount,
+    currency: row.currency,
     paymentStatus: row.paymentStatus,
+    provider:
+      row.gateway === "wave" || row.gateway === "orange_money"
+        ? row.gateway
+        : null,
+    externalReference: row.externalId,
     paidAt: row.paidAt ? row.paidAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 
@@ -432,6 +443,7 @@ export async function createOrderRecord(
   input: {
     tenantId: string;
     branchId: string;
+    currency: string;
     customerId: string;
     orderType: PosOrderType;
     status: "draft" | "received";
@@ -447,6 +459,7 @@ export async function createOrderRecord(
     id: orderId,
     tenantId: input.tenantId,
     branchId: input.branchId,
+    currency: input.currency,
     customerId: input.customerId,
     orderType: input.orderType,
     status: input.status,
@@ -662,11 +675,16 @@ export async function createPaymentTransactionRecord(
     orderId: string;
     paymentMethod: PosPaymentMethod;
     amount: string;
+    currency: string;
     actorUserId: string;
+    provider?: PosMobileMoneyProvider;
+    externalReference?: string;
+    idempotencyKey?: string;
   },
 ): Promise<PosPaymentTransaction> {
   const paymentId = createId();
-  const paidAt = new Date();
+  const isCash = input.paymentMethod === "cash";
+  const paidAt = isCash ? new Date() : null;
 
   await db.insert(paymentTransactions).values({
     id: paymentId,
@@ -676,7 +694,11 @@ export async function createPaymentTransactionRecord(
     orderId: input.orderId,
     paymentMethod: input.paymentMethod,
     amount: input.amount,
-    paymentStatus: "paid",
+    currency: input.currency,
+    paymentStatus: isCash ? "paid" : "pending",
+    gateway: input.provider,
+    externalId: input.externalReference,
+    idempotencyKey: input.idempotencyKey,
     paidAt,
     createdBy: input.actorUserId,
     updatedBy: input.actorUserId,
@@ -693,6 +715,125 @@ export async function createPaymentTransactionRecord(
   }
 
   return toPaymentTransaction(rows[0]);
+}
+
+export async function findPaymentTransactionByIdempotencyKey(
+  db: Database,
+  input: { tenantId: string; idempotencyKey: string },
+): Promise<PosPaymentTransaction | null> {
+  const rows = await db
+    .select()
+    .from(paymentTransactions)
+    .where(
+      and(
+        eq(paymentTransactions.tenantId, input.tenantId),
+        eq(paymentTransactions.idempotencyKey, input.idempotencyKey),
+        isNull(paymentTransactions.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ? toPaymentTransaction(rows[0]) : null;
+}
+
+export async function findPaymentTransactionByProviderReference(
+  db: Database,
+  input: {
+    tenantId: string;
+    provider: PosMobileMoneyProvider;
+    externalReference: string;
+  },
+): Promise<PosPaymentTransaction | null> {
+  const rows = await db
+    .select()
+    .from(paymentTransactions)
+    .where(
+      and(
+        eq(paymentTransactions.tenantId, input.tenantId),
+        eq(paymentTransactions.gateway, input.provider),
+        eq(paymentTransactions.externalId, input.externalReference),
+        isNull(paymentTransactions.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ? toPaymentTransaction(rows[0]) : null;
+}
+
+export async function findPendingManualPaymentForOrder(
+  db: Database,
+  input: { tenantId: string; orderId: string },
+): Promise<PosPaymentTransaction | null> {
+  const rows = await db
+    .select()
+    .from(paymentTransactions)
+    .where(
+      and(
+        eq(paymentTransactions.tenantId, input.tenantId),
+        eq(paymentTransactions.orderId, input.orderId),
+        eq(paymentTransactions.paymentMethod, "app"),
+        eq(paymentTransactions.paymentStatus, "pending"),
+        inArray(paymentTransactions.gateway, ["wave", "orange_money"]),
+        isNull(paymentTransactions.deletedAt),
+      ),
+    )
+    .orderBy(desc(paymentTransactions.createdAt))
+    .limit(1);
+
+  return rows[0] ? toPaymentTransaction(rows[0]) : null;
+}
+
+export async function findPaymentTransactionForUpdate(
+  db: Database,
+  input: { tenantId: string; orderId: string; paymentId: string },
+): Promise<PosPaymentTransaction | null> {
+  const rows = await db
+    .select()
+    .from(paymentTransactions)
+    .where(
+      and(
+        eq(paymentTransactions.id, input.paymentId),
+        eq(paymentTransactions.tenantId, input.tenantId),
+        eq(paymentTransactions.orderId, input.orderId),
+        isNull(paymentTransactions.deletedAt),
+      ),
+    )
+    .for("update")
+    .limit(1);
+
+  return rows[0] ? toPaymentTransaction(rows[0]) : null;
+}
+
+export async function resolveManualPaymentTransaction(
+  db: Database,
+  input: {
+    tenantId: string;
+    paymentId: string;
+    status: "paid" | "failed";
+    actorUserId: string;
+  },
+): Promise<PosPaymentTransaction | null> {
+  const now = new Date();
+  const rows = await db
+    .update(paymentTransactions)
+    .set({
+      paymentStatus: input.status,
+      paidAt: input.status === "paid" ? now : null,
+      updatedAt: now,
+      updatedBy: input.actorUserId,
+      version: sql`${paymentTransactions.version} + 1`,
+    })
+    .where(
+      and(
+        eq(paymentTransactions.id, input.paymentId),
+        eq(paymentTransactions.tenantId, input.tenantId),
+        eq(paymentTransactions.paymentStatus, "pending"),
+        isNull(paymentTransactions.deletedAt),
+      ),
+    )
+    .returning();
+
+  return rows[0] ? toPaymentTransaction(rows[0]) : null;
 }
 
 export async function recalculateOrderPaymentState(
@@ -934,6 +1075,27 @@ export async function findPosOrderOverview(
     period: PosOrderOverviewPeriod;
   },
 ): Promise<PosOrderOverview> {
+  const effectiveBranchId =
+    input.branchId ??
+    (input.allowedBranchIds?.length === 1 ? input.allowedBranchIds[0] : undefined);
+  const currencyRows = effectiveBranchId
+    ? await db
+        .select({ currency: branches.defaultCurrency })
+        .from(branches)
+        .where(
+          and(
+            eq(branches.id, effectiveBranchId),
+            eq(branches.tenantId, input.tenantId),
+            isNull(branches.deletedAt),
+          ),
+        )
+        .limit(1)
+    : await db
+        .select({ currency: tenantSettings.defaultCurrency })
+        .from(tenantSettings)
+        .where(eq(tenantSettings.tenantId, input.tenantId))
+        .limit(1);
+  const currency = currencyRows[0]?.currency ?? "XOF";
   const start = getPeriodStart(input.period);
   const orderFilters: SQL[] = [
     eq(orders.tenantId, input.tenantId),
@@ -955,6 +1117,7 @@ export async function findPosOrderOverview(
       return {
         tenantId: input.tenantId,
         branchId: input.branchId ?? null,
+        currency,
         period: input.period,
         orderCount: 0,
         totalAmount: "0.00",
@@ -1001,18 +1164,20 @@ export async function findPosOrderOverview(
   const methodRows = await db
     .select({
       method: paymentTransactions.paymentMethod,
+      provider: paymentTransactions.gateway,
       amount: sql<string>`coalesce(sum(${paymentTransactions.amount}), 0)`,
       count: sql<number>`count(*)::int`,
     })
     .from(paymentTransactions)
     .where(and(...paymentFilters))
-    .groupBy(paymentTransactions.paymentMethod);
+    .groupBy(paymentTransactions.paymentMethod, paymentTransactions.gateway);
 
   const totals = totalsRows[0];
 
   return {
     tenantId: input.tenantId,
     branchId: input.branchId ?? null,
+    currency,
     period: input.period,
     orderCount: totals?.orderCount ?? 0,
     totalAmount: Number(totals?.totalAmount ?? "0").toFixed(2),
@@ -1024,6 +1189,10 @@ export async function findPosOrderOverview(
     cancelledCount: totals?.cancelledCount ?? 0,
     paymentMethods: methodRows.map((row) => ({
       method: row.method,
+      provider:
+        row.provider === "wave" || row.provider === "orange_money"
+          ? row.provider
+          : null,
       amount: Number(row.amount).toFixed(2),
       count: row.count,
     })),

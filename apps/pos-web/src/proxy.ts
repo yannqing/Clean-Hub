@@ -238,7 +238,10 @@ export async function proxy(request: NextRequest) {
 export const config = {
   /**
    * Guard every navigable route plus /login. Static assets, Next internals
-   * and the public logo are skipped automatically by the negative-lookahead.
+   * plus install metadata and the public logo are skipped by the
+   * negative-lookahead.
    */
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|cleanhub-logo-mark.jpg).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|cleanhub-logo-mark.jpg).*)",
+  ],
 };

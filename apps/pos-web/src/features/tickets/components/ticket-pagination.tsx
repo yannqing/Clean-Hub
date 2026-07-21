@@ -3,6 +3,8 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 
+import { buildPaginationWindow } from "@/lib/pagination";
+
 import {
   DEFAULT_TICKET_PAGE_SIZE,
   TICKET_FILTER_KEYS,
@@ -30,7 +32,10 @@ export function TicketPagination({ total }: TicketPaginationProps) {
 
   const pageSize = parsePageSizeParam(params.get(TICKET_FILTER_KEYS.pageSize));
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const page = Math.min(parsePageParam(params.get(TICKET_FILTER_KEYS.page)), pageCount);
+  const page = Math.min(
+    parsePageParam(params.get(TICKET_FILTER_KEYS.page)),
+    pageCount,
+  );
 
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
@@ -57,7 +62,7 @@ export function TicketPagination({ total }: TicketPaginationProps) {
     });
   }
 
-  const pages = buildPageWindow(page, pageCount);
+  const pages = buildPaginationWindow(page, pageCount);
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3 text-sm">
@@ -70,7 +75,7 @@ export function TicketPagination({ total }: TicketPaginationProps) {
         <label className="flex items-center gap-2 text-slate-500">
           每页
           <select
-            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none disabled:opacity-60"
+            className="h-10 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none disabled:opacity-60"
             disabled={isPending}
             onChange={(event) => changeSize(Number(event.target.value))}
             value={pageSize}
@@ -132,7 +137,7 @@ function PagerButton({
 }) {
   return (
     <button
-      className={`flex h-8 min-w-8 items-center justify-center rounded-md px-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
         active
           ? "bg-blue-600 text-white"
           : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
@@ -147,33 +152,3 @@ function PagerButton({
 }
 
 void DEFAULT_TICKET_PAGE_SIZE;
-
-/**
- * Build a compact page-number window: always show the first and last page,
- * plus a window of +/-1 around the current page, inserting "..." gaps.
- * Example for page 7 of 20: [1, '...', 6, 7, 8, '...', 20]
- */
-function buildPageWindow(
-  current: number,
-  total: number,
-): Array<number | "..."> {
-  if (total <= 7) {
-    return Array.from({ length: total }, (_, i) => i + 1);
-  }
-
-  const window: Array<number | "..."> = [1];
-  const start = Math.max(2, current - 1);
-  const end = Math.min(total - 1, current + 1);
-
-  if (start > 2) {
-    window.push("...");
-  }
-  for (let p = start; p <= end; p++) {
-    window.push(p);
-  }
-  if (end < total - 1) {
-    window.push("...");
-  }
-  window.push(total);
-  return window;
-}

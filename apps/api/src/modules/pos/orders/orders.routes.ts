@@ -4,11 +4,13 @@ import type { AppBindings } from "../../../http/types.js";
 import type { NotificationPublisher } from "../../notifications/index.js";
 import {
   changePosOrderStatusController,
+  confirmPosManualPaymentController,
   createPosOrderController,
   createPosOrderItemController,
   createPosOrderPaymentController,
   deletePosOrderController,
   deletePosOrderItemController,
+  failPosManualPaymentController,
   getPosOrderController,
   getPosOrderOverviewController,
   listPosOrderPaymentsController,
@@ -38,6 +40,14 @@ export function createPosOrdersRoutes({
 
   routes.get("/:orderId/payments", listPosOrderPaymentsController);
   routes.post("/:orderId/payments", createPosOrderPaymentController);
+  routes.post(
+    "/:orderId/payments/:paymentId/confirm",
+    confirmPosManualPaymentController,
+  );
+  routes.post(
+    "/:orderId/payments/:paymentId/fail",
+    failPosManualPaymentController,
+  );
   routes.post("/:orderId/status-changes", changePosOrderStatusController);
   routes.post("/:orderId/items", createPosOrderItemController);
   routes.patch("/:orderId/items/:itemId", updatePosOrderItemController);

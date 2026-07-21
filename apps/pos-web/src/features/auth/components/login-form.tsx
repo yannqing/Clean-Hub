@@ -1,12 +1,14 @@
 "use client";
 
 import { useTranslation } from "@cleanhub/i18n/react";
+import { isApiHttpError } from "@cleanhub/api-client";
 import { posToast as toast } from "@/lib/pos-toast";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { posTenantCode } from "@/config/tenant";
 import { posApi } from "@/lib/api-client";
+import { getPosApiErrorMessage } from "@/lib/api-error-message";
 
 import { getOrCreatePosDeviceId } from "../utils/device-id";
 import {
@@ -84,7 +86,10 @@ export function LoginForm() {
       router.replace(resolvePostLoginPath());
       router.refresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : t("pos.auth.loginFailed");
+      const fallback = t("pos.auth.loginFailed");
+      const message = isApiHttpError(error)
+        ? getPosApiErrorMessage(error, fallback)
+        : fallback;
       setErrorMessage(message);
       setFormState(initialState);
       submittedPinRef.current = null;

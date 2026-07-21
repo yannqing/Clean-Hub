@@ -27,12 +27,13 @@ type ServiceTicketCreateDialogProps = {
   onCreated: (ticketId: string) => void;
 };
 
-const TYPE_OPTIONS: ReadonlyArray<{ value: ServiceTicketType; label: string }> = [
-  { value: "laundry", label: "洗衣护理" },
-  { value: "car_wash", label: "车辆清洗" },
-  { value: "retail", label: "零售" },
-  { value: "delivery", label: "配送" },
-];
+const TYPE_OPTIONS: ReadonlyArray<{ value: ServiceTicketType; label: string }> =
+  [
+    { value: "laundry", label: "洗衣护理" },
+    { value: "car_wash", label: "车辆清洗" },
+    { value: "retail", label: "零售" },
+    { value: "delivery", label: "配送" },
+  ];
 
 const PRIORITY_OPTIONS: ReadonlyArray<{
   value: ServiceTicketPriority;
@@ -148,7 +149,7 @@ export function ServiceTicketCreateDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle>新建服务工单</DialogTitle>
         </DialogHeader>
@@ -190,7 +191,9 @@ export function ServiceTicketCreateDialog({
           <FormField label="预计取件时间">
             <input
               className={inputClass}
-              onChange={(event) => update("expectedPickupAt", event.target.value)}
+              onChange={(event) =>
+                update("expectedPickupAt", event.target.value)
+              }
               type="datetime-local"
               value={form.expectedPickupAt}
             />

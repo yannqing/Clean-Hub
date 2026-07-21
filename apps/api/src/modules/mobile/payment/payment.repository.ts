@@ -43,6 +43,7 @@ export type PaymentOrderRecord = {
   id: string;
   tenantId: string;
   branchId: string;
+  currency: string;
   customerId: string;
   customerAccountId: string;
   status: "draft" | "received" | "paid" | "delivered" | "cancelled";
@@ -79,6 +80,7 @@ function toTransaction(
     customerId: row.customerId,
     orderId: row.orderId,
     amount: row.amount,
+    currency: row.currency,
     paymentStatus: row.paymentStatus,
     idempotencyKey: row.idempotencyKey,
     gateway: row.gateway,
@@ -99,6 +101,7 @@ function toRefundRequest(row: typeof refundRequests.$inferSelect): RefundRequest
     orderId: row.orderId,
     paymentTransactionId: row.paymentTransactionId,
     amount: row.amount,
+    currency: row.currency,
     reason: row.reason,
     status: row.status,
     gateway: row.gateway,
@@ -168,6 +171,7 @@ export class PaymentRepository {
         id: orders.id,
         tenantId: orders.tenantId,
         branchId: orders.branchId,
+        currency: orders.currency,
         customerId: orders.customerId,
         customerAccountId: customers.customerAccountId,
         status: orders.status,
@@ -284,6 +288,7 @@ export class PaymentRepository {
     customerId: string;
     orderId: string;
     amount: string;
+    currency: string;
     idempotencyKey: string;
   }): Promise<{ transaction: CustomerPaymentTransaction; idempotent: boolean }> {
     const [inserted] = await this.db
@@ -296,6 +301,7 @@ export class PaymentRepository {
         orderId: input.orderId,
         paymentMethod: "app",
         amount: input.amount,
+        currency: input.currency,
         paymentStatus: "pending",
         idempotencyKey: input.idempotencyKey,
         initiatorType: "customer",
@@ -535,6 +541,7 @@ export class PaymentRepository {
     customerId: string;
     orderId: string;
     amount: string;
+    currency: string;
     reason: string;
     paymentTransactionId?: string | null;
   }): Promise<RefundRequest | null> {
@@ -549,6 +556,7 @@ export class PaymentRepository {
         orderId: input.orderId,
         paymentTransactionId: input.paymentTransactionId,
         amount: input.amount,
+        currency: input.currency,
         reason: input.reason,
         status: "pending",
       })
@@ -673,6 +681,7 @@ export class PaymentRepository {
     return {
       id: order.id,
       branchId: order.branchId,
+      currency: order.currency,
       customerId: order.customerId,
       orderType: order.orderType,
       status: order.status,

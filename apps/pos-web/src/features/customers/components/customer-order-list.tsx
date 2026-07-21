@@ -8,9 +8,9 @@ import type { PosOrderSummary } from "@cleanhub/api-client";
 
 import { useTranslation } from "@cleanhub/i18n/react";
 import { posToast as toast } from "@/lib/pos-toast";
+import { formatPosMoney } from "@/lib/money";
 
 import {
-  CUSTOMER_CURRENCY,
   CUSTOMER_ORDER_PAYMENT_LABELS,
   CUSTOMER_ORDER_PAYMENT_TONES,
   CUSTOMER_ORDER_STATUS_LABELS,
@@ -86,14 +86,14 @@ export function CustomerOrderList({
 
   return (
     <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between border-b border-slate-200 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5">
         <div>
           <h2 className="font-semibold text-slate-950">订单记录</h2>
           <p className="mt-1 text-sm text-slate-500">
             仅展示该客户档案名下的订单记录。
           </p>
         </div>
-        <div className="flex h-10 w-[300px] items-center rounded-lg border border-slate-200 bg-slate-50 px-3">
+        <div className="flex h-10 w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-3 sm:w-[300px]">
           <span className="mr-2 text-slate-400">🔍</span>
           <input
             className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
@@ -107,7 +107,24 @@ export function CustomerOrderList({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="divide-y divide-slate-100 min-[1400px]:hidden">
+        {rows.length === 0 ? (
+          <div className="px-5 py-10 text-center text-sm text-slate-500">
+            {loading ? "加载中…" : "没有符合当前条件的订单。"}
+          </div>
+        ) : (
+          rows.map((order) => (
+            <CustomerOrderCard
+              key={order.id}
+              locale={locale}
+              onOpen={() => router.push(`/orders/${order.id}`)}
+              order={order}
+            />
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-x-auto min-[1400px]:block">
         <div className="min-w-[760px]">
           <div className="grid grid-cols-[130px_1.3fr_140px_140px_130px] bg-slate-50 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
             <div>订单</div>
@@ -145,21 +162,31 @@ export function CustomerOrderList({
                     </div>
                   </div>
                   <div className="text-slate-700">
-                    {CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ?? order.orderType}
+                    {CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ??
+                      order.orderType}
                   </div>
                   <div>
-                    <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${payTone}`}>
+                    <span
+                      className={`rounded-md px-2.5 py-1 text-xs font-semibold ${payTone}`}
+                    >
                       {CUSTOMER_ORDER_PAYMENT_LABELS[order.paymentStatus] ??
                         order.paymentStatus}
                     </span>
                   </div>
                   <div>
-                    <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${statusTone}`}>
-                      {CUSTOMER_ORDER_STATUS_LABELS[order.status] ?? order.status}
+                    <span
+                      className={`rounded-md px-2.5 py-1 text-xs font-semibold ${statusTone}`}
+                    >
+                      {CUSTOMER_ORDER_STATUS_LABELS[order.status] ??
+                        order.status}
                     </span>
                   </div>
                   <div className="text-right font-semibold text-slate-950">
-                    {formatMoney(order.totalAmount, locale)}
+                    {formatPosMoney(
+                      order.totalAmount,
+                      order.currency,
+                      locale,
+                    )}
                   </div>
                 </button>
               );
@@ -176,7 +203,7 @@ export function CustomerOrderList({
           <label className="flex items-center gap-1">
             每页
             <select
-              className="h-8 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none"
+              className="h-10 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none"
               value={currentPageSize}
               onChange={(event) => {
                 setCurrentPageSize(Number(event.target.value));
@@ -194,7 +221,7 @@ export function CustomerOrderList({
         </div>
         <div className="flex items-center gap-1">
           <button
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
+            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
             disabled={loading || page === 1}
             type="button"
             onClick={() => setPage((p) => p - 1)}
@@ -205,7 +232,7 @@ export function CustomerOrderList({
             {page} / {pageCount}
           </span>
           <button
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
+            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
             disabled={loading || page === pageCount}
             type="button"
             onClick={() => setPage((p) => p + 1)}
@@ -218,13 +245,81 @@ export function CustomerOrderList({
   );
 }
 
-function formatMoney(
-  amount: string | number | null | undefined,
-  locale: string,
-): string {
-  const value = Number(amount ?? 0);
-  if (!Number.isFinite(value)) return `${CUSTOMER_CURRENCY} 0`;
-  return `${CUSTOMER_CURRENCY} ${value.toLocaleString(locale)}`;
+function CustomerOrderCard({
+  order,
+  locale,
+  onOpen,
+}: {
+  order: PosOrderSummary;
+  locale: string;
+  onOpen: () => void;
+}) {
+  const statusTone =
+    CUSTOMER_ORDER_STATUS_TONES[order.status] ?? "bg-slate-100 text-slate-600";
+  const payTone =
+    CUSTOMER_ORDER_PAYMENT_TONES[order.paymentStatus] ??
+    "bg-slate-100 text-slate-600";
+
+  return (
+    <button
+      className="w-full p-4 text-left transition hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:p-5"
+      onClick={onOpen}
+      type="button"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="font-mono text-sm font-semibold text-blue-700">
+            {order.id.slice(-8).toUpperCase()}
+          </div>
+          <div className="mt-1 text-sm font-medium text-slate-800">
+            {CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ?? order.orderType}
+          </div>
+          <div className="mt-1 text-xs text-slate-500">
+            {formatDate(order.createdAt, locale)}
+          </div>
+        </div>
+        <span
+          className={`rounded-md px-2.5 py-1 text-xs font-semibold ${statusTone}`}
+        >
+          {CUSTOMER_ORDER_STATUS_LABELS[order.status] ?? order.status}
+        </span>
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3">
+        <div>
+          <dt className="text-xs text-slate-400">支付状态</dt>
+          <dd className="mt-1">
+            <span
+              className={`rounded-md px-2.5 py-1 text-xs font-semibold ${payTone}`}
+            >
+              {CUSTOMER_ORDER_PAYMENT_LABELS[order.paymentStatus] ??
+                order.paymentStatus}
+            </span>
+          </dd>
+        </div>
+        <CustomerOrderCardDetail
+          label="订单金额"
+          value={formatPosMoney(order.totalAmount, order.currency, locale)}
+        />
+        <CustomerOrderCardDetail label="操作" value="查看订单详情" />
+      </dl>
+    </button>
+  );
+}
+
+function CustomerOrderCardDetail({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <dt className="text-xs text-slate-400">{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-slate-700">{value}</dd>
+    </div>
+  );
 }
 
 function formatDate(iso: string, locale: string): string {

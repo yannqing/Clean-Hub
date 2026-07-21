@@ -12,6 +12,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 
 import { Icon, PosBreadcrumb, type PosIconName } from "@/components/app-shell";
 import { posRoutes } from "@/config/routes";
+import { DEFAULT_POS_CURRENCY } from "@/lib/money";
 import type { PosSessionUser } from "@/lib/session";
 import { posToast as toast } from "@/lib/pos-toast";
 
@@ -257,6 +258,16 @@ const PAYMENT_METHOD_LABELS: Record<string, Record<"zh-CN" | "en" | "fr", string
     en: "Cash",
     fr: "Espèces",
   },
+  orange_money: {
+    "zh-CN": "Orange Money",
+    en: "Orange Money",
+    fr: "Orange Money",
+  },
+  wave: {
+    "zh-CN": "Wave",
+    en: "Wave",
+    fr: "Wave",
+  },
 };
 
 function resolveLocale(locale: string): "zh-CN" | "en" | "fr" {
@@ -497,7 +508,7 @@ export function ShiftHandoverView({
   const { locale } = useTranslation();
   const resolvedLocale = resolveLocale(locale);
   const copy = COPY[resolvedLocale];
-  const currency = branch?.defaultCurrency ?? "XOF";
+  const currency = branch?.defaultCurrency ?? DEFAULT_POS_CURRENCY;
   const cashierName = user?.displayName ?? "-";
   const branchName = branch?.name ?? "-";
   const expectedCash = useMemo(() => {
@@ -737,7 +748,7 @@ export function ShiftHandoverView({
             <div className="mt-3 grid gap-2">
               {copy.checklist.map((item, index) => (
                 <label
-                  className="flex items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700"
+                  className="flex min-h-11 items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700"
                   key={item}
                 >
                   <input
@@ -756,7 +767,7 @@ export function ShiftHandoverView({
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               disabled={!canComplete}
               onClick={completeHandover}
               type="button"
@@ -765,7 +776,7 @@ export function ShiftHandoverView({
               {copy.complete}
             </button>
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               onClick={() => window.print()}
               type="button"
             >
@@ -773,7 +784,7 @@ export function ShiftHandoverView({
               {copy.print}
             </button>
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               onClick={() => void copySummary()}
               type="button"
             >
@@ -798,11 +809,12 @@ export function ShiftHandoverView({
                 summary.orders.paymentMethods.map((item) => (
                   <div
                     className="flex items-center justify-between gap-3 text-sm"
-                    key={item.method}
+                    key={`${item.method}:${item.provider ?? "default"}`}
                   >
                     <span className="font-medium text-slate-600">
-                      {PAYMENT_METHOD_LABELS[item.method]?.[resolvedLocale] ??
-                        item.method}
+                      {PAYMENT_METHOD_LABELS[item.provider ?? item.method]?.[
+                        resolvedLocale
+                      ] ?? item.provider ?? item.method}
                     </span>
                     <span className="font-semibold text-slate-950">
                       {formatMoney(toNumber(item.amount), currency, locale)}

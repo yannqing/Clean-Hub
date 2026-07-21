@@ -3,10 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition, type ReactNode } from "react";
 
-import {
-  DEFAULT_ORDER_PAGE_SIZE,
-  ORDER_FILTER_KEYS,
-} from "../constants";
+import { DEFAULT_ORDER_PAGE_SIZE, ORDER_FILTER_KEYS } from "../constants";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
@@ -67,7 +64,7 @@ export function OrderPagination({ total }: { total: number }) {
         <label className="flex items-center gap-2 text-slate-500">
           每页
           <select
-            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none disabled:opacity-60"
+            className="h-10 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none disabled:opacity-60"
             disabled={isPending}
             onChange={(event) => changeSize(Number(event.target.value))}
             value={pageSize}
@@ -83,7 +80,10 @@ export function OrderPagination({ total }: { total: number }) {
       </div>
 
       <div className="flex items-center gap-1">
-        <PagerButton disabled={isPending || page <= 1} onClick={() => goTo(page - 1)}>
+        <PagerButton
+          disabled={isPending || page <= 1}
+          onClick={() => goTo(page - 1)}
+        >
           上一页
         </PagerButton>
         <span className="px-2 text-sm font-semibold text-slate-600">
@@ -111,7 +111,7 @@ function PagerButton({
 }) {
   return (
     <button
-      className="flex h-8 min-w-8 items-center justify-center rounded-md border border-slate-200 bg-white px-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+      className="flex h-11 min-w-11 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
       disabled={disabled}
       onClick={onClick}
       type="button"

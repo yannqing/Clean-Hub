@@ -5,6 +5,7 @@ import { customers, getDb, type Database } from "@cleanhub/db";
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import { assertPosContext, requireFeatureEnabled, requirePosBranchId } from "../../auth/permission.helper.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { findBranchById } from "../../tenant/branches/branches.repository.js";
 import { ServiceTicketError } from "./service-tickets.errors.js";
 import {
   areLinkedOrdersSettled,
@@ -249,10 +250,23 @@ export async function createPosServiceTicket(
   await requirePosBranchId(authContext, data.branchId, db);
   await requireTicketFeature(authContext, data.ticketType, db);
   await requireCustomerActive(db, { tenantId, customerId: data.customerId });
+  const branch = await findBranchById(db, {
+    tenantId,
+    branchId: data.branchId,
+  });
+
+  if (!branch) {
+    throw new ServiceTicketError(
+      "BRANCH_NOT_ALLOWED",
+      "Branch was not found.",
+      404,
+    );
+  }
 
   return db.transaction(async (tx) => {
     const summary = await createServiceTicketRecord(tx, {
       ...data,
+      currency: branch.defaultCurrency,
       assistantId: authContext.userId,
       tenantId,
       actorUserId: authContext.userId,

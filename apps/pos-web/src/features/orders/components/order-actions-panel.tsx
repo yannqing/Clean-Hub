@@ -2,8 +2,13 @@
 
 import { posToast as toast } from "@/lib/pos-toast";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import type { PosOrderDetail, PosOrderStatus } from "@cleanhub/api-client";
+import { useRef, useState, useTransition } from "react";
+import type {
+  PosMobileMoneyProvider,
+  PosOrderDetail,
+  PosOrderStatus,
+  PosPaymentTransaction,
+} from "@cleanhub/api-client";
 
 import { Icon } from "@/components/app-shell";
 
@@ -14,8 +19,11 @@ import {
 } from "../actions";
 import {
   formatOrderMoney,
+  MOBILE_MONEY_PROVIDER_LABELS,
   ORDER_STATUS_LABELS,
 } from "../constants";
+
+type PaymentOption = "cash" | PosMobileMoneyProvider;
 
 const STATUS_TRANSITIONS: Record<PosOrderStatus, PosOrderStatus[]> = {
   draft: ["received", "cancelled"],
@@ -25,29 +33,68 @@ const STATUS_TRANSITIONS: Record<PosOrderStatus, PosOrderStatus[]> = {
   cancelled: [],
 };
 
-export function OrderActionsPanel({ order }: { order: PosOrderDetail }) {
+export function OrderActionsPanel({
+  order,
+  payments,
+}: {
+  order: PosOrderDetail;
+  payments: PosPaymentTransaction[];
+}) {
   const router = useRouter();
   const [amount, setAmount] = useState(getOutstandingAmount(order));
+  const [paymentOption, setPaymentOption] = useState<PaymentOption>("cash");
+  const [externalReference, setExternalReference] = useState("");
+  const idempotencyKeyRef = useRef<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const outstanding = getOutstandingAmount(order);
+  const pendingManualPayment = payments.find(
+    (payment) =>
+      payment.paymentStatus === "pending" && payment.provider !== null,
+  );
   const canPay =
     Number(outstanding) > 0 &&
     order.status !== "cancelled" &&
-    order.status !== "delivered";
+    order.status !== "delivered" &&
+    !pendingManualPayment;
   const transitions = STATUS_TRANSITIONS[order.status];
   const canDelete =
     Number(order.paidAmount) === 0 &&
     ["draft", "received", "cancelled"].includes(order.status);
 
   function pay() {
+    const reference = externalReference.trim();
+    if (paymentOption !== "cash" && reference.length < 3) {
+      toast.error("请输入 Wave / Orange Money 交易流水号。");
+      return;
+    }
+
     startTransition(async () => {
-      const result = await payOrderAction(order.id, {
-        paymentMethod: "cash",
-        amount,
-      });
+      const result =
+        paymentOption === "cash"
+          ? await payOrderAction(order.id, {
+              paymentMethod: "cash",
+              amount,
+            })
+          : await payOrderAction(order.id, {
+              paymentMethod: "app",
+              amount,
+              provider: paymentOption,
+              externalReference: reference,
+              idempotencyKey:
+                idempotencyKeyRef.current ??
+                (idempotencyKeyRef.current = createPaymentIdempotencyKey(
+                  order.id,
+                )),
+            });
       if (result.ok) {
-        toast.success("现金收款已记录。");
+        toast.success(
+          paymentOption === "cash"
+            ? "现金收款已记录。"
+            : `${MOBILE_MONEY_PROVIDER_LABELS[paymentOption]} 支付已记录，等待 Manager 确认。`,
+        );
+        idempotencyKeyRef.current = null;
+        setExternalReference("");
         router.refresh();
       } else {
         toast.error(result.message);
@@ -97,24 +144,91 @@ export function OrderActionsPanel({ order }: { order: PosOrderDetail }) {
       <div className="mt-5 rounded-lg bg-slate-50 p-4">
         <div className="text-xs font-medium text-slate-500">待收金额</div>
         <div className="mt-1 text-xl font-semibold text-slate-950">
-          {formatOrderMoney(outstanding)}
+          {formatOrderMoney(outstanding, order.currency)}
         </div>
-        <div className="mt-3 flex gap-2">
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {(
+            ["cash", "wave", "orange_money"] satisfies PaymentOption[]
+          ).map((option) => (
+            <button
+              className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition ${
+                paymentOption === option
+                  ? "border-blue-600 bg-blue-600 text-white"
+                  : "border-slate-200 bg-white text-slate-700 hover:border-blue-200"
+              }`}
+              disabled={!canPay || isPending}
+              key={option}
+              onClick={() => {
+                setPaymentOption(option);
+                setExternalReference("");
+                idempotencyKeyRef.current = null;
+              }}
+              type="button"
+            >
+              {option === "cash"
+                ? "现金"
+                : MOBILE_MONEY_PROVIDER_LABELS[option]}
+            </button>
+          ))}
+        </div>
+
+        {pendingManualPayment ? (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+            当前订单已有一笔
+            {pendingManualPayment.provider
+              ? ` ${MOBILE_MONEY_PROVIDER_LABELS[pendingManualPayment.provider]} `
+              : "移动支付"}
+            待确认。处理完成前不能继续收款。
+          </div>
+        ) : paymentOption !== "cash" ? (
+          <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-800">
+            客户需先在外部应用完成转账。这里只记录付款凭证，不会自动扣款；Owner 或 Manager
+            核对商户账户后才能确认到账。
+          </div>
+        ) : null}
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto]">
           <input
-            className="h-10 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-300"
+            className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-300"
             disabled={!canPay || isPending}
             inputMode="decimal"
             onChange={(event) => setAmount(event.target.value)}
             value={amount}
           />
+          {paymentOption !== "cash" ? (
+            <input
+              className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-300"
+              disabled={!canPay || isPending}
+              maxLength={120}
+              onChange={(event) => {
+                setExternalReference(event.target.value);
+                idempotencyKeyRef.current = null;
+              }}
+              placeholder="交易流水号"
+              value={externalReference}
+            />
+          ) : (
+            <div className="hidden sm:block" />
+          )}
           <button
-            className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={!canPay || isPending || Number(amount) <= 0}
+            className={`flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+              paymentOption === "cash"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-amber-600 hover:bg-amber-700"
+            }`}
+            disabled={
+              !canPay ||
+              isPending ||
+              Number(amount) <= 0 ||
+              (paymentOption !== "cash" && externalReference.trim().length < 3)
+            }
             onClick={pay}
             type="button"
           >
             <Icon className="h-4 w-4" name="wallet-cards" />
-            现金收款
+            {paymentOption === "cash"
+              ? "现金收款"
+              : `记录 ${MOBILE_MONEY_PROVIDER_LABELS[paymentOption]}`}
           </button>
         </div>
       </div>
@@ -127,7 +241,7 @@ export function OrderActionsPanel({ order }: { order: PosOrderDetail }) {
         ) : (
           transitions.map((status) => (
             <button
-              className="flex h-10 items-center justify-between rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-11 items-center justify-between rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isPending}
               key={status}
               onClick={() => changeStatus(status)}
@@ -140,7 +254,7 @@ export function OrderActionsPanel({ order }: { order: PosOrderDetail }) {
         )}
 
         <button
-          className="mt-2 flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-2 flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!canDelete || isPending}
           onClick={remove}
           type="button"
@@ -155,4 +269,12 @@ export function OrderActionsPanel({ order }: { order: PosOrderDetail }) {
 
 function getOutstandingAmount(order: PosOrderDetail): string {
   return Math.max(0, Number(order.totalAmount) - Number(order.paidAmount)).toFixed(2);
+}
+
+function createPaymentIdempotencyKey(orderId: string): string {
+  const operationId =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  return `pos-manual-payment:${orderId}:${operationId}`;
 }

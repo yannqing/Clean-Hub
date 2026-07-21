@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Toaster } from "@cleanhub/ui";
 import { isSupportedLocale } from "@cleanhub/i18n";
 import { cookies } from "next/headers";
@@ -10,6 +10,24 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "CleanHub POS",
   description: "CleanHub store POS",
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/cleanhub-logo-mark.jpg",
+    shortcut: "/cleanhub-logo-mark.jpg",
+    apple: "/cleanhub-logo-mark.jpg",
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "CleanHub POS",
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#F7F9FC",
 };
 
 const POS_LOCALE_COOKIE_NAME = "cleanhub.pos.locale";

@@ -47,8 +47,15 @@
     {
       "idx": 6,
       "version": "7",
-      "when": 1783859554530,
-      "tag": "0006_cold_the_phantom",
+      "when": 1783913181567,
+      "tag": "0006_wandering_hellion",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784615088770,
+      "tag": "0007_misty_boom_boom",
       "breakpoints": true
     }
   ]

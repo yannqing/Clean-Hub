@@ -65,6 +65,7 @@ export const serviceTickets = pgTable(
     branchId: ulidColumn("branch_id")
       .notNull()
       .references(() => branches.id),
+    currency: varchar("currency", { length: 3 }).notNull().default("XOF"),
     customerId: ulidColumn("customer_id")
       .notNull()
       .references(() => customers.id),

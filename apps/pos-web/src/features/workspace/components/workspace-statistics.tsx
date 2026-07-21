@@ -17,10 +17,12 @@ import type { PosWorkspaceStatistics } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 
 import { Icon, type PosIconName } from "@/components/app-shell/icons";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import {
   PosChartContainer,
   PosChartTooltip,
 } from "@/components/charts/pos-chart";
+import { formatPosMoney } from "@/lib/money";
 
 type WorkspaceStatisticsProps = {
   statistics: PosWorkspaceStatistics | null;
@@ -50,12 +52,12 @@ function formatNumber(value: number, locale: string): string {
   }).format(value);
 }
 
-function formatCurrency(value: number, locale: string): string {
-  return new Intl.NumberFormat(locale, {
-    currency: "CNY",
-    maximumFractionDigits: value % 1 === 0 ? 0 : 2,
-    style: "currency",
-  }).format(value);
+function formatCurrency(
+  value: number,
+  locale: string,
+  currency: string,
+): string {
+  return formatPosMoney(value, currency, locale);
 }
 
 function formatPercent(value: number, locale: string): string {
@@ -144,6 +146,7 @@ function LegendRow({
 }
 
 function PaymentChart({
+  currency,
   locale,
   orderCount,
   paidAmount,
@@ -151,6 +154,7 @@ function PaymentChart({
   totalAmount,
   unpaidCount,
 }: {
+  currency: string;
   locale: string;
   orderCount: number;
   paidAmount: number;
@@ -164,14 +168,14 @@ function PaymentChart({
     ? [
         {
           color: CHART_COLORS.paid,
-          displayValue: formatCurrency(paidAmount, locale),
+          displayValue: formatCurrency(paidAmount, locale, currency),
           helper: percentLabel,
           label: "已收款",
           value: paidAmount,
         },
         {
           color: "#cbd5e1",
-          displayValue: formatCurrency(unpaidAmount, locale),
+          displayValue: formatCurrency(unpaidAmount, locale, currency),
           helper: `未付款订单 ${formatOrderUnitCount(unpaidCount, locale)}`,
           label: "待收款",
           value: unpaidAmount,
@@ -180,7 +184,7 @@ function PaymentChart({
     : [
         {
           color: "#e2e8f0",
-          displayValue: formatCurrency(0, locale),
+          displayValue: formatCurrency(0, locale, currency),
           label: "暂无收款",
           value: 1,
         },
@@ -237,12 +241,12 @@ function PaymentChart({
           <LegendRow
             color={CHART_COLORS.paid}
             label="已收款"
-            value={formatCurrency(paidAmount, locale)}
+            value={formatCurrency(paidAmount, locale, currency)}
           />
           <LegendRow
             color="#cbd5e1"
             label="待收款"
-            value={formatCurrency(unpaidAmount, locale)}
+            value={formatCurrency(unpaidAmount, locale, currency)}
           />
           <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
             未付款订单 {formatOrderUnitCount(unpaidCount, locale)}
@@ -464,6 +468,7 @@ function CustomerGrowth({
 
 export function WorkspaceStatistics({ statistics }: WorkspaceStatisticsProps) {
   const { locale } = useTranslation();
+  const { currency } = usePosRuntimeConfig();
 
   if (!statistics) {
     return null;
@@ -510,7 +515,7 @@ export function WorkspaceStatistics({ statistics }: WorkspaceStatisticsProps) {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           color={CHART_COLORS.orders}
-          helper={`已收款 ${formatCurrency(paidAmount, locale)}`}
+          helper={`已收款 ${formatCurrency(paidAmount, locale, currency)}`}
           icon="receipt"
           label="订单数"
           value={formatNumber(orderCount, locale)}
@@ -520,7 +525,7 @@ export function WorkspaceStatistics({ statistics }: WorkspaceStatisticsProps) {
           helper={`实收占比 ${formatPercent(paidPercent, locale)}`}
           icon="wallet-cards"
           label="销售额"
-          value={formatCurrency(totalAmount, locale)}
+          value={formatCurrency(totalAmount, locale, currency)}
         />
         <KpiCard
           color={CHART_COLORS.tickets}
@@ -540,6 +545,7 @@ export function WorkspaceStatistics({ statistics }: WorkspaceStatisticsProps) {
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_1fr_1fr]">
         <PaymentChart
+          currency={currency}
           locale={locale}
           orderCount={orderCount}
           paidAmount={paidAmount}

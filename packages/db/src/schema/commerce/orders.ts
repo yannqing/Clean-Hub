@@ -84,6 +84,7 @@ export const orders = pgTable(
     branchId: ulidColumn("branch_id")
       .notNull()
       .references(() => branches.id),
+    currency: varchar("currency", { length: 3 }).notNull().default("XOF"),
     customerId: ulidColumn("customer_id")
       .notNull()
       .references(() => customers.id),
@@ -184,6 +185,7 @@ export const paymentTransactions = pgTable(
       .references(() => orders.id),
     paymentMethod: paymentMethodEnum("payment_method").notNull(),
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("XOF"),
     paymentStatus: paymentTransactionStatusEnum("payment_status")
       .notNull()
       .default("pending"),
@@ -281,6 +283,7 @@ export const refundRequests = pgTable(
       () => paymentTransactions.id,
     ),
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("XOF"),
     reason: text("reason").notNull(),
     status: refundRequestStatusEnum("status").notNull().default("pending"),
     gateway: varchar("gateway", { length: 80 }),

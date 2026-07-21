@@ -147,7 +147,7 @@ importers:
         version: 8.0.1(@capacitor/core@8.3.3)
       '@capacitor/push-notifications':
         specifier: ^8.1.1
-        version: 8.1.1(@capacitor/core@8.3.3)
+        version: 8.1.2(@capacitor/core@8.3.3)
       '@cleanhub/hardware':
         specifier: workspace:*
         version: link:../../packages/hardware
@@ -811,8 +811,8 @@ packages:
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
-  '@capacitor/push-notifications@8.1.1':
-    resolution: {integrity: sha512-WqzjPKIbYbARMN+GC0XMAJcxJpUUzqgzS/Ny8RODLrro38pQhm3GXYwX2Mwd+LZlLY39rGImkCkrKyQSNfuikA==}
+  '@capacitor/push-notifications@8.1.2':
+    resolution: {integrity: sha512-TQl4XxqJfNF+KbSYBFMXYYT5WXUaleVKXlByhh/8+KySMVNjp+l5OqAUoGe/sY1IAnGXEuUeCjA/WLZEVvGwrA==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
@@ -5636,7 +5636,7 @@ snapshots:
     dependencies:
       '@capacitor/core': 8.4.1
 
-  '@capacitor/push-notifications@8.1.1(@capacitor/core@8.3.3)':
+  '@capacitor/push-notifications@8.1.2(@capacitor/core@8.3.3)':
     dependencies:
       '@capacitor/core': 8.3.3
 

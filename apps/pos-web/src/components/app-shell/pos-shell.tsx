@@ -11,11 +11,7 @@ import { LogoutButton } from "@/features/auth/components";
 import { GlobalSearchBox } from "@/features/global-search";
 import { HeaderNotificationsMenu } from "@/features/notifications/components";
 import { LanguageSwitcher } from "@/components/i18n";
-import {
-  posRoutes,
-  posShellCopy,
-  posSidebarNavigation,
-} from "@/config";
+import { posRoutes, posShellCopy, posSidebarNavigation } from "@/config";
 
 import { Icon } from "./icons";
 
@@ -140,20 +136,20 @@ export function PosShell({
       ? resolvedProfile.initials
       : (roleLabel.trim()[0]?.toUpperCase() ?? resolvedProfile.initials);
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F7F9FC] text-slate-900">
+    <div className="flex h-screen h-dvh min-h-0 overflow-hidden bg-[#F7F9FC] pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-slate-900">
       <aside
-        className="flex w-[240px] shrink-0 flex-col border-r border-slate-200 bg-white"
+        className="flex w-20 shrink-0 flex-col border-r border-slate-200 bg-white transition-[width] xl:w-[240px]"
         data-pos-i18n-managed="true"
       >
-        <div className="border-b border-slate-100 px-5 py-5">
-          <div className="flex items-center gap-3">
+        <div className="border-b border-slate-100 px-3 py-4 xl:px-5 xl:py-5">
+          <div className="flex items-center justify-center gap-3 xl:justify-start">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               alt="CleanHub mark"
-              className="h-11 w-11 rounded-xl object-cover"
+              className="h-10 w-10 rounded-xl object-cover xl:h-11 xl:w-11"
               src="/cleanhub-logo-mark.jpg"
             />
-            <div>
+            <div className="hidden xl:block">
               <div className="text-lg font-extrabold tracking-tight">
                 <span className="text-slate-950">Clean</span>
                 <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
@@ -167,19 +163,20 @@ export function PosShell({
           </div>
 
           <Link
-            className="mt-5 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700"
+            aria-label={t("pos.shell.create")}
+            className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700 xl:mt-5"
             href={posRoutes.newIntake}
           >
             <Icon className="h-4 w-4" name="user-plus" />
-            {t("pos.shell.create")}
+            <span className="hidden xl:inline">{t("pos.shell.create")}</span>
           </Link>
         </div>
 
-        <nav className="pos-scrollbar flex-1 overflow-y-auto overflow-x-hidden px-3 py-4">
-          <div className="space-y-6">
+        <nav className="pos-scrollbar flex-1 overflow-y-auto overflow-x-hidden px-2 py-4 xl:px-3">
+          <div className="space-y-4 xl:space-y-6">
             {posSidebarNavigation.map((section) => (
               <div key={section.titleKey}>
-                <div className="mb-2 px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <div className="mb-2 hidden px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 xl:block">
                   {t(section.titleKey)}
                 </div>
                 <div className="space-y-1">
@@ -198,10 +195,10 @@ export function PosShell({
                             ? t("pos.shell.unreadMessages", {
                                 count: currentUnreadCount,
                               })
-                            : undefined
+                            : label
                         }
                         className={cn(
-                          "relative flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm transition",
+                          "relative flex h-11 w-full items-center justify-center gap-3 rounded-lg px-2 text-left text-sm transition xl:h-10 xl:justify-start xl:px-3",
                           active
                             ? "bg-blue-50 text-blue-700"
                             : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
@@ -214,7 +211,7 @@ export function PosShell({
                         ) : null}
                         <span
                           className={cn(
-                            "flex h-7 w-7 items-center justify-center rounded-md",
+                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
                             active
                               ? "bg-white text-blue-700 shadow-sm"
                               : "text-slate-400",
@@ -222,11 +219,11 @@ export function PosShell({
                         >
                           <Icon className="h-4 w-4" name={item.icon} />
                         </span>
-                        <span className="min-w-0 flex-1 truncate font-medium">
+                        <span className="hidden min-w-0 flex-1 truncate font-medium xl:block">
                           {label}
                         </span>
                         {showUnreadIndicator ? (
-                          <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                          <span className="absolute right-2 top-2 h-2 w-2 shrink-0 rounded-full bg-red-500 xl:static" />
                         ) : null}
                       </Link>
                     );
@@ -237,12 +234,12 @@ export function PosShell({
           </div>
         </nav>
 
-        <div className="border-t border-slate-100 p-4">
-          <div className="flex items-center gap-3 rounded-lg bg-slate-50 p-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 via-blue-500 to-violet-500 text-xs font-bold text-white">
+        <div className="border-t border-slate-100 p-2 xl:p-4">
+          <div className="flex items-center justify-center gap-3 rounded-lg bg-slate-50 p-2 xl:justify-start xl:p-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 via-blue-500 to-violet-500 text-xs font-bold text-white">
               {displayInitials}
             </div>
-            <div className="min-w-0 flex-1">
+            <div className="hidden min-w-0 flex-1 xl:block">
               <div className="truncate text-sm font-semibold text-slate-900">
                 {profileName}
               </div>
@@ -252,7 +249,7 @@ export function PosShell({
             </div>
             <LogoutButton
               aria-label={t("pos.shell.logout")}
-              className="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-200/60 hover:text-slate-700"
+              className="hidden h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-200/60 hover:text-slate-700 xl:flex"
             >
               <Icon className="h-4 w-4" name="lock" />
             </LogoutButton>
@@ -262,24 +259,26 @@ export function PosShell({
 
       <main className="flex min-w-0 flex-1 flex-col">
         <header
-          className="flex h-[68px] items-center gap-4 border-b border-slate-200 bg-white px-6"
+          className="flex h-[72px] items-center gap-2 border-b border-slate-200 bg-white px-3 sm:px-4 xl:gap-4 xl:px-6"
           data-pos-i18n-managed="true"
         >
           <GlobalSearchBox />
 
           <div className="ml-auto flex items-center gap-2">
-            <div className="hidden items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 lg:flex">
+            <div className="hidden items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 2xl:flex">
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
               {t("pos.shell.synced")}
             </div>
             <LanguageSwitcher />
             <LogoutButton
               aria-label={t("pos.shell.lockScreen")}
-              className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 xl:px-3"
               signOutLabel={t("pos.shell.lockScreen")}
             >
               <Icon className="h-4 w-4 text-slate-500" name="lock" />
-              {t("pos.shell.lockScreen")}
+              <span className="hidden xl:inline">
+                {t("pos.shell.lockScreen")}
+              </span>
             </LogoutButton>
             <HeaderNotificationsMenu
               onUnreadCountChange={setCurrentUnreadCount}
@@ -288,7 +287,7 @@ export function PosShell({
           </div>
         </header>
 
-        <div className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5">
+        <div className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-5 sm:py-5 xl:px-6">
           {children}
         </div>
       </main>

@@ -18,8 +18,10 @@ import {
 } from "react";
 
 import { Icon } from "@/components/app-shell/icons";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 import { posApi } from "@/lib/api-client";
+import { formatPosMoney } from "@/lib/money";
 
 const MIN_QUERY_LENGTH = 2;
 const SEARCH_DEBOUNCE_MS = 300;
@@ -33,7 +35,10 @@ type SearchGroup = {
   items: PosGlobalSearchItem[];
 };
 
-const ENTITY_ICON: Record<PosGlobalSearchItem["type"], "users" | "clipboard-list" | "receipt"> = {
+const ENTITY_ICON: Record<
+  PosGlobalSearchItem["type"],
+  "users" | "clipboard-list" | "receipt"
+> = {
   customer: "users",
   ticket: "clipboard-list",
   order: "receipt",
@@ -73,21 +78,23 @@ function getFallbackHref(query: string): string {
   return `${posRoutes.customers}?q=${encoded}`;
 }
 
-function formatAmount(amount: string | null | undefined, locale: string): string {
+function formatAmount(
+  amount: string | null | undefined,
+  currency: string,
+  locale: string,
+): string {
   const value = Number(amount);
   if (!Number.isFinite(value)) {
     return "";
   }
 
-  return new Intl.NumberFormat(locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+  return formatPosMoney(value, currency, locale);
 }
 
 export function GlobalSearchBox() {
   const router = useRouter();
   const { locale, t } = useTranslation();
+  const { currency } = usePosRuntimeConfig();
   const inputId = useId();
   const listboxId = useId();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -242,7 +249,7 @@ export function GlobalSearchBox() {
       );
     }
 
-    const amount = formatAmount(item.metadata?.totalAmount, locale);
+    const amount = formatAmount(item.metadata?.totalAmount, currency, locale);
     if (amount) {
       parts.push(t("pos.globalSearch.amount", { amount }));
     }
@@ -322,7 +329,9 @@ export function GlobalSearchBox() {
                 <span
                   className={cn(
                     "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
-                    active ? "bg-white text-blue-700" : "bg-slate-100 text-slate-500",
+                    active
+                      ? "bg-white text-blue-700"
+                      : "bg-slate-100 text-slate-500",
                   )}
                 >
                   <Icon className="h-4 w-4" name={ENTITY_ICON[item.type]} />
@@ -349,8 +358,8 @@ export function GlobalSearchBox() {
   }
 
   return (
-    <div ref={rootRef} className="relative w-full max-w-[620px]">
-      <div className="flex h-11 w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-3 transition focus-within:border-blue-300 focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]">
+    <div ref={rootRef} className="relative min-w-0 w-full max-w-[620px]">
+      <div className="flex h-12 w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-3 transition focus-within:border-blue-300 focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]">
         <Icon
           className="mr-2.5 h-[18px] w-[18px] text-slate-400"
           name="search"
@@ -382,7 +391,7 @@ export function GlobalSearchBox() {
           value={query}
         />
         <button
-          className="ml-2 flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-white px-2.5 text-xs font-semibold text-slate-500 shadow-sm transition hover:text-slate-800"
+          className="ml-2 flex h-11 shrink-0 items-center gap-1.5 rounded-md bg-white px-2.5 text-xs font-semibold text-slate-500 shadow-sm transition hover:text-slate-800"
           onClick={() => router.push(posRoutes.scan)}
           type="button"
         >

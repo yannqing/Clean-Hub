@@ -76,7 +76,8 @@ export function TicketRelatedOrders({
                   支付：{PAYMENT_STATUS_LABELS[order.paymentStatus] ?? order.paymentStatus}
                 </span>
                 <span className="font-semibold text-slate-950">
-                  {formatTicketMoney(order.paidAmount)} / {formatTicketMoney(order.totalAmount)}
+                  {formatTicketMoney(order.paidAmount, order.currency)} /{" "}
+                  {formatTicketMoney(order.totalAmount, order.currency)}
                 </span>
               </div>
             </Link>

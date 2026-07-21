@@ -21,6 +21,7 @@ export type MobilePaymentTransaction = {
   customerId: string;
   orderId: string;
   amount: string;
+  currency: string;
   paymentStatus: MobilePaymentTransactionStatus;
   idempotencyKey: string | null;
   gateway: string | null;
@@ -73,6 +74,7 @@ export type MobileRefundRequest = {
   orderId: string;
   paymentTransactionId: string | null;
   amount: string;
+  currency: string;
   reason: string;
   status: MobileRefundRequestStatus;
   gateway: string | null;
@@ -91,6 +93,7 @@ export type MobileRefundRequest = {
 export type MobileRefundOrderDetail = {
   id: string;
   branchId: string;
+  currency: string;
   customerId: string;
   orderType: string;
   status: string;

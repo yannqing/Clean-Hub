@@ -1,6 +1,6 @@
 import { and, asc, eq, isNull, sql, type SQL } from "drizzle-orm";
 
-import { prices, services, type Database } from "@cleanhub/db";
+import { prices, services, tenantSettings, type Database } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
 
 import type {
@@ -138,6 +138,12 @@ export async function createServiceRecord(
   input: CreateServiceRequest & { tenantId: string; actorUserId: string },
 ): Promise<ServiceSummary> {
   const serviceId = createId();
+  const currencyRows = await db
+    .select({ currency: tenantSettings.defaultCurrency })
+    .from(tenantSettings)
+    .where(eq(tenantSettings.tenantId, input.tenantId))
+    .limit(1);
+  const currency = currencyRows[0]?.currency ?? "XOF";
 
   await db.insert(services).values({
     id: serviceId,
@@ -156,7 +162,7 @@ export async function createServiceRecord(
     tenantId: input.tenantId,
     serviceId,
     amount: "1.00",
-    currency: "XOF",
+    currency,
     status: input.status ?? "active",
     createdBy: input.actorUserId,
     updatedBy: input.actorUserId,

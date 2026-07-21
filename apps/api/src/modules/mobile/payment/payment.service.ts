@@ -238,7 +238,7 @@ export class PaymentService {
             orderId: existing.orderId,
             transactionId: existing.id,
             amount: existing.amount,
-            currency: this.config.currency,
+            currency: existing.currency,
             idempotencyKey: input.idempotencyKey,
             customerAccountId: customer.subjectId,
           }),
@@ -280,6 +280,7 @@ export class PaymentService {
         customerId: order.customerId,
         orderId: order.id,
         amount: input.amount,
+        currency: order.currency,
         idempotencyKey: input.idempotencyKey,
       });
     const gateway = await this.gateway.createPayment({
@@ -287,7 +288,7 @@ export class PaymentService {
       orderId: order.id,
       transactionId: transaction.id,
       amount: transaction.amount,
-      currency: this.config.currency,
+      currency: transaction.currency,
       idempotencyKey: input.idempotencyKey,
       customerAccountId: customer.subjectId,
     });
@@ -498,6 +499,7 @@ export class PaymentService {
       customerId: order.customerId,
       orderId: order.id,
       amount: input.amount,
+      currency: order.currency,
       reason: input.reason,
       paymentTransactionId: paymentTransaction?.id ?? null,
     });
@@ -629,7 +631,7 @@ export class PaymentService {
       refundRequestId: refundRequest.id,
       transactionId: paymentTransactionId,
       amount: refundRequest.amount,
-      currency: this.config.currency,
+      currency: refundRequest.currency,
     });
     const approved = await this.repository.attachRefundGateway({
       tenantId: owner.tenantId,

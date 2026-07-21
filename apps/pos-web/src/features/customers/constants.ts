@@ -69,9 +69,6 @@ export const EMPTY_PROFILE_FORM: ProfileFormValues = {
 /** Placeholder for stats the milestone doc defers (tier/balance/orders). */
 export const CUSTOMER_STAT_PLACEHOLDER = "—";
 
-/** Currency used when no per-branch currency is available (placeholder). */
-export const CUSTOMER_CURRENCY = "XOF";
-
 // ---- 服务工单 label maps (local, not cross-feature imports) ----------------
 // Values mirror apps/pos-web/src/features/tickets/constants.ts but are kept
 // local so the customers feature does not depend on the tickets feature.

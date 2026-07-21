@@ -146,7 +146,7 @@ export function NotificationsCenter({
           </p>
         </div>
         <button
-          className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={isPending || overview.unreadCount === 0}
           onClick={() => runAction(markAllNotificationsReadAction)}
           type="button"
@@ -167,7 +167,7 @@ export function NotificationsCenter({
           <div className="text-xs text-slate-500">当前结果 · 共 {total} 条</div>
         </div>
         <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
-          <div className="flex h-10 min-w-[260px] flex-1 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 focus-within:border-blue-300 focus-within:bg-white">
+          <div className="flex h-11 min-w-[260px] flex-1 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 focus-within:border-blue-300 focus-within:bg-white">
             <Icon className="mr-2 h-4 w-4 text-slate-400" name="search" />
             <input
               className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
@@ -236,7 +236,7 @@ export function NotificationsCenter({
             value={params.get(NOTIFICATION_FILTER_KEYS.relatedType) ?? ""}
           />
           <button
-            className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
             disabled={isPending}
             onClick={() => router.replace("/notifications", { scroll: false })}
             type="button"
@@ -481,7 +481,7 @@ function NotificationRow({
           </div>
           <div className="flex justify-end gap-1">
             <button
-              className="flex h-8 items-center rounded-lg px-2 text-xs font-semibold text-slate-500 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-11 items-center rounded-lg px-3 text-xs font-semibold text-slate-500 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={disabled || notification.readStatus !== "unread"}
               onClick={() => onMarkRead(notification.id)}
               type="button"
@@ -489,7 +489,7 @@ function NotificationRow({
               已读
             </button>
             <button
-              className="flex h-8 items-center rounded-lg px-2 text-xs font-semibold text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-11 items-center rounded-lg px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
               disabled={disabled || notification.readStatus === "archived"}
               onClick={() => onArchive(notification.id)}
               type="button"
@@ -571,7 +571,7 @@ function NotificationDetailPanel({
             </div>
             {relatedHref ? (
               <Link
-                className="mt-3 inline-flex h-9 items-center gap-2 rounded-lg bg-blue-600 px-3 text-sm font-semibold text-white hover:bg-blue-700"
+                className="mt-3 inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
                 href={relatedHref}
               >
                 <Icon className="h-4 w-4" name="chevron-right" />
@@ -583,7 +583,7 @@ function NotificationDetailPanel({
 
         <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
           <button
-            className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
             disabled={disabled || notification.readStatus !== "unread"}
             onClick={() => onMarkRead(notification.id)}
             type="button"
@@ -592,7 +592,7 @@ function NotificationDetailPanel({
             标记已读
           </button>
           <button
-            className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
             disabled={disabled || notification.readStatus === "archived"}
             onClick={() => onArchive(notification.id)}
             type="button"
@@ -636,7 +636,7 @@ function FilterSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm">
+    <label className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm">
       <span className="font-medium text-slate-500">{label}</span>
       <select
         className="bg-transparent text-sm text-slate-700 outline-none"

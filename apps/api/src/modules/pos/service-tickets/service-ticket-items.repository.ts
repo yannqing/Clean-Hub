@@ -1,6 +1,11 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 
-import { serviceTickets, ticketItems, type Database } from "@cleanhub/db";
+import {
+  prices,
+  serviceTickets,
+  ticketItems,
+  type Database,
+} from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
 
 import { ServiceTicketError } from "./service-tickets.errors.js";
@@ -58,6 +63,41 @@ async function lockTicketForItems(
   return rows[0] ?? null;
 }
 
+async function assertServicePriceCurrency(
+  db: Database,
+  input: { tenantId: string; serviceId: string; ticketCurrency: string },
+): Promise<void> {
+  const rows = await db
+    .select({ currency: prices.currency })
+    .from(prices)
+    .where(
+      and(
+        eq(prices.tenantId, input.tenantId),
+        eq(prices.serviceId, input.serviceId),
+        eq(prices.status, "active"),
+        isNull(prices.deletedAt),
+      ),
+    )
+    .limit(1);
+  const priceCurrency = rows[0]?.currency;
+
+  if (!priceCurrency) {
+    throw new ServiceTicketError(
+      "VALIDATION_ERROR",
+      "Active service price was not found.",
+      422,
+    );
+  }
+
+  if (priceCurrency !== input.ticketCurrency) {
+    throw new ServiceTicketError(
+      "VALIDATION_ERROR",
+      `Service price currency ${priceCurrency} does not match ticket currency ${input.ticketCurrency}.`,
+      422,
+    );
+  }
+}
+
 export async function findTicketItemById(
   db: Database,
   input: { tenantId: string; ticketId: string; itemId: string },
@@ -93,6 +133,14 @@ export async function createServiceTicketItemRecord(
       "Service ticket was not found.",
       404,
     );
+  }
+
+  if (input.serviceId) {
+    await assertServicePriceCurrency(db, {
+      tenantId: input.tenantId,
+      serviceId: input.serviceId,
+      ticketCurrency: ticket.currency,
+    });
   }
 
   const quantity = input.quantity ?? 1;
@@ -161,9 +209,22 @@ export async function updateServiceTicketItemRecord(
     actorUserId: string;
   },
 ): Promise<ServiceTicketItem | null> {
+  const ticket = await lockTicketForItems(db, input);
+  if (!ticket) {
+    return null;
+  }
+
   const existing = await findTicketItemById(db, input);
   if (!existing) {
     return null;
+  }
+
+  if (input.serviceId) {
+    await assertServicePriceCurrency(db, {
+      tenantId: input.tenantId,
+      serviceId: input.serviceId,
+      ticketCurrency: ticket.currency,
+    });
   }
 
   const quantity = input.quantity ?? existing.quantity;

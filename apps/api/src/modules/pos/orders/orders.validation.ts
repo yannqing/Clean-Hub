@@ -29,6 +29,8 @@ export const posOrderItemSourceTypeSchema = z.enum([
 
 export const posPaymentMethodSchema = z.enum(["cash", "card", "app"]);
 
+export const posMobileMoneyProviderSchema = z.enum(["wave", "orange_money"]);
+
 const amountSchema = z
   .string()
   .trim()
@@ -120,9 +122,36 @@ export const changePosOrderStatusBodySchema = z.object({
   version: z.number().int().min(1),
 });
 
-export const createPosPaymentBodySchema = z.object({
-  paymentMethod: posPaymentMethodSchema,
-  amount: amountSchema,
+const idempotencyKeySchema = z.string().trim().min(1).max(120);
+
+export const createPosPaymentBodySchema = z.discriminatedUnion(
+  "paymentMethod",
+  [
+    z.object({
+      paymentMethod: z.literal("cash"),
+      amount: amountSchema,
+      idempotencyKey: idempotencyKeySchema.optional(),
+    }),
+    z.object({
+      paymentMethod: z.literal("app"),
+      amount: amountSchema,
+      provider: posMobileMoneyProviderSchema,
+      externalReference: z.string().trim().min(3).max(120),
+      idempotencyKey: idempotencyKeySchema,
+    }),
+  ],
+);
+
+export const resolvePosPaymentBodySchema = z.object({
+  reason: z.string().trim().min(3).max(500).optional(),
+});
+
+export const failPosPaymentBodySchema = z.object({
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const posPaymentParamsSchema = posOrderParamsSchema.extend({
+  paymentId: ulidSchema,
 });
 
 export const createPosOrderItemBodySchema = createManualOrderItemBodySchema;

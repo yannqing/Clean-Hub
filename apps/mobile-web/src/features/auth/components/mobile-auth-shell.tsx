@@ -13,11 +13,11 @@ import { DeliveryHome } from "@/features/delivery";
 import { OwnerHome } from "@/features/owner";
 import { apiClient } from "@/lib/api-client";
 import { mobileReleaseConfig } from "@/lib/mobile-release-config";
+import { clearMobileSession } from "@/lib/token-storage";
 import {
   disablePushNotifications,
   enablePushNotifications,
 } from "@/lib/push-notifications";
-import { clearMobileSession } from "@/lib/token-storage";
 import {
   enterTenantContext,
   getCustomerTestOtp,
@@ -111,7 +111,6 @@ export function MobileAuthShell() {
         setTenantCode(state.tenantCode);
         setTenantInput(state.tenantCode ?? "");
         setSession(nextSession);
-
         if (nextSession) {
           // Best effort: never blocks session restore.
           void enablePushNotifications(apiClient);

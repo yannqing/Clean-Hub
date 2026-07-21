@@ -81,7 +81,7 @@ export function AccountFormDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle>
             {mode === "edit" ? "编辑客户账户" : "新增客户账户"}
@@ -91,21 +91,27 @@ export function AccountFormDialog({
           <FormField
             id="form-account-name"
             label="账户名称"
-            onChange={(value) => setForm((current) => ({ ...current, accountName: value }))}
+            onChange={(value) =>
+              setForm((current) => ({ ...current, accountName: value }))
+            }
             placeholder="例如：Diop Family"
             value={form.accountName}
           />
           <FormField
             id="form-account-phone"
             label="账户手机号"
-            onChange={(value) => setForm((current) => ({ ...current, phone: value }))}
+            onChange={(value) =>
+              setForm((current) => ({ ...current, phone: value }))
+            }
             placeholder="+221 ..."
             value={form.phone}
           />
           <FormField
             id="form-account-email"
             label="账户邮箱"
-            onChange={(value) => setForm((current) => ({ ...current, email: value }))}
+            onChange={(value) =>
+              setForm((current) => ({ ...current, email: value }))
+            }
             placeholder="name@example.com"
             type="email"
             value={form.email}

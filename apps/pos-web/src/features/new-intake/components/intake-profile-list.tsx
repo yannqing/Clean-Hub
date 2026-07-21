@@ -2,6 +2,10 @@
 
 import { useTranslation } from "@cleanhub/i18n/react";
 
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
+import { formatPosMoney } from "@/lib/money";
+import { buildPaginationWindow } from "@/lib/pagination";
+
 import type {
   IntakeAccountRow,
   IntakeLookupRow,
@@ -59,7 +63,9 @@ export function IntakeProfileList({
   onSelect,
 }: IntakeProfileListProps) {
   const { locale } = useTranslation();
+  const { currency } = usePosRuntimeConfig();
   const isAccountMode = mode === "accountProfiles";
+  const pages = buildPaginationWindow(page, pageCount);
 
   if (rows.length === 0 && loading) {
     return (
@@ -78,20 +84,16 @@ export function IntakeProfileList({
     const description = isAccountMode
       ? "当前账户还没有客户档案。可以为该账户创建第一个接待档案。"
       : hasSearched
-      ? "没有账户或档案联系方式匹配当前查询。请先创建客户账户，再添加第一个档案。"
-      : "默认不会展示客户资料。请输入手机号、邮箱或姓名，系统会匹配客户账户与档案联系方式。";
+        ? "没有账户或档案联系方式匹配当前查询。请先创建客户账户，再添加第一个档案。"
+        : "默认不会展示客户资料。请输入手机号、邮箱或姓名，系统会匹配客户账户与档案联系方式。";
 
     return (
       <div className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
           ⌕
         </div>
-        <h2 className="mt-4 text-base font-semibold text-slate-950">
-          {title}
-        </h2>
-        <p className="mt-1 max-w-md text-sm text-slate-500">
-          {description}
-        </p>
+        <h2 className="mt-4 text-base font-semibold text-slate-950">{title}</h2>
+        <p className="mt-1 max-w-md text-sm text-slate-500">{description}</p>
         {isAccountMode ? (
           <div className="mt-5 flex items-center gap-2">
             <button
@@ -142,14 +144,14 @@ export function IntakeProfileList({
         <div className="flex flex-wrap items-center gap-2">
           {isAccountMode ? (
             <button
-              className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               type="button"
               onClick={onBackToSearchResults}
             >
               返回搜索结果
             </button>
           ) : null}
-          <div className="flex h-9 w-[260px] items-center rounded-lg border border-slate-200 bg-white px-3">
+          <div className="flex h-11 w-full items-center rounded-lg border border-slate-200 bg-white px-3 sm:w-[260px]">
             <span className="mr-2 text-slate-400">⌕</span>
             <input
               className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
@@ -162,7 +164,7 @@ export function IntakeProfileList({
           </div>
           {isAccountMode ? (
             <button
-              className="flex h-9 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+              className="flex h-11 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
               type="button"
               onClick={onCreateProfile}
             >
@@ -173,7 +175,20 @@ export function IntakeProfileList({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="divide-y divide-slate-100 min-[1400px]:hidden">
+        {rows.map((row) => (
+          <IntakeResultCard
+            key={`${row.kind}-${row.id}`}
+            locale={locale}
+            onSelect={() =>
+              row.kind === "account" ? onSelectAccount(row) : onSelect(row)
+            }
+            row={row}
+          />
+        ))}
+      </div>
+
+      <div className="hidden overflow-x-auto min-[1400px]:block">
         <div className="min-w-[900px]">
           <div
             className={`grid ${GRID_COLS} bg-white px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400`}
@@ -232,9 +247,7 @@ export function IntakeProfileList({
                   {formatDisplayDate(row.createdAt, locale)}
                 </div>
 
-                <div className="text-right font-semibold text-slate-400">
-                  —
-                </div>
+                <div className="text-right font-semibold text-slate-400">—</div>
               </button>
             ) : (
               <button
@@ -283,7 +296,7 @@ export function IntakeProfileList({
                 </div>
 
                 <div className="text-right font-semibold text-slate-950">
-                  XOF 0
+                  {formatPosMoney(0, currency, locale)}
                 </div>
               </button>
             ),
@@ -291,10 +304,10 @@ export function IntakeProfileList({
         </div>
       </div>
 
-      <div className="flex items-center justify-end border-t border-slate-200 px-5 py-4">
-        <div className="flex items-center gap-1">
+      <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-4 py-4 sm:px-5">
+        <div className="flex flex-wrap items-center justify-end gap-1">
           <select
-            className="mr-2 h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600"
+            className="mr-2 h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-600"
             onChange={(event) => onPageSizeChange(Number(event.target.value))}
             value={pageSize}
           >
@@ -305,31 +318,35 @@ export function IntakeProfileList({
             ))}
           </select>
           <button
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-600 disabled:opacity-40"
+            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 disabled:opacity-40"
             disabled={page === 1}
             type="button"
             onClick={() => onPageChange(page - 1)}
           >
             上一页
           </button>
-          {Array.from({ length: pageCount }, (_, index) => index + 1).map(
-            (pageNumber) => (
+          {pages.map((entry, index) =>
+            entry === "..." ? (
+              <span className="px-1.5 text-slate-400" key={`gap-${index}`}>
+                …
+              </span>
+            ) : (
               <button
-                className={`h-9 min-w-9 rounded-lg text-sm font-semibold ${
-                  pageNumber === page
+                className={`h-11 min-w-11 rounded-lg text-sm font-semibold ${
+                  entry === page
                     ? "bg-blue-600 text-white"
                     : "border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
-                key={pageNumber}
+                key={entry}
                 type="button"
-                onClick={() => onPageChange(pageNumber)}
+                onClick={() => onPageChange(entry)}
               >
-                {pageNumber}
+                {entry}
               </button>
             ),
           )}
           <button
-            className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-600 disabled:opacity-40"
+            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 disabled:opacity-40"
             disabled={page === pageCount}
             type="button"
             onClick={() => onPageChange(page + 1)}
@@ -342,11 +359,87 @@ export function IntakeProfileList({
   );
 }
 
+function IntakeResultCard({
+  row,
+  locale,
+  onSelect,
+}: {
+  row: IntakeLookupRow;
+  locale: string;
+  onSelect: () => void;
+}) {
+  const isAccount = row.kind === "account";
+  const name = isAccount ? row.accountName : row.fullName;
+
+  return (
+    <button
+      className="w-full p-4 text-left transition hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:p-5"
+      onClick={onSelect}
+      type="button"
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white ${
+            isAccount
+              ? "bg-slate-800"
+              : "bg-gradient-to-br from-blue-600 via-blue-500 to-violet-500"
+          }`}
+        >
+          {initials(name)}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="truncate text-base font-semibold text-slate-950">
+              {name}
+            </span>
+            <span
+              className={`rounded-md px-2 py-1 text-[11px] font-semibold ${
+                isAccount
+                  ? "bg-amber-50 text-amber-700"
+                  : "bg-violet-50 text-violet-700"
+              }`}
+            >
+              {isAccount ? "客户账户" : "客户档案"}
+            </span>
+          </div>
+          <div className="mt-1 text-sm text-slate-600">
+            {row.phone || "未填写手机号"}
+          </div>
+          <div className="mt-0.5 truncate text-xs text-slate-500">
+            {row.email || "未填写邮箱"}
+          </div>
+        </div>
+        <span className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+          {isAccount ? "查看档案" : "进入详情"}
+        </span>
+      </div>
+
+      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3">
+        <div>
+          <dt className="text-xs text-slate-400">所属账户</dt>
+          <dd className="mt-1 truncate text-sm font-medium text-slate-700">
+            {isAccount ? row.accountName : row.accountName || "未关联账户"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-slate-400">状态</dt>
+          <dd className="mt-1 text-sm font-medium text-slate-700">
+            {row.status === "disabled" ? "已停用" : "正常"}
+          </dd>
+        </div>
+        <div>
+          <dt className="text-xs text-slate-400">创建时间</dt>
+          <dd className="mt-1 text-sm font-medium text-slate-700">
+            {formatDisplayDate(row.createdAt, locale)}
+          </dd>
+        </div>
+      </dl>
+    </button>
+  );
+}
+
 function initials(name: string): string {
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
+  const parts = name.trim().split(/\s+/).filter(Boolean);
 
   if (parts.length >= 2) {
     return `${parts[0][0] ?? ""}${parts[1][0] ?? ""}`.toUpperCase();

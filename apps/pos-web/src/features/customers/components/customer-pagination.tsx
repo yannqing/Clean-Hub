@@ -1,5 +1,7 @@
 "use client";
 
+import { buildPaginationWindow } from "@/lib/pagination";
+
 import { CUSTOMER_PAGE_SIZE_OPTIONS } from "../constants";
 
 type CustomerPaginationProps = {
@@ -21,12 +23,13 @@ export function CustomerPagination({
   onPageChange,
 }: CustomerPaginationProps) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const pages = buildPaginationWindow(page, pageCount);
 
   return (
-    <div className="flex items-center justify-end border-t border-slate-200 px-5 py-4">
-      <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-4 py-4 sm:px-5">
+      <div className="flex flex-wrap items-center justify-end gap-1">
         <select
-          className="mr-2 h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm"
+          className="mr-2 h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm"
           onChange={(event) => onPageSizeChange(Number(event.target.value))}
           value={pageSize}
         >
@@ -37,31 +40,35 @@ export function CustomerPagination({
           ))}
         </select>
         <button
-          className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
+          className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
           disabled={page === 1}
           type="button"
           onClick={() => onPageChange(page - 1)}
         >
           上一页
         </button>
-        {Array.from({ length: pageCount }, (_, index) => index + 1).map(
-          (pageNumber) => (
+        {pages.map((entry, index) =>
+          entry === "..." ? (
+            <span className="px-1.5 text-slate-400" key={`gap-${index}`}>
+              …
+            </span>
+          ) : (
             <button
-              className={`h-9 min-w-9 rounded-lg text-sm font-semibold ${
-                pageNumber === page
+              className={`h-11 min-w-11 rounded-lg text-sm font-semibold ${
+                entry === page
                   ? "bg-blue-600 text-white"
                   : "border border-slate-200 text-slate-600"
               }`}
-              key={pageNumber}
+              key={entry}
               type="button"
-              onClick={() => onPageChange(pageNumber)}
+              onClick={() => onPageChange(entry)}
             >
-              {pageNumber}
+              {entry}
             </button>
           ),
         )}
         <button
-          className="h-9 rounded-lg border border-slate-200 px-3 text-sm font-semibold disabled:opacity-40"
+          className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
           disabled={page === pageCount}
           type="button"
           onClick={() => onPageChange(page + 1)}

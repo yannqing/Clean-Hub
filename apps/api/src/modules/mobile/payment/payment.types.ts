@@ -97,7 +97,6 @@ export type PaymentGateway = {
 
 export type PaymentConfig = {
   gateway: PaymentGatewayName;
-  currency: string;
   mockSecret: string;
   mockPaymentBaseUrl: string;
 };
@@ -109,6 +108,7 @@ export type CustomerPaymentTransaction = {
   customerId: string;
   orderId: string;
   amount: string;
+  currency: string;
   paymentStatus: PaymentTransactionStatus;
   idempotencyKey: string | null;
   gateway: PaymentGatewayName | string | null;
@@ -168,6 +168,7 @@ export type RefundRequest = {
   orderId: string;
   paymentTransactionId: string | null;
   amount: string;
+  currency: string;
   reason: string;
   status: RefundRequestStatus;
   gateway: string | null;
@@ -186,6 +187,7 @@ export type RefundRequest = {
 export type RefundOrderDetail = {
   id: string;
   branchId: string;
+  currency: string;
   customerId: string;
   orderType: string;
   status: string;
