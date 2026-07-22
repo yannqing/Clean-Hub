@@ -3,6 +3,9 @@
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import { useEffect, useState } from "react";
+import { useTranslation } from "@cleanhub/i18n/react";
+
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
 
 import {
   Dialog,
@@ -41,6 +44,8 @@ export function IntakeCreateProfileDialog({
   onOpenChange,
   onCreated,
 }: IntakeCreateProfileDialogProps) {
+  const { locale } = useTranslation();
+  const text = (value: string) => translatePosText(value, locale);
   const [form, setForm] = useState<IntakeCreateProfileInput>(initialForm);
   const [accountKeyword, setAccountKeyword] = useState(initialAccountKeyword);
   const [accounts, setAccounts] = useState<IntakeAccountOption[]>(
@@ -124,20 +129,20 @@ export function IntakeCreateProfileDialog({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
         <DialogHeader>
-          <DialogTitle>新建客户档案</DialogTitle>
+          <DialogTitle>{text("新建客户档案")}</DialogTitle>
         </DialogHeader>
 
         {/* Account selector */}
         <section>
           <span className="mb-1.5 block text-xs font-semibold text-slate-600">
-            所属账户
+            {text("所属账户")}
           </span>
           <div className="flex h-11 items-center rounded-lg border border-slate-200 bg-white px-3">
             <span className="mr-2 text-slate-400">🔍</span>
             <input
               className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
               onChange={(event) => refreshAccounts(event.target.value)}
-              placeholder="搜索账户名称、手机号或邮箱"
+              placeholder={text("搜索账户名称、手机号或邮箱")}
               value={accountKeyword}
             />
           </div>
@@ -145,11 +150,11 @@ export function IntakeCreateProfileDialog({
           <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-slate-200">
             {accountsLoading ? (
               <div className="px-3 py-4 text-center text-xs text-slate-500">
-                加载中…
+                {text("加载中…")}
               </div>
             ) : accounts.length === 0 ? (
               <div className="px-3 py-4 text-center text-xs text-slate-500">
-                没有匹配的账户，请先创建客户账户。
+                {text("没有匹配的账户，请先创建客户账户。")}
               </div>
             ) : (
               accounts.map((account) => {
@@ -165,17 +170,21 @@ export function IntakeCreateProfileDialog({
                   >
                     <div className="min-w-0">
                       <div className="truncate font-semibold">
-                        {account.accountName}
+                        <RawText value={account.accountName} />
                       </div>
                       <div className="truncate text-xs text-slate-500">
-                        {[account.phone, account.email]
-                          .filter(Boolean)
-                          .join(" · ") || "未填写联系方式"}
+                        <RawText
+                          value={
+                            [account.phone, account.email]
+                              .filter(Boolean)
+                              .join(" · ") || text("未填写联系方式")
+                          }
+                        />
                       </div>
                     </div>
                     {active && (
                       <span className="ml-2 shrink-0 text-xs font-semibold">
-                        ✓ 已选择
+                        ✓ {text("已选择")}
                       </span>
                     )}
                   </button>
@@ -185,7 +194,12 @@ export function IntakeCreateProfileDialog({
           </div>
           {selectedAccount && (
             <p className="mt-1.5 text-xs text-slate-500">
-              将在「{selectedAccount.accountName}」下新增档案。
+              <RawText
+                value={formatProfileAccountNote(
+                  selectedAccount.accountName,
+                  locale,
+                )}
+              />
             </p>
           )}
         </section>
@@ -194,21 +208,21 @@ export function IntakeCreateProfileDialog({
         <div className="grid grid-cols-2 gap-4">
           <FormField
             id="form-intake-profile-name"
-            label="档案姓名"
+            label={text("档案姓名")}
             onChange={(value) => update("fullName", value)}
-            placeholder="客户姓名"
+            placeholder={text("客户姓名")}
             value={form.fullName}
           />
           <FormField
             id="form-intake-profile-phone"
-            label="档案手机号"
+            label={text("档案手机号")}
             onChange={(value) => update("profilePhone", value)}
             placeholder="+221 ..."
             value={form.profilePhone}
           />
           <FormField
             id="form-intake-profile-email"
-            label="档案邮箱"
+            label={text("档案邮箱")}
             onChange={(value) => update("profileEmail", value)}
             placeholder="name@example.com"
             type="email"
@@ -216,7 +230,7 @@ export function IntakeCreateProfileDialog({
           />
           <label className="block">
             <span className="mb-1.5 block text-xs font-semibold text-slate-600">
-              账户关系
+              {text("账户关系")}
             </span>
             <select
               className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
@@ -225,7 +239,7 @@ export function IntakeCreateProfileDialog({
             >
               {INTAKE_RELATIONSHIP_OPTIONS.map((value) => (
                 <option key={value} value={value}>
-                  {value}
+                  {text(value)}
                 </option>
               ))}
             </select>
@@ -239,7 +253,7 @@ export function IntakeCreateProfileDialog({
             type="button"
             onClick={() => onOpenChange(false)}
           >
-            取消
+            {text("取消")}
           </button>
           <button
             className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
@@ -247,12 +261,26 @@ export function IntakeCreateProfileDialog({
             type="button"
             onClick={handleSubmit}
           >
-            {submitting ? "保存中…" : "保存"}
+            {text(submitting ? "保存中…" : "保存")}
           </button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
+}
+
+function formatProfileAccountNote(accountName: string, locale: string): string {
+  if (locale === "en") {
+    return `A new profile will be created under “${accountName}”.`;
+  }
+  if (locale === "fr") {
+    return `Un nouveau profil sera créé sous « ${accountName} ».`;
+  }
+  return `将在「${accountName}」下新增档案。`;
+}
+
+function RawText({ value }: { value: string }) {
+  return value;
 }
 
 function FormField({

@@ -7,16 +7,14 @@ import type {
   PosOrderType,
 } from "@cleanhub/api-client";
 
-import { Icon, PosBreadcrumb } from "@/components/app-shell";
-
 import {
   DEFAULT_ORDER_PAGE_SIZE,
   ORDER_FILTER_KEYS,
   type OrderDateFilter,
 } from "@/features/orders/constants";
 import {
-  OrderCreateDialog,
   OrderMetrics,
+  OrdersPageHeader,
   OrdersTable,
   OrdersToolbar,
 } from "@/features/orders/components";
@@ -146,25 +144,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
 
   return (
     <section>
-      <PosBreadcrumb className="mb-5" items={[{ label: "订单管理" }]} />
-
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-            订单管理
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            查询门店订单、查看支付状态并处理现金收款。
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <Icon className="h-4 w-4 text-slate-400" name="wallet-cards" />
-            本期仅开放现金收款
-          </div>
-          <OrderCreateDialog defaultBranchId={branch?.id} />
-        </div>
-      </div>
+      <OrdersPageHeader defaultBranchId={branch?.id} />
 
       <OrderMetrics overview={overview} />
 

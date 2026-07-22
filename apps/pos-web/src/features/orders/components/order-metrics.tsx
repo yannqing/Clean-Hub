@@ -1,6 +1,10 @@
+"use client";
+
+import { useTranslation } from "@cleanhub/i18n/react";
 import type { PosOrderOverview } from "@cleanhub/api-client";
 
 import { Icon } from "@/components/app-shell";
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
 
 import { formatOrderMoney } from "../constants";
 
@@ -53,33 +57,36 @@ function MetricCard({ label, value, note, icon, tone }: MetricCardProps) {
 }
 
 export function OrderMetrics({ overview }: { overview: PosOrderOverview }) {
+  const { locale } = useTranslation();
+  const text = (value: string) => translatePosText(value, locale);
+
   return (
     <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
       <MetricCard
         icon="receipt"
-        label={PERIOD_LABELS[overview.period]}
-        note={PERIOD_NOTES[overview.period]}
+        label={text(PERIOD_LABELS[overview.period])}
+        note={text(PERIOD_NOTES[overview.period])}
         tone="blue"
         value={overview.orderCount}
       />
       <MetricCard
         icon="wallet-cards"
-        label="已收金额"
-        note="成功支付流水"
+        label={text("已收金额")}
+        note={text("成功支付流水")}
         tone="emerald"
-        value={formatOrderMoney(overview.paidAmount, overview.currency)}
+        value={formatOrderMoney(overview.paidAmount, overview.currency, locale)}
       />
       <MetricCard
         icon="clock"
-        label="待支付"
-        note="未支付 + 部分支付"
+        label={text("待支付")}
+        note={text("未支付 + 部分支付")}
         tone="amber"
         value={overview.unpaidCount + overview.partialCount}
       />
       <MetricCard
         icon="package-check"
-        label="已交付"
-        note={PERIOD_NOTES[overview.period]}
+        label={text("已交付")}
+        note={text(PERIOD_NOTES[overview.period])}
         tone="violet"
         value={overview.deliveredCount}
       />

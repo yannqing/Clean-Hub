@@ -3,6 +3,8 @@
 import { posToast as toast } from "@/lib/pos-toast";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import type { SupportedLocale } from "@cleanhub/i18n";
+import { useTranslation } from "@cleanhub/i18n/react";
 import type {
   CreateManualOrderItemRequest,
   CreatePosOrderRequest,
@@ -19,6 +21,7 @@ import {
 } from "@cleanhub/ui";
 
 import { Icon, type PosIconName } from "@/components/app-shell";
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { posRoutes } from "@/config";
 import { posApi } from "@/lib/api-client";
 
@@ -71,6 +74,8 @@ export function OrderCreateDialog({
   triggerIcon = "plus",
   triggerLabel = "新增订单",
 }: OrderCreateDialogProps) {
+  const { locale } = useTranslation();
+  const text = (value: string) => translatePosText(value, locale);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -196,13 +201,13 @@ export function OrderCreateDialog({
         type="button"
       >
         <Icon className="h-4 w-4" name={triggerIcon} />
-        {triggerLabel}
+        {translatePosText(triggerLabel, locale)}
       </button>
 
       <Dialog onOpenChange={handleOpenChange} open={open}>
         <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain sm:max-w-5xl">
           <DialogHeader>
-            <DialogTitle>新增订单</DialogTitle>
+            <DialogTitle>{text("新增订单")}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-5">
@@ -219,7 +224,7 @@ export function OrderCreateDialog({
                     onClick={() => setOrderType(value)}
                     type="button"
                   >
-                    {value === "manual" ? "普通订单" : "工单订单"}
+                    {text(value === "manual" ? "普通订单" : "工单订单")}
                   </button>
                 ))}
               </div>
@@ -251,7 +256,7 @@ export function OrderCreateDialog({
             )}
 
             <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
-              <Field label="过期日期">
+              <Field label={text("过期日期")}>
                 <input
                   className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
                   onChange={(event) => setExpireAt(event.target.value)}
@@ -259,11 +264,11 @@ export function OrderCreateDialog({
                   value={expireAt}
                 />
               </Field>
-              <Field label="备注">
+              <Field label={text("备注")}>
                 <input
                   className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
                   onChange={(event) => setNotes(event.target.value)}
-                  placeholder="选填"
+                  placeholder={text("选填")}
                   value={notes}
                 />
               </Field>
@@ -277,7 +282,7 @@ export function OrderCreateDialog({
               onClick={() => handleOpenChange(false)}
               type="button"
             >
-              取消
+              {text("取消")}
             </button>
             <button
               className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
@@ -285,7 +290,7 @@ export function OrderCreateDialog({
               onClick={submit}
               type="button"
             >
-              {isPending ? "创建中..." : "创建订单"}
+              {text(isPending ? "创建中..." : "创建订单")}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -309,6 +314,9 @@ function ManualOrderFields({
   onAddItem: () => void;
   onRemoveItem: (index: number) => void;
 }) {
+  const { locale } = useTranslation();
+  const text = (value: string) => translatePosText(value, locale);
+
   return (
     <div className="grid gap-4">
       <CustomerProfilePicker
@@ -318,14 +326,16 @@ function ManualOrderFields({
 
       <div className="rounded-lg border border-slate-200">
         <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-          <div className="text-sm font-semibold text-slate-800">订单条目</div>
+          <div className="text-sm font-semibold text-slate-800">
+            {text("订单条目")}
+          </div>
           <button
             className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
             onClick={onAddItem}
             type="button"
           >
             <Icon className="h-3.5 w-3.5" name="plus" />
-            添加条目
+            {text("添加条目")}
           </button>
         </div>
         <div className="grid gap-3 p-4">
@@ -336,7 +346,7 @@ function ManualOrderFields({
             >
               <label>
                 <span className="mb-1 block text-xs font-semibold text-slate-500">
-                  来源
+                  {text("来源")}
                 </span>
                 <select
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none"
@@ -350,33 +360,33 @@ function ManualOrderFields({
                 >
                   {SOURCE_TYPE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
-                      {option.label}
+                      {text(option.label)}
                     </option>
                   ))}
                 </select>
               </label>
               <TextField
-                label="项目名称"
+                label={text("项目名称")}
                 onChange={(value) => onUpdateItem(index, { itemName: value })}
-                placeholder="如洗衣服务"
+                placeholder={text("如洗衣服务")}
                 value={item.itemName}
               />
               <TextField
-                label="数量"
+                label={text("数量")}
                 onChange={(value) => onUpdateItem(index, { quantity: value })}
                 value={item.quantity}
               />
               <TextField
-                label="单价"
+                label={text("单价")}
                 onChange={(value) => onUpdateItem(index, { unitAmount: value })}
                 value={item.unitAmount}
               />
               <button
-                aria-label="删除条目"
+                aria-label={text("删除条目")}
                 className="mt-5 flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 md:mt-0 md:self-end xl:mt-5"
                 disabled={items.length === 1}
                 onClick={() => onRemoveItem(index)}
-                title="删除条目"
+                title={text("删除条目")}
                 type="button"
               >
                 <Icon className="h-4 w-4" name="trash" />
@@ -398,6 +408,8 @@ function TicketOrderFields({
   selectedTicket: ServiceTicketSummary | null;
   onSelectTicket: (ticket: ServiceTicketSummary | null) => void;
 }) {
+  const { locale } = useTranslation();
+
   return (
     <div className="grid gap-4">
       <ServiceTicketPicker
@@ -406,7 +418,10 @@ function TicketOrderFields({
         selectedTicket={selectedTicket}
       />
       <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">
-        选择工单后，系统会自动把该工单中尚未生成订单的项目全部带入订单。
+        {translatePosText(
+          "选择工单后，系统会自动把该工单中尚未生成订单的项目全部带入订单。",
+          locale,
+        )}
       </div>
     </div>
   );
@@ -419,6 +434,8 @@ function CustomerProfilePicker({
   selectedCustomer: PosCustomerProfileWithAccount | null;
   onSelect: (customer: PosCustomerProfileWithAccount | null) => void;
 }) {
+  const { locale } = useTranslation();
+  const text = (value: string) => translatePosText(value, locale);
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<PosCustomerProfileWithAccount[]>([]);
@@ -453,12 +470,12 @@ function CustomerProfilePicker({
   }, [keyword]);
 
   return (
-    <Field label="客户档案">
+    <Field label={text("客户档案")}>
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
         <input
           className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
           onChange={(event) => setKeyword(event.target.value)}
-          placeholder="搜索客户姓名、手机号或邮箱"
+          placeholder={text("搜索客户姓名、手机号或邮箱")}
           value={keyword}
         />
         {selectedCustomer ? (
@@ -475,7 +492,7 @@ function CustomerProfilePicker({
           />
         ) : null}
         <OptionList
-          emptyText={loading ? "加载客户中..." : "没有匹配的客户档案"}
+          emptyText={text(loading ? "加载客户中..." : "没有匹配的客户档案")}
           options={options.map((customer) => ({
             id: customer.id,
             title: customer.fullName,
@@ -499,6 +516,8 @@ function ServiceTicketPicker({
   selectedTicket: ServiceTicketSummary | null;
   onSelect: (ticket: ServiceTicketSummary | null) => void;
 }) {
+  const { locale } = useTranslation();
+  const text = (value: string) => translatePosText(value, locale);
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<ServiceTicketSummary[]>([]);
@@ -530,30 +549,32 @@ function ServiceTicketPicker({
   }, [keyword, locked]);
 
   return (
-    <Field label="服务工单">
+    <Field label={text("服务工单")}>
       <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
         {locked ? null : (
           <input
             className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="搜索工单号或客户名"
+            placeholder={text("搜索工单号或客户名")}
             value={keyword}
           />
         )}
         {selectedTicket ? (
           <SelectedPill
             label={selectedTicket.ticketNo ?? selectedTicket.id}
-            meta={`${selectedTicket.customerName} · ${selectedTicket.itemCount} 个项目 · 合计 ${selectedTicket.totalAmount}`}
+            meta={formatTicketMeta(selectedTicket, locale)}
             onClear={locked ? undefined : () => onSelect(null)}
           />
         ) : null}
         {locked ? null : (
           <OptionList
-            emptyText={loading ? "加载工单中..." : "没有可生成订单的工单"}
+            emptyText={text(
+              loading ? "加载工单中..." : "没有可生成订单的工单",
+            )}
             options={options.map((ticket) => ({
               id: ticket.id,
               title: ticket.ticketNo ?? ticket.id,
-              meta: `${ticket.customerName} · ${ticket.itemCount} 个项目 · 合计 ${ticket.totalAmount}`,
+              meta: formatTicketMeta(ticket, locale),
               onSelect: () => onSelect(ticket),
             }))}
           />
@@ -572,14 +593,16 @@ function SelectedPill({
   meta: string;
   onClear?: () => void;
 }) {
+  const { locale } = useTranslation();
+
   return (
     <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2">
       <div className="min-w-0">
         <div className="truncate text-sm font-semibold text-blue-900">
-          {label}
+          <RawText value={label} />
         </div>
         <div className="mt-0.5 truncate text-xs font-medium text-blue-600">
-          {meta}
+          <RawText value={meta} />
         </div>
       </div>
       {onClear ? (
@@ -588,7 +611,7 @@ function SelectedPill({
           onClick={onClear}
           type="button"
         >
-          清除
+          {translatePosText("清除", locale)}
         </button>
       ) : null}
     </div>
@@ -623,10 +646,10 @@ function OptionList({
           type="button"
         >
           <div className="truncate text-sm font-semibold text-slate-800">
-            {option.title}
+            <RawText value={option.title} />
           </div>
           <div className="mt-0.5 truncate text-xs text-slate-500">
-            {option.meta}
+            <RawText value={option.meta} />
           </div>
         </button>
       ))}
@@ -666,4 +689,22 @@ function TextField({
       />
     </Field>
   );
+}
+
+function RawText({ value }: { value: string }) {
+  return value;
+}
+
+function formatTicketMeta(
+  ticket: ServiceTicketSummary,
+  locale: SupportedLocale,
+): string {
+  const count = ticket.itemCount;
+  if (locale === "en") {
+    return `${ticket.customerName} · ${count} ${count === 1 ? "item" : "items"} · total ${ticket.totalAmount}`;
+  }
+  if (locale === "fr") {
+    return `${ticket.customerName} · ${count} ${count === 1 ? "article" : "articles"} · total ${ticket.totalAmount}`;
+  }
+  return `${ticket.customerName} · ${count} 个项目 · 合计 ${ticket.totalAmount}`;
 }

@@ -1,9 +1,9 @@
 import { Suspense } from "react";
 
-import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { getCurrentUser } from "@/lib/auth";
 
 import { TicketMetrics } from "@/features/tickets/components/ticket-metrics";
+import { TicketsPageHeader } from "@/features/tickets/components/tickets-page-header";
 import {
   DEFAULT_TICKET_PAGE_SIZE,
   TICKET_FILTER_KEYS,
@@ -143,22 +143,7 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
 
   return (
     <section>
-      <PosBreadcrumb className="mb-5" items={[{ label: "工单管理" }]} />
-
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-            工单管理
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            查询工单、跟进服务进度并维护工单信息。
-          </p>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          <Icon className="h-4 w-4 text-slate-400" name="alert" />
-          本页面仅支持查询，新增工单请在「客户接待」中创建
-        </div>
-      </div>
+      <TicketsPageHeader />
 
       <TicketMetrics overview={overview} />
 

@@ -2,8 +2,10 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
+import { useTranslation } from "@cleanhub/i18n/react";
 
 import { Icon } from "@/components/app-shell";
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
 
 import {
   TICKET_PRIORITY_OPTIONS,
@@ -44,6 +46,7 @@ export function TicketsToolbar({
   currentCount,
   mineCount,
 }: TicketsToolbarProps) {
+  const { locale } = useTranslation();
   const router = useRouter();
   const params = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -84,18 +87,21 @@ export function TicketsToolbar({
     () =>
       SCOPE_OPTIONS.map((option) => ({
         ...option,
+        label: translatePosText(option.label, locale),
         // Only show a count badge when we have one for that scope.
         count: option.value === "mine" ? mineCount : allCount,
         active: scope === option.value,
       })),
-    [allCount, mineCount, scope],
+    [allCount, locale, mineCount, scope],
   );
+
+  const text = (value: string) => translatePosText(value, locale);
 
   return (
     <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div
-          aria-label="工单范围"
+          aria-label={text("工单范围")}
           className="flex rounded-lg bg-slate-100 p-1"
           role="group"
         >
@@ -126,7 +132,7 @@ export function TicketsToolbar({
           ))}
         </div>
         <div className="text-xs text-slate-500">
-          当前范围 · 共 {currentCount} 条
+          {text("当前范围 · 共")} {currentCount} {text("条")}
         </div>
       </div>
 
@@ -147,49 +153,49 @@ export function TicketsToolbar({
                 apply({ [TICKET_FILTER_KEYS.q]: draft.trim() || undefined });
               }
             }}
-            placeholder="工单号、客户名"
+            placeholder={text("工单号、客户名")}
             value={draft}
           />
         </div>
 
         <FilterSelect
-          label="状态"
+          label={text("状态")}
           onChange={(value) =>
             apply({ [TICKET_FILTER_KEYS.status]: value || undefined })
           }
           options={TICKET_STATUS_OPTIONS.map((option) => ({
             value: option.value,
-            label: option.label,
+            label: text(option.label),
           }))}
-          placeholder="全部状态"
+          placeholder={text("全部状态")}
           value={status}
         />
         <FilterSelect
-          label="类型"
+          label={text("类型")}
           onChange={(value) =>
             apply({ [TICKET_FILTER_KEYS.type]: value || undefined })
           }
           options={TICKET_TYPE_OPTIONS.map((option) => ({
             value: option.value,
-            label: option.label,
+            label: text(option.label),
           }))}
-          placeholder="全部类型"
+          placeholder={text("全部类型")}
           value={type}
         />
         <FilterSelect
-          label="优先级"
+          label={text("优先级")}
           onChange={(value) =>
             apply({ [TICKET_FILTER_KEYS.priority]: value || undefined })
           }
           options={TICKET_PRIORITY_OPTIONS.map((option) => ({
             value: option.value,
-            label: option.label,
+            label: text(option.label),
           }))}
-          placeholder="全部优先级"
+          placeholder={text("全部优先级")}
           value={priority}
         />
         <FilterSelect
-          label="日期"
+          label={text("日期")}
           onChange={(value) =>
             apply({
               [TICKET_FILTER_KEYS.date]:
@@ -198,9 +204,9 @@ export function TicketsToolbar({
           }
           options={DATE_OPTIONS.map((option) => ({
             value: option.value,
-            label: option.label,
+            label: text(option.label),
           }))}
-          placeholder="全部日期"
+          placeholder={text("全部日期")}
           value={date}
         />
 
@@ -211,7 +217,7 @@ export function TicketsToolbar({
           type="button"
         >
           <Icon className="h-4 w-4" name="rotate-ccw" />
-          重置
+          {text("重置")}
         </button>
       </div>
     </section>

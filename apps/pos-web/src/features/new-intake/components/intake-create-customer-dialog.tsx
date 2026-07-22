@@ -3,6 +3,9 @@
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import { useState } from "react";
+import { useTranslation } from "@cleanhub/i18n/react";
+
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
 
 import {
   Dialog,
@@ -38,6 +41,8 @@ export function IntakeCreateCustomerDialog({
   onOpenChange,
   onCreated,
 }: IntakeCreateCustomerDialogProps) {
+  const { locale } = useTranslation();
+  const text = (value: string) => translatePosText(value, locale);
   const [form, setForm] = useState<IntakeCreateAccountInput>(initialForm);
   const [submitting, setSubmitting] = useState(false);
 
@@ -75,26 +80,26 @@ export function IntakeCreateCustomerDialog({
     <Dialog onOpenChange={onOpenChange} open={open}>
       <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
         <DialogHeader>
-          <DialogTitle>新建客户账户</DialogTitle>
+          <DialogTitle>{text("新建客户账户")}</DialogTitle>
         </DialogHeader>
         <div className="grid grid-cols-2 gap-4">
           <FormField
             id="form-intake-account-name"
-            label="账户名称"
+            label={text("账户名称")}
             onChange={(value) => update("accountName", value)}
-            placeholder="例如：Diop Family"
+            placeholder={text("例如：Diop Family")}
             value={form.accountName}
           />
           <FormField
             id="form-intake-account-phone"
-            label="账户手机号"
+            label={text("账户手机号")}
             onChange={(value) => update("accountPhone", value)}
             placeholder="+221 ..."
             value={form.accountPhone}
           />
           <FormField
             id="form-intake-account-email"
-            label="账户邮箱"
+            label={text("账户邮箱")}
             onChange={(value) => update("accountEmail", value)}
             placeholder="name@example.com"
             type="email"
@@ -102,7 +107,7 @@ export function IntakeCreateCustomerDialog({
           />
         </div>
         <p className="text-sm text-slate-500">
-          账户保存共享联系方式，可关联多个客户档案。
+          {text("账户保存共享联系方式，可关联多个客户档案。")}
         </p>
         <DialogFooter>
           <button
@@ -111,7 +116,7 @@ export function IntakeCreateCustomerDialog({
             type="button"
             onClick={() => onOpenChange(false)}
           >
-            取消
+            {text("取消")}
           </button>
           <button
             className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
@@ -119,7 +124,7 @@ export function IntakeCreateCustomerDialog({
             type="button"
             onClick={handleSubmit}
           >
-            {submitting ? "保存中…" : "保存"}
+            {text(submitting ? "保存中…" : "保存")}
           </button>
         </DialogFooter>
       </DialogContent>

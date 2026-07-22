@@ -1,5 +1,9 @@
 "use client";
 
+import { useTranslation } from "@cleanhub/i18n/react";
+
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
+
 type IntakeCustomerSearchProps = {
   draftQuery: string;
   onDraftQueryChange: (value: string) => void;
@@ -11,6 +15,9 @@ export function IntakeCustomerSearch({
   onDraftQueryChange,
   onSearch,
 }: IntakeCustomerSearchProps) {
+  const { locale } = useTranslation();
+  const text = (value: string) => translatePosText(value, locale);
+
   return (
     <div className="border-b border-slate-200 p-5">
       <div className="flex gap-3">
@@ -24,7 +31,7 @@ export function IntakeCustomerSearch({
                 onSearch();
               }
             }}
-            placeholder="输入账户或档案手机号 / 邮箱"
+            placeholder={text("输入账户或档案手机号 / 邮箱")}
             value={draftQuery}
           />
           <button
@@ -32,7 +39,7 @@ export function IntakeCustomerSearch({
             type="button"
             onClick={onSearch}
           >
-            查询
+            {text("查询")}
           </button>
         </div>
       </div>

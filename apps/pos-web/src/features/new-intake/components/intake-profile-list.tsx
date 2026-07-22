@@ -1,7 +1,9 @@
 "use client";
 
+import type { SupportedLocale } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { formatPosMoney } from "@/lib/money";
 import { buildPaginationWindow } from "@/lib/pagination";
@@ -63,6 +65,7 @@ export function IntakeProfileList({
   onSelect,
 }: IntakeProfileListProps) {
   const { locale } = useTranslation();
+  const text = (value: string) => translatePosText(value, locale);
   const { currency } = usePosRuntimeConfig();
   const isAccountMode = mode === "accountProfiles";
   const pages = buildPaginationWindow(page, pageCount);
@@ -92,8 +95,12 @@ export function IntakeProfileList({
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
           ⌕
         </div>
-        <h2 className="mt-4 text-base font-semibold text-slate-950">{title}</h2>
-        <p className="mt-1 max-w-md text-sm text-slate-500">{description}</p>
+        <h2 className="mt-4 text-base font-semibold text-slate-950">
+          {text(title)}
+        </h2>
+        <p className="mt-1 max-w-md text-sm text-slate-500">
+          {text(description)}
+        </p>
         {isAccountMode ? (
           <div className="mt-5 flex items-center gap-2">
             <button
@@ -129,15 +136,30 @@ export function IntakeProfileList({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/70 px-5 py-3">
         <div>
           <div className="text-sm font-semibold text-slate-900">
-            {isAccountMode
-              ? `${account?.accountName ?? "客户账户"} · ${total} 个档案`
-              : `${total} 条匹配结果`}
+            {isAccountMode ? (
+              <RawText
+                value={formatAccountProfileCount(
+                  account?.accountName ?? text("客户账户"),
+                  total,
+                  locale,
+                )}
+              />
+            ) : (
+              `${total} 条匹配结果`
+            )}
           </div>
           <div className="mt-0.5 text-xs text-slate-500">
-            {isAccountMode
-              ? [account?.phone, account?.email].filter(Boolean).join(" / ") ||
-                "账户下的客户档案"
-              : "点击账户查看其档案列表，点击档案进入客户详情"}
+            {isAccountMode ? (
+              <RawText
+                value={
+                  [account?.phone, account?.email]
+                    .filter(Boolean)
+                    .join(" / ") || text("账户下的客户档案")
+                }
+              />
+            ) : (
+              "点击账户查看其档案列表，点击档案进入客户详情"
+            )}
           </div>
         </div>
 
@@ -210,11 +232,11 @@ export function IntakeProfileList({
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-800 text-xs font-bold text-white">
-                    {initials(row.accountName)}
+                    <RawText value={initials(row.accountName)} />
                   </div>
                   <div className="min-w-0">
                     <div className="truncate font-semibold text-slate-950">
-                      {row.accountName}
+                      <RawText value={row.accountName} />
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
                       <span>客户账户</span>
@@ -227,7 +249,7 @@ export function IntakeProfileList({
 
                 <div className="min-w-0">
                   <div className="truncate font-medium text-slate-700">
-                    {row.accountName}
+                    <RawText value={row.accountName} />
                   </div>
                   <div className="truncate text-xs text-slate-400">
                     {row.status === "disabled" ? "已停用" : "账户有效"}
@@ -236,10 +258,14 @@ export function IntakeProfileList({
 
                 <div className="min-w-0">
                   <div className="truncate text-slate-700">
-                    {row.phone || "未填写账户手机号"}
+                    <RawText
+                      value={row.phone || text("未填写账户手机号")}
+                    />
                   </div>
                   <div className="truncate text-xs text-slate-500">
-                    {row.email || "未填写账户邮箱"}
+                    <RawText
+                      value={row.email || text("未填写账户邮箱")}
+                    />
                   </div>
                 </div>
 
@@ -258,11 +284,11 @@ export function IntakeProfileList({
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 via-blue-500 to-violet-500 text-xs font-bold text-white">
-                    {initials(row.fullName)}
+                    <RawText value={initials(row.fullName)} />
                   </div>
                   <div className="min-w-0">
                     <div className="truncate font-semibold text-slate-950">
-                      {row.fullName}
+                      <RawText value={row.fullName} />
                     </div>
                     <div className="mt-0.5 flex items-center gap-2 text-xs text-slate-500">
                       <span>{profileRelation(row)}</span>
@@ -275,7 +301,11 @@ export function IntakeProfileList({
 
                 <div className="min-w-0">
                   <div className="truncate font-medium text-slate-700">
-                    {row.accountName || "未关联账户"}
+                    {row.accountName ? (
+                      <RawText value={row.accountName} />
+                    ) : (
+                      "未关联账户"
+                    )}
                   </div>
                   <div className="truncate text-xs text-slate-400">
                     {row.status === "disabled" ? "档案已停用" : "档案有效"}
@@ -284,10 +314,14 @@ export function IntakeProfileList({
 
                 <div className="min-w-0">
                   <div className="truncate text-slate-700">
-                    {row.phone || "未填写档案手机号"}
+                    <RawText
+                      value={row.phone || text("未填写档案手机号")}
+                    />
                   </div>
                   <div className="truncate text-xs text-slate-500">
-                    {row.email || "未填写档案邮箱"}
+                    <RawText
+                      value={row.email || text("未填写档案邮箱")}
+                    />
                   </div>
                 </div>
 
@@ -365,11 +399,12 @@ function IntakeResultCard({
   onSelect,
 }: {
   row: IntakeLookupRow;
-  locale: string;
+  locale: SupportedLocale;
   onSelect: () => void;
 }) {
   const isAccount = row.kind === "account";
   const name = isAccount ? row.accountName : row.fullName;
+  const text = (value: string) => translatePosText(value, locale);
 
   return (
     <button
@@ -385,12 +420,12 @@ function IntakeResultCard({
               : "bg-gradient-to-br from-blue-600 via-blue-500 to-violet-500"
           }`}
         >
-          {initials(name)}
+          <RawText value={initials(name)} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="truncate text-base font-semibold text-slate-950">
-              {name}
+              <RawText value={name} />
             </span>
             <span
               className={`rounded-md px-2 py-1 text-[11px] font-semibold ${
@@ -403,10 +438,10 @@ function IntakeResultCard({
             </span>
           </div>
           <div className="mt-1 text-sm text-slate-600">
-            {row.phone || "未填写手机号"}
+            <RawText value={row.phone || text("未填写手机号")} />
           </div>
           <div className="mt-0.5 truncate text-xs text-slate-500">
-            {row.email || "未填写邮箱"}
+            <RawText value={row.email || text("未填写邮箱")} />
           </div>
         </div>
         <span className="shrink-0 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
@@ -418,7 +453,13 @@ function IntakeResultCard({
         <div>
           <dt className="text-xs text-slate-400">所属账户</dt>
           <dd className="mt-1 truncate text-sm font-medium text-slate-700">
-            {isAccount ? row.accountName : row.accountName || "未关联账户"}
+            <RawText
+              value={
+                isAccount
+                  ? row.accountName
+                  : row.accountName || text("未关联账户")
+              }
+            />
           </dd>
         </div>
         <div>
@@ -448,6 +489,24 @@ function initials(name: string): string {
   return (parts[0]?.slice(0, 2) || "?").toUpperCase();
 }
 
+function RawText({ value }: { value: string }) {
+  return value;
+}
+
+function formatAccountProfileCount(
+  accountName: string,
+  count: number,
+  locale: SupportedLocale,
+): string {
+  if (locale === "en") {
+    return `${accountName} · ${count} ${count === 1 ? "profile" : "profiles"}`;
+  }
+  if (locale === "fr") {
+    return `${accountName} · ${count} ${count === 1 ? "profil" : "profils"}`;
+  }
+  return `${accountName} · ${count} 个档案`;
+}
+
 function profileRelation(row: IntakeProfileRow): string {
   const name = row.fullName.toLowerCase();
   if (name.includes("household") || name.includes("共享")) return "共享档案";
@@ -462,7 +521,7 @@ function profileTier(row: IntakeProfileRow): string {
   return "普通客户";
 }
 
-function formatDisplayDate(value: string, locale: string): string {
+function formatDisplayDate(value: string, locale: SupportedLocale): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
 

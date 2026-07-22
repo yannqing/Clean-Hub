@@ -11,7 +11,9 @@
   "scripts": {
     "dev": "turbo dev",
     "dev:api": "pnpm --filter @cleanhub/api dev",
+    "dev:web-admin": "pnpm --filter @cleanhub/web-admin dev",
     "dev:pos-web": "pnpm --filter @cleanhub/pos-web dev",
+    "dev:mobile": "pnpm --filter @cleanhub/mobile dev",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

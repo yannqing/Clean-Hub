@@ -10,5 +10,6 @@ export { OrderInfoEditor } from "./order-info-editor";
 export { OrderItemsManager } from "./order-items-manager";
 export { OrderMetrics } from "./order-metrics";
 export { OrderPagination } from "./order-pagination";
+export { OrdersPageHeader } from "./orders-page-header";
 export { OrdersTable } from "./orders-table";
 export { OrdersToolbar } from "./orders-toolbar";

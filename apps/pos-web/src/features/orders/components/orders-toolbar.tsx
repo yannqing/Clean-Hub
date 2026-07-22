@@ -2,8 +2,10 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import { useTranslation } from "@cleanhub/i18n/react";
 
 import { Icon } from "@/components/app-shell";
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
 
 import {
   ORDER_FILTER_KEYS,
@@ -23,6 +25,7 @@ const DATE_OPTIONS: ReadonlyArray<{
 ];
 
 export function OrdersToolbar({ totalCount }: { totalCount: number }) {
+  const { locale } = useTranslation();
   const router = useRouter();
   const params = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -32,6 +35,7 @@ export function OrdersToolbar({ totalCount }: { totalCount: number }) {
   const paymentStatus = params.get(ORDER_FILTER_KEYS.paymentStatus) ?? "";
   const orderType = params.get(ORDER_FILTER_KEYS.orderType) ?? "";
   const date = params.get(ORDER_FILTER_KEYS.date) ?? "";
+  const text = (value: string) => translatePosText(value, locale);
 
   const apply = useCallback(
     (next: Record<string, string | undefined>, resetPage = true) => {
@@ -58,9 +62,11 @@ export function OrdersToolbar({ totalCount }: { totalCount: number }) {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
           <Icon className="h-4 w-4 text-blue-600" name="receipt" />
-          订单筛选
+          {text("订单筛选")}
         </div>
-        <div className="text-xs text-slate-500">当前结果 · 共 {totalCount} 条</div>
+        <div className="text-xs text-slate-500">
+          {text("当前结果 · 共")} {totalCount} {text("条")}
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
@@ -80,48 +86,60 @@ export function OrdersToolbar({ totalCount }: { totalCount: number }) {
                 apply({ [ORDER_FILTER_KEYS.q]: draft.trim() || undefined });
               }
             }}
-            placeholder="订单号、客户名"
+            placeholder={text("订单号、客户名")}
             value={draft}
           />
         </div>
 
         <FilterSelect
-          label="状态"
+          label={text("状态")}
           onChange={(value) =>
             apply({ [ORDER_FILTER_KEYS.status]: value || undefined })
           }
-          options={ORDER_STATUS_OPTIONS}
-          placeholder="全部状态"
+          options={ORDER_STATUS_OPTIONS.map((option) => ({
+            ...option,
+            label: text(option.label),
+          }))}
+          placeholder={text("全部状态")}
           value={status}
         />
         <FilterSelect
-          label="支付"
+          label={text("支付")}
           onChange={(value) =>
             apply({ [ORDER_FILTER_KEYS.paymentStatus]: value || undefined })
           }
-          options={ORDER_PAYMENT_STATUS_OPTIONS}
-          placeholder="全部支付"
+          options={ORDER_PAYMENT_STATUS_OPTIONS.map((option) => ({
+            ...option,
+            label: text(option.label),
+          }))}
+          placeholder={text("全部支付")}
           value={paymentStatus}
         />
         <FilterSelect
-          label="类型"
+          label={text("类型")}
           onChange={(value) =>
             apply({ [ORDER_FILTER_KEYS.orderType]: value || undefined })
           }
-          options={ORDER_TYPE_OPTIONS}
-          placeholder="全部类型"
+          options={ORDER_TYPE_OPTIONS.map((option) => ({
+            ...option,
+            label: text(option.label),
+          }))}
+          placeholder={text("全部类型")}
           value={orderType}
         />
         <FilterSelect
-          label="日期"
+          label={text("日期")}
           onChange={(value) =>
             apply({
               [ORDER_FILTER_KEYS.date]:
                 value === "all" ? undefined : (value as OrderDateFilter),
             })
           }
-          options={DATE_OPTIONS}
-          placeholder="全部日期"
+          options={DATE_OPTIONS.map((option) => ({
+            ...option,
+            label: text(option.label),
+          }))}
+          placeholder={text("全部日期")}
           value={date}
         />
 
@@ -132,7 +150,7 @@ export function OrdersToolbar({ totalCount }: { totalCount: number }) {
           type="button"
         >
           <Icon className="h-4 w-4" name="rotate-ccw" />
-          重置
+          {text("重置")}
         </button>
       </div>
     </section>

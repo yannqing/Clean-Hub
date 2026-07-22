@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "@cleanhub/i18n/react";
 
 import { useRouter } from "next/navigation";
 
 import { PosBreadcrumb } from "@/components/app-shell";
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import { customerDetailPath } from "@/config";
@@ -42,8 +44,10 @@ type IntakeCustomerLookupProps = {
 export function IntakeCustomerLookup({
   initialQuery = "",
 }: IntakeCustomerLookupProps) {
+  const { locale } = useTranslation();
   const router = useRouter();
   const normalizedInitialQuery = initialQuery.trim();
+  const text = (value: string) => translatePosText(value, locale);
 
   const [draftQuery, setDraftQuery] = useState(normalizedInitialQuery);
   const [resultFilter, setResultFilter] = useState("");
@@ -297,12 +301,12 @@ export function IntakeCustomerLookup({
     <div className="px-6 py-5">
       <div className="mb-5 flex items-end justify-between gap-5">
         <div>
-          <PosBreadcrumb items={[{ label: "客户接待" }]} />
+          <PosBreadcrumb items={[{ label: text("客户接待") }]} />
           <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-            查询客户档案
+            {text("查询客户档案")}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            {NEWINTAKE_PAGE_DESCRIPTION}
+            {text(NEWINTAKE_PAGE_DESCRIPTION)}
           </p>
         </div>
 
@@ -312,7 +316,7 @@ export function IntakeCustomerLookup({
           onClick={handleCreateCustomer}
         >
           <span className="text-base leading-none">+</span>
-          新建客户
+          {text("新建客户")}
         </button>
       </div>
 

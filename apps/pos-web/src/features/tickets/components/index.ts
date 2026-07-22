@@ -14,6 +14,7 @@ export { TicketMetrics } from "./ticket-metrics";
 export { TicketPagination } from "./ticket-pagination";
 export { TicketRelatedOrders } from "./ticket-related-orders";
 export { TicketStatusDialog, useTicketStatusDialog } from "./ticket-status-dialog";
+export { TicketsPageHeader } from "./tickets-page-header";
 export { TicketsTable } from "./tickets-table";
 export { TicketsToolbar } from "./tickets-toolbar";
 // Param keys + parsers live in a plain (non-client) module so both the server
