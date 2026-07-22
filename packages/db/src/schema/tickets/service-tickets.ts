@@ -10,7 +10,11 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
-import { businessLineEnum, services } from "../catalog/services.js";
+import {
+  businessLineEnum,
+  pricingUnitEnum,
+  services,
+} from "../catalog/services.js";
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
 import { branches } from "../tenancy/branches.js";
@@ -141,6 +145,17 @@ export const ticketItems = pgTable(
     itemBrand: varchar("item_brand", { length: 80 }),
     itemMaterial: varchar("item_material", { length: 80 }),
     quantity: integer("quantity").notNull().default(1),
+    pricingUnit: pricingUnitEnum("pricing_unit"),
+    standardUnitAmount: numeric("standard_unit_amount", {
+      precision: 12,
+      scale: 2,
+    }),
+    chargedUnitAmount: numeric("charged_unit_amount", {
+      precision: 12,
+      scale: 2,
+    }),
+    weight: numeric("weight", { precision: 10, scale: 3 }),
+    bagCount: integer("bag_count"),
     unitAmount: numeric("unit_amount", { precision: 12, scale: 2 }).notNull(),
     lineAmount: numeric("line_amount", { precision: 12, scale: 2 }).notNull(),
     remark: text("remark"),

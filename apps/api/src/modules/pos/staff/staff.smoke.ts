@@ -1,0 +1,187 @@
+import assert from "node:assert/strict";
+
+import {
+  posShiftHandovers,
+  posStaffShifts,
+  posZReports,
+} from "@cleanhub/db";
+import { getTableConfig } from "drizzle-orm/pg-core";
+
+import { AuthError } from "../../auth/auth.errors.js";
+import {
+  calculateAdjustmentTotals,
+  calculateCashVariance,
+  calculateNetSales,
+} from "./staff.repository.js";
+import {
+  assertShiftTerminal,
+  resolveShiftTransition,
+} from "./staff.service.js";
+import { PosStaffError } from "./staff.errors.js";
+import type { ShiftRecord } from "./staff.types.js";
+import {
+  clockRequestSchema,
+  createHandoverRequestSchema,
+} from "./staff.validation.js";
+
+const shiftConfig = getTableConfig(posStaffShifts);
+const handoverConfig = getTableConfig(posShiftHandovers);
+const reportConfig = getTableConfig(posZReports);
+
+function uniqueIndexNames(config: ReturnType<typeof getTableConfig>): string[] {
+  return config.indexes
+    .filter((index) => index.config.unique)
+    .map((index) => index.config.name ?? "");
+}
+
+assert.ok(
+  uniqueIndexNames(shiftConfig).includes("pos_staff_shifts_staff_open_unique"),
+  "concurrent clock-in needs a staff-scoped open-shift uniqueness guard",
+);
+assert.ok(
+  uniqueIndexNames(shiftConfig).includes("pos_staff_shifts_terminal_open_unique"),
+  "concurrent clock-in needs a terminal-scoped open-shift uniqueness guard",
+);
+assert.ok(
+  uniqueIndexNames(handoverConfig).includes(
+    "pos_shift_handovers_outgoing_shift_unique",
+  ),
+  "a shift may be handed over only once",
+);
+assert.ok(
+  uniqueIndexNames(reportConfig).includes("pos_z_reports_shift_unique"),
+  "a shift may produce only one immutable report snapshot",
+);
+assert.ok(
+  uniqueIndexNames(reportConfig).includes("pos_z_reports_handover_unique"),
+  "a handover may produce only one immutable report snapshot",
+);
+assert.ok(
+  reportConfig.columns.some(
+    (column) => column.name === "cutoff_at" && column.notNull,
+  ),
+  "Z Reports must persist a mandatory cutoff",
+);
+assert.equal(
+  reportConfig.columns.some((column) => column.name === "updated_at"),
+  false,
+  "immutable Z Report snapshots must not expose mutable timestamp state",
+);
+
+assert.deepEqual(resolveShiftTransition("break_start", "open"), {
+  from: "open",
+  to: "on_break",
+});
+assert.deepEqual(resolveShiftTransition("break_end", "on_break"), {
+  from: "on_break",
+  to: "open",
+});
+assert.deepEqual(resolveShiftTransition("clock_out", "open"), {
+  from: "open",
+  to: "closed",
+});
+assert.throws(
+  () => resolveShiftTransition("break_start", "on_break"),
+  (error: unknown) =>
+    error instanceof PosStaffError && error.code === "INVALID_SHIFT_ACTION",
+);
+assert.throws(
+  () => resolveShiftTransition("break_end", "open"),
+  (error: unknown) =>
+    error instanceof PosStaffError && error.code === "INVALID_SHIFT_ACTION",
+);
+
+assert.equal(
+  clockRequestSchema.safeParse({ action: "clock_in" }).success,
+  false,
+  "clock-in requires an opening float",
+);
+assert.equal(
+  clockRequestSchema.safeParse({ action: "clock_out" }).success,
+  false,
+  "clock-out requires a closing float",
+);
+assert.equal(
+  createHandoverRequestSchema.safeParse({
+    incomingStaffId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+    countedCash: "-1.00",
+  }).success,
+  false,
+  "handover counted cash cannot be negative",
+);
+
+const adjustments = calculateAdjustmentTotals([
+  {
+    adjustmentType: "refund",
+    direction: "debit",
+    amount: "25.00",
+    method: "cash",
+  },
+  {
+    adjustmentType: "refund",
+    direction: "credit",
+    amount: "5.00",
+    method: "cash",
+  },
+  {
+    adjustmentType: "correction",
+    direction: "credit",
+    amount: "7.00",
+    method: "cash",
+  },
+  {
+    adjustmentType: "correction",
+    direction: "debit",
+    amount: "2.00",
+    method: "card",
+  },
+]);
+assert.deepEqual(adjustments, {
+  refundAmount: 20,
+  correctionAmount: 5,
+  cashAdjustment: -13,
+});
+assert.equal(calculateCashVariance("97.25", "100.00"), "-2.75");
+assert.equal(
+  calculateNetSales("100.00", "10.00"),
+  "90.00",
+  "refunds and payment corrections must not change net sales",
+);
+
+const shift: ShiftRecord = {
+  id: "01ARZ3NDEKTSV4RRFFQ69G5FAZ",
+  tenantId: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
+  branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+  terminalId: "01ARZ3NDEKTSV4RRFFQ69G5FB1",
+  staffId: "01ARZ3NDEKTSV4RRFFQ69G5FB2",
+  status: "open",
+  startedAt: new Date().toISOString(),
+  endedAt: null,
+  openingFloat: "100.00",
+  closingFloat: null,
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
+  version: 1,
+};
+assert.throws(
+  () =>
+    assertShiftTerminal(shift, {
+      branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+      terminalId: shift.terminalId,
+    }),
+  (error: unknown) =>
+    error instanceof AuthError && error.code === "FORBIDDEN",
+  "cross-branch shift access must fail before mutation",
+);
+assert.throws(
+  () =>
+    assertShiftTerminal(shift, {
+      branchId: shift.branchId,
+      terminalId: "01ARZ3NDEKTSV4RRFFQ69G5FB3",
+    }),
+  (error: unknown) =>
+    error instanceof AuthError && error.code === "FORBIDDEN",
+  "cross-terminal shift access must fail before mutation",
+);
+
+console.log("POS staff/shift smoke passed.");

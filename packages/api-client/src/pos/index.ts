@@ -2,9 +2,11 @@ import type { ApiClient } from "../types";
 import { createPosTerminalAuthApi } from "./auth";
 import { createPosAccountsApi } from "./accounts";
 import { createPosBranchesApi } from "./branches";
+import { createPosCatalogApi } from "./catalog";
 import { createPosCustomersApi } from "./customers";
 import { createPosNotificationsApi } from "./notifications";
 import { createPosOrdersApi } from "./orders";
+import { createPosPaymentAdjustmentsApi } from "./payment-adjustments";
 import { createPosOverviewApi } from "./overview";
 import { createPosReceptionApi } from "./reception";
 import { createPosSearchApi } from "./search";
@@ -21,12 +23,16 @@ export * from "./accounts";
 export * from "./accounts.types";
 export * from "./branches";
 export * from "./branches.types";
+export * from "./catalog";
+export * from "./catalog.types";
 export * from "./customers";
 export * from "./customers.types";
 export * from "./notifications";
 export * from "./notifications.types";
 export * from "./orders";
 export * from "./orders.types";
+export * from "./payment-adjustments";
+export * from "./payment-adjustments.types";
 export * from "./overview";
 export * from "./overview.types";
 export * from "./reception";
@@ -49,16 +55,18 @@ export * from "./workspace.types";
 export function createPosApi(client: ApiClient) {
   return {
     branches: createPosBranchesApi(client),
+    catalog: createPosCatalogApi(client),
     customers: createPosCustomersApi(client),
     serviceTickets: createPosServiceTicketsApi(client),
     accounts: createPosAccountsApi(client),
     orders: createPosOrdersApi(client),
+    paymentAdjustments: createPosPaymentAdjustmentsApi(client),
     search: createPosSearchApi(client),
     overview: createPosOverviewApi(client),
     staff: createPosStaffApi(client),
     reception: createPosReceptionApi(client),
     /**
-     * POS-terminal-specific auth (PIN login, device binding, terminal lock).
+     * POS-terminal enrollment, credential rotation, and terminal lock APIs.
      * Named `terminalAuth` to avoid clashing with the platform-wide login
      * session exposed at `posApi.auth` (wired by createCleanHubApiClient).
      */

@@ -12,10 +12,11 @@ import {
 /** Soft-delete a whole ticket (cascades to its items server-side). */
 export async function deleteTicketAction(
   ticketId: string,
+  reason: string,
 ): Promise<TicketActionResult<void>> {
   const result = await runTicketAction(async () => {
     const options = await getPosServerApiRequestOptions();
-    await posApi.pos.serviceTickets.remove(ticketId, options);
+    await posApi.pos.serviceTickets.remove(ticketId, reason, options);
   });
 
   if (result.ok) {

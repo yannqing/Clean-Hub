@@ -23,6 +23,8 @@ import {
   getOrderOverviewQuery,
   getOrdersListQuery,
 } from "@/features/orders/queries";
+import { getPosCatalogQuery } from "@/features/orders/queries/get-pos-catalog.query";
+import { getCurrentUser } from "@/lib/auth";
 
 type OrdersPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -136,15 +138,23 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   const query = buildOrderListQuery(normalized);
   const overviewPeriod = buildOverviewPeriod(normalized);
 
-  const [list, overview, branch] = await Promise.all([
+  const [list, overview, branch, catalog, user] = await Promise.all([
     getOrdersListQuery(query),
     getOrderOverviewQuery({ period: overviewPeriod }),
     getMyBranchQuery().catch(() => null),
+    getPosCatalogQuery().catch(() => ({ data: [] })),
+    getCurrentUser(),
   ]);
 
   return (
     <section>
-      <OrdersPageHeader defaultBranchId={branch?.id} />
+      <OrdersPageHeader
+        canManageSensitiveOperations={
+          user?.role === "owner" || user?.role === "manager"
+        }
+        catalog={catalog.data}
+        defaultBranchId={branch?.id}
+      />
 
       <OrderMetrics overview={overview} />
 

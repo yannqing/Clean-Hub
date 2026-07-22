@@ -2,7 +2,7 @@
 
 import { posToast as toast } from "@/lib/pos-toast";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import { posRoutes } from "@/config";
 
@@ -27,14 +27,20 @@ export function TicketDeleteDialog({
 }: TicketDeleteDialogProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [reason, setReason] = useState("");
 
   if (!open) {
     return null;
   }
 
   function confirm() {
+    const normalizedReason = reason.trim();
+    if (!normalizedReason) {
+      toast.error("请输入删除原因");
+      return;
+    }
     startTransition(async () => {
-      const result = await deleteTicketAction(ticketId);
+      const result = await deleteTicketAction(ticketId, normalizedReason);
       if (result.ok) {
         toast.success(`工单 ${ticketNo ?? ""} 已删除`);
         router.replace(posRoutes.tickets);
@@ -68,10 +74,22 @@ export function TicketDeleteDialog({
             吗？此操作为软删除，将级联删除该工单下的所有项目。
           </p>
         </div>
+        <div className="p-5">
+          <label className="grid gap-2 text-sm font-semibold text-slate-700">
+            删除原因（必填）
+            <textarea
+              className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-400"
+              disabled={isPending}
+              maxLength={500}
+              onChange={(event) => setReason(event.target.value)}
+              value={reason}
+            />
+          </label>
+        </div>
         <div className="flex justify-end gap-2 border-t border-slate-200 p-4">
           <button
             className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-            disabled={isPending}
+            disabled={isPending || !reason.trim()}
             onClick={onClose}
             type="button"
           >

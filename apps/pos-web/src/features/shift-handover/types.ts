@@ -10,7 +10,11 @@ import type {
   ServiceTicketSummary,
 } from "@cleanhub/api-client";
 
-export type { ShiftRecord } from "@cleanhub/api-client";
+export type {
+  PosStaffSummary,
+  PosZReport,
+  ShiftRecord,
+} from "@cleanhub/api-client";
 
 export type ShiftHandoverSummary = {
   generatedAt: string;
@@ -20,19 +24,4 @@ export type ShiftHandoverSummary = {
   readyTickets: ServiceTicketSummary[];
   overdueTickets: ServiceTicketSummary[];
   exceptionTickets: ServiceTicketSummary[];
-};
-
-export type LocalShiftHandoverRecord = {
-  id: string;
-  createdAt: string;
-  cashierName: string;
-  branchName: string;
-  expectedCash: number;
-  countedCash: number;
-  variance: number;
-  pendingOrderCount: number;
-  overdueTicketCount: number;
-  exceptionTicketCount: number;
-  incomingStaffName: string | null;
-  notes: string | null;
 };

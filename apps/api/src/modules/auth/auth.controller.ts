@@ -12,6 +12,7 @@ import {
   ACCESS_COOKIE_NAME,
   REFRESH_COOKIE_NAME,
 } from "./cookie.service.js";
+import { POS_TERMINAL_CREDENTIAL_COOKIE_NAME } from "./pos-terminal-credential.js";
 
 export type AuthControllerOptions = {
   authService: AuthService;
@@ -41,6 +42,10 @@ export function createAuthController({ authService }: AuthControllerOptions) {
         pin: body.pin,
         tenantCode: body.tenantCode,
         deviceId: body.deviceId,
+        terminalCredential: getCookie(
+          c,
+          POS_TERMINAL_CREDENTIAL_COOKIE_NAME,
+        ),
         ...getRequestMeta(c, body.deviceId),
       });
 
@@ -56,6 +61,10 @@ export function createAuthController({ authService }: AuthControllerOptions) {
 
       const result = await authService.refresh({
         refreshToken: refreshToken ?? "",
+        terminalCredential: getCookie(
+          c,
+          POS_TERMINAL_CREDENTIAL_COOKIE_NAME,
+        ),
         ...getRequestMeta(c),
       });
 

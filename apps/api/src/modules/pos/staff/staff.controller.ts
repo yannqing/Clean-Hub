@@ -1,87 +1,119 @@
 import type { Context } from "hono";
 
 import type { AppBindings } from "../../../http/types.js";
-import { PosNotImplementedError } from "../not-implemented.errors.js";
 import { getRequestMeta } from "../request-meta.helper.js";
-import { requirePathParam } from "../require-path-param.helper.js";
+import { PosStaffError } from "./staff.errors.js";
 import {
   clockAction,
   createHandover,
+  getCurrentShift,
   getPosStaff,
+  getPosZReport,
   listPosStaff,
+  listPosZReports,
 } from "./staff.service.js";
-import type {
-  ClockRequest,
-  CreateHandoverRequest,
-  PosStaffListQuery,
-} from "./staff.types.js";
+import {
+  clockRequestSchema,
+  createHandoverRequestSchema,
+  posStaffListQuerySchema,
+  posStaffParamsSchema,
+  posZReportListQuerySchema,
+  posZReportParamsSchema,
+} from "./staff.validation.js";
 
-function notImplementedResponse(c: Context<AppBindings>, error: PosNotImplementedError) {
+function errorResponse(c: Context<AppBindings>, error: PosStaffError) {
   return c.json(
-    {
-      message: error.message,
-      code: error.code,
-      requestId: c.get("requestId"),
-    },
+    { message: error.message, code: error.code, requestId: c.get("requestId") },
     error.status,
   );
 }
 
 export async function listPosStaffController(c: Context<AppBindings>) {
-  const query = c.req.query() as PosStaffListQuery;
-  const result = await listPosStaff({
-    authContext: c.get("authContext"),
-    query,
-  });
-  return c.json({ data: result });
+  const query = posStaffListQuerySchema.parse(c.req.query());
+  try {
+    return c.json({
+      data: await listPosStaff({ authContext: c.get("authContext"), query }),
+    });
+  } catch (error) {
+    if (error instanceof PosStaffError) return errorResponse(c, error);
+    throw error;
+  }
 }
 
 export async function getPosStaffController(c: Context<AppBindings>) {
-  const staffId = requirePathParam(c, "staffId");
-  if (staffId instanceof Response) {
-    return staffId;
+  const { staffId } = posStaffParamsSchema.parse(c.req.param());
+  try {
+    return c.json(
+      await getPosStaff({ authContext: c.get("authContext"), staffId }),
+    );
+  } catch (error) {
+    if (error instanceof PosStaffError) return errorResponse(c, error);
+    throw error;
   }
-  const staff = await getPosStaff({
-    authContext: c.get("authContext"),
-    staffId,
-  });
-  return c.json(staff);
+}
+
+export async function getCurrentShiftController(c: Context<AppBindings>) {
+  try {
+    return c.json(await getCurrentShift(c.get("authContext")));
+  } catch (error) {
+    if (error instanceof PosStaffError) return errorResponse(c, error);
+    throw error;
+  }
 }
 
 export async function clockActionController(c: Context<AppBindings>) {
-  const rawBody = await c.req.json().catch(() => ({}));
-  const data = rawBody as ClockRequest;
-
+  const data = clockRequestSchema.parse(await c.req.json().catch(() => ({})));
   try {
-    const shift = await clockAction({
-      authContext: c.get("authContext"),
-      requestMeta: getRequestMeta(c),
-      data,
-    });
-    return c.json(shift);
+    return c.json(
+      await clockAction({
+        authContext: c.get("authContext"),
+        requestMeta: getRequestMeta(c),
+        data,
+      }),
+    );
   } catch (error) {
-    if (error instanceof PosNotImplementedError) {
-      return notImplementedResponse(c, error);
-    }
+    if (error instanceof PosStaffError) return errorResponse(c, error);
     throw error;
   }
 }
 
 export async function createHandoverController(c: Context<AppBindings>) {
-  const rawBody = await c.req.json().catch(() => ({}));
-  const data = rawBody as CreateHandoverRequest;
-
+  const data = createHandoverRequestSchema.parse(
+    await c.req.json().catch(() => ({})),
+  );
   try {
-    const handover = await createHandover({
-      authContext: c.get("authContext"),
-      requestMeta: getRequestMeta(c),
-      data,
-    });
-    return c.json(handover, 201);
+    return c.json(
+      await createHandover({
+        authContext: c.get("authContext"),
+        requestMeta: getRequestMeta(c),
+        data,
+      }),
+      201,
+    );
   } catch (error) {
-    if (error instanceof PosNotImplementedError) {
-      return notImplementedResponse(c, error);
-    }
+    if (error instanceof PosStaffError) return errorResponse(c, error);
+    throw error;
+  }
+}
+
+export async function listPosZReportsController(c: Context<AppBindings>) {
+  const query = posZReportListQuerySchema.parse(c.req.query());
+  try {
+    return c.json({
+      data: await listPosZReports(c.get("authContext"), query),
+    });
+  } catch (error) {
+    if (error instanceof PosStaffError) return errorResponse(c, error);
+    throw error;
+  }
+}
+
+export async function getPosZReportController(c: Context<AppBindings>) {
+  const { zReportId } = posZReportParamsSchema.parse(c.req.param());
+  try {
+    return c.json(await getPosZReport(c.get("authContext"), zReportId));
+  } catch (error) {
+    if (error instanceof PosStaffError) return errorResponse(c, error);
     throw error;
   }
 }

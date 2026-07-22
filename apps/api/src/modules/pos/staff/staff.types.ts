@@ -1,27 +1,21 @@
-/**
- * POS staff management — DTOs.
- *
- * Covers cashier profiles, shift clock-in/out, and shift handover. All shapes
- * are scaffold placeholders; no db tables exist yet (staff/shifts/handovers).
- */
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 
-export type PosStaffRole = "cashier" | "supervisor" | "manager";
-
+export type PosStaffRole = "owner" | "manager" | "cashier";
 export type PosStaffStatus = "on_duty" | "off_duty" | "on_break";
+export type PosShiftStatus = "open" | "on_break" | "closed";
 
 export type PosStaffSummary = {
   id: string;
   displayName: string;
   role: PosStaffRole;
   status: PosStaffStatus;
+  currentShiftId: string | null;
 };
 
 export type PosStaffDetail = PosStaffSummary & {
   email: string | null;
   phone: string | null;
   branchId: string;
-  currentShiftId: string | null;
 };
 
 export type PosStaffListQuery = {
@@ -32,39 +26,90 @@ export type PosStaffListQuery = {
   offset?: number;
 };
 
-/** Clock-in / clock-out request. */
 export type ClockAction = "clock_in" | "clock_out" | "break_start" | "break_end";
 
 export type ClockRequest = {
   action: ClockAction;
-  deviceId?: string;
+  openingFloat?: string;
+  closingFloat?: string;
 };
 
 export type ShiftRecord = {
   id: string;
+  tenantId: string;
+  branchId: string;
+  terminalId: string;
   staffId: string;
+  status: PosShiftStatus;
   startedAt: string;
   endedAt: string | null;
   openingFloat: string;
   closingFloat: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
 };
 
-/** Handover from the outgoing shift to the incoming one. */
+export type PosZReportPaymentBreakdown = {
+  method: string;
+  provider: string | null;
+  grossAmount: string;
+  refundAmount: string;
+  netAmount: string;
+  transactionCount: number;
+};
+
+export type PosZReport = {
+  id: string;
+  tenantId: string;
+  branchId: string;
+  terminalId: string;
+  shiftId: string;
+  handoverId: string;
+  currency: string;
+  cutoffAt: string;
+  orderCount: number;
+  grossSales: string;
+  discountAmount: string;
+  refundAmount: string;
+  correctionAmount: string;
+  netSales: string;
+  expectedCash: string;
+  countedCash: string;
+  variance: string;
+  outstandingOrders: number;
+  paymentBreakdown: PosZReportPaymentBreakdown[];
+  createdAt: string;
+};
+
 export type CreateHandoverRequest = {
   incomingStaffId: string;
-  cashCounted: string;
+  countedCash: string;
   notes?: string;
-  outstandingTickets: number;
 };
 
 export type HandoverRecord = {
   id: string;
+  tenantId: string;
+  branchId: string;
+  terminalId: string;
+  outgoingShiftId: string;
   outgoingStaffId: string;
   incomingStaffId: string;
-  cashCounted: string;
+  expectedCash: string;
+  countedCash: string;
+  variance: string;
+  outstandingOrders: number;
   outstandingTickets: number;
   notes: string | null;
+  cutoffAt: string;
   createdAt: string;
+  zReport: PosZReport;
+};
+
+export type PosZReportListQuery = {
+  limit?: number;
+  offset?: number;
 };
 
 export type PosStaffListInput = {

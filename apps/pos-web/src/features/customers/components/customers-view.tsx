@@ -37,10 +37,14 @@ import { ProfileFormDialog } from "./profile-form-dialog";
  * open. All data is fetched client-side via the queries module.
  */
 type CustomersViewProps = {
+  canDelete?: boolean;
   initialQuery?: string;
 };
 
-export function CustomersView({ initialQuery = "" }: CustomersViewProps) {
+export function CustomersView({
+  canDelete = false,
+  initialQuery = "",
+}: CustomersViewProps) {
   const router = useRouter();
   const normalizedInitialQuery = initialQuery.trim();
   const [viewMode, setViewMode] = useState<CustomerViewMode>("list");
@@ -323,7 +327,7 @@ export function CustomersView({ initialQuery = "" }: CustomersViewProps) {
           rows={rows}
           totalAccounts={totalAccounts}
           totalProfiles={totalProfiles}
-          onDelete={openDelete}
+          onDelete={canDelete ? openDelete : undefined}
           onEdit={openEdit}
           onService={(row) => router.push(customerDetailPath(row.id))}
           onToggleStatus={handleToggleStatus}

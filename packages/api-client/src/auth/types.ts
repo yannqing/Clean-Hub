@@ -20,6 +20,9 @@ export type AuthContext = {
   role: AdminRole;
   roles: string[];
   permissions: Permission[];
+  terminalId?: string;
+  terminalBranchId?: string;
+  terminalDeviceId?: string;
   accessTokenExpiresAt: string;
 };
 

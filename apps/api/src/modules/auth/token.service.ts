@@ -14,6 +14,9 @@ export type AccessTokenClaims = {
   roles: string[];
   permissions: string[];
   branchIds: string[];
+  terminalId?: string;
+  terminalBranchId?: string;
+  terminalDeviceId?: string;
   expiresAt: Date;
 };
 
@@ -25,6 +28,9 @@ export type TokenIssueContext = {
   roles: string[];
   permissions: string[];
   branchIds: string[];
+  terminalId?: string;
+  terminalBranchId?: string;
+  terminalDeviceId?: string;
 };
 
 export type TokenServiceOptions = {
@@ -99,6 +105,9 @@ export class TokenService {
       roles: context.roles,
       permissions: context.permissions,
       branchIds: context.branchIds,
+      terminalId: context.terminalId,
+      terminalBranchId: context.terminalBranchId,
+      terminalDeviceId: context.terminalDeviceId,
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setSubject(context.userId)
@@ -145,6 +154,18 @@ export class TokenService {
         branchIds: Array.isArray(result.payload.branchIds)
           ? result.payload.branchIds.map(String)
           : [],
+        terminalId:
+          typeof result.payload.terminalId === "string"
+            ? result.payload.terminalId
+            : undefined,
+        terminalBranchId:
+          typeof result.payload.terminalBranchId === "string"
+            ? result.payload.terminalBranchId
+            : undefined,
+        terminalDeviceId:
+          typeof result.payload.terminalDeviceId === "string"
+            ? result.payload.terminalDeviceId
+            : undefined,
         expiresAt: new Date(Number(result.payload.exp ?? 0) * 1000),
       };
     } catch {

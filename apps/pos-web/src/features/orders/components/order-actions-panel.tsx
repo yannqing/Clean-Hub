@@ -9,11 +9,21 @@ import type {
   PosOrderStatus,
   PosPaymentTransaction,
 } from "@cleanhub/api-client";
+import { createId } from "@cleanhub/id";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";
+import { usePosOfflineWrites } from "@/features/offline/lib";
+import { getPosApiErrorMessage } from "@/lib/api-error-message";
 
 import {
-  changeOrderStatusAction,
   deleteOrderAction,
   payOrderAction,
 } from "../actions";
@@ -34,16 +44,23 @@ const STATUS_TRANSITIONS: Record<PosOrderStatus, PosOrderStatus[]> = {
 };
 
 export function OrderActionsPanel({
+  canManageSensitiveOperations,
   order,
   payments,
 }: {
+  canManageSensitiveOperations: boolean;
   order: PosOrderDetail;
   payments: PosPaymentTransaction[];
 }) {
   const router = useRouter();
+  const { changeOrderStatus } = usePosOfflineWrites();
   const [amount, setAmount] = useState(getOutstandingAmount(order));
   const [paymentOption, setPaymentOption] = useState<PaymentOption>("cash");
   const [externalReference, setExternalReference] = useState("");
+  const [sensitiveAction, setSensitiveAction] = useState<
+    "cancel" | "delete" | null
+  >(null);
+  const [sensitiveReason, setSensitiveReason] = useState("");
   const idempotencyKeyRef = useRef<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -57,8 +74,11 @@ export function OrderActionsPanel({
     order.status !== "cancelled" &&
     order.status !== "delivered" &&
     !pendingManualPayment;
-  const transitions = STATUS_TRANSITIONS[order.status];
+  const transitions = STATUS_TRANSITIONS[order.status].filter(
+    (status) => status !== "cancelled" || canManageSensitiveOperations,
+  );
   const canDelete =
+    canManageSensitiveOperations &&
     Number(order.paidAmount) === 0 &&
     ["draft", "received", "cancelled"].includes(order.status);
 
@@ -75,6 +95,9 @@ export function OrderActionsPanel({
           ? await payOrderAction(order.id, {
               paymentMethod: "cash",
               amount,
+              idempotencyKey:
+                idempotencyKeyRef.current ??
+                (idempotencyKeyRef.current = createPaymentIdempotencyKey()),
             })
           : await payOrderAction(order.id, {
               paymentMethod: "app",
@@ -83,9 +106,7 @@ export function OrderActionsPanel({
               externalReference: reference,
               idempotencyKey:
                 idempotencyKeyRef.current ??
-                (idempotencyKeyRef.current = createPaymentIdempotencyKey(
-                  order.id,
-                )),
+                (idempotencyKeyRef.current = createPaymentIdempotencyKey()),
             });
       if (result.ok) {
         toast.success(
@@ -102,24 +123,31 @@ export function OrderActionsPanel({
     });
   }
 
-  function changeStatus(to: PosOrderStatus) {
+  function changeStatus(to: PosOrderStatus, reason?: string) {
     startTransition(async () => {
-      const result = await changeOrderStatusAction(order.id, {
-        to,
-        version: order.version,
-      });
-      if (result.ok) {
-        toast.success(`订单状态已更新为「${ORDER_STATUS_LABELS[to]}」。`);
-        router.refresh();
-      } else {
-        toast.error(result.message);
+      try {
+        const result = await changeOrderStatus(order.id, {
+          to,
+          reason,
+          version: order.version,
+        });
+        toast.success(
+          result.queued
+            ? `网络不可用，「${ORDER_STATUS_LABELS[to]}」状态已加入同步队列。`
+            : `订单状态已更新为「${ORDER_STATUS_LABELS[to]}」。`,
+        );
+        setSensitiveAction(null);
+        setSensitiveReason("");
+        if (!result.queued) router.refresh();
+      } catch (error) {
+        toast.error(getPosApiErrorMessage(error, "订单状态更新失败，请重试。"));
       }
     });
   }
 
-  function remove() {
+  function remove(reason: string) {
     startTransition(async () => {
-      const result = await deleteOrderAction(order.id);
+      const result = await deleteOrderAction(order.id, { reason });
       if (result.ok) {
         toast.success("订单已删除。");
         router.replace("/orders");
@@ -127,6 +155,21 @@ export function OrderActionsPanel({
         toast.error(result.message);
       }
     });
+  }
+
+  function submitSensitiveAction() {
+    const reason = sensitiveReason.trim();
+    if (!sensitiveAction || !reason) {
+      toast.error("请填写操作原因。");
+      return;
+    }
+
+    if (sensitiveAction === "cancel") {
+      changeStatus("cancelled", reason);
+      return;
+    }
+
+    remove(reason);
   }
 
   return (
@@ -192,7 +235,10 @@ export function OrderActionsPanel({
             className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-300"
             disabled={!canPay || isPending}
             inputMode="decimal"
-            onChange={(event) => setAmount(event.target.value)}
+            onChange={(event) => {
+              setAmount(event.target.value);
+              idempotencyKeyRef.current = null;
+            }}
             value={amount}
           />
           {paymentOption !== "cash" ? (
@@ -244,7 +290,13 @@ export function OrderActionsPanel({
               className="flex h-11 items-center justify-between rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isPending}
               key={status}
-              onClick={() => changeStatus(status)}
+              onClick={() => {
+                if (status === "cancelled") {
+                  setSensitiveAction("cancel");
+                  return;
+                }
+                changeStatus(status);
+              }}
               type="button"
             >
               <span>设为 {ORDER_STATUS_LABELS[status]}</span>
@@ -256,13 +308,66 @@ export function OrderActionsPanel({
         <button
           className="mt-2 flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!canDelete || isPending}
-          onClick={remove}
+          onClick={() => setSensitiveAction("delete")}
           type="button"
         >
           <Icon className="h-4 w-4" name="trash" />
           删除订单
         </button>
       </div>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !isPending) {
+            setSensitiveAction(null);
+            setSensitiveReason("");
+          }
+        }}
+        open={sensitiveAction !== null}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {sensitiveAction === "delete" ? "删除订单" : "取消订单"}
+            </DialogTitle>
+            <DialogDescription>
+              此操作仅限 Owner 或 Manager，并会记录操作原因和审计信息。
+            </DialogDescription>
+          </DialogHeader>
+          <label className="grid gap-2 text-sm font-medium text-slate-700">
+            操作原因
+            <textarea
+              className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-300"
+              disabled={isPending}
+              maxLength={500}
+              onChange={(event) => setSensitiveReason(event.target.value)}
+              placeholder="填写取消或删除原因"
+              value={sensitiveReason}
+            />
+          </label>
+          <DialogFooter>
+            <button
+              className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+              disabled={isPending}
+              onClick={() => {
+                setSensitiveAction(null);
+                setSensitiveReason("");
+              }}
+              type="button"
+            >
+              返回
+            </button>
+            <button
+              className="h-10 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50"
+              disabled={isPending || !sensitiveReason.trim()}
+              onClick={submitSensitiveAction}
+              type="button"
+            >
+              {isPending ? "处理中…" : "确认"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
@@ -271,10 +376,6 @@ function getOutstandingAmount(order: PosOrderDetail): string {
   return Math.max(0, Number(order.totalAmount) - Number(order.paidAmount)).toFixed(2);
 }
 
-function createPaymentIdempotencyKey(orderId: string): string {
-  const operationId =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  return `pos-manual-payment:${orderId}:${operationId}`;
+function createPaymentIdempotencyKey(): string {
+  return createId();
 }

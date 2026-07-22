@@ -13,10 +13,11 @@ import {
 export async function deleteTicketItemAction(
   ticketId: string,
   itemId: string,
+  reason: string,
 ): Promise<TicketActionResult<void>> {
   const result = await runTicketAction(async () => {
     const options = await getPosServerApiRequestOptions();
-    await posApi.pos.serviceTickets.removeItem(ticketId, itemId, options);
+    await posApi.pos.serviceTickets.removeItem(ticketId, itemId, reason, options);
   });
 
   if (result.ok) {

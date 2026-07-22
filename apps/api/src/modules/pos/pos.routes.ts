@@ -4,6 +4,7 @@ import type { AppBindings } from "../../http/types.js";
 import type { NotificationPublisher } from "../notifications/index.js";
 import { createPosAuthRoutes } from "./auth/auth.routes.js";
 import { getMyPosBranchController } from "./branches/pos.controller.js";
+import { createPosCatalogRoutes } from "./catalog/catalog.routes.js";
 import {
   createPosAccountsRoutes,
   createPosCustomersRoutes,
@@ -11,6 +12,7 @@ import {
 import { createPosNotificationsRoutes } from "./notifications/notifications.routes.js";
 import { createPosOrdersRoutes } from "./orders/orders.routes.js";
 import { createPosOverviewRoutes } from "./overview/overview.routes.js";
+import { createPosPaymentAdjustmentRoutes } from "./payment-adjustments/payment-adjustments.routes.js";
 import { createPosReceptionRoutes } from "./reception/reception.routes.js";
 import { createPosSearchRoutes } from "./search/search.routes.js";
 import { createPosStaffRoutes } from "./staff/staff.routes.js";
@@ -36,9 +38,11 @@ export function createPosRoutes({
   // the repository implementations land.
   routes.route("/auth", createPosAuthRoutes());
   routes.route("/customers", createPosCustomersRoutes());
+  routes.route("/catalog", createPosCatalogRoutes());
   routes.route("/service-tickets", createPosServiceTicketsRoutes());
   routes.route("/accounts", createPosAccountsRoutes());
   routes.route("/orders", createPosOrdersRoutes({ notificationPublisher }));
+  routes.route("/payment-adjustments", createPosPaymentAdjustmentRoutes());
   routes.route("/search", createPosSearchRoutes());
   routes.route("/overview", createPosOverviewRoutes());
   routes.route("/staff", createPosStaffRoutes());

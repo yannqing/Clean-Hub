@@ -1,0 +1,19 @@
+export type PosStaffErrorCode =
+  | "POS_TERMINAL_REQUIRED"
+  | "STAFF_NOT_FOUND"
+  | "SHIFT_NOT_FOUND"
+  | "SHIFT_ALREADY_OPEN"
+  | "INVALID_SHIFT_ACTION"
+  | "HANDOVER_ALREADY_COMPLETED"
+  | "Z_REPORT_NOT_FOUND";
+
+export class PosStaffError extends Error {
+  constructor(
+    readonly code: PosStaffErrorCode,
+    message: string,
+    readonly status: 403 | 404 | 409 | 422,
+  ) {
+    super(message);
+    this.name = "PosStaffError";
+  }
+}

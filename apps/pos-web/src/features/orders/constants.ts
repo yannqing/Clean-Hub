@@ -6,6 +6,7 @@ import type {
   PosPaymentMethod,
   PosPaymentTransactionStatus,
 } from "@cleanhub/api-client";
+import { formatPosOrderCode } from "@cleanhub/domain/order-codes";
 
 import { getPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
 import { DEFAULT_POS_CURRENCY, formatPosMoney } from "@/lib/money";
@@ -154,5 +155,5 @@ export function formatOrderDateTime(
 }
 
 export function displayOrderCode(orderId: string): string {
-  return `OD-${orderId.slice(-8).toUpperCase()}`;
+  return formatPosOrderCode(orderId);
 }

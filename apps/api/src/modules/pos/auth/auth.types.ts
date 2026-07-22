@@ -1,43 +1,42 @@
-/**
- * POS terminal authentication — DTOs.
- *
- * POS-specific auth on top of the platform-wide login (modules/auth/):
- * PIN quick-login, device binding, and terminal lock/unlock. Scaffold only.
- */
-import type { AuthRequestMeta } from "../../auth/auth.types.js";
+import type {
+  AuthContext,
+  AuthRequestMeta,
+} from "../../auth/auth.types.js";
 
-export type PosDeviceStatus = "active" | "revoked";
+export type PosDeviceStatus = "active" | "inactive";
 
 export type PosDevice = {
   id: string;
   deviceId: string;
-  label: string;
+  label: string | null;
   branchId: string;
   status: PosDeviceStatus;
+  credentialVersion: number;
+  credentialIssuedAt: string | null;
+  credentialRotatedAt: string | null;
+  credentialLastUsedAt: string | null;
   lastSeenAt: string | null;
   boundAt: string;
+  updatedAt: string;
 };
 
-/** Quick PIN login (after the device is already bound to a session). */
-export type PosPinLoginRequest = {
-  pin: string;
-  deviceId: string;
-};
-
-export type PosPinLoginResult = {
-  success: boolean;
-  staffId: string | null;
-  attemptRemaining: number | null;
-};
-
-/** Bind a physical device to a tenant/branch. */
 export type BindPosDeviceRequest = {
   deviceId: string;
   label: string;
   branchId: string;
 };
 
-/** Terminal lock/unlock during an active shift (cashier steps away). */
+export type UpdatePosDeviceRequest = {
+  branchId?: string;
+  label?: string;
+  status?: PosDeviceStatus;
+  reason: string;
+};
+
+export type RotatePosDeviceCredentialRequest = {
+  reason: string;
+};
+
 export type PosTerminalLockState = "locked" | "unlocked";
 
 export type PosTerminalState = {
@@ -49,23 +48,38 @@ export type PosTerminalState = {
 
 export type SetTerminalLockRequest = {
   lockState: PosTerminalLockState;
+  reason: string;
 };
 
-export type PosPinLoginInput = {
-  requestMeta?: AuthRequestMeta;
-  data: PosPinLoginRequest;
+export type PosDeviceMutationResult = {
+  device: PosDevice;
+  setCookieHeaders: string[];
 };
 
-export type BindPosDeviceInput = {
+export type PosDeviceMutationInput<TData> = {
+  authContext: AuthContext;
   requestMeta?: AuthRequestMeta;
-  data: BindPosDeviceRequest;
+  data: TData;
 };
 
-export type SetTerminalLockInput = {
-  requestMeta?: AuthRequestMeta;
-  data: SetTerminalLockRequest;
-};
+export type BindPosDeviceInput = PosDeviceMutationInput<BindPosDeviceRequest>;
+
+export type UpdatePosDeviceInput =
+  PosDeviceMutationInput<UpdatePosDeviceRequest> & {
+    deviceId: string;
+  };
+
+export type RotatePosDeviceCredentialInput =
+  PosDeviceMutationInput<RotatePosDeviceCredentialRequest> & {
+    deviceId: string;
+  };
+
+export type SetTerminalLockInput =
+  PosDeviceMutationInput<SetTerminalLockRequest> & {
+    deviceId: string;
+  };
 
 export type GetPosDeviceInput = {
+  authContext: AuthContext;
   deviceId: string;
 };

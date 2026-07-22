@@ -50,6 +50,28 @@ export async function findCustomerStatistics(
     branchId?: string;
   },
 ): Promise<PosCustomerStatistics> {
+  if (input.allowedBranchIds?.length === 0) {
+    return {
+      totalCount: 0,
+      todayNewCount: 0,
+      activeCount: 0,
+      disabledCount: 0,
+      profileCount: 0,
+      activeProfileCount: 0,
+      disabledProfileCount: 0,
+      todayNewProfileCount: 0,
+      orderedCustomerCount: 0,
+      ticketedCustomerCount: 0,
+      engagedCustomerCount: 0,
+      repeatOrderCustomerCount: 0,
+      repeatTicketCustomerCount: 0,
+      sevenDayNewAccounts: getLastSevenUtcDates().map((date) => ({
+        date,
+        count: 0,
+      })),
+    };
+  }
+
   const baseFilters: SQL[] = [
     eq(customerAccounts.tenantId, input.tenantId),
     isNull(customerAccounts.deletedAt),

@@ -1,6 +1,10 @@
 import { type Database, getDb } from "@cleanhub/db";
 import type { AuthContext } from "../../auth/auth.types.js";
-import { assertPosContext } from "../../auth/permission.helper.js";
+import {
+  requirePosBranchAccess,
+  requirePosTenantId,
+  resolvePosBranchScope,
+} from "../access-control.helper.js";
 import {
   findCustomerStatistics,
   findOrderStatisticsDetail,
@@ -16,26 +20,6 @@ import type {
 } from "./statistics.types.js";
 
 // ---------------------------------------------------------------------------
-// Local helpers (same pattern as orders.service.ts)
-// ---------------------------------------------------------------------------
-
-function requirePosContext(authContext: AuthContext): string {
-  assertPosContext(authContext);
-  return authContext.tenantId!;
-}
-
-function resolveListBranchScope(
-  authContext: AuthContext,
-): string[] | undefined {
-  if (authContext.role === "owner" || authContext.role === "manager") {
-    return authContext.branchIds.length > 0
-      ? authContext.branchIds
-      : undefined;
-  }
-  return authContext.branchIds;
-}
-
-// ---------------------------------------------------------------------------
 // Overview
 // ---------------------------------------------------------------------------
 
@@ -44,11 +28,14 @@ export async function getPosStatisticsOverview(
   query: { period?: PosStatisticsPeriod; branchId?: string },
   db: Database = getDb(),
 ): Promise<PosStatisticsOverview> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
+  if (query.branchId) {
+    requirePosBranchAccess(authContext, query.branchId);
+  }
 
   return findStatisticsOverview(db, {
     tenantId,
-    allowedBranchIds: resolveListBranchScope(authContext),
+    allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
     period: query.period,
   });
@@ -63,11 +50,14 @@ export async function getPosTicketStatistics(
   query: { period?: PosStatisticsPeriod; branchId?: string },
   db: Database = getDb(),
 ): Promise<PosTicketStatisticsDetail> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
+  if (query.branchId) {
+    requirePosBranchAccess(authContext, query.branchId);
+  }
 
   return findTicketStatisticsDetail(db, {
     tenantId,
-    allowedBranchIds: resolveListBranchScope(authContext),
+    allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
     period: query.period,
   });
@@ -82,11 +72,14 @@ export async function getPosOrderStatistics(
   query: { period?: PosStatisticsPeriod; branchId?: string },
   db: Database = getDb(),
 ): Promise<PosOrderStatisticsDetail> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
+  if (query.branchId) {
+    requirePosBranchAccess(authContext, query.branchId);
+  }
 
   return findOrderStatisticsDetail(db, {
     tenantId,
-    allowedBranchIds: resolveListBranchScope(authContext),
+    allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
     period: query.period,
   });
@@ -101,11 +94,14 @@ export async function getPosCustomerStatistics(
   query: { branchId?: string },
   db: Database = getDb(),
 ): Promise<PosCustomerStatistics> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
+  if (query.branchId) {
+    requirePosBranchAccess(authContext, query.branchId);
+  }
 
   return findCustomerStatistics(db, {
     tenantId,
-    allowedBranchIds: resolveListBranchScope(authContext),
+    allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
   });
 }

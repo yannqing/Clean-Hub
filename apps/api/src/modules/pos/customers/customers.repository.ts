@@ -554,6 +554,11 @@ export async function findPosCustomerServiceItems(
         itemBrand: ticketItems.itemBrand,
         itemMaterial: ticketItems.itemMaterial,
         quantity: ticketItems.quantity,
+        pricingUnit: ticketItems.pricingUnit,
+        standardUnitAmount: ticketItems.standardUnitAmount,
+        chargedUnitAmount: ticketItems.chargedUnitAmount,
+        weight: ticketItems.weight,
+        bagCount: ticketItems.bagCount,
         unitAmount: ticketItems.unitAmount,
         lineAmount: ticketItems.lineAmount,
         serviceId: ticketItems.serviceId,
@@ -605,7 +610,12 @@ export async function findPosCustomerServiceItems(
       itemBrand: row.itemBrand,
       itemMaterial: row.itemMaterial,
       quantity: row.quantity,
-      unitAmount: row.unitAmount,
+      pricingUnit: row.pricingUnit ?? "per_item",
+      standardUnitAmount: row.standardUnitAmount ?? row.unitAmount,
+      chargedUnitAmount: row.chargedUnitAmount ?? row.unitAmount,
+      weight: row.weight,
+      bagCount: row.bagCount,
+      unitAmount: row.chargedUnitAmount ?? row.unitAmount,
       lineAmount: row.lineAmount,
       serviceId: row.serviceId,
       labelCode: row.labelCode,
@@ -626,6 +636,7 @@ export async function findPosCustomerServiceItems(
 // ---- writes: accounts -----------------------------------------------------
 
 export type InsertPosAccountInput = {
+  id?: string;
   actorUserId: string;
   tenantId: string;
   accountName: string;
@@ -637,7 +648,7 @@ export async function insertPosAccount(
   db: Database,
   input: InsertPosAccountInput,
 ): Promise<PosCustomerAccountDetail> {
-  const id = createId();
+  const id = input.id ?? createId();
   const phone = normalizeOptional(input.phone);
   const email = input.email ? normalizeEmail(input.email) : undefined;
 
@@ -1003,15 +1014,18 @@ export async function writePosAccountAuditLog(
     tenantId: string;
     accountId: string;
     eventType: string;
-    before?: PosAccountAuditSnapshot | null;
-    after?: PosAccountAuditSnapshot | null;
+    before?: Record<string, unknown> | null;
+    after?: Record<string, unknown> | null;
     reason?: string;
+    branchId?: string;
+    metadata?: Record<string, unknown>;
     ipAddress?: string;
     userAgent?: string;
   },
 ): Promise<void> {
   await writeAuditLog(db, {
     tenantId: input.tenantId,
+    branchId: input.branchId,
     actorUserId: input.actorUserId,
     eventCategory: "pos_customer",
     eventType: input.eventType,
@@ -1019,6 +1033,7 @@ export async function writePosAccountAuditLog(
     entityId: input.accountId,
     success: true,
     reason: input.reason,
+    metadata: input.metadata,
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
     before: input.before ?? undefined,
@@ -1033,15 +1048,18 @@ export async function writePosProfileAuditLog(
     tenantId: string;
     customerId: string;
     eventType: string;
-    before?: PosProfileAuditSnapshot | null;
-    after?: PosProfileAuditSnapshot | null;
+    before?: Record<string, unknown> | null;
+    after?: Record<string, unknown> | null;
     reason?: string;
+    branchId?: string;
+    metadata?: Record<string, unknown>;
     ipAddress?: string;
     userAgent?: string;
   },
 ): Promise<void> {
   await writeAuditLog(db, {
     tenantId: input.tenantId,
+    branchId: input.branchId,
     actorUserId: input.actorUserId,
     eventCategory: "pos_customer",
     eventType: input.eventType,
@@ -1049,6 +1067,7 @@ export async function writePosProfileAuditLog(
     entityId: input.customerId,
     success: true,
     reason: input.reason,
+    metadata: input.metadata,
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
     before: input.before ?? undefined,

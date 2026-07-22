@@ -1,4 +1,4 @@
-import type { ApiClient } from "../types";
+import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   CreatePosAccountRequest,
   PosAccountProfilesQuery,
@@ -20,8 +20,10 @@ import type {
 export function createPosAccountsApi(client: ApiClient) {
   return {
     /** Create a customer account. POST /pos/accounts */
-    create: (input: CreatePosAccountRequest) =>
-      client.post<PosCustomerAccountDetail>("/pos/accounts", input),
+    create: (
+      input: CreatePosAccountRequest,
+      options?: Omit<ApiRequestOptions, "method" | "body" | "query">,
+    ) => client.post<PosCustomerAccountDetail>("/pos/accounts", input, options),
 
     /** Account detail. GET /pos/accounts/:accountId */
     get: (accountId: string) =>
@@ -69,7 +71,9 @@ export function createPosAccountsApi(client: ApiClient) {
       ),
 
     /** Soft delete an account (cascades to its profiles). DELETE /pos/accounts/:accountId */
-    remove: (accountId: string) =>
-      client.delete<void>(`/pos/accounts/${accountId}`),
+    remove: (accountId: string, reason: string) =>
+      client.delete<void>(`/pos/accounts/${accountId}`, {
+        query: { reason },
+      }),
   };
 }

@@ -8,33 +8,50 @@ export type TicketItemFormFieldErrors = Partial<
 >;
 
 /**
- * Validate a ticket item create/edit form. The server requires `itemName` and
- * a non-negative `unitAmount`; quantity defaults to 1. We surface those rules
- * here so the form can show field-level errors before submitting.
+ * Validate catalog selection, measurement, and controlled price input before
+ * the server repeats the same authorization and calculation checks.
  */
 export function validateTicketItemForm(
   values: TicketItemFormValues,
 ): TicketItemFormFieldErrors | null {
   const errors: TicketItemFormFieldErrors = {};
 
-  if (!values.itemName.trim()) {
-    errors.itemName = "请输入物品名称";
-  } else if (values.itemName.length > 200) {
-    errors.itemName = "名称不能超过 200 字";
+  if (!values.serviceId) {
+    errors.serviceId = "请选择服务项目";
   }
 
-  const quantity = Number(values.quantity);
-  if (!values.quantity.trim() || !Number.isFinite(quantity)) {
-    errors.quantity = "请输入数量";
-  } else if (!Number.isInteger(quantity) || quantity < 1) {
-    errors.quantity = "数量必须是大于等于 1 的整数";
+  if (values.pricingUnit === "per_kg") {
+    const weight = Number(values.weight);
+    if (!values.weight.trim() || !Number.isFinite(weight) || weight <= 0) {
+      errors.weight = "请输入大于 0 的重量";
+    }
+    const bagCount = Number(values.bagCount);
+    if (!Number.isInteger(bagCount) || bagCount < 1) {
+      errors.bagCount = "袋数必须是大于等于 1 的整数";
+    }
+  } else {
+    const quantity = Number(values.quantity);
+    if (!values.quantity.trim() || !Number.isFinite(quantity)) {
+      errors.quantity = "请输入数量";
+    } else if (!Number.isInteger(quantity) || quantity < 1) {
+      errors.quantity = "数量必须是大于等于 1 的整数";
+    }
   }
 
-  const unitAmount = Number(values.unitAmount);
-  if (!values.unitAmount.trim() || !Number.isFinite(unitAmount)) {
-    errors.unitAmount = "请输入单价";
-  } else if (unitAmount < 0) {
-    errors.unitAmount = "单价不能为负";
+  const chargedUnitAmount = Number(values.chargedUnitAmount);
+  if (!values.chargedUnitAmount.trim() || !Number.isFinite(chargedUnitAmount)) {
+    errors.chargedUnitAmount = "请输入收费单价";
+  } else if (chargedUnitAmount < 0) {
+    errors.chargedUnitAmount = "收费单价不能为负";
+  }
+
+  if (
+    values.priceTouched &&
+    Number(values.chargedUnitAmount).toFixed(2) !==
+      Number(values.standardUnitAmount).toFixed(2) &&
+    !values.overrideReason.trim()
+  ) {
+    errors.overrideReason = "覆盖标准价时必须填写原因";
   }
 
   return Object.keys(errors).length > 0 ? errors : null;

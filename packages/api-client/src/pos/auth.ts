@@ -2,25 +2,32 @@ import type { ApiClient } from "../types";
 import type {
   BindPosDeviceRequest,
   PosDevice,
-  PosPinLoginRequest,
-  PosPinLoginResult,
   PosTerminalState,
+  RotatePosDeviceCredentialRequest,
   SetTerminalLockRequest,
+  UpdatePosDeviceRequest,
 } from "./auth.types";
 
 /**
- * POS-terminal-specific auth (PIN quick-login, device binding, terminal lock).
- * The platform-wide password login / refresh / logout live under
- * `posApi.auth` (modules/auth/); this namespace is the POS-specific layer.
+ * POS terminal enrollment and management. PIN login remains under
+ * `posApi.auth` so it can establish the normal HttpOnly auth cookies.
  */
 export function createPosTerminalAuthApi(client: ApiClient) {
   return {
-    pinLogin: (input: PosPinLoginRequest) =>
-      client.post<PosPinLoginResult>("/pos/auth/pin-login", input),
     bindDevice: (input: BindPosDeviceRequest) =>
       client.post<PosDevice>("/pos/auth/devices", input),
     getDevice: (deviceId: string) =>
       client.get<PosDevice>(`/pos/auth/devices/${deviceId}`),
+    updateDevice: (deviceId: string, input: UpdatePosDeviceRequest) =>
+      client.patch<PosDevice>(`/pos/auth/devices/${deviceId}`, input),
+    rotateCredential: (
+      deviceId: string,
+      input: RotatePosDeviceCredentialRequest,
+    ) =>
+      client.post<PosDevice>(
+        `/pos/auth/devices/${deviceId}/credential-rotation`,
+        input,
+      ),
     getTerminalState: (deviceId: string) =>
       client.get<PosTerminalState>(`/pos/auth/terminals/${deviceId}`),
     setTerminalLock: (deviceId: string, input: SetTerminalLockRequest) =>

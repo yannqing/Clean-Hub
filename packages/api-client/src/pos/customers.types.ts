@@ -111,6 +111,11 @@ export type PosCustomerServiceItemSummary = {
   itemBrand: string | null;
   itemMaterial: string | null;
   quantity: number;
+  pricingUnit: import("./service-tickets.types").ServiceTicketPricingUnit;
+  standardUnitAmount: string;
+  chargedUnitAmount: string;
+  weight: string | null;
+  bagCount: number | null;
   unitAmount: string;
   lineAmount: string;
   serviceId: string | null;

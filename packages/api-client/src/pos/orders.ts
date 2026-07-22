@@ -4,6 +4,9 @@ import type {
   CreatePosOrderItemRequest,
   CreatePosOrderRequest,
   CreatePosPaymentRequest,
+  CreatePosPaymentResponse,
+  DeletePosOrderItemRequest,
+  DeletePosOrderRequest,
   PosOrderDetail,
   PosOrderListQuery,
   PosOrderListResponse,
@@ -35,9 +38,14 @@ export function createPosOrdersApi(client: ApiClient) {
       input: UpdatePosOrderRequest,
       options?: RequestOptions,
     ) => client.patch<PosOrderDetail>(`/pos/orders/${orderId}`, input, options),
-    remove: (orderId: string, options?: RequestOptions) =>
+    remove: (
+      orderId: string,
+      input: DeletePosOrderRequest,
+      options?: RequestOptions,
+    ) =>
       client.delete<void>(`/pos/orders/${orderId}`, {
         parseAs: "void",
+        body: input,
         ...options,
       }),
     changeStatus: (
@@ -60,7 +68,7 @@ export function createPosOrdersApi(client: ApiClient) {
       input: CreatePosPaymentRequest,
       options?: RequestOptions,
     ) =>
-      client.post<PosOrderDetail>(
+      client.post<CreatePosPaymentResponse>(
         `/pos/orders/${orderId}/payments`,
         input,
         options,
@@ -108,10 +116,15 @@ export function createPosOrdersApi(client: ApiClient) {
         input,
         options,
       ),
-    deleteItem: (orderId: string, itemId: string, options?: RequestOptions) =>
+    deleteItem: (
+      orderId: string,
+      itemId: string,
+      input: DeletePosOrderItemRequest,
+      options?: RequestOptions,
+    ) =>
       client.delete<PosOrderDetail>(
         `/pos/orders/${orderId}/items/${itemId}`,
-        options,
+        { body: input, ...options },
       ),
   };
 }

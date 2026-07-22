@@ -31,25 +31,34 @@ import { coerceTicketItemType, validateTicketItemForm } from "../validators";
 import type { TicketItemFormValues } from "../types";
 import { TicketItemStatusBadge } from "./ticket-badges";
 import type {
+  PosCatalogService,
   ServiceTicketItem,
   ServiceTicketItemStatus,
 } from "@cleanhub/api-client";
 
 type TicketItemEditorProps = {
+  canManage: boolean;
+  catalog: PosCatalogService[];
   ticketId: string;
   currency: string;
   items: ServiceTicketItem[];
 };
 
 const EMPTY_ITEM_FORM: TicketItemFormValues = {
-  itemName: "",
+  serviceId: "",
+  pricingUnit: "per_item",
+  standardUnitAmount: "0",
+  chargedUnitAmount: "0",
+  priceTouched: false,
   itemType: "",
   itemCategory: "",
   itemColor: "",
   itemBrand: "",
   itemMaterial: "",
   quantity: "1",
-  unitAmount: "0",
+  weight: "",
+  bagCount: "1",
+  overrideReason: "",
   defectNotes: "",
   specialRequest: "",
   remark: "",
@@ -66,6 +75,8 @@ const EMPTY_ITEM_FORM: TicketItemFormValues = {
  * `revalidatePath` refresh the data, so this component stays a thin controller.
  */
 export function TicketItemEditor({
+  canManage,
+  catalog,
   ticketId,
   currency,
   items,
@@ -84,14 +95,20 @@ export function TicketItemEditor({
     setCreating(false);
     setEditingId(item.id);
     setForm({
-      itemName: item.itemName,
+      serviceId: item.serviceId ?? "",
+      pricingUnit: item.pricingUnit,
+      standardUnitAmount: item.standardUnitAmount,
+      chargedUnitAmount: item.chargedUnitAmount,
+      priceTouched: false,
       itemType: item.itemType ?? "",
       itemCategory: item.itemCategory ?? "",
       itemColor: item.itemColor ?? "",
       itemBrand: item.itemBrand ?? "",
       itemMaterial: item.itemMaterial ?? "",
       quantity: String(item.quantity),
-      unitAmount: item.unitAmount,
+      weight: item.weight ?? "",
+      bagCount: String(item.bagCount ?? 1),
+      overrideReason: "",
       defectNotes: item.defectNotes ?? "",
       specialRequest: item.specialRequest ?? "",
       remark: item.remark ?? "",
@@ -134,6 +151,7 @@ export function TicketItemEditor({
         ) : null}
         {items.map((item) => (
           <ItemRow
+            canManage={canManage}
             currency={currency}
             item={item}
             key={item.id}
@@ -158,6 +176,8 @@ export function TicketItemEditor({
             </DialogTitle>
           </DialogHeader>
           <ItemForm
+            canManage={canManage}
+            catalog={catalog}
             currency={currency}
             form={form}
             itemId={editingId ?? undefined}
@@ -173,17 +193,21 @@ export function TicketItemEditor({
 }
 
 function ItemRow({
+  canManage,
   currency,
   item,
   onEdit,
   ticketId,
 }: {
+  canManage: boolean;
   currency: string;
   item: ServiceTicketItem;
   onEdit: () => void;
   ticketId: string;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
 
   function changeStatus(next: ServiceTicketItemStatus) {
     startTransition(async () => {
@@ -199,13 +223,17 @@ function ItemRow({
   }
 
   function remove() {
-    if (!window.confirm(`确认删除项目「${item.itemName}」？`)) {
+    const reason = deleteReason.trim();
+    if (!reason) {
+      toast.error("请输入删除原因");
       return;
     }
     startTransition(async () => {
-      const result = await deleteTicketItemAction(ticketId, item.id);
+      const result = await deleteTicketItemAction(ticketId, item.id, reason);
       if (result.ok) {
         toast.success("项目已删除");
+        setDeleteOpen(false);
+        setDeleteReason("");
       } else {
         toast.error(result.message);
       }
@@ -247,16 +275,18 @@ function ItemRow({
           >
             <Icon className="h-4 w-4" name="square-pen" />
           </button>
-          <button
-            aria-label="删除项目"
-            className="flex h-11 w-11 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
-            disabled={isPending}
-            onClick={remove}
-            title="删除项目"
-            type="button"
-          >
-            <Icon className="h-4 w-4" name="trash" />
-          </button>
+          {canManage ? (
+            <button
+              aria-label="删除项目"
+              className="flex h-11 w-11 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              disabled={isPending}
+              onClick={() => setDeleteOpen(true)}
+              title="删除项目"
+              type="button"
+            >
+              <Icon className="h-4 w-4" name="trash" />
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -302,10 +332,20 @@ function ItemRow({
           ) : null}
         </div>
         <div>
-          <div className="text-xs text-slate-400">数量 / 单价</div>
-          <div className="mt-1 text-sm font-medium text-slate-700">
-            {item.quantity} × {formatTicketMoney(item.unitAmount, currency)}
+          <div className="text-xs text-slate-400">
+            {item.pricingUnit === "per_kg" ? "重量 / 单价" : "数量 / 单价"}
           </div>
+          <div className="mt-1 text-sm font-medium text-slate-700">
+            {item.pricingUnit === "per_kg"
+              ? `${item.weight ?? "0"} kg${item.bagCount ? ` · ${item.bagCount} 袋` : ""}`
+              : `${item.quantity} 件`} {" "}
+            × {formatTicketMoney(item.chargedUnitAmount, currency)}
+          </div>
+          {item.chargedUnitAmount !== item.standardUnitAmount ? (
+            <div className="mt-1 text-xs text-amber-700">
+              标准价 {formatTicketMoney(item.standardUnitAmount, currency)}
+            </div>
+          ) : null}
         </div>
         <div>
           <div className="text-xs text-slate-400">项目金额</div>
@@ -314,11 +354,60 @@ function ItemRow({
           </div>
         </div>
       </div>
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !isPending) {
+            setDeleteOpen(false);
+            setDeleteReason("");
+          }
+        }}
+        open={deleteOpen}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>删除项目</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <p className="text-sm text-slate-600">
+              删除「{item.itemName}」会写入审计记录。
+            </p>
+            <Field label="删除原因（必填）" wide>
+              <textarea
+                className={`${inputClass} min-h-[88px] py-2`}
+                disabled={isPending}
+                maxLength={500}
+                onChange={(event) => setDeleteReason(event.target.value)}
+                value={deleteReason}
+              />
+            </Field>
+            <div className="flex justify-end gap-2">
+              <button
+                className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600"
+                disabled={isPending}
+                onClick={() => setDeleteOpen(false)}
+                type="button"
+              >
+                取消
+              </button>
+              <button
+                className="h-10 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+                disabled={isPending || !deleteReason.trim()}
+                onClick={remove}
+                type="button"
+              >
+                {isPending ? "删除中…" : "确认删除"}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </article>
   );
 }
 
 function ItemForm({
+  canManage,
+  catalog,
   currency,
   form,
   onChange,
@@ -327,6 +416,8 @@ function ItemForm({
   ticketId,
   itemId,
 }: {
+  canManage: boolean;
+  catalog: PosCatalogService[];
   currency: string;
   form: TicketItemFormValues;
   onChange: (next: TicketItemFormValues) => void;
@@ -361,14 +452,25 @@ function ItemForm({
     }
 
     const payload = {
-      itemName: form.itemName.trim(),
+      serviceId: form.serviceId,
       itemType: coerceTicketItemType(form.itemType) || undefined,
       itemCategory: form.itemCategory.trim() || undefined,
       itemColor: form.itemColor.trim() || undefined,
       itemBrand: form.itemBrand.trim() || undefined,
       itemMaterial: form.itemMaterial.trim() || undefined,
-      quantity: Number(form.quantity),
-      unitAmount: form.unitAmount,
+      quantity:
+        form.pricingUnit === "per_item" ? Number(form.quantity) : undefined,
+      weight: form.pricingUnit === "per_kg" ? form.weight : undefined,
+      bagCount:
+        form.pricingUnit === "per_kg" ? Number(form.bagCount) : undefined,
+      chargedUnitAmount:
+        onSubmit === "create" || form.priceTouched
+          ? form.chargedUnitAmount
+          : undefined,
+      overrideReason:
+        form.priceTouched && form.overrideReason.trim()
+          ? form.overrideReason.trim()
+          : undefined,
       defectNotes: form.defectNotes.trim() || undefined,
       specialRequest: form.specialRequest.trim() || undefined,
       remark: form.remark.trim() || undefined,
@@ -391,12 +493,44 @@ function ItemForm({
   return (
     <form onSubmit={submit}>
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
-        <Field label="物品名称（必填）">
-          <input
+        <Field label="服务项目（必填）" wide>
+          <select
             className={inputClass}
-            onChange={(event) => update("itemName", event.target.value)}
-            value={form.itemName}
-          />
+            onChange={(event) => {
+              const service = catalog.find(
+                (entry) => entry.id === event.target.value,
+              );
+              if (!service) {
+                update("serviceId", "");
+                return;
+              }
+              onChange({
+                ...form,
+                serviceId: service.id,
+                pricingUnit: service.pricingUnit,
+                standardUnitAmount: service.amount,
+                chargedUnitAmount: service.amount,
+                priceTouched: true,
+                quantity: service.pricingUnit === "per_item" ? form.quantity || "1" : "1",
+                weight: service.pricingUnit === "per_kg" ? form.weight : "",
+                bagCount: service.pricingUnit === "per_kg" ? form.bagCount || "1" : "1",
+                overrideReason: "",
+              });
+            }}
+            value={form.serviceId}
+          >
+            <option value="">请选择服务</option>
+            {catalog.map((service) => (
+              <option key={service.id} value={service.id}>
+                {service.name} · {service.pricingUnit === "per_kg" ? "按公斤" : "按件"} · {formatTicketMoney(service.amount, service.currency)}
+              </option>
+            ))}
+          </select>
+          {catalog.length === 0 ? (
+            <span className="mt-1.5 block text-xs text-amber-700">
+              当前业务类型没有可用的服务及有效价格。
+            </span>
+          ) : null}
         </Field>
         <Field label="物品类型">
           <select
@@ -451,36 +585,93 @@ function ItemForm({
             emptyText="无匹配材质，按回车自定义"
           />
         </Field>
-        <Field label="数量">
+        {form.pricingUnit === "per_kg" ? (
+          <>
+            <Field label="重量（kg）">
+              <input
+                className={inputClass}
+                min="0.001"
+                onChange={(event) => update("weight", event.target.value)}
+                onWheel={handleNumberInputWheel}
+                step="0.001"
+                type="number"
+                value={form.weight}
+              />
+            </Field>
+            <Field label="袋数">
+              <input
+                className={inputClass}
+                min={1}
+                onChange={(event) => update("bagCount", event.target.value)}
+                onWheel={handleNumberInputWheel}
+                step={1}
+                type="number"
+                value={form.bagCount}
+              />
+            </Field>
+          </>
+        ) : (
+          <Field label="数量">
+            <input
+              className={inputClass}
+              min={1}
+              onChange={(event) => update("quantity", event.target.value)}
+              onWheel={handleNumberInputWheel}
+              step={1}
+              type="number"
+              value={form.quantity}
+            />
+          </Field>
+        )}
+        <Field label={canManage ? "收费单价" : "标准单价"}>
           <input
             className={inputClass}
-            min={1}
-            onChange={(event) => update("quantity", event.target.value)}
-            onWheel={handleNumberInputWheel}
-            type="number"
-            value={form.quantity}
-          />
-        </Field>
-        <Field label="单价">
-          <input
-            className={inputClass}
+            disabled={!canManage}
             min={0}
-            onChange={(event) => update("unitAmount", event.target.value)}
+            onChange={(event) =>
+              onChange({
+                ...form,
+                chargedUnitAmount: event.target.value,
+                priceTouched: true,
+              })
+            }
             onWheel={handleNumberInputWheel}
+            step="0.01"
             type="number"
-            value={form.unitAmount}
+            value={form.chargedUnitAmount}
           />
+          {canManage && form.chargedUnitAmount !== form.standardUnitAmount ? (
+            <span className="mt-1.5 block text-xs text-amber-700">
+              标准价 {formatTicketMoney(form.standardUnitAmount, currency)}
+            </span>
+          ) : null}
         </Field>
         <Field label="行金额（自动计算）">
           <input
             className={inputClass}
             disabled
             value={formatTicketMoney(
-              (Number(form.quantity) || 0) * (Number(form.unitAmount) || 0),
+              (form.pricingUnit === "per_kg"
+                ? Number(form.weight) || 0
+                : Number(form.quantity) || 0) *
+                (Number(form.chargedUnitAmount) || 0),
               currency,
             )}
           />
         </Field>
+        {canManage &&
+        form.priceTouched &&
+        Number(form.chargedUnitAmount).toFixed(2) !==
+          Number(form.standardUnitAmount).toFixed(2) ? (
+          <Field label="改价原因（必填）" wide>
+            <textarea
+              className={`${inputClass} min-h-[72px] py-2`}
+              maxLength={500}
+              onChange={(event) => update("overrideReason", event.target.value)}
+              value={form.overrideReason}
+            />
+          </Field>
+        ) : null}
         <Field label="瑕疵" wide>
           <textarea
             className={`${inputClass} min-h-[72px]`}
