@@ -14,6 +14,7 @@
     "@cleanhub/api-client": "workspace:*",
     "@cleanhub/hardware": "workspace:*",
     "@cleanhub/i18n": "workspace:*",
+    "@cleanhub/mobile": "workspace:*",
     "@cleanhub/offline": "workspace:*",
     "@cleanhub/ui": "workspace:*",
     "lucide-react": "^1.14.0",

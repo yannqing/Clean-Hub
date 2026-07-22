@@ -31,23 +31,31 @@ export async function runEmailDeliveryOnce(
     process.env.EMAIL_DELIVERY_BATCH_SIZE,
     50,
   );
+  const pushBatchSize = readPositiveInteger(
+    process.env.PUSH_DELIVERY_BATCH_SIZE,
+    50,
+  );
   const overdueBatchSize = readPositiveInteger(
     process.env.EMAIL_OVERDUE_TICKET_BATCH_SIZE,
     100,
   );
-  const [overdueResult, deliveryResult] = await Promise.all([
+  const [overdueResult, deliveryResult, pushResult] = await Promise.all([
     isDisabled(process.env.EMAIL_OVERDUE_TICKET_DISABLED)
       ? Promise.resolve(null)
       : service.publishOverdueTicketEvents({ limit: overdueBatchSize }),
     service.processEmailDeliveries({ limit: batchSize }),
+    isDisabled(process.env.PUSH_DELIVERY_DISABLED)
+      ? Promise.resolve(null)
+      : service.processPushDeliveries({ limit: pushBatchSize }),
   ]);
 
   logger.info(
     {
       overdue: overdueResult,
       deliveries: deliveryResult,
+      pushDeliveries: pushResult,
     },
-    "Email delivery cron completed",
+    "Notification delivery cron completed",
   );
 }
 

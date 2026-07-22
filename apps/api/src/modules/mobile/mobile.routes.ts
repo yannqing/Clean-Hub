@@ -12,6 +12,7 @@ import {
   NotificationsService,
   type NotificationPublisher,
 } from "../notifications/index.js";
+import { createMobileNotificationsRoutes } from "./notifications/index.js";
 import { createOwnerRoutes } from "./owner/index.js";
 import { OwnerService } from "./owner/index.js";
 import {
@@ -48,6 +49,7 @@ export function createMobileRoutes({
   });
 
   routes.route("/media", createMediaRoutes());
+  routes.route("/notifications", createMobileNotificationsRoutes());
   routes.route("/customer", createCustomerRoutes());
   routes.route("/delivery", createDeliveryRoutes({ deliveryService }));
   routes.route("/owner", createOwnerRoutes({ ownerService }));

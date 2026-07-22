@@ -485,6 +485,7 @@ export const frMessages = {
       connectFirst: "Connectez une imprimante portable avant d'imprimer.",
       missingInfo: "La tache ne contient pas les informations indispensables.",
       missingDocument: "Ajoutez une commande ou un ticket avant impression.",
+      noDeviceFound: "Aucune imprimante portable trouvee a proximite.",
       webUnavailable:
         "Connexion Bluetooth indisponible dans cette vue web. Utilisez l'application native apres synchronisation Capacitor.",
       popupBlocked: "La fenetre d'impression a ete bloquee.",

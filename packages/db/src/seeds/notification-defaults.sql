@@ -1,4 +1,4 @@
--- Default Email notification templates and configs for Demo Tenant 1 (CLEAN-001).
+-- Default Email/Push notification templates and configs for Demo Tenant 1 (CLEAN-001).
 --
 -- This is seed data, not schema migration. It is intentionally idempotent and
 -- uses fixed ULIDs so local/dev environments can be reseeded safely.
@@ -112,7 +112,33 @@ VALUES
   ('01SEED0200TPLRFDREJ0000003', NULL, 'email.refund.rejected', '退款拒绝邮件', 'business', 'zh-CN',
    '退款申请未通过',
    '您的订单 {{orderId}} 退款申请未通过。原因：{{rejectionReason}}。',
-   '[{"name":"orderId"},{"name":"rejectionReason"}]'::jsonb, true, true)
+   '[{"name":"orderId"},{"name":"rejectionReason"}]'::jsonb, true, true),
+
+  ('01SEED0200TPLDLVPSH0000001', NULL, 'push.delivery.status_changed', 'Delivery status push', 'business', 'en',
+   'Delivery update',
+   'Your {{type}} delivery is now {{toStatus}}.',
+   '[{"name":"type"},{"name":"toStatus"}]'::jsonb, true, true),
+  ('01SEED0200TPLDLVPSH0000002', NULL, 'push.delivery.status_changed', 'Push statut livraison', 'business', 'fr',
+   'Mise a jour livraison',
+   'Votre livraison {{type}} est maintenant {{toStatus}}.',
+   '[{"name":"type"},{"name":"toStatus"}]'::jsonb, true, true),
+  ('01SEED0200TPLDLVPSH0000003', NULL, 'push.delivery.status_changed', '配送状态推送', 'business', 'zh-CN',
+   '配送状态更新',
+   '您的 {{type}} 配送任务状态已更新为 {{toStatus}}。',
+   '[{"name":"type"},{"name":"toStatus"}]'::jsonb, true, true),
+
+  ('01SEED0200TPLRFDPSH0000001', NULL, 'push.refund.approved', 'Refund approved push', 'business', 'en',
+   'Refund approved',
+   'Your refund of {{amount}} has been approved.',
+   '[{"name":"amount"}]'::jsonb, true, true),
+  ('01SEED0200TPLRFDPSH0000002', NULL, 'push.refund.approved', 'Push remboursement approuve', 'business', 'fr',
+   'Remboursement approuve',
+   'Votre remboursement de {{amount}} est approuve.',
+   '[{"name":"amount"}]'::jsonb, true, true),
+  ('01SEED0200TPLRFDPSH0000003', NULL, 'push.refund.approved', '退款批准推送', 'business', 'zh-CN',
+   '退款已批准',
+   '您的退款 {{amount}} 已批准。',
+   '[{"name":"amount"}]'::jsonb, true, true)
 ON CONFLICT (id) DO UPDATE SET
   template_name = EXCLUDED.template_name,
   locale = EXCLUDED.locale,
@@ -144,7 +170,11 @@ VALUES
   ('01SEED0200CFGRFDAPP0000001', '01KRERJN800000000000000001', '01SEED0200TPLRFDAPP0000001',
    'Refund approved customer email', 'business', 'event', 'refund.approved', 'email', 'customer', 3, 60, true),
   ('01SEED0200CFGRFDREJ0000001', '01KRERJN800000000000000001', '01SEED0200TPLRFDREJ0000001',
-   'Refund rejected customer email', 'business', 'event', 'refund.rejected', 'email', 'customer', 3, 60, true)
+   'Refund rejected customer email', 'business', 'event', 'refund.rejected', 'email', 'customer', 3, 60, true),
+  ('01SEED0200CFGDLVPSH0000001', '01KRERJN800000000000000001', '01SEED0200TPLDLVPSH0000001',
+   'Delivery status customer push', 'business', 'event', 'delivery.status_changed', 'push', 'customer', 10, 60, true),
+  ('01SEED0200CFGRFDPSH0000001', '01KRERJN800000000000000001', '01SEED0200TPLRFDPSH0000001',
+   'Refund approved customer push', 'business', 'event', 'refund.approved', 'push', 'customer', 3, 60, true)
 ON CONFLICT (id) DO UPDATE SET
   template_id = EXCLUDED.template_id,
   config_name = EXCLUDED.config_name,

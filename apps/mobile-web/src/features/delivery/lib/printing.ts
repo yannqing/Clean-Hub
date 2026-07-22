@@ -1,9 +1,15 @@
 import {
+  buildDeliveryLabelEscPos,
   buildDeliveryLabelText,
+  buildDeliveryReceiptEscPos,
   buildDeliveryReceiptText,
+  createPortablePrinterPrintJob,
+  defaultEscPosPrinterProfile,
+  getPortablePrinterErrorMessage,
   type DeliveryPrintTask,
-  type PrintLocale,
+  type PortablePrinter,
   type PortablePrinterDevice,
+  type PrintLocale,
 } from "@cleanhub/hardware";
 
 import type { DeliveryTaskDetail } from "../types";
@@ -32,11 +38,51 @@ export type DeliveryPrintMessages = {
   connectFirst: string;
   missingDocument: string;
   missingInfo: string;
+  noDeviceFound: string;
   popupBlocked: string;
   readyLabel: string;
   readyReceipt: string;
   webUnavailable: string;
 };
+
+type CapacitorGlobal = {
+  isNativePlatform?: () => boolean;
+  Plugins?: Record<string, unknown>;
+};
+
+let nativePrinterInstance: PortablePrinter | null = null;
+
+function getCapacitorGlobal(): CapacitorGlobal | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const candidate = window as Window & { Capacitor?: CapacitorGlobal };
+  return candidate.Capacitor ?? null;
+}
+
+export function isNativePortablePrintingAvailable(): boolean {
+  const capacitor = getCapacitorGlobal();
+
+  if (!capacitor) {
+    return false;
+  }
+
+  if (typeof capacitor.isNativePlatform === "function") {
+    return capacitor.isNativePlatform();
+  }
+
+  return Boolean(capacitor.Plugins?.BluetoothLe);
+}
+
+async function getNativePortablePrinter(): Promise<PortablePrinter> {
+  if (!nativePrinterInstance) {
+    const { createCapacitorBlePortablePrinter } = await import("@cleanhub/mobile");
+    nativePrinterInstance = createCapacitorBlePortablePrinter();
+  }
+
+  return nativePrinterInstance;
+}
 
 export function validateDeliveryPrintTask(
   task: DeliveryTaskDetail,
@@ -54,13 +100,57 @@ export function validateDeliveryPrintTask(
 }
 
 export async function connectPortablePrinter(
-  messages: Pick<DeliveryPrintMessages, "webUnavailable">,
+  messages: Pick<DeliveryPrintMessages, "noDeviceFound" | "webUnavailable">,
+  onStateChange?: (state: DeliveryPrinterState) => void,
 ): Promise<DeliveryPrinterState> {
-  return {
-    status: "unavailable",
-    device: null,
-    error: messages.webUnavailable,
-  };
+  if (!isNativePortablePrintingAvailable()) {
+    return {
+      status: "unavailable",
+      device: null,
+      error: messages.webUnavailable,
+    };
+  }
+
+  try {
+    const printer = await getNativePortablePrinter();
+
+    onStateChange?.({ status: "discovering", device: null, error: null });
+
+    const devices = await printer.discover({
+      serviceUuids: [defaultEscPosPrinterProfile.serviceUuid],
+    });
+    const target = pickStrongestDevice(devices);
+
+    if (!target) {
+      return {
+        status: "unavailable",
+        device: null,
+        error: messages.noDeviceFound,
+      };
+    }
+
+    await printer.connect({ deviceId: target.id });
+
+    return {
+      status: "connected",
+      device: target,
+      error: null,
+    };
+  } catch (error) {
+    return {
+      status: "unavailable",
+      device: null,
+      error: getPortablePrinterErrorMessage(error),
+    };
+  }
+}
+
+export async function disconnectPortablePrinter(): Promise<DeliveryPrinterState> {
+  if (nativePrinterInstance) {
+    await nativePrinterInstance.disconnect();
+  }
+
+  return { ...initialDeliveryPrinterState };
 }
 
 export async function printDeliveryDocument(input: {
@@ -76,24 +166,43 @@ export async function printDeliveryDocument(input: {
     throw new Error(validationError);
   }
 
+  const printable = toDeliveryPrintTask(input.task);
+  const readyMessage =
+    input.document === "label"
+      ? input.messages.readyLabel
+      : input.messages.readyReceipt;
+
+  if (!isNativePortablePrintingAvailable()) {
+    const content =
+      input.document === "label"
+        ? buildDeliveryLabelText(printable, { locale: input.locale })
+        : buildDeliveryReceiptText(printable, { locale: input.locale });
+
+    openBrowserPrintPreview(content, input.document, input.locale, input.messages);
+
+    return { message: readyMessage };
+  }
+
   if (!input.printer.device) {
     throw new Error(input.messages.connectFirst);
   }
 
-  const printable = toDeliveryPrintTask(input.task);
-  const content =
+  const printer = await getNativePortablePrinter();
+  const bytes =
     input.document === "label"
-      ? buildDeliveryLabelText(printable, { locale: input.locale })
-      : buildDeliveryReceiptText(printable, { locale: input.locale });
+      ? buildDeliveryLabelEscPos(printable, { locale: input.locale })
+      : buildDeliveryReceiptEscPos(printable, { locale: input.locale });
 
-  openBrowserPrintPreview(content, input.document, input.locale, input.messages);
+  await printer.print(
+    createPortablePrinterPrintJob({
+      id: `${input.document}-${input.task.id}-${Date.now()}`,
+      printerId: input.printer.device.id,
+      title: `CleanHub ${input.document}`,
+      bytes,
+    }),
+  );
 
-  return {
-    message:
-      input.document === "label"
-        ? input.messages.readyLabel
-        : input.messages.readyReceipt,
-  };
+  return { message: readyMessage };
 }
 
 export function toDeliveryPrintTask(task: DeliveryTaskDetail): DeliveryPrintTask {
@@ -110,6 +219,20 @@ export function toDeliveryPrintTask(task: DeliveryTaskDetail): DeliveryPrintTask
     scheduledAt: task.expectedAt ?? undefined,
     note: task.notes ?? undefined,
   };
+}
+
+function pickStrongestDevice(
+  devices: PortablePrinterDevice[],
+): PortablePrinterDevice | null {
+  if (!devices.length) {
+    return null;
+  }
+
+  return [...devices].sort(
+    (first, second) =>
+      (second.rssi ?? Number.NEGATIVE_INFINITY) -
+      (first.rssi ?? Number.NEGATIVE_INFINITY),
+  )[0];
 }
 
 function openBrowserPrintPreview(

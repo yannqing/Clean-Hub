@@ -15,6 +15,10 @@ import { apiClient } from "@/lib/api-client";
 import { mobileReleaseConfig } from "@/lib/mobile-release-config";
 import { clearMobileSession } from "@/lib/token-storage";
 import {
+  disablePushNotifications,
+  enablePushNotifications,
+} from "@/lib/push-notifications";
+import {
   enterTenantContext,
   getCustomerTestOtp,
   loadStoredAuthState,
@@ -107,6 +111,10 @@ export function MobileAuthShell() {
         setTenantCode(state.tenantCode);
         setTenantInput(state.tenantCode ?? "");
         setSession(nextSession);
+        if (nextSession) {
+          // Best effort: never blocks session restore.
+          void enablePushNotifications(apiClient);
+        }
       })
       .catch(() => {
         if (mounted) {
@@ -215,11 +223,15 @@ export function MobileAuthShell() {
 
       setSession(nextSession);
       setMessage(t("auth.login.success"));
+      // Best effort: never blocks login.
+      void enablePushNotifications(apiClient);
     });
   }
 
   function handleLogout() {
     runAction(async () => {
+      // Unregister the device token while the session is still valid.
+      await disablePushNotifications(apiClient);
       await logoutLocally();
       setSession(null);
       setPassword("");
@@ -230,6 +242,7 @@ export function MobileAuthShell() {
 
   function handleTenantReset() {
     runAction(async () => {
+      await disablePushNotifications(apiClient);
       await resetTenantContext();
       setTenantCode(null);
       setTenantInput("");

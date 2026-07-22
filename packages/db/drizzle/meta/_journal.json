@@ -50,6 +50,13 @@
       "when": 1783913181567,
       "tag": "0006_wandering_hellion",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784615088770,
+      "tag": "0007_misty_boom_boom",
+      "breakpoints": true
     }
   ]
 }

@@ -59,6 +59,7 @@ type DeliveryTaskDetailSheetProps = {
   open: boolean;
   primaryTaskAction: DeliveryPrimaryTaskAction | null;
   printer: DeliveryPrinterState;
+  printerConnectionRequired: boolean;
   proofTypeLabelKeys: Record<DeliveryProofType, TranslationKey>;
   selectedTask: DeliveryTaskDetail | null;
   selectedTaskCanReportException: boolean;
@@ -104,6 +105,7 @@ export function DeliveryTaskDetailSheet({
   open,
   primaryTaskAction,
   printer,
+  printerConnectionRequired,
   proofTypeLabelKeys,
   selectedTask,
   selectedTaskCanReportException,
@@ -307,7 +309,10 @@ export function DeliveryTaskDetailSheet({
                   <div className="mt-3 grid grid-cols-2 gap-2">
                     <Button
                       className="h-11"
-                      disabled={Boolean(activeAction) || !printer.device}
+                      disabled={
+                        Boolean(activeAction) ||
+                        (printerConnectionRequired && !printer.device)
+                      }
                       type="button"
                       variant="secondary"
                       onClick={() => onPrintDocument("receipt")}
@@ -321,7 +326,10 @@ export function DeliveryTaskDetailSheet({
                     </Button>
                     <Button
                       className="h-11"
-                      disabled={Boolean(activeAction) || !printer.device}
+                      disabled={
+                        Boolean(activeAction) ||
+                        (printerConnectionRequired && !printer.device)
+                      }
                       type="button"
                       variant="secondary"
                       onClick={() => onPrintDocument("label")}

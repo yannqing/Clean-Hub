@@ -9,8 +9,15 @@ import {
   renderNotificationTemplate,
 } from "./notification-renderer.js";
 import { NotificationsRepository } from "./notifications.repository.js";
+import { PushAdapter, PushSendError } from "./push.adapter.js";
+import {
+  loadPushConfig,
+  loadPushRetrySettings,
+  type PushConfig,
+} from "./push-config.js";
 import type {
-  EmailDeliveryWorkItem,
+  DeliveryWorkItem,
+  NotificationChannel,
   NotificationConfigRecord,
   NotificationDeliveryRecord,
   NotificationDeliveryRunResult,
@@ -18,7 +25,9 @@ import type {
   NotificationEvent,
   NotificationPublishResult,
   NotificationRecipientType,
+  NotificationRecord,
   OverdueTicketEventSource,
+  PushTokenRecord,
 } from "./notifications.types.js";
 
 export type NotificationPublisher = {
@@ -38,6 +47,9 @@ export type NotificationsRepositoryLike = Pick<
   | "isUserPreferenceEnabled"
   | "countRecentDeliveries"
   | "listClaimableEmailDeliveries"
+  | "listClaimablePushDeliveries"
+  | "listPushTokensForDelivery"
+  | "softDeletePushTokens"
   | "markDeliverySent"
   | "markDeliveryFailed"
   | "skipDelivery"
@@ -48,6 +60,8 @@ export type NotificationsServiceOptions = {
   repository?: NotificationsRepositoryLike;
   emailAdapter?: ChannelAdapter;
   emailConfig?: EmailConfig;
+  pushAdapter?: ChannelAdapter;
+  pushConfig?: PushConfig;
   env?: NodeJS.ProcessEnv;
   logger?: Pick<AppLogger, "info" | "warn" | "error">;
 };
@@ -60,11 +74,15 @@ export class NotificationsService implements NotificationPublisher {
   private readonly env: NodeJS.ProcessEnv;
   private emailAdapter?: ChannelAdapter;
   private emailConfig?: EmailConfig;
+  private pushAdapter?: ChannelAdapter;
+  private pushConfig?: PushConfig;
 
   constructor(options: NotificationsServiceOptions = {}) {
     this.repository = options.repository ?? new NotificationsRepository();
     this.emailAdapter = options.emailAdapter;
     this.emailConfig = options.emailConfig;
+    this.pushAdapter = options.pushAdapter;
+    this.pushConfig = options.pushConfig;
     this.env = options.env ?? process.env;
     this.logger =
       options.logger ??
@@ -140,6 +158,36 @@ export class NotificationsService implements NotificationPublisher {
 
     for (const item of workItems) {
       const itemResult = await this.processEmailDelivery(item, now);
+
+      result[itemResult] += 1;
+    }
+
+    return result;
+  }
+
+  async processPushDeliveries(input: {
+    now?: Date;
+    limit?: number;
+    leaseSeconds?: number;
+  } = {}): Promise<NotificationDeliveryRunResult> {
+    const now = input.now ?? new Date();
+    const leaseUntil = new Date(
+      now.getTime() + (input.leaseSeconds ?? 5 * 60) * 1000,
+    );
+    const workItems = await this.repository.listClaimablePushDeliveries({
+      now,
+      limit: input.limit ?? 50,
+      leaseUntil,
+    });
+    const result: NotificationDeliveryRunResult = {
+      claimed: workItems.length,
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+    };
+
+    for (const item of workItems) {
+      const itemResult = await this.processPushDelivery(item, now);
 
       result[itemResult] += 1;
     }
@@ -271,7 +319,7 @@ export class NotificationsService implements NotificationPublisher {
   }
 
   private async processEmailDelivery(
-    item: EmailDeliveryWorkItem,
+    item: DeliveryWorkItem,
     now: Date,
   ): Promise<"sent" | "failed" | "skipped"> {
     const validation = await this.validateEmailDelivery(item, now);
@@ -316,13 +364,203 @@ export class NotificationsService implements NotificationPublisher {
       );
       return "sent";
     } catch (error) {
-      await this.markDeliverySendFailure(item.delivery, error, now);
+      await this.markDeliverySendFailure(item.delivery, error, now, "email");
       return "failed";
     }
   }
 
+  private async processPushDelivery(
+    item: DeliveryWorkItem,
+    now: Date,
+  ): Promise<"sent" | "failed" | "skipped"> {
+    const validation = await this.validatePushDelivery(item, now);
+
+    if (!validation.ok) {
+      await this.repository.skipDelivery({
+        deliveryId: item.delivery.id,
+        reason: validation.reason,
+        now,
+      });
+      this.logger.info(
+        {
+          tenantId: item.delivery.tenantId,
+          deliveryId: item.delivery.id,
+          reason: validation.reason,
+        },
+        "Push notification delivery skipped",
+      );
+      return "skipped";
+    }
+
+    let adapter: ChannelAdapter;
+
+    try {
+      adapter = this.getPushAdapter();
+    } catch (error) {
+      // Missing FCM credentials: fail the delivery (retried later) instead of
+      // crashing the process.
+      await this.markDeliverySendFailure(item.delivery, error, now, "push");
+      return "failed";
+    }
+
+    const data = buildPushData(item.notification);
+    const invalidTokenIds: string[] = [];
+    let sentExternalId: string | null = null;
+    let transientError: unknown = null;
+
+    for (const pushToken of validation.tokens) {
+      try {
+        const sendResult = await adapter.send({
+          deliveryId: item.delivery.id,
+          to: pushToken.token,
+          subject: item.notification.title,
+          text: item.notification.content,
+          data,
+        });
+
+        sentExternalId ??= sendResult.externalId;
+      } catch (error) {
+        if (error instanceof PushSendError && error.isTokenInvalid) {
+          invalidTokenIds.push(pushToken.id);
+          continue;
+        }
+
+        transientError = error;
+      }
+    }
+
+    if (invalidTokenIds.length > 0) {
+      await this.repository.softDeletePushTokens({
+        tokenIds: invalidTokenIds,
+        now,
+      });
+      this.logger.warn(
+        {
+          tenantId: item.delivery.tenantId,
+          deliveryId: item.delivery.id,
+          invalidTokenIds,
+        },
+        "Push tokens invalidated by FCM and soft deleted",
+      );
+    }
+
+    if (sentExternalId) {
+      await this.repository.markDeliverySent({
+        deliveryId: item.delivery.id,
+        externalId: sentExternalId,
+        now,
+      });
+      this.logger.info(
+        {
+          tenantId: item.delivery.tenantId,
+          deliveryId: item.delivery.id,
+          externalId: sentExternalId,
+          tokenCount: validation.tokens.length,
+          invalidTokenCount: invalidTokenIds.length,
+        },
+        "Push notification sent",
+      );
+      return "sent";
+    }
+
+    if (transientError) {
+      await this.markDeliverySendFailure(
+        item.delivery,
+        transientError,
+        now,
+        "push",
+      );
+      return "failed";
+    }
+
+    await this.repository.skipDelivery({
+      deliveryId: item.delivery.id,
+      reason: "push_tokens_invalid",
+      now,
+    });
+    this.logger.info(
+      {
+        tenantId: item.delivery.tenantId,
+        deliveryId: item.delivery.id,
+      },
+      "Push notification delivery skipped because every token was invalid",
+    );
+    return "skipped";
+  }
+
+  private async validatePushDelivery(
+    item: DeliveryWorkItem,
+    now: Date,
+  ): Promise<
+    { ok: true; tokens: PushTokenRecord[] } | { ok: false; reason: string }
+  > {
+    if (!(await this.repository.isTenantNotificationsEnabled(item.delivery.tenantId))) {
+      return { ok: false, reason: "tenant_notifications_disabled" };
+    }
+
+    const settings = await this.repository.getTenantNotificationSettings(
+      item.delivery.tenantId,
+    );
+
+    if (
+      isChannelDisabledBySettings(
+        settings,
+        "push",
+        item.config?.triggerEvent ?? null,
+      )
+    ) {
+      return { ok: false, reason: "notification_settings_disabled" };
+    }
+
+    if (!item.delivery.recipientId) {
+      return { ok: false, reason: "recipient_id_missing" };
+    }
+
+    if (
+      item.delivery.recipientType === "user" &&
+      !(await this.repository.isUserPreferenceEnabled({
+        tenantId: item.delivery.tenantId,
+        userId: item.delivery.recipientId,
+        noticeType: item.notification.noticeType,
+        channel: "push",
+      }))
+    ) {
+      return { ok: false, reason: "recipient_preference_disabled" };
+    }
+
+    if (item.config?.frequencyLimit && item.config.frequencyWindowMinutes) {
+      const since = new Date(
+        now.getTime() - item.config.frequencyWindowMinutes * 60_000,
+      );
+      const count = await this.repository.countRecentDeliveries({
+        tenantId: item.delivery.tenantId,
+        configId: item.config.id,
+        recipientType: item.delivery.recipientType,
+        recipientId: item.delivery.recipientId,
+        since,
+        excludeDeliveryId: item.delivery.id,
+      });
+
+      if (count >= item.config.frequencyLimit) {
+        return { ok: false, reason: "frequency_limit_exceeded" };
+      }
+    }
+
+    const tokens = await this.repository.listPushTokensForDelivery({
+      tenantId: item.delivery.tenantId,
+      recipientType: item.delivery.recipientType,
+      recipientId: item.delivery.recipientId,
+    });
+
+    if (tokens.length === 0) {
+      return { ok: false, reason: "no_push_tokens" };
+    }
+
+    return { ok: true, tokens };
+  }
+
   private async validateEmailDelivery(
-    item: EmailDeliveryWorkItem,
+    item: DeliveryWorkItem,
     now: Date,
   ): Promise<{ ok: true; to: string } | { ok: false; reason: string }> {
     if (!(await this.repository.isTenantNotificationsEnabled(item.delivery.tenantId))) {
@@ -333,7 +571,13 @@ export class NotificationsService implements NotificationPublisher {
       item.delivery.tenantId,
     );
 
-    if (isEmailDisabledBySettings(settings, item.config?.triggerEvent ?? null)) {
+    if (
+      isChannelDisabledBySettings(
+        settings,
+        "email",
+        item.config?.triggerEvent ?? null,
+      )
+    ) {
       return { ok: false, reason: "notification_settings_disabled" };
     }
 
@@ -378,7 +622,7 @@ export class NotificationsService implements NotificationPublisher {
   }
 
   private async resolveRecipientEmail(
-    item: EmailDeliveryWorkItem,
+    item: DeliveryWorkItem,
   ): Promise<string | null> {
     if (item.delivery.recipientType === "customer" && item.delivery.recipientId) {
       return this.repository.findCustomerEmail({
@@ -401,7 +645,9 @@ export class NotificationsService implements NotificationPublisher {
     delivery: NotificationDeliveryRecord,
     error: unknown,
     now: Date,
+    channel: NotificationChannel,
   ): Promise<void> {
+    const retrySettings = this.getRetrySettings(channel);
     const attemptAfterFailure = delivery.attemptCount + 1;
     const nextRetryAt =
       attemptAfterFailure >= delivery.maxAttempts
@@ -410,13 +656,15 @@ export class NotificationsService implements NotificationPublisher {
             now.getTime() +
               getBackoffSeconds(
                 attemptAfterFailure,
-                this.getEmailConfig().retryBaseSeconds,
-                this.getEmailConfig().retryMaxSeconds,
+                retrySettings.retryBaseSeconds,
+                retrySettings.retryMaxSeconds,
               ) *
                 1000,
           );
     const failedReason =
-      error instanceof Error ? error.message : "Email delivery failed.";
+      error instanceof Error
+        ? error.message
+        : `${channel === "push" ? "Push" : "Email"} delivery failed.`;
 
     await this.repository.markDeliveryFailed({
       delivery,
@@ -429,11 +677,23 @@ export class NotificationsService implements NotificationPublisher {
         error,
         tenantId: delivery.tenantId,
         deliveryId: delivery.id,
+        channel,
         attemptAfterFailure,
         nextRetryAt: nextRetryAt?.toISOString() ?? null,
       },
-      "Email notification delivery failed",
+      "Notification delivery failed",
     );
+  }
+
+  private getRetrySettings(channel: NotificationChannel): {
+    retryBaseSeconds: number;
+    retryMaxSeconds: number;
+  } {
+    if (channel === "push") {
+      return loadPushRetrySettings(this.env);
+    }
+
+    return this.getEmailConfig();
   }
 
   private resolveRecipientId(
@@ -468,6 +728,16 @@ export class NotificationsService implements NotificationPublisher {
     this.emailAdapter ??= new EmailAdapter(this.getEmailConfig());
     return this.emailAdapter;
   }
+
+  private getPushConfig(): PushConfig {
+    this.pushConfig ??= loadPushConfig(this.env);
+    return this.pushConfig;
+  }
+
+  private getPushAdapter(): ChannelAdapter {
+    this.pushAdapter ??= new PushAdapter(this.getPushConfig());
+    return this.pushAdapter;
+  }
 }
 
 export function createNotificationsServiceFromEnv(
@@ -480,27 +750,71 @@ function requiresConcreteRecipient(type: NotificationRecipientType): boolean {
   return type === "customer" || type === "user";
 }
 
-function isEmailDisabledBySettings(
+function isChannelDisabledBySettings(
   settings: Record<string, unknown>,
+  channel: NotificationChannel,
   triggerEvent: string | null,
 ): boolean {
-  if (settings.emailEnabled === false || settings.disableEmail === true) {
+  if (
+    channel === "email" &&
+    (settings.emailEnabled === false || settings.disableEmail === true)
+  ) {
     return true;
   }
 
-  if (readNestedBoolean(settings, ["channels", "email"]) === false) {
+  if (
+    channel === "push" &&
+    (settings.pushEnabled === false || settings.disablePush === true)
+  ) {
+    return true;
+  }
+
+  if (readNestedBoolean(settings, ["channels", channel]) === false) {
     return true;
   }
 
   if (
     triggerEvent &&
-    (readNestedBoolean(settings, ["events", triggerEvent, "email"]) === false ||
-      readNestedBoolean(settings, [triggerEvent, "email"]) === false)
+    (readNestedBoolean(settings, ["events", triggerEvent, channel]) === false ||
+      readNestedBoolean(settings, [triggerEvent, channel]) === false)
   ) {
     return true;
   }
 
   return false;
+}
+
+/**
+ * Builds the FCM data payload used by the mobile client for deep-linking.
+ * FCM only accepts string values.
+ */
+function buildPushData(notification: NotificationRecord): Record<string, string> {
+  const data: Record<string, string> = {
+    notificationId: notification.id,
+  };
+  const payload = notification.payload ?? {};
+
+  if (typeof payload.eventName === "string" && payload.eventName) {
+    data.eventName = payload.eventName;
+  }
+
+  if (notification.relatedType) {
+    data.relatedType = notification.relatedType;
+  }
+
+  if (notification.relatedId) {
+    data.relatedId = notification.relatedId;
+  }
+
+  for (const key of ["orderId", "ticketId", "taskId"] as const) {
+    const value = payload[key];
+
+    if (typeof value === "string" && value) {
+      data[key] = value;
+    }
+  }
+
+  return data;
 }
 
 function readNestedBoolean(

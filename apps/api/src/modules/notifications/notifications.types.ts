@@ -12,7 +12,22 @@ export type NotificationTriggerEvent =
   | "ticket.overdue"
   | "delivery.status_changed";
 
-export type NotificationChannel = "email";
+export type NotificationChannel = "email" | "push";
+
+export type PushSubjectType = "customer" | "staff";
+
+export type PushPlatform = "android" | "ios" | "web";
+
+export type PushTokenRecord = {
+  id: string;
+  tenantId: string;
+  subjectType: PushSubjectType;
+  subjectId: string;
+  platform: PushPlatform;
+  token: string;
+  deviceId: string | null;
+  locale: string | null;
+};
 
 export type NotificationRecipientType =
   | "role"
@@ -107,7 +122,7 @@ export type NotificationDeliveryRecord = {
   createdAt: Date;
 };
 
-export type EmailDeliveryWorkItem = {
+export type DeliveryWorkItem = {
   delivery: NotificationDeliveryRecord;
   notification: NotificationRecord;
   config: Pick<
@@ -115,6 +130,8 @@ export type EmailDeliveryWorkItem = {
     "id" | "triggerEvent" | "frequencyLimit" | "frequencyWindowMinutes"
   > | null;
 };
+
+export type EmailDeliveryWorkItem = DeliveryWorkItem;
 
 export type NotificationEnqueueResult = {
   notification: NotificationRecord;

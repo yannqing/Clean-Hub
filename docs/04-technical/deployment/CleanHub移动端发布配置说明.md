@@ -85,6 +85,40 @@ pnpm --filter @cleanhub/mobile package:ios
 
 Certificates, private keys, and provisioning profiles are injected by the developer keychain or CI. The script archives with `xcodebuild`, exports an IPA to `release/mobile/ios/export`, then the release owner uploads it to TestFlight through Transporter or CI.
 
+## Push Notifications (FCM)
+
+Mobile push uses Firebase Cloud Messaging (HTTP v1) for both Android and iOS. Without the configuration below the app still builds and runs; push deliveries stay queued and retry until the backend credentials are configured.
+
+### Firebase project
+
+Create one Firebase project per environment (dev/staging/prod), register the Android app (`com.cleanhub.app`) and the iOS app with the matching bundle id.
+
+### Android
+
+Download `google-services.json` from the Firebase console and place it at:
+
+```text
+apps/mobile/android/app/google-services.json
+```
+
+The Gradle config applies the `com.google.gms.google-services` plugin only when this file exists, so local builds without credentials keep working. Do not commit `google-services.json` to the repository; inject it via CI secrets during release builds.
+
+### iOS
+
+In Xcode enable the `Push Notifications` capability (plus `Background Modes > Remote notifications`) for the App target, create an APNs auth key in the Apple Developer portal, and upload it to the Firebase project (Project settings -> Cloud Messaging -> APNs authentication key).
+
+### Backend credentials
+
+The API sends pushes through the FCM HTTP v1 endpoint using a Firebase service account (Project settings -> Service accounts -> Generate new private key). Configure `apps/api` with:
+
+```bash
+FCM_PROJECT_ID=...
+FCM_CLIENT_EMAIL=...
+FCM_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+Keep the private key on one line with literal `\n` escapes. Optional tuning variables (`PUSH_DELIVERY_DISABLED`, `PUSH_DELIVERY_BATCH_SIZE`, `PUSH_DELIVERY_RETRY_BASE_SECONDS`, `PUSH_DELIVERY_RETRY_MAX_SECONDS`) are documented in `.env.example`. Tenants opt in through `notification_configs` rows with `channel = 'push'`; see `packages/db/src/seeds/notification-defaults.sql` for the demo tenant examples.
+
 ## Release Gate
 
 Before distribution:

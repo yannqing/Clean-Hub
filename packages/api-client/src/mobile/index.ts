@@ -3,6 +3,7 @@ import { createMobileAuthApi } from "./auth";
 import { createMobileCustomerApi } from "./customer";
 import { createMobileDeliveryApi } from "./delivery";
 import { createMobileMediaApi } from "./media";
+import { createMobileNotificationsApi } from "./notifications";
 import { createMobileOwnerApi } from "./owner";
 import { createMobilePaymentApi } from "./payment";
 
@@ -14,6 +15,8 @@ export * from "./delivery";
 export * from "./delivery.types";
 export * from "./media";
 export * from "./media.types";
+export * from "./notifications";
+export * from "./notifications.types";
 export * from "./owner";
 export * from "./owner.types";
 export * from "./payment";
@@ -25,6 +28,7 @@ export function createMobileApi(client: ApiClient) {
     customer: createMobileCustomerApi(client),
     delivery: createMobileDeliveryApi(client),
     media: createMobileMediaApi(client),
+    notifications: createMobileNotificationsApi(client),
     owner: createMobileOwnerApi(client),
     payment: createMobilePaymentApi(client),
   };
