@@ -180,18 +180,18 @@ export function ReportSummaryView({
   }
 
   return (
-    <div className="grid gap-6">
-      <div>
+    <section className="min-h-[560px]">
+      <div className="border-b p-5">
         <Badge variant="secondary">{m.reports.eyebrow}</Badge>
         <h1 className="mt-3 text-2xl font-semibold tracking-normal">
           {m.reports.title}
         </h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
           {m.reports.description}
         </p>
       </div>
 
-      <form className="grid gap-4 rounded-md border p-4 md:grid-cols-5" method="GET">
+      <form className="grid gap-4 border-b p-5 lg:grid-cols-[1fr_1fr_1fr_1fr_180px]" method="GET">
         <div className="grid gap-2">
           <Label htmlFor="report-preset">{m.reports.formLabels.preset}</Label>
           <Select
@@ -246,13 +246,15 @@ export function ReportSummaryView({
       </form>
 
       {error ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error}
+        <div className="p-5">
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            {error}
+          </div>
         </div>
       ) : summary ? (
-        <>
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card>
+        <div className="grid gap-5 p-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Card className="rounded-md">
               <CardHeader>
                 <CardTitle className="text-sm font-medium">
                   {m.reports.cards.grossSales}
@@ -265,7 +267,7 @@ export function ReportSummaryView({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-md">
               <CardHeader>
                 <CardTitle className="text-sm font-medium">
                   {m.reports.cards.orders}
@@ -276,7 +278,7 @@ export function ReportSummaryView({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-md">
               <CardHeader>
                 <CardTitle className="text-sm font-medium">
                   {m.reports.cards.pendingPickup}
@@ -289,7 +291,7 @@ export function ReportSummaryView({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-md">
               <CardHeader>
                 <CardTitle className="text-sm font-medium">
                   {m.reports.cards.inProgress}
@@ -303,8 +305,8 @@ export function ReportSummaryView({
             </Card>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="rounded-md">
               <CardHeader>
                 <CardTitle>{m.reports.paymentBreakdown}</CardTitle>
               </CardHeader>
@@ -324,7 +326,7 @@ export function ReportSummaryView({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-md">
               <CardHeader>
                 <CardTitle>{m.reports.exports}</CardTitle>
               </CardHeader>
@@ -348,8 +350,8 @@ export function ReportSummaryView({
               </CardContent>
             </Card>
           </div>
-        </>
+        </div>
       ) : null}
-    </div>
+    </section>
   );
 }

@@ -430,71 +430,77 @@ export function ServiceCatalogView() {
           </div>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{m.services.columns.service}</TableHead>
-              <TableHead>{m.services.columns.businessLine}</TableHead>
-              <TableHead>{m.services.columns.pricing}</TableHead>
-              <TableHead>{m.services.columns.status}</TableHead>
-              <TableHead className="text-right">
-                {m.services.columns.actions}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {services.map((service) => (
-              <TableRow key={service.id}>
-                <TableCell>
-                  <div className="font-medium">{service.name}</div>
-                </TableCell>
-                <TableCell>
-                  {m.common.businessLineLabels[service.businessLine]}
-                </TableCell>
-                <TableCell>{m.common.pricingUnitLabels[service.pricingUnit]}</TableCell>
-                <TableCell>
-                  <Badge
-                    variant={service.status === "active" ? "default" : "outline"}
-                  >
-                    {m.common.statusLabels[service.status]}
-                  </Badge>
-                </TableCell>
-                <TableCell className="space-x-2 text-right">
-                  <Button
-                    onClick={() => {
-                      setEditingServiceId(service.id);
-                      setFormValues(toFormValues(service));
-                    }}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {m.services.actions.edit}
-                  </Button>
-                  <Button
-                    disabled={saving}
-                    onClick={() => void handleStatusChange(service)}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {service.status === "active"
-                      ? m.services.actions.deactivate
-                      : m.services.actions.activate}
-                  </Button>
-                  <Button
-                    onClick={() => setPendingDelete(service)}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {m.services.actions.delete}
-                  </Button>
-                </TableCell>
+        <div className="p-5">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{m.services.columns.service}</TableHead>
+                <TableHead>{m.services.columns.businessLine}</TableHead>
+                <TableHead>{m.services.columns.pricing}</TableHead>
+                <TableHead>{m.services.columns.status}</TableHead>
+                <TableHead className="text-right">
+                  {m.services.columns.actions}
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {services.map((service) => (
+                <TableRow key={service.id}>
+                  <TableCell>
+                    <div className="font-medium">{service.name}</div>
+                  </TableCell>
+                  <TableCell>
+                    {m.common.businessLineLabels[service.businessLine]}
+                  </TableCell>
+                  <TableCell>
+                    {m.common.pricingUnitLabels[service.pricingUnit]}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        service.status === "active" ? "default" : "outline"
+                      }
+                    >
+                      {m.common.statusLabels[service.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="space-x-2 text-right">
+                    <Button
+                      onClick={() => {
+                        setEditingServiceId(service.id);
+                        setFormValues(toFormValues(service));
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {m.services.actions.edit}
+                    </Button>
+                    <Button
+                      disabled={saving}
+                      onClick={() => void handleStatusChange(service)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {service.status === "active"
+                        ? m.services.actions.deactivate
+                        : m.services.actions.activate}
+                    </Button>
+                    <Button
+                      onClick={() => setPendingDelete(service)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {m.services.actions.delete}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       {/* Delete confirmation */}

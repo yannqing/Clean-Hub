@@ -374,68 +374,76 @@ export function PriceCatalogView() {
           </div>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{m.prices.columns.service}</TableHead>
-              <TableHead>{m.prices.columns.businessLine}</TableHead>
-              <TableHead>{m.prices.columns.amount}</TableHead>
-              <TableHead>{m.prices.columns.status}</TableHead>
-              <TableHead className="text-right">{m.prices.columns.actions}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {prices.map((price) => (
-              <TableRow key={price.id}>
-                <TableCell>
-                  <div className="font-medium">{price.serviceName}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {price.serviceId}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {m.common.businessLineLabels[price.businessLine]}
-                </TableCell>
-                <TableCell>
-                  {price.amount} {price.currency}
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={price.status === "active" ? "default" : "outline"}
-                  >
-                    {m.common.statusLabels[price.status]}
-                  </Badge>
-                </TableCell>
-                <TableCell className="space-x-2 text-right">
-                  <Button
-                    disabled={saving}
-                    onClick={() =>
-                      void handleStatusChange(price.id, price.status, price.version)
-                    }
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {price.status === "active"
-                      ? m.prices.actions.deactivate
-                      : m.prices.actions.activate}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setEditingPriceId(price.id);
-                      setFormValues(toFormValues(price));
-                    }}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {m.prices.actions.edit}
-                  </Button>
-                </TableCell>
+        <div className="p-5">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{m.prices.columns.service}</TableHead>
+                <TableHead>{m.prices.columns.businessLine}</TableHead>
+                <TableHead>{m.prices.columns.amount}</TableHead>
+                <TableHead>{m.prices.columns.status}</TableHead>
+                <TableHead className="text-right">
+                  {m.prices.columns.actions}
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {prices.map((price) => (
+                <TableRow key={price.id}>
+                  <TableCell>
+                    <div className="font-medium">{price.serviceName}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {price.serviceId}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {m.common.businessLineLabels[price.businessLine]}
+                  </TableCell>
+                  <TableCell>
+                    {price.amount} {price.currency}
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={price.status === "active" ? "default" : "outline"}
+                    >
+                      {m.common.statusLabels[price.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="space-x-2 text-right">
+                    <Button
+                      disabled={saving}
+                      onClick={() =>
+                        void handleStatusChange(
+                          price.id,
+                          price.status,
+                          price.version,
+                        )
+                      }
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {price.status === "active"
+                        ? m.prices.actions.deactivate
+                        : m.prices.actions.activate}
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setEditingPriceId(price.id);
+                        setFormValues(toFormValues(price));
+                      }}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {m.prices.actions.edit}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
     </section>
   );
