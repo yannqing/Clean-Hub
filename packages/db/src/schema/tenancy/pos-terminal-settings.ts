@@ -55,6 +55,17 @@ export const posTerminalSettings = pgTable(
     printCopies: smallint("print_copies").notNull().default(1),
     lockTimeoutSeconds: integer("lock_timeout_seconds").notNull().default(300),
     status: posTerminalStatusEnum("status").notNull().default("active"),
+    credentialDigest: varchar("credential_digest", { length: 128 }),
+    credentialVersion: integer("credential_version").notNull().default(0),
+    credentialIssuedAt: timestamp("credential_issued_at", {
+      withTimezone: true,
+    }),
+    credentialRotatedAt: timestamp("credential_rotated_at", {
+      withTimezone: true,
+    }),
+    credentialLastUsedAt: timestamp("credential_last_used_at", {
+      withTimezone: true,
+    }),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
     createdAt: timestamp("created_at", { withTimezone: true })

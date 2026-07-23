@@ -10,6 +10,7 @@ import { useState } from "react";
 import { LogoutButton } from "@/features/auth/components";
 import { GlobalSearchBox } from "@/features/global-search";
 import { HeaderNotificationsMenu } from "@/features/notifications/components";
+import { OfflineSyncBadge } from "@/features/offline/components";
 import { LanguageSwitcher } from "@/components/i18n";
 import { posRoutes, posShellCopy, posSidebarNavigation } from "@/config";
 
@@ -265,10 +266,7 @@ export function PosShell({
           <GlobalSearchBox />
 
           <div className="ml-auto flex items-center gap-2">
-            <div className="hidden items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700 2xl:flex">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              {t("pos.shell.synced")}
-            </div>
+            <OfflineSyncBadge />
             <LanguageSwitcher />
             <LogoutButton
               aria-label={t("pos.shell.lockScreen")}

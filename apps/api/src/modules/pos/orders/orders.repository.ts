@@ -23,9 +23,12 @@ import {
   type Database,
 } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
+import {
+  POS_ORDER_CODE_SUFFIX_LENGTH,
+  parsePosOrderCodeSuffix,
+} from "@cleanhub/domain/order-codes";
 
 import type {
-  CreateManualOrderItemRequest,
   PosOrderDetail,
   PosOrderItem,
   PosOrderListInput,
@@ -37,9 +40,23 @@ import type {
   PosMobileMoneyProvider,
   PosPaymentMethod,
   PosPaymentTransaction,
-  UpdatePosOrderItemRequest,
   UpdatePosOrderRequest,
 } from "./orders.types.js";
+
+export type ResolvedPosOrderItemInput = {
+  serviceId: string;
+  itemName: string;
+  pricingUnit: "per_item" | "per_kg";
+  standardUnitAmount: string;
+  chargedUnitAmount: string;
+  quantity: string;
+  weight: string | null;
+  bagCount: number | null;
+  itemColor?: string | null;
+  defectNotes?: string | null;
+  specialRequest?: string | null;
+  itemIdentifier?: string | null;
+};
 
 function normalizeNullable(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
@@ -58,8 +75,15 @@ function addMoney(left: string, right: string): string {
   return (Number(left) + Number(right)).toFixed(2);
 }
 
-function computeLineAmount(quantity: string, unitAmount: string): string {
-  return (Number(quantity) * Number(unitAmount)).toFixed(2);
+export function calculatePosOrderItemLineAmount(
+  input: Pick<
+    ResolvedPosOrderItemInput,
+    "pricingUnit" | "quantity" | "weight" | "chargedUnitAmount"
+  >,
+): string {
+  const units =
+    input.pricingUnit === "per_kg" ? Number(input.weight) : Number(input.quantity);
+  return (units * Number(input.chargedUnitAmount)).toFixed(2);
 }
 
 function toOrderItem(row: typeof orderItems.$inferSelect): PosOrderItem {
@@ -69,10 +93,20 @@ function toOrderItem(row: typeof orderItems.$inferSelect): PosOrderItem {
     ticketId: row.ticketId,
     sourceType: row.sourceType,
     sourceId: row.sourceId,
+    serviceId: row.serviceId,
     itemName: row.itemName,
     quantity: row.quantity,
-    unitAmount: row.unitAmount,
+    pricingUnit: row.pricingUnit ?? "per_item",
+    standardUnitAmount: row.standardUnitAmount ?? row.unitAmount,
+    chargedUnitAmount: row.chargedUnitAmount ?? row.unitAmount,
+    weight: row.weight,
+    bagCount: row.bagCount,
+    unitAmount: row.chargedUnitAmount ?? row.unitAmount,
     lineAmount: row.lineAmount,
+    itemColor: row.itemColor,
+    defectNotes: row.defectNotes,
+    specialRequest: row.specialRequest,
+    itemIdentifier: row.itemIdentifier,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     version: row.version,
@@ -160,13 +194,20 @@ function buildOrderFilters(input: PosOrderListInput): SQL[] {
     filters.push(inArray(orders.status, statuses));
   }
   if (query.q) {
-    const pattern = `%${escapeLikePattern(query.q)}%`;
-    filters.push(
-      or(
-        sql`${orders.id} ilike ${pattern} escape '\\'`,
-        sql`${customers.fullName} ilike ${pattern} escape '\\'`,
-      )!,
-    );
+    const displayCodeSuffix = parsePosOrderCodeSuffix(query.q);
+    if (displayCodeSuffix) {
+      filters.push(
+        sql`upper(right(${orders.id}, ${POS_ORDER_CODE_SUFFIX_LENGTH})) = ${displayCodeSuffix}`,
+      );
+    } else {
+      const pattern = `%${escapeLikePattern(query.q)}%`;
+      filters.push(
+        or(
+          sql`${orders.id} ilike ${pattern} escape '\\'`,
+          sql`${customers.fullName} ilike ${pattern} escape '\\'`,
+        )!,
+      );
+    }
   }
   if (query.createdAfter) {
     filters.push(gte(orders.createdAt, new Date(query.createdAfter)));
@@ -441,6 +482,7 @@ export async function countAlreadyOrderedTicketItems(
 export async function createOrderRecord(
   db: Database,
   input: {
+    id?: string;
     tenantId: string;
     branchId: string;
     currency: string;
@@ -453,7 +495,7 @@ export async function createOrderRecord(
     actorUserId: string;
   },
 ): Promise<string> {
-  const orderId = createId();
+  const orderId = input.id ?? createId();
 
   await db.insert(orders).values({
     id: orderId,
@@ -501,10 +543,20 @@ export async function insertOrderItemsFromTicketItems(
       customerId: input.customerId,
       sourceType: "ticket_item" as const,
       sourceId: item.id,
+      serviceId: item.serviceId,
       itemName: item.itemName,
       quantity: String(item.quantity),
+      pricingUnit: item.pricingUnit ?? "per_item",
+      standardUnitAmount: item.standardUnitAmount ?? item.unitAmount,
+      chargedUnitAmount: item.chargedUnitAmount ?? item.unitAmount,
+      weight: item.weight,
+      bagCount: item.bagCount,
       unitAmount: item.unitAmount,
       lineAmount: item.lineAmount,
+      itemColor: item.itemColor,
+      defectNotes: item.defectNotes,
+      specialRequest: item.specialRequest,
+      itemIdentifier: item.labelCode,
       createdBy: input.actorUserId,
       updatedBy: input.actorUserId,
     })),
@@ -518,7 +570,7 @@ export async function insertManualOrderItems(
     branchId: string;
     customerId: string;
     orderId: string;
-    items: CreateManualOrderItemRequest[];
+    items: ResolvedPosOrderItemInput[];
     actorUserId: string;
   },
 ): Promise<void> {
@@ -530,12 +582,22 @@ export async function insertManualOrderItems(
       tenantId: input.tenantId,
       branchId: input.branchId,
       customerId: input.customerId,
-      sourceType: item.sourceType,
-      sourceId: item.sourceId ?? createId(),
+      sourceType: "product" as const,
+      sourceId: item.serviceId,
+      serviceId: item.serviceId,
       itemName: item.itemName.trim(),
       quantity: item.quantity,
-      unitAmount: item.unitAmount,
-      lineAmount: computeLineAmount(item.quantity, item.unitAmount),
+      pricingUnit: item.pricingUnit,
+      standardUnitAmount: item.standardUnitAmount,
+      chargedUnitAmount: item.chargedUnitAmount,
+      weight: item.weight,
+      bagCount: item.bagCount,
+      unitAmount: item.chargedUnitAmount,
+      lineAmount: calculatePosOrderItemLineAmount(item),
+      itemColor: normalizeNullable(item.itemColor),
+      defectNotes: normalizeNullable(item.defectNotes),
+      specialRequest: normalizeNullable(item.specialRequest),
+      itemIdentifier: normalizeNullable(item.itemIdentifier),
       createdBy: input.actorUserId,
       updatedBy: input.actorUserId,
     })),
@@ -679,42 +741,36 @@ export async function createPaymentTransactionRecord(
     actorUserId: string;
     provider?: PosMobileMoneyProvider;
     externalReference?: string;
-    idempotencyKey?: string;
+    idempotencyKey: string;
   },
-): Promise<PosPaymentTransaction> {
+): Promise<PosPaymentTransaction | null> {
   const paymentId = createId();
   const isCash = input.paymentMethod === "cash";
   const paidAt = isCash ? new Date() : null;
 
-  await db.insert(paymentTransactions).values({
-    id: paymentId,
-    tenantId: input.tenantId,
-    branchId: input.branchId,
-    customerId: input.customerId,
-    orderId: input.orderId,
-    paymentMethod: input.paymentMethod,
-    amount: input.amount,
-    currency: input.currency,
-    paymentStatus: isCash ? "paid" : "pending",
-    gateway: input.provider,
-    externalId: input.externalReference,
-    idempotencyKey: input.idempotencyKey,
-    paidAt,
-    createdBy: input.actorUserId,
-    updatedBy: input.actorUserId,
-  });
-
   const rows = await db
-    .select()
-    .from(paymentTransactions)
-    .where(eq(paymentTransactions.id, paymentId))
-    .limit(1);
+    .insert(paymentTransactions)
+    .values({
+      id: paymentId,
+      tenantId: input.tenantId,
+      branchId: input.branchId,
+      customerId: input.customerId,
+      orderId: input.orderId,
+      paymentMethod: input.paymentMethod,
+      amount: input.amount,
+      currency: input.currency,
+      paymentStatus: isCash ? "paid" : "pending",
+      gateway: input.provider,
+      externalId: input.externalReference,
+      idempotencyKey: input.idempotencyKey,
+      paidAt,
+      createdBy: input.actorUserId,
+      updatedBy: input.actorUserId,
+    })
+    .onConflictDoNothing()
+    .returning();
 
-  if (!rows[0]) {
-    throw new Error("Created payment transaction could not be loaded.");
-  }
-
-  return toPaymentTransaction(rows[0]);
+  return rows[0] ? toPaymentTransaction(rows[0]) : null;
 }
 
 export async function findPaymentTransactionByIdempotencyKey(
@@ -897,7 +953,7 @@ export async function recalculateOrderPaymentState(
 
 export async function createManualOrderItemRecord(
   db: Database,
-  input: CreateManualOrderItemRequest & {
+  input: ResolvedPosOrderItemInput & {
     tenantId: string;
     branchId: string;
     customerId: string;
@@ -914,12 +970,22 @@ export async function createManualOrderItemRecord(
     tenantId: input.tenantId,
     branchId: input.branchId,
     customerId: input.customerId,
-    sourceType: input.sourceType,
-    sourceId: input.sourceId ?? createId(),
+    sourceType: "product",
+    sourceId: input.serviceId,
+    serviceId: input.serviceId,
     itemName: input.itemName.trim(),
     quantity: input.quantity,
-    unitAmount: input.unitAmount,
-    lineAmount: computeLineAmount(input.quantity, input.unitAmount),
+    pricingUnit: input.pricingUnit,
+    standardUnitAmount: input.standardUnitAmount,
+    chargedUnitAmount: input.chargedUnitAmount,
+    weight: input.weight,
+    bagCount: input.bagCount,
+    unitAmount: input.chargedUnitAmount,
+    lineAmount: calculatePosOrderItemLineAmount(input),
+    itemColor: normalizeNullable(input.itemColor),
+    defectNotes: normalizeNullable(input.defectNotes),
+    specialRequest: normalizeNullable(input.specialRequest),
+    itemIdentifier: normalizeNullable(input.itemIdentifier),
     createdBy: input.actorUserId,
     updatedBy: input.actorUserId,
   });
@@ -937,10 +1003,11 @@ export async function createManualOrderItemRecord(
 
 export async function updateManualOrderItemRecord(
   db: Database,
-  input: UpdatePosOrderItemRequest & {
+  input: ResolvedPosOrderItemInput & {
     tenantId: string;
     orderId: string;
     itemId: string;
+    version: number;
     actorUserId: string;
   },
 ): Promise<{ updated: boolean; exists: boolean }> {
@@ -949,16 +1016,25 @@ export async function updateManualOrderItemRecord(
     return { updated: false, exists: false };
   }
 
-  const quantity = input.quantity ?? existing.quantity;
-  const unitAmount = input.unitAmount ?? existing.unitAmount;
-
   const updatedRows = await db
     .update(orderItems)
     .set({
-      itemName: input.itemName?.trim() ?? existing.itemName,
-      quantity,
-      unitAmount,
-      lineAmount: computeLineAmount(quantity, unitAmount),
+      serviceId: input.serviceId,
+      sourceType: "product",
+      sourceId: input.serviceId,
+      itemName: input.itemName.trim(),
+      quantity: input.quantity,
+      pricingUnit: input.pricingUnit,
+      standardUnitAmount: input.standardUnitAmount,
+      chargedUnitAmount: input.chargedUnitAmount,
+      weight: input.weight,
+      bagCount: input.bagCount,
+      unitAmount: input.chargedUnitAmount,
+      lineAmount: calculatePosOrderItemLineAmount(input),
+      itemColor: normalizeNullable(input.itemColor),
+      defectNotes: normalizeNullable(input.defectNotes),
+      specialRequest: normalizeNullable(input.specialRequest),
+      itemIdentifier: normalizeNullable(input.itemIdentifier),
       updatedAt: new Date(),
       updatedBy: input.actorUserId,
       version: sql`${orderItems.version} + 1`,

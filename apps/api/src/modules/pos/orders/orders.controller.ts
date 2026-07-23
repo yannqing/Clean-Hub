@@ -30,6 +30,8 @@ import {
   createPosOrderBodySchema,
   createPosOrderItemBodySchema,
   createPosPaymentBodySchema,
+  deletePosOrderBodySchema,
+  deletePosOrderItemBodySchema,
   failPosPaymentBodySchema,
   posOrderItemParamsSchema,
   posOrderListQuerySchema,
@@ -176,11 +178,14 @@ export async function changePosOrderStatusController(c: Context<AppBindings>) {
 
 export async function deletePosOrderController(c: Context<AppBindings>) {
   const params = posOrderParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = deletePosOrderBodySchema.parse(rawBody);
 
   try {
     await deletePosOrder(
       c.get("authContext"),
       params.orderId,
+      data,
       getRequestMeta(c),
     );
     return c.body(null, 204);
@@ -217,13 +222,13 @@ export async function createPosOrderPaymentController(
   const data = createPosPaymentBodySchema.parse(rawBody);
 
   try {
-    const order = await createPosOrderPayment(
+    const result = await createPosOrderPayment(
       c.get("authContext"),
       params.orderId,
       data,
       getRequestMeta(c),
     );
-    return c.json(order, 201);
+    return c.json(result, result.idempotent ? 200 : 201);
   } catch (error) {
     if (error instanceof PosOrderError) {
       return createErrorResponse(c, error);
@@ -323,12 +328,15 @@ export async function updatePosOrderItemController(c: Context<AppBindings>) {
 
 export async function deletePosOrderItemController(c: Context<AppBindings>) {
   const params = posOrderItemParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = deletePosOrderItemBodySchema.parse(rawBody);
 
   try {
     const order = await deletePosOrderItem(
       c.get("authContext"),
       params.orderId,
       params.itemId,
+      data,
       getRequestMeta(c),
     );
     return c.json(order);

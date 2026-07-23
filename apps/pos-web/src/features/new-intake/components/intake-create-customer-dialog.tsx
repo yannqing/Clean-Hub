@@ -2,6 +2,7 @@
 
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posToast as toast } from "@/lib/pos-toast";
+import { usePosOfflineWrites } from "@/features/offline/lib";
 import { useState } from "react";
 import { useTranslation } from "@cleanhub/i18n/react";
 
@@ -15,7 +16,6 @@ import {
   DialogTitle,
 } from "@cleanhub/ui";
 
-import { createIntakeAccount } from "../queries";
 import type { IntakeCreatedAccount } from "../queries";
 import type { IntakeCreateAccountInput } from "../types";
 
@@ -45,6 +45,7 @@ export function IntakeCreateCustomerDialog({
   const text = (value: string) => translatePosText(value, locale);
   const [form, setForm] = useState<IntakeCreateAccountInput>(initialForm);
   const [submitting, setSubmitting] = useState(false);
+  const { createCustomerAccount } = usePosOfflineWrites();
 
   function update<K extends keyof IntakeCreateAccountInput>(
     key: K,
@@ -65,8 +66,29 @@ export function IntakeCreateCustomerDialog({
 
     setSubmitting(true);
     try {
-      const account = await createIntakeAccount(form);
-      toast.success("新增客户账户已保存");
+      const result = await createCustomerAccount({
+        accountName: form.accountName.trim(),
+        phone: form.accountPhone.trim() || undefined,
+        email: form.accountEmail.trim() || undefined,
+      });
+      const account = result.queued
+        ? {
+            accountId: result.entityId,
+            accountName: form.accountName.trim(),
+            phone: form.accountPhone.trim() || null,
+            email: form.accountEmail.trim() || null,
+          }
+        : {
+            accountId: result.data.id,
+            accountName: result.data.accountName,
+            phone: result.data.phone,
+            email: result.data.email,
+          };
+      toast.success(
+        result.queued
+          ? "网络不可用，客户账户已加入同步队列。"
+          : "新增客户账户已保存",
+      );
       onOpenChange(false);
       onCreated(account);
     } catch (error) {

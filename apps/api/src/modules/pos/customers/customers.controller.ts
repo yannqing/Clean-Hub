@@ -23,6 +23,7 @@ import {
   changePosCustomerStatusBodySchema,
   createPosAccountBodySchema,
   createPosProfileBodySchema,
+  deletePosCustomerQuerySchema,
   listPosAccountProfilesQuerySchema,
   listPosCustomerServiceItemsQuerySchema,
   listPosCustomersQuerySchema,
@@ -167,12 +168,14 @@ export async function changePosProfileStatusController(
 
 export async function deletePosProfileController(c: Context<AppBindings>) {
   const params = posCustomerIdParamsSchema.parse(c.req.param());
+  const query = deletePosCustomerQuerySchema.parse(c.req.query());
 
   try {
     await deletePosProfile({
       authContext: c.get("authContext"),
       requestMeta: getRequestMeta(c),
       customerId: params.customerId,
+      reason: query.reason,
     });
 
     return c.body(null, 204);
@@ -321,12 +324,14 @@ export async function changePosAccountStatusController(
 
 export async function deletePosAccountController(c: Context<AppBindings>) {
   const params = posAccountIdParamsSchema.parse(c.req.param());
+  const query = deletePosCustomerQuerySchema.parse(c.req.query());
 
   try {
     await deletePosAccount({
       authContext: c.get("authContext"),
       requestMeta: getRequestMeta(c),
       accountId: params.accountId,
+      reason: query.reason,
     });
 
     return c.body(null, 204);

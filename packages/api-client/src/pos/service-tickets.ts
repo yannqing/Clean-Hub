@@ -56,8 +56,11 @@ export function createPosServiceTicketsApi(client: ApiClient) {
     ) =>
       client.patch<ServiceTicketDetail>(`${BASE}/${ticketId}`, input, options),
 
-    remove: (ticketId: string, options?: RequestOptions) =>
-      client.delete<void>(`${BASE}/${ticketId}`, options),
+    remove: (ticketId: string, reason: string, options?: RequestOptions) =>
+      client.delete<void>(`${BASE}/${ticketId}`, {
+        ...options,
+        query: { reason },
+      }),
 
     changeStatus: (
       ticketId: string,
@@ -112,7 +115,12 @@ export function createPosServiceTicketsApi(client: ApiClient) {
     removeItem: (
       ticketId: string,
       itemId: string,
+      reason: string,
       options?: RequestOptions,
-    ) => client.delete<void>(`${BASE}/${ticketId}/items/${itemId}`, options),
+    ) =>
+      client.delete<void>(`${BASE}/${ticketId}/items/${itemId}`, {
+        ...options,
+        query: { reason },
+      }),
   };
 }

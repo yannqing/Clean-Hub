@@ -365,66 +365,68 @@ export function TenantAuditLogView() {
           </div>
         </div>
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{m.auditLogs.columns.time}</TableHead>
-              <TableHead>{m.auditLogs.columns.category}</TableHead>
-              <TableHead>{m.auditLogs.columns.event}</TableHead>
-              <TableHead>{m.auditLogs.columns.entity}</TableHead>
-              <TableHead>{m.auditLogs.columns.actor}</TableHead>
-              <TableHead>{m.auditLogs.columns.result}</TableHead>
-              <TableHead className="text-right">
-                {m.auditLogs.columns.actions}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {logs.map((log) => (
-              <TableRow key={log.id}>
-                <TableCell>{formatDateTime(log.createdAt)}</TableCell>
-                <TableCell>{getCategoryLabel(log.eventCategory)}</TableCell>
-                <TableCell>{getAuditEventDescription(log.eventType)}</TableCell>
-                <TableCell>
-                  <div>
-                    {log.entityType ?? m.auditLogs.placeholders.unknownEntity}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {log.entityId ?? m.auditLogs.placeholders.noEntity}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div>
-                    {log.actorDisplayName ??
-                      log.actorUserId ??
-                      m.auditLogs.placeholders.systemActor}
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {log.ipAddress ?? m.auditLogs.placeholders.noIp}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={getStatusVariant(log.success)}>
-                    {log.success
-                      ? m.auditLogs.successLabel
-                      : m.auditLogs.failedLabel}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <Button
-                    disabled={detailLoading}
-                    onClick={() => void handleSelectLog(log.id)}
-                    size="sm"
-                    type="button"
-                    variant="outline"
-                  >
-                    {m.common.details}
-                  </Button>
-                </TableCell>
+        <div className="p-5">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>{m.auditLogs.columns.time}</TableHead>
+                <TableHead>{m.auditLogs.columns.category}</TableHead>
+                <TableHead>{m.auditLogs.columns.event}</TableHead>
+                <TableHead>{m.auditLogs.columns.entity}</TableHead>
+                <TableHead>{m.auditLogs.columns.actor}</TableHead>
+                <TableHead>{m.auditLogs.columns.result}</TableHead>
+                <TableHead className="text-right">
+                  {m.auditLogs.columns.actions}
+                </TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {logs.map((log) => (
+                <TableRow key={log.id}>
+                  <TableCell>{formatDateTime(log.createdAt)}</TableCell>
+                  <TableCell>{getCategoryLabel(log.eventCategory)}</TableCell>
+                  <TableCell>{getAuditEventDescription(log.eventType)}</TableCell>
+                  <TableCell>
+                    <div>
+                      {log.entityType ?? m.auditLogs.placeholders.unknownEntity}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {log.entityId ?? m.auditLogs.placeholders.noEntity}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div>
+                      {log.actorDisplayName ??
+                        log.actorUserId ??
+                        m.auditLogs.placeholders.systemActor}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {log.ipAddress ?? m.auditLogs.placeholders.noIp}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={getStatusVariant(log.success)}>
+                      {log.success
+                        ? m.auditLogs.successLabel
+                        : m.auditLogs.failedLabel}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      disabled={detailLoading}
+                      onClick={() => void handleSelectLog(log.id)}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      {m.common.details}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
 
       <div className="border-t p-5">

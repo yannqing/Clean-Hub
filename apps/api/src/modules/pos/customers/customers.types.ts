@@ -109,6 +109,7 @@ export type ListPosAccountProfilesResult = {
 };
 
 export type CreatePosAccountRequest = {
+  id?: string;
   accountName: string;
   /** Phone and email are mutually optional but at least one is required. */
   phone?: string;
@@ -162,6 +163,11 @@ export type PosCustomerServiceItemSummary = {
   itemBrand: string | null;
   itemMaterial: string | null;
   quantity: number;
+  pricingUnit: "per_item" | "per_kg";
+  standardUnitAmount: string;
+  chargedUnitAmount: string;
+  weight: string | null;
+  bagCount: number | null;
   unitAmount: string;
   lineAmount: string;
   serviceId: string | null;
@@ -267,14 +273,14 @@ export type DeletePosAccountInput = {
   authContext: AuthContext;
   requestMeta?: AuthRequestMeta;
   accountId: string;
-  reason?: string;
+  reason: string;
 };
 
 export type DeletePosProfileInput = {
   authContext: AuthContext;
   requestMeta?: AuthRequestMeta;
   customerId: string;
-  reason?: string;
+  reason: string;
 };
 
 // ---- Audit snapshots ------------------------------------------------------

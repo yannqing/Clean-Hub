@@ -1,7 +1,10 @@
 import { getDb, type Database } from "@cleanhub/db";
 
-import { assertPosContext } from "../../auth/permission.helper.js";
 import { findBranchById } from "../../tenant/branches/branches.repository.js";
+import {
+  requirePosTenantId,
+  resolvePosBranchScope,
+} from "../access-control.helper.js";
 import type { PosBranchMeInput, PosBranchSummary } from "./pos.types.js";
 
 /**
@@ -15,16 +18,15 @@ export async function getMyPosBranch(
   input: PosBranchMeInput,
   db: Database = getDb(),
 ): Promise<PosBranchSummary | null> {
-  assertPosContext(input.authContext);
-
-  const branchId = input.authContext.branchIds[0];
+  const tenantId = requirePosTenantId(input.authContext);
+  const branchId = resolvePosBranchScope(input.authContext)?.[0];
 
   if (!branchId) {
     return null;
   }
 
   return findBranchById(db, {
-    tenantId: input.authContext.tenantId!,
+    tenantId,
     branchId,
   });
 }

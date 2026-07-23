@@ -32,10 +32,12 @@ import type {
 import { resolveLoginScope } from "./login-scope.helper.js";
 
 export type PosTerminalLoginContext = {
+  id: string;
   tenantId: string;
-  branchId: string | null;
-  status: "active" | "inactive" | null;
-  deviceRegistered: boolean;
+  branchId: string;
+  deviceId: string;
+  status: "active" | "inactive";
+  credentialDigest: string | null;
 };
 
 type PosPinLoginCandidateAggregate = {
@@ -49,6 +51,8 @@ export type StoredRefreshToken = {
   id: string;
   userId: string;
   tenantId: string | null;
+  deviceId: string | null;
+  terminalId: string | null;
   familyId: string;
   expiresAt: Date;
   revokedAt: Date | null;
@@ -171,10 +175,12 @@ export class AuthRepository {
         tenantStatus: tenants.status,
         terminalId: posTerminalSettings.id,
         terminalBranchId: posTerminalSettings.branchId,
+        terminalDeviceId: posTerminalSettings.deviceId,
         terminalStatus: posTerminalSettings.status,
+        terminalCredentialDigest: posTerminalSettings.credentialDigest,
       })
       .from(tenants)
-      .leftJoin(
+      .innerJoin(
         posTerminalSettings,
         and(
           eq(posTerminalSettings.tenantId, tenants.id),
@@ -195,12 +201,61 @@ export class AuthRepository {
       return null;
     }
 
+    if (
+      !row.terminalId ||
+      !row.terminalBranchId ||
+      !row.terminalDeviceId ||
+      !row.terminalStatus
+    ) {
+      return null;
+    }
+
     return {
+      id: row.terminalId,
       tenantId: row.tenantId,
       branchId: row.terminalBranchId,
+      deviceId: row.terminalDeviceId,
       status: row.terminalStatus,
-      deviceRegistered: Boolean(row.terminalId),
+      credentialDigest: row.terminalCredentialDigest,
     };
+  }
+
+  async findPosTerminalById(
+    terminalId: string,
+  ): Promise<PosTerminalLoginContext | null> {
+    const rows = await this.db
+      .select({
+        id: posTerminalSettings.id,
+        tenantId: posTerminalSettings.tenantId,
+        branchId: posTerminalSettings.branchId,
+        deviceId: posTerminalSettings.deviceId,
+        status: posTerminalSettings.status,
+        credentialDigest: posTerminalSettings.credentialDigest,
+      })
+      .from(posTerminalSettings)
+      .innerJoin(tenants, eq(posTerminalSettings.tenantId, tenants.id))
+      .where(
+        and(
+          eq(posTerminalSettings.id, terminalId),
+          eq(tenants.status, "active"),
+          isNull(tenants.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+
+  async markPosTerminalCredentialUsed(terminalId: string): Promise<void> {
+    const now = new Date();
+    await this.db
+      .update(posTerminalSettings)
+      .set({
+        credentialLastUsedAt: now,
+        lastSeenAt: now,
+        updatedAt: now,
+      })
+      .where(eq(posTerminalSettings.id, terminalId));
   }
 
   async findPosPinLoginCandidates({
@@ -305,6 +360,7 @@ export class AuthRepository {
     tokenHash,
     familyId,
     expiresAt,
+    terminalId,
     meta,
   }: {
     userId: string;
@@ -312,6 +368,7 @@ export class AuthRepository {
     tokenHash: string;
     familyId: string;
     expiresAt: Date;
+    terminalId?: string;
     meta?: AuthRequestMeta;
   }): Promise<string> {
     const rows = await this.db
@@ -322,6 +379,7 @@ export class AuthRepository {
         tokenHash,
         familyId,
         deviceId: meta?.deviceId,
+        terminalId,
         ipAddress: meta?.ipAddress,
         userAgent: meta?.userAgent,
         expiresAt,
@@ -339,6 +397,8 @@ export class AuthRepository {
         id: authRefreshTokens.id,
         userId: authRefreshTokens.userId,
         tenantId: authRefreshTokens.tenantId,
+        deviceId: authRefreshTokens.deviceId,
+        terminalId: authRefreshTokens.terminalId,
         familyId: authRefreshTokens.familyId,
         expiresAt: authRefreshTokens.expiresAt,
         revokedAt: authRefreshTokens.revokedAt,

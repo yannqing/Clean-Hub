@@ -15,7 +15,7 @@ type CustomerTableProps = {
   onToggleStatus: (row: CustomerListRow) => void;
   onViewProfiles: (accountId: string) => void;
   onEdit: (row: CustomerListRow) => void;
-  onDelete: (row: CustomerListRow) => void;
+  onDelete?: (row: CustomerListRow) => void;
   onService?: (row: CustomerListRow) => void;
 };
 
@@ -64,7 +64,7 @@ export function CustomerTable({
             {rows.map((row) => (
               <CustomerCard
                 key={`${row.kind}-${row.id}`}
-                onDelete={() => onDelete(row)}
+                onDelete={onDelete ? () => onDelete(row) : undefined}
                 onEdit={() => onEdit(row)}
                 onService={
                   row.kind === "profile" && onService
@@ -104,7 +104,7 @@ export function CustomerTable({
                     onToggleStatus={() => onToggleStatus(row)}
                     onViewProfiles={() => onViewProfiles(row.id)}
                     onEdit={() => onEdit(row)}
-                    onDelete={() => onDelete(row)}
+                    onDelete={onDelete ? () => onDelete(row) : undefined}
                   />
                 ) : (
                   <ProfileRow
@@ -112,7 +112,7 @@ export function CustomerTable({
                     row={row}
                     onToggleStatus={() => onToggleStatus(row)}
                     onEdit={() => onEdit(row)}
-                    onDelete={() => onDelete(row)}
+                    onDelete={onDelete ? () => onDelete(row) : undefined}
                     onService={onService ? () => onService(row) : undefined}
                   />
                 ),
@@ -138,7 +138,7 @@ function CustomerCard({
   onViewProfiles?: () => void;
   onService?: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
 }) {
   const isAccount = row.kind === "account";
   const name = isAccount ? row.accountName : row.fullName;
@@ -210,13 +210,15 @@ function CustomerCard({
         >
           编辑
         </button>
-        <button
-          className="h-11 rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-600"
-          onClick={onDelete}
-          type="button"
-        >
-          删除
-        </button>
+        {onDelete ? (
+          <button
+            className="h-11 rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-600"
+            onClick={onDelete}
+            type="button"
+          >
+            删除
+          </button>
+        ) : null}
       </div>
     </article>
   );
@@ -227,7 +229,7 @@ type AccountRowProps = {
   onToggleStatus: () => void;
   onViewProfiles: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
 };
 
 function AccountRow({
@@ -301,13 +303,15 @@ function AccountRow({
         >
           编辑
         </button>
-        <button
-          className="text-xs font-semibold text-red-600"
-          type="button"
-          onClick={onDelete}
-        >
-          删除
-        </button>
+        {onDelete ? (
+          <button
+            className="text-xs font-semibold text-red-600"
+            type="button"
+            onClick={onDelete}
+          >
+            删除
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -317,7 +321,7 @@ type ProfileRowProps = {
   row: Extract<CustomerListRow, { kind: "profile" }>;
   onToggleStatus: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   onService?: () => void;
 };
 
@@ -388,13 +392,15 @@ function ProfileRow({
         >
           编辑
         </button>
-        <button
-          className="text-xs font-semibold text-red-600"
-          type="button"
-          onClick={onDelete}
-        >
-          删除
-        </button>
+        {onDelete ? (
+          <button
+            className="text-xs font-semibold text-red-600"
+            type="button"
+            onClick={onDelete}
+          >
+            删除
+          </button>
+        ) : null}
       </div>
     </div>
   );

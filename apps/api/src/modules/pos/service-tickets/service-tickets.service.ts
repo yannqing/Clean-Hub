@@ -3,9 +3,17 @@ import { and, eq, isNull } from "drizzle-orm";
 import { customers, getDb, type Database } from "@cleanhub/db";
 
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
-import { assertPosContext, requireFeatureEnabled, requirePosBranchId } from "../../auth/permission.helper.js";
+import { requireFeatureEnabled } from "../../auth/permission.helper.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { findBranchById } from "../../tenant/branches/branches.repository.js";
+import {
+  authorizePosSensitiveOperation,
+  createPosAuditMetadata,
+  requirePosBranchAccess,
+  requirePosTenantId,
+  resolvePosBranchScope,
+} from "../access-control.helper.js";
+import { findPosCatalogServiceById } from "../catalog/catalog.repository.js";
 import { ServiceTicketError } from "./service-tickets.errors.js";
 import {
   areLinkedOrdersSettled,
@@ -51,6 +59,18 @@ import type {
   UpdateServiceTicketRequest,
 } from "./service-tickets.types.js";
 
+type ResolvedTicketItemPricing = {
+  serviceId: string;
+  itemName: string;
+  pricingUnit: "per_item" | "per_kg";
+  standardUnitAmount: string;
+  chargedUnitAmount: string;
+  quantity: number;
+  weight: string | null;
+  bagCount: number | null;
+  overrideReason?: string;
+};
+
 /**
  * Maps a ticket's business line to the tenant feature flag that must be
  * enabled before the ticket can be created or mutated. `retail` and `delivery`
@@ -63,30 +83,6 @@ const BUSINESS_LINE_FEATURES: Record<ServiceTicketType, "laundry" | "car_wash" |
   retail: "retail",
   delivery: "delivery",
 };
-
-function requirePosContext(authContext: AuthContext): string {
-  assertPosContext(authContext);
-  return authContext.tenantId!;
-}
-
-/**
- * Branches the caller may list. Returns `undefined` for "no branch filter"
- * (owner/manager with no explicit assignment → see all tenant branches),
- * or an explicit branch-id list (cashier scope). An empty array means the
- * caller is a non-owner with no branch assignment → nothing is visible.
- */
-function resolveListBranchScope(
-  authContext: AuthContext,
-): string[] | undefined {
-  if (authContext.role === "owner" || authContext.role === "manager") {
-    // Owner/manager: no enforcement unless the token happens to carry an
-    // explicit branch list (treat empty as "all").
-    return authContext.branchIds.length > 0
-      ? authContext.branchIds
-      : undefined;
-  }
-  return authContext.branchIds;
-}
 
 async function requireTicketFeature(
   authContext: AuthContext,
@@ -133,6 +129,111 @@ async function requireCustomerActive(
   }
 }
 
+function moneyEquals(left: string, right: string): boolean {
+  return Number(left).toFixed(2) === Number(right).toFixed(2);
+}
+
+async function resolveTicketItemPricing(
+  db: Database,
+  input: {
+    authContext: AuthContext;
+    tenantId: string;
+    ticket: { currency: string; ticketType: ServiceTicketType };
+    data: CreateServiceTicketItemRequest | UpdateServiceTicketItemRequest;
+    existing?: ServiceTicketItem;
+  },
+): Promise<ResolvedTicketItemPricing> {
+  const serviceId = input.data.serviceId ?? input.existing?.serviceId;
+  if (!serviceId) {
+    throw new ServiceTicketError(
+      "VALIDATION_ERROR",
+      "A catalog service is required for every ticket item.",
+      422,
+    );
+  }
+
+  const service = await findPosCatalogServiceById(db, {
+    tenantId: input.tenantId,
+    serviceId,
+  });
+  if (!service) {
+    throw new ServiceTicketError(
+      "VALIDATION_ERROR",
+      "The selected catalog service is not active or has no active price.",
+      422,
+    );
+  }
+  if (service.businessLine !== input.ticket.ticketType) {
+    throw new ServiceTicketError(
+      "VALIDATION_ERROR",
+      "The selected service does not belong to this ticket business line.",
+      422,
+    );
+  }
+  if (service.currency !== input.ticket.currency) {
+    throw new ServiceTicketError(
+      "VALIDATION_ERROR",
+      "The selected service price currency does not match the ticket currency.",
+      422,
+    );
+  }
+
+  const serviceChanged = !input.existing || serviceId !== input.existing.serviceId;
+  const standardUnitAmount =
+    serviceChanged || !input.existing
+      ? service.amount
+      : input.existing.standardUnitAmount;
+  const chargedUnitAmount =
+    input.data.chargedUnitAmount ??
+    (serviceChanged || !input.existing
+      ? standardUnitAmount
+      : input.existing.chargedUnitAmount);
+  const priceWasSubmitted =
+    input.data.chargedUnitAmount !== undefined || serviceChanged;
+  const overrideReason =
+    priceWasSubmitted && !moneyEquals(chargedUnitAmount, standardUnitAmount)
+      ? authorizePosSensitiveOperation(
+          input.authContext,
+          "price_override",
+          input.data.overrideReason,
+        )
+      : undefined;
+
+  if (service.pricingUnit === "per_kg") {
+    const weight = input.data.weight ?? input.existing?.weight;
+    if (!weight || Number(weight) <= 0) {
+      throw new ServiceTicketError(
+        "VALIDATION_ERROR",
+        "Weight is required for a per-kilogram service.",
+        422,
+      );
+    }
+    return {
+      serviceId,
+      itemName: service.name,
+      pricingUnit: service.pricingUnit,
+      standardUnitAmount,
+      chargedUnitAmount,
+      quantity: 1,
+      weight,
+      bagCount: input.data.bagCount ?? input.existing?.bagCount ?? 1,
+      overrideReason,
+    };
+  }
+
+  return {
+    serviceId,
+    itemName: service.name,
+    pricingUnit: service.pricingUnit,
+    standardUnitAmount,
+    chargedUnitAmount,
+    quantity: input.data.quantity ?? input.existing?.quantity ?? 1,
+    weight: null,
+    bagCount: null,
+    overrideReason,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // List / detail / overview
 // ---------------------------------------------------------------------------
@@ -142,13 +243,17 @@ export async function listPosServiceTickets(
   query: ServiceTicketListQuery,
   db: Database = getDb(),
 ): Promise<{ data: ServiceTicketSummary[]; total: number }> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
+
+  if (query.branchId) {
+    requirePosBranchAccess(authContext, query.branchId);
+  }
 
   await requireTicketFeature(authContext, query.ticketType, db);
 
   const listInput = {
     tenantId,
-    allowedBranchIds: resolveListBranchScope(authContext),
+    allowedBranchIds: resolvePosBranchScope(authContext),
     status: query.status ? (Array.isArray(query.status) ? query.status : [query.status]) : undefined,
     priority: query.priority,
     ticketType: query.ticketType,
@@ -179,7 +284,7 @@ export async function getPosServiceTicketDetail(
   ticketId: string,
   db: Database = getDb(),
 ): Promise<ServiceTicketDetail> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
 
   const detail = await findServiceTicketDetail(db, { tenantId, ticketId });
 
@@ -192,7 +297,7 @@ export async function getPosServiceTicketDetail(
   }
 
   await requireTicketFeature(authContext, detail.ticketType, db);
-  await requirePosBranchId(authContext, detail.branchId, db);
+  requirePosBranchAccess(authContext, detail.branchId);
 
   return detail;
 }
@@ -202,15 +307,15 @@ export async function getPosServiceTicketOverview(
   query: { branchId?: string },
   db: Database = getDb(),
 ): Promise<ServiceTicketOverview> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
 
   if (query.branchId) {
-    await requirePosBranchId(authContext, query.branchId, db);
+    requirePosBranchAccess(authContext, query.branchId);
   }
 
   return findServiceTicketOverview(db, {
     tenantId,
-    allowedBranchIds: resolveListBranchScope(authContext),
+    allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
   });
 }
@@ -220,7 +325,7 @@ export async function getPosServiceTicketRelatedOrders(
   ticketId: string,
   db: Database = getDb(),
 ): Promise<RelatedOrderSummary[]> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
 
   const ticket = await findServiceTicketRaw(db, { tenantId, ticketId });
   if (!ticket) {
@@ -230,7 +335,7 @@ export async function getPosServiceTicketRelatedOrders(
       404,
     );
   }
-  await requirePosBranchId(authContext, ticket.branchId, db);
+  requirePosBranchAccess(authContext, ticket.branchId);
 
   return findRelatedOrders(db, { tenantId, ticketId });
 }
@@ -245,9 +350,9 @@ export async function createPosServiceTicket(
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
 ): Promise<ServiceTicketDetail> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
 
-  await requirePosBranchId(authContext, data.branchId, db);
+  requirePosBranchAccess(authContext, data.branchId);
   await requireTicketFeature(authContext, data.ticketType, db);
   await requireCustomerActive(db, { tenantId, customerId: data.customerId });
   const branch = await findBranchById(db, {
@@ -289,6 +394,7 @@ export async function createPosServiceTicket(
       entityType: "service_ticket",
       entityId: summary.id,
       after: summary,
+      metadata: createPosAuditMetadata(authContext),
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
     });
@@ -304,7 +410,7 @@ export async function updatePosServiceTicket(
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
 ): Promise<ServiceTicketDetail> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
 
   return db.transaction(async (tx) => {
     const before = await findServiceTicketAuditSnapshot(tx, {
@@ -320,7 +426,7 @@ export async function updatePosServiceTicket(
       );
     }
 
-    await requirePosBranchId(authContext, before.branchId, tx);
+    requirePosBranchAccess(authContext, before.branchId);
     await requireTicketFeature(
       authContext,
       data.ticketType ?? before.ticketType,
@@ -360,6 +466,7 @@ export async function updatePosServiceTicket(
       entityId: ticketId,
       before,
       after: summary,
+      metadata: createPosAuditMetadata(authContext),
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
     });
@@ -375,7 +482,11 @@ export async function changePosServiceTicketStatus(
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
 ): Promise<ServiceTicketDetail> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
+  const cancellationReason =
+    data.to === "cancelled"
+      ? authorizePosSensitiveOperation(authContext, "cancel", data.reason)
+      : undefined;
 
   return db.transaction(async (tx) => {
     const before = await findServiceTicketAuditSnapshot(tx, {
@@ -391,11 +502,19 @@ export async function changePosServiceTicketStatus(
       );
     }
 
-    await requirePosBranchId(authContext, before.branchId, tx);
+    requirePosBranchAccess(authContext, before.branchId);
     await requireTicketFeature(authContext, before.ticketType, tx);
 
     const from = before.ticketStatus;
     const to = data.to;
+
+    if (from === to) {
+      const detail = await findServiceTicketDetail(tx, { tenantId, ticketId });
+      if (!detail) {
+        throw new Error("Service ticket could not be loaded for status replay.");
+      }
+      return detail;
+    }
 
     if (!isAllowedTicketTransition(from, to)) {
       throw new ServiceTicketError(
@@ -458,7 +577,11 @@ export async function changePosServiceTicketStatus(
       entityId: ticketId,
       before: { ticketStatus: from },
       after: { ticketStatus: to },
-      metadata: data.note ? { note: data.note } : undefined,
+      reason: cancellationReason,
+      metadata:
+        data.note || cancellationReason
+          ? createPosAuditMetadata(authContext, { note: data.note })
+          : createPosAuditMetadata(authContext),
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
     });
@@ -470,10 +593,16 @@ export async function changePosServiceTicketStatus(
 export async function deletePosServiceTicket(
   authContext: AuthContext,
   ticketId: string,
+  reason: string,
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
 ): Promise<void> {
-  const tenantId = requirePosContext(authContext);
+  const normalizedReason = authorizePosSensitiveOperation(
+    authContext,
+    "delete",
+    reason,
+  );
+  const tenantId = requirePosTenantId(authContext);
 
   await db.transaction(async (tx) => {
     const before = await findServiceTicketAuditSnapshot(tx, {
@@ -489,7 +618,7 @@ export async function deletePosServiceTicket(
       );
     }
 
-    await requirePosBranchId(authContext, before.branchId, tx);
+    requirePosBranchAccess(authContext, before.branchId);
 
     const deleted = await softDeleteServiceTicketRecord(tx, {
       tenantId,
@@ -515,6 +644,8 @@ export async function deletePosServiceTicket(
       entityId: ticketId,
       before,
       after: { deleted: true },
+      reason: normalizedReason,
+      metadata: createPosAuditMetadata(authContext),
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
     });
@@ -533,7 +664,7 @@ export async function createPosServiceTicketItem(
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
 ): Promise<ServiceTicketItem> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
   const { ticketId, data } = input;
 
   return db.transaction(async (tx) => {
@@ -549,11 +680,28 @@ export async function createPosServiceTicketItem(
       );
     }
 
-    await requirePosBranchId(authContext, before.branchId, tx);
+    requirePosBranchAccess(authContext, before.branchId);
     await requireTicketFeature(authContext, before.ticketType, tx);
 
+    const pricing = await resolveTicketItemPricing(tx, {
+      authContext,
+      tenantId,
+      ticket: before,
+      data,
+    });
+    const {
+      bagCount: _bagCount,
+      chargedUnitAmount: _chargedUnitAmount,
+      overrideReason: _overrideReason,
+      quantity: _quantity,
+      serviceId: _serviceId,
+      weight: _weight,
+      ...operationalData
+    } = data;
+
     const item = await createServiceTicketItemRecord(tx, {
-      ...data,
+      ...operationalData,
+      ...pricing,
       tenantId,
       ticketId,
       actorUserId: authContext.userId,
@@ -567,7 +715,19 @@ export async function createPosServiceTicketItem(
       eventType: "pos.service_ticket.item_added",
       entityType: "service_ticket",
       entityId: ticketId,
-      after: { itemId: item.id, labelCode: item.labelCode },
+      after: {
+        itemId: item.id,
+        labelCode: item.labelCode,
+        serviceId: item.serviceId,
+        pricingUnit: item.pricingUnit,
+        standardUnitAmount: item.standardUnitAmount,
+        chargedUnitAmount: item.chargedUnitAmount,
+        quantity: item.quantity,
+        weight: item.weight,
+        bagCount: item.bagCount,
+      },
+      reason: pricing.overrideReason,
+      metadata: createPosAuditMetadata(authContext),
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
     });
@@ -585,7 +745,7 @@ export async function updatePosServiceTicketItem(
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
 ): Promise<ServiceTicketItem> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
   const { ticketId, itemId, data } = input;
 
   return db.transaction(async (tx) => {
@@ -601,10 +761,41 @@ export async function updatePosServiceTicketItem(
       );
     }
 
-    await requirePosBranchId(authContext, before.branchId, tx);
+    requirePosBranchAccess(authContext, before.branchId);
+
+    const existing = await findTicketItemById(tx, {
+      tenantId,
+      ticketId,
+      itemId,
+    });
+    if (!existing) {
+      throw new ServiceTicketError(
+        "SERVICE_TICKET_ITEM_NOT_FOUND",
+        "Service ticket item was not found.",
+        404,
+      );
+    }
+
+    const pricing = await resolveTicketItemPricing(tx, {
+      authContext,
+      tenantId,
+      ticket: before,
+      data,
+      existing,
+    });
+    const {
+      bagCount: _bagCount,
+      chargedUnitAmount: _chargedUnitAmount,
+      overrideReason: _overrideReason,
+      quantity: _quantity,
+      serviceId: _serviceId,
+      weight: _weight,
+      ...operationalData
+    } = data;
 
     const item = await updateServiceTicketItemRecord(tx, {
-      ...data,
+      ...operationalData,
+      ...pricing,
       tenantId,
       ticketId,
       itemId,
@@ -627,7 +818,26 @@ export async function updatePosServiceTicketItem(
       eventType: "pos.service_ticket.item_updated",
       entityType: "service_ticket",
       entityId: ticketId,
-      metadata: { itemId },
+      before: {
+        serviceId: existing.serviceId,
+        pricingUnit: existing.pricingUnit,
+        standardUnitAmount: existing.standardUnitAmount,
+        chargedUnitAmount: existing.chargedUnitAmount,
+        quantity: existing.quantity,
+        weight: existing.weight,
+        bagCount: existing.bagCount,
+      },
+      after: {
+        serviceId: item.serviceId,
+        pricingUnit: item.pricingUnit,
+        standardUnitAmount: item.standardUnitAmount,
+        chargedUnitAmount: item.chargedUnitAmount,
+        quantity: item.quantity,
+        weight: item.weight,
+        bagCount: item.bagCount,
+      },
+      reason: pricing.overrideReason,
+      metadata: createPosAuditMetadata(authContext, { itemId }),
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
     });
@@ -645,7 +855,7 @@ export async function changePosServiceTicketItemStatus(
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
 ): Promise<ServiceTicketItem> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
   const { ticketId, itemId, data } = input;
 
   return db.transaction(async (tx) => {
@@ -661,7 +871,7 @@ export async function changePosServiceTicketItemStatus(
       );
     }
 
-    await requirePosBranchId(authContext, before.branchId, tx);
+    requirePosBranchAccess(authContext, before.branchId);
 
     const existing = await findTicketItemById(tx, {
       tenantId,
@@ -718,7 +928,7 @@ export async function changePosServiceTicketItemStatus(
       entityId: ticketId,
       before: { itemStatus: existing.itemStatus },
       after: { itemStatus: data.to },
-      metadata: { itemId },
+      metadata: createPosAuditMetadata(authContext, { itemId }),
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
     });
@@ -729,11 +939,16 @@ export async function changePosServiceTicketItemStatus(
 
 export async function deletePosServiceTicketItem(
   authContext: AuthContext,
-  input: ServiceTicketItemListInput & { itemId: string },
+  input: ServiceTicketItemListInput & { itemId: string; reason: string },
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
 ): Promise<void> {
-  const tenantId = requirePosContext(authContext);
+  const normalizedReason = authorizePosSensitiveOperation(
+    authContext,
+    "delete",
+    input.reason,
+  );
+  const tenantId = requirePosTenantId(authContext);
   const { ticketId, itemId } = input;
 
   await db.transaction(async (tx) => {
@@ -749,7 +964,20 @@ export async function deletePosServiceTicketItem(
       );
     }
 
-    await requirePosBranchId(authContext, before.branchId, tx);
+    requirePosBranchAccess(authContext, before.branchId);
+
+    const existing = await findTicketItemById(tx, {
+      tenantId,
+      ticketId,
+      itemId,
+    });
+    if (!existing) {
+      throw new ServiceTicketError(
+        "SERVICE_TICKET_ITEM_NOT_FOUND",
+        "Service ticket item was not found.",
+        404,
+      );
+    }
 
     const deleted = await softDeleteServiceTicketItemRecord(tx, {
       tenantId,
@@ -774,7 +1002,10 @@ export async function deletePosServiceTicketItem(
       eventType: "pos.service_ticket.item_removed",
       entityType: "service_ticket",
       entityId: ticketId,
-      metadata: { itemId },
+      before: existing,
+      after: { deleted: true },
+      reason: normalizedReason,
+      metadata: createPosAuditMetadata(authContext, { itemId }),
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
     });

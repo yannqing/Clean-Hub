@@ -6,9 +6,8 @@ import { useRouter } from "next/navigation";
 import type { SupportedLocale } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import type {
-  CreateManualOrderItemRequest,
   CreatePosOrderRequest,
-  PosOrderItemSourceType,
+  PosCatalogService,
   PosCustomerProfileWithAccount,
   ServiceTicketSummary,
 } from "@cleanhub/api-client";
@@ -23,30 +22,45 @@ import {
 import { Icon, type PosIconName } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { posRoutes } from "@/config";
+import { usePosOfflineWrites } from "@/features/offline/lib";
+import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 
-import { createOrderAction } from "../actions";
+import { formatOrderMoney } from "../constants";
 
-type ManualItemForm = CreateManualOrderItemRequest & {
+type ManualItemForm = {
   key: string;
+  serviceId: string;
+  pricingUnit: "per_item" | "per_kg";
+  standardUnitAmount: string;
+  chargedUnitAmount: string;
+  priceTouched: boolean;
+  quantity: string;
+  weight: string;
+  bagCount: string;
+  overrideReason: string;
+  itemColor: string;
+  defectNotes: string;
+  specialRequest: string;
+  itemIdentifier: string;
 };
-
-const SOURCE_TYPE_OPTIONS: Array<{
-  value: Exclude<PosOrderItemSourceType, "ticket_item">;
-  label: string;
-}> = [
-  { value: "product", label: "商品/服务" },
-  { value: "subscription", label: "订阅" },
-  { value: "delivery_fee", label: "配送费" },
-];
 
 function emptyItem(): ManualItemForm {
   return {
     key: `${Date.now()}-${Math.random()}`,
-    sourceType: "product",
-    itemName: "",
+    serviceId: "",
+    pricingUnit: "per_item",
+    standardUnitAmount: "0",
+    chargedUnitAmount: "0",
+    priceTouched: false,
     quantity: "1",
-    unitAmount: "0",
+    weight: "",
+    bagCount: "1",
+    overrideReason: "",
+    itemColor: "",
+    defectNotes: "",
+    specialRequest: "",
+    itemIdentifier: "",
   };
 }
 
@@ -58,6 +72,8 @@ function toIsoOrNull(value: string): string | null {
 }
 
 type OrderCreateDialogProps = {
+  canManageSensitiveOperations?: boolean;
+  catalog?: PosCatalogService[];
   defaultBranchId?: string;
   initialTicket?: ServiceTicketSummary;
   orderDetailHref?: (orderId: string) => string;
@@ -67,6 +83,8 @@ type OrderCreateDialogProps = {
 };
 
 export function OrderCreateDialog({
+  canManageSensitiveOperations = false,
+  catalog = [],
   defaultBranchId,
   initialTicket,
   orderDetailHref,
@@ -77,6 +95,7 @@ export function OrderCreateDialog({
   const { locale } = useTranslation();
   const text = (value: string) => translatePosText(value, locale);
   const router = useRouter();
+  const { createOrder } = usePosOfflineWrites();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [orderType, setOrderType] = useState<"manual" | "ticket">(
@@ -141,18 +160,39 @@ export function OrderCreateDialog({
     }
 
     const normalizedItems = items.map((item) => ({
-      sourceType: item.sourceType,
-      itemName: item.itemName.trim(),
-      quantity: item.quantity.trim(),
-      unitAmount: item.unitAmount.trim(),
+      serviceId: item.serviceId,
+      quantity:
+        item.pricingUnit === "per_item" ? item.quantity.trim() : undefined,
+      weight: item.pricingUnit === "per_kg" ? item.weight.trim() : undefined,
+      bagCount:
+        item.pricingUnit === "per_kg" ? Number(item.bagCount) : undefined,
+      chargedUnitAmount: item.chargedUnitAmount.trim(),
+      overrideReason: item.overrideReason.trim() || undefined,
+      itemColor: item.itemColor.trim() || undefined,
+      defectNotes: item.defectNotes.trim() || undefined,
+      specialRequest: item.specialRequest.trim() || undefined,
+      itemIdentifier: item.itemIdentifier.trim() || undefined,
+      pricingUnit: item.pricingUnit,
+      standardUnitAmount: item.standardUnitAmount,
+      priceTouched: item.priceTouched,
     }));
 
     if (
       normalizedItems.some(
         (item) =>
-          !item.itemName ||
-          Number(item.quantity) <= 0 ||
-          Number(item.unitAmount) <= 0,
+          !item.serviceId ||
+          (item.pricingUnit === "per_item" &&
+            (!Number.isInteger(Number(item.quantity)) ||
+              Number(item.quantity) < 1)) ||
+          (item.pricingUnit === "per_kg" &&
+            (Number(item.weight) <= 0 ||
+              !Number.isInteger(item.bagCount) ||
+              (item.bagCount ?? 0) < 1)) ||
+          Number(item.chargedUnitAmount) <= 0 ||
+          (item.priceTouched &&
+            Number(item.chargedUnitAmount).toFixed(2) !==
+              Number(item.standardUnitAmount).toFixed(2) &&
+            !item.overrideReason),
       )
     ) {
       toast.error("请完整填写订单条目。");
@@ -163,7 +203,18 @@ export function OrderCreateDialog({
       orderType: "manual",
       branchId: defaultBranchId,
       customerId: selectedCustomer.id,
-      items: normalizedItems,
+      items: normalizedItems.map((item) => ({
+        serviceId: item.serviceId,
+        quantity: item.quantity,
+        weight: item.weight,
+        bagCount: item.bagCount,
+        chargedUnitAmount: item.chargedUnitAmount,
+        overrideReason: item.overrideReason,
+        itemColor: item.itemColor,
+        defectNotes: item.defectNotes,
+        specialRequest: item.specialRequest,
+        itemIdentifier: item.itemIdentifier,
+      })),
       expireAt: toIsoOrNull(expireAt),
       notes: normalizedNotes,
     };
@@ -176,16 +227,21 @@ export function OrderCreateDialog({
     }
 
     startTransition(async () => {
-      const result = await createOrderAction(payload);
-      if (result.ok && result.data) {
+      try {
+        const result = await createOrder(payload);
+        if (result.queued) {
+          toast.success("网络不可用，订单已加入同步队列。");
+          handleOpenChange(false);
+          router.push(posRoutes.orders);
+          return;
+        }
         toast.success("订单已创建。");
         handleOpenChange(false);
         router.push(
-          orderDetailHref?.(result.data.id) ??
-            posRoutes.orderDetail(result.data.id),
+          orderDetailHref?.(result.data.id) ?? posRoutes.orderDetail(result.data.id),
         );
-      } else {
-        toast.error(result.message);
+      } catch (error) {
+        toast.error(getPosApiErrorMessage(error, "订单创建失败，请重试。"));
       }
     });
   }
@@ -232,6 +288,9 @@ export function OrderCreateDialog({
 
             {orderType === "manual" ? (
               <ManualOrderFields
+                canOverridePrice={canManageSensitiveOperations}
+                catalog={catalog}
+                currency={catalog[0]?.currency ?? "XOF"}
                 selectedCustomer={selectedCustomer}
                 items={items}
                 onAddItem={() =>
@@ -300,6 +359,9 @@ export function OrderCreateDialog({
 }
 
 function ManualOrderFields({
+  canOverridePrice,
+  catalog,
+  currency,
   selectedCustomer,
   items,
   onSelectCustomer,
@@ -307,6 +369,9 @@ function ManualOrderFields({
   onAddItem,
   onRemoveItem,
 }: {
+  canOverridePrice: boolean;
+  catalog: PosCatalogService[];
+  currency: string;
   selectedCustomer: PosCustomerProfileWithAccount | null;
   items: ManualItemForm[];
   onSelectCustomer: (customer: PosCustomerProfileWithAccount | null) => void;
@@ -341,49 +406,140 @@ function ManualOrderFields({
         <div className="grid gap-3 p-4">
           {items.map((item, index) => (
             <div
-              className="grid min-w-0 gap-3 rounded-lg bg-slate-50 p-3 md:grid-cols-2 xl:grid-cols-[130px_minmax(0,1fr)_minmax(0,1.2fr)_90px_110px_36px]"
+              className="grid min-w-0 gap-3 rounded-lg bg-slate-50 p-3 md:grid-cols-2 lg:grid-cols-3"
               key={item.key}
             >
-              <label>
+              <label className="md:col-span-2 lg:col-span-3">
                 <span className="mb-1 block text-xs font-semibold text-slate-500">
-                  {text("来源")}
+                  {text("服务项目")}
                 </span>
                 <select
                   className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none"
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    const service = catalog.find(
+                      (entry) => entry.id === event.target.value,
+                    );
+                    if (!service) {
+                      onUpdateItem(index, { serviceId: "" });
+                      return;
+                    }
                     onUpdateItem(index, {
-                      sourceType: event.target
-                        .value as ManualItemForm["sourceType"],
-                    })
-                  }
-                  value={item.sourceType}
+                      serviceId: service.id,
+                      pricingUnit: service.pricingUnit,
+                      standardUnitAmount: service.amount,
+                      chargedUnitAmount: service.amount,
+                      priceTouched: true,
+                      quantity:
+                        service.pricingUnit === "per_item"
+                          ? item.quantity || "1"
+                          : "1",
+                      weight:
+                        service.pricingUnit === "per_kg" ? item.weight : "",
+                      bagCount:
+                        service.pricingUnit === "per_kg"
+                          ? item.bagCount || "1"
+                          : "1",
+                      overrideReason: "",
+                    });
+                  }}
+                  value={item.serviceId}
                 >
-                  {SOURCE_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {text(option.label)}
+                  <option value="">{text("请选择服务")}</option>
+                  {catalog.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name} · {text(service.pricingUnit === "per_kg" ? "按公斤" : "按件")} · {formatOrderMoney(service.amount, service.currency)}
                     </option>
                   ))}
                 </select>
               </label>
+              {item.pricingUnit === "per_kg" ? (
+                <>
+                  <TextField
+                    label="重量（kg）"
+                    onChange={(value) => onUpdateItem(index, { weight: value })}
+                    type="number"
+                    value={item.weight}
+                  />
+                  <TextField
+                    label="袋数"
+                    onChange={(value) => onUpdateItem(index, { bagCount: value })}
+                    type="number"
+                    value={item.bagCount}
+                  />
+                </>
+              ) : (
+                <TextField
+                  label="数量"
+                  onChange={(value) => onUpdateItem(index, { quantity: value })}
+                  type="number"
+                  value={item.quantity}
+                />
+              )}
               <TextField
-                label={text("项目名称")}
-                onChange={(value) => onUpdateItem(index, { itemName: value })}
-                placeholder={text("如洗衣服务")}
-                value={item.itemName}
+                disabled={!canOverridePrice}
+                label={text(canOverridePrice ? "收费单价" : "标准单价")}
+                onChange={(value) =>
+                  onUpdateItem(index, {
+                    chargedUnitAmount: value,
+                    priceTouched: true,
+                  })
+                }
+                type="number"
+                value={item.chargedUnitAmount}
+              />
+              <div className="rounded-lg bg-blue-50 px-3 py-2">
+                <div className="text-xs font-semibold text-blue-600">
+                  {text("小计")}
+                </div>
+                <div className="mt-1 font-semibold text-blue-950">
+                  {formatOrderMoney(
+                    (item.pricingUnit === "per_kg"
+                      ? Number(item.weight) || 0
+                      : Number(item.quantity) || 0) *
+                      (Number(item.chargedUnitAmount) || 0),
+                    currency,
+                  )}
+                </div>
+              </div>
+              <TextField
+                label={text("颜色")}
+                onChange={(value) => onUpdateItem(index, { itemColor: value })}
+                value={item.itemColor}
               />
               <TextField
-                label={text("数量")}
-                onChange={(value) => onUpdateItem(index, { quantity: value })}
-                value={item.quantity}
+                label={text("物品 / 袋标识")}
+                onChange={(value) =>
+                  onUpdateItem(index, { itemIdentifier: value })
+                }
+                value={item.itemIdentifier}
               />
               <TextField
-                label={text("单价")}
-                onChange={(value) => onUpdateItem(index, { unitAmount: value })}
-                value={item.unitAmount}
+                label={text("瑕疵")}
+                onChange={(value) => onUpdateItem(index, { defectNotes: value })}
+                value={item.defectNotes}
               />
+              <TextField
+                label={text("特殊要求")}
+                onChange={(value) =>
+                  onUpdateItem(index, { specialRequest: value })
+                }
+                value={item.specialRequest}
+              />
+              {canOverridePrice &&
+              item.priceTouched &&
+              Number(item.chargedUnitAmount).toFixed(2) !==
+                Number(item.standardUnitAmount).toFixed(2) ? (
+                <TextField
+                  label={text("改价原因（必填）")}
+                  onChange={(value) =>
+                    onUpdateItem(index, { overrideReason: value })
+                  }
+                  value={item.overrideReason}
+                />
+              ) : null}
               <button
                 aria-label={text("删除条目")}
-                className="mt-5 flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 md:mt-0 md:self-end xl:mt-5"
+                className="flex h-11 w-11 items-center justify-center justify-self-end rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 md:col-span-2 lg:col-span-3"
                 disabled={items.length === 1}
                 onClick={() => onRemoveItem(index)}
                 title={text("删除条目")}
@@ -669,22 +825,29 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function TextField({
+  disabled,
   label,
   value,
   onChange,
   placeholder,
+  type = "text",
 }: {
+  disabled?: boolean;
   label: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  type?: "text" | "number";
 }) {
   return (
     <Field label={label}>
       <input
-        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-500"
+        disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
+        step={type === "number" ? "0.001" : undefined}
+        type={type}
         value={value}
       />
     </Field>

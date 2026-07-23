@@ -18,6 +18,26 @@ const POS_API_ERROR_MESSAGES: Record<
     en: "Too many failed sign-in attempts. Try again later.",
     fr: "Trop de tentatives de connexion ont échoué. Réessayez plus tard.",
   },
+  POS_TERMINAL_ENROLLMENT_REQUIRED: {
+    "zh-CN": "此终端尚未登记，请联系店主或店长完成终端登记。",
+    en: "This terminal is not enrolled. Ask an owner or manager to enroll it.",
+    fr: "Ce terminal n'est pas enregistré. Demandez à un propriétaire ou à un responsable de l'enregistrer.",
+  },
+  POS_TERMINAL_DISABLED: {
+    "zh-CN": "此终端已停用，请联系店主或店长。",
+    en: "This terminal is disabled. Contact an owner or manager.",
+    fr: "Ce terminal est désactivé. Contactez un propriétaire ou un responsable.",
+  },
+  POS_TERMINAL_CREDENTIAL_INVALID: {
+    "zh-CN": "终端凭据已失效，请重新登记此终端。",
+    en: "The terminal credential has expired. Enroll this terminal again.",
+    fr: "L'identifiant du terminal a expiré. Enregistrez à nouveau ce terminal.",
+  },
+  FORBIDDEN: {
+    "zh-CN": "当前账号没有执行此操作的权限。",
+    en: "Your account does not have permission for this action.",
+    fr: "Votre compte n'est pas autorisé à effectuer cette action.",
+  },
   POS_PHONE_CONFLICT: {
     "zh-CN": "该手机号已存在客户账户。",
     en: "A customer account with this phone already exists.",

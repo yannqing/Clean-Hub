@@ -13,6 +13,9 @@ export type PosSessionUser = {
   role: AdminRole;
   roles: string[];
   permissions: string[];
+  terminalId?: string;
+  terminalBranchId?: string;
+  terminalDeviceId?: string;
   accessTokenExpiresAt: string;
 };
 

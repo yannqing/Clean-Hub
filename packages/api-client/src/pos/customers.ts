@@ -1,6 +1,5 @@
 import type { ApiClient } from "../types";
 import type {
-  CreatePosProfileRequest,
   PosCustomerOrderStats,
   PosCustomerListQuery,
   PosCustomerListResult,
@@ -63,8 +62,10 @@ export function createPosCustomersApi(client: ApiClient) {
       ),
 
     /** Soft delete a profile. DELETE /pos/customers/:customerId */
-    remove: (customerId: string) =>
-      client.delete<void>(`/pos/customers/${customerId}`),
+    remove: (customerId: string, reason: string) =>
+      client.delete<void>(`/pos/customers/${customerId}`, {
+        query: { reason },
+      }),
   };
 }
 

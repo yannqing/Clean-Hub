@@ -1,6 +1,9 @@
 "use client";
 
 import { posToast as toast } from "@/lib/pos-toast";
+import { usePosOfflineWrites } from "@/features/offline/lib";
+import { getPosApiErrorMessage } from "@/lib/api-error-message";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import {
@@ -8,10 +11,7 @@ import {
   TICKET_STATUS_TONES,
   TICKET_STATUS_TRANSITIONS,
 } from "../constants";
-import {
-  changeTicketStatusAction,
-  isPickupTransition,
-} from "../actions";
+import { isPickupTransition } from "../actions";
 import { TicketBadge } from "./ticket-badges";
 import type { ServiceTicketStatus } from "@cleanhub/api-client";
 
@@ -39,7 +39,10 @@ export function TicketStatusDialog({
   open,
   onClose,
 }: TicketStatusDialogProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [cancelReason, setCancelReason] = useState("");
+  const { changeTicketStatus } = usePosOfflineWrites();
 
   if (!open) {
     return null;
@@ -48,18 +51,28 @@ export function TicketStatusDialog({
   const reachable = TICKET_STATUS_TRANSITIONS[current];
 
   function choose(next: ServiceTicketStatus) {
+    const reason = cancelReason.trim();
+    if (next === "cancelled" && !reason) {
+      toast.error("取消工单时必须填写原因");
+      return;
+    }
     startTransition(async () => {
-      const result = await changeTicketStatusAction(ticketId, { to: next, version });
-      if (result.ok) {
-        toast.success(`工单状态已更新为「${TICKET_STATUS_LABELS[next]}」`);
+      try {
+        const result = await changeTicketStatus(ticketId, {
+          to: next,
+          reason: next === "cancelled" ? reason : undefined,
+          version,
+        });
+        toast.success(
+          result.queued
+            ? `网络不可用，「${TICKET_STATUS_LABELS[next]}」状态已加入同步队列。`
+            : `工单状态已更新为「${TICKET_STATUS_LABELS[next]}」`,
+        );
+        setCancelReason("");
         onClose();
-      } else if (result.code === "PICKUP_REQUIRES_SETTLEMENT") {
-        toast.error("取件前请先结清关联订单。");
-      } else if (result.code === "VERSION_CONFLICT") {
-        toast.error("该工单已被他人修改，正在刷新…");
-        onClose();
-      } else {
-        toast.error(result.message);
+        if (!result.queued) router.refresh();
+      } catch (error) {
+        toast.error(getPosApiErrorMessage(error, "工单状态更新失败，请重试。"));
       }
     });
   }
@@ -125,6 +138,18 @@ export function TicketStatusDialog({
             })
           )}
         </div>
+        {reachable.includes("cancelled") ? (
+          <label className="mx-5 mb-5 grid gap-2 text-sm font-semibold text-slate-700">
+            取消原因（选择取消时必填）
+            <textarea
+              className="min-h-20 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-400"
+              disabled={isPending}
+              maxLength={500}
+              onChange={(event) => setCancelReason(event.target.value)}
+              value={cancelReason}
+            />
+          </label>
+        ) : null}
         <div className="flex justify-end border-t border-slate-200 p-4">
           <button
             className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"

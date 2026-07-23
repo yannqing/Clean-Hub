@@ -1,5 +1,6 @@
 "use client";
 
+import type { PosCatalogService } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 
 import { Icon, PosBreadcrumb } from "@/components/app-shell";
@@ -8,10 +9,14 @@ import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { OrderCreateDialog } from "./order-create-dialog";
 
 type OrdersPageHeaderProps = {
+  canManageSensitiveOperations?: boolean;
+  catalog?: PosCatalogService[];
   defaultBranchId?: string;
 };
 
 export function OrdersPageHeader({
+  canManageSensitiveOperations = false,
+  catalog = [],
   defaultBranchId,
 }: OrdersPageHeaderProps) {
   const { locale } = useTranslation();
@@ -38,7 +43,11 @@ export function OrdersPageHeader({
             <Icon className="h-4 w-4 text-slate-400" name="wallet-cards" />
             {text("本期仅开放现金收款")}
           </div>
-          <OrderCreateDialog defaultBranchId={defaultBranchId} />
+          <OrderCreateDialog
+            canManageSensitiveOperations={canManageSensitiveOperations}
+            catalog={catalog}
+            defaultBranchId={defaultBranchId}
+          />
         </div>
       </div>
     </>

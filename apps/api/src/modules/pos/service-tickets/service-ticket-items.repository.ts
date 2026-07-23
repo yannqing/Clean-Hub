@@ -1,7 +1,6 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import {
-  prices,
   serviceTickets,
   ticketItems,
   type Database,
@@ -25,16 +24,23 @@ function normalizeNullable(value: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
-function computeLineAmount(quantity: number, unitAmount: string): string {
-  const unit = Number(unitAmount);
-  if (!Number.isFinite(unit)) {
+function computeLineAmount(input: {
+  pricingUnit: "per_item" | "per_kg";
+  quantity: number;
+  weight: string | null;
+  chargedUnitAmount: string;
+}): string {
+  const unit = Number(input.chargedUnitAmount);
+  const measurement =
+    input.pricingUnit === "per_kg" ? Number(input.weight) : input.quantity;
+  if (!Number.isFinite(unit) || !Number.isFinite(measurement)) {
     throw new ServiceTicketError(
       "VALIDATION_ERROR",
-      "unitAmount must be a decimal number.",
+      "Ticket item pricing inputs must be decimal numbers.",
       422,
     );
   }
-  return (quantity * unit).toFixed(2);
+  return (measurement * unit).toFixed(2);
 }
 
 /**
@@ -63,41 +69,6 @@ async function lockTicketForItems(
   return rows[0] ?? null;
 }
 
-async function assertServicePriceCurrency(
-  db: Database,
-  input: { tenantId: string; serviceId: string; ticketCurrency: string },
-): Promise<void> {
-  const rows = await db
-    .select({ currency: prices.currency })
-    .from(prices)
-    .where(
-      and(
-        eq(prices.tenantId, input.tenantId),
-        eq(prices.serviceId, input.serviceId),
-        eq(prices.status, "active"),
-        isNull(prices.deletedAt),
-      ),
-    )
-    .limit(1);
-  const priceCurrency = rows[0]?.currency;
-
-  if (!priceCurrency) {
-    throw new ServiceTicketError(
-      "VALIDATION_ERROR",
-      "Active service price was not found.",
-      422,
-    );
-  }
-
-  if (priceCurrency !== input.ticketCurrency) {
-    throw new ServiceTicketError(
-      "VALIDATION_ERROR",
-      `Service price currency ${priceCurrency} does not match ticket currency ${input.ticketCurrency}.`,
-      422,
-    );
-  }
-}
-
 export async function findTicketItemById(
   db: Database,
   input: { tenantId: string; ticketId: string; itemId: string },
@@ -120,10 +91,24 @@ export async function findTicketItemById(
 
 export async function createServiceTicketItemRecord(
   db: Database,
-  input: CreateServiceTicketItemRequest & {
+  input: Omit<
+    CreateServiceTicketItemRequest,
+    | "bagCount"
+    | "chargedUnitAmount"
+    | "overrideReason"
+    | "quantity"
+    | "weight"
+  > & {
     tenantId: string;
     ticketId: string;
     actorUserId: string;
+    itemName: string;
+    pricingUnit: "per_item" | "per_kg";
+    standardUnitAmount: string;
+    chargedUnitAmount: string;
+    quantity: number;
+    weight: string | null;
+    bagCount: number | null;
   },
 ): Promise<ServiceTicketItem> {
   const ticket = await lockTicketForItems(db, input);
@@ -135,16 +120,7 @@ export async function createServiceTicketItemRecord(
     );
   }
 
-  if (input.serviceId) {
-    await assertServicePriceCurrency(db, {
-      tenantId: input.tenantId,
-      serviceId: input.serviceId,
-      ticketCurrency: ticket.currency,
-    });
-  }
-
-  const quantity = input.quantity ?? 1;
-  const lineAmount = computeLineAmount(quantity, input.unitAmount);
+  const lineAmount = computeLineAmount(input);
   const itemId = createId();
   const labelCode = await generateLabelCode(db, {
     tenantId: input.tenantId,
@@ -157,7 +133,7 @@ export async function createServiceTicketItemRecord(
     ticketId: input.ticketId,
     tenantId: input.tenantId,
     branchId: ticket.branchId,
-    serviceId: normalizeNullable(input.serviceId ?? null),
+    serviceId: input.serviceId,
     itemType: input.itemType ?? null,
     itemName: input.itemName.trim(),
     itemCategory: normalizeNullable(input.itemCategory ?? null),
@@ -165,8 +141,13 @@ export async function createServiceTicketItemRecord(
     itemColor: normalizeNullable(input.itemColor ?? null),
     itemBrand: normalizeNullable(input.itemBrand ?? null),
     itemMaterial: normalizeNullable(input.itemMaterial ?? null),
-    quantity,
-    unitAmount: input.unitAmount,
+    quantity: input.quantity,
+    pricingUnit: input.pricingUnit,
+    standardUnitAmount: input.standardUnitAmount,
+    chargedUnitAmount: input.chargedUnitAmount,
+    weight: input.weight,
+    bagCount: input.bagCount,
+    unitAmount: input.chargedUnitAmount,
     lineAmount,
     defectNotes: normalizeNullable(input.defectNotes ?? null),
     specialRequest: normalizeNullable(input.specialRequest ?? null),
@@ -202,11 +183,27 @@ export async function createServiceTicketItemRecord(
 
 export async function updateServiceTicketItemRecord(
   db: Database,
-  input: UpdateServiceTicketItemRequest & {
+  input: Omit<
+    UpdateServiceTicketItemRequest,
+    | "bagCount"
+    | "chargedUnitAmount"
+    | "overrideReason"
+    | "quantity"
+    | "serviceId"
+    | "weight"
+  > & {
     tenantId: string;
     ticketId: string;
     itemId: string;
     actorUserId: string;
+    serviceId: string;
+    itemName: string;
+    pricingUnit: "per_item" | "per_kg";
+    standardUnitAmount: string;
+    chargedUnitAmount: string;
+    quantity: number;
+    weight: string | null;
+    bagCount: number | null;
   },
 ): Promise<ServiceTicketItem | null> {
   const ticket = await lockTicketForItems(db, input);
@@ -219,25 +216,12 @@ export async function updateServiceTicketItemRecord(
     return null;
   }
 
-  if (input.serviceId) {
-    await assertServicePriceCurrency(db, {
-      tenantId: input.tenantId,
-      serviceId: input.serviceId,
-      ticketCurrency: ticket.currency,
-    });
-  }
-
-  const quantity = input.quantity ?? existing.quantity;
-  const unitAmount = input.unitAmount ?? existing.unitAmount;
-  const lineAmount =
-    input.quantity !== undefined || input.unitAmount !== undefined
-      ? computeLineAmount(quantity, unitAmount)
-      : existing.lineAmount;
+  const lineAmount = computeLineAmount(input);
 
   await db
     .update(ticketItems)
     .set({
-      itemName: input.itemName?.trim() ?? existing.itemName,
+      itemName: input.itemName.trim(),
       itemType: input.itemType ?? existing.itemType,
       itemCategory:
         input.itemCategory === undefined
@@ -255,13 +239,15 @@ export async function updateServiceTicketItemRecord(
         input.itemMaterial === undefined
           ? existing.itemMaterial
           : normalizeNullable(input.itemMaterial),
-      quantity,
-      unitAmount,
+      quantity: input.quantity,
+      pricingUnit: input.pricingUnit,
+      standardUnitAmount: input.standardUnitAmount,
+      chargedUnitAmount: input.chargedUnitAmount,
+      weight: input.weight,
+      bagCount: input.bagCount,
+      unitAmount: input.chargedUnitAmount,
       lineAmount,
-      serviceId:
-        input.serviceId === undefined
-          ? existing.serviceId
-          : normalizeNullable(input.serviceId),
+      serviceId: input.serviceId,
       defectNotes:
         input.defectNotes === undefined
           ? existing.defectNotes

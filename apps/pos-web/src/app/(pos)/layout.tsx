@@ -2,6 +2,7 @@ import { PosShell, type PosShellProfile } from "@/components/app-shell";
 import { PosRuntimeConfigProvider } from "@/components/runtime/pos-runtime-config";
 import { getMyBranchQuery } from "@/features/branches/queries";
 import { getNotificationsOverviewQuery } from "@/features/notifications/queries";
+import { OfflineSyncProvider } from "@/features/offline/components";
 import { getCurrentUser } from "@/lib/auth";
 
 export default async function PosLayout({
@@ -24,18 +25,27 @@ export default async function PosLayout({
         };
       })()
     : undefined;
+  const runtimeBranchId = user?.terminalBranchId ?? branch?.id ?? null;
 
   return (
     <PosRuntimeConfigProvider
-      branchId={branch?.id}
+      tenantId={user?.tenantId}
+      branchId={runtimeBranchId}
+      terminalId={user?.terminalId}
       currency={branch?.defaultCurrency}
     >
-      <PosShell
-        notificationUnreadCount={notificationsOverview?.unreadCount ?? 0}
-        profile={profile}
+      <OfflineSyncProvider
+        tenantId={user?.tenantId}
+        branchId={runtimeBranchId}
+        terminalId={user?.terminalId}
       >
-        {children}
-      </PosShell>
+        <PosShell
+          notificationUnreadCount={notificationsOverview?.unreadCount ?? 0}
+          profile={profile}
+        >
+          {children}
+        </PosShell>
+      </OfflineSyncProvider>
     </PosRuntimeConfigProvider>
   );
 }

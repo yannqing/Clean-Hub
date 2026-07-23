@@ -1,6 +1,10 @@
 import { type Database, getDb } from "@cleanhub/db";
 import type { AuthContext } from "../../auth/auth.types.js";
-import { assertPosContext } from "../../auth/permission.helper.js";
+import {
+  requirePosBranchAccess,
+  requirePosTenantId,
+  resolvePosBranchScope,
+} from "../access-control.helper.js";
 import {
   findPendingTasks,
   findRecentActivities,
@@ -13,26 +17,6 @@ import type {
 } from "./workspace.types.js";
 
 // ---------------------------------------------------------------------------
-// Local helpers (same pattern as orders.service.ts)
-// ---------------------------------------------------------------------------
-
-function requirePosContext(authContext: AuthContext): string {
-  assertPosContext(authContext);
-  return authContext.tenantId!;
-}
-
-function resolveListBranchScope(
-  authContext: AuthContext,
-): string[] | undefined {
-  if (authContext.role === "owner" || authContext.role === "manager") {
-    return authContext.branchIds.length > 0
-      ? authContext.branchIds
-      : undefined;
-  }
-  return authContext.branchIds;
-}
-
-// ---------------------------------------------------------------------------
 // Overview
 // ---------------------------------------------------------------------------
 
@@ -41,11 +25,14 @@ export async function getPosWorkspaceOverview(
   query: { branchId?: string },
   db: Database = getDb(),
 ): Promise<PosWorkspaceOverview> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
+  if (query.branchId) {
+    requirePosBranchAccess(authContext, query.branchId);
+  }
 
   return findWorkspaceOverview(db, {
     tenantId,
-    allowedBranchIds: resolveListBranchScope(authContext),
+    allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
   });
 }
@@ -59,11 +46,14 @@ export async function getPosRecentActivities(
   query: { branchId?: string; limit?: number },
   db: Database = getDb(),
 ): Promise<PosRecentActivitiesResponse> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
+  if (query.branchId) {
+    requirePosBranchAccess(authContext, query.branchId);
+  }
 
   return findRecentActivities(db, {
     tenantId,
-    allowedBranchIds: resolveListBranchScope(authContext),
+    allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
     limit: query.limit,
   });
@@ -78,11 +68,14 @@ export async function getPosPendingTasks(
   query: { branchId?: string },
   db: Database = getDb(),
 ): Promise<PosPendingTasksResponse> {
-  const tenantId = requirePosContext(authContext);
+  const tenantId = requirePosTenantId(authContext);
+  if (query.branchId) {
+    requirePosBranchAccess(authContext, query.branchId);
+  }
 
   return findPendingTasks(db, {
     tenantId,
-    allowedBranchIds: resolveListBranchScope(authContext),
+    allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
   });
 }

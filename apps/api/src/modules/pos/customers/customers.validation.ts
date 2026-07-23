@@ -75,6 +75,7 @@ export const posCustomerIdParamsSchema = z.object({
 
 export const createPosAccountBodySchema = z
   .object({
+    id: ulidSchema.optional(),
     accountName: z.string().trim().min(1).max(200),
     phone: optionalNonEmpty(32),
     email: optionalEmail(),
@@ -121,4 +122,8 @@ export const updatePosProfileBodySchema = z
 export const changePosCustomerStatusBodySchema = z.object({
   status: customerStatusSchema,
   reason: z.string().trim().max(500).optional(),
+});
+
+export const deletePosCustomerQuerySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
 });

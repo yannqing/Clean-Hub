@@ -92,12 +92,52 @@ export type OfflineQueueOptions = {
   queueKey?: string;
 };
 
+export type OfflineQueueScope = {
+  tenantId: string;
+  branchId: string;
+  terminalId: string;
+};
+
+export type PersistentPrintJobStatus =
+  | "pending"
+  | "printing"
+  | "printed"
+  | "failed";
+
+export type PersistentPrintJob<TPayload = unknown> = {
+  id: string;
+  idempotencyKey: string;
+  payload: TPayload;
+  status: PersistentPrintJobStatus;
+  attempt: number;
+  createdAt: string;
+  updatedAt: string;
+  printedAt?: string;
+  lastError?: string;
+};
+
+export type EnqueuePrintJobInput<TPayload> = {
+  payload: TPayload;
+  id?: string;
+  idempotencyKey?: string;
+};
+
+export type PrintJobHandler<TPayload> = (
+  job: PersistentPrintJob<TPayload>,
+) => Promise<void>;
+
+export type PrintJobReplayResult<TPayload> = {
+  printed: PersistentPrintJob<TPayload>[];
+  failed?: PersistentPrintJob<TPayload>;
+};
+
 export type DeliveryTaskCacheOptions = {
   storage: AsyncKeyValueStorage;
   cacheKey?: string;
 };
 
 const DEFAULT_QUEUE_KEY = "cleanhub.offline.queue.v1";
+const DEFAULT_PRINT_QUEUE_KEY = "cleanhub.pos.offline.print.queue.v1";
 const DEFAULT_DELIVERY_TASK_CACHE_KEY = "cleanhub.offline.deliveryTasks.v1";
 
 export function createPreferencesStorageAdapter(
@@ -135,6 +175,62 @@ export function createMemoryStorage(
   };
 }
 
+export function createWebStorageAdapter(storage: Storage): AsyncKeyValueStorage {
+  return {
+    async getItem(key) {
+      return storage.getItem(key);
+    },
+    async setItem(key, value) {
+      storage.setItem(key, value);
+    },
+    async removeItem(key) {
+      storage.removeItem(key);
+    },
+  };
+}
+
+export function buildScopedOfflineQueueKey(
+  scope: OfflineQueueScope,
+  namespace = "cleanhub.pos.offline.queue.v1",
+): string {
+  const segments = [scope.tenantId, scope.branchId, scope.terminalId].map(
+    (segment) => segment.trim(),
+  );
+
+  if (segments.some((segment) => segment.length === 0)) {
+    throw new Error(
+      "Offline queue scope requires tenant, branch, and terminal identifiers.",
+    );
+  }
+
+  return [namespace, ...segments.map(encodeURIComponent)].join(":");
+}
+
+export function createScopedOfflineQueue(input: {
+  storage: AsyncKeyValueStorage;
+  scope: OfflineQueueScope;
+  namespace?: string;
+}): OfflineQueue {
+  return new OfflineQueue({
+    storage: input.storage,
+    queueKey: buildScopedOfflineQueueKey(input.scope, input.namespace),
+  });
+}
+
+export function createScopedPrintJobQueue<TPayload>(input: {
+  storage: AsyncKeyValueStorage;
+  scope: OfflineQueueScope;
+  namespace?: string;
+}): PersistentPrintJobQueue<TPayload> {
+  return new PersistentPrintJobQueue<TPayload>({
+    storage: input.storage,
+    queueKey: buildScopedOfflineQueueKey(
+      input.scope,
+      input.namespace ?? DEFAULT_PRINT_QUEUE_KEY,
+    ),
+  });
+}
+
 export class OfflineQueue {
   private readonly storage: AsyncKeyValueStorage;
   private readonly queueKey: string;
@@ -147,7 +243,17 @@ export class OfflineQueue {
   async enqueue<TPayload = unknown>(
     input: EnqueueInput<TPayload>,
   ): Promise<OfflineQueueItem<TPayload>> {
-    const queue = await this.readQueue();
+    const queue = await this.readQueue<TPayload>();
+    const existing = queue.find(
+      (item) =>
+        (input.id !== undefined && item.id === input.id) ||
+        (input.idempotencyKey !== undefined &&
+          item.idempotencyKey === input.idempotencyKey),
+    );
+    if (existing) {
+      return existing;
+    }
+
     const now = new Date().toISOString();
     const item: OfflineQueueItem<TPayload> = {
       id: input.id ?? createId(),
@@ -304,6 +410,140 @@ export class OfflineQueue {
     }
 
     await this.storage.setItem(this.queueKey, JSON.stringify(queue));
+  }
+}
+
+export class PersistentPrintJobQueue<TPayload = unknown> {
+  private readonly storage: AsyncKeyValueStorage;
+  private readonly queueKey: string;
+
+  constructor(options: OfflineQueueOptions) {
+    this.storage = options.storage;
+    this.queueKey = options.queueKey ?? DEFAULT_PRINT_QUEUE_KEY;
+  }
+
+  async enqueue(
+    input: EnqueuePrintJobInput<TPayload>,
+  ): Promise<PersistentPrintJob<TPayload>> {
+    const jobs = await this.readJobs();
+    const idempotencyKey = input.idempotencyKey ?? createId();
+    const existing = jobs.find(
+      (job) => job.idempotencyKey === idempotencyKey,
+    );
+    if (existing) return existing;
+
+    const now = new Date().toISOString();
+    const job: PersistentPrintJob<TPayload> = {
+      id: input.id ?? createId(),
+      idempotencyKey,
+      payload: input.payload,
+      status: "pending",
+      attempt: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    jobs.push(job);
+    await this.writeJobs(jobs);
+    return job;
+  }
+
+  async list(): Promise<PersistentPrintJob<TPayload>[]> {
+    return this.readJobs();
+  }
+
+  async replay(
+    handler: PrintJobHandler<TPayload>,
+  ): Promise<PrintJobReplayResult<TPayload>> {
+    const printed: PersistentPrintJob<TPayload>[] = [];
+
+    while (true) {
+      const jobs = await this.readJobs();
+      const next = jobs.find((job) => job.status !== "printed");
+      if (!next) return { printed };
+
+      const result = await this.execute(next.id, handler);
+      if (result.status === "failed") return { printed, failed: result };
+      printed.push(result);
+    }
+  }
+
+  async retry(
+    jobId: string,
+    handler: PrintJobHandler<TPayload>,
+  ): Promise<PersistentPrintJob<TPayload>> {
+    const jobs = await this.readJobs();
+    const job = jobs.find((candidate) => candidate.id === jobId);
+    if (!job) throw new Error(`Print job not found: ${jobId}`);
+    if (job.status === "printed") return job;
+    return this.execute(jobId, handler);
+  }
+
+  async clearPrinted(): Promise<void> {
+    const jobs = await this.readJobs();
+    await this.writeJobs(jobs.filter((job) => job.status !== "printed"));
+  }
+
+  private async execute(
+    jobId: string,
+    handler: PrintJobHandler<TPayload>,
+  ): Promise<PersistentPrintJob<TPayload>> {
+    let jobs = await this.readJobs();
+    const current = jobs.find((job) => job.id === jobId);
+    if (!current) throw new Error(`Print job not found: ${jobId}`);
+    if (current.status === "printed") return current;
+
+    const printing: PersistentPrintJob<TPayload> = {
+      ...current,
+      status: "printing",
+      attempt: current.attempt + 1,
+      updatedAt: new Date().toISOString(),
+      lastError: undefined,
+    };
+    jobs = jobs.map((job) => (job.id === jobId ? printing : job));
+    await this.writeJobs(jobs);
+
+    try {
+      await handler(printing);
+      const printed: PersistentPrintJob<TPayload> = {
+        ...printing,
+        status: "printed",
+        printedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      await this.replaceJob(printed);
+      return printed;
+    } catch (error) {
+      const failed: PersistentPrintJob<TPayload> = {
+        ...printing,
+        status: "failed",
+        lastError: getErrorMessage(error),
+        updatedAt: new Date().toISOString(),
+      };
+      await this.replaceJob(failed);
+      return failed;
+    }
+  }
+
+  private async replaceJob(next: PersistentPrintJob<TPayload>): Promise<void> {
+    const jobs = await this.readJobs();
+    await this.writeJobs(
+      jobs.map((job) => (job.id === next.id ? next : job)),
+    );
+  }
+
+  private async readJobs(): Promise<PersistentPrintJob<TPayload>[]> {
+    const raw = await this.storage.getItem(this.queueKey);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as PersistentPrintJob<TPayload>[];
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
+  private async writeJobs(jobs: PersistentPrintJob<TPayload>[]): Promise<void> {
+    if (jobs.length === 0 && this.storage.removeItem) {
+      await this.storage.removeItem(this.queueKey);
+      return;
+    }
+    await this.storage.setItem(this.queueKey, JSON.stringify(jobs));
   }
 }
 

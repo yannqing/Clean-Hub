@@ -5,7 +5,10 @@ import {
   resolveEffectiveSecurityPolicy,
 } from "../saas/security/security-policy.js";
 import { AuthError, invalidCredentials } from "./auth.errors.js";
-import { AuthRepository } from "./auth.repository.js";
+import {
+  AuthRepository,
+  type PosTerminalLoginContext,
+} from "./auth.repository.js";
 import type {
   AdminRole,
   AuthContext,
@@ -32,6 +35,10 @@ import {
 } from "./login-lockout.helper.js";
 import { resolveLoginScope } from "./login-scope.helper.js";
 import { verifyPassword } from "./password.service.js";
+import {
+  assertEnrolledTerminalCredential,
+  buildPosPinLockKeys,
+} from "./pos-terminal-credential.js";
 import { hashOpaqueToken, TokenService } from "./token.service.js";
 
 function normalizeIdentifier(identifier: string): string {
@@ -77,6 +84,48 @@ function resolvePrimaryRole(user: AuthenticatedUser, access: UserAccess): AdminR
   return role;
 }
 
+async function assertLockKeysNotLocked(
+  db: Database,
+  lockKeys: readonly string[],
+): Promise<void> {
+  for (const lockKey of lockKeys) {
+    await assertLoginNotLocked(db, lockKey);
+  }
+}
+
+async function recordFailureForLockKeys(
+  db: Database,
+  lockKeys: readonly string[],
+  policy: Awaited<ReturnType<typeof resolveEffectiveSecurityPolicy>>,
+): Promise<void> {
+  let lockError: AuthError | undefined;
+
+  for (const lockKey of lockKeys) {
+    try {
+      await recordLoginFailure(db, lockKey, policy);
+    } catch (error) {
+      if (error instanceof AuthError && error.code === "ACCOUNT_LOCKED") {
+        lockError = error;
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (lockError) {
+    throw lockError;
+  }
+}
+
+async function clearLockKeys(
+  db: Database,
+  lockKeys: readonly string[],
+): Promise<void> {
+  for (const lockKey of lockKeys) {
+    await clearLoginLockout(db, lockKey);
+  }
+}
+
 export class AuthService {
   private readonly db: Database;
   private readonly repository: AuthRepository;
@@ -115,10 +164,15 @@ export class AuthService {
       eventType: string;
       meta?: AuthRequestMeta;
       metadata?: Record<string, unknown>;
+      terminal?: PosTerminalLoginContext;
     },
   ): Promise<AuthResult> {
     const access = await this.repository.getUserAccess(user.id);
-    const authContextBase = this.buildAuthContextBase(user, access);
+    const authContextBase = this.buildAuthContextBase(
+      user,
+      access,
+      input.terminal,
+    );
     const refreshTokenTtlSeconds = await this.getRefreshTokenTtlSeconds();
     const tokens = await this.tokenService.issueTokenPair(authContextBase, {
       refreshTokenTtlSeconds,
@@ -133,6 +187,7 @@ export class AuthService {
       tokenHash: hashOpaqueToken(tokens.refreshToken),
       familyId: tokens.refreshTokenFamilyId,
       expiresAt: tokens.refreshTokenExpiresAt,
+      terminalId: input.terminal?.id,
       meta: input.meta,
     });
 
@@ -261,58 +316,76 @@ export class AuthService {
   async loginWithPosPin(input: PosPinLoginInput): Promise<AuthResult> {
     const tenantCode = input.tenantCode.trim();
     const deviceId = input.deviceId.trim();
-    const lockKey = buildLoginLockKey(`pos-pin:${deviceId}`, tenantCode);
     const policy = await resolveEffectiveSecurityPolicy(this.db);
-    const meta = buildRequestMeta(input);
-
-    await assertLoginNotLocked(this.db, lockKey);
 
     const terminalContext = await this.repository.findPosTerminalLoginContext({
       tenantCode,
       deviceId,
     });
-
-    if (!terminalContext) {
-      try {
-        await recordLoginFailure(this.db, lockKey, policy);
-      } catch (error) {
-        if (error instanceof AuthError && error.code === "ACCOUNT_LOCKED") {
-          await this.repository.writeAuditLog({
-            eventType: "auth.pos_pin_login.failed",
-            success: false,
-            reason: error.code,
-            meta,
-            metadata: { tenantCode, deviceId },
-          });
+    const lockKeys = buildPosPinLockKeys({
+      tenantId: terminalContext?.tenantId ?? `code:${tenantCode.toLowerCase()}`,
+      terminalId: terminalContext?.id,
+      ipAddress: input.ipAddress,
+    });
+    const meta: AuthRequestMeta = terminalContext
+      ? {
+          ipAddress: input.ipAddress,
+          userAgent: input.userAgent,
+          deviceId: terminalContext.deviceId,
         }
+      : buildRequestMeta(input);
 
-        throw error;
+    await assertLockKeysNotLocked(this.db, lockKeys);
+
+    try {
+      assertEnrolledTerminalCredential(
+        terminalContext,
+        input.terminalCredential,
+      );
+    } catch (error) {
+      if (
+        error instanceof AuthError &&
+        error.code !== "POS_TERMINAL_DISABLED"
+      ) {
+        try {
+          await recordFailureForLockKeys(this.db, lockKeys, policy);
+        } catch (lockError) {
+          if (
+            lockError instanceof AuthError &&
+            lockError.code === "ACCOUNT_LOCKED"
+          ) {
+            await this.repository.writeAuditLog({
+              tenantId: terminalContext?.tenantId,
+              eventType: "auth.pos_pin_login.failed",
+              success: false,
+              reason: lockError.code,
+              meta,
+              metadata: {
+                tenantCode,
+                deviceId,
+                terminalId: terminalContext?.id,
+                branchId: terminalContext?.branchId,
+              },
+            });
+          }
+          throw lockError;
+        }
       }
 
       await this.repository.writeAuditLog({
+        tenantId: terminalContext?.tenantId,
         eventType: "auth.pos_pin_login.failed",
         success: false,
-        reason: "invalid_tenant_or_terminal",
-        meta,
-        metadata: { tenantCode, deviceId },
-      });
-      throw invalidCredentials();
-    }
-
-    if (terminalContext.deviceRegistered && terminalContext.status !== "active") {
-      await this.repository.writeAuditLog({
-        tenantId: terminalContext.tenantId,
-        eventType: "auth.pos_pin_login.failed",
-        success: false,
-        reason: "terminal_inactive",
+        reason: error instanceof AuthError ? error.code : "terminal_invalid",
         meta,
         metadata: {
           tenantCode,
           deviceId,
-          branchId: terminalContext.branchId,
+          terminalId: terminalContext?.id,
+          branchId: terminalContext?.branchId,
         },
       });
-      throw new AuthError("FORBIDDEN", "POS terminal is inactive.");
+      throw error;
     }
 
     const candidates = await this.repository.findPosPinLoginCandidates({
@@ -329,7 +402,7 @@ export class AuthService {
 
     if (matchedUsers.length !== 1) {
       try {
-        await recordLoginFailure(this.db, lockKey, policy);
+        await recordFailureForLockKeys(this.db, lockKeys, policy);
       } catch (error) {
         if (error instanceof AuthError && error.code === "ACCOUNT_LOCKED") {
           await this.repository.writeAuditLog({
@@ -341,8 +414,8 @@ export class AuthService {
             metadata: {
               tenantCode,
               deviceId,
+              terminalId: terminalContext.id,
               branchId: terminalContext.branchId,
-              terminalRegistered: terminalContext.deviceRegistered,
             },
           });
         }
@@ -359,8 +432,8 @@ export class AuthService {
         metadata: {
           tenantCode,
           deviceId,
+          terminalId: terminalContext.id,
           branchId: terminalContext.branchId,
-          terminalRegistered: terminalContext.deviceRegistered,
         },
       });
       throw invalidCredentials();
@@ -370,16 +443,18 @@ export class AuthService {
 
     try {
       assertActiveUser(user);
-      await clearLoginLockout(this.db, lockKey);
+      await clearLockKeys(this.db, lockKeys);
+      await this.repository.markPosTerminalCredentialUsed(terminalContext.id);
 
       return this.issueAuthResult(user, {
         eventType: "auth.pos_pin_login.success",
         meta,
+        terminal: terminalContext,
         metadata: {
           tenantCode,
           deviceId,
+          terminalId: terminalContext.id,
           branchId: terminalContext.branchId,
-          terminalRegistered: terminalContext.deviceRegistered,
         },
       });
     } catch (error) {
@@ -394,8 +469,8 @@ export class AuthService {
           metadata: {
             tenantCode,
             deviceId,
+            terminalId: terminalContext.id,
             branchId: terminalContext.branchId,
-            terminalRegistered: terminalContext.deviceRegistered,
           },
         });
       }
@@ -442,7 +517,32 @@ export class AuthService {
     assertActiveUser(user);
 
     const access = await this.repository.getUserAccess(user.id);
-    const authContextBase = this.buildAuthContextBase(user, access);
+    const terminal = storedToken.terminalId
+      ? (await this.repository.findPosTerminalById(storedToken.terminalId)) ??
+        undefined
+      : undefined;
+
+    if (
+      storedToken.terminalId &&
+      (!terminal ||
+        terminal.tenantId !== storedToken.tenantId ||
+        terminal.deviceId !== storedToken.deviceId)
+    ) {
+      await this.repository.revokeRefreshTokenFamily(storedToken.familyId);
+      throw new AuthError(
+        "POS_TERMINAL_DISABLED",
+        "The POS terminal session is no longer active.",
+      );
+    }
+
+    if (terminal) {
+      assertEnrolledTerminalCredential(
+        terminal,
+        input.terminalCredential,
+      );
+    }
+
+    const authContextBase = this.buildAuthContextBase(user, access, terminal);
     const refreshTokenTtlSeconds = await this.getRefreshTokenTtlSeconds();
     const issuedTokens = await this.tokenService.issueTokenPair(authContextBase, {
       refreshTokenTtlSeconds,
@@ -461,7 +561,10 @@ export class AuthService {
       tokenHash: hashOpaqueToken(tokens.refreshToken),
       familyId: storedToken.familyId,
       expiresAt: tokens.refreshTokenExpiresAt,
-      meta: input,
+      terminalId: terminal?.id,
+      meta: terminal
+        ? { ...input, deviceId: terminal.deviceId }
+        : input,
     });
 
     await this.repository.revokeRefreshToken({
@@ -513,8 +616,28 @@ export class AuthService {
     assertActiveUser(user);
 
     const access = await this.repository.getUserAccess(user.id);
+    const terminal = claims.terminalId
+      ? (await this.repository.findPosTerminalById(claims.terminalId)) ??
+        undefined
+      : undefined;
+
+    if (
+      claims.terminalId &&
+      (!terminal ||
+        terminal.status !== "active" ||
+        !terminal.credentialDigest ||
+        terminal.tenantId !== user.tenantId ||
+        terminal.branchId !== claims.terminalBranchId ||
+        terminal.deviceId !== claims.terminalDeviceId)
+    ) {
+      throw new AuthError(
+        "POS_TERMINAL_DISABLED",
+        "The POS terminal session is no longer active.",
+      );
+    }
+
     return this.withAccessTokenExpiresAt(
-      this.buildAuthContextBase(user, access),
+      this.buildAuthContextBase(user, access, terminal),
       claims.expiresAt,
     );
   }
@@ -522,16 +645,38 @@ export class AuthService {
   private buildAuthContextBase(
     user: AuthenticatedUser,
     access: UserAccess,
+    terminal?: PosTerminalLoginContext,
   ): Omit<AuthContext, "accessTokenExpiresAt"> {
-    return {
+    const role = resolvePrimaryRole(user, access);
+
+    if (
+      terminal &&
+      role !== "owner" &&
+      !access.branchIds.includes(terminal.branchId)
+    ) {
+      throw new AuthError(
+        "FORBIDDEN",
+        "The staff member is not assigned to the terminal branch.",
+      );
+    }
+
+    const context: Omit<AuthContext, "accessTokenExpiresAt"> = {
       userId: user.id,
       displayName: access.displayName,
       tenantId: user.tenantId,
-      branchIds: access.branchIds,
-      role: resolvePrimaryRole(user, access),
+      branchIds: terminal ? [terminal.branchId] : access.branchIds,
+      role,
       roles: access.roles,
       permissions: access.permissions,
     };
+
+    if (terminal) {
+      context.terminalId = terminal.id;
+      context.terminalBranchId = terminal.branchId;
+      context.terminalDeviceId = terminal.deviceId;
+    }
+
+    return context;
   }
 
   private withAccessTokenExpiresAt(

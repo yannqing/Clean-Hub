@@ -138,8 +138,11 @@ export function changeAccountStatus(
   return posApi.pos.accounts.changeStatus(accountId, input);
 }
 
-export async function deleteAccount(accountId: string): Promise<void> {
-  await posApi.pos.accounts.remove(accountId);
+export async function deleteAccount(
+  accountId: string,
+  reason: string,
+): Promise<void> {
+  await posApi.pos.accounts.remove(accountId, reason);
 }
 
 // ---- profile mutations ----------------------------------------------------
@@ -165,8 +168,11 @@ export function changeProfileStatus(
   return posApi.pos.customers.changeStatus(customerId, input);
 }
 
-export async function deleteProfile(customerId: string): Promise<void> {
-  await posApi.pos.customers.remove(customerId);
+export async function deleteProfile(
+  customerId: string,
+  reason: string,
+): Promise<void> {
+  await posApi.pos.customers.remove(customerId, reason);
 }
 
 // ---- customer-scoped tickets / orders --------------------------------------

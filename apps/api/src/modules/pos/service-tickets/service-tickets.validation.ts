@@ -57,6 +57,12 @@ const amountSchema = z
   .trim()
   .regex(/^\d+(\.\d{1,2})?$/, "Amount must be a decimal with up to 2 places.");
 
+const weightSchema = z
+  .string()
+  .trim()
+  .regex(/^\d+(\.\d{1,3})?$/, "Weight must be a decimal with up to 3 places.")
+  .refine((value) => Number(value) > 0, "Weight must be greater than zero.");
+
 const optionalUlid = z.string().regex(ULID_PATTERN);
 
 const isoTimestampSchema = z
@@ -120,22 +126,35 @@ export const updateServiceTicketBodySchema = z
     "At least one ticket field must be provided.",
   );
 
-export const changeServiceTicketStatusBodySchema = z.object({
-  to: serviceTicketStatusSchema,
-  note: z.string().trim().max(2000).optional(),
-  version: z.number().int().min(1),
-});
+export const changeServiceTicketStatusBodySchema = z
+  .object({
+    to: serviceTicketStatusSchema,
+    note: z.string().trim().max(2000).optional(),
+    reason: z.string().trim().min(1).max(500).optional(),
+    version: z.number().int().min(1),
+  })
+  .superRefine((value, context) => {
+    if (value.to === "cancelled" && !value.reason) {
+      context.addIssue({
+        code: "custom",
+        path: ["reason"],
+        message: "A reason is required when cancelling a ticket.",
+      });
+    }
+  });
 
 export const createServiceTicketItemBodySchema = z.object({
-  itemName: z.string().trim().min(1).max(200),
+  serviceId: z.string().regex(ULID_PATTERN),
   itemType: serviceTicketItemTypeSchema.optional(),
   itemCategory: z.string().trim().max(80).optional(),
   itemColor: z.string().trim().max(40).optional(),
   itemBrand: z.string().trim().max(80).optional(),
   itemMaterial: z.string().trim().max(80).optional(),
-  quantity: z.coerce.number().int().min(1).max(9999).default(1),
-  unitAmount: amountSchema,
-  serviceId: optionalUlid.nullable().optional(),
+  quantity: z.coerce.number().int().min(1).max(9999).optional(),
+  weight: weightSchema.optional(),
+  bagCount: z.coerce.number().int().min(1).max(9999).optional(),
+  chargedUnitAmount: amountSchema.optional(),
+  overrideReason: z.string().trim().min(1).max(500).optional(),
   defectNotes: z.string().trim().max(2000).optional(),
   specialRequest: z.string().trim().max(2000).optional(),
   remark: z.string().trim().max(2000).optional(),
@@ -144,15 +163,17 @@ export const createServiceTicketItemBodySchema = z.object({
 
 export const updateServiceTicketItemBodySchema = z
   .object({
-    itemName: z.string().trim().min(1).max(200).optional(),
+    serviceId: z.string().regex(ULID_PATTERN).optional(),
     itemType: serviceTicketItemTypeSchema.optional(),
     itemCategory: z.string().trim().max(80).nullable().optional(),
     itemColor: z.string().trim().max(40).nullable().optional(),
     itemBrand: z.string().trim().max(80).nullable().optional(),
     itemMaterial: z.string().trim().max(80).nullable().optional(),
     quantity: z.coerce.number().int().min(1).max(9999).optional(),
-    unitAmount: amountSchema.optional(),
-    serviceId: optionalUlid.nullable().optional(),
+    weight: weightSchema.nullable().optional(),
+    bagCount: z.coerce.number().int().min(1).max(9999).nullable().optional(),
+    chargedUnitAmount: amountSchema.optional(),
+    overrideReason: z.string().trim().min(1).max(500).optional(),
     defectNotes: z.string().trim().max(2000).nullable().optional(),
     specialRequest: z.string().trim().max(2000).nullable().optional(),
     remark: z.string().trim().max(2000).nullable().optional(),
@@ -161,7 +182,8 @@ export const updateServiceTicketItemBodySchema = z
   .refine(
     (value) => Object.keys(value).length > 0,
     "At least one item field must be provided.",
-  );
+  )
+  ;
 
 export const changeServiceTicketItemStatusBodySchema = z.object({
   to: serviceTicketItemStatusSchema,
@@ -169,4 +191,8 @@ export const changeServiceTicketItemStatusBodySchema = z.object({
 
 export const serviceTicketOverviewQuerySchema = z.object({
   branchId: optionalUlid.optional(),
+});
+
+export const serviceTicketDeleteQuerySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
 });

@@ -24,10 +24,12 @@ export type PosPinLoginInput = AuthRequestMeta & {
   pin: string;
   tenantCode: string;
   deviceId: string;
+  terminalCredential?: string;
 };
 
 export type RefreshInput = AuthRequestMeta & {
   refreshToken: string;
+  terminalCredential?: string;
 };
 
 export type LogoutInput = AuthRequestMeta & {
@@ -43,6 +45,9 @@ export type AuthContext = {
   role: AdminRole;
   roles: string[];
   permissions: string[];
+  terminalId?: string;
+  terminalBranchId?: string;
+  terminalDeviceId?: string;
   accessTokenExpiresAt: string;
 };
 

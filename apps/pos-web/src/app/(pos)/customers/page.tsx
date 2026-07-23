@@ -1,4 +1,5 @@
 import { CustomersView } from "@/features/customers";
+import { getCurrentUser } from "@/lib/auth";
 
 type CustomersPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -15,8 +16,14 @@ function getParam(
 export default async function CustomersPage({
   searchParams,
 }: CustomersPageProps) {
-  const params = await searchParams;
+  const [params, user] = await Promise.all([searchParams, getCurrentUser()]);
   const initialQuery = getParam(params, "q")?.trim() ?? "";
 
-  return <CustomersView initialQuery={initialQuery} key={initialQuery} />;
+  return (
+    <CustomersView
+      canDelete={user?.role === "owner" || user?.role === "manager"}
+      initialQuery={initialQuery}
+      key={initialQuery}
+    />
+  );
 }

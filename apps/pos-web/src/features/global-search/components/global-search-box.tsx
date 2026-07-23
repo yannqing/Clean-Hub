@@ -5,6 +5,7 @@ import type {
   PosGlobalSearchResponse,
 } from "@cleanhub/api-client";
 import type { TranslationKey } from "@cleanhub/i18n";
+import { isPosOrderLookupQuery } from "@cleanhub/domain/order-codes";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { cn } from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
@@ -72,7 +73,7 @@ function getFallbackHref(query: string): string {
   if (/^TK-/i.test(query)) {
     return `${posRoutes.tickets}?q=${encoded}`;
   }
-  if (/^ORD-|^[0-9A-HJKMNP-TV-Z]{20,26}$/i.test(query)) {
+  if (isPosOrderLookupQuery(query)) {
     return `${posRoutes.orders}?q=${encoded}`;
   }
   return `${posRoutes.customers}?q=${encoded}`;

@@ -4,21 +4,23 @@ import type { AppBindings } from "../../../http/types.js";
 import {
   clockActionController,
   createHandoverController,
+  getCurrentShiftController,
   getPosStaffController,
+  getPosZReportController,
   listPosStaffController,
+  listPosZReportsController,
 } from "./staff.controller.js";
 
-/**
- * POS staff routes — listing, clock-in/out, and shift handover.
- * Scaffold: handlers exist, service layer returns 501 until implemented.
- */
 export function createPosStaffRoutes() {
   const routes = new Hono<AppBindings>();
 
   routes.get("/", listPosStaffController);
-  routes.get("/:staffId", getPosStaffController);
+  routes.get("/current-shift", getCurrentShiftController);
   routes.post("/clock", clockActionController);
   routes.post("/handovers", createHandoverController);
+  routes.get("/z-reports", listPosZReportsController);
+  routes.get("/z-reports/:zReportId", getPosZReportController);
+  routes.get("/:staffId", getPosStaffController);
 
   return routes;
 }

@@ -1,6 +1,13 @@
 import { getDb, type Database } from "@cleanhub/db";
 
-import { assertPosContext } from "../../auth/permission.helper.js";
+import type { AuthContext } from "../../auth/auth.types.js";
+import {
+  authorizePosSensitiveOperation,
+  createPosAuditMetadata,
+  requireAnyPosBranchAccess,
+  requirePosTenantId,
+  resolvePosBranchScope,
+} from "../access-control.helper.js";
 import { PosCustomerError } from "./customers.errors.js";
 import {
   cascadeSoftDeleteProfilesByAccount,
@@ -83,13 +90,14 @@ function requireProfile(
   return profile;
 }
 
-function resolveListBranchScope(
-  authContext: { role: string; branchIds: string[] },
-): string[] | undefined {
-  if (authContext.role === "owner" || authContext.role === "manager") {
-    return authContext.branchIds.length > 0 ? authContext.branchIds : undefined;
-  }
-  return authContext.branchIds;
+function customerAuditContext(authContext: AuthContext): {
+  branchId?: string;
+  metadata: Record<string, unknown>;
+} {
+  return {
+    branchId: authContext.terminalBranchId,
+    metadata: createPosAuditMetadata(authContext),
+  };
 }
 
 // ---- list -----------------------------------------------------------------
@@ -98,10 +106,21 @@ export async function listPosCustomers(
   input: ListPosCustomersInput,
   db: Database = getDb(),
 ): Promise<ListPosCustomersResult> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  const tenantId = requirePosTenantId(input.authContext);
 
   const { query } = input;
+  const allowedBranchIds = resolvePosBranchScope(input.authContext);
+
+  if (allowedBranchIds?.length === 0) {
+    return {
+      data: [],
+      total: 0,
+      totalAccounts: 0,
+      totalProfiles: 0,
+      limit: query.limit,
+      offset: query.offset,
+    };
+  }
 
   if (query.resultType === "account") {
     const [{ items, total }, totalProfiles] = await Promise.all([
@@ -184,7 +203,7 @@ export async function getPosAccount(
   input: GetPosAccountInput,
   db: Database = getDb(),
 ): Promise<PosCustomerAccountDetail> {
-  assertPosContext(input.authContext);
+  requireAnyPosBranchAccess(input.authContext);
   const account = await findPosAccountById(
     db,
     input.authContext.tenantId!,
@@ -197,8 +216,8 @@ export async function getPosProfilesByAccount(
   input: GetPosProfilesByAccountInput,
   db: Database = getDb(),
 ): Promise<ListPosAccountProfilesResult> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  requireAnyPosBranchAccess(input.authContext);
+  const tenantId = requirePosTenantId(input.authContext);
 
   // Verify the account exists (and is not soft-deleted) before listing its
   // profiles, so callers get a clean 404 instead of an empty list.
@@ -219,8 +238,15 @@ export async function createPosAccount(
   input: CreatePosAccountInput,
   db: Database = getDb(),
 ): Promise<PosCustomerAccountDetail> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  requireAnyPosBranchAccess(input.authContext);
+  const tenantId = requirePosTenantId(input.authContext);
+
+  if (input.data.id) {
+    const existing = await findPosAccountById(db, tenantId, input.data.id);
+    if (existing) {
+      return existing;
+    }
+  }
 
   if (!input.data.phone && !input.data.email) {
     throw new PosCustomerError(
@@ -254,6 +280,7 @@ export async function createPosAccount(
   }
 
   const account = await insertPosAccount(db, {
+    id: input.data.id,
     actorUserId: input.authContext.userId,
     tenantId,
     accountName: input.data.accountName,
@@ -262,6 +289,7 @@ export async function createPosAccount(
   });
 
   await writePosAccountAuditLog(db, {
+    ...customerAuditContext(input.authContext),
     actorUserId: input.authContext.userId,
     tenantId,
     accountId: account.id,
@@ -283,8 +311,8 @@ export async function updatePosAccount(
   input: UpdatePosAccountInput,
   db: Database = getDb(),
 ): Promise<PosCustomerAccountDetail> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  requireAnyPosBranchAccess(input.authContext);
+  const tenantId = requirePosTenantId(input.authContext);
 
   // Ensure the account exists (404) before running conflict checks.
   requireAccount(await findPosAccountById(db, tenantId, input.accountId));
@@ -331,6 +359,7 @@ export async function updatePosAccount(
 
   if (before && after) {
     await writePosAccountAuditLog(db, {
+      ...customerAuditContext(input.authContext),
       actorUserId: input.authContext.userId,
       tenantId,
       accountId: input.accountId,
@@ -349,8 +378,8 @@ export async function changePosAccountStatus(
   input: ChangePosAccountStatusInput,
   db: Database = getDb(),
 ): Promise<PosCustomerAccountDetail> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  requireAnyPosBranchAccess(input.authContext);
+  const tenantId = requirePosTenantId(input.authContext);
 
   const existing = requireAccount(
     await findPosAccountById(db, tenantId, input.accountId),
@@ -378,6 +407,7 @@ export async function changePosAccountStatus(
   );
 
   await writePosAccountAuditLog(db, {
+    ...customerAuditContext(input.authContext),
     actorUserId: input.authContext.userId,
     tenantId,
     accountId: input.accountId,
@@ -408,8 +438,13 @@ export async function deletePosAccount(
   input: DeletePosAccountInput,
   db: Database = getDb(),
 ): Promise<void> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  const normalizedReason = authorizePosSensitiveOperation(
+    input.authContext,
+    "delete",
+    input.reason,
+  );
+  requireAnyPosBranchAccess(input.authContext);
+  const tenantId = requirePosTenantId(input.authContext);
 
   const existing = requireAccount(
     await findPosAccountById(db, tenantId, input.accountId),
@@ -425,6 +460,7 @@ export async function deletePosAccount(
   await softDeletePosAccount(db, tenantId, input.accountId, input.authContext.userId);
 
   await writePosAccountAuditLog(db, {
+    ...customerAuditContext(input.authContext),
     actorUserId: input.authContext.userId,
     tenantId,
     accountId: input.accountId,
@@ -435,7 +471,8 @@ export async function deletePosAccount(
       email: existing.email,
       status: existing.status,
     },
-    reason: input.reason,
+    after: { deleted: true },
+    reason: normalizedReason,
     ipAddress: input.requestMeta?.ipAddress,
     userAgent: input.requestMeta?.userAgent,
   });
@@ -447,7 +484,7 @@ export async function getPosProfile(
   input: GetPosProfileInput,
   db: Database = getDb(),
 ): Promise<PosCustomerProfileDetail> {
-  assertPosContext(input.authContext);
+  requireAnyPosBranchAccess(input.authContext);
   const profile = await findPosProfileById(
     db,
     input.authContext.tenantId!,
@@ -460,8 +497,12 @@ export async function getPosCustomerOrderStats(
   input: GetPosCustomerOrderStatsInput,
   db: Database = getDb(),
 ): Promise<PosCustomerOrderStats> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  const tenantId = requirePosTenantId(input.authContext);
+  const allowedBranchIds = resolvePosBranchScope(input.authContext);
+
+  if (allowedBranchIds?.length === 0) {
+    return { orderCount: 0, totalPaid: "0" };
+  }
 
   requireProfile(await findPosProfileById(db, tenantId, input.customerId));
 
@@ -469,7 +510,7 @@ export async function getPosCustomerOrderStats(
     db,
     tenantId,
     input.customerId,
-    resolveListBranchScope(input.authContext),
+    allowedBranchIds,
   );
 }
 
@@ -477,8 +518,17 @@ export async function listPosCustomerServiceItems(
   input: ListPosCustomerServiceItemsInput,
   db: Database = getDb(),
 ): Promise<ListPosCustomerServiceItemsResult> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  const tenantId = requirePosTenantId(input.authContext);
+  const allowedBranchIds = resolvePosBranchScope(input.authContext);
+
+  if (allowedBranchIds?.length === 0) {
+    return {
+      data: [],
+      total: 0,
+      limit: input.query.limit,
+      offset: input.query.offset,
+    };
+  }
 
   requireProfile(await findPosProfileById(db, tenantId, input.customerId));
 
@@ -488,7 +538,7 @@ export async function listPosCustomerServiceItems(
     input.customerId,
     {
       ...input.query,
-      allowedBranchIds: resolveListBranchScope(input.authContext),
+      allowedBranchIds,
     },
   );
 }
@@ -499,8 +549,8 @@ export async function createPosProfile(
   input: CreatePosProfileInput,
   db: Database = getDb(),
 ): Promise<PosCustomerProfileDetail> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  requireAnyPosBranchAccess(input.authContext);
+  const tenantId = requirePosTenantId(input.authContext);
 
   // Profile must be created under an existing, non-deleted account in this
   // tenant. A disabled account cannot receive new profiles (the "new profile"
@@ -530,6 +580,7 @@ export async function createPosProfile(
   });
 
   await writePosProfileAuditLog(db, {
+    ...customerAuditContext(input.authContext),
     actorUserId: input.authContext.userId,
     tenantId,
     customerId: profile.id,
@@ -555,8 +606,8 @@ export async function updatePosProfile(
   input: UpdatePosProfileInput,
   db: Database = getDb(),
 ): Promise<PosCustomerProfileDetail> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  requireAnyPosBranchAccess(input.authContext);
+  const tenantId = requirePosTenantId(input.authContext);
 
   requireProfile(await findPosProfileById(db, tenantId, input.customerId));
 
@@ -582,6 +633,7 @@ export async function updatePosProfile(
 
   if (before && after) {
     await writePosProfileAuditLog(db, {
+      ...customerAuditContext(input.authContext),
       actorUserId: input.authContext.userId,
       tenantId,
       customerId: input.customerId,
@@ -600,8 +652,8 @@ export async function changePosProfileStatus(
   input: ChangePosProfileStatusInput,
   db: Database = getDb(),
 ): Promise<PosCustomerProfileDetail> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  requireAnyPosBranchAccess(input.authContext);
+  const tenantId = requirePosTenantId(input.authContext);
 
   const existing = requireProfile(
     await findPosProfileById(db, tenantId, input.customerId),
@@ -629,6 +681,7 @@ export async function changePosProfileStatus(
   );
 
   await writePosProfileAuditLog(db, {
+    ...customerAuditContext(input.authContext),
     actorUserId: input.authContext.userId,
     tenantId,
     customerId: input.customerId,
@@ -665,8 +718,13 @@ export async function deletePosProfile(
   input: DeletePosProfileInput,
   db: Database = getDb(),
 ): Promise<void> {
-  assertPosContext(input.authContext);
-  const tenantId = input.authContext.tenantId!;
+  const normalizedReason = authorizePosSensitiveOperation(
+    input.authContext,
+    "delete",
+    input.reason,
+  );
+  requireAnyPosBranchAccess(input.authContext);
+  const tenantId = requirePosTenantId(input.authContext);
 
   const existing = requireProfile(
     await findPosProfileById(db, tenantId, input.customerId),
@@ -675,6 +733,7 @@ export async function deletePosProfile(
   await softDeletePosProfile(db, tenantId, input.customerId, input.authContext.userId);
 
   await writePosProfileAuditLog(db, {
+    ...customerAuditContext(input.authContext),
     actorUserId: input.authContext.userId,
     tenantId,
     customerId: input.customerId,
@@ -689,7 +748,8 @@ export async function deletePosProfile(
       notes: existing.notes,
       status: existing.status,
     },
-    reason: input.reason,
+    after: { deleted: true },
+    reason: normalizedReason,
     ipAddress: input.requestMeta?.ipAddress,
     userAgent: input.requestMeta?.userAgent,
   });
