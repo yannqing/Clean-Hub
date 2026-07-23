@@ -30,6 +30,7 @@ import {
   clearLoginLockout,
   recordLoginFailure,
 } from "./login-lockout.helper.js";
+import { resolveLoginScope } from "./login-scope.helper.js";
 import { verifyPassword } from "./password.service.js";
 import { hashOpaqueToken, TokenService } from "./token.service.js";
 
@@ -160,14 +161,18 @@ export class AuthService {
 
   async login(input: LoginInput): Promise<AuthResult> {
     const normalizedIdentifier = normalizeIdentifier(input.identifier);
-    const lockKey = buildLoginLockKey(normalizedIdentifier, input.tenantCode);
+    const loginScope = resolveLoginScope(input.tenantCode);
+    const lockKey = buildLoginLockKey(
+      normalizedIdentifier,
+      loginScope.tenantCode,
+    );
     const policy = await resolveEffectiveSecurityPolicy(this.db);
 
     await assertLoginNotLocked(this.db, lockKey);
 
     const user = await this.repository.findLoginUser({
       identifier: normalizedIdentifier,
-      tenantCode: input.tenantCode,
+      tenantCode: loginScope.tenantCode,
     });
 
     if (!user) {
@@ -195,13 +200,6 @@ export class AuthService {
         metadata: { identifier: normalizedIdentifier },
       });
       throw invalidCredentials();
-    }
-
-    if (user.tenantId && !input.tenantCode?.trim()) {
-      throw new AuthError(
-        "TENANT_CODE_REQUIRED",
-        "Pressing code is required for store administrators.",
-      );
     }
 
     try {

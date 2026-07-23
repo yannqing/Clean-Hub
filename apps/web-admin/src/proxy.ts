@@ -1,5 +1,12 @@
-import { isSaasAdminRole, type AdminRole } from "@cleanhub/domain";
+import type { AdminRole } from "@cleanhub/domain";
 import { NextResponse, type NextRequest } from "next/server";
+
+import {
+  AUTH_REDIRECT_REASONS,
+  AUTH_REDIRECT_REASON_PARAM,
+  getWebAdminHomePath,
+  type AuthRedirectReason,
+} from "@/config/auth-routing";
 
 const ACCESS_COOKIE_NAME = "cleanhub_access_token";
 const REFRESH_COOKIE_NAME = "cleanhub_refresh_token";
@@ -23,10 +30,6 @@ type AuthResolution = {
   authContext: AuthContext;
   setCookieHeaders: string[];
 };
-
-function getDefaultPathForRole(role: AdminRole): string {
-  return isSaasAdminRole(role) ? "/saas" : "/tenant";
-}
 
 function isSaasPath(pathname: string): boolean {
   return pathname === "/saas" || pathname.startsWith("/saas/");
@@ -76,12 +79,20 @@ function createRedirect(
   return appendSetCookieHeaders(NextResponse.redirect(url), setCookieHeaders);
 }
 
-function redirectToLogin(request: NextRequest): NextResponse {
+function redirectToLogin(
+  request: NextRequest,
+  setCookieHeaders: string[] = [],
+  reason?: AuthRedirectReason,
+): NextResponse {
   const url = request.nextUrl.clone();
   url.pathname = "/login";
+  url.search = "";
   url.searchParams.set("next", request.nextUrl.pathname);
+  if (reason) {
+    url.searchParams.set(AUTH_REDIRECT_REASON_PARAM, reason);
+  }
 
-  return NextResponse.redirect(url);
+  return appendSetCookieHeaders(NextResponse.redirect(url), setCookieHeaders);
 }
 
 async function requestAuthContext(
@@ -146,28 +157,40 @@ export async function proxy(request: NextRequest) {
       return NextResponse.next();
     }
 
-    return createRedirect(
-      request,
-      getDefaultPathForRole(auth.authContext.role),
-      auth.setCookieHeaders,
-    );
+    const defaultPath = getWebAdminHomePath(auth.authContext);
+    if (!defaultPath) {
+      return appendSetCookieHeaders(
+        NextResponse.next(),
+        auth.setCookieHeaders,
+      );
+    }
+
+    return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 
   if (!auth) {
     return redirectToLogin(request);
   }
 
-  const defaultPath = getDefaultPathForRole(auth.authContext.role);
+  const defaultPath = getWebAdminHomePath(auth.authContext);
+
+  if (!defaultPath) {
+    return redirectToLogin(
+      request,
+      auth.setCookieHeaders,
+      AUTH_REDIRECT_REASONS.tenantAccessDenied,
+    );
+  }
 
   if (pathname === "/") {
     return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 
-  if (isSaasPath(pathname) && !isSaasAdminRole(auth.authContext.role)) {
+  if (isSaasPath(pathname) && defaultPath !== "/saas") {
     return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 
-  if (isTenantPath(pathname) && isSaasAdminRole(auth.authContext.role)) {
+  if (isTenantPath(pathname) && defaultPath !== "/tenant") {
     return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 

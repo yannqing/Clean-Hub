@@ -124,8 +124,61 @@ export const enMessages: WebAdminMessages = {
   common: {
     personalCenter: "Personal Center",
     language: "Language",
+    languageLabels: {
+      en: "English",
+      zhCN: "Simplified Chinese",
+    },
+    theme: "Theme",
+    switchToDarkTheme: "Switch to dark theme",
+    switchToLightTheme: "Switch to light theme",
     signOut: "Sign out",
     signingOut: "Signing out...",
+  },
+  auth: {
+    brandName: "CleanHub Web Admin",
+    brandSuffix: "Management Console",
+    heroTitle: "One workspace for every store.",
+    heroDescription:
+      "Manage stores, staff, service configuration, reports, and operational settings from one secure place.",
+    title: "Welcome back",
+    description:
+      "Choose store or platform sign-in. Store administrators must also enter their store code.",
+    signInAs: "Sign in as",
+    tenantModeLabel: "Store admin",
+    tenantModeDescription: "Owner or manager for a laundry or pressing store",
+    platformModeLabel: "Platform admin",
+    platformModeDescription:
+      "CleanHub SaaS operations, super administrators, or support",
+    tenantCodeLabel: "Store code",
+    tenantCodePlaceholder: "e.g. SN-0042",
+    tenantCodeHint:
+      "The unique store code assigned by CleanHub. Required for store administrators.",
+    platformHint:
+      "Platform administrators sign in with an email address or phone number and a password. No store code is required.",
+    identifierLabel: "Email or phone",
+    identifierPlaceholder: "admin@cleanhub.local",
+    passwordLabel: "Password",
+    passwordPlaceholder: "Enter password",
+    submit: "Sign in",
+    submitting: "Signing in...",
+    signedIn: "Signed in successfully.",
+    validation: {
+      identifierRequired: "Email or phone is required.",
+      passwordRequired: "Password is required.",
+      tenantCodeRequired: "Store code is required for store login.",
+    },
+    errors: {
+      checkForm: "Please check the login form.",
+      accessDenied:
+        "This account cannot access CleanHub Web Admin. Sign in with an owner, manager, or platform administrator account.",
+      signInFailed:
+        "Unable to sign in. Check your account details and try again.",
+    },
+    redirect: {
+      sessionExpired: "Your session has expired. Sign in again.",
+      tenantAccessDenied:
+        "This account cannot access tenant administration. Sign in with an owner or manager account.",
+    },
   },
   saas: saasMessagesEn satisfies SaasMessages,
   tenant: tenantMessagesEn satisfies TenantMessages,

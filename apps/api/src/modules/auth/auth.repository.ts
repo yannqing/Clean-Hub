@@ -5,6 +5,7 @@ import {
   inArray,
   isNull,
   or,
+  sql,
 } from "drizzle-orm";
 
 import {
@@ -28,6 +29,7 @@ import type {
   AuthenticatedUser,
   UserAccess,
 } from "./auth.types.js";
+import { resolveLoginScope } from "./login-scope.helper.js";
 
 export type PosTerminalLoginContext = {
   tenantId: string;
@@ -63,6 +65,7 @@ export class AuthRepository {
     tenantCode?: string;
   }): Promise<AuthenticatedUser | null> {
     const normalizedIdentifier = identifier.trim().toLowerCase();
+    const loginScope = resolveLoginScope(tenantCode);
 
     const rows = await this.db
       .select({
@@ -77,7 +80,10 @@ export class AuthRepository {
             eq(users.normalizedEmail, normalizedIdentifier),
             eq(users.phone, identifier.trim()),
           ),
-          tenantCode ? eq(tenants.pressingCode, tenantCode) : undefined,
+          eq(users.userType, loginScope.userType),
+          loginScope.userType === "tenant"
+            ? sql`upper(${tenants.pressingCode}) = ${loginScope.tenantCode}`
+            : isNull(users.tenantId),
         ),
       )
       .limit(1);

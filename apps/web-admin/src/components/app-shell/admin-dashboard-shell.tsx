@@ -9,7 +9,6 @@ import { useEffect, useMemo, useState } from "react";
 import { LanguageSwitcher } from "@/components/i18n";
 import { filterSidebarSections } from "@/config/feature-visibility";
 import { getNavIcon } from "@/config/nav-icons";
-import { webAdminWorkspaceTabs } from "@/config/navigation";
 import { webAdminRoutes } from "@/config/routes";
 import { LogoutButton } from "@/features/auth/components";
 import { getAuthSessionQuery } from "@/features/auth/queries";
@@ -73,7 +72,6 @@ export function AdminDashboardShell({
     () => filterSidebarSections(messages.sidebar[scope]),
     [messages.sidebar, scope],
   );
-  const tabs = scope === "tenant" ? webAdminWorkspaceTabs.tenant : [];
   const profileHref =
     scope === "saas" ? webAdminRoutes.saas.profile : webAdminRoutes.tenant.profile;
   const profileActive = isActivePath(pathname, profileHref);
@@ -231,37 +229,7 @@ export function AdminDashboardShell({
                   <TodoCenterBell />
                   <LanguageSwitcher />
                 </div>
-              ) : (
-                <div
-                  aria-label={`${scope} tabs`}
-                  className="inline-flex w-fit flex-wrap gap-1 rounded-lg border bg-muted p-1"
-                  role="tablist"
-                >
-                  {tabs.map((tab) => {
-                    const active = isActivePath(pathname, tab.href);
-
-                    return (
-                      <Link
-                        aria-current={active ? "page" : undefined}
-                        aria-selected={active}
-                        className={cn(
-                          "inline-flex h-8 items-center rounded-md px-3 text-sm font-medium transition-colors",
-                          "hover:bg-background hover:text-foreground",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          active
-                            ? "bg-background text-foreground shadow-sm"
-                            : "text-muted-foreground",
-                        )}
-                        href={tab.href}
-                        key={tab.href}
-                        role="tab"
-                      >
-                        {tab.label}
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
+              ) : null}
             </div>
           </header>
 

@@ -21,7 +21,6 @@ import { createSaasFeedbackTicketRoutes } from "./modules/saas/feedback/feedback
 import { createSaasOperationLogRoutes } from "./modules/saas/ops/operation-logs.routes.js";
 import { createSaasOverviewRoutes } from "./modules/saas/overview/overview.routes.js";
 import { createSaasPlatformSettingsRoutes } from "./modules/saas/platform-settings/platform-settings.routes.js";
-import { createSaaSTestRoutes } from "./modules/saas/test/saas.routes.js";
 import { createSaasSecurityRoutes } from "./modules/saas/security/security.routes.js";
 import { createSaasTenantsRoutes } from "./modules/saas/tenants/tenants.routes.js";
 import { createSaasRolesRoutes } from "./modules/saas/users/saas-roles.routes.js";
@@ -129,9 +128,6 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
 
   // POS 终端侧（收银员 / 店长 / 店主）
   app.route("/pos", createPosRoutes({ notificationPublisher: notificationsService }));
-
-  // 测试路由
-  app.route("/saas/test/user", createSaaSTestRoutes());
 
   app.notFound((c) =>
     c.json(

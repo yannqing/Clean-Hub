@@ -15,25 +15,40 @@ import { z } from "zod";
 export const LOGIN_MODES = ["platform", "tenant"] as const;
 export type LoginMode = (typeof LOGIN_MODES)[number];
 
-export const loginFormSchema = z
-  .object({
-    loginMode: z.enum(LOGIN_MODES),
-    identifier: z
-      .string()
-      .trim()
-      .min(1, "Email or phone is required."),
-    password: z.string().min(1, "Password is required."),
-    tenantCode: z.string().trim(),
-  })
-  .superRefine((value, ctx) => {
-    if (value.loginMode === "tenant" && !value.tenantCode) {
-      ctx.addIssue({
-        path: ["tenantCode"],
-        code: z.ZodIssueCode.custom,
-        message: "Pressing code is required for store login.",
-      });
-    }
-  });
+export type LoginValidationMessages = {
+  identifierRequired: string;
+  passwordRequired: string;
+  tenantCodeRequired: string;
+};
+
+const defaultValidationMessages: LoginValidationMessages = {
+  identifierRequired: "Email or phone is required.",
+  passwordRequired: "Password is required.",
+  tenantCodeRequired: "Store code is required for store login.",
+};
+
+export function createLoginFormSchema(
+  messages: LoginValidationMessages = defaultValidationMessages,
+) {
+  return z
+    .object({
+      loginMode: z.enum(LOGIN_MODES),
+      identifier: z.string().trim().min(1, messages.identifierRequired),
+      password: z.string().min(1, messages.passwordRequired),
+      tenantCode: z.string().trim(),
+    })
+    .superRefine((value, ctx) => {
+      if (value.loginMode === "tenant" && !value.tenantCode) {
+        ctx.addIssue({
+          path: ["tenantCode"],
+          code: z.ZodIssueCode.custom,
+          message: messages.tenantCodeRequired,
+        });
+      }
+    });
+}
+
+export const loginFormSchema = createLoginFormSchema();
 
 /**
  * Form values derived from the schema. Components and the server action share

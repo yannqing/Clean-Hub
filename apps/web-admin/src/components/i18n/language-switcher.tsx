@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Icon,
   Select,
   SelectContent,
   SelectItem,
@@ -8,13 +9,16 @@ import {
   SelectValue,
   cn,
 } from "@cleanhub/ui";
+import { Languages } from "lucide-react";
 
-import { useSaasI18n, useWebAdminLocale, type WebAdminLocale } from "@/i18n";
+import { useWebAdminLocale, type WebAdminLocale } from "@/i18n";
 
 const localeOptions: WebAdminLocale[] = ["en", "zh-CN"];
 
 function getLocaleLabel(
-  languageLabels: ReturnType<typeof useSaasI18n>["m"]["common"]["languageLabels"],
+  languageLabels: ReturnType<
+    typeof useWebAdminLocale
+  >["messages"]["common"]["languageLabels"],
   locale: WebAdminLocale,
 ): string {
   if (locale === "zh-CN") {
@@ -26,11 +30,14 @@ function getLocaleLabel(
 
 type LanguageSwitcherProps = {
   className?: string;
+  iconOnly?: boolean;
 };
 
-export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
+export function LanguageSwitcher({
+  className,
+  iconOnly = false,
+}: LanguageSwitcherProps) {
   const { locale, setLocale, messages } = useWebAdminLocale();
-  const { m } = useSaasI18n();
 
   return (
     <Select
@@ -39,9 +46,18 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
     >
       <SelectTrigger
         aria-label={messages.common.language}
-        className={cn("h-9 w-[9.5rem]", className)}
+        className={cn(
+          iconOnly
+            ? "size-9 justify-center px-0 [&>svg:last-child]:hidden"
+            : "h-9 w-[9.5rem]",
+          className,
+        )}
+        title={messages.common.language}
       >
-        <SelectValue placeholder={messages.common.language} />
+        <Icon icon={Languages} aria-hidden="true" />
+        {iconOnly ? null : (
+          <SelectValue placeholder={messages.common.language} />
+        )}
       </SelectTrigger>
       <SelectContent
         align="end"
@@ -52,7 +68,7 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
       >
         {localeOptions.map((option) => (
           <SelectItem key={option} value={option}>
-            {getLocaleLabel(m.common.languageLabels, option)}
+            {getLocaleLabel(messages.common.languageLabels, option)}
           </SelectItem>
         ))}
       </SelectContent>

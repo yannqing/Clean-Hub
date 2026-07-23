@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Toaster } from "@cleanhub/ui";
 
 import { AppProviders } from "@/components/providers";
+import { ThemeInitializer } from "@/components/theme/theme-initializer";
 import { WebAdminLocaleProvider, getWebAdminMessages } from "@/i18n";
 import {
   getWebAdminHtmlLang,
@@ -28,7 +29,10 @@ export default async function RootLayout({
   const initialMessages = await getWebAdminMessages(initialLocale);
 
   return (
-    <html lang={getWebAdminHtmlLang(initialLocale)}>
+    <html lang={getWebAdminHtmlLang(initialLocale)} suppressHydrationWarning>
+      <head>
+        <ThemeInitializer />
+      </head>
       <body>
         <WebAdminLocaleProvider
           initialLocale={initialLocale}

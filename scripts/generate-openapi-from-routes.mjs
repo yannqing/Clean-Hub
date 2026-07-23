@@ -509,7 +509,6 @@ function getTag(path) {
   if (path.startsWith("/saas/backups")) return "SaaS Backups";
   if (path.startsWith("/saas/operation-logs")) return "SaaS Operation Logs";
   if (path.startsWith("/saas/security")) return "SaaS Security";
-  if (path.startsWith("/saas/test")) return "SaaS Test";
   if (path.startsWith("/saas")) return "SaaS";
   if (path.startsWith("/tenant/users")) return "Tenant Users";
   if (path.startsWith("/tenant")) return "Tenant";

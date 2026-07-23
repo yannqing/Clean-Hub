@@ -1,17 +1,20 @@
 "use client";
 
+import type { AuthContext } from "@cleanhub/api-client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button, Input, Label, cn, toast } from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 
+import { getWebAdminHomePath } from "@/config/auth-routing";
 import { webAdminRoutes } from "@/config/routes";
+import { useWebAdminLocale } from "@/i18n";
 
 import { loginAction } from "../actions/login.action";
 import { getOrCreateWebAdminDeviceId } from "../utils";
 import {
-  loginFormSchema,
+  createLoginFormSchema,
   type LoginFormField,
   type LoginFormValues,
   type LoginMode,
@@ -24,34 +27,25 @@ const defaultValues: LoginFormValues = {
   tenantCode: "",
 };
 
-function resolveHomePath(role: string): string {
-  if (role === "super_admin" || role === "support") {
-    return webAdminRoutes.saas.home;
-  }
-
-  return webAdminRoutes.tenant.home;
-}
-
 function isSafeInternalPath(path: string | null): path is string {
   return Boolean(path) && path!.startsWith("/") && !path!.startsWith("//");
 }
 
-function isPathAllowedForRole(path: string, role: string): boolean {
-  if (role === "super_admin" || role === "support") {
-    return (
-      path === webAdminRoutes.saas.home ||
-      path.startsWith(`${webAdminRoutes.saas.home}/`)
-    );
-  }
-
+function isPathAllowedForHome(path: string, homePath: "/saas" | "/tenant") {
   return (
-    path === webAdminRoutes.tenant.home ||
-    path.startsWith(`${webAdminRoutes.tenant.home}/`)
+    path === homePath ||
+    path.startsWith(`${homePath}/`)
   );
 }
 
-function resolvePostLoginPath(role: string): string {
-  const defaultPath = resolveHomePath(role);
+function resolvePostLoginPath(
+  authContext: Pick<AuthContext, "role" | "tenantId">,
+): string {
+  const defaultPath = getWebAdminHomePath(authContext);
+
+  if (!defaultPath) {
+    return webAdminRoutes.login;
+  }
 
   if (typeof window === "undefined") {
     return defaultPath;
@@ -59,33 +53,56 @@ function resolvePostLoginPath(role: string): string {
 
   const nextPath = new URLSearchParams(window.location.search).get("next");
 
-  if (isSafeInternalPath(nextPath) && isPathAllowedForRole(nextPath, role)) {
+  if (
+    isSafeInternalPath(nextPath) &&
+    isPathAllowedForHome(nextPath, defaultPath)
+  ) {
     return nextPath;
   }
 
   return defaultPath;
 }
 
-const LOGIN_MODE_OPTIONS: {
-  value: LoginMode;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: "tenant",
-    label: "Store admin",
-    description: "Owner or manager for a laundry / pressing business",
-  },
-  {
-    value: "platform",
-    label: "Platform admin",
-    description: "CleanHub SaaS operations (super admin / support)",
-  },
-];
-
 export function LoginForm() {
   const router = useRouter();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const { messages } = useWebAdminLocale();
+  const auth = messages.auth;
+  const [errorCode, setErrorCode] = useState<
+    "invalidForm" | "accessDenied" | "signInFailed" | null
+  >(null);
+  const errorMessage =
+    errorCode === "invalidForm"
+      ? auth.errors.checkForm
+      : errorCode === "accessDenied"
+        ? auth.errors.accessDenied
+        : errorCode === "signInFailed"
+          ? auth.errors.signInFailed
+          : null;
+  const localizedLoginFormSchema = useMemo(
+    () => createLoginFormSchema(auth.validation),
+    [auth.validation],
+  );
+  const loginModeOptions: {
+    value: LoginMode;
+    label: string;
+    description: string;
+  }[] = [
+    {
+      value: "tenant",
+      label: auth.tenantModeLabel,
+      description: auth.tenantModeDescription,
+    },
+    {
+      value: "platform",
+      label: auth.platformModeLabel,
+      description: auth.platformModeDescription,
+    },
+  ];
+  const localizedFieldErrors: Partial<Record<LoginFormField, string>> = {
+    identifier: auth.validation.identifierRequired,
+    password: auth.validation.passwordRequired,
+    tenantCode: auth.validation.tenantCodeRequired,
+  };
 
   const {
     register,
@@ -96,7 +113,7 @@ export function LoginForm() {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     defaultValues,
-    resolver: zodResolver(loginFormSchema),
+    resolver: zodResolver(localizedLoginFormSchema),
     mode: "onSubmit",
   });
 
@@ -115,11 +132,11 @@ export function LoginForm() {
       setValue("tenantCode", "", { shouldValidate: false });
     }
 
-    setErrorMessage(null);
+    setErrorCode(null);
   }
 
   async function submit(values: LoginFormValues) {
-    setErrorMessage(null);
+    setErrorCode(null);
 
     const result = await loginAction({
       ...values,
@@ -127,21 +144,31 @@ export function LoginForm() {
     });
 
     if (!result.ok) {
+      const localizedMessage =
+        result.errorCode === "invalidForm"
+          ? auth.errors.checkForm
+          : result.errorCode === "accessDenied"
+            ? auth.errors.accessDenied
+            : auth.errors.signInFailed;
+
       // Map server-side field errors back onto react-hook-form so the inline
       // messages stay consistent with the resolver-driven ones.
       for (const [field, message] of Object.entries(result.errors)) {
         if (typeof message === "string") {
-          setError(field as LoginFormField, { message });
+          setError(field as LoginFormField, {
+            message:
+              localizedFieldErrors[field as LoginFormField] ?? message,
+          });
         }
       }
 
-      setErrorMessage(result.message);
-      toast.error(result.message);
+      setErrorCode(result.errorCode);
+      toast.error(localizedMessage);
       return;
     }
 
-    toast.success("Signed in successfully.");
-    router.replace(resolvePostLoginPath(result.data.role));
+    toast.success(auth.signedIn);
+    router.replace(resolvePostLoginPath(result.data));
     router.refresh();
   }
 
@@ -152,13 +179,13 @@ export function LoginForm() {
       noValidate
     >
       <fieldset className="grid gap-2">
-        <legend className="text-sm font-medium">Sign in as</legend>
+        <legend className="text-sm font-medium">{auth.signInAs}</legend>
         <div
           className="grid gap-2 sm:grid-cols-2"
           role="radiogroup"
-          aria-label="Sign in as"
+          aria-label={auth.signInAs}
         >
-          {LOGIN_MODE_OPTIONS.map((option) => {
+          {loginModeOptions.map((option) => {
             const selected = loginMode === option.value;
 
             return (
@@ -168,7 +195,7 @@ export function LoginForm() {
                 className={cn(
                   "rounded-lg border px-3 py-3 text-left transition-colors",
                   selected
-                    ? "border-primary bg-primary/5 ring-1 ring-primary"
+                    ? "border-foreground bg-muted/60 ring-1 ring-foreground"
                     : "border-border bg-background hover:bg-muted/40",
                 )}
                 onClick={() => setLoginMode(option.value)}
@@ -189,56 +216,61 @@ export function LoginForm() {
 
       {isTenantLogin ? (
         <div className="grid gap-2">
-          <Label htmlFor="tenantCode">Pressing code</Label>
+          <Label htmlFor="tenantCode">{auth.tenantCodeLabel}</Label>
           <Input
             aria-invalid={Boolean(errors.tenantCode)}
             autoComplete="organization"
             id="tenantCode"
-            placeholder="e.g. SN-0042"
+            placeholder={auth.tenantCodePlaceholder}
             type="text"
             {...register("tenantCode")}
           />
           <p className="text-xs text-muted-foreground">
-            The store code assigned by CleanHub. Required for store administrators.
+            {auth.tenantCodeHint}
           </p>
           {errors.tenantCode ? (
-            <p className="text-xs text-destructive">{errors.tenantCode.message}</p>
+            <p className="text-xs text-destructive">
+              {auth.validation.tenantCodeRequired}
+            </p>
           ) : null}
         </div>
       ) : (
         <p className="rounded-md border border-dashed border-border bg-muted/30 px-3 py-2 text-xs leading-5 text-muted-foreground">
-          Platform administrators sign in with email and password only. Do not
-          enter a pressing code.
+          {auth.platformHint}
         </p>
       )}
 
       <div className="grid gap-2">
-        <Label htmlFor="identifier">Email or phone</Label>
+        <Label htmlFor="identifier">{auth.identifierLabel}</Label>
         <Input
           aria-invalid={Boolean(errors.identifier)}
           autoComplete="username"
           id="identifier"
-          placeholder="admin@cleanhub.local"
+          placeholder={auth.identifierPlaceholder}
           type="text"
           {...register("identifier")}
         />
         {errors.identifier ? (
-          <p className="text-xs text-destructive">{errors.identifier.message}</p>
+          <p className="text-xs text-destructive">
+            {auth.validation.identifierRequired}
+          </p>
         ) : null}
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor="password">Password</Label>
+        <Label htmlFor="password">{auth.passwordLabel}</Label>
         <Input
           aria-invalid={Boolean(errors.password)}
           autoComplete="current-password"
           id="password"
-          placeholder="Enter password"
+          placeholder={auth.passwordPlaceholder}
           type="password"
           {...register("password")}
         />
         {errors.password ? (
-          <p className="text-xs text-destructive">{errors.password.message}</p>
+          <p className="text-xs text-destructive">
+            {auth.validation.passwordRequired}
+          </p>
         ) : null}
       </div>
 
@@ -248,8 +280,12 @@ export function LoginForm() {
         </p>
       ) : null}
 
-      <Button disabled={isSubmitting} type="submit">
-        {isSubmitting ? "Signing in..." : "Sign in"}
+      <Button
+        className="h-10"
+        disabled={isSubmitting}
+        type="submit"
+      >
+        {isSubmitting ? auth.submitting : auth.submit}
       </Button>
     </form>
   );

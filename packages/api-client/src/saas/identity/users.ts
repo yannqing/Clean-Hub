@@ -53,7 +53,6 @@ export function createSaasUsersApi(client: ApiClient) {
     getSaasUsers,
     get: (userId: string) => getSaasUser(userId),
     list: (query?: QueryParams) => getSaasUsers(query),
-    test: () => client.get<SaasUserSummary>("/saas/test/user"),
     update: (userId: string, input: UpdateSaasUserRequest) =>
       updateSaasUser(userId, input),
     updateStatus: (userId: string, input: UpdateSaasUserStatusRequest) =>

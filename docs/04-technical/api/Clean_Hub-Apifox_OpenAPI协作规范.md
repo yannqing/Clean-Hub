@@ -452,7 +452,6 @@ POST /saas/users
 GET  /saas/users/:userId
 PATCH /saas/users/:userId
 GET  /tenant/users
-GET  /saas/test/user
 ```
 
 以下 routes 文件存在，但需要确认是否已正式挂载后再标记为 `ready`：

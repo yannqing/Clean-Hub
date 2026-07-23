@@ -2,6 +2,7 @@
 
 import type { AuthContext } from "@cleanhub/api-client";
 
+import { getWebAdminHomePath } from "@/config/auth-routing";
 import { webAdminApi } from "@/lib/api-client";
 
 import {
@@ -19,6 +20,7 @@ type LoginActionResult =
   | {
       ok: false;
       errors: LoginFormFieldErrors;
+      errorCode: "invalidForm" | "accessDenied" | "signInFailed";
       message: string;
     };
 
@@ -50,12 +52,13 @@ export async function loginAction(
     return {
       ok: false,
       errors: validationErrors,
+      errorCode: "invalidForm",
       message: "Please check the login form.",
     };
   }
 
   try {
-    let appliedCookieNames = new Set<string>();
+    let loginResponse: Response | undefined;
     const result = await webAdminApi.auth.login(
       {
         identifier: input.identifier,
@@ -65,11 +68,29 @@ export async function loginAction(
         deviceId: input.deviceId,
       },
       {
-        afterResponse: async (response) => {
-          appliedCookieNames = await applyAuthCookies(response);
+        afterResponse: (response) => {
+          loginResponse = response;
         },
       },
     );
+
+    if (!getWebAdminHomePath(result.authContext)) {
+      return {
+        ok: false,
+        errors: {},
+        errorCode: "accessDenied",
+        message:
+          "This account cannot access CleanHub Web Admin. Sign in with an owner, manager, or platform administrator account.",
+      };
+    }
+
+    if (!loginResponse) {
+      throw new Error(
+        "The API did not return an authenticated browser response.",
+      );
+    }
+
+    const appliedCookieNames = await applyAuthCookies(loginResponse);
 
     if (
       !appliedCookieNames.has("cleanhub_access_token") ||
@@ -88,6 +109,7 @@ export async function loginAction(
     return {
       ok: false,
       errors: {},
+      errorCode: "signInFailed",
       message: getLoginErrorMessage(error),
     };
   }

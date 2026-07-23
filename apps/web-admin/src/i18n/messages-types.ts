@@ -21,6 +21,45 @@ type SidebarSection = {
   items: { label: string; href: string }[];
 };
 
+type AuthCopy = {
+  brandName: string;
+  brandSuffix: string;
+  heroTitle: string;
+  heroDescription: string;
+  title: string;
+  description: string;
+  signInAs: string;
+  tenantModeLabel: string;
+  tenantModeDescription: string;
+  platformModeLabel: string;
+  platformModeDescription: string;
+  tenantCodeLabel: string;
+  tenantCodePlaceholder: string;
+  tenantCodeHint: string;
+  platformHint: string;
+  identifierLabel: string;
+  identifierPlaceholder: string;
+  passwordLabel: string;
+  passwordPlaceholder: string;
+  submit: string;
+  submitting: string;
+  signedIn: string;
+  validation: {
+    identifierRequired: string;
+    passwordRequired: string;
+    tenantCodeRequired: string;
+  };
+  errors: {
+    checkForm: string;
+    accessDenied: string;
+    signInFailed: string;
+  };
+  redirect: {
+    sessionExpired: string;
+    tenantAccessDenied: string;
+  };
+};
+
 export type WebAdminMessages = {
   shell: {
     saas: ShellCopy;
@@ -33,9 +72,17 @@ export type WebAdminMessages = {
   common: {
     personalCenter: string;
     language: string;
+    languageLabels: {
+      en: string;
+      zhCN: string;
+    };
+    theme: string;
+    switchToDarkTheme: string;
+    switchToLightTheme: string;
     signOut: string;
     signingOut: string;
   };
+  auth: AuthCopy;
   saas: SaasMessages;
   tenant: TenantMessages;
 };

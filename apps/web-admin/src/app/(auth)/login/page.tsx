@@ -1,21 +1,25 @@
-import { LoginForm } from "@/features/auth/components";
+import { LoginPageContent } from "@/features/auth/components";
+import {
+  isAuthRedirectReason,
+  type AuthRedirectReason,
+} from "@/config/auth-routing";
 
-export default function LoginPage() {
-  return (
-    <main className="min-h-screen bg-muted/30 px-6 py-12 text-foreground">
-      <div className="mx-auto max-w-md">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            CleanHub Web Admin
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold">Login</h1>
-          <p className="mt-4 text-sm leading-6 text-muted-foreground">
-            Choose store or platform sign-in. Store administrators must enter
-            their pressing code.
-          </p>
-        </div>
-        <LoginForm />
-      </div>
-    </main>
-  );
+type LoginPageProps = {
+  searchParams?: Promise<{
+    reason?: string | string[];
+  }>;
+};
+
+function resolveAuthRedirectReason(
+  value: string | string[] | undefined,
+): AuthRedirectReason | undefined {
+  const reason = Array.isArray(value) ? value[0] : value;
+  return isAuthRedirectReason(reason) ? reason : undefined;
+}
+
+export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const params = await searchParams;
+  const reason = resolveAuthRedirectReason(params?.reason);
+
+  return <LoginPageContent reason={reason} />;
 }
