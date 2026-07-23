@@ -8,6 +8,7 @@ export { OrderCreateDialog } from "./order-create-dialog";
 export { OrderDetailView } from "./order-detail-view";
 export { OrderInfoEditor } from "./order-info-editor";
 export { OrderItemsManager } from "./order-items-manager";
+export { OrderPaymentAdjustments } from "./order-payment-adjustments";
 export { OrderMetrics } from "./order-metrics";
 export { OrderPagination } from "./order-pagination";
 export { OrdersPageHeader } from "./orders-page-header";

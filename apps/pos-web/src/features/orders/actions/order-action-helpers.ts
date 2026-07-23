@@ -1,11 +1,13 @@
 import { ApiHttpError } from "@cleanhub/api-client";
 
 export type PosOrderErrorCode =
+  | "FORBIDDEN"
   | "ORDER_NOT_FOUND"
   | "ORDER_ITEM_NOT_FOUND"
   | "PAYMENT_NOT_FOUND"
   | "PAYMENT_NOT_SUPPORTED"
   | "PAYMENT_REFERENCE_CONFLICT"
+  | "PAYMENT_AMOUNT_EXCEEDED"
   | "PAYMENT_ALREADY_PENDING"
   | "PAYMENT_ALREADY_RESOLVED"
   | "PAYMENT_CONFIRMATION_FORBIDDEN"
@@ -30,11 +32,13 @@ export type OrderActionResult<TPayload = unknown> = {
 };
 
 const ORDER_ERROR_MESSAGES: Record<PosOrderErrorCode, string> = {
+  FORBIDDEN: "当前账号没有执行此操作的权限。",
   ORDER_NOT_FOUND: "订单不存在或已被删除。",
   ORDER_ITEM_NOT_FOUND: "订单条目不存在。",
   PAYMENT_NOT_FOUND: "支付流水不存在。",
   PAYMENT_NOT_SUPPORTED: "当前支付流水不支持此操作。",
   PAYMENT_REFERENCE_CONFLICT: "该交易流水号已被记录，请核对后重试。",
+  PAYMENT_AMOUNT_EXCEEDED: "调整金额超过当前可处理余额。",
   PAYMENT_ALREADY_PENDING: "请先处理当前待确认的移动支付。",
   PAYMENT_ALREADY_RESOLVED: "该支付已经处理，请刷新页面。",
   PAYMENT_CONFIRMATION_FORBIDDEN: "只有 Owner 或 Manager 可以确认移动支付。",

@@ -72,6 +72,8 @@ export function SettingsView() {
   // Hardware devices
   const [hardwareDevices, setHardwareDevices] = useState<PosHardwareDeviceSummary[]>([]);
   const [hardwareLoading, setHardwareLoading] = useState(true);
+  const [canManageSensitiveHardware, setCanManageSensitiveHardware] =
+    useState(false);
 
   // Load all data on mount.
   const loadData = useCallback(async () => {
@@ -103,6 +105,11 @@ export function SettingsView() {
       // Load hardware devices via POS read-only endpoint.
       const devices = await fetchHardwareDevices();
       setHardwareDevices(devices);
+
+      const authContext = await posApi.auth.me();
+      setCanManageSensitiveHardware(
+        authContext.role === "owner" || authContext.role === "manager",
+      );
 
       setPageState("ready");
     } catch (error) {
@@ -209,6 +216,7 @@ export function SettingsView() {
 
       {/* Hardware devices (read-only list via POS endpoint) */}
       <HardwareSettingsCard
+        canManageSensitiveHardware={canManageSensitiveHardware}
         devices={hardwareDevices}
         loading={hardwareLoading}
       />

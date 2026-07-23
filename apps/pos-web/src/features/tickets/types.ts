@@ -47,14 +47,20 @@ export type TicketBasicFormValues = {
 
 /** Form values for a ticket item (create/edit). */
 export type TicketItemFormValues = {
-  itemName: string;
+  serviceId: string;
+  pricingUnit: import("@cleanhub/api-client").ServiceTicketPricingUnit;
+  standardUnitAmount: string;
+  chargedUnitAmount: string;
+  priceTouched: boolean;
   itemType: import("@cleanhub/api-client").ServiceTicketItemType | "";
   itemCategory: string;
   itemColor: string;
   itemBrand: string;
   itemMaterial: string;
   quantity: string; // keep as string in inputs, parse on save
-  unitAmount: string;
+  weight: string;
+  bagCount: string;
+  overrideReason: string;
   defectNotes: string;
   specialRequest: string;
   remark: string;

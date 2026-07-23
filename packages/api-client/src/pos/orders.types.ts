@@ -31,10 +31,20 @@ export type PosOrderItem = {
   ticketId: string | null;
   sourceType: PosOrderItemSourceType;
   sourceId: string;
+  serviceId: string | null;
   itemName: string;
   quantity: string;
+  pricingUnit: "per_item" | "per_kg";
+  standardUnitAmount: string;
+  chargedUnitAmount: string;
+  weight: string | null;
+  bagCount: number | null;
   unitAmount: string;
   lineAmount: string;
+  itemColor: string | null;
+  defectNotes: string | null;
+  specialRequest: string | null;
+  itemIdentifier: string | null;
   createdAt: string;
   updatedAt: string;
   version: number;
@@ -98,6 +108,7 @@ export type PosOrderListResponse = {
 };
 
 export type CreateTicketBasedOrderRequest = {
+  id?: string;
   orderType: "ticket";
   ticketId: string;
   ticketItemIds?: string[];
@@ -106,14 +117,20 @@ export type CreateTicketBasedOrderRequest = {
 };
 
 export type CreateManualOrderItemRequest = {
-  sourceType: Exclude<PosOrderItemSourceType, "ticket_item">;
-  sourceId?: string;
-  itemName: string;
-  quantity: string;
-  unitAmount: string;
+  serviceId: string;
+  quantity?: string;
+  weight?: string;
+  bagCount?: number;
+  chargedUnitAmount?: string;
+  overrideReason?: string;
+  itemColor?: string;
+  defectNotes?: string;
+  specialRequest?: string;
+  itemIdentifier?: string;
 };
 
 export type CreateManualOrderRequest = {
+  id?: string;
   orderType: "manual";
   branchId: string;
   customerId: string;
@@ -136,14 +153,19 @@ export type UpdatePosOrderRequest = {
 export type ChangePosOrderStatusRequest = {
   to: PosOrderStatus;
   note?: string;
+  reason?: string;
   version: number;
+};
+
+export type DeletePosOrderRequest = {
+  reason: string;
 };
 
 export type CreatePosPaymentRequest =
   | {
       paymentMethod: "cash";
       amount: string;
-      idempotencyKey?: string;
+      idempotencyKey: string;
     }
   | {
       paymentMethod: "app";
@@ -153,6 +175,12 @@ export type CreatePosPaymentRequest =
       idempotencyKey: string;
     };
 
+export type CreatePosPaymentResponse = {
+  order: PosOrderDetail;
+  payment: PosPaymentTransaction;
+  idempotent: boolean;
+};
+
 export type ResolvePosPaymentRequest = {
   reason?: string;
 };
@@ -160,10 +188,21 @@ export type ResolvePosPaymentRequest = {
 export type CreatePosOrderItemRequest = CreateManualOrderItemRequest;
 
 export type UpdatePosOrderItemRequest = {
-  itemName?: string;
+  serviceId?: string;
   quantity?: string;
-  unitAmount?: string;
+  weight?: string;
+  bagCount?: number;
+  chargedUnitAmount?: string;
+  overrideReason?: string;
+  itemColor?: string | null;
+  defectNotes?: string | null;
+  specialRequest?: string | null;
+  itemIdentifier?: string | null;
   version: number;
+};
+
+export type DeletePosOrderItemRequest = {
+  reason: string;
 };
 
 export type PosOrderPaymentsResponse = {

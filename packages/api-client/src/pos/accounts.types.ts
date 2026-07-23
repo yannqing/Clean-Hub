@@ -31,6 +31,8 @@ export type PosAccountProfilesResponse = {
 };
 
 export type CreatePosAccountRequest = {
+  /** Stable client-generated ULID used by offline replay. */
+  id?: string;
   accountName: string;
   /** Phone and email are mutually optional but at least one is required. */
   phone?: string;

@@ -2,6 +2,7 @@
 
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posToast as toast } from "@/lib/pos-toast";
+import { usePosOfflineWrites } from "@/features/offline/lib";
 import { useState } from "react";
 
 import {
@@ -12,7 +13,7 @@ import {
   DialogTitle,
 } from "@cleanhub/ui";
 
-import { createAccount, updateAccount } from "../queries";
+import { updateAccount } from "../queries";
 import type { AccountFormValues, PosCustomerAccountDetail } from "../types";
 
 type AccountFormDialogProps = {
@@ -47,6 +48,7 @@ export function AccountFormDialog({
 }: AccountFormDialogProps) {
   const [form, setForm] = useState<AccountFormValues>(initial ?? EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const { createCustomerAccount } = usePosOfflineWrites();
 
   async function handleSubmit() {
     if (!form.accountName.trim()) {
@@ -65,11 +67,23 @@ export function AccountFormDialog({
         phone: form.phone.trim() || undefined,
         email: form.email.trim() || undefined,
       };
+      const createResult =
+        mode === "edit" && accountId
+          ? null
+          : await createCustomerAccount(body);
       const result =
         mode === "edit" && accountId
           ? await updateAccount(accountId, body)
-          : await createAccount(body);
-      toast.success(mode === "edit" ? "修改已保存" : "新增账户已保存");
+          : createResult?.queued
+            ? createQueuedAccountDetail(createResult.entityId, body)
+            : createResult!.data;
+      toast.success(
+        createResult?.queued
+          ? "网络不可用，客户账户已加入同步队列。"
+          : mode === "edit"
+            ? "修改已保存"
+            : "新增账户已保存",
+      );
       onSaved(result);
       onOpenChange(false);
     } catch (error) {
@@ -141,6 +155,23 @@ export function AccountFormDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function createQueuedAccountDetail(
+  id: string,
+  input: { accountName: string; phone?: string; email?: string },
+): PosCustomerAccountDetail {
+  const now = new Date().toISOString();
+  return {
+    id,
+    accountName: input.accountName,
+    phone: input.phone ?? null,
+    email: input.email ?? null,
+    status: "active",
+    createdAt: now,
+    updatedAt: now,
+    version: 1,
+  };
 }
 
 function FormField({

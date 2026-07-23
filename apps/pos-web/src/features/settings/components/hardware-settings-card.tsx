@@ -1,14 +1,29 @@
 "use client";
 
+import { useState } from "react";
+
 import type { PosHardwareDeviceSummary } from "@cleanhub/api-client";
 
 import {
   Card,
   CardContent,
+  CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
-  CardDescription,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@cleanhub/ui";
+
+import { Icon, type PosIconName } from "@/components/app-shell";
+import { getDesktopBridge } from "@/features/hardware/lib/desktop-bridge";
+import { getPosApiErrorMessage } from "@/lib/api-error-message";
+import { posApi } from "@/lib/api-client";
+import { posToast as toast } from "@/lib/pos-toast";
 
 const DEVICE_TYPE_LABELS: Record<string, string> = {
   printer: "打印机",
@@ -23,21 +38,74 @@ const CONNECTION_TYPE_LABELS: Record<string, string> = {
   other: "其他",
 };
 
-const DEVICE_ICONS: Record<string, string> = {
-  printer: "🖨️",
-  scanner: "📷",
-  cash_drawer: "💰",
+const DEVICE_ICONS: Record<string, PosIconName> = {
+  printer: "printer",
+  scanner: "scan-line",
+  cash_drawer: "wallet-cards",
 };
 
 type HardwareSettingsCardProps = {
+  canManageSensitiveHardware: boolean;
   devices: PosHardwareDeviceSummary[];
   loading: boolean;
 };
 
 export function HardwareSettingsCard({
+  canManageSensitiveHardware,
   devices,
   loading,
 }: HardwareSettingsCardProps) {
+  const [drawerDialogOpen, setDrawerDialogOpen] = useState(false);
+  const [drawerReason, setDrawerReason] = useState("");
+  const [openingDrawer, setOpeningDrawer] = useState(false);
+  const configuredDrawer = devices.find(
+    (device) =>
+      device.deviceType === "cash_drawer" && device.status === "active",
+  );
+
+  async function openDrawer() {
+    const reason = drawerReason.trim();
+    if (!reason) {
+      toast.error("请填写开钱箱原因。");
+      return;
+    }
+
+    setOpeningDrawer(true);
+    try {
+      const authorization =
+        await posApi.pos.hardware.authorizeManualDrawerOpen({ reason });
+      const bridge = getDesktopBridge();
+      if (!bridge) {
+        throw new Error(
+          "未检测到 CleanHub Desktop 硬件桥，请在 Desktop 客户端中重试。",
+        );
+      }
+
+      const capabilities = await bridge.hardware.getCapabilities();
+      if (!capabilities.cashDrawer) {
+        throw new Error(
+          "当前终端的钱箱适配器不可用，请检查 Desktop 钱箱配置。",
+        );
+      }
+
+      await bridge.hardware.openCashDrawer({
+        reason: authorization.reason,
+      });
+      toast.success("钱箱已打开。");
+      setDrawerDialogOpen(false);
+      setDrawerReason("");
+    } catch (error) {
+      toast.error(
+        getPosApiErrorMessage(
+          error,
+          "开钱箱失败，请检查硬件连接后重试。",
+        ),
+      );
+    } finally {
+      setOpeningDrawer(false);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -63,9 +131,10 @@ export function HardwareSettingsCard({
                 className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3"
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-xl">
-                    {DEVICE_ICONS[device.deviceType] ?? "🔧"}
-                  </span>
+                  <Icon
+                    className="h-5 w-5 text-slate-500"
+                    name={DEVICE_ICONS[device.deviceType] ?? "settings"}
+                  />
                   <div>
                     <p className="text-sm font-medium text-slate-800">
                       {device.name}
@@ -84,13 +153,82 @@ export function HardwareSettingsCard({
                       : "bg-slate-100 text-slate-500"
                   }`}
                 >
-                  {device.status === "active" ? "在线" : "离线"}
+                  {device.status === "active" ? "已配置" : "已停用"}
                 </span>
               </div>
             ))}
           </div>
         )}
       </CardContent>
+
+      {canManageSensitiveHardware ? (
+        <CardFooter className="mt-5 flex items-center justify-between gap-4 border-t border-slate-100 pt-5">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-800">钱箱控制</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {configuredDrawer ? configuredDrawer.name : "当前门店未配置可用钱箱"}
+            </p>
+          </div>
+          <button
+            className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!configuredDrawer || loading}
+            onClick={() => setDrawerDialogOpen(true)}
+            type="button"
+          >
+            <Icon className="h-4 w-4" name="wallet-cards" />
+            开钱箱
+          </button>
+        </CardFooter>
+      ) : null}
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !openingDrawer) {
+            setDrawerReason("");
+          }
+          setDrawerDialogOpen(open);
+        }}
+        open={drawerDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>手动开钱箱</DialogTitle>
+            <DialogDescription>
+              仅 Owner 或 Manager 可执行，授权原因和当前终端会写入审计记录。
+            </DialogDescription>
+          </DialogHeader>
+          <label className="grid gap-2 text-sm font-medium text-slate-700">
+            操作原因
+            <textarea
+              className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-300"
+              disabled={openingDrawer}
+              maxLength={500}
+              onChange={(event) => setDrawerReason(event.target.value)}
+              placeholder="填写手动开钱箱原因"
+              value={drawerReason}
+            />
+          </label>
+          <DialogFooter>
+            <button
+              className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+              disabled={openingDrawer}
+              onClick={() => setDrawerDialogOpen(false)}
+              type="button"
+            >
+              返回
+            </button>
+            <button
+              className="flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={openingDrawer || !drawerReason.trim()}
+              onClick={() => void openDrawer()}
+              type="button"
+            >
+              <Icon className="h-4 w-4" name="wallet-cards" />
+              {openingDrawer ? "授权中…" : "授权并打开"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

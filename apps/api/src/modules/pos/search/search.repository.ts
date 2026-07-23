@@ -18,6 +18,11 @@ import {
   ticketItems,
   type Database,
 } from "@cleanhub/db";
+import {
+  POS_ORDER_CODE_SUFFIX_LENGTH,
+  formatPosOrderCode,
+  parsePosOrderCodeSuffix,
+} from "@cleanhub/domain/order-codes";
 
 import type {
   PosGlobalSearchItem,
@@ -194,7 +199,6 @@ async function searchOrders(
   db: Database,
   input: PosGlobalSearchRepositoryInput,
 ): Promise<PosGlobalSearchItem[]> {
-  const pattern = searchPattern(input.q);
   const filters: SQL[] = [
     eq(orders.tenantId, input.tenantId),
     isNull(orders.deletedAt),
@@ -205,14 +209,22 @@ async function searchOrders(
     filters.push(scopedBranches);
   }
 
-  filters.push(
-    or(
-      sql`${orders.id} ilike ${pattern} escape '\\'`,
-      sql`${customers.fullName} ilike ${pattern} escape '\\'`,
-      sql`${customers.phone} ilike ${pattern} escape '\\'`,
-      sql`${customers.email} ilike ${pattern} escape '\\'`,
-    )!,
-  );
+  const displayCodeSuffix = parsePosOrderCodeSuffix(input.q);
+  if (displayCodeSuffix) {
+    filters.push(
+      sql`upper(right(${orders.id}, ${POS_ORDER_CODE_SUFFIX_LENGTH})) = ${displayCodeSuffix}`,
+    );
+  } else {
+    const pattern = searchPattern(input.q);
+    filters.push(
+      or(
+        sql`${orders.id} ilike ${pattern} escape '\\'`,
+        sql`${customers.fullName} ilike ${pattern} escape '\\'`,
+        sql`${customers.phone} ilike ${pattern} escape '\\'`,
+        sql`${customers.email} ilike ${pattern} escape '\\'`,
+      )!,
+    );
+  }
 
   const rows = await db
     .select({
@@ -244,7 +256,7 @@ async function searchOrders(
   return rows.map((row) => ({
     id: row.id,
     type: "order",
-    title: row.id,
+    title: formatPosOrderCode(row.id),
     subtitle: row.customerName ?? undefined,
     badge: row.paymentStatus ?? row.status,
     href: `/orders/${row.id}`,

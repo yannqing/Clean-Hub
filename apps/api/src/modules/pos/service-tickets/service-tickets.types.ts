@@ -31,6 +31,8 @@ export type ServiceTicketItemType = "cloth" | "car" | "shoe" | "carpet";
 
 export type ServiceTicketItemStatus = "pending_wash" | "washing" | "done" | "ready_to_pick" | "exception";
 
+export type ServiceTicketPricingUnit = "per_item" | "per_kg";
+
 export type ServiceTicketItem = {
   id: string;
   ticketId: string;
@@ -42,6 +44,12 @@ export type ServiceTicketItem = {
   itemBrand: string | null;
   itemMaterial: string | null;
   quantity: number;
+  pricingUnit: ServiceTicketPricingUnit;
+  standardUnitAmount: string;
+  chargedUnitAmount: string;
+  weight: string | null;
+  bagCount: number | null;
+  /** Legacy alias retained while older POS readers migrate. */
   unitAmount: string;
   lineAmount: string;
   serviceId: string | null;
@@ -148,19 +156,22 @@ export type UpdateServiceTicketRequest = {
 export type ChangeServiceTicketStatusRequest = {
   to: ServiceTicketStatus;
   note?: string;
+  reason?: string;
   version: number;
 };
 
 export type CreateServiceTicketItemRequest = {
-  itemName: string;
+  serviceId: string;
   itemType?: ServiceTicketItemType;
   itemCategory?: string;
   itemColor?: string;
   itemBrand?: string;
   itemMaterial?: string;
   quantity?: number;
-  unitAmount: string;
-  serviceId?: string | null;
+  weight?: string;
+  bagCount?: number;
+  chargedUnitAmount?: string;
+  overrideReason?: string;
   defectNotes?: string;
   specialRequest?: string;
   remark?: string;
@@ -168,15 +179,17 @@ export type CreateServiceTicketItemRequest = {
 };
 
 export type UpdateServiceTicketItemRequest = {
-  itemName?: string;
+  serviceId?: string;
   itemType?: ServiceTicketItemType;
   itemCategory?: string | null;
   itemColor?: string | null;
   itemBrand?: string | null;
   itemMaterial?: string | null;
   quantity?: number;
-  unitAmount?: string;
-  serviceId?: string | null;
+  weight?: string | null;
+  bagCount?: number | null;
+  chargedUnitAmount?: string;
+  overrideReason?: string;
   defectNotes?: string | null;
   specialRequest?: string | null;
   remark?: string | null;

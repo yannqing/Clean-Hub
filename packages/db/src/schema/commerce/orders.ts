@@ -13,6 +13,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
+import { pricingUnitEnum, services } from "../catalog/services.js";
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
 import { branches } from "../tenancy/branches.js";
@@ -143,10 +144,26 @@ export const orderItems = pgTable(
       .references(() => customers.id),
     sourceType: orderItemSourceTypeEnum("source_type").notNull(),
     sourceId: ulidColumn("source_id").notNull(),
+    serviceId: ulidColumn("service_id").references(() => services.id),
     itemName: varchar("item_name", { length: 200 }).notNull(),
     quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull(),
+    pricingUnit: pricingUnitEnum("pricing_unit"),
+    standardUnitAmount: numeric("standard_unit_amount", {
+      precision: 12,
+      scale: 2,
+    }),
+    chargedUnitAmount: numeric("charged_unit_amount", {
+      precision: 12,
+      scale: 2,
+    }),
+    weight: numeric("weight", { precision: 10, scale: 3 }),
+    bagCount: integer("bag_count"),
     unitAmount: numeric("unit_amount", { precision: 12, scale: 2 }).notNull(),
     lineAmount: numeric("line_amount", { precision: 12, scale: 2 }).notNull(),
+    itemColor: varchar("item_color", { length: 40 }),
+    defectNotes: text("defect_notes"),
+    specialRequest: text("special_request"),
+    itemIdentifier: varchar("item_identifier", { length: 64 }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -163,6 +180,7 @@ export const orderItems = pgTable(
     index("order_items_order_id_idx").on(table.orderId),
     index("order_items_tenant_id_idx").on(table.tenantId),
     index("order_items_ticket_id_idx").on(table.ticketId),
+    index("order_items_service_id_idx").on(table.serviceId),
     index("order_items_source_idx").on(table.sourceType, table.sourceId),
   ],
 );
@@ -214,10 +232,11 @@ export const paymentTransactions = pgTable(
       table.idempotencyKey,
     ),
     index("payment_transactions_order_id_idx").on(table.orderId),
-    index("payment_transactions_gateway_external_id_idx").on(
-      table.gateway,
-      table.externalId,
-    ),
+    uniqueIndex("payment_transactions_tenant_gateway_external_id_unique")
+      .on(table.tenantId, table.gateway, table.externalId)
+      .where(
+        sql`${table.deletedAt} is null and ${table.gateway} is not null and ${table.gateway} <> '' and ${table.externalId} is not null and ${table.externalId} <> ''`,
+      ),
     index("payment_transactions_tenant_branch_paid_at_idx").on(
       table.tenantId,
       table.branchId,

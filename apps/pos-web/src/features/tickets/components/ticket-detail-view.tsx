@@ -1,13 +1,13 @@
 "use client";
 
 import { useTranslation } from "@cleanhub/i18n/react";
-import { posToast as toast } from "@/lib/pos-toast";
 import Link from "next/link";
 import { useState } from "react";
 
 import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { customerDetailPath, posRoutes } from "@/config";
 import { OrderCreateDialog } from "@/features/orders/components/order-create-dialog";
+import { PrintJobControl } from "@/features/hardware/components";
 
 import {
   formatTicketDateTime,
@@ -17,7 +17,11 @@ import {
   TICKET_SOURCE_LABELS,
   TICKET_TYPE_LABELS,
 } from "../constants";
-import type { RelatedOrderSummary, ServiceTicketDetail } from "@cleanhub/api-client";
+import type {
+  PosCatalogService,
+  RelatedOrderSummary,
+  ServiceTicketDetail,
+} from "@cleanhub/api-client";
 import { TicketBasicForm } from "./ticket-basic-form";
 import { TicketDeleteDialog } from "./ticket-delete-dialog";
 import { TicketItemEditor } from "./ticket-item-editor";
@@ -30,6 +34,8 @@ import { TicketRelatedOrders } from "./ticket-related-orders";
 import { TicketStatusDialog } from "./ticket-status-dialog";
 
 type TicketDetailViewProps = {
+  canManage: boolean;
+  catalog: PosCatalogService[];
   from?: string;
   intakeQuery?: string;
   ticket: ServiceTicketDetail;
@@ -42,6 +48,8 @@ type TicketDetailViewProps = {
  * item CRUD (inside the editor). Deletion is gated behind a confirmation dialog.
  */
 export function TicketDetailView({
+  canManage,
+  catalog,
   from,
   intakeQuery,
   ticket,
@@ -78,6 +86,36 @@ export function TicketDetailView({
     fromIntake || fromCustomer ? customerDetailHref : posRoutes.tickets;
   const backLabel =
     fromIntake || fromCustomer ? "返回客户档案" : "返回工单列表";
+  const ticketCode =
+    ticket.ticketNo ?? `TK-${ticket.id.slice(-8).toUpperCase()}`;
+  const itemLines = (ticket.items ?? []).flatMap((item) => {
+    const measurement =
+      item.pricingUnit === "per_kg"
+        ? `${item.weight ?? "0"} kg${item.bagCount ? ` / ${item.bagCount} bags` : ""}`
+        : `${item.quantity} items`;
+    return [
+      `${item.itemName} | ${measurement} | ${formatTicketMoney(item.chargedUnitAmount, ticket.currency)}`,
+      item.chargedUnitAmount !== item.standardUnitAmount
+        ? `Standard: ${formatTicketMoney(item.standardUnitAmount, ticket.currency)}`
+        : "",
+      item.itemColor ? `Color: ${item.itemColor}` : "",
+      item.defectNotes ? `Defect: ${item.defectNotes}` : "",
+      item.specialRequest ? `Request: ${item.specialRequest}` : "",
+      item.labelCode ? `Label: ${item.labelCode}` : "",
+    ].filter(Boolean);
+  });
+  const labelContent = [
+    "CleanHub",
+    ticketCode,
+    ticket.customerName,
+    `${ticket.itemCount} items`,
+    ...itemLines,
+    ticket.expectedPickupAt
+      ? formatTicketDateTime(ticket.expectedPickupAt, locale)
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   return (
     <section>
@@ -113,14 +151,14 @@ export function TicketDetailView({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              onClick={() => toast.info("打印能力尚未接入，敬请期待。")}
-              type="button"
-            >
-              <Icon className="h-4 w-4" name="printer" />
-              打印标签
-            </button>
+            <PrintJobControl
+              canReprint={canManage}
+              content={labelContent}
+              documentType="label"
+              entityId={ticket.id}
+              initialLabel="打印标签"
+              title={ticketCode}
+            />
             <OrderCreateDialog
               initialTicket={ticket}
               orderDetailHref={(orderId) =>
@@ -219,6 +257,12 @@ export function TicketDetailView({
           )}
 
           <TicketItemEditor
+            canManage={canManage}
+            catalog={catalog.filter(
+              (service) =>
+                service.businessLine === ticket.ticketType &&
+                service.currency === ticket.currency,
+            )}
             currency={ticket.currency}
             items={ticket.items ?? []}
             ticketId={ticket.id}

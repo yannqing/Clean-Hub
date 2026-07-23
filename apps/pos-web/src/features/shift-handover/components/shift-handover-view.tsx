@@ -1,12 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import type {
   PosBranchSummary,
   PosOrderSummary,
+  PosStaffSummary,
+  PosZReport,
   ServiceTicketSummary,
+  ShiftRecord,
 } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 
@@ -16,16 +20,26 @@ import { DEFAULT_POS_CURRENCY } from "@/lib/money";
 import type { PosSessionUser } from "@/lib/session";
 import { posToast as toast } from "@/lib/pos-toast";
 
-import type {
-  LocalShiftHandoverRecord,
-  ShiftHandoverSummary,
-} from "../types";
+import {
+  clockShiftAction,
+  createShiftHandoverAction,
+} from "../actions";
+import type { ShiftHandoverSummary } from "../types";
 
-const STORAGE_KEY = "cleanhub.pos-web.shift-handovers";
-const MAX_LOCAL_RECORDS = 5;
+const DRAFT_STORAGE_KEY = "cleanhub.pos-web.shift-handover-draft";
+
+type ShiftHandoverDraft = {
+  countedCash: string;
+  incomingStaffId: string;
+  notes: string;
+  checks: boolean[];
+};
 
 type ShiftHandoverViewProps = {
   branch: PosBranchSummary | null;
+  currentShift: ShiftRecord | null;
+  recentReports: PosZReport[];
+  staff: PosStaffSummary[];
   summary: ShiftHandoverSummary;
   user: PosSessionUser | null;
 };
@@ -36,6 +50,13 @@ type Copy = {
   description: string;
   currentShift: string;
   active: string;
+  onBreak: string;
+  noOpenShift: string;
+  openingFloat: string;
+  clockIn: string;
+  clockOut: string;
+  breakStart: string;
+  breakEnd: string;
   cashier: string;
   branch: string;
   generatedAt: string;
@@ -51,6 +72,7 @@ type Copy = {
   cashInputLabel: string;
   incomingStaffLabel: string;
   incomingStaffPlaceholder: string;
+  noAvailableStaff: string;
   notesLabel: string;
   notesPlaceholder: string;
   checklistTitle: string;
@@ -76,6 +98,12 @@ type Copy = {
   viewTickets: string;
   items: string;
   total: string;
+  cutoff: string;
+  grossSales: string;
+  discounts: string;
+  refunds: string;
+  corrections: string;
+  netSales: string;
 };
 
 const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
@@ -85,6 +113,13 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     description: "核对现金、待收款订单、异常工单和待取件任务。",
     currentShift: "当前班次",
     active: "进行中",
+    onBreak: "休息中",
+    noOpenShift: "未上班",
+    openingFloat: "开班备用金",
+    clockIn: "上班",
+    clockOut: "下班",
+    breakStart: "开始休息",
+    breakEnd: "结束休息",
     cashier: "当前店员",
     branch: "门店",
     generatedAt: "统计时间",
@@ -99,7 +134,8 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     cashCardDescription: "按钱箱实点金额填写，系统会自动计算差异。",
     cashInputLabel: "实点现金金额",
     incomingStaffLabel: "接班店员",
-    incomingStaffPlaceholder: "可选，输入接班人姓名",
+    incomingStaffPlaceholder: "选择接班店员",
+    noAvailableStaff: "暂无可接班店员",
     notesLabel: "交接备注",
     notesPlaceholder: "记录异常现金、待确认支付、设备情况等",
     checklistTitle: "交接确认",
@@ -110,10 +146,10 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
       "票据、打印机和钱箱状态已确认",
     ],
     complete: "完成交接",
-    completeDisabled: "请填写实点现金并完成确认项",
+    completeDisabled: "请先开班，并填写实点现金、选择接班人和完成确认项",
     print: "打印摘要",
     copy: "复制摘要",
-    saved: "交接记录已保存在本机。",
+    saved: "交接完成，Z Report 已生成。",
     copied: "交接摘要已复制。",
     copyFailed: "复制失败，请手动选择摘要内容。",
     paymentBreakdown: "收款方式",
@@ -124,12 +160,18 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     exceptionTickets: "异常工单",
     emptyOrders: "暂无待收款订单",
     emptyTickets: "暂无相关工单",
-    recentRecords: "本机最近交接",
-    noRecentRecords: "暂无本机交接记录",
+    recentRecords: "最近 Z Report",
+    noRecentRecords: "暂无 Z Report",
     viewOrders: "处理订单",
     viewTickets: "查看工单",
     items: "件",
     total: "合计",
+    cutoff: "截止时间",
+    grossSales: "销售总额",
+    discounts: "折扣",
+    refunds: "退款",
+    corrections: "冲正",
+    netSales: "净销售额",
   },
   en: {
     breadcrumb: "Shift handover",
@@ -138,6 +180,13 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
       "Reconcile cash, unpaid orders, exception tickets, and pickup tasks.",
     currentShift: "Current shift",
     active: "Open",
+    onBreak: "On break",
+    noOpenShift: "Not clocked in",
+    openingFloat: "Opening float",
+    clockIn: "Clock in",
+    clockOut: "Clock out",
+    breakStart: "Start break",
+    breakEnd: "End break",
     cashier: "Current staff",
     branch: "Store",
     generatedAt: "Snapshot time",
@@ -153,7 +202,8 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
       "Enter the cash counted in the drawer. The variance is calculated automatically.",
     cashInputLabel: "Counted cash amount",
     incomingStaffLabel: "Incoming staff",
-    incomingStaffPlaceholder: "Optional, enter incoming staff name",
+    incomingStaffPlaceholder: "Select incoming staff",
+    noAvailableStaff: "No staff available for handover",
     notesLabel: "Handover notes",
     notesPlaceholder: "Record cash variance, pending payments, device status",
     checklistTitle: "Handover confirmation",
@@ -164,10 +214,11 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
       "Receipts, printer, and cash drawer status were checked",
     ],
     complete: "Complete handover",
-    completeDisabled: "Enter counted cash and complete all confirmations",
+    completeDisabled:
+      "Open a shift, enter counted cash, choose incoming staff, and complete all confirmations",
     print: "Print summary",
     copy: "Copy summary",
-    saved: "Handover record saved on this device.",
+    saved: "Handover completed and Z Report generated.",
     copied: "Handover summary copied.",
     copyFailed: "Copy failed. Select the summary manually.",
     paymentBreakdown: "Payment methods",
@@ -178,12 +229,18 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     exceptionTickets: "Exception tickets",
     emptyOrders: "No pending-payment orders",
     emptyTickets: "No related tickets",
-    recentRecords: "Recent device handovers",
-    noRecentRecords: "No device handover records",
+    recentRecords: "Recent Z Reports",
+    noRecentRecords: "No Z Reports",
     viewOrders: "Process orders",
     viewTickets: "View tickets",
     items: "items",
     total: "Total",
+    cutoff: "Cutoff",
+    grossSales: "Gross sales",
+    discounts: "Discounts",
+    refunds: "Refunds",
+    corrections: "Corrections",
+    netSales: "Net sales",
   },
   fr: {
     breadcrumb: "Passation",
@@ -192,6 +249,13 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
       "Rapprochez les espèces, les commandes non payées, les tickets en exception et les retraits.",
     currentShift: "Service actuel",
     active: "Ouvert",
+    onBreak: "En pause",
+    noOpenShift: "Service non ouvert",
+    openingFloat: "Fonds de caisse initial",
+    clockIn: "Prendre le service",
+    clockOut: "Terminer le service",
+    breakStart: "Commencer la pause",
+    breakEnd: "Terminer la pause",
     cashier: "Employé actuel",
     branch: "Magasin",
     generatedAt: "Heure du relevé",
@@ -207,7 +271,8 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
       "Saisissez le montant compté dans le tiroir. L'écart est calculé automatiquement.",
     cashInputLabel: "Montant compté",
     incomingStaffLabel: "Employé entrant",
-    incomingStaffPlaceholder: "Optionnel, nom de l'employé entrant",
+    incomingStaffPlaceholder: "Sélectionner l'employé entrant",
+    noAvailableStaff: "Aucun employé disponible pour la passation",
     notesLabel: "Notes de passation",
     notesPlaceholder:
       "Indiquez les écarts de caisse, paiements en attente, état des appareils",
@@ -219,10 +284,11 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
       "Les reçus, l'imprimante et le tiroir-caisse ont été vérifiés",
     ],
     complete: "Terminer la passation",
-    completeDisabled: "Saisissez les espèces et validez tous les contrôles",
+    completeDisabled:
+      "Ouvrez un service, saisissez les espèces, choisissez l'employé entrant et validez les contrôles",
     print: "Imprimer le résumé",
     copy: "Copier le résumé",
-    saved: "Passation enregistrée sur cet appareil.",
+    saved: "Passation terminée et rapport Z généré.",
     copied: "Résumé de passation copié.",
     copyFailed: "Échec de copie. Sélectionnez le résumé manuellement.",
     paymentBreakdown: "Moyens de paiement",
@@ -233,12 +299,18 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     exceptionTickets: "Tickets en exception",
     emptyOrders: "Aucune commande à encaisser",
     emptyTickets: "Aucun ticket concerné",
-    recentRecords: "Passations récentes sur l'appareil",
-    noRecentRecords: "Aucune passation enregistrée sur l'appareil",
+    recentRecords: "Rapports Z récents",
+    noRecentRecords: "Aucun rapport Z",
     viewOrders: "Traiter les commandes",
     viewTickets: "Voir les tickets",
     items: "articles",
     total: "Total",
+    cutoff: "Clôture",
+    grossSales: "Ventes brutes",
+    discounts: "Remises",
+    refunds: "Remboursements",
+    corrections: "Corrections",
+    netSales: "Ventes nettes",
   },
 };
 
@@ -322,25 +394,36 @@ function displayTicketCode(ticket: ServiceTicketSummary): string {
   return ticket.ticketNo ?? `TK-${ticket.id.slice(-8).toUpperCase()}`;
 }
 
-function readLocalRecords(): LocalShiftHandoverRecord[] {
+function readDraft(): ShiftHandoverDraft | null {
   try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
     if (!raw) {
-      return [];
+      return null;
     }
 
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.slice(0, MAX_LOCAL_RECORDS) : [];
+    const parsed = JSON.parse(raw) as Partial<ShiftHandoverDraft>;
+    if (
+      typeof parsed.countedCash !== "string" ||
+      typeof parsed.incomingStaffId !== "string" ||
+      typeof parsed.notes !== "string" ||
+      !Array.isArray(parsed.checks) ||
+      !parsed.checks.every((item) => typeof item === "boolean")
+    ) {
+      return null;
+    }
+    return {
+      countedCash: parsed.countedCash,
+      incomingStaffId: parsed.incomingStaffId,
+      notes: parsed.notes,
+      checks: parsed.checks,
+    };
   } catch {
-    return [];
+    return null;
   }
 }
 
-function writeLocalRecords(records: LocalShiftHandoverRecord[]) {
-  window.localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(records.slice(0, MAX_LOCAL_RECORDS)),
-  );
+function writeDraft(draft: ShiftHandoverDraft) {
+  window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
 }
 
 function MetricCard({
@@ -502,9 +585,13 @@ function buildSummaryText({
 
 export function ShiftHandoverView({
   branch,
+  currentShift,
+  recentReports,
+  staff,
   summary,
   user,
 }: ShiftHandoverViewProps) {
+  const router = useRouter();
   const { locale } = useTranslation();
   const resolvedLocale = resolveLocale(locale);
   const copy = COPY[resolvedLocale];
@@ -515,8 +602,8 @@ export function ShiftHandoverView({
     const cash = summary.orders?.paymentMethods.find(
       (item) => item.method === "cash",
     );
-    return toNumber(cash?.amount);
-  }, [summary.orders]);
+    return toNumber(currentShift?.openingFloat) + toNumber(cash?.amount);
+  }, [currentShift?.openingFloat, summary.orders]);
   const paidToday = toNumber(summary.orders?.paidAmount);
   const orderCount = summary.orders?.orderCount ?? 0;
   const pendingOrderCount =
@@ -524,17 +611,27 @@ export function ShiftHandoverView({
   const readyTicketCount = summary.tickets?.byStatus.ready_to_pick ?? 0;
   const overdueTicketCount = summary.tickets?.overdueCount ?? 0;
   const exceptionTicketCount = summary.tickets?.byStatus.exception ?? 0;
+  const availableStaff = staff.filter(
+    (item) => item.id !== user?.userId && item.status === "off_duty",
+  );
   const [countedCash, setCountedCash] = useState("");
-  const [incomingStaffName, setIncomingStaffName] = useState("");
+  const [incomingStaffId, setIncomingStaffId] = useState("");
   const [notes, setNotes] = useState("");
+  const [openingFloat, setOpeningFloat] = useState("0");
   const [checks, setChecks] = useState<boolean[]>(() =>
     copy.checklist.map(() => false),
   );
-  const [records, setRecords] = useState<LocalShiftHandoverRecord[]>([]);
+  const [draftHydrated, setDraftHydrated] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const countedCashValue = toNumber(countedCash);
   const variance = countedCashValue - expectedCash;
   const allChecked = checks.every(Boolean);
-  const canComplete = countedCash.trim().length > 0 && allChecked;
+  const canComplete =
+    currentShift !== null &&
+    countedCash.trim().length > 0 &&
+    incomingStaffId.length > 0 &&
+    allChecked &&
+    !isSubmitting;
   const summaryText = buildSummaryText({
     branchName,
     cashierName,
@@ -550,13 +647,39 @@ export function ShiftHandoverView({
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
-      setRecords(readLocalRecords());
+      if (!currentShift) {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+        setDraftHydrated(false);
+        return;
+      }
+      const draft = readDraft();
+      if (draft) {
+        setCountedCash(draft.countedCash);
+        setIncomingStaffId(draft.incomingStaffId);
+        setNotes(draft.notes);
+        setChecks(
+          copy.checklist.map((_, index) => draft.checks[index] ?? false),
+        );
+      }
+      setDraftHydrated(true);
     }, 0);
 
     return () => {
       window.clearTimeout(timeoutId);
     };
-  }, []);
+  }, [copy.checklist, currentShift?.id, currentShift]);
+
+  useEffect(() => {
+    if (!draftHydrated || !currentShift) return;
+    writeDraft({ countedCash, incomingStaffId, notes, checks });
+  }, [
+    checks,
+    countedCash,
+    currentShift,
+    draftHydrated,
+    incomingStaffId,
+    notes,
+  ]);
 
   function updateCheck(index: number, checked: boolean) {
     setChecks((current) =>
@@ -566,31 +689,54 @@ export function ShiftHandoverView({
     );
   }
 
-  function completeHandover() {
+  async function completeHandover() {
     if (!canComplete) {
       toast.warning(copy.completeDisabled);
       return;
     }
+    setIsSubmitting(true);
+    const result = await createShiftHandoverAction({
+      incomingStaffId,
+      countedCash,
+      notes: notes.trim() || undefined,
+    });
+    if (!result.ok) {
+      toast.error(result.message);
+      setIsSubmitting(false);
+      return;
+    }
 
-    const record: LocalShiftHandoverRecord = {
-      id: `handover-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      cashierName,
-      branchName,
-      expectedCash,
-      countedCash: countedCashValue,
-      variance,
-      pendingOrderCount,
-      overdueTicketCount,
-      exceptionTicketCount,
-      incomingStaffName: incomingStaffName.trim() || null,
-      notes: notes.trim() || null,
-    };
-    const nextRecords = [record, ...records].slice(0, MAX_LOCAL_RECORDS);
-
-    writeLocalRecords(nextRecords);
-    setRecords(nextRecords);
+    setDraftHydrated(false);
+    window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+    setCountedCash("");
+    setIncomingStaffId("");
+    setNotes("");
+    setChecks(copy.checklist.map(() => false));
+    setIsSubmitting(false);
     toast.success(copy.saved);
+    router.refresh();
+  }
+
+  async function performClockAction(
+    action: "clock_in" | "clock_out" | "break_start" | "break_end",
+  ) {
+    if (action === "clock_out" && countedCash.trim().length === 0) {
+      toast.warning(copy.completeDisabled);
+      return;
+    }
+    setIsSubmitting(true);
+    const result = await clockShiftAction({
+      action,
+      openingFloat: action === "clock_in" ? openingFloat : undefined,
+      closingFloat: action === "clock_out" ? countedCash : undefined,
+    });
+    if (!result.ok) {
+      toast.error(result.message);
+      setIsSubmitting(false);
+      return;
+    }
+    setIsSubmitting(false);
+    router.refresh();
   }
 
   async function copySummary() {
@@ -625,9 +771,29 @@ export function ShiftHandoverView({
             </h1>
             <p className="mt-1 text-sm text-slate-500">{copy.description}</p>
           </div>
-          <span className="inline-flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" />
-            {copy.active}
+          <span
+            className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${
+              currentShift?.status === "open"
+                ? "bg-emerald-50 text-emerald-700"
+                : currentShift?.status === "on_break"
+                  ? "bg-amber-50 text-amber-700"
+                  : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            <span
+              className={`h-2 w-2 rounded-full ${
+                currentShift?.status === "open"
+                  ? "bg-emerald-500"
+                  : currentShift?.status === "on_break"
+                    ? "bg-amber-500"
+                    : "bg-slate-400"
+              }`}
+            />
+            {currentShift?.status === "open"
+              ? copy.active
+              : currentShift?.status === "on_break"
+                ? copy.onBreak
+                : copy.noOpenShift}
           </span>
         </div>
 
@@ -652,6 +818,67 @@ export function ShiftHandoverView({
               {formatDateTime(summary.generatedAt, locale)}
             </p>
           </div>
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-4">
+          {!currentShift ? (
+            <label className="block min-w-52">
+              <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+                {copy.openingFloat}
+              </span>
+              <input
+                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-300 focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
+                inputMode="decimal"
+                onChange={(event) =>
+                  setOpeningFloat(normalizeMoneyInput(event.target.value))
+                }
+                placeholder="0"
+                value={openingFloat}
+              />
+            </label>
+          ) : null}
+          {!currentShift ? (
+            <button
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={isSubmitting || openingFloat.trim().length === 0}
+              onClick={() => void performClockAction("clock_in")}
+              type="button"
+            >
+              <Icon className="h-4 w-4" name="clock" />
+              {copy.clockIn}
+            </button>
+          ) : currentShift.status === "on_break" ? (
+            <button
+              className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              disabled={isSubmitting}
+              onClick={() => void performClockAction("break_end")}
+              type="button"
+            >
+              <Icon className="h-4 w-4" name="clock" />
+              {copy.breakEnd}
+            </button>
+          ) : (
+            <>
+              <button
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                disabled={isSubmitting}
+                onClick={() => void performClockAction("break_start")}
+                type="button"
+              >
+                <Icon className="h-4 w-4" name="clock" />
+                {copy.breakStart}
+              </button>
+              <button
+                className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                disabled={isSubmitting || countedCash.trim().length === 0}
+                onClick={() => void performClockAction("clock_out")}
+                type="button"
+              >
+                <Icon className="h-4 w-4" name="replace" />
+                {copy.clockOut}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -708,6 +935,7 @@ export function ShiftHandoverView({
               </span>
               <input
                 className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-300 focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
+                disabled={!currentShift}
                 inputMode="decimal"
                 onChange={(event) =>
                   setCountedCash(normalizeMoneyInput(event.target.value))
@@ -720,12 +948,23 @@ export function ShiftHandoverView({
               <span className="mb-1.5 block text-xs font-semibold text-slate-600">
                 {copy.incomingStaffLabel}
               </span>
-              <input
+              <select
                 className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
-                onChange={(event) => setIncomingStaffName(event.target.value)}
-                placeholder={copy.incomingStaffPlaceholder}
-                value={incomingStaffName}
-              />
+                disabled={!currentShift || availableStaff.length === 0}
+                onChange={(event) => setIncomingStaffId(event.target.value)}
+                value={incomingStaffId}
+              >
+                <option value="">
+                  {availableStaff.length > 0
+                    ? copy.incomingStaffPlaceholder
+                    : copy.noAvailableStaff}
+                </option>
+                {availableStaff.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.displayName}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
 
@@ -735,6 +974,7 @@ export function ShiftHandoverView({
             </span>
             <textarea
               className="min-h-24 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
+              disabled={!currentShift}
               onChange={(event) => setNotes(event.target.value)}
               placeholder={copy.notesPlaceholder}
               value={notes}
@@ -754,6 +994,7 @@ export function ShiftHandoverView({
                   <input
                     checked={checks[index] ?? false}
                     className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                    disabled={!currentShift}
                     onChange={(event) =>
                       updateCheck(index, event.target.checked)
                     }
@@ -769,7 +1010,7 @@ export function ShiftHandoverView({
             <button
               className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
               disabled={!canComplete}
-              onClick={completeHandover}
+              onClick={() => void completeHandover()}
               type="button"
             >
               <Icon className="h-4 w-4" name="save" />
@@ -840,26 +1081,91 @@ export function ShiftHandoverView({
               </h2>
             </div>
             <div className="mt-4 space-y-3">
-              {records.length > 0 ? (
-                records.map((record) => (
+              {recentReports.length > 0 ? (
+                recentReports.map((report) => (
                   <div
                     className="rounded-lg border border-slate-200 bg-slate-50 p-3"
-                    key={record.id}
+                    key={report.id}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <p className="truncate text-sm font-semibold text-slate-900">
-                        {record.cashierName}
+                      <p className="font-mono text-xs font-semibold text-blue-700">
+                        Z-{report.id.slice(-8).toUpperCase()}
                       </p>
                       <span className="text-xs font-medium text-slate-500">
-                        {formatDateTime(record.createdAt, locale)}
+                        {formatDateTime(report.cutoffAt, locale)}
                       </span>
                     </div>
-                    <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
-                      <span>{copy.variance}</span>
-                      <span className="font-semibold text-slate-900">
-                        {formatMoney(record.variance, currency, locale)}
+                    <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                      <span className="text-slate-500">{copy.grossSales}</span>
+                      <span className="text-right font-semibold text-slate-900">
+                        {formatMoney(toNumber(report.grossSales), report.currency, locale)}
+                      </span>
+                      <span className="text-slate-500">{copy.discounts}</span>
+                      <span className="text-right font-semibold text-slate-900">
+                        {formatMoney(
+                          toNumber(report.discountAmount),
+                          report.currency,
+                          locale,
+                        )}
+                      </span>
+                      <span className="text-slate-500">{copy.refunds}</span>
+                      <span className="text-right font-semibold text-red-700">
+                        {formatMoney(toNumber(report.refundAmount), report.currency, locale)}
+                      </span>
+                      <span className="text-slate-500">{copy.corrections}</span>
+                      <span className="text-right font-semibold text-slate-900">
+                        {formatMoney(toNumber(report.correctionAmount), report.currency, locale)}
+                      </span>
+                      <span className="text-slate-500">{copy.netSales}</span>
+                      <span className="text-right font-semibold text-slate-900">
+                        {formatMoney(toNumber(report.netSales), report.currency, locale)}
                       </span>
                     </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-200 pt-3 text-center text-xs">
+                      <div>
+                        <p className="text-slate-500">{copy.expectedCash}</p>
+                        <p className="mt-1 font-semibold text-slate-900">
+                          {formatMoney(toNumber(report.expectedCash), report.currency, locale)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">{copy.cashCounted}</p>
+                        <p className="mt-1 font-semibold text-slate-900">
+                          {formatMoney(toNumber(report.countedCash), report.currency, locale)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-slate-500">{copy.variance}</p>
+                        <p className="mt-1 font-semibold text-slate-900">
+                          {formatMoney(toNumber(report.variance), report.currency, locale)}
+                        </p>
+                      </div>
+                    </div>
+                    {report.paymentBreakdown.length > 0 ? (
+                      <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-3 text-xs">
+                        {report.paymentBreakdown.map((payment) => (
+                          <div
+                            className="flex items-center justify-between gap-3"
+                            key={`${payment.method}:${payment.provider ?? "default"}`}
+                          >
+                            <span className="truncate text-slate-500">
+                              {PAYMENT_METHOD_LABELS[
+                                payment.provider ?? payment.method
+                              ]?.[resolvedLocale] ??
+                                payment.provider ??
+                                payment.method}
+                            </span>
+                            <span className="font-semibold text-slate-900">
+                              {formatMoney(
+                                toNumber(payment.netAmount),
+                                report.currency,
+                                locale,
+                              )}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
                 ))
               ) : (

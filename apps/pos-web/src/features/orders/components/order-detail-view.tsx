@@ -9,15 +9,19 @@ import {
   DialogTitle,
 } from "@cleanhub/ui";
 import type {
+  PosCatalogService,
   PosOrderDetail,
   PosMobileMoneyProvider,
+  PosPaymentAdjustment,
   PosPaymentTransaction,
 } from "@cleanhub/api-client";
+import { buildPosReceiptText, type PrintLocale } from "@cleanhub/hardware";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { PosBreadcrumb } from "@/components/app-shell";
 import { customerDetailPath, posRoutes } from "@/config";
+import { PrintJobControl } from "@/features/hardware/components";
 
 import {
   MOBILE_MONEY_PROVIDER_LABELS,
@@ -38,9 +42,12 @@ import { OrderActionsPanel } from "./order-actions-panel";
 import { OrderPaymentStatusBadge, OrderStatusBadge } from "./order-badges";
 import { OrderInfoEditor } from "./order-info-editor";
 import { OrderItemsManager } from "./order-items-manager";
+import { OrderPaymentAdjustments } from "./order-payment-adjustments";
 
 type OrderDetailViewProps = {
   canResolveManualPayments: boolean;
+  adjustments: PosPaymentAdjustment[];
+  catalog: PosCatalogService[];
   order: PosOrderDetail;
   payments: PosPaymentTransaction[];
   source?: {
@@ -53,11 +60,15 @@ type OrderDetailViewProps = {
 
 export function OrderDetailView({
   canResolveManualPayments,
+  adjustments,
+  catalog,
   order,
   payments,
   source,
 }: OrderDetailViewProps) {
+  const { locale } = useTranslation();
   const breadcrumbItems = buildOrderBreadcrumbItems(order, source);
+  const receiptContent = buildOrderReceiptContent(order, payments, locale);
 
   return (
     <section>
@@ -74,7 +85,15 @@ export function OrderDetailView({
               {ORDER_TYPE_LABELS[order.orderType]}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-start gap-2">
+            <PrintJobControl
+              canReprint={canResolveManualPayments}
+              content={receiptContent}
+              documentType="receipt"
+              entityId={order.id}
+              initialLabel="打印小票"
+              title={`RC-${order.id.slice(-8).toUpperCase()}`}
+            />
             <OrderStatusBadge status={order.status} />
             <OrderPaymentStatusBadge status={order.paymentStatus} />
           </div>
@@ -84,17 +103,115 @@ export function OrderDetailView({
       <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="grid gap-4">
           <OrderInfoEditor order={order} />
-          <OrderItemsManager order={order} />
+          <OrderItemsManager
+            canManageSensitiveOperations={canResolveManualPayments}
+            catalog={catalog.filter((service) => service.currency === order.currency)}
+            order={order}
+          />
           <OrderPaymentsCard
             canResolveManualPayments={canResolveManualPayments}
             orderId={order.id}
             payments={payments}
           />
+          <OrderPaymentAdjustments
+            adjustments={adjustments}
+            canManage={canResolveManualPayments}
+            order={order}
+            payments={payments}
+          />
         </div>
-        <OrderActionsPanel order={order} payments={payments} />
+        <OrderActionsPanel
+          canManageSensitiveOperations={canResolveManualPayments}
+          order={order}
+          payments={payments}
+        />
       </div>
     </section>
   );
+}
+
+function buildOrderReceiptContent(
+  order: PosOrderDetail,
+  payments: PosPaymentTransaction[],
+  locale: string,
+): string {
+  const items = order.items.map((item) => {
+    const quantity =
+      item.pricingUnit === "per_kg"
+        ? Number(item.weight ?? item.quantity)
+        : Number(item.quantity);
+    const details = [
+      item.pricingUnit === "per_kg"
+        ? `计量 ${item.weight ?? item.quantity} kg${item.bagCount ? ` / ${item.bagCount} 袋` : ""}`
+        : `计量 ${item.quantity} 件`,
+      `成交价 ${formatOrderMoney(item.chargedUnitAmount, order.currency)}`,
+      item.standardUnitAmount !== item.chargedUnitAmount
+        ? `标准价 ${formatOrderMoney(item.standardUnitAmount, order.currency)}`
+        : null,
+      item.itemColor ? `颜色 ${item.itemColor}` : null,
+      item.defectNotes ? `瑕疵 ${item.defectNotes}` : null,
+      item.specialRequest ? `要求 ${item.specialRequest}` : null,
+      item.itemIdentifier ? `标识 ${item.itemIdentifier}` : null,
+    ].filter((value): value is string => Boolean(value));
+
+    return {
+      name: item.itemName,
+      quantity: Number.isFinite(quantity) ? quantity : 0,
+      unitAmountMinor: toMinorUnits(item.chargedUnitAmount, order.currency),
+      totalAmountMinor: toMinorUnits(item.lineAmount, order.currency),
+      note: details.length > 0 ? details.join("; ") : undefined,
+    };
+  });
+  const subtotalMinor = items.reduce(
+    (total, item) => total + item.totalAmountMinor,
+    0,
+  );
+  const totalMinor = toMinorUnits(order.totalAmount, order.currency);
+  const paymentMethod = [
+    ...new Set(
+      payments
+        .filter((payment) => payment.paymentStatus === "paid")
+        .map((payment) =>
+          getPaymentDisplayName(payment.paymentMethod, payment.provider),
+        ),
+    ),
+  ].join(" / ");
+
+  return buildPosReceiptText(
+    {
+      receiptNo: `RC-${order.id.slice(-8).toUpperCase()}`,
+      orderCode: displayOrderCode(order.id),
+      issuedAt: order.paidAt ?? order.updatedAt,
+      currency: order.currency,
+      merchantName: "CleanHub",
+      customerName: order.customerName,
+      items,
+      subtotalMinor,
+      discountMinor: Math.max(0, subtotalMinor - totalMinor),
+      totalMinor,
+      paidMinor: toMinorUnits(order.paidAmount, order.currency),
+      balanceMinor: Math.max(
+        0,
+        totalMinor - toMinorUnits(order.paidAmount, order.currency),
+      ),
+      paymentMethod: paymentMethod || undefined,
+      footer: "Thank you",
+    },
+    { locale: toPrintLocale(locale) },
+  );
+}
+
+function toMinorUnits(value: string, currency: string): number {
+  const fractionDigits = new Intl.NumberFormat("en", {
+    style: "currency",
+    currency,
+  }).resolvedOptions().maximumFractionDigits ?? 2;
+  return Math.round(Number(value) * 10 ** fractionDigits);
+}
+
+function toPrintLocale(locale: string): PrintLocale {
+  if (locale === "zh-CN" || locale === "fr") return locale;
+  return "en";
 }
 
 function buildOrderBreadcrumbItems(

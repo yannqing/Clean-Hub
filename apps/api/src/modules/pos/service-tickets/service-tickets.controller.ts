@@ -23,6 +23,7 @@ import {
   createServiceTicketBodySchema,
   createServiceTicketItemBodySchema,
   serviceTicketItemParamsSchema,
+  serviceTicketDeleteQuerySchema,
   serviceTicketListQuerySchema,
   serviceTicketOverviewQuerySchema,
   serviceTicketParamsSchema,
@@ -142,11 +143,13 @@ export async function changeServiceTicketStatusController(
 
 export async function deleteServiceTicketController(c: Context<AppBindings>) {
   const params = serviceTicketParamsSchema.parse(c.req.param());
+  const query = serviceTicketDeleteQuerySchema.parse(c.req.query());
 
   try {
     await deletePosServiceTicket(
       c.get("authContext"),
       params.ticketId,
+      query.reason,
       getRequestMeta(c),
     );
     return c.body(null, 204);
@@ -251,11 +254,16 @@ export async function deleteServiceTicketItemController(
   c: Context<AppBindings>,
 ) {
   const params = serviceTicketItemParamsSchema.parse(c.req.param());
+  const query = serviceTicketDeleteQuerySchema.parse(c.req.query());
 
   try {
     await deletePosServiceTicketItem(
       c.get("authContext"),
-      { ticketId: params.ticketId, itemId: params.itemId },
+      {
+        ticketId: params.ticketId,
+        itemId: params.itemId,
+        reason: query.reason,
+      },
       getRequestMeta(c),
     );
     return c.body(null, 204);

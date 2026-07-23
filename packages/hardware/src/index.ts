@@ -6,6 +6,207 @@ export type PrintJob = {
   content: string;
 };
 
+export type PosHardwareCapabilities = {
+  scanner: boolean;
+  printer: boolean;
+  cashDrawer: boolean;
+  secureTerminalCredential: boolean;
+};
+
+export type PosPrinterDevice = {
+  id: string;
+  name: string;
+  isDefault: boolean;
+};
+
+export type PosPrintJobStatus = "pending" | "printing" | "printed" | "failed";
+
+export type PosPrintRequest = PrintJob & {
+  title?: string;
+  copies?: number;
+};
+
+export type PosPrintResult = {
+  jobId: string;
+  status: PosPrintJobStatus;
+  error?: string;
+};
+
+export type PosDrawerOpenRequest = {
+  reason: string;
+};
+
+export type PosScanEvent = {
+  value: string;
+  symbology?: string;
+  scannedAt: string;
+};
+
+export class PosHardwareUnavailableError extends Error {
+  readonly code = "POS_HARDWARE_UNAVAILABLE";
+
+  constructor(
+    readonly capability: "scanner" | "printer" | "cashDrawer",
+    message: string,
+  ) {
+    super(message);
+    this.name = "PosHardwareUnavailableError";
+  }
+}
+
+export type PosScannerAdapter = {
+  isAvailable(): boolean | Promise<boolean>;
+};
+
+export type PosPrinterAdapter = {
+  isAvailable(): boolean | Promise<boolean>;
+  listPrinters(): Promise<PosPrinterDevice[]>;
+  print(request: PosPrintRequest): Promise<PosPrintResult>;
+};
+
+export type PosCashDrawerAdapter = {
+  isAvailable(): boolean | Promise<boolean>;
+  open(request: PosDrawerOpenRequest): Promise<void>;
+};
+
+export type PosHardwareRuntime = {
+  getCapabilities(): Promise<PosHardwareCapabilities>;
+  listPrinters(): Promise<PosPrinterDevice[]>;
+  print(request: PosPrintRequest): Promise<PosPrintResult>;
+  openCashDrawer(request: PosDrawerOpenRequest): Promise<void>;
+};
+
+export function createUnavailablePosScannerAdapter(
+  reason = "No scanner adapter is configured for this terminal.",
+): PosScannerAdapter {
+  void reason;
+  return { isAvailable: () => false };
+}
+
+export function createUnavailablePosPrinterAdapter(
+  reason = "No printer adapter is configured for this terminal.",
+): PosPrinterAdapter {
+  return {
+    isAvailable: () => false,
+    async listPrinters() {
+      return [];
+    },
+    async print(request) {
+      return {
+        jobId: request.id,
+        status: "failed",
+        error: reason,
+      };
+    },
+  };
+}
+
+export function createUnavailablePosCashDrawerAdapter(
+  reason = "No cash-drawer adapter is configured for this terminal.",
+): PosCashDrawerAdapter {
+  return {
+    isAvailable: () => false,
+    async open(request) {
+      if (!request.reason.trim()) {
+        throw new Error("A reason is required to open the cash drawer.");
+      }
+      throw new PosHardwareUnavailableError("cashDrawer", reason);
+    },
+  };
+}
+
+export function createPosHardwareRuntime(input: {
+  scanner?: PosScannerAdapter;
+  printer?: PosPrinterAdapter;
+  cashDrawer?: PosCashDrawerAdapter;
+  secureTerminalCredential(): boolean | Promise<boolean>;
+}): PosHardwareRuntime {
+  const scanner = input.scanner ?? createUnavailablePosScannerAdapter();
+  const printer = input.printer ?? createUnavailablePosPrinterAdapter();
+  const cashDrawer =
+    input.cashDrawer ?? createUnavailablePosCashDrawerAdapter();
+
+  return {
+    async getCapabilities() {
+      const [scannerAvailable, printerAvailable, cashDrawerAvailable, secure] =
+        await Promise.all([
+          scanner.isAvailable(),
+          printer.isAvailable(),
+          cashDrawer.isAvailable(),
+          input.secureTerminalCredential(),
+        ]);
+      return {
+        scanner: scannerAvailable,
+        printer: printerAvailable,
+        cashDrawer: cashDrawerAvailable,
+        secureTerminalCredential: secure,
+      };
+    },
+    listPrinters: () => printer.listPrinters(),
+    print: (request) => printer.print(request),
+    openCashDrawer: (request) => cashDrawer.open(request),
+  };
+}
+
+export type PosReceiptLine = {
+  name: string;
+  quantity: number;
+  unitAmountMinor: number;
+  totalAmountMinor: number;
+  note?: string;
+};
+
+export type PosReceiptDocument = {
+  receiptNo: string;
+  orderCode: string;
+  issuedAt: string | Date;
+  currency: string;
+  merchantName: string;
+  branchName?: string;
+  customerName?: string;
+  items: PosReceiptLine[];
+  subtotalMinor: number;
+  discountMinor?: number;
+  totalMinor: number;
+  paidMinor: number;
+  balanceMinor: number;
+  paymentMethod?: string;
+  footer?: string;
+};
+
+export function buildPosReceiptText(
+  receipt: PosReceiptDocument,
+  options: DeliveryPrintTemplateOptions = {},
+): string {
+  return buildPosReceiptLines(receipt, options).join("\n");
+}
+
+export function buildPosReceiptEscPos(
+  receipt: PosReceiptDocument,
+  options: DeliveryPrintTemplateOptions = {},
+): Uint8Array {
+  return escPosDocument(buildPosReceiptLines(receipt, options), {
+    cut: true,
+    emphasizedTitle: true,
+  });
+}
+
+export function createPosReceiptPrintRequest(input: {
+  id: string;
+  printerId: string;
+  receipt: PosReceiptDocument;
+  copies?: number;
+  options?: DeliveryPrintTemplateOptions;
+}): PosPrintRequest {
+  return {
+    id: input.id,
+    printerId: input.printerId,
+    title: input.receipt.receiptNo,
+    content: buildPosReceiptText(input.receipt, input.options),
+    copies: input.copies,
+  };
+}
+
 export type PortablePrinterConnectionState =
   | "disconnected"
   | "discovering"
@@ -177,6 +378,51 @@ const receiptLabels = {
   },
 } as const satisfies Record<PrintLocale, Record<string, string>>;
 
+const posReceiptLabels = {
+  en: {
+    title: "RECEIPT",
+    receipt: "Receipt",
+    order: "Order",
+    customer: "Customer",
+    items: "Items",
+    subtotal: "Subtotal",
+    discount: "Discount",
+    total: "Total",
+    paid: "Paid",
+    balance: "Balance",
+    payment: "Payment",
+    issued: "Issued",
+  },
+  fr: {
+    title: "RECU",
+    receipt: "Recu",
+    order: "Commande",
+    customer: "Client",
+    items: "Articles",
+    subtotal: "Sous-total",
+    discount: "Remise",
+    total: "Total",
+    paid: "Paye",
+    balance: "Solde",
+    payment: "Paiement",
+    issued: "Emis",
+  },
+  "zh-CN": {
+    title: "收据",
+    receipt: "收据号",
+    order: "订单",
+    customer: "客户",
+    items: "项目",
+    subtotal: "小计",
+    discount: "优惠",
+    total: "合计",
+    paid: "已付",
+    balance: "余额",
+    payment: "支付方式",
+    issued: "开具时间",
+  },
+} as const satisfies Record<PrintLocale, Record<string, string>>;
+
 const ESC = 0x1b;
 const GS = 0x1d;
 const LF = 0x0a;
@@ -340,6 +586,60 @@ function buildDeliveryReceiptLines(
     task.note ? keyValue(labels.note, task.note) : undefined,
     rule(width),
     keyValue(labels.printed, formatDateTime(options.now ?? new Date(), options.locale)),
+  ]);
+}
+
+function buildPosReceiptLines(
+  receipt: PosReceiptDocument,
+  options: DeliveryPrintTemplateOptions,
+): string[] {
+  const width = options.paperWidth ?? 32;
+  const locale = options.locale ?? "en";
+  const labels = posReceiptLabels[locale];
+  const amountFormatter = new Intl.NumberFormat(toIntlLocale(locale), {
+    style: "currency",
+    currency: receipt.currency,
+  });
+  const fractionDigits =
+    amountFormatter.resolvedOptions().maximumFractionDigits ?? 2;
+  const minorUnitDivisor = 10 ** fractionDigits;
+  const amount = (value: number) =>
+    amountFormatter.format(value / minorUnitDivisor);
+
+  return compactLines([
+    center(receipt.merchantName, width),
+    center(labels.title, width),
+    receipt.branchName ? center(receipt.branchName, width) : undefined,
+    rule(width),
+    keyValue(labels.receipt, receipt.receiptNo),
+    keyValue(labels.order, receipt.orderCode),
+    receipt.customerName
+      ? keyValue(labels.customer, receipt.customerName)
+      : undefined,
+    keyValue(labels.issued, formatDateTime(receipt.issuedAt, locale)),
+    rule(width),
+    labels.items,
+    ...receipt.items.flatMap((item) =>
+      wrapText(
+        `${item.name} x${item.quantity} ${amount(item.totalAmountMinor)}${
+          item.note ? ` (${item.note})` : ""
+        }`,
+        width,
+      ),
+    ),
+    rule(width),
+    keyValue(labels.subtotal, amount(receipt.subtotalMinor)),
+    receipt.discountMinor
+      ? keyValue(labels.discount, `-${amount(receipt.discountMinor)}`)
+      : undefined,
+    keyValue(labels.total, amount(receipt.totalMinor)),
+    keyValue(labels.paid, amount(receipt.paidMinor)),
+    keyValue(labels.balance, amount(receipt.balanceMinor)),
+    receipt.paymentMethod
+      ? keyValue(labels.payment, receipt.paymentMethod)
+      : undefined,
+    receipt.footer ? rule(width) : undefined,
+    receipt.footer ? center(receipt.footer, width) : undefined,
   ]);
 }
 

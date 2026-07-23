@@ -15,6 +15,9 @@ function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 422 | 500 {
     case "FORBIDDEN":
     case "FEATURE_DISABLED":
     case "ACCOUNT_LOCKED":
+    case "POS_TERMINAL_CREDENTIAL_INVALID":
+    case "POS_TERMINAL_DISABLED":
+    case "POS_TERMINAL_ENROLLMENT_REQUIRED":
       return 403;
     case "PASSWORD_POLICY_VIOLATION":
     case "TENANT_CODE_REQUIRED":
