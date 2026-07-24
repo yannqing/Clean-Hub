@@ -78,6 +78,280 @@ export type TenantMessages = {
     notFoundDescription: string;
   };
 
+  navigationPlaceholders: {
+    orders: {
+      title: string;
+      description: string;
+    };
+    customers: {
+      title: string;
+      description: string;
+    };
+    products: {
+      title: string;
+      description: string;
+    };
+  };
+
+  orders: {
+    title: string;
+    description: string;
+    metrics: {
+      label: string;
+      totalOrders: string;
+      totalAmount: string;
+      paidAmount: string;
+      pendingPayment: string;
+    };
+    toolbar: {
+      statusLabel: string;
+      allStatusesOption: string;
+      dateLabel: string;
+      dateOptions: {
+        today: string;
+        last7Days: string;
+        last30Days: string;
+        last365Days: string;
+        all: string;
+      };
+      searchLabel: string;
+      searchPlaceholder: string;
+      settingsLabel: string;
+      sortTitle: string;
+      columnsTitle: string;
+      sortOptions: {
+        createdDesc: string;
+        createdAsc: string;
+        amountDesc: string;
+        amountAsc: string;
+      };
+    };
+    listTitle: string;
+    totalResults: string;
+    columns: {
+      order: string;
+      customer: string;
+      branch: string;
+      type: string;
+      items: string;
+      amount: string;
+      payment: string;
+      status: string;
+      createdAt: string;
+    };
+    typeLabels: {
+      ticket: string;
+      manual: string;
+    };
+    statusLabels: {
+      draft: string;
+      received: string;
+      paid: string;
+      delivered: string;
+      cancelled: string;
+    };
+    paymentStatusLabels: {
+      unpaid: string;
+      paid: string;
+      partial: string;
+      refunded: string;
+    };
+    paidAmount: string;
+    unknownCustomer: string;
+    branchFallback: string;
+    emptyTitle: string;
+    emptyDescription: string;
+    loadError: string;
+    overviewError: string;
+    pageSummary: string;
+  };
+
+  customers: {
+    title: string;
+    metrics: {
+      label: string;
+      totalCustomers: string;
+      activeCustomers: string;
+      disabledCustomers: string;
+      linkedAccounts: string;
+    };
+    toolbar: {
+      statusLabel: string;
+      allStatusesOption: string;
+      dateLabel: string;
+      dateOptions: {
+        today: string;
+        last7Days: string;
+        last30Days: string;
+        last365Days: string;
+        all: string;
+      };
+      searchLabel: string;
+      searchPlaceholder: string;
+      settingsLabel: string;
+      sortTitle: string;
+      columnsTitle: string;
+      sortOptions: {
+        createdDesc: string;
+        createdAsc: string;
+        nameAsc: string;
+        nameDesc: string;
+      };
+    };
+    columns: {
+      customer: string;
+      account: string;
+      phone: string;
+      email: string;
+      status: string;
+      createdAt: string;
+    };
+    statusLabels: {
+      active: string;
+      disabled: string;
+    };
+    notProvided: string;
+    emptyTitle: string;
+    emptyDescription: string;
+    filteredEmptyTitle: string;
+    filteredEmptyDescription: string;
+    loadError: string;
+    pageSummary: string;
+  };
+
+  products: {
+    title: string;
+    metrics: {
+      label: string;
+      totalProducts: string;
+      activeProducts: string;
+      totalSkus: string;
+      lowStockSkus: string;
+    };
+    toolbar: {
+      statusLabel: string;
+      allStatusesOption: string;
+      importAction: string;
+      exportAction: string;
+      addProductAction: string;
+      dateLabel: string;
+      dateOptions: {
+        today: string;
+        last7Days: string;
+        last30Days: string;
+        last365Days: string;
+        all: string;
+      };
+      searchLabel: string;
+      searchPlaceholder: string;
+      settingsLabel: string;
+      sortTitle: string;
+      columnsTitle: string;
+      sortOptions: {
+        createdDesc: string;
+        createdAsc: string;
+        nameAsc: string;
+        nameDesc: string;
+        stockDesc: string;
+        stockAsc: string;
+      };
+    };
+    create: {
+      title: string;
+      description: string;
+      backToProducts: string;
+      requiredHint: string;
+      saveProduct: string;
+      saveUnavailable: string;
+      sections: {
+        basic: {
+          title: string;
+          description: string;
+        };
+        sku: {
+          title: string;
+          description: string;
+        };
+        pricing: {
+          title: string;
+          description: string;
+        };
+        inventory: {
+          title: string;
+          description: string;
+        };
+      };
+      fields: {
+        name: string;
+        category: string;
+        brand: string;
+        status: string;
+        description: string;
+        skuCode: string;
+        barcode: string;
+        variantName: string;
+        unitOfMeasure: string;
+        unitsPerSale: string;
+        salePrice: string;
+        currency: string;
+        referenceCost: string;
+        trackInventory: string;
+        openingStock: string;
+        reorderPoint: string;
+        allowNegativeStock: string;
+        allowOfflineSale: string;
+      };
+      placeholders: {
+        name: string;
+        category: string;
+        brand: string;
+        description: string;
+        skuCode: string;
+        barcode: string;
+        variantName: string;
+        currency: string;
+      };
+      unitOptions: {
+        piece: string;
+        box: string;
+        bottle: string;
+        pack: string;
+      };
+    };
+    columns: {
+      product: string;
+      category: string;
+      sku: string;
+      price: string;
+      inventory: string;
+      status: string;
+      createdAt: string;
+    };
+    statusLabels: {
+      active: string;
+      inactive: string;
+    };
+    skuCount: string;
+    stockOnHand: string;
+    stockReserved: string;
+    lowStock: string;
+    noBrand: string;
+    noCategory: string;
+    noSku: string;
+    noBarcode: string;
+    noPrice: string;
+    inventoryNotTracked: string;
+    featureDisabledTitle: string;
+    featureDisabledDescription: string;
+    emptyTitle: string;
+    emptyDescription: string;
+    filteredEmptyTitle: string;
+    filteredEmptyDescription: string;
+    loadError: string;
+    overviewError: string;
+    pageSummary: string;
+  };
+
   branches: {
     // 三页共享
     eyebrow: string;
@@ -139,101 +413,38 @@ export type TenantMessages = {
     };
   };
 
-  users: {
-    eyebrow: string;
-    title: string;
-    addMember: string;
-    searchPlaceholder: string;
-    noMembers: string;
-    columns: {
-      name: string;
-      email: string;
-      role: string;
-      branches: string;
-      status: string;
-      lastLogin: string;
-      created: string;
-      actions: string;
-    };
-    roleLabels: {
-      owner: string;
-      manager: string;
-      cashier: string;
-    };
-    actions: {
-      resetPin: string;
-      edit: string;
-    };
-    detail: {
-      title: string;
-      labels: {
-        email: string;
-        phone: string;
-        role: string;
-        branches: string;
-        status: string;
-        language: string;
-        lastLogin: string;
-        updated: string;
-      };
-    };
-    create: {
-      title: string;
-      description: string;
-      labels: {
-        displayName: string;
-        email: string;
-        phone: string;
-        role: string;
-        branches: string;
-        initialPin: string;
-      };
-      creatingMember: string;
-      createMember: string;
-    };
-    edit: {
-      title: string;
-      description: string;
-      loadingCurrent: string;
-      labels: {
-        displayName: string;
-        phone: string;
-        role: string;
-        branches: string;
-      };
-      keepCurrentRole: string;
-    };
-    disable: {
-      title: string;
-      description: string;
-      disabling: string;
-      action: string;
-    };
-    enable: {
-      title: string;
-      description: string;
-      enabling: string;
-      action: string;
-    };
-    resetPin: {
-      title: string;
-      description: string;
-      reason: string;
-      reasonPlaceholder: string;
-      resetting: string;
-      action: string;
-    };
-    temporaryPin: {
-      title: string;
-      description: string;
-      done: string;
-    };
-  };
-
   services: {
     eyebrow: string;
     title: string;
     searchPlaceholder: string;
+    metrics: {
+      label: string;
+      totalServices: string;
+      activeServices: string;
+      inactiveServices: string;
+      businessLines: string;
+    };
+    toolbar: {
+      filterLabel: string;
+      dateLabel: string;
+      dateOptions: {
+        today: string;
+        last7Days: string;
+        last30Days: string;
+        last365Days: string;
+        all: string;
+      };
+      searchLabel: string;
+      settingsLabel: string;
+      sortTitle: string;
+      columnsTitle: string;
+      sortOptions: {
+        createdDesc: string;
+        createdAsc: string;
+        nameAsc: string;
+        nameDesc: string;
+      };
+    };
     formLabels: {
       search: string;
       businessLine: string;
@@ -245,25 +456,41 @@ export type TenantMessages = {
       createService: string;
       updateService: string;
       cancelEdit: string;
+      saving: string;
     };
     columns: {
       service: string;
       businessLine: string;
       pricing: string;
       status: string;
+      createdAt: string;
       actions: string;
     };
     actions: {
+      add: string;
+      menu: string;
       activate: string;
       deactivate: string;
       delete: string;
       edit: string;
     };
     empty: string;
+    emptyDescription: string;
+    filteredEmptyTitle: string;
+    filteredEmptyDescription: string;
     deletedToast: string;
+    savedToast: string;
+    statusUpdatedToast: string;
     formFallbackError: string;
     requestFailed: string;
     versionConflict: string;
+    pageSummary: string;
+    formDialog: {
+      createTitle: string;
+      createDescription: string;
+      editTitle: string;
+      editDescription: string;
+    };
     delete: {
       title: string;
       description: string;
@@ -472,6 +699,56 @@ export type TenantMessages = {
   overview: {
     eyebrow: string;
     description: string;
+    welcomeTitle: string;
+    searchLabel: string;
+    searchPlaceholder: string;
+    searchComposer: {
+      addContextLabel: string;
+      contextMenuLabel: string;
+      sendLabel: string;
+      recommendationsTitle: string;
+      contextTypes: {
+        file: {
+          label: string;
+          description: string;
+        };
+        mention: {
+          label: string;
+          description: string;
+        };
+        branch: {
+          label: string;
+          description: string;
+        };
+        user: {
+          label: string;
+          description: string;
+        };
+      };
+      recommendations: string[];
+    };
+    quickEntries: {
+      branches: {
+        title: string;
+        description: string;
+      };
+      services: {
+        title: string;
+        description: string;
+      };
+      prices: {
+        title: string;
+        description: string;
+      };
+      hardware: {
+        title: string;
+        description: string;
+      };
+      reports: {
+        title: string;
+        description: string;
+      };
+    };
     metrics: {
       visibleBranches: string;
       shown: string;
@@ -489,7 +766,6 @@ export type TenantMessages = {
       createBranch: string;
       settings: string;
       branches: string;
-      users: string;
       services: string;
       prices: string;
       reports: string;

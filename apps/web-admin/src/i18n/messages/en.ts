@@ -27,6 +27,13 @@ export const enMessages: WebAdminMessages = {
       title: "Store Operations",
       description:
         "Manage branches, staff, service configuration, reports, and tenant settings.",
+      header: {
+        searchLabel: "Search the tenant workspace",
+        searchPlaceholder: "Search branches, users, or services...",
+        assistantLabel: "AI assistant",
+        messagesLabel: "Messages",
+        accountLabel: "Signed-in user",
+      },
     },
   },
   sidebar: {
@@ -81,8 +88,10 @@ export const enMessages: WebAdminMessages = {
       {
         title: "Main",
         items: [
-          { label: "Dashboard", href: webAdminRoutes.tenant.home },
-          { label: "User Management", href: webAdminRoutes.tenant.users },
+          { label: "Home", href: webAdminRoutes.tenant.home },
+          { label: "Orders", href: webAdminRoutes.tenant.orders },
+          { label: "Customers", href: webAdminRoutes.tenant.customers },
+          { label: "Products", href: webAdminRoutes.tenant.products },
           { label: "Reports", href: webAdminRoutes.tenant.reports },
         ],
       },
@@ -92,10 +101,6 @@ export const enMessages: WebAdminMessages = {
           {
             label: "Branch Settings",
             href: webAdminRoutes.tenant.config.branches,
-          },
-          {
-            label: "Service Catalog",
-            href: webAdminRoutes.tenant.config.services,
           },
           { label: "Price Books", href: webAdminRoutes.tenant.config.prices },
           {

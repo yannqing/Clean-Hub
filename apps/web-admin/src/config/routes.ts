@@ -26,8 +26,11 @@ export const webAdminRoutes = {
   tenant: {
     home: "/tenant",
     profile: "/tenant/profile",
+    orders: "/tenant/orders",
+    customers: "/tenant/customers",
+    products: "/tenant/products",
+    newProduct: "/tenant/products/new",
     branches: "/tenant/branches",
-    users: "/tenant/users",
     services: "/tenant/services",
     prices: "/tenant/prices",
     hardware: "/tenant/hardware",

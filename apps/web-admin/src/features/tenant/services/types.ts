@@ -14,6 +14,7 @@ export type ServiceSummary = {
   categoryId: string | null;
   pricingUnit: ServicePricingUnit;
   status: ServiceStatus;
+  createdAt: string;
   updatedAt: string;
   version: number;
 };

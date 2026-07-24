@@ -24,6 +24,13 @@ export const zhCNMessages: WebAdminMessages = {
       eyebrow: "租户管理",
       title: "门店运营",
       description: "管理门店、员工、服务配置、报表与租户设置。",
+      header: {
+        searchLabel: "搜索租户工作区",
+        searchPlaceholder: "搜索门店、用户或服务...",
+        assistantLabel: "智能助手",
+        messagesLabel: "消息",
+        accountLabel: "当前登录用户",
+      },
     },
   },
   sidebar: {
@@ -63,8 +70,10 @@ export const zhCNMessages: WebAdminMessages = {
       {
         title: "主菜单",
         items: [
-          { label: "仪表盘", href: webAdminRoutes.tenant.home },
-          { label: "用户管理", href: webAdminRoutes.tenant.users },
+          { label: "主页", href: webAdminRoutes.tenant.home },
+          { label: "订单", href: webAdminRoutes.tenant.orders },
+          { label: "顾客", href: webAdminRoutes.tenant.customers },
+          { label: "产品", href: webAdminRoutes.tenant.products },
           { label: "报表", href: webAdminRoutes.tenant.reports },
         ],
       },
@@ -72,7 +81,6 @@ export const zhCNMessages: WebAdminMessages = {
         title: "配置管理",
         items: [
           { label: "门店设置", href: webAdminRoutes.tenant.config.branches },
-          { label: "服务目录", href: webAdminRoutes.tenant.config.services },
           { label: "价格本", href: webAdminRoutes.tenant.config.prices },
           { label: "硬件设备", href: webAdminRoutes.tenant.config.hardware },
           { label: "通知", href: webAdminRoutes.tenant.config.notifications },
@@ -118,7 +126,8 @@ export const zhCNMessages: WebAdminMessages = {
     tenantCodeLabel: "门店编码",
     tenantCodePlaceholder: "例如：SN-0042",
     tenantCodeHint: "CleanHub 分配给门店的唯一编码，门店管理员登录时必填。",
-    platformHint: "平台管理员使用邮箱或手机号并输入密码即可登录，无需填写门店编码。",
+    platformHint:
+      "平台管理员使用邮箱或手机号并输入密码即可登录，无需填写门店编码。",
     identifierLabel: "邮箱或手机号",
     identifierPlaceholder: "admin@cleanhub.local",
     passwordLabel: "密码",
@@ -139,7 +148,8 @@ export const zhCNMessages: WebAdminMessages = {
     },
     redirect: {
       sessionExpired: "登录状态已过期，请重新登录。",
-      tenantAccessDenied: "该账号无权访问租户管理后台，请使用业主或经理账号登录。",
+      tenantAccessDenied:
+        "该账号无权访问租户管理后台，请使用业主或经理账号登录。",
     },
   },
   saas: saasMessagesZhCN satisfies SaasMessages,

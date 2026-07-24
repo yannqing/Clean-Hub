@@ -16,6 +16,16 @@ type ShellCopy = {
   description: string;
 };
 
+type TenantShellCopy = ShellCopy & {
+  header: {
+    searchLabel: string;
+    searchPlaceholder: string;
+    assistantLabel: string;
+    messagesLabel: string;
+    accountLabel: string;
+  };
+};
+
 type SidebarSection = {
   title: string;
   items: { label: string; href: string }[];
@@ -63,7 +73,7 @@ type AuthCopy = {
 export type WebAdminMessages = {
   shell: {
     saas: ShellCopy;
-    tenant: ShellCopy;
+    tenant: TenantShellCopy;
   };
   sidebar: {
     saas: SidebarSection[];
