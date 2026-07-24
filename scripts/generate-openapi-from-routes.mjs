@@ -4,7 +4,10 @@ import { fileURLToPath } from "node:url";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const appPath = resolve(rootDir, "apps/api/src/app.ts");
-const outputPath = resolve(rootDir, "docs/04-technical/api/cleanhub.openapi.json");
+const outputPath = resolve(
+  rootDir,
+  "docs/04-technical/api/cleanhub.openapi.json",
+);
 
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
 const PUBLIC_ROUTES = new Set([
@@ -149,7 +152,12 @@ const SCHEMAS = {
       email: { type: "string", format: "email", maxLength: 320 },
       phone: { type: "string", minLength: 3, maxLength: 32 },
       displayName: { type: "string", minLength: 1, maxLength: 120 },
-      password: { type: "string", format: "password", minLength: 6, maxLength: 128 },
+      password: {
+        type: "string",
+        format: "password",
+        minLength: 6,
+        maxLength: 128,
+      },
       roleCode: {
         type: "string",
         enum: ["super_admin", "support"],
@@ -175,21 +183,6 @@ const SCHEMAS = {
       timezone: { type: "string", minLength: 1, maxLength: 64 },
     },
     minProperties: 1,
-  },
-  TenantUserSummary: {
-    type: "object",
-    properties: {
-      id: { type: "string" },
-      email: { type: "string", nullable: true, format: "email" },
-      displayName: { type: "string" },
-      role: { type: "string" },
-      branchIds: {
-        type: "array",
-        items: { type: "string" },
-      },
-      status: { type: "string" },
-    },
-    required: ["id", "email", "displayName", "role", "branchIds", "status"],
   },
 };
 
@@ -308,35 +301,6 @@ const OPERATION_OVERRIDES = {
       ...errorResponses([401, 403, 404, 409, 422, 500]),
     },
   },
-  "GET /tenant/users": {
-    summary: "List tenant users",
-    tags: ["Tenant Users"],
-    parameters: [
-      queryParameter("q", { type: "string" }),
-      queryParameter("status", {
-        type: "string",
-        enum: ["invited", "active", "disabled", "suspended"],
-      }),
-      queryParameter("limit", {
-        type: "integer",
-        minimum: 1,
-        maximum: 100,
-        default: 50,
-      }),
-      queryParameter("offset", {
-        type: "integer",
-        minimum: 0,
-        default: 0,
-      }),
-    ],
-    responses: {
-      200: jsonResponse("Tenant user list.", {
-        type: "array",
-        items: { $ref: "#/components/schemas/TenantUserSummary" },
-      }),
-      ...errorResponses([401, 403, 422, 500]),
-    },
-  },
 };
 
 function jsonRequest(schemaRef) {
@@ -406,7 +370,8 @@ function pathParameter(name) {
 
 function parseNamedImports(source, importerPath) {
   const imports = new Map();
-  const importPattern = /import\s+\{(?<names>[^}]+)\}\s+from\s+["'](?<specifier>[^"']+)["']/gs;
+  const importPattern =
+    /import\s+\{(?<names>[^}]+)\}\s+from\s+["'](?<specifier>[^"']+)["']/gs;
 
   for (const match of source.matchAll(importPattern)) {
     const names = match.groups.names
@@ -420,7 +385,10 @@ function parseNamedImports(source, importerPath) {
       continue;
     }
 
-    const importedPath = resolve(dirname(importerPath), specifier).replace(/\.js$/, ".ts");
+    const importedPath = resolve(dirname(importerPath), specifier).replace(
+      /\.js$/,
+      ".ts",
+    );
     for (const name of names) {
       imports.set(name, importedPath);
     }
@@ -510,7 +478,6 @@ function getTag(path) {
   if (path.startsWith("/saas/operation-logs")) return "SaaS Operation Logs";
   if (path.startsWith("/saas/security")) return "SaaS Security";
   if (path.startsWith("/saas")) return "SaaS";
-  if (path.startsWith("/tenant/users")) return "Tenant Users";
   if (path.startsWith("/tenant")) return "Tenant";
   return "API";
 }
@@ -523,7 +490,9 @@ function getOperationId(method, path) {
     .map((part) => part.replace(/[^A-Za-z0-9]/g, " "))
     .flatMap((part) => part.split(/\s+/).filter(Boolean))
     .map((part, index) =>
-      index === 0 ? part.toLowerCase() : part.charAt(0).toUpperCase() + part.slice(1),
+      index === 0
+        ? part.toLowerCase()
+        : part.charAt(0).toUpperCase() + part.slice(1),
     )
     .join("");
 
@@ -549,7 +518,10 @@ function createDefaultOperation(method, path) {
     operationId: getOperationId(method, path),
     parameters: extractPathParameters(path).map(pathParameter),
     responses: {
-      [status]: status === 204 ? { description: "No content." } : jsonResponse("Success.", {}),
+      [status]:
+        status === 204
+          ? { description: "No content." }
+          : jsonResponse("Success.", {}),
       ...errorResponses([401, 403, 404, 422, 500]),
     },
   };
@@ -565,7 +537,10 @@ function mergeOperation(base, override) {
   const merged = {
     ...base,
     ...override,
-    parameters: mergeParameters(base.parameters ?? [], override.parameters ?? []),
+    parameters: mergeParameters(
+      base.parameters ?? [],
+      override.parameters ?? [],
+    ),
     responses: override.responses ?? base.responses,
   };
 
@@ -640,7 +615,9 @@ async function main() {
     try {
       routeSource = await readFile(routeFilePath, "utf8");
     } catch (error) {
-      warnings.push(`Cannot read routes file for ${route.factory}: ${routeFilePath}`);
+      warnings.push(
+        `Cannot read routes file for ${route.factory}: ${routeFilePath}`,
+      );
       continue;
     }
 
@@ -673,9 +650,15 @@ async function main() {
         description: "Local API",
       },
     ],
-    tags: [...new Set(Object.values(paths).flatMap((operations) =>
-      Object.values(operations).flatMap((operation) => operation.tags ?? []),
-    ))]
+    tags: [
+      ...new Set(
+        Object.values(paths).flatMap((operations) =>
+          Object.values(operations).flatMap(
+            (operation) => operation.tags ?? [],
+          ),
+        ),
+      ),
+    ]
       .sort()
       .map((name) => ({ name })),
     paths: sortOpenApiPaths(paths),

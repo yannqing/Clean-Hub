@@ -329,7 +329,6 @@ POST {{baseUrl}}/auth/login
 ```text
 GET {{baseUrl}}/saas/users
 GET {{baseUrl}}/saas/backups
-GET {{baseUrl}}/tenant/users
 ```
 
 注意：
@@ -451,7 +450,6 @@ GET  /saas/users
 POST /saas/users
 GET  /saas/users/:userId
 PATCH /saas/users/:userId
-GET  /tenant/users
 ```
 
 以下 routes 文件存在，但需要确认是否已正式挂载后再标记为 `ready`：

@@ -157,7 +157,6 @@ apps/api/src/app.ts
 app.get("/health", ...)
 app.route("/auth", createAuthRoutes({ authService }))
 app.route("/saas/users", createSaasUsersRoutes())
-app.route("/tenant/users", createTenantUserRoutes())
 ```
 
 ### 6.2 解析 import 映射
@@ -167,7 +166,6 @@ app.route("/tenant/users", createTenantUserRoutes())
 ```text
 createAuthRoutes -> apps/api/src/modules/auth/auth.routes.ts
 createSaasUsersRoutes -> apps/api/src/modules/saas-users/saas-users.routes.ts
-createTenantUserRoutes -> apps/api/src/modules/users/users.routes.ts
 ```
 
 ### 6.3 读取模块 routes 文件
