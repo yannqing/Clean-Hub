@@ -216,7 +216,8 @@ async function resolveOrderItemPricing(
     );
   }
 
-  const serviceChanged = !input.existing || serviceId !== input.existing.serviceId;
+  const serviceChanged =
+    !input.existing || serviceId !== input.existing.serviceId;
   const standardUnitAmount =
     serviceChanged || !input.existing
       ? service.amount
@@ -280,7 +281,11 @@ async function resolveOrderItemPricing(
   }
 
   const quantity = input.data.quantity ?? input.existing?.quantity;
-  if (!quantity || !Number.isInteger(Number(quantity)) || Number(quantity) < 1) {
+  if (
+    !quantity ||
+    !Number.isInteger(Number(quantity)) ||
+    Number(quantity) < 1
+  ) {
     throw new PosOrderError(
       "VALIDATION_ERROR",
       "A positive whole-number quantity is required for a per-item service.",
@@ -424,7 +429,9 @@ export async function createPosOrder(
 async function createTicketOrder(
   db: Database,
   tenantId: string,
-  input: CreatePosOrderInput & { data: Extract<CreatePosOrderRequest, { orderType: "ticket" }> },
+  input: CreatePosOrderInput & {
+    data: Extract<CreatePosOrderRequest, { orderType: "ticket" }>;
+  },
 ): Promise<PosOrderDetail> {
   const ticket = await findServiceTicketForOrder(db, {
     tenantId,
@@ -450,7 +457,8 @@ async function createTicketOrder(
 
   if (
     items.length === 0 ||
-    (input.data.ticketItemIds && items.length !== input.data.ticketItemIds.length)
+    (input.data.ticketItemIds &&
+      items.length !== input.data.ticketItemIds.length)
   ) {
     throw new PosOrderError(
       "SERVICE_TICKET_EMPTY",
@@ -515,7 +523,9 @@ async function createTicketOrder(
 async function createManualOrder(
   db: Database,
   tenantId: string,
-  input: CreatePosOrderInput & { data: Extract<CreatePosOrderRequest, { orderType: "manual" }> },
+  input: CreatePosOrderInput & {
+    data: Extract<CreatePosOrderRequest, { orderType: "manual" }>;
+  },
 ): Promise<PosOrderDetail> {
   requirePosBranchAccess(input.authContext, input.data.branchId);
   await requireCustomerActive(db, {
@@ -854,12 +864,14 @@ export async function createPosOrderPayment(
     }
 
     if (data.paymentMethod === "app") {
-      const existingReference =
-        await findPaymentTransactionByProviderReference(tx, {
+      const existingReference = await findPaymentTransactionByProviderReference(
+        tx,
+        {
           tenantId,
           provider: data.provider,
           externalReference: data.externalReference,
-        });
+        },
+      );
       if (existingReference) {
         return loadIdempotentPaymentResult(tx, {
           tenantId,
@@ -1025,7 +1037,8 @@ async function resolvePosManualPayment(
     }
 
     if (status === "paid") {
-      const outstanding = Number(before.totalAmount) - Number(before.paidAmount);
+      const outstanding =
+        Number(before.totalAmount) - Number(before.paidAmount);
       if (Number(payment.amount) > outstanding) {
         throw new PosOrderError(
           "VALIDATION_ERROR",
@@ -1390,6 +1403,8 @@ export async function getPosOrderOverview(
     allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
     period: query.period ?? "today",
+    createdAfter: query.createdAfter,
+    createdBefore: query.createdBefore,
   });
 }
 

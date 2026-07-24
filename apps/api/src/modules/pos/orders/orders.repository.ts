@@ -1,5 +1,6 @@
 import {
   and,
+  asc,
   desc,
   eq,
   gte,
@@ -35,6 +36,7 @@ import type {
   PosOrderOverview,
   PosOrderOverviewPeriod,
   PosOrderPaymentStatus,
+  PosOrderSort,
   PosOrderSummary,
   PosOrderType,
   PosMobileMoneyProvider,
@@ -82,7 +84,9 @@ export function calculatePosOrderItemLineAmount(
   >,
 ): string {
   const units =
-    input.pricingUnit === "per_kg" ? Number(input.weight) : Number(input.quantity);
+    input.pricingUnit === "per_kg"
+      ? Number(input.weight)
+      : Number(input.quantity);
   return (units * Number(input.chargedUnitAmount)).toFixed(2);
 }
 
@@ -190,7 +194,9 @@ function buildOrderFilters(input: PosOrderListInput): SQL[] {
     filters.push(eq(orders.paymentStatus, query.paymentStatus));
   }
   if (query.status) {
-    const statuses = Array.isArray(query.status) ? query.status : [query.status];
+    const statuses = Array.isArray(query.status)
+      ? query.status
+      : [query.status];
     filters.push(inArray(orders.status, statuses));
   }
   if (query.q) {
@@ -219,6 +225,24 @@ function buildOrderFilters(input: PosOrderListInput): SQL[] {
   return filters;
 }
 
+function buildOrderSort(sort: PosOrderSort | undefined): SQL[] {
+  switch (sort) {
+    case "created_asc":
+      return [asc(orders.createdAt), asc(orders.id)];
+    case "amount_desc":
+      return [
+        desc(orders.totalAmount),
+        desc(orders.createdAt),
+        desc(orders.id),
+      ];
+    case "amount_asc":
+      return [asc(orders.totalAmount), desc(orders.createdAt), desc(orders.id)];
+    case "created_desc":
+    default:
+      return [desc(orders.createdAt), desc(orders.id)];
+  }
+}
+
 export async function findPosOrders(
   db: Database,
   input: PosOrderListInput,
@@ -236,7 +260,7 @@ export async function findPosOrders(
     .from(orders)
     .leftJoin(customers, eq(customers.id, orders.customerId))
     .where(and(...buildOrderFilters(input)))
-    .orderBy(desc(orders.createdAt))
+    .orderBy(...buildOrderSort(input.query.sort))
     .limit(input.query.limit ?? 50)
     .offset(input.query.offset ?? 0);
 
@@ -315,7 +339,7 @@ export async function findPosOrderDetail(
 export async function findPosOrderRaw(
   db: Database,
   input: { tenantId: string; orderId: string },
-): Promise<(typeof orders.$inferSelect) | null> {
+): Promise<typeof orders.$inferSelect | null> {
   const rows = await db
     .select()
     .from(orders)
@@ -334,7 +358,7 @@ export async function findPosOrderRaw(
 export async function findPosOrderRawForUpdate(
   db: Database,
   input: { tenantId: string; orderId: string },
-): Promise<(typeof orders.$inferSelect) | null> {
+): Promise<typeof orders.$inferSelect | null> {
   const rows = await db
     .select()
     .from(orders)
@@ -416,7 +440,7 @@ export async function findCustomerForOrder(
 export async function findServiceTicketForOrder(
   db: Database,
   input: { tenantId: string; ticketId: string },
-): Promise<(typeof serviceTickets.$inferSelect) | null> {
+): Promise<typeof serviceTickets.$inferSelect | null> {
   const rows = await db
     .select()
     .from(serviceTickets)
@@ -921,11 +945,7 @@ export async function recalculateOrderPaymentState(
   const paidAmount = Number(rows[0]?.paidAmount ?? "0");
   const totalAmount = Number(order.totalAmount);
   const paymentStatus: PosOrderPaymentStatus =
-    paidAmount <= 0
-      ? "unpaid"
-      : paidAmount < totalAmount
-        ? "partial"
-        : "paid";
+    paidAmount <= 0 ? "unpaid" : paidAmount < totalAmount ? "partial" : "paid";
   const nextStatus =
     paymentStatus === "paid" && order.status !== "delivered"
       ? "paid"
@@ -1149,11 +1169,15 @@ export async function findPosOrderOverview(
     allowedBranchIds?: string[];
     branchId?: string;
     period: PosOrderOverviewPeriod;
+    createdAfter?: string;
+    createdBefore?: string;
   },
 ): Promise<PosOrderOverview> {
   const effectiveBranchId =
     input.branchId ??
-    (input.allowedBranchIds?.length === 1 ? input.allowedBranchIds[0] : undefined);
+    (input.allowedBranchIds?.length === 1
+      ? input.allowedBranchIds[0]
+      : undefined);
   const currencyRows = effectiveBranchId
     ? await db
         .select({ currency: branches.defaultCurrency })
@@ -1172,7 +1196,10 @@ export async function findPosOrderOverview(
         .where(eq(tenantSettings.tenantId, input.tenantId))
         .limit(1);
   const currency = currencyRows[0]?.currency ?? "XOF";
-  const start = getPeriodStart(input.period);
+  const start = input.createdAfter
+    ? new Date(input.createdAfter)
+    : getPeriodStart(input.period);
+  const end = input.createdBefore ? new Date(input.createdBefore) : null;
   const orderFilters: SQL[] = [
     eq(orders.tenantId, input.tenantId),
     isNull(orders.deletedAt),
@@ -1186,6 +1213,10 @@ export async function findPosOrderOverview(
   if (start) {
     orderFilters.push(gte(orders.createdAt, start));
     paymentFilters.push(gte(paymentTransactions.paidAt, start));
+  }
+  if (end) {
+    orderFilters.push(lt(orders.createdAt, end));
+    paymentFilters.push(lt(paymentTransactions.paidAt, end));
   }
 
   if (input.allowedBranchIds !== undefined) {

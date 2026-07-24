@@ -1,4 +1,4 @@
-import type { ApiClient } from "../types";
+import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   PosCustomerOrderStats,
   PosCustomerListQuery,
@@ -11,6 +11,8 @@ import type {
   UpdatePosProfileRequest,
 } from "./customers.types";
 
+type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
+
 /**
  * POS customer PROFILE api. Mounted under `/pos/customers`.
  *
@@ -21,8 +23,11 @@ import type {
 export function createPosCustomersApi(client: ApiClient) {
   return {
     /** Hybrid search across accounts and profiles. GET /pos/customers */
-    list: (query?: PosCustomerListQuery) =>
-      client.get<PosCustomerListResult>("/pos/customers", { query }),
+    list: (query?: PosCustomerListQuery, options?: RequestOptions) =>
+      client.get<PosCustomerListResult>("/pos/customers", {
+        query,
+        ...options,
+      }),
 
     /** Profile detail. GET /pos/customers/:customerId */
     get: (customerId: string) =>
@@ -52,10 +57,7 @@ export function createPosCustomersApi(client: ApiClient) {
       ),
 
     /** Change profile status (active/disabled). POST /pos/customers/:customerId/status-changes */
-    changeStatus: (
-      customerId: string,
-      input: PosCustomerStatusChangeRequest,
-    ) =>
+    changeStatus: (customerId: string, input: PosCustomerStatusChangeRequest) =>
       client.post<PosCustomerProfileDetail>(
         `/pos/customers/${customerId}/status-changes`,
         input,

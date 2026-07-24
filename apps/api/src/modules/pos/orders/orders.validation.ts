@@ -21,6 +21,13 @@ export const posOrderPaymentStatusSchema = z.enum([
 
 export const posOrderTypeSchema = z.enum(["ticket", "manual"]);
 
+export const posOrderSortSchema = z.enum([
+  "created_desc",
+  "created_asc",
+  "amount_desc",
+  "amount_asc",
+]);
+
 export const posOrderItemSourceTypeSchema = z.enum([
   "subscription",
   "delivery_fee",
@@ -53,7 +60,10 @@ const isoTimestampSchema = z
   .string()
   .trim()
   .min(1)
-  .refine((value) => !Number.isNaN(Date.parse(value)), "Invalid ISO timestamp.");
+  .refine(
+    (value) => !Number.isNaN(Date.parse(value)),
+    "Invalid ISO timestamp.",
+  );
 
 const statusFilterSchema = z
   .union([posOrderStatusSchema, z.array(posOrderStatusSchema)])
@@ -68,6 +78,7 @@ export const posOrderListQuerySchema = z.object({
   q: z.string().trim().min(1).max(120).optional(),
   createdAfter: isoTimestampSchema.optional(),
   createdBefore: isoTimestampSchema.optional(),
+  sort: posOrderSortSchema.optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -211,4 +222,6 @@ export const deletePosOrderItemBodySchema = z.object({
 export const posOrderOverviewQuerySchema = z.object({
   period: z.enum(["all", "today", "week", "month"]).default("today"),
   branchId: ulidSchema.optional(),
+  createdAfter: isoTimestampSchema.optional(),
+  createdBefore: isoTimestampSchema.optional(),
 });

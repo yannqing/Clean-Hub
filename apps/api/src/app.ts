@@ -31,10 +31,10 @@ import { createTenantHardwareRoutes } from "./modules/tenant/hardware/hardware.r
 import { createTenantBranchRoutes } from "./modules/tenant/branches/branches.routes.js";
 import { createTenantOverviewRoutes } from "./modules/tenant/overview/overview.routes.js";
 import { createTenantPriceRoutes } from "./modules/tenant/prices/prices.routes.js";
+import { createTenantProductRoutes } from "./modules/tenant/products/products.routes.js";
 import { createTenantReportRoutes } from "./modules/tenant/reports/reports.routes.js";
 import { createTenantServiceRoutes } from "./modules/tenant/services/services.routes.js";
 import { createTenantSettingsRoutes } from "./modules/tenant/settings/settings.routes.js";
-import { createTenantUsersRoutes } from "./modules/tenant/users/index.js";
 import { createPosRoutes } from "./modules/pos/pos.routes.js";
 
 export type CreateApiAppOptions = {
@@ -69,7 +69,12 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
 
         return apiEnv.corsOrigins.includes(origin) ? origin : null;
       },
-      allowHeaders: ["Content-Type", "Authorization", "X-Request-Id", "X-Device-Id"],
+      allowHeaders: [
+        "Content-Type",
+        "Authorization",
+        "X-Request-Id",
+        "X-Device-Id",
+      ],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
     }),
@@ -118,16 +123,19 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.route("/tenant/overview", createTenantOverviewRoutes());
   app.route("/tenant/settings", createTenantSettingsRoutes());
   app.route("/tenant/branches", createTenantBranchRoutes());
-  app.route("/tenant/users", createTenantUsersRoutes());
   app.route("/tenant/audit-logs", createTenantAuditRoutes());
   app.route("/tenant/hardware-configs", createTenantHardwareRoutes());
   app.route("/tenant/services", createTenantServiceRoutes());
   app.route("/tenant/prices", createTenantPriceRoutes());
+  app.route("/tenant/products", createTenantProductRoutes());
   app.route("/tenant/backups", createTenantBackupRoutes());
   app.route("/tenant/reports", createTenantReportRoutes());
 
   // POS 终端侧（收银员 / 店长 / 店主）
-  app.route("/pos", createPosRoutes({ notificationPublisher: notificationsService }));
+  app.route(
+    "/pos",
+    createPosRoutes({ notificationPublisher: notificationsService }),
+  );
 
   app.notFound((c) =>
     c.json(

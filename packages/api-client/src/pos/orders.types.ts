@@ -11,6 +11,12 @@ export type PosOrderStatus =
 
 export type PosOrderPaymentStatus = "unpaid" | "paid" | "partial" | "refunded";
 
+export type PosOrderSort =
+  | "created_desc"
+  | "created_asc"
+  | "amount_desc"
+  | "amount_asc";
+
 export type PosOrderItemSourceType =
   | "ticket_item"
   | "subscription"
@@ -98,6 +104,7 @@ export type PosOrderListQuery = {
   q?: string;
   createdAfter?: string;
   createdBefore?: string;
+  sort?: PosOrderSort;
   limit?: number;
   offset?: number;
 };
@@ -214,6 +221,8 @@ export type PosOrderOverviewPeriod = "all" | "today" | "week" | "month";
 export type PosOrderOverviewQuery = {
   period?: PosOrderOverviewPeriod;
   branchId?: string;
+  createdAfter?: string;
+  createdBefore?: string;
 };
 
 export type PosOrderOverviewPaymentMethod = {
