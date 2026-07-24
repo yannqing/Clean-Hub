@@ -1,5 +1,7 @@
 import {
   boolean,
+  check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -13,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
+import { productPrices, productSkus } from "../catalog/products.js";
 import { pricingUnitEnum, services } from "../catalog/services.js";
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
@@ -43,6 +46,13 @@ export const orderItemSourceTypeEnum = pgEnum("order_item_source_type", [
   "subscription",
   "delivery_fee",
   "product",
+]);
+
+export const orderItemKindEnum = pgEnum("order_item_kind", [
+  "service",
+  "product",
+  "subscription",
+  "delivery_fee",
 ]);
 
 export const paymentMethodEnum = pgEnum("payment_method", [
@@ -118,6 +128,7 @@ export const orders = pgTable(
     version: integer("version").notNull().default(1),
   },
   (table) => [
+    uniqueIndex("orders_tenant_id_id_unique").on(table.tenantId, table.id),
     index("orders_tenant_id_branch_id_idx").on(table.tenantId, table.branchId),
     index("orders_tenant_id_status_idx").on(table.tenantId, table.status),
     index("orders_customer_id_idx").on(table.customerId),
@@ -142,10 +153,21 @@ export const orderItems = pgTable(
     customerId: ulidColumn("customer_id")
       .notNull()
       .references(() => customers.id),
+    itemKind: orderItemKindEnum("item_kind").notNull().default("service"),
     sourceType: orderItemSourceTypeEnum("source_type").notNull(),
     sourceId: ulidColumn("source_id").notNull(),
     serviceId: ulidColumn("service_id").references(() => services.id),
+    productSkuId: ulidColumn("product_sku_id"),
+    productPriceId: ulidColumn("product_price_id"),
     itemName: varchar("item_name", { length: 200 }).notNull(),
+    skuSnapshot: varchar("sku_snapshot", { length: 80 }),
+    barcodeSnapshot: varchar("barcode_snapshot", { length: 80 }),
+    variantNameSnapshot: varchar("variant_name_snapshot", { length: 160 }),
+    unitOfMeasureSnapshot: varchar("unit_of_measure_snapshot", { length: 32 }),
+    unitCostAmount: numeric("unit_cost_amount", {
+      precision: 14,
+      scale: 4,
+    }),
     quantity: numeric("quantity", { precision: 12, scale: 3 }).notNull(),
     pricingUnit: pricingUnitEnum("pricing_unit"),
     standardUnitAmount: numeric("standard_unit_amount", {
@@ -177,11 +199,44 @@ export const orderItems = pgTable(
     version: integer("version").notNull().default(1),
   },
   (table) => [
+    uniqueIndex("order_items_tenant_id_id_unique").on(table.tenantId, table.id),
+    foreignKey({
+      name: "order_items_tenant_product_sku_fk",
+      columns: [table.tenantId, table.productSkuId],
+      foreignColumns: [productSkus.tenantId, productSkus.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "order_items_tenant_product_price_fk",
+      columns: [table.tenantId, table.productSkuId, table.productPriceId],
+      foreignColumns: [
+        productPrices.tenantId,
+        productPrices.productSkuId,
+        productPrices.id,
+      ],
+    }).onDelete("restrict"),
     index("order_items_order_id_idx").on(table.orderId),
     index("order_items_tenant_id_idx").on(table.tenantId),
     index("order_items_ticket_id_idx").on(table.ticketId),
     index("order_items_service_id_idx").on(table.serviceId),
+    index("order_items_product_sku_id_idx").on(table.productSkuId),
     index("order_items_source_idx").on(table.sourceType, table.sourceId),
+    check(
+      "order_items_product_reference_check",
+      sql`(
+        ${table.itemKind} = 'product'
+        and ${table.productSkuId} is not null
+        and ${table.serviceId} is null
+        and ${table.ticketId} is null
+      ) or (
+        ${table.itemKind} <> 'product'
+        and ${table.productSkuId} is null
+        and ${table.productPriceId} is null
+      )`,
+    ),
+    check(
+      "order_items_unit_cost_nonnegative_check",
+      sql`${table.unitCostAmount} is null or ${table.unitCostAmount} >= 0`,
+    ),
   ],
 );
 
@@ -266,11 +321,9 @@ export const paymentCallbacks = pgTable(
       .defaultNow(),
   },
   (table) => [
-    uniqueIndex("payment_callbacks_gateway_external_event_unique").on(
-      table.gateway,
-      table.externalId,
-      table.event,
-    ).where(sql`${table.signatureVerified} = true`),
+    uniqueIndex("payment_callbacks_gateway_external_event_unique")
+      .on(table.gateway, table.externalId, table.event)
+      .where(sql`${table.signatureVerified} = true`),
     index("payment_callbacks_tenant_id_idx").on(table.tenantId),
     index("payment_callbacks_status_created_at_idx").on(
       table.processingStatus,
@@ -330,10 +383,7 @@ export const refundRequests = pgTable(
       .where(
         sql`${table.deletedAt} is null and ${table.status} in ('pending', 'processing')`,
       ),
-    index("refund_requests_tenant_status_idx").on(
-      table.tenantId,
-      table.status,
-    ),
+    index("refund_requests_tenant_status_idx").on(table.tenantId, table.status),
     index("refund_requests_order_id_idx").on(table.orderId),
     index("refund_requests_payment_transaction_id_idx").on(
       table.paymentTransactionId,

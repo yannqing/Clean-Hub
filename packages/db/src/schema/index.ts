@@ -4,6 +4,7 @@ export * from "./appointments/index.js";
 export * from "./commerce/index.js";
 export * from "./delivery/index.js";
 export * from "./identity/index.js";
+export * from "./inventory/index.js";
 export * from "./operations/index.js";
 export * from "./platform/index.js";
 export * from "./tenancy/index.js";

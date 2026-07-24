@@ -7,6 +7,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -51,6 +52,7 @@ export const branches = pgTable(
     version: integer("version").notNull().default(1),
   },
   (table) => [
+    uniqueIndex("branches_tenant_id_id_unique").on(table.tenantId, table.id),
     index("branches_tenant_id_idx").on(table.tenantId),
     index("branches_status_idx").on(table.status),
     index("branches_deleted_at_idx").on(table.deletedAt),

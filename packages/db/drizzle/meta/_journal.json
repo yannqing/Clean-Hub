@@ -64,6 +64,13 @@
       "when": 1784700636920,
       "tag": "0008_puzzling_bushwacker",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784801082009,
+      "tag": "0009_product_catalog_inventory",
+      "breakpoints": true
     }
   ]
 }

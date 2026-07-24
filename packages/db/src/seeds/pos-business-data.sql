@@ -369,7 +369,7 @@ VALUES
   -- Order 6 (cancelled, manual subscription): 1 item
   ('01SEED010001T000000000010', '01SEED01000RD0000000000006', NULL, '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000007',
    'subscription', 'SUB-SILVER-MONTH', '银卡月度会员', 1, 99.00, 99.00),
-  -- Order 7 (paid, manual product): 1 item
+  -- Order 7 (paid, legacy retail service line): 1 item
   ('01SEED010001T000000000011', '01SEED01000RD0000000000007', NULL, '01KRERJN800000000000000001', '01KRERJN8G0000000000000040', '01SEED0100CPS0000000000002',
    'product', '01SEED0100SVC0000000000008', '织物除味剂', 1, 12.00, 12.00),
   -- Order 8 (draft, from ticket 6): 2 items
@@ -694,6 +694,37 @@ ON CONFLICT (id) DO UPDATE SET
   unit_amount = EXCLUDED.unit_amount,
   line_amount = EXCLUDED.line_amount,
   updated_at = now();
+
+-- Keep the legacy seed rows semantically compatible with the product domain:
+-- the old `product` source rows still point to service records and therefore
+-- remain service-kind rows until an explicit service-to-SKU mapping is approved.
+UPDATE order_items
+SET item_kind = CASE source_type
+  WHEN 'subscription' THEN 'subscription'::order_item_kind
+  WHEN 'delivery_fee' THEN 'delivery_fee'::order_item_kind
+  ELSE 'service'::order_item_kind
+END
+WHERE id LIKE '01SEED010001T%';
+
+UPDATE order_items AS oi
+SET service_id = ti.service_id
+FROM ticket_items AS ti
+WHERE oi.id LIKE '01SEED010001T%'
+  AND oi.source_type = 'ticket_item'
+  AND oi.source_id = ti.id
+  AND oi.tenant_id = ti.tenant_id
+  AND oi.ticket_id = ti.ticket_id
+  AND oi.service_id IS NULL
+  AND ti.service_id IS NOT NULL;
+
+UPDATE order_items AS oi
+SET service_id = s.id
+FROM services AS s
+WHERE oi.id LIKE '01SEED010001T%'
+  AND oi.source_type = 'product'
+  AND oi.source_id = s.id
+  AND oi.tenant_id = s.tenant_id
+  AND oi.service_id IS NULL;
 
 INSERT INTO payment_transactions (
   id, tenant_id, branch_id, customer_id, order_id,
