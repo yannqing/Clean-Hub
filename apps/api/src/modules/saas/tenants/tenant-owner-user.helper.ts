@@ -12,7 +12,7 @@ import {
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js";
 import { hashPassword, hashPin } from "../../auth/password.service.js";
-import { resolveEffectiveSecurityPolicy } from "../../saas/security/security-policy.js";
+import { resolveEffectiveSecurityPolicy } from "../security/security-policy.js";
 
 export type CreateTenantOwnerUserInput = {
   tenantId: string;

@@ -32,8 +32,8 @@ import {
   hardwareDeviceStatusOptions,
   hardwareDeviceTypeOptions,
 } from "../constants";
+import { getBranchListQuery } from "../../branches/queries";
 import { getDeviceListQuery } from "../queries";
-import { getTenantBranchListQuery } from "../../users/queries";
 import {
   bindDeviceAction,
   deleteDeviceAction,
@@ -54,13 +54,7 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "";
 }
 
-function StatusBadge({
-  status,
-  label,
-}: {
-  status: string;
-  label: string;
-}) {
+function StatusBadge({ status, label }: { status: string; label: string }) {
   const variant = status === "active" ? "default" : "secondary";
   return <Badge variant={variant}>{label}</Badge>;
 }
@@ -83,9 +77,7 @@ function BranchSelect({
   onChange: (branchId: string) => void;
 }) {
   if (branches.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground px-1">{emptyLabel}</p>
-    );
+    return <p className="text-sm text-muted-foreground px-1">{emptyLabel}</p>;
   }
 
   return (
@@ -129,14 +121,17 @@ export function HardwareListView() {
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const [editDevice, setEditDevice] = useState<HardwareConfigSummary | null>(null);
+  const [editDevice, setEditDevice] = useState<HardwareConfigSummary | null>(
+    null,
+  );
   const [editForm, setEditForm] = useState<UpdateHardwareConfigRequest>({
     version: 0,
   });
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
-  const [pendingDelete, setPendingDelete] = useState<HardwareConfigSummary | null>(null);
+  const [pendingDelete, setPendingDelete] =
+    useState<HardwareConfigSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -147,7 +142,7 @@ export function HardwareListView() {
   }, []);
 
   useEffect(() => {
-    getTenantBranchListQuery()
+    getBranchListQuery()
       .then((result) => {
         if (isCurrent.current) setBranches(result);
       })
@@ -177,7 +172,8 @@ export function HardwareListView() {
   }, [loadDevices]);
 
   const getBranchName = useCallback(
-    (branchId: string) => branches.find((b) => b.id === branchId)?.name ?? branchId,
+    (branchId: string) =>
+      branches.find((b) => b.id === branchId)?.name ?? branchId,
     [branches],
   );
 
@@ -196,7 +192,12 @@ export function HardwareListView() {
     }
 
     setCreateOpen(false);
-    setCreateForm({ branchId: "", name: "", deviceType: "printer", connectionType: "usb" });
+    setCreateForm({
+      branchId: "",
+      name: "",
+      deviceType: "printer",
+      connectionType: "usb",
+    });
     loadDevices();
   }, [createForm, loadDevices]);
 
@@ -256,12 +257,12 @@ export function HardwareListView() {
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">{m.hardware.title}</h1>
-        <Button onClick={() => setCreateOpen(true)}>{m.hardware.addDevice}</Button>
+        <Button onClick={() => setCreateOpen(true)}>
+          {m.hardware.addDevice}
+        </Button>
       </div>
 
-      {error && (
-        <p className="text-sm text-destructive">{error}</p>
-      )}
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
       {isPending ? (
         <p className="text-sm text-muted-foreground">{m.common.loading}</p>
@@ -298,7 +299,9 @@ export function HardwareListView() {
                 <TableCell>
                   <StatusBadge
                     status={device.status}
-                    label={m.common.statusLabels[device.status] ?? device.status}
+                    label={
+                      m.common.statusLabels[device.status] ?? device.status
+                    }
                   />
                 </TableCell>
                 <TableCell>{formatDateTime(device.createdAt)}</TableCell>
@@ -415,8 +418,13 @@ export function HardwareListView() {
               <p className="text-sm text-destructive">{createError}</p>
             )}
 
-            <Button disabled={createLoading} onClick={() => void handleCreate()}>
-              {createLoading ? m.hardware.create.adding : m.hardware.create.action}
+            <Button
+              disabled={createLoading}
+              onClick={() => void handleCreate()}
+            >
+              {createLoading
+                ? m.hardware.create.adding
+                : m.hardware.create.action}
             </Button>
           </div>
         </DialogContent>
@@ -432,9 +440,7 @@ export function HardwareListView() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{m.hardware.edit.title}</DialogTitle>
-            <DialogDescription>
-              {editDevice?.name}
-            </DialogDescription>
+            <DialogDescription>{editDevice?.name}</DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-4">
@@ -451,9 +457,9 @@ export function HardwareListView() {
               <Label>{m.hardware.columns.type}</Label>
               <p className="text-sm text-muted-foreground">
                 {editDevice
-                  ? hardwareDeviceTypeOptions.find(
+                  ? (hardwareDeviceTypeOptions.find(
                       (opt) => opt.value === editDevice.deviceType,
-                    )?.label ?? editDevice.deviceType
+                    )?.label ?? editDevice.deviceType)
                   : ""}
               </p>
               <p className="text-xs text-muted-foreground">
@@ -526,7 +532,10 @@ export function HardwareListView() {
               <Button variant="outline" onClick={() => setEditDevice(null)}>
                 {m.common.cancel}
               </Button>
-              <Button disabled={editLoading} onClick={() => void handleUpdate()}>
+              <Button
+                disabled={editLoading}
+                onClick={() => void handleUpdate()}
+              >
                 {editLoading
                   ? m.hardware.edit.savingChanges
                   : m.hardware.edit.saveChanges}
@@ -546,7 +555,9 @@ export function HardwareListView() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{m.hardware.delete.title}</DialogTitle>
-            <DialogDescription>{m.hardware.delete.description}</DialogDescription>
+            <DialogDescription>
+              {m.hardware.delete.description}
+            </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-3">
             <Button

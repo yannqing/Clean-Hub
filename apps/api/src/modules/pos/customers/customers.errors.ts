@@ -1,9 +1,8 @@
 /**
  * Domain errors for POS customer management (accounts + profiles).
  *
- * Mirrors the TenantUserError pattern: each error carries a stable `code`
- * and an HTTP `status` so the controller can map it to a structured
- * response without leaking implementation details.
+ * Each error carries a stable `code` and an HTTP `status` so the controller
+ * can map it to a structured response without leaking implementation details.
  */
 export type PosCustomerErrorCode =
   | "POS_ACCOUNT_NOT_FOUND"

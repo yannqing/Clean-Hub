@@ -80,10 +80,6 @@ export function TenantOverviewView({
           href: webAdminRoutes.tenant.branches,
         },
         {
-          label: m.overview.quickLinks.users,
-          href: webAdminRoutes.tenant.users,
-        },
-        {
           label: m.overview.quickLinks.services,
           href: webAdminRoutes.tenant.services,
         },
@@ -238,7 +234,8 @@ export function TenantOverviewView({
           <p className="mt-3 text-2xl font-semibold">
             {branchCountReachedLimit
               ? `${branchCount} ${m.overview.metrics.shown}`
-              : (branchCount?.toLocaleString() ?? m.overview.metrics.unavailable)}
+              : (branchCount?.toLocaleString() ??
+                m.overview.metrics.unavailable)}
           </p>
         </div>
         {metricKeys.map((key) => (

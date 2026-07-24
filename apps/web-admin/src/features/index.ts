@@ -5,6 +5,6 @@ export * as saasUsersFeature from "./saas/users";
 export * as tenantBranchesFeature from "./tenant/branches";
 export * as tenantHardwareFeature from "./tenant/hardware";
 export * as tenantPricesFeature from "./tenant/prices";
+export * as tenantProductsFeature from "./tenant/products";
 export * as tenantReportsFeature from "./tenant/reports";
 export * as tenantServicesFeature from "./tenant/services";
-export * as tenantUsersFeature from "./tenant/users";

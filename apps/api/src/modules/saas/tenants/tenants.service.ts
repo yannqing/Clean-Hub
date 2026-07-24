@@ -11,7 +11,7 @@ import {
 import {
   createTenantOwnerUser,
   TenantOwnerUserHelperError,
-} from "../../tenant/users/tenant-users.helper.js";
+} from "./tenant-owner-user.helper.js";
 import { SaasTenantsError } from "./tenants.errors.js";
 import {
   createSaasTenantRecord,

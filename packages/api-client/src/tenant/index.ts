@@ -9,11 +9,14 @@ import {
 } from "./insights";
 import { createTenantBackupsApi } from "./backups";
 import { createTenantBranchesApi } from "./branches";
-import { createTenantPricesApi, createTenantServicesApi } from "./catalog";
+import {
+  createTenantPricesApi,
+  createTenantProductsApi,
+  createTenantServicesApi,
+} from "./catalog";
 import { createTenantHardwareApi } from "./hardware";
 import { createTenantNotificationsApi } from "./notifications";
 import { createTenantSettingsApi } from "./settings";
-import { createTenantUsersApi } from "./identity";
 
 export * from "./insights";
 export * from "./backups";
@@ -21,7 +24,6 @@ export * from "./branches";
 export * from "./catalog";
 export * from "./hardware";
 export * from "./notifications";
-export * from "./identity";
 // NOTE: settings types are exported explicitly below (not via `export *`),
 // because `TenantSettings` / `UpdateTenantSettingsRequest` collide with the
 // SaaS-domain types of the same name (see ../saas/tenants). They are re-exported
@@ -40,9 +42,9 @@ export function createTenantApi(client: ApiClient) {
   const branches = createTenantBranchesApi(client);
   const overview = createTenantOverviewApi(client);
   const settings = createTenantSettingsApi(client);
-  const users = createTenantUsersApi(client);
   const services = createTenantServicesApi(client);
   const prices = createTenantPricesApi(client);
+  const products = createTenantProductsApi(client);
   const hardware = createTenantHardwareApi(client);
   const notifications = createTenantNotificationsApi(client);
   const reports = createTenantReportsApi(client);
@@ -53,9 +55,9 @@ export function createTenantApi(client: ApiClient) {
     branches,
     overview,
     settings,
-    users,
     services,
     prices,
+    products,
     hardware,
     notifications,
     reports,
