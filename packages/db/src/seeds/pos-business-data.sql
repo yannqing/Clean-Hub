@@ -6,11 +6,13 @@
 --   cashier1  = 01KRERJN8F0000000000000031 (acts as created_by / assistant_id)
 --
 -- Idempotent: every statement uses ON CONFLICT ... DO UPDATE / DO NOTHING.
--- IDs are fixed readable ULIDs (prefix 01SEED01...) so cross-table references stay stable.
+-- IDs are fixed readable ULIDs (prefix 01SEED01...) where the seed owns the
+-- record. Service-category references resolve by the category's natural key,
+-- so an existing matching category with a different ID is reused safely.
 --
 -- Coverage:
 --   tenant_feature_flags (1) — enables the business lines seeded below
---   services (8) + prices (8)
+--   service_categories (8) + services (8) + prices (8)
 --   customer_accounts (10) + customers (14)
 --   service_tickets (14) + ticket_items (~20)
 --   orders (14) + order_items (~20)
@@ -50,27 +52,166 @@ ON CONFLICT (tenant_id) DO UPDATE SET
   updated_at             = now();
 
 -- ───────────────────────────────────────────────
--- 1) Services catalog (8 items across business lines)
+-- 1) Default service categories
 -- ───────────────────────────────────────────────
-INSERT INTO services (id, tenant_id, name, business_line, pricing_unit, status)
+INSERT INTO service_categories (
+  id, tenant_id, name, business_line, description, sort_order, status
+)
 VALUES
-  ('01SEED0100SVC0000000000001', '01KRERJN800000000000000001', '衬衫水洗', 'laundry', 'per_item', 'active'),
-  ('01SEED0100SVC0000000000002', '01KRERJN800000000000000001', '西装干洗', 'laundry', 'per_item', 'active'),
-  ('01SEED0100SVC0000000000003', '01KRERJN800000000000000001', '外套水洗', 'laundry', 'per_item', 'active'),
-  ('01SEED0100SVC0000000000004', '01KRERJN800000000000000001', '床单水洗', 'laundry', 'per_kg', 'active'),
-  ('01SEED0100SVC0000000000005', '01KRERJN800000000000000001', 'SUV 精洗', 'car_wash', 'per_item', 'active'),
-  ('01SEED0100SVC0000000000006', '01KRERJN800000000000000001', '轿车精洗', 'car_wash', 'per_item', 'active'),
-  ('01SEED0100SVC0000000000007', '01KRERJN800000000000000001', '银卡月度会员', 'retail', 'per_item', 'active'),
-  ('01SEED0100SVC0000000000008', '01KRERJN800000000000000001', '织物除味剂', 'retail', 'per_item', 'active')
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  business_line = EXCLUDED.business_line,
-  pricing_unit = EXCLUDED.pricing_unit,
+  ('01SEED0100SCG0000000000001', '01KRERJN800000000000000001', '衣物洗护', 'laundry', '衬衫、西装、外套等日常衣物的水洗与干洗服务', 10, 'active'),
+  ('01SEED0100SCG0000000000002', '01KRERJN800000000000000001', '熨烫护理', 'laundry', '衣物熨烫、整形与精细护理服务', 20, 'active'),
+  ('01SEED0100SCG0000000000003', '01KRERJN800000000000000001', '家纺洗护', 'laundry', '床单、被套、窗帘等家纺用品的洗护服务', 30, 'active'),
+  ('01SEED0100SCG0000000000004', '01KRERJN800000000000000001', '鞋靴洗护', 'laundry', '运动鞋、皮鞋和靴类的清洁与护理服务', 40, 'active'),
+  ('01SEED0100SCG0000000000005', '01KRERJN800000000000000001', '地毯与大件', 'laundry', '地毯、沙发套和其他大件织物的专业清洁服务', 50, 'active'),
+  ('01SEED0100SCG0000000000006', '01KRERJN800000000000000001', '洗车服务', 'car_wash', '轿车、SUV 等车辆的外洗与精洗服务', 10, 'active'),
+  ('01SEED0100SCG0000000000007', '01KRERJN800000000000000001', '会员与增值服务', 'retail', '会员方案及与主营服务配套的增值项目', 10, 'active'),
+  ('01SEED0100SCG0000000000008', '01KRERJN800000000000000001', '配送服务', 'delivery', '上门取送及订单配送相关服务', 10, 'active')
+ON CONFLICT (tenant_id, business_line, name) WHERE deleted_at IS NULL DO UPDATE SET
+  description = EXCLUDED.description,
+  sort_order = EXCLUDED.sort_order,
   status = EXCLUDED.status,
   updated_at = now();
 
 -- ───────────────────────────────────────────────
--- 2) Prices (1:1 with services)
+-- 2) Services catalog (8 items across business lines)
+-- ───────────────────────────────────────────────
+INSERT INTO services (
+  id, tenant_id, category_id, name, description, business_line,
+  pricing_unit, display_order, label_rule, status
+)
+VALUES
+  (
+    '01SEED0100SVC0000000000001', '01KRERJN800000000000000001',
+    (
+      SELECT id
+      FROM service_categories
+      WHERE tenant_id = '01KRERJN800000000000000001'
+        AND business_line = 'laundry'
+        AND name = '衣物洗护'
+        AND deleted_at IS NULL
+    ),
+    '衬衫水洗', '单件衬衫标准水洗、烘干与整理服务', 'laundry',
+    'per_item', 10, 'per_item', 'active'
+  ),
+  (
+    '01SEED0100SVC0000000000002', '01KRERJN800000000000000001',
+    (
+      SELECT id
+      FROM service_categories
+      WHERE tenant_id = '01KRERJN800000000000000001'
+        AND business_line = 'laundry'
+        AND name = '衣物洗护'
+        AND deleted_at IS NULL
+    ),
+    '西装干洗', '单件西装专业干洗与整形护理服务', 'laundry',
+    'per_item', 20, 'per_item', 'active'
+  ),
+  (
+    '01SEED0100SVC0000000000003', '01KRERJN800000000000000001',
+    (
+      SELECT id
+      FROM service_categories
+      WHERE tenant_id = '01KRERJN800000000000000001'
+        AND business_line = 'laundry'
+        AND name = '衣物洗护'
+        AND deleted_at IS NULL
+    ),
+    '外套水洗', '单件日常外套水洗与整理服务', 'laundry',
+    'per_item', 30, 'per_item', 'active'
+  ),
+  (
+    '01SEED0100SVC0000000000004', '01KRERJN800000000000000001',
+    (
+      SELECT id
+      FROM service_categories
+      WHERE tenant_id = '01KRERJN800000000000000001'
+        AND business_line = 'laundry'
+        AND name = '家纺洗护'
+        AND deleted_at IS NULL
+    ),
+    '床单水洗', '床单、被套等家纺用品按公斤计价的水洗服务', 'laundry',
+    'per_kg', 40, 'per_bag', 'active'
+  ),
+  (
+    '01SEED0100SVC0000000000005', '01KRERJN800000000000000001',
+    (
+      SELECT id
+      FROM service_categories
+      WHERE tenant_id = '01KRERJN800000000000000001'
+        AND business_line = 'car_wash'
+        AND name = '洗车服务'
+        AND deleted_at IS NULL
+    ),
+    'SUV 精洗', 'SUV 车型内外精细清洁服务', 'car_wash',
+    'per_item', 10, 'none', 'active'
+  ),
+  (
+    '01SEED0100SVC0000000000006', '01KRERJN800000000000000001',
+    (
+      SELECT id
+      FROM service_categories
+      WHERE tenant_id = '01KRERJN800000000000000001'
+        AND business_line = 'car_wash'
+        AND name = '洗车服务'
+        AND deleted_at IS NULL
+    ),
+    '轿车精洗', '轿车车型内外精细清洁服务', 'car_wash',
+    'per_item', 20, 'none', 'active'
+  ),
+  (
+    '01SEED0100SVC0000000000007', '01KRERJN800000000000000001',
+    (
+      SELECT id
+      FROM service_categories
+      WHERE tenant_id = '01KRERJN800000000000000001'
+        AND business_line = 'retail'
+        AND name = '会员与增值服务'
+        AND deleted_at IS NULL
+    ),
+    '银卡月度会员', '面向普通会员的月度服务权益方案', 'retail',
+    'per_item', 10, 'none', 'active'
+  ),
+  (
+    '01SEED0100SVC0000000000008', '01KRERJN800000000000000001',
+    (
+      SELECT id
+      FROM service_categories
+      WHERE tenant_id = '01KRERJN800000000000000001'
+        AND business_line = 'retail'
+        AND name = '会员与增值服务'
+        AND deleted_at IS NULL
+    ),
+    '织物除味剂', '作为洗护订单附加项目销售的织物除味服务', 'retail',
+    'per_item', 20, 'none', 'active'
+  )
+ON CONFLICT (id) DO UPDATE SET
+  category_id = EXCLUDED.category_id,
+  name = EXCLUDED.name,
+  description = EXCLUDED.description,
+  business_line = EXCLUDED.business_line,
+  pricing_unit = EXCLUDED.pricing_unit,
+  display_order = EXCLUDED.display_order,
+  label_rule = EXCLUDED.label_rule,
+  status = EXCLUDED.status,
+  updated_at = now();
+
+-- The service-category migration creates one "未分类" fallback per existing
+-- tenant/business-line scope so historical services can be backfilled safely.
+-- The demo services above now reference their intended categories, therefore
+-- remove only migration-generated fallbacks that are no longer referenced.
+DELETE FROM service_categories AS category
+WHERE category.tenant_id = '01KRERJN800000000000000001'
+  AND category.name = '未分类'
+  AND category.description = '迁移期间为既有服务自动创建的默认分类'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM services AS service
+    WHERE service.tenant_id = category.tenant_id
+      AND service.category_id = category.id
+  );
+
+-- ───────────────────────────────────────────────
+-- 3) Prices (1:1 with services)
 -- ───────────────────────────────────────────────
 INSERT INTO prices (id, tenant_id, service_id, amount, currency, status)
 VALUES
@@ -89,7 +230,7 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = now();
 
 -- ───────────────────────────────────────────────
--- 3) Customer accounts (5)
+-- 4) Customer accounts (5)
 -- ───────────────────────────────────────────────
 INSERT INTO customer_accounts (id, tenant_id, account_name, phone, email, status)
 VALUES
@@ -106,7 +247,7 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = now();
 
 -- ───────────────────────────────────────────────
--- 4) Customer profiles (8, distributed across accounts)
+-- 5) Customer profiles (8, distributed across accounts)
 -- ───────────────────────────────────────────────
 INSERT INTO customers (id, customer_account_id, tenant_id, full_name, phone, email, relationship, address, notes, status)
 VALUES
@@ -130,7 +271,7 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = now();
 
 -- ───────────────────────────────────────────────
--- 5) Service tickets (8, covering all statuses & priorities)
+-- 6) Service tickets (8, covering all statuses & priorities)
 -- ───────────────────────────────────────────────
 -- ticket_status enum: draft / pending / in_progress / ready_to_pick / picked_up / cancelled / exception
 -- priority enum     : normal / urgent / critical
@@ -203,7 +344,7 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = now();
 
 -- ───────────────────────────────────────────────
--- 6) Ticket items (~20, distributed across tickets)
+-- 7) Ticket items (~20, distributed across tickets)
 -- ───────────────────────────────────────────────
 -- ticket_item_type enum: cloth / car / shoe / carpet
 -- ticket_item_status enum: washing / done / ready_to_pick
@@ -264,7 +405,7 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = now();
 
 -- ───────────────────────────────────────────────
--- 7) Orders (8, mix of ticket-linked and manual)
+-- 8) Orders (8, mix of ticket-linked and manual)
 -- ───────────────────────────────────────────────
 -- order_type enum        : ticket / manual
 -- order_status enum      : draft / received / paid / delivered / cancelled
@@ -335,7 +476,7 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = now();
 
 -- ───────────────────────────────────────────────
--- 8) Order items (~15)
+-- 9) Order items (~15)
 -- ───────────────────────────────────────────────
 -- source_type enum: ticket_item / subscription / delivery_fee / product
 INSERT INTO order_items (
@@ -388,7 +529,7 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = now();
 
 -- ───────────────────────────────────────────────
--- 9) Payment transactions (~12, covering all methods & statuses)
+-- 10) Payment transactions (~12, covering all methods & statuses)
 -- ───────────────────────────────────────────────
 -- payment_method enum: cash / card / app
 -- payment_transaction_status enum: pending / paid / refunded / failed
@@ -421,7 +562,7 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = now();
 
 -- ───────────────────────────────────────────────
--- 10) Notifications (6) + Deliveries (6, to cashier1)
+-- 11) Notifications (6) + Deliveries (6, to cashier1)
 -- ───────────────────────────────────────────────
 -- scope enum     : pos / saas / tenant / mobile / desktop
 -- notice_type    : system / business
@@ -497,7 +638,7 @@ ON CONFLICT (id) DO UPDATE SET
   updated_at = now();
 
 -- ───────────────────────────────────────────────
--- 11) Additional POS demo data for richer dashboards
+-- 12) Additional POS demo data for richer dashboards
 -- These rows are intentionally dated around 2026-07-08 so the POS home page
 -- has non-empty today metrics and recent activity after a fresh seed.
 -- ───────────────────────────────────────────────

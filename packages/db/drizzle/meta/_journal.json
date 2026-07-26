@@ -71,6 +71,48 @@
       "when": 1784801082009,
       "tag": "0009_product_catalog_inventory",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784872800553,
+      "tag": "0010_fresh_stature",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784880897658,
+      "tag": "0011_ordinary_sebastian_shaw",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1784882043336,
+      "tag": "0012_wise_jean_grey",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1784882286496,
+      "tag": "0013_tiresome_komodo",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1784883606571,
+      "tag": "0014_silky_stepford_cuckoos",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1784889403499,
+      "tag": "0015_strange_lucky_pierre",
+      "breakpoints": true
     }
   ]
 }

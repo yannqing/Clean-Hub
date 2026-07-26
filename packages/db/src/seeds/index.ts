@@ -7,13 +7,16 @@ import { config } from "dotenv";
 import { createDbConnection, getDatabaseUrl } from "../client.js";
 
 // Load the repo-root .env the same way drizzle.config.ts does.
-config({ path: join(dirname(fileURLToPath(import.meta.url)), "../../../../.env") });
+config({
+  path: join(dirname(fileURLToPath(import.meta.url)), "../../../../.env"),
+});
 
 const SEED_FILES = [
   "dev-accounts.sql",
   "mobile-rbac.sql",
   "pos-cashiers.sql",
   "pos-business-data.sql",
+  "product-category-attributes.sql",
   "notification-defaults.sql",
   "pos-terminal-settings.sql",
   "mobile-e2e.sql",

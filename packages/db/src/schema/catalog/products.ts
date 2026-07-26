@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   numeric,
+  pgEnum,
   pgTable,
   text,
   timestamp,
@@ -20,6 +21,11 @@ import { mediaObjects } from "../platform/media.js";
 import { branches } from "../tenancy/branches.js";
 import { tenants } from "../tenancy/tenants.js";
 import { catalogItemStatusEnum } from "./services.js";
+
+export const productCategoryAttributeValueTypeEnum = pgEnum(
+  "product_category_attribute_value_type",
+  ["text", "single_select", "multi_select"],
+);
 
 export const productCategories = pgTable(
   "product_categories",
@@ -82,6 +88,7 @@ export const products = pgTable(
     name: varchar("name", { length: 200 }).notNull(),
     brand: varchar("brand", { length: 120 }),
     description: text("description"),
+    tags: jsonb("tags").$type<string[]>().notNull().default([]),
     status: catalogItemStatusEnum("status").notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -106,6 +113,10 @@ export const products = pgTable(
     index("products_tenant_name_idx").on(table.tenantId, table.name),
     index("products_category_id_idx").on(table.categoryId),
     index("products_deleted_at_idx").on(table.deletedAt),
+    check(
+      "products_tags_array_check",
+      sql`jsonb_typeof(${table.tags}) = 'array'`,
+    ),
   ],
 );
 
@@ -319,9 +330,7 @@ export const productMedia = pgTable(
       .references(() => tenants.id),
     productId: ulidColumn("product_id").notNull(),
     productSkuId: ulidColumn("product_sku_id"),
-    mediaObjectId: ulidColumn("media_object_id")
-      .notNull()
-      .references(() => mediaObjects.id, { onDelete: "restrict" }),
+    mediaObjectId: ulidColumn("media_object_id").notNull(),
     isPrimary: boolean("is_primary").notNull().default(false),
     sortOrder: integer("sort_order").notNull().default(0),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -334,6 +343,9 @@ export const productMedia = pgTable(
   (table) => [
     uniqueIndex("product_media_product_object_unique")
       .on(table.tenantId, table.productId, table.mediaObjectId)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("product_media_tenant_object_unique")
+      .on(table.tenantId, table.mediaObjectId)
       .where(sql`${table.deletedAt} is null`),
     uniqueIndex("product_media_product_primary_unique")
       .on(table.tenantId, table.productId)
@@ -359,7 +371,259 @@ export const productMedia = pgTable(
         productSkus.id,
       ],
     }).onDelete("restrict"),
+    foreignKey({
+      name: "product_media_tenant_media_object_fk",
+      columns: [table.tenantId, table.mediaObjectId],
+      foreignColumns: [mediaObjects.tenantId, mediaObjects.id],
+    }).onDelete("restrict"),
     index("product_media_media_object_id_idx").on(table.mediaObjectId),
     index("product_media_deleted_at_idx").on(table.deletedAt),
+  ],
+);
+
+export const productCategoryAttributeDefinitions = pgTable(
+  "product_category_attribute_definitions",
+  {
+    id: ulidPrimaryKey(),
+    tenantId: ulidColumn("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    categoryId: ulidColumn("category_id").notNull(),
+    code: varchar("code", { length: 80 }).notNull(),
+    name: varchar("name", { length: 120 }).notNull(),
+    valueType: productCategoryAttributeValueTypeEnum("value_type").notNull(),
+    required: boolean("required").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    status: catalogItemStatusEnum("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdBy: ulidColumn("created_by").references(() => users.id),
+    updatedBy: ulidColumn("updated_by").references(() => users.id),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: ulidColumn("deleted_by").references(() => users.id),
+    version: integer("version").notNull().default(1),
+  },
+  (table) => [
+    uniqueIndex("product_cat_attr_defs_tenant_id_unique").on(
+      table.tenantId,
+      table.id,
+    ),
+    uniqueIndex("product_cat_attr_defs_tenant_category_id_unique").on(
+      table.tenantId,
+      table.categoryId,
+      table.id,
+    ),
+    uniqueIndex("product_cat_attr_defs_active_code_unique")
+      .on(table.tenantId, table.categoryId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+    foreignKey({
+      name: "product_cat_attr_defs_tenant_category_fk",
+      columns: [table.tenantId, table.categoryId],
+      foreignColumns: [productCategories.tenantId, productCategories.id],
+    }).onDelete("restrict"),
+    index("product_cat_attr_defs_category_status_idx").on(
+      table.tenantId,
+      table.categoryId,
+      table.status,
+    ),
+    index("product_cat_attr_defs_deleted_at_idx").on(table.deletedAt),
+    check(
+      "product_cat_attr_defs_code_not_blank_check",
+      sql`length(btrim(${table.code})) > 0`,
+    ),
+    check(
+      "product_cat_attr_defs_name_not_blank_check",
+      sql`length(btrim(${table.name})) > 0`,
+    ),
+    check(
+      "product_cat_attr_defs_sort_order_check",
+      sql`${table.sortOrder} >= 0`,
+    ),
+  ],
+);
+
+export const productCategoryAttributeOptions = pgTable(
+  "product_category_attribute_options",
+  {
+    id: ulidPrimaryKey(),
+    tenantId: ulidColumn("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    definitionId: ulidColumn("definition_id").notNull(),
+    code: varchar("code", { length: 80 }).notNull(),
+    label: varchar("label", { length: 120 }).notNull(),
+    sortOrder: integer("sort_order").notNull().default(0),
+    status: catalogItemStatusEnum("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdBy: ulidColumn("created_by").references(() => users.id),
+    updatedBy: ulidColumn("updated_by").references(() => users.id),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: ulidColumn("deleted_by").references(() => users.id),
+    version: integer("version").notNull().default(1),
+  },
+  (table) => [
+    uniqueIndex("product_cat_attr_opts_tenant_definition_id_unique").on(
+      table.tenantId,
+      table.definitionId,
+      table.id,
+    ),
+    uniqueIndex("product_cat_attr_opts_active_code_unique")
+      .on(table.tenantId, table.definitionId, table.code)
+      .where(sql`${table.deletedAt} is null`),
+    foreignKey({
+      name: "product_cat_attr_opts_tenant_definition_fk",
+      columns: [table.tenantId, table.definitionId],
+      foreignColumns: [
+        productCategoryAttributeDefinitions.tenantId,
+        productCategoryAttributeDefinitions.id,
+      ],
+    }).onDelete("restrict"),
+    index("product_cat_attr_opts_definition_status_idx").on(
+      table.tenantId,
+      table.definitionId,
+      table.status,
+    ),
+    index("product_cat_attr_opts_deleted_at_idx").on(table.deletedAt),
+    check(
+      "product_cat_attr_opts_code_not_blank_check",
+      sql`length(btrim(${table.code})) > 0`,
+    ),
+    check(
+      "product_cat_attr_opts_label_not_blank_check",
+      sql`length(btrim(${table.label})) > 0`,
+    ),
+    check(
+      "product_cat_attr_opts_sort_order_check",
+      sql`${table.sortOrder} >= 0`,
+    ),
+  ],
+);
+
+export const productAttributeValues = pgTable(
+  "product_attribute_values",
+  {
+    id: ulidPrimaryKey(),
+    tenantId: ulidColumn("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    productId: ulidColumn("product_id").notNull(),
+    definitionId: ulidColumn("definition_id").notNull(),
+    textValue: text("text_value"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdBy: ulidColumn("created_by").references(() => users.id),
+    updatedBy: ulidColumn("updated_by").references(() => users.id),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: ulidColumn("deleted_by").references(() => users.id),
+    version: integer("version").notNull().default(1),
+  },
+  (table) => [
+    uniqueIndex("product_attr_values_tenant_id_unique").on(
+      table.tenantId,
+      table.id,
+    ),
+    uniqueIndex("product_attr_values_tenant_definition_id_unique").on(
+      table.tenantId,
+      table.definitionId,
+      table.id,
+    ),
+    uniqueIndex("product_attr_values_active_definition_unique")
+      .on(table.tenantId, table.productId, table.definitionId)
+      .where(sql`${table.deletedAt} is null`),
+    foreignKey({
+      name: "product_attr_values_tenant_product_fk",
+      columns: [table.tenantId, table.productId],
+      foreignColumns: [products.tenantId, products.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "product_attr_values_tenant_definition_fk",
+      columns: [table.tenantId, table.definitionId],
+      foreignColumns: [
+        productCategoryAttributeDefinitions.tenantId,
+        productCategoryAttributeDefinitions.id,
+      ],
+    }).onDelete("restrict"),
+    index("product_attr_values_product_idx").on(
+      table.tenantId,
+      table.productId,
+    ),
+    index("product_attr_values_definition_idx").on(
+      table.tenantId,
+      table.definitionId,
+    ),
+    index("product_attr_values_deleted_at_idx").on(table.deletedAt),
+    check(
+      "product_attr_values_text_not_blank_check",
+      sql`${table.textValue} is null or length(btrim(${table.textValue})) > 0`,
+    ),
+  ],
+);
+
+export const productAttributeValueOptions = pgTable(
+  "product_attribute_value_options",
+  {
+    id: ulidPrimaryKey(),
+    tenantId: ulidColumn("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    attributeValueId: ulidColumn("attribute_value_id").notNull(),
+    definitionId: ulidColumn("definition_id").notNull(),
+    optionId: ulidColumn("option_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdBy: ulidColumn("created_by").references(() => users.id),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: ulidColumn("deleted_by").references(() => users.id),
+  },
+  (table) => [
+    uniqueIndex("product_attr_value_opts_active_unique")
+      .on(
+        table.tenantId,
+        table.attributeValueId,
+        table.definitionId,
+        table.optionId,
+      )
+      .where(sql`${table.deletedAt} is null`),
+    foreignKey({
+      name: "product_attr_value_opts_tenant_value_fk",
+      columns: [table.tenantId, table.definitionId, table.attributeValueId],
+      foreignColumns: [
+        productAttributeValues.tenantId,
+        productAttributeValues.definitionId,
+        productAttributeValues.id,
+      ],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "product_attr_value_opts_tenant_option_fk",
+      columns: [table.tenantId, table.definitionId, table.optionId],
+      foreignColumns: [
+        productCategoryAttributeOptions.tenantId,
+        productCategoryAttributeOptions.definitionId,
+        productCategoryAttributeOptions.id,
+      ],
+    }).onDelete("restrict"),
+    index("product_attr_value_opts_value_idx").on(
+      table.tenantId,
+      table.attributeValueId,
+    ),
+    index("product_attr_value_opts_option_idx").on(
+      table.tenantId,
+      table.optionId,
+    ),
+    index("product_attr_value_opts_deleted_at_idx").on(table.deletedAt),
   ],
 );
