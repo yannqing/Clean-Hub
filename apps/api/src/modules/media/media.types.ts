@@ -1,6 +1,9 @@
-export type MediaObjectPurpose = "delivery_proof" | "delivery_signature";
+export type MediaObjectPurpose =
+  | "delivery_proof"
+  | "delivery_signature"
+  | "product_image";
 
-export type MediaObjectStatus = "pending" | "committed";
+export type MediaObjectStatus = "pending" | "committed" | "deleting";
 
 export type RequestMediaUploadInput = {
   tenantId: string;
@@ -30,6 +33,14 @@ export type MediaObjectRecord = {
   createdAt: string;
   committedAt: string | null;
   expiresAt: string;
+  cleanupClaimToken: string | null;
+  cleanupClaimedAt: string | null;
+};
+
+export type ClaimedMediaObjectRecord = MediaObjectRecord & {
+  status: "deleting";
+  cleanupClaimToken: string;
+  cleanupClaimedAt: string;
 };
 
 export type MediaDownloadTicket = {
@@ -47,6 +58,7 @@ export type CleanupExpiredMediaResult = {
 export type MediaErrorCode =
   | "MEDIA_FORBIDDEN"
   | "MEDIA_NOT_FOUND"
+  | "MEDIA_CONFLICT"
   | "MEDIA_VALIDATION_ERROR"
   | "MEDIA_STORAGE_ERROR";
 
@@ -54,7 +66,7 @@ export class MediaError extends Error {
   constructor(
     readonly code: MediaErrorCode,
     message: string,
-    readonly status: 403 | 404 | 422 | 500,
+    readonly status: 403 | 404 | 409 | 422 | 500,
     readonly details?: Record<string, unknown>,
   ) {
     super(message);

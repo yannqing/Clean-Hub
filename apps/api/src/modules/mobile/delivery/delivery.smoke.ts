@@ -342,6 +342,8 @@ function createMediaService(): DeliveryMediaServiceLike & {
         createdAt: new Date().toISOString(),
         committedAt: new Date().toISOString(),
         expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        cleanupClaimToken: null,
+        cleanupClaimedAt: null,
       };
     },
     async createDownloadLink({ objectKey }) {
