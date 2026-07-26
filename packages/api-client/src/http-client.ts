@@ -6,6 +6,7 @@ import {
   ApiParseError,
   ApiTimeoutError,
   type ApiErrorDetails,
+  type ApiFieldError,
 } from "./errors";
 import type {
   ApiClient,
@@ -229,16 +230,56 @@ function getErrorCode(parsedBody: unknown): string | undefined {
   return undefined;
 }
 
-function getValidationErrors(parsedBody: unknown): ApiErrorDetails["validationErrors"] {
-  if (
-    parsedBody &&
-    typeof parsedBody === "object" &&
-    "validationErrors" in parsedBody
-  ) {
-    return (parsedBody as ApiErrorDetails).validationErrors;
+function isApiFieldError(value: unknown): value is ApiFieldError {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "field" in value &&
+    typeof (value as { field?: unknown }).field === "string" &&
+    "message" in value &&
+    typeof (value as { message?: unknown }).message === "string"
+  );
+}
+
+function getValidationErrors(
+  parsedBody: unknown,
+): ApiErrorDetails["validationErrors"] {
+  if (!parsedBody || typeof parsedBody !== "object") {
+    return undefined;
   }
 
-  return undefined;
+  const validationErrors = (
+    parsedBody as {
+      validationErrors?: unknown;
+    }
+  ).validationErrors;
+
+  if (Array.isArray(validationErrors)) {
+    return validationErrors.filter(isApiFieldError);
+  }
+
+  if (
+    !validationErrors ||
+    typeof validationErrors !== "object" ||
+    !("fieldErrors" in validationErrors)
+  ) {
+    return undefined;
+  }
+
+  const fieldErrors = (validationErrors as { fieldErrors?: unknown })
+    .fieldErrors;
+
+  if (!fieldErrors || typeof fieldErrors !== "object") {
+    return undefined;
+  }
+
+  return Object.entries(fieldErrors).flatMap(([field, messages]) =>
+    Array.isArray(messages)
+      ? messages
+          .filter((message): message is string => typeof message === "string")
+          .map((message) => ({ field, message }))
+      : [],
+  );
 }
 
 function shouldRetry({
