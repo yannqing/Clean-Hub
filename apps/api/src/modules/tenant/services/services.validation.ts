@@ -11,6 +11,25 @@ export const serviceBusinessLineSchema = z.enum([
 
 export const servicePricingUnitSchema = z.enum(["per_item", "per_kg"]);
 export const serviceStatusSchema = z.enum(["active", "inactive"]);
+export const serviceLabelRuleSchema = z.enum([
+  "none",
+  "per_item",
+  "per_order_item",
+  "per_bag",
+]);
+
+const standardPriceSchema = z
+  .union([z.string(), z.number()])
+  .transform((value) => String(value).trim())
+  .refine((value) => /^\d+(\.\d{1,2})?$/.test(value), {
+    message: "Standard price must be a decimal with up to 2 places.",
+  })
+  .refine((value) => Number(value) > 0, {
+    message: "Standard price must be greater than 0.",
+  })
+  .refine((value) => Number(value) <= 9_999_999_999.99, {
+    message: "Standard price exceeds the supported maximum.",
+  });
 
 export const serviceListQuerySchema = z.object({
   businessLine: serviceBusinessLineSchema.optional(),
@@ -24,15 +43,22 @@ export const serviceParamsSchema = z.object({
   serviceId: z.string().regex(ULID_PATTERN),
 });
 
-export const createServiceBodySchema = z.object({
+const serviceProfileBodySchema = z.object({
   businessLine: serviceBusinessLineSchema,
-  name: z.string().trim().min(1).max(120),
-  categoryId: z.string().regex(ULID_PATTERN).nullable().optional(),
+  name: z.string().trim().min(1).max(200),
+  categoryId: z.string().regex(ULID_PATTERN),
+  description: z.string().trim().max(2000).nullable().optional(),
+  displayOrder: z.number().int().min(0).max(1_000_000).optional(),
   pricingUnit: servicePricingUnitSchema,
-  status: serviceStatusSchema.default("active"),
+  labelRule: serviceLabelRuleSchema,
+  status: serviceStatusSchema.optional(),
 });
 
-export const updateServiceBodySchema = createServiceBodySchema
+export const createServiceBodySchema = serviceProfileBodySchema.extend({
+  standardPrice: standardPriceSchema,
+});
+
+export const updateServiceBodySchema = serviceProfileBodySchema
   .partial()
   .extend({
     version: z.number().int().positive(),

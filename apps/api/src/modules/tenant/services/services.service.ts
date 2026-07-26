@@ -7,6 +7,7 @@ import {
 } from "../../auth/permission.helper.js";
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { findServiceCategoryById } from "../service-categories/service-categories.repository.js";
 import { TenantServicesError } from "./services.errors.js";
 import {
   createServiceRecord,
@@ -20,6 +21,7 @@ import {
 } from "./services.repository.js";
 import type {
   CreateServiceRequest,
+  ServiceBusinessLine,
   ServiceListInput,
   ServiceStatus,
   ServiceSummary,
@@ -41,6 +43,45 @@ async function requireTenantReadyForServices(
 
   if (businessLine) {
     await requireFeatureEnabled(authContext, businessLine, db);
+  }
+}
+
+async function requireCompatibleServiceCategory(
+  db: Database,
+  input: {
+    tenantId: string;
+    categoryId: string;
+    businessLine: ServiceBusinessLine;
+    allowInactive: boolean;
+  },
+): Promise<void> {
+  const category = await findServiceCategoryById(db, {
+    tenantId: input.tenantId,
+    categoryId: input.categoryId,
+  });
+
+  if (!category) {
+    throw new TenantServicesError(
+      "SERVICE_CATEGORY_NOT_FOUND",
+      "Service category was not found.",
+      404,
+    );
+  }
+
+  if (category.businessLine !== input.businessLine) {
+    throw new TenantServicesError(
+      "SERVICE_CATEGORY_BUSINESS_LINE_MISMATCH",
+      "Service category does not belong to the selected business line.",
+      422,
+    );
+  }
+
+  if (!input.allowInactive && category.status !== "active") {
+    throw new TenantServicesError(
+      "SERVICE_CATEGORY_INACTIVE",
+      "Inactive service categories cannot be assigned.",
+      422,
+    );
   }
 }
 
@@ -95,6 +136,12 @@ export async function createTenantService(
   const tenantId = requireTenantContext(authContext);
 
   await requireTenantReadyForServices(authContext, db, data.businessLine);
+  await requireCompatibleServiceCategory(db, {
+    tenantId,
+    categoryId: data.categoryId,
+    businessLine: data.businessLine,
+    allowInactive: false,
+  });
 
   const duplicate = await findServiceByName(db, {
     tenantId,
@@ -178,6 +225,13 @@ export async function updateTenantService(
       tx,
       data.businessLine ?? before.businessLine,
     );
+    const categoryId = data.categoryId ?? before.categoryId;
+    await requireCompatibleServiceCategory(tx, {
+      tenantId,
+      categoryId,
+      businessLine: data.businessLine ?? before.businessLine,
+      allowInactive: categoryId === before.categoryId,
+    });
 
     const service = await updateServiceRecord(tx, {
       ...data,

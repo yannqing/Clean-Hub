@@ -1,6 +1,8 @@
 import type { ApiClient, ApiRequestOptions, QueryParams } from "../../types";
 import type {
   CreateServiceRequest,
+  ServiceCategoryListQuery,
+  ServiceCategorySummary,
   ServiceListQuery,
   ServiceSummary,
   UpdateServiceStatusRequest,
@@ -16,18 +18,45 @@ export function createTenantServicesApi(client: ApiClient) {
         query,
         ...options,
       }),
-    getDetail: (serviceId: string) =>
-      client.get<ServiceSummary>(`/tenant/services/${serviceId}`),
-    create: (data: CreateServiceRequest) =>
-      client.post<ServiceSummary>("/tenant/services", data),
-    update: (serviceId: string, data: UpdateServiceRequest) =>
-      client.patch<ServiceSummary>(`/tenant/services/${serviceId}`, data),
-    updateStatus: (serviceId: string, data: UpdateServiceStatusRequest) =>
-      client.patch<ServiceSummary>(
-        `/tenant/services/${serviceId}/status`,
-        data,
+    listCategories: (
+      query?: ServiceCategoryListQuery | QueryParams,
+      options?: RequestOptions,
+    ) =>
+      client.get<ServiceCategorySummary[]>("/tenant/service-categories", {
+        query,
+        ...options,
+      }),
+    getDetail: (serviceId: string, options?: RequestOptions) =>
+      client.get<ServiceSummary>(
+        `/tenant/services/${encodeURIComponent(serviceId)}`,
+        options,
       ),
-    remove: (serviceId: string) =>
-      client.delete<void>(`/tenant/services/${serviceId}`),
+    create: (data: CreateServiceRequest, options?: RequestOptions) =>
+      client.post<ServiceSummary>("/tenant/services", data, options),
+    update: (
+      serviceId: string,
+      data: UpdateServiceRequest,
+      options?: RequestOptions,
+    ) =>
+      client.patch<ServiceSummary>(
+        `/tenant/services/${encodeURIComponent(serviceId)}`,
+        data,
+        options,
+      ),
+    updateStatus: (
+      serviceId: string,
+      data: UpdateServiceStatusRequest,
+      options?: RequestOptions,
+    ) =>
+      client.patch<ServiceSummary>(
+        `/tenant/services/${encodeURIComponent(serviceId)}/status`,
+        data,
+        options,
+      ),
+    remove: (serviceId: string, options?: RequestOptions) =>
+      client.delete<void>(`/tenant/services/${encodeURIComponent(serviceId)}`, {
+        ...options,
+        parseAs: "void",
+      }),
   };
 }

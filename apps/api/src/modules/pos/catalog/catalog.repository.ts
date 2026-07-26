@@ -1,10 +1,12 @@
-import { prices, services, type Database } from "@cleanhub/db";
-import { and, asc, eq, isNull, sql, type SQL } from "drizzle-orm";
+import {
+  prices,
+  serviceCategories,
+  services,
+  type Database,
+} from "@cleanhub/db";
+import { and, asc, eq, isNull, or, sql, type SQL } from "drizzle-orm";
 
-import type {
-  PosCatalogQuery,
-  PosCatalogService,
-} from "./catalog.types.js";
+import type { PosCatalogQuery, PosCatalogService } from "./catalog.types.js";
 
 function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
@@ -18,6 +20,8 @@ export async function findPosCatalogServices(
     eq(services.tenantId, input.tenantId),
     eq(services.status, "active"),
     isNull(services.deletedAt),
+    eq(serviceCategories.status, "active"),
+    isNull(serviceCategories.deletedAt),
     eq(prices.tenantId, input.tenantId),
     eq(prices.status, "active"),
     isNull(prices.deletedAt),
@@ -28,7 +32,12 @@ export async function findPosCatalogServices(
   }
   if (input.q) {
     const query = `%${escapeLikePattern(input.q)}%`;
-    filters.push(sql`${services.name} ilike ${query} escape '\\'`);
+    filters.push(
+      or(
+        sql`${services.name} ilike ${query} escape '\\'`,
+        sql`${serviceCategories.name} ilike ${query} escape '\\'`,
+      )!,
+    );
   }
 
   return db
@@ -36,12 +45,21 @@ export async function findPosCatalogServices(
       id: services.id,
       name: services.name,
       categoryId: services.categoryId,
+      categoryName: serviceCategories.name,
       businessLine: services.businessLine,
       pricingUnit: services.pricingUnit,
+      labelRule: services.labelRule,
       amount: prices.amount,
       currency: prices.currency,
     })
     .from(services)
+    .innerJoin(
+      serviceCategories,
+      and(
+        eq(serviceCategories.id, services.categoryId),
+        eq(serviceCategories.tenantId, services.tenantId),
+      ),
+    )
     .innerJoin(
       prices,
       and(
@@ -50,7 +68,12 @@ export async function findPosCatalogServices(
       ),
     )
     .where(and(...filters))
-    .orderBy(asc(services.businessLine), asc(services.name))
+    .orderBy(
+      asc(serviceCategories.sortOrder),
+      asc(services.displayOrder),
+      asc(services.name),
+      asc(services.id),
+    )
     .limit(input.limit);
 }
 
@@ -63,12 +86,23 @@ export async function findPosCatalogServiceById(
       id: services.id,
       name: services.name,
       categoryId: services.categoryId,
+      categoryName: serviceCategories.name,
       businessLine: services.businessLine,
       pricingUnit: services.pricingUnit,
+      labelRule: services.labelRule,
       amount: prices.amount,
       currency: prices.currency,
     })
     .from(services)
+    .innerJoin(
+      serviceCategories,
+      and(
+        eq(serviceCategories.id, services.categoryId),
+        eq(serviceCategories.tenantId, services.tenantId),
+        eq(serviceCategories.status, "active"),
+        isNull(serviceCategories.deletedAt),
+      ),
+    )
     .innerJoin(
       prices,
       and(

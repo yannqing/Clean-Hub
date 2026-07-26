@@ -8,6 +8,11 @@ export type ServiceBusinessLine =
 
 export type ServicePricingUnit = "per_item" | "per_kg";
 export type ServiceStatus = "active" | "inactive";
+export type ServiceLabelRule =
+  | "none"
+  | "per_item"
+  | "per_order_item"
+  | "per_bag";
 
 export type ServiceListInput = {
   businessLine?: ServiceBusinessLine;
@@ -22,8 +27,14 @@ export type ServiceSummary = {
   tenantId: string;
   businessLine: ServiceBusinessLine;
   name: string;
-  categoryId: string | null;
+  categoryId: string;
+  categoryName: string;
+  description: string | null;
+  displayOrder: number;
   pricingUnit: ServicePricingUnit;
+  labelRule: ServiceLabelRule;
+  standardPrice: string;
+  currency: string;
   status: ServiceStatus;
   createdAt: string;
   updatedAt: string;
@@ -33,12 +44,18 @@ export type ServiceSummary = {
 export type CreateServiceRequest = {
   businessLine: ServiceBusinessLine;
   name: string;
-  categoryId?: string | null;
+  categoryId: string;
+  description?: string | null;
+  displayOrder?: number;
   pricingUnit: ServicePricingUnit;
+  labelRule: ServiceLabelRule;
+  standardPrice: string;
   status?: ServiceStatus;
 };
 
-export type UpdateServiceRequest = Partial<CreateServiceRequest> & {
+export type UpdateServiceRequest = Partial<
+  Omit<CreateServiceRequest, "standardPrice">
+> & {
   /** Optimistic-concurrency version from the record the editor last read. */
   version: number;
 };
@@ -53,7 +70,11 @@ export type ServiceAuditSnapshot = {
   tenantId: string;
   businessLine: ServiceBusinessLine;
   name: string;
-  categoryId: string | null;
+  categoryId: string;
+  categoryName: string;
+  description: string | null;
+  displayOrder: number;
   pricingUnit: ServicePricingUnit;
+  labelRule: ServiceLabelRule;
   status: ServiceStatus;
 };

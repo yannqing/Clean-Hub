@@ -5,13 +5,20 @@ export type PosCatalogBusinessLine =
   | "delivery";
 
 export type PosCatalogPricingUnit = "per_item" | "per_kg";
+export type PosCatalogLabelRule =
+  | "none"
+  | "per_item"
+  | "per_order_item"
+  | "per_bag";
 
 export type PosCatalogService = {
   id: string;
   name: string;
-  categoryId: string | null;
+  categoryId: string;
+  categoryName: string;
   businessLine: PosCatalogBusinessLine;
   pricingUnit: PosCatalogPricingUnit;
+  labelRule: PosCatalogLabelRule;
   amount: string;
   currency: string;
 };

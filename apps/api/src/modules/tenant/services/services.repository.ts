@@ -1,6 +1,12 @@
 import { and, asc, eq, isNull, sql, type SQL } from "drizzle-orm";
 
-import { prices, services, tenantSettings, type Database } from "@cleanhub/db";
+import {
+  prices,
+  serviceCategories,
+  services,
+  tenantSettings,
+  type Database,
+} from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
 
 import type {
@@ -23,14 +29,64 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
-function toServiceSummary(row: typeof services.$inferSelect): ServiceSummary {
+type ServiceJoinedRow = {
+  id: string;
+  tenantId: string;
+  businessLine: ServiceSummary["businessLine"];
+  name: string;
+  categoryId: string | null;
+  categoryName: string;
+  description: string | null;
+  displayOrder: number;
+  pricingUnit: ServiceSummary["pricingUnit"];
+  labelRule: ServiceSummary["labelRule"];
+  standardPrice: string;
+  currency: string;
+  status: ServiceSummary["status"];
+  createdAt: Date;
+  updatedAt: Date;
+  version: number;
+};
+
+function buildServiceSelect() {
+  return {
+    id: services.id,
+    tenantId: services.tenantId,
+    businessLine: services.businessLine,
+    name: services.name,
+    categoryId: services.categoryId,
+    categoryName: serviceCategories.name,
+    description: services.description,
+    displayOrder: services.displayOrder,
+    pricingUnit: services.pricingUnit,
+    labelRule: services.labelRule,
+    standardPrice: prices.amount,
+    currency: prices.currency,
+    status: services.status,
+    createdAt: services.createdAt,
+    updatedAt: services.updatedAt,
+    version: services.version,
+  };
+}
+
+function toServiceSummary(row: ServiceJoinedRow): ServiceSummary {
+  if (!row.categoryId) {
+    throw new Error(`Service "${row.id}" has no category.`);
+  }
+
   return {
     id: row.id,
     tenantId: row.tenantId,
     businessLine: row.businessLine,
     name: row.name,
     categoryId: row.categoryId,
+    categoryName: row.categoryName,
+    description: row.description,
+    displayOrder: row.displayOrder,
     pricingUnit: row.pricingUnit,
+    labelRule: row.labelRule,
+    standardPrice: row.standardPrice,
+    currency: row.currency,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -44,7 +100,11 @@ function toAuditSnapshot(row: ServiceSummary): ServiceAuditSnapshot {
     businessLine: row.businessLine,
     name: row.name,
     categoryId: row.categoryId,
+    categoryName: row.categoryName,
+    description: row.description,
+    displayOrder: row.displayOrder,
     pricingUnit: row.pricingUnit,
+    labelRule: row.labelRule,
     status: row.status,
   };
 }
@@ -56,6 +116,8 @@ export async function findServices(
   const filters: SQL[] = [
     eq(services.tenantId, input.tenantId),
     isNull(services.deletedAt),
+    isNull(serviceCategories.deletedAt),
+    isNull(prices.deletedAt),
   ];
 
   if (input.businessLine) {
@@ -72,10 +134,29 @@ export async function findServices(
   }
 
   const rows = await db
-    .select()
+    .select(buildServiceSelect())
     .from(services)
+    .innerJoin(
+      serviceCategories,
+      and(
+        eq(serviceCategories.id, services.categoryId),
+        eq(serviceCategories.tenantId, services.tenantId),
+      ),
+    )
+    .innerJoin(
+      prices,
+      and(
+        eq(prices.serviceId, services.id),
+        eq(prices.tenantId, services.tenantId),
+      ),
+    )
     .where(and(...filters))
-    .orderBy(asc(services.name))
+    .orderBy(
+      asc(serviceCategories.sortOrder),
+      asc(services.displayOrder),
+      asc(services.name),
+      asc(services.id),
+    )
     .limit(input.limit)
     .offset(input.offset);
 
@@ -87,13 +168,29 @@ export async function findServiceById(
   input: { tenantId: string; serviceId: string },
 ): Promise<ServiceSummary | null> {
   const rows = await db
-    .select()
+    .select(buildServiceSelect())
     .from(services)
+    .innerJoin(
+      serviceCategories,
+      and(
+        eq(serviceCategories.id, services.categoryId),
+        eq(serviceCategories.tenantId, services.tenantId),
+      ),
+    )
+    .innerJoin(
+      prices,
+      and(
+        eq(prices.serviceId, services.id),
+        eq(prices.tenantId, services.tenantId),
+      ),
+    )
     .where(
       and(
         eq(services.id, input.serviceId),
         eq(services.tenantId, input.tenantId),
         isNull(services.deletedAt),
+        isNull(serviceCategories.deletedAt),
+        isNull(prices.deletedAt),
       ),
     )
     .limit(1);
@@ -150,8 +247,11 @@ export async function createServiceRecord(
     tenantId: input.tenantId,
     businessLine: input.businessLine,
     name: input.name.trim(),
-    categoryId: normalizeNullable(input.categoryId),
+    categoryId: input.categoryId,
+    description: normalizeNullable(input.description),
+    displayOrder: input.displayOrder ?? 0,
     pricingUnit: input.pricingUnit,
+    labelRule: input.labelRule,
     status: input.status ?? "active",
     createdBy: input.actorUserId,
     updatedBy: input.actorUserId,
@@ -161,7 +261,7 @@ export async function createServiceRecord(
     id: createId(),
     tenantId: input.tenantId,
     serviceId,
-    amount: "1.00",
+    amount: input.standardPrice,
     currency,
     status: input.status ?? "active",
     createdBy: input.actorUserId,
@@ -200,10 +300,14 @@ export async function updateServiceRecord(
       businessLine: input.businessLine ?? existing.businessLine,
       name: input.name?.trim() ?? existing.name,
       categoryId:
-        input.categoryId === undefined
-          ? existing.categoryId
-          : normalizeNullable(input.categoryId),
+        input.categoryId === undefined ? existing.categoryId : input.categoryId,
+      description:
+        input.description === undefined
+          ? existing.description
+          : normalizeNullable(input.description),
+      displayOrder: input.displayOrder ?? existing.displayOrder,
       pricingUnit: input.pricingUnit ?? existing.pricingUnit,
+      labelRule: input.labelRule ?? existing.labelRule,
       status: input.status ?? existing.status,
       updatedAt: new Date(),
       updatedBy: input.actorUserId,
