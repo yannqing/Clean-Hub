@@ -1,7 +1,13 @@
 import type { ApiClient, ApiRequestOptions, QueryParams } from "../../types";
 import type {
+  CreateTenantProductRequest,
+  CreateTenantProductResponse,
+  RequestTenantProductMediaUploadRequest,
+  TenantProductCategoryAttributeListResponse,
+  TenantProductCategoryListResponse,
   TenantProductListQuery,
   TenantProductListResponse,
+  TenantProductMediaUploadTicket,
   TenantProductOverview,
   TenantProductOverviewQuery,
 } from "./products.types";
@@ -26,5 +32,30 @@ export function createTenantProductsApi(client: ApiClient) {
         query,
         ...options,
       }),
+    create: (input: CreateTenantProductRequest, options?: RequestOptions) =>
+      client.post<CreateTenantProductResponse>(
+        "/tenant/products",
+        input,
+        options,
+      ),
+    categories: (options?: RequestOptions) =>
+      client.get<TenantProductCategoryListResponse>(
+        "/tenant/products/categories",
+        options,
+      ),
+    categoryAttributes: (categoryId: string, options?: RequestOptions) =>
+      client.get<TenantProductCategoryAttributeListResponse>(
+        `/tenant/products/categories/${encodeURIComponent(categoryId)}/attributes`,
+        options,
+      ),
+    requestMediaUpload: (
+      input: RequestTenantProductMediaUploadRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<TenantProductMediaUploadTicket>(
+        "/tenant/products/media/uploads",
+        input,
+        options,
+      ),
   };
 }

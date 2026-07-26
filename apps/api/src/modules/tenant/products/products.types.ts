@@ -1,5 +1,105 @@
 export type TenantProductStatus = "active" | "inactive";
 
+export type CreateTenantProductBranchSetting = {
+  branchId: string;
+  openingStock: string;
+  reorderPoint: string;
+};
+
+export type CreateTenantProductCategoryAttribute =
+  | {
+      definitionId: string;
+      optionIds: string[];
+      textValue?: never;
+    }
+  | {
+      definitionId: string;
+      optionIds?: never;
+      textValue: string;
+    };
+
+export type CreateTenantProductRequest = {
+  name: string;
+  categoryId?: string;
+  categoryName?: string;
+  categoryAttributes: CreateTenantProductCategoryAttribute[];
+  brand?: string;
+  description?: string;
+  tags: string[];
+  status: TenantProductStatus;
+  skuCode: string;
+  barcode?: string;
+  variantName?: string;
+  unitOfMeasure: string;
+  unitsPerSale: string;
+  salePrice: string;
+  currency: string;
+  referenceCost?: string | null;
+  trackInventory: boolean;
+  allowNegativeStock: boolean;
+  allowOfflineSale: boolean;
+  branchSettings: CreateTenantProductBranchSetting[];
+  mediaObjectKeys: string[];
+};
+
+export type CreateTenantProductResponse = {
+  id: string;
+};
+
+export type RequestTenantProductMediaUpload = {
+  contentType: string;
+  sizeBytes: number;
+};
+
+export type TenantProductMediaUploadTicket = {
+  objectKey: string;
+  uploadUrl: string;
+  headers: Record<string, string>;
+  expiresAt: string;
+};
+
+export type TenantProductCategorySummary = {
+  id: string;
+  name: string;
+  code: string | null;
+};
+
+export type TenantProductCategoryListResponse = {
+  data: TenantProductCategorySummary[];
+};
+
+export type TenantProductCategoryAttributeValueType =
+  | "text"
+  | "single_select"
+  | "multi_select";
+
+export type TenantProductCategoryAttributeOption = {
+  id: string;
+  code: string;
+  label: string;
+  sortOrder: number;
+};
+
+export type TenantProductCategoryAttributeDefinition = {
+  id: string;
+  code: string;
+  name: string;
+  valueType: TenantProductCategoryAttributeValueType;
+  required: boolean;
+  sortOrder: number;
+  options: TenantProductCategoryAttributeOption[];
+};
+
+export type TenantProductCategoryAttributeListResponse = {
+  category: {
+    id: string;
+    name: string;
+    code: string | null;
+    version: number;
+  };
+  data: TenantProductCategoryAttributeDefinition[];
+};
+
 export type TenantProductPriceRange = {
   currency: string;
   minAmount: string;
@@ -12,6 +112,7 @@ export type TenantProductSummary = {
   brand: string | null;
   categoryId: string | null;
   categoryName: string | null;
+  tags: string[];
   status: TenantProductStatus;
   skuCount: number;
   activeSkuCount: number;
