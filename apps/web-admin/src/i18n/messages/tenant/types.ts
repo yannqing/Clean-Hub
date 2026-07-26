@@ -258,34 +258,110 @@ export type TenantMessages = {
     };
     create: {
       title: string;
-      description: string;
-      backToProducts: string;
+      breadcrumbLabel: string;
       requiredHint: string;
       saveProduct: string;
-      saveUnavailable: string;
-      sections: {
-        basic: {
-          title: string;
-          description: string;
-        };
-        sku: {
-          title: string;
-          description: string;
-        };
-        pricing: {
-          title: string;
-          description: string;
-        };
-        inventory: {
-          title: string;
-          description: string;
-        };
+      created: string;
+      createFailed: string;
+      productConflict: string;
+      mediaCreateConflict: string;
+      checkForm: string;
+      loadFailed: string;
+      removeTag: string;
+      removeImage: string;
+      managePublishing: string;
+      branchDialogDescription: string;
+      branchSearchPlaceholder: string;
+      noMatchingBranches: string;
+      confirmBranchSelection: string;
+      selectedBranchCount: string;
+      addTags: string;
+      addTag: string;
+      tagSearchPlaceholder: string;
+      tagEmpty: string;
+      richText: {
+        toolbarLabel: string;
+        bold: string;
+        italic: string;
+        underline: string;
+        bulletList: string;
+        numberedList: string;
+        clearFormatting: string;
+      };
+      addImages: string;
+      mediaHelp: string;
+      mediaTypeInvalid: string;
+      mediaTooLarge: string;
+      mediaLimitReached: string;
+      mediaUploadFailed: string;
+      unsavedChanges: string;
+      showMoreSettings: string;
+      hideMoreSettings: string;
+      categoryMetafields: {
+        uncategorized: string;
+        loading: string;
+        loadFailed: string;
+        retry: string;
+        noAttributes: string;
+        recommended: string;
+        textPlaceholder: string;
+        chooseValue: string;
+        chooseValues: string;
+        noOptions: string;
+        selectedValues: string;
+        required: string;
+        add: string;
+        remove: string;
+        added: string;
+        removed: string;
+        changeConfirm: string;
+      };
+      taxonomy: {
+        categories: Record<string, string>;
+        attributes: Record<string, string>;
+        options: Record<string, string>;
+      };
+      validation: {
+        nameRequired: string;
+        nameTooLong: string;
+        categoryInvalid: string;
+        categoryAttributeValueRequired: string;
+        categoryAttributesInvalid: string;
+        tooManyCategoryAttributes: string;
+        brandTooLong: string;
+        descriptionTooLong: string;
+        tooManyTags: string;
+        tagTooLong: string;
+        tooManyMedia: string;
+        mediaInvalid: string;
+        statusInvalid: string;
+        skuCodeRequired: string;
+        skuCodeTooLong: string;
+        skuCodeDuplicate: string;
+        barcodeTooLong: string;
+        barcodeDuplicate: string;
+        variantNameTooLong: string;
+        unitOfMeasureRequired: string;
+        unitOfMeasureTooLong: string;
+        unitsPerSaleInvalid: string;
+        salePriceInvalid: string;
+        currencyInvalid: string;
+        referenceCostInvalid: string;
+        branchRequired: string;
+        branchInvalid: string;
+        branchDuplicate: string;
+        branchInventoryInvalid: string;
+        serverInvalid: string;
       };
       fields: {
         name: string;
         category: string;
+        categoryMetafields: string;
         brand: string;
         status: string;
+        publishBranches: string;
+        tags: string;
+        media: string;
         description: string;
         skuCode: string;
         barcode: string;
@@ -295,9 +371,12 @@ export type TenantMessages = {
         salePrice: string;
         currency: string;
         referenceCost: string;
+        profit: string;
+        profitMargin: string;
         trackInventory: string;
         openingStock: string;
         reorderPoint: string;
+        branch: string;
         allowNegativeStock: string;
         allowOfflineSale: string;
       };
@@ -310,6 +389,7 @@ export type TenantMessages = {
         barcode: string;
         variantName: string;
         currency: string;
+        tags: string;
       };
       unitOptions: {
         piece: string;
@@ -450,7 +530,18 @@ export type TenantMessages = {
       businessLine: string;
       status: string;
       name: string;
+      category: string;
+      description: string;
+      displayOrder: string;
       pricing: string;
+      labelRule: string;
+      standardPrice: string;
+    };
+    labelRuleLabels: {
+      none: string;
+      per_item: string;
+      per_order_item: string;
+      per_bag: string;
     };
     formButtons: {
       createService: string;
@@ -458,8 +549,40 @@ export type TenantMessages = {
       cancelEdit: string;
       saving: string;
     };
+    create: {
+      title: string;
+      breadcrumbLabel: string;
+      namePlaceholder: string;
+      categoryPlaceholder: string;
+      descriptionPlaceholder: string;
+      displayOrderHint: string;
+      pricingHint: string;
+      categoriesLoadFailed: string;
+      currencyLoadFailed: string;
+      noCategoriesForBusinessLine: string;
+      created: string;
+      createFailed: string;
+      nameConflict: string;
+      checkForm: string;
+      unsavedChanges: string;
+    };
+    validation: {
+      businessLineInvalid: string;
+      nameRequired: string;
+      nameTooLong: string;
+      categoryRequired: string;
+      categoryInvalid: string;
+      descriptionTooLong: string;
+      displayOrderInvalid: string;
+      pricingUnitInvalid: string;
+      labelRuleInvalid: string;
+      standardPriceInvalid: string;
+      statusInvalid: string;
+      versionRequired: string;
+    };
     columns: {
       service: string;
+      category: string;
       businessLine: string;
       pricing: string;
       status: string;
@@ -473,6 +596,7 @@ export type TenantMessages = {
       deactivate: string;
       delete: string;
       edit: string;
+      managePrice: string;
     };
     empty: string;
     emptyDescription: string;
@@ -490,6 +614,9 @@ export type TenantMessages = {
       createDescription: string;
       editTitle: string;
       editDescription: string;
+      categoriesLoading: string;
+      categoriesLoadFailed: string;
+      priceManagedSeparately: string;
     };
     delete: {
       title: string;

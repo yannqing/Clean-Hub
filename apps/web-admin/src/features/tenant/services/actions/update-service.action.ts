@@ -1,6 +1,7 @@
 import { webAdminApi } from "@/lib/api-client";
 
 import type {
+  ServiceFormErrors,
   ServiceFormValues,
   ServiceStatus,
   ServiceSummary,
@@ -10,8 +11,6 @@ import {
   getServiceActionError,
   type ServiceActionError,
 } from "./service-action-errors";
-
-type ServiceFormErrors = Partial<Record<keyof ServiceFormValues, string>>;
 
 export type UpdateServiceActionResult =
   | { ok: true; data: ServiceSummary }
@@ -42,10 +41,14 @@ export async function updateServiceAction(
       data: service,
     };
   } catch (error) {
+    const actionError = getServiceActionError(
+      error,
+      "Service could not be updated.",
+    );
+
     return {
       ok: false,
-      ...getServiceActionError(error, "Service could not be updated."),
-      errors: {},
+      ...actionError,
     };
   }
 }
@@ -60,10 +63,10 @@ export async function updateServiceStatusAction(
   version: number,
 ): Promise<UpdateServiceStatusActionResult> {
   try {
-    const service = await webAdminApi.tenant.services.updateStatus(
-      serviceId,
-      { status, version },
-    );
+    const service = await webAdminApi.tenant.services.updateStatus(serviceId, {
+      status,
+      version,
+    });
 
     return {
       ok: true,

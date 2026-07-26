@@ -1,13 +1,15 @@
 import { webAdminApi } from "@/lib/api-client";
 
-import type { ServiceFormValues, ServiceSummary } from "../types";
+import type {
+  ServiceFormErrors,
+  ServiceFormValues,
+  ServiceSummary,
+} from "../types";
 import { validateServiceForm } from "../validators";
 import {
   getServiceActionError,
   type ServiceActionError,
 } from "./service-action-errors";
-
-type ServiceFormErrors = Partial<Record<keyof ServiceFormValues, string>>;
 
 export type CreateServiceActionResult =
   | { ok: true; data: ServiceSummary }
@@ -34,10 +36,14 @@ export async function createServiceAction(
       data: service,
     };
   } catch (error) {
+    const actionError = getServiceActionError(
+      error,
+      "Service could not be created.",
+    );
+
     return {
       ok: false,
-      ...getServiceActionError(error, "Service could not be created."),
-      errors: {},
+      ...actionError,
     };
   }
 }

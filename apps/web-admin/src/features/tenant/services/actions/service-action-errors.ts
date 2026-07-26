@@ -1,6 +1,6 @@
 import { ApiHttpError } from "@cleanhub/api-client";
 
-import type { ServiceFormValues } from "../types";
+import type { ServiceFormErrors, ServiceFormValues } from "../types";
 
 /**
  * Map an API error thrown by a service write into the action result shape used
@@ -12,7 +12,7 @@ export type ServiceActionError = {
   message: string;
   code?: string;
   status?: number;
-  errors: Partial<Record<keyof ServiceFormValues, string>>;
+  errors: ServiceFormErrors;
 };
 
 type ServiceFieldName = keyof ServiceFormValues;
@@ -21,7 +21,11 @@ const serviceFormFields = new Set<ServiceFieldName>([
   "businessLine",
   "name",
   "categoryId",
+  "description",
+  "displayOrder",
   "pricingUnit",
+  "labelRule",
+  "standardPrice",
   "status",
   "version",
 ]);
@@ -30,22 +34,25 @@ const serviceFieldMap: Record<string, ServiceFieldName> = {
   businessLine: "businessLine",
   name: "name",
   categoryId: "categoryId",
+  description: "description",
+  displayOrder: "displayOrder",
   pricingUnit: "pricingUnit",
+  labelRule: "labelRule",
+  standardPrice: "standardPrice",
   status: "status",
   version: "version",
 };
 
-function mapValidationErrors(
-  error: ApiHttpError,
-): Partial<Record<ServiceFieldName, string>> {
-  const errors: Partial<Record<ServiceFieldName, string>> = {};
+function mapValidationErrors(error: ApiHttpError): ServiceFormErrors {
+  const errors: ServiceFormErrors = {};
 
   for (const item of error.validationErrors ?? []) {
     if (typeof item.field !== "string" || typeof item.message !== "string") {
       continue;
     }
 
-    const field = serviceFieldMap[item.field] ?? (item.field as ServiceFieldName);
+    const field =
+      serviceFieldMap[item.field] ?? (item.field as ServiceFieldName);
 
     if (serviceFormFields.has(field)) {
       errors[field] = item.message;
@@ -60,11 +67,23 @@ export function getServiceActionError(
   fallbackMessage: string,
 ): ServiceActionError {
   if (error instanceof ApiHttpError) {
+    const errors = mapValidationErrors(error);
+
+    if (
+      [
+        "SERVICE_CATEGORY_NOT_FOUND",
+        "SERVICE_CATEGORY_INACTIVE",
+        "SERVICE_CATEGORY_BUSINESS_LINE_MISMATCH",
+      ].includes(error.code ?? "")
+    ) {
+      errors.categoryId = "categoryInvalid";
+    }
+
     return {
       message: error.message || fallbackMessage,
       code: error.code,
       status: error.status,
-      errors: mapValidationErrors(error),
+      errors,
     };
   }
 

@@ -32,6 +32,7 @@ export const webAdminRoutes = {
     newProduct: "/tenant/products/new",
     branches: "/tenant/branches",
     services: "/tenant/services",
+    newService: "/tenant/services/new",
     prices: "/tenant/prices",
     hardware: "/tenant/hardware",
     reports: "/tenant/reports",

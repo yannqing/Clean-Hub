@@ -26,6 +26,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
   cn,
   toast,
 } from "@cleanhub/ui";
@@ -46,21 +47,29 @@ import {
   SlidersHorizontal,
   Trash2,
 } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { webAdminRoutes } from "@/config/routes";
 import { isVersionConflict } from "@/features/tenant/shared/version-conflict";
 import { interpolate, useTenantI18n } from "@/i18n";
+import { formatMoney } from "@/lib/format";
 
 import {
-  createServiceAction,
   deleteServiceAction,
   updateServiceAction,
   updateServiceStatusAction,
 } from "../actions";
-import { getServiceDatasetQuery } from "../queries";
+import {
+  getServiceCategoryDatasetQuery,
+  getServiceDatasetQuery,
+} from "../queries";
 import type {
   ServiceBusinessLine,
+  ServiceCategorySummary,
+  ServiceFormErrors,
   ServiceFormValues,
+  ServiceLabelRule,
   ServiceStatus,
   ServiceSummary,
 } from "../types";
@@ -78,6 +87,7 @@ type ServiceDateFilter =
 type ServiceSort = "created_desc" | "created_asc" | "name_asc" | "name_desc";
 type ServiceColumnKey =
   | "service"
+  | "category"
   | "businessLine"
   | "pricing"
   | "status"
@@ -92,6 +102,7 @@ const businessLineValues: ServiceBusinessLine[] = [
 
 const SERVICE_COLUMN_KEYS: ServiceColumnKey[] = [
   "service",
+  "category",
   "businessLine",
   "pricing",
   "status",
@@ -100,6 +111,7 @@ const SERVICE_COLUMN_KEYS: ServiceColumnKey[] = [
 
 const DEFAULT_VISIBLE_COLUMNS: Record<ServiceColumnKey, boolean> = {
   service: true,
+  category: true,
   businessLine: true,
   pricing: true,
   status: true,
@@ -110,7 +122,11 @@ const defaultFormValues: ServiceFormValues = {
   businessLine: "laundry",
   name: "",
   categoryId: "",
+  description: "",
+  displayOrder: "0",
   pricingUnit: "per_item",
+  labelRule: "per_order_item",
+  standardPrice: "",
   status: "active",
   version: 0,
 };
@@ -119,12 +135,24 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function FieldError({ message }: { message?: string }) {
+  return message ? (
+    <p className="text-xs text-destructive" role="alert">
+      {message}
+    </p>
+  ) : null;
+}
+
 function toFormValues(service: ServiceSummary): ServiceFormValues {
   return {
     businessLine: service.businessLine,
     name: service.name,
-    categoryId: service.categoryId ?? "",
+    categoryId: service.categoryId,
+    description: service.description ?? "",
+    displayOrder: String(service.displayOrder),
     pricingUnit: service.pricingUnit,
+    labelRule: service.labelRule,
+    standardPrice: service.standardPrice,
     status: service.status,
     version: service.version,
   };
@@ -185,6 +213,7 @@ function isServiceWithinDateRange(
 export function ServiceCatalogView() {
   const { formatDateTime, locale, m } = useTenantI18n();
   const [serviceDataset, setServiceDataset] = useState<ServiceSummary[]>([]);
+  const [categories, setCategories] = useState<ServiceCategorySummary[]>([]);
   const [page, setPage] = useState(1);
   const [businessLine, setBusinessLine] = useState<BusinessLineFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
@@ -202,12 +231,15 @@ export function ServiceCatalogView() {
     null,
   );
   const [loading, setLoading] = useState(true);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<ServiceSummary | null>(
     null,
   );
   const [error, setError] = useState<string | null>(null);
+  const [categoriesError, setCategoriesError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<ServiceFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
 
   const businessLineOptions = useMemo(
@@ -217,6 +249,21 @@ export function ServiceCatalogView() {
         label: m.common.businessLineLabels[value],
       })),
     [m.common.businessLineLabels],
+  );
+  const availableEditCategories = useMemo(
+    () =>
+      categories.filter(
+        (category) =>
+          category.businessLine === formValues.businessLine &&
+          (category.status === "active" ||
+            category.id === formValues.categoryId),
+      ),
+    [categories, formValues.businessLine, formValues.categoryId],
+  );
+  const editingService = useMemo(
+    () =>
+      serviceDataset.find((service) => service.id === editingServiceId) ?? null,
+    [editingServiceId, serviceDataset],
   );
 
   const loadServices = useCallback(
@@ -243,6 +290,35 @@ export function ServiceCatalogView() {
     [m.services.requestFailed],
   );
 
+  const loadCategories = useCallback(
+    async (signal?: AbortSignal) => {
+      setCategoriesLoading(true);
+      setCategoriesError(null);
+
+      try {
+        const result = await getServiceCategoryDatasetQuery({}, { signal });
+
+        if (!signal?.aborted) {
+          setCategories(result);
+        }
+      } catch (loadError) {
+        if (!signal?.aborted) {
+          setCategoriesError(
+            getErrorMessage(
+              loadError,
+              m.services.formDialog.categoriesLoadFailed,
+            ),
+          );
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setCategoriesLoading(false);
+        }
+      }
+    },
+    [m.services.formDialog.categoriesLoadFailed],
+  );
+
   useEffect(() => {
     let current = true;
     const controller = new AbortController();
@@ -265,11 +341,34 @@ export function ServiceCatalogView() {
         }
       });
 
+    getServiceCategoryDatasetQuery({}, { signal: controller.signal })
+      .then((result) => {
+        if (current) {
+          setCategories(result);
+          setCategoriesError(null);
+        }
+      })
+      .catch((loadError) => {
+        if (current) {
+          setCategoriesError(
+            getErrorMessage(
+              loadError,
+              m.services.formDialog.categoriesLoadFailed,
+            ),
+          );
+        }
+      })
+      .finally(() => {
+        if (current) {
+          setCategoriesLoading(false);
+        }
+      });
+
     return () => {
       current = false;
       controller.abort();
     };
-  }, [m.services.requestFailed]);
+  }, [m.services.formDialog.categoriesLoadFailed, m.services.requestFailed]);
 
   const dateScopedServices = useMemo(
     () =>
@@ -331,6 +430,9 @@ export function ServiceCatalogView() {
         service.id,
         service.name,
         service.categoryId,
+        service.categoryName,
+        service.description,
+        m.services.labelRuleLabels[service.labelRule],
         m.common.businessLineLabels[service.businessLine],
         m.common.pricingUnitLabels[service.pricingUnit],
       ];
@@ -358,6 +460,7 @@ export function ServiceCatalogView() {
     locale,
     m.common.businessLineLabels,
     m.common.pricingUnitLabels,
+    m.services.labelRuleLabels,
     normalizedQuery,
     sort,
     status,
@@ -460,16 +563,10 @@ export function ServiceCatalogView() {
     });
   }
 
-  function openCreateDialog() {
-    setEditingServiceId(null);
-    setFormValues(defaultFormValues);
-    setFormError(null);
-    setFormOpen(true);
-  }
-
   function openEditDialog(service: ServiceSummary) {
     setEditingServiceId(service.id);
     setFormValues(toFormValues(service));
+    setFormErrors({});
     setFormError(null);
     setActionMenuServiceId(null);
     setFormOpen(true);
@@ -479,23 +576,94 @@ export function ServiceCatalogView() {
     setFormOpen(false);
     setEditingServiceId(null);
     setFormValues(defaultFormValues);
+    setFormErrors({});
+    setFormError(null);
+  }
+
+  function getFieldError(field: keyof ServiceFormValues): string | undefined {
+    const errorCode = formErrors[field];
+
+    if (!errorCode) {
+      return undefined;
+    }
+
+    return (
+      m.services.validation[errorCode as keyof typeof m.services.validation] ??
+      errorCode
+    );
+  }
+
+  function updateFormField<TKey extends keyof ServiceFormValues>(
+    field: TKey,
+    value: ServiceFormValues[TKey],
+  ) {
+    setFormValues((current) => ({ ...current, [field]: value }));
+    setFormErrors((current) => {
+      if (!current[field]) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next[field];
+      return next;
+    });
+    setFormError(null);
+  }
+
+  function updateEditBusinessLine(value: ServiceBusinessLine) {
+    setFormValues((current) => {
+      const categoryStillMatches = categories.some(
+        (category) =>
+          category.id === current.categoryId &&
+          category.businessLine === value &&
+          (category.status === "active" || category.id === current.categoryId),
+      );
+
+      return {
+        ...current,
+        businessLine: value,
+        categoryId: categoryStillMatches ? current.categoryId : "",
+      };
+    });
+    setFormErrors((current) => {
+      const next = { ...current };
+      delete next.businessLine;
+      delete next.categoryId;
+      return next;
+    });
     setFormError(null);
   }
 
   async function handleSubmit() {
+    if (!editingServiceId || categoriesLoading || categoriesError !== null) {
+      return;
+    }
+
     setSaving(true);
+    setFormErrors({});
     setFormError(null);
 
     try {
-      const result = editingServiceId
-        ? await updateServiceAction(editingServiceId, formValues)
-        : await createServiceAction(formValues);
+      const result = await updateServiceAction(editingServiceId, formValues);
 
       if (!result.ok) {
+        if (result.code === "SERVICE_NAME_DUPLICATE") {
+          setFormErrors({ name: m.services.create.nameConflict });
+          setFormError(m.services.create.nameConflict);
+          return;
+        }
+
+        setFormErrors(result.errors);
         const conflict = isVersionConflict(result);
+        const validationError = Object.values(result.errors)[0];
+        const translatedValidationError = validationError
+          ? (m.services.validation[
+              validationError as keyof typeof m.services.validation
+            ] ?? validationError)
+          : undefined;
         const nextMessage = conflict
           ? m.services.versionConflict
-          : (Object.values(result.errors)[0] ??
+          : (translatedValidationError ??
             result.message ??
             m.services.formFallbackError);
         setFormError(nextMessage);
@@ -629,14 +797,11 @@ export function ServiceCatalogView() {
             </PopoverContent>
           </Popover>
 
-          <Button
-            className="h-8 gap-1.5 px-2.5 text-xs"
-            onClick={openCreateDialog}
-            size="sm"
-            type="button"
-          >
-            <Icon aria-hidden icon={Plus} size={14} />
-            {m.services.actions.add}
+          <Button asChild className="h-8 gap-1.5 px-2.5 text-xs" size="sm">
+            <Link href={webAdminRoutes.tenant.newService}>
+              <Icon aria-hidden icon={Plus} size={14} />
+              {m.services.actions.add}
+            </Link>
           </Button>
         </div>
       </header>
@@ -936,6 +1101,9 @@ export function ServiceCatalogView() {
                 {visibleColumns.service ? (
                   <TableHead>{m.services.columns.service}</TableHead>
                 ) : null}
+                {visibleColumns.category ? (
+                  <TableHead>{m.services.columns.category}</TableHead>
+                ) : null}
                 {visibleColumns.businessLine ? (
                   <TableHead>{m.services.columns.businessLine}</TableHead>
                 ) : null}
@@ -961,6 +1129,9 @@ export function ServiceCatalogView() {
                       {service.name}
                     </TableCell>
                   ) : null}
+                  {visibleColumns.category ? (
+                    <TableCell>{service.categoryName}</TableCell>
+                  ) : null}
                   {visibleColumns.businessLine ? (
                     <TableCell>
                       {m.common.businessLineLabels[service.businessLine]}
@@ -968,7 +1139,16 @@ export function ServiceCatalogView() {
                   ) : null}
                   {visibleColumns.pricing ? (
                     <TableCell>
-                      {m.common.pricingUnitLabels[service.pricingUnit]}
+                      <span className="block font-medium">
+                        {formatMoney(
+                          Number(service.standardPrice),
+                          service.currency,
+                          locale,
+                        )}
+                      </span>
+                      <span className="block text-[11px] text-muted-foreground">
+                        {m.common.pricingUnitLabels[service.pricingUnit]}
+                      </span>
                     </TableCell>
                   ) : null}
                   {visibleColumns.status ? (
@@ -1088,17 +1268,11 @@ export function ServiceCatalogView() {
         }}
         open={formOpen}
       >
-        <DialogContent className="sm:max-w-xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>
-              {editingServiceId
-                ? m.services.formDialog.editTitle
-                : m.services.formDialog.createTitle}
-            </DialogTitle>
+            <DialogTitle>{m.services.formDialog.editTitle}</DialogTitle>
             <DialogDescription>
-              {editingServiceId
-                ? m.services.formDialog.editDescription
-                : m.services.formDialog.createDescription}
+              {m.services.formDialog.editDescription}
             </DialogDescription>
           </DialogHeader>
 
@@ -1106,15 +1280,14 @@ export function ServiceCatalogView() {
             <div className="grid gap-2 sm:col-span-2">
               <Label htmlFor="service-name">{m.services.formLabels.name}</Label>
               <Input
+                aria-invalid={Boolean(formErrors.name)}
                 id="service-name"
                 onChange={(event) =>
-                  setFormValues((current) => ({
-                    ...current,
-                    name: event.target.value,
-                  }))
+                  updateFormField("name", event.target.value)
                 }
                 value={formValues.name}
               />
+              <FieldError message={getFieldError("name")} />
             </div>
 
             <div className="grid gap-2">
@@ -1123,14 +1296,14 @@ export function ServiceCatalogView() {
               </Label>
               <Select
                 onValueChange={(value) =>
-                  setFormValues((current) => ({
-                    ...current,
-                    businessLine: value as ServiceBusinessLine,
-                  }))
+                  updateEditBusinessLine(value as ServiceBusinessLine)
                 }
                 value={formValues.businessLine}
               >
-                <SelectTrigger id="service-form-business-line">
+                <SelectTrigger
+                  aria-invalid={Boolean(formErrors.businessLine)}
+                  id="service-form-business-line"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1141,6 +1314,79 @@ export function ServiceCatalogView() {
                   ))}
                 </SelectContent>
               </Select>
+              <FieldError message={getFieldError("businessLine")} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="service-form-category">
+                {m.services.formLabels.category}
+              </Label>
+              <Select
+                disabled={categoriesLoading || categoriesError !== null}
+                onValueChange={(value) => updateFormField("categoryId", value)}
+                value={formValues.categoryId}
+              >
+                <SelectTrigger
+                  aria-invalid={Boolean(formErrors.categoryId)}
+                  id="service-form-category"
+                >
+                  <SelectValue
+                    placeholder={m.services.create.categoryPlaceholder}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableEditCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.id}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldError message={getFieldError("categoryId")} />
+              {categoriesLoading ? (
+                <p className="text-xs text-muted-foreground">
+                  {m.services.formDialog.categoriesLoading}
+                </p>
+              ) : null}
+              {!categoriesLoading &&
+              !categoriesError &&
+              availableEditCategories.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  {m.services.create.noCategoriesForBusinessLine}
+                </p>
+              ) : null}
+            </div>
+
+            {categoriesError ? (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-destructive sm:col-span-2">
+                <span>{m.services.formDialog.categoriesLoadFailed}</span>
+                <Button
+                  disabled={categoriesLoading}
+                  onClick={() => void loadCategories()}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {m.common.retry}
+                </Button>
+              </div>
+            ) : null}
+
+            <div className="grid gap-2 sm:col-span-2">
+              <Label htmlFor="service-form-description">
+                {m.services.formLabels.description}
+              </Label>
+              <Textarea
+                aria-invalid={Boolean(formErrors.description)}
+                id="service-form-description"
+                maxLength={2000}
+                onChange={(event) =>
+                  updateFormField("description", event.target.value)
+                }
+                rows={3}
+                value={formValues.description}
+              />
+              <FieldError message={getFieldError("description")} />
             </div>
 
             <div className="grid gap-2">
@@ -1149,14 +1395,17 @@ export function ServiceCatalogView() {
               </Label>
               <Select
                 onValueChange={(value) =>
-                  setFormValues((current) => ({
-                    ...current,
-                    pricingUnit: value as ServiceFormValues["pricingUnit"],
-                  }))
+                  updateFormField(
+                    "pricingUnit",
+                    value as ServiceFormValues["pricingUnit"],
+                  )
                 }
                 value={formValues.pricingUnit}
               >
-                <SelectTrigger id="service-pricing-unit">
+                <SelectTrigger
+                  aria-invalid={Boolean(formErrors.pricingUnit)}
+                  id="service-pricing-unit"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1168,22 +1417,72 @@ export function ServiceCatalogView() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+              <FieldError message={getFieldError("pricingUnit")} />
             </div>
 
-            <div className="grid gap-2 sm:col-span-2">
+            <div className="grid gap-2">
+              <Label htmlFor="service-form-label-rule">
+                {m.services.formLabels.labelRule}
+              </Label>
+              <Select
+                onValueChange={(value) =>
+                  updateFormField("labelRule", value as ServiceLabelRule)
+                }
+                value={formValues.labelRule}
+              >
+                <SelectTrigger
+                  aria-invalid={Boolean(formErrors.labelRule)}
+                  id="service-form-label-rule"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(
+                    ["none", "per_item", "per_order_item", "per_bag"] as const
+                  ).map((value) => (
+                    <SelectItem key={value} value={value}>
+                      {m.services.labelRuleLabels[value]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldError message={getFieldError("labelRule")} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="service-form-display-order">
+                {m.services.formLabels.displayOrder}
+              </Label>
+              <Input
+                aria-invalid={Boolean(formErrors.displayOrder)}
+                id="service-form-display-order"
+                inputMode="numeric"
+                max={1_000_000}
+                min={0}
+                onChange={(event) =>
+                  updateFormField("displayOrder", event.target.value)
+                }
+                step={1}
+                type="number"
+                value={formValues.displayOrder}
+              />
+              <FieldError message={getFieldError("displayOrder")} />
+            </div>
+
+            <div className="grid gap-2">
               <Label htmlFor="service-form-status">
                 {m.services.formLabels.status}
               </Label>
               <Select
                 onValueChange={(value) =>
-                  setFormValues((current) => ({
-                    ...current,
-                    status: value as ServiceStatus,
-                  }))
+                  updateFormField("status", value as ServiceStatus)
                 }
                 value={formValues.status}
               >
-                <SelectTrigger id="service-form-status">
+                <SelectTrigger
+                  aria-invalid={Boolean(formErrors.status)}
+                  id="service-form-status"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1195,6 +1494,32 @@ export function ServiceCatalogView() {
                   </SelectItem>
                 </SelectContent>
               </Select>
+              <FieldError message={getFieldError("status")} />
+            </div>
+
+            <div className="grid gap-2 rounded-md border bg-muted/30 p-3 sm:col-span-2">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                <div className="min-w-0">
+                  <Label>{m.services.formLabels.standardPrice}</Label>
+                  <p className="mt-1 text-base font-semibold">
+                    {editingService
+                      ? formatMoney(
+                          Number(editingService.standardPrice),
+                          editingService.currency,
+                          locale,
+                        )
+                      : "—"}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {m.services.formDialog.priceManagedSeparately}
+                  </p>
+                </div>
+                <Button asChild size="sm" type="button" variant="outline">
+                  <Link href={webAdminRoutes.tenant.prices}>
+                    {m.services.actions.managePrice}
+                  </Link>
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -1211,12 +1536,19 @@ export function ServiceCatalogView() {
             >
               {m.common.cancel}
             </Button>
-            <Button disabled={saving} onClick={handleSubmit} type="button">
+            <Button
+              disabled={
+                saving ||
+                categoriesLoading ||
+                categoriesError !== null ||
+                availableEditCategories.length === 0
+              }
+              onClick={handleSubmit}
+              type="button"
+            >
               {saving
                 ? m.services.formButtons.saving
-                : editingServiceId
-                  ? m.services.formButtons.updateService
-                  : m.services.formButtons.createService}
+                : m.services.formButtons.updateService}
             </Button>
           </div>
         </DialogContent>
