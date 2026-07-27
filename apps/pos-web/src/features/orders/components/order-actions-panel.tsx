@@ -10,6 +10,7 @@ import type {
   PosPaymentTransaction,
 } from "@cleanhub/api-client";
 import { createId } from "@cleanhub/id";
+import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Dialog,
   DialogContent,
@@ -20,13 +21,11 @@ import {
 } from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { usePosOfflineWrites } from "@/features/offline/lib";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 
-import {
-  deleteOrderAction,
-  payOrderAction,
-} from "../actions";
+import { deleteOrderAction, payOrderAction } from "../actions";
 import {
   formatOrderMoney,
   MOBILE_MONEY_PROVIDER_LABELS,
@@ -52,7 +51,9 @@ export function OrderActionsPanel({
   order: PosOrderDetail;
   payments: PosPaymentTransaction[];
 }) {
+  const { locale } = useTranslation();
   const router = useRouter();
+  const text = (value: string) => translatePosText(value, locale);
   const { changeOrderStatus } = usePosOfflineWrites();
   const [amount, setAmount] = useState(getOutstandingAmount(order));
   const [paymentOption, setPaymentOption] = useState<PaymentOption>("cash");
@@ -74,7 +75,15 @@ export function OrderActionsPanel({
     order.status !== "cancelled" &&
     order.status !== "delivered" &&
     !pendingManualPayment;
-  const transitions = STATUS_TRANSITIONS[order.status].filter(
+  const isZeroTotalReadyForConfirmation =
+    Number(order.totalAmount) === 0 &&
+    Number(order.paidAmount) === 0 &&
+    order.paymentStatus === "paid" &&
+    (order.status === "draft" || order.status === "received");
+  const availableTransitions = isZeroTotalReadyForConfirmation
+    ? [...STATUS_TRANSITIONS[order.status], "paid" as const]
+    : STATUS_TRANSITIONS[order.status];
+  const transitions = availableTransitions.filter(
     (status) => status !== "cancelled" || canManageSensitiveOperations,
   );
   const canDelete =
@@ -185,34 +194,55 @@ export function OrderActionsPanel({
       </div>
 
       <div className="mt-5 rounded-lg bg-slate-50 p-4">
-        <div className="text-xs font-medium text-slate-500">待收金额</div>
+        <div className="grid gap-2 border-b border-slate-200 pb-3 text-xs">
+          <div className="flex items-center justify-between gap-3 text-slate-500">
+            <span>{text("订单小计")}</span>
+            <span className="font-semibold text-slate-700">
+              {formatOrderMoney(order.subtotalAmount, order.currency, locale)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-slate-500">
+            <span>{text("优惠金额")}</span>
+            <span className="font-semibold text-emerald-700">
+              {Number(order.discountAmount) > 0 ? "−" : ""}
+              {formatOrderMoney(order.discountAmount, order.currency, locale)}
+            </span>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-slate-600">
+            <span className="font-semibold">{text("应付总额")}</span>
+            <span className="text-sm font-semibold text-slate-950">
+              {formatOrderMoney(order.totalAmount, order.currency, locale)}
+            </span>
+          </div>
+        </div>
+        <div className="mt-3 text-xs font-medium text-slate-500">待收金额</div>
         <div className="mt-1 text-xl font-semibold text-slate-950">
           {formatOrderMoney(outstanding, order.currency)}
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2">
-          {(
-            ["cash", "wave", "orange_money"] satisfies PaymentOption[]
-          ).map((option) => (
-            <button
-              className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition ${
-                paymentOption === option
-                  ? "border-blue-600 bg-blue-600 text-white"
-                  : "border-slate-200 bg-white text-slate-700 hover:border-blue-200"
-              }`}
-              disabled={!canPay || isPending}
-              key={option}
-              onClick={() => {
-                setPaymentOption(option);
-                setExternalReference("");
-                idempotencyKeyRef.current = null;
-              }}
-              type="button"
-            >
-              {option === "cash"
-                ? "现金"
-                : MOBILE_MONEY_PROVIDER_LABELS[option]}
-            </button>
-          ))}
+          {(["cash", "wave", "orange_money"] satisfies PaymentOption[]).map(
+            (option) => (
+              <button
+                className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition ${
+                  paymentOption === option
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-blue-200"
+                }`}
+                disabled={!canPay || isPending}
+                key={option}
+                onClick={() => {
+                  setPaymentOption(option);
+                  setExternalReference("");
+                  idempotencyKeyRef.current = null;
+                }}
+                type="button"
+              >
+                {option === "cash"
+                  ? "现金"
+                  : MOBILE_MONEY_PROVIDER_LABELS[option]}
+              </button>
+            ),
+          )}
         </div>
 
         {pendingManualPayment ? (
@@ -225,8 +255,14 @@ export function OrderActionsPanel({
           </div>
         ) : paymentOption !== "cash" ? (
           <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-800">
-            客户需先在外部应用完成转账。这里只记录付款凭证，不会自动扣款；Owner 或 Manager
-            核对商户账户后才能确认到账。
+            客户需先在外部应用完成转账。这里只记录付款凭证，不会自动扣款；Owner
+            或 Manager 核对商户账户后才能确认到账。
+          </div>
+        ) : null}
+
+        {isZeroTotalReadyForConfirmation ? (
+          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-800">
+            {text("当前订单应付金额为 0。确认零元订单后即可继续完成交付。")}
           </div>
         ) : null}
 
@@ -299,7 +335,11 @@ export function OrderActionsPanel({
               }}
               type="button"
             >
-              <span>设为 {ORDER_STATUS_LABELS[status]}</span>
+              <span>
+                {status === "paid" && isZeroTotalReadyForConfirmation
+                  ? text("确认零元订单")
+                  : `设为 ${ORDER_STATUS_LABELS[status]}`}
+              </span>
               <Icon className="h-4 w-4 text-slate-400" name="chevron-right" />
             </button>
           ))
@@ -373,7 +413,10 @@ export function OrderActionsPanel({
 }
 
 function getOutstandingAmount(order: PosOrderDetail): string {
-  return Math.max(0, Number(order.totalAmount) - Number(order.paidAmount)).toFixed(2);
+  return Math.max(
+    0,
+    Number(order.totalAmount) - Number(order.paidAmount),
+  ).toFixed(2);
 }
 
 function createPaymentIdempotencyKey(): string {

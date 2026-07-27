@@ -40,6 +40,7 @@ import {
 import { posToast as toast } from "@/lib/pos-toast";
 import { OrderActionsPanel } from "./order-actions-panel";
 import { OrderPaymentStatusBadge, OrderStatusBadge } from "./order-badges";
+import { OrderDiscountsCard } from "./order-discounts-card";
 import { OrderInfoEditor } from "./order-info-editor";
 import { OrderItemsManager } from "./order-items-manager";
 import { OrderPaymentAdjustments } from "./order-payment-adjustments";
@@ -105,8 +106,15 @@ export function OrderDetailView({
           <OrderInfoEditor order={order} />
           <OrderItemsManager
             canManageSensitiveOperations={canResolveManualPayments}
-            catalog={catalog.filter((service) => service.currency === order.currency)}
+            catalog={catalog.filter(
+              (service) => service.currency === order.currency,
+            )}
             order={order}
+          />
+          <OrderDiscountsCard
+            canManageSensitiveOperations={canResolveManualPayments}
+            order={order}
+            payments={payments}
           />
           <OrderPaymentsCard
             canResolveManualPayments={canResolveManualPayments}
@@ -122,6 +130,7 @@ export function OrderDetailView({
         </div>
         <OrderActionsPanel
           canManageSensitiveOperations={canResolveManualPayments}
+          key={`${order.id}:${order.version}`}
           order={order}
           payments={payments}
         />
@@ -162,10 +171,8 @@ function buildOrderReceiptContent(
       note: details.length > 0 ? details.join("; ") : undefined,
     };
   });
-  const subtotalMinor = items.reduce(
-    (total, item) => total + item.totalAmountMinor,
-    0,
-  );
+  const subtotalMinor = toMinorUnits(order.subtotalAmount, order.currency);
+  const discountMinor = toMinorUnits(order.discountAmount, order.currency);
   const totalMinor = toMinorUnits(order.totalAmount, order.currency);
   const paymentMethod = [
     ...new Set(
@@ -187,7 +194,7 @@ function buildOrderReceiptContent(
       customerName: order.customerName,
       items,
       subtotalMinor,
-      discountMinor: Math.max(0, subtotalMinor - totalMinor),
+      discountMinor,
       totalMinor,
       paidMinor: toMinorUnits(order.paidAmount, order.currency),
       balanceMinor: Math.max(
@@ -202,10 +209,11 @@ function buildOrderReceiptContent(
 }
 
 function toMinorUnits(value: string, currency: string): number {
-  const fractionDigits = new Intl.NumberFormat("en", {
-    style: "currency",
-    currency,
-  }).resolvedOptions().maximumFractionDigits ?? 2;
+  const fractionDigits =
+    new Intl.NumberFormat("en", {
+      style: "currency",
+      currency,
+    }).resolvedOptions().maximumFractionDigits ?? 2;
   return Math.round(Number(value) * 10 ** fractionDigits);
 }
 
@@ -469,7 +477,9 @@ function OrderPaymentsCard({
                   {getPaymentDisplayName(
                     resolution.payment.paymentMethod,
                     resolution.payment.provider,
-                  )} · {formatOrderMoney(
+                  )}{" "}
+                  ·{" "}
+                  {formatOrderMoney(
                     resolution.payment.amount,
                     resolution.payment.currency,
                   )}

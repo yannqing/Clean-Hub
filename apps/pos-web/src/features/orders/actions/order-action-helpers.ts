@@ -20,6 +20,12 @@ export type PosOrderErrorCode =
   | "ORDER_ALREADY_PAID"
   | "ORDER_NOT_PAID"
   | "ORDER_CANNOT_BE_DELETED"
+  | "DISCOUNT_NOT_FOUND"
+  | "DISCOUNT_NOT_APPLICABLE"
+  | "DISCOUNT_NOT_COMBINABLE"
+  | "DISCOUNT_IDEMPOTENCY_CONFLICT"
+  | "DISCOUNT_APPLICATION_NOT_FOUND"
+  | "AUTOMATIC_DISCOUNT_CANNOT_BE_REMOVED"
   | "VERSION_CONFLICT"
   | "VALIDATION_ERROR";
 
@@ -51,6 +57,13 @@ const ORDER_ERROR_MESSAGES: Record<PosOrderErrorCode, string> = {
   ORDER_ALREADY_PAID: "订单已收款，不能执行该操作。",
   ORDER_NOT_PAID: "订单未结清，不能交付。",
   ORDER_CANNOT_BE_DELETED: "该订单不能删除。",
+  DISCOUNT_NOT_FOUND: "优惠码不存在、已停用或不适用于当前门店。",
+  DISCOUNT_NOT_APPLICABLE: "当前订单不满足该折扣的使用条件。",
+  DISCOUNT_NOT_COMBINABLE: "该折扣不能与订单中已有的折扣叠加使用。",
+  DISCOUNT_IDEMPOTENCY_CONFLICT: "本次折扣请求已失效，请重新提交。",
+  DISCOUNT_APPLICATION_NOT_FOUND: "该折扣记录不存在或已经被移除。",
+  AUTOMATIC_DISCOUNT_CANNOT_BE_REMOVED:
+    "自动折扣由适用规则控制，不能手动移除。",
   VERSION_CONFLICT: "订单已被他人修改，请刷新后重试。",
   VALIDATION_ERROR: "提交内容校验未通过，请检查表单。",
 };
@@ -75,7 +88,8 @@ export async function runOrderAction<TPayload>(
       };
     }
 
-    const message = error instanceof Error ? error.message : "操作失败，请稍后重试。";
+    const message =
+      error instanceof Error ? error.message : "操作失败，请稍后重试。";
     return { ok: false, message };
   }
 }

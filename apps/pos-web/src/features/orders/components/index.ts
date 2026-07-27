@@ -6,6 +6,7 @@ export {
 } from "./order-badges";
 export { OrderCreateDialog } from "./order-create-dialog";
 export { OrderDetailView } from "./order-detail-view";
+export { OrderDiscountsCard } from "./order-discounts-card";
 export { OrderInfoEditor } from "./order-info-editor";
 export { OrderItemsManager } from "./order-items-manager";
 export { OrderPaymentAdjustments } from "./order-payment-adjustments";
