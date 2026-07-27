@@ -2,9 +2,9 @@ import type { ReportSummaryQuery } from "./types";
 
 export type ReportDatePresetId =
   | "today"
-  | "yesterday"
-  | "thisWeek"
-  | "lastWeek"
+  | "last7Days"
+  | "last30Days"
+  | "last90Days"
   | "thisMonth"
   | "lastMonth";
 
@@ -22,40 +22,68 @@ export type ReportDatePreset = {
 
 export const reportDatePresets: ReportDatePreset[] = [
   { id: "today", label: "" },
-  { id: "yesterday", label: "" },
-  { id: "thisWeek", label: "" },
-  { id: "lastWeek", label: "" },
+  { id: "last7Days", label: "" },
+  { id: "last30Days", label: "" },
+  { id: "last90Days", label: "" },
   { id: "thisMonth", label: "" },
   { id: "lastMonth", label: "" },
 ];
 
-/** Format a Date as a `YYYY-MM-DD` string in its local timezone. */
+export const DEFAULT_REPORT_DATE_PRESET: ReportDatePresetId = "last30Days";
+
+/** Format a Date as a `YYYY-MM-DD` string using the report API's UTC boundary. */
 function toDateOnly(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
-function startOfDay(date: Date): Date {
-  const next = new Date(date);
-  next.setHours(0, 0, 0, 0);
-  return next;
+function toDateOnlyInTimeZone(date: Date, timeZone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      day: "2-digit",
+      month: "2-digit",
+      timeZone,
+      year: "numeric",
+    }).formatToParts(date);
+    const values = Object.fromEntries(
+      parts.map((part) => [part.type, part.value]),
+    );
+
+    if (values.year && values.month && values.day) {
+      return `${values.year}-${values.month}-${values.day}`;
+    }
+  } catch {
+    // Invalid tenant timezones fall back to the API's UTC boundary.
+  }
+
+  return toDateOnly(date);
 }
 
-function startOfWeek(date: Date): Date {
-  // Week starts on Monday.
-  const next = startOfDay(date);
-  const day = next.getDay(); // 0 = Sun ... 6 = Sat
-  const diff = (day + 6) % 7; // Mon=0 ... Sun=6
-  next.setDate(next.getDate() - diff);
-  return next;
+function resolveCalendarDate(date: Date, timeZone: string): Date {
+  return new Date(`${toDateOnlyInTimeZone(date, timeZone)}T00:00:00.000Z`);
 }
 
 function startOfMonth(date: Date): Date {
-  const next = startOfDay(date);
-  next.setDate(1);
+  const next = new Date(date);
+  next.setUTCDate(1);
   return next;
+}
+
+function rollingRange(
+  days: number,
+  now: Date,
+  timeZone: string,
+): Pick<ReportSummaryQuery, "from" | "to"> {
+  const end = resolveCalendarDate(now, timeZone);
+  const start = new Date(end);
+  start.setUTCDate(start.getUTCDate() - (days - 1));
+
+  return {
+    from: toDateOnly(start),
+    to: toDateOnly(end),
+  };
 }
 
 /**
@@ -66,42 +94,56 @@ function startOfMonth(date: Date): Date {
 export function resolveReportDatePreset(
   id: ReportDatePresetId,
   now: Date = new Date(),
+  timeZone = "UTC",
 ): Pick<ReportSummaryQuery, "from" | "to"> | undefined {
+  const calendarNow = resolveCalendarDate(now, timeZone);
+
   switch (id) {
     case "today": {
-      const today = toDateOnly(now);
+      const today = toDateOnly(calendarNow);
       return { from: today, to: today };
     }
-    case "yesterday": {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      const value = toDateOnly(yesterday);
-      return { from: value, to: value };
+    case "last7Days": {
+      return rollingRange(7, now, timeZone);
     }
-    case "thisWeek": {
-      return { from: toDateOnly(startOfWeek(now)), to: toDateOnly(now) };
+    case "last30Days": {
+      return rollingRange(30, now, timeZone);
     }
-    case "lastWeek": {
-      const thisWeekStart = startOfWeek(now);
-      const lastWeekStart = new Date(thisWeekStart);
-      lastWeekStart.setDate(lastWeekStart.getDate() - 7);
-      const lastWeekEnd = new Date(thisWeekStart);
-      lastWeekEnd.setDate(lastWeekEnd.getDate() - 1);
-      return { from: toDateOnly(lastWeekStart), to: toDateOnly(lastWeekEnd) };
+    case "last90Days": {
+      return rollingRange(90, now, timeZone);
     }
     case "thisMonth": {
-      return { from: toDateOnly(startOfMonth(now)), to: toDateOnly(now) };
+      return {
+        from: toDateOnly(startOfMonth(calendarNow)),
+        to: toDateOnly(calendarNow),
+      };
     }
     case "lastMonth": {
-      const thisMonthStart = startOfMonth(now);
+      const thisMonthStart = startOfMonth(calendarNow);
       const lastMonthStart = new Date(thisMonthStart);
-      lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+      lastMonthStart.setUTCMonth(lastMonthStart.getUTCMonth() - 1);
       const lastMonthEnd = new Date(thisMonthStart);
-      lastMonthEnd.setDate(lastMonthEnd.getDate() - 1);
+      lastMonthEnd.setUTCDate(lastMonthEnd.getUTCDate() - 1);
       return { from: toDateOnly(lastMonthStart), to: toDateOnly(lastMonthEnd) };
     }
     default: {
       return undefined;
     }
   }
+}
+
+export function resolveSelectedReportDatePreset(
+  query: Pick<ReportSummaryQuery, "from" | "to">,
+  now: Date = new Date(),
+  timeZone = "UTC",
+): ReportDatePresetId | "custom" {
+  for (const preset of reportDatePresets) {
+    const range = resolveReportDatePreset(preset.id, now, timeZone);
+
+    if (range?.from === query.from && range?.to === query.to) {
+      return preset.id;
+    }
+  }
+
+  return "custom";
 }

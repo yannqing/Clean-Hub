@@ -1,9 +1,11 @@
 import {
+  DEFAULT_REPORT_DATE_PRESET,
   getReportSummaryQuery,
   ReportSummaryView,
+  resolveReportDatePreset,
+  resolveSelectedReportDatePreset,
   type ReportSummaryQuery,
 } from "@/features/tenant/reports";
-import { getTenantSettingsQuery } from "@/features/tenant/settings/queries";
 
 type ReportsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -20,42 +22,48 @@ function getStringParam(
 
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const params = (await searchParams) ?? {};
-  const query: ReportSummaryQuery = {
+  const requestedQuery: ReportSummaryQuery = {
     from: getStringParam(params, "from"),
     to: getStringParam(params, "to"),
     branchId: getStringParam(params, "branchId"),
+    currency: getStringParam(params, "currency"),
   };
-
-  // Run the report summary and tenant settings lookups in parallel. Settings is
-  // fetched only to resolve the tenant's currency for display; if it fails we
-  // fall back to the platform default currency (`XOF`) instead of blocking the
-  // report. Both queries resolve their own request options so cookies/auth are
-  // handled consistently with the rest of the app.
-  const [reportResult, settingsResult] = await Promise.all([
-    getReportSummaryQuery(query)
-      .then((summary) => ({ summary, error: undefined as string | undefined }))
-      .catch((error: unknown) => ({
-        summary: undefined,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Report summary failed to load.",
-      })),
-    getTenantSettingsQuery()
-      .then((settings) => ({
-        currency: settings?.defaultCurrency,
-        tenantName: settings?.tenantName,
-      }))
-      .catch(() => ({ currency: undefined, tenantName: undefined })),
-  ]);
+  const reportResult = await getReportSummaryQuery(requestedQuery)
+    .then((summary) => ({ summary, error: undefined as string | undefined }))
+    .catch((error: unknown) => ({
+      summary: undefined,
+      error:
+        error instanceof Error
+          ? error.message
+          : "Report summary failed to load.",
+    }));
+  const fallbackRange = resolveReportDatePreset(DEFAULT_REPORT_DATE_PRESET);
+  const query: ReportSummaryQuery = reportResult.summary
+    ? {
+        from: reportResult.summary.filters.from ?? undefined,
+        to: reportResult.summary.filters.to ?? undefined,
+        branchId: reportResult.summary.filters.branchId ?? undefined,
+        currency: reportResult.summary.currency,
+      }
+    : {
+        ...fallbackRange,
+        ...requestedQuery,
+      };
+  const selectedPreset =
+    !requestedQuery.from && !requestedQuery.to
+      ? DEFAULT_REPORT_DATE_PRESET
+      : resolveSelectedReportDatePreset(
+          query,
+          new Date(),
+          reportResult.summary?.timezone ?? "UTC",
+        );
 
   return (
     <ReportSummaryView
-      currency={settingsResult.currency}
       error={reportResult.error}
       query={query}
+      selectedPreset={selectedPreset}
       summary={reportResult.summary}
-      tenantName={settingsResult.tenantName}
     />
   );
 }
