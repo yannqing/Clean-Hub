@@ -238,7 +238,8 @@ export function OrderCreateDialog({
         toast.success("订单已创建。");
         handleOpenChange(false);
         router.push(
-          orderDetailHref?.(result.data.id) ?? posRoutes.orderDetail(result.data.id),
+          orderDetailHref?.(result.data.id) ??
+            posRoutes.orderDetail(result.data.id),
         );
       } catch (error) {
         toast.error(getPosApiErrorMessage(error, "订单创建失败，请重试。"));
@@ -447,7 +448,11 @@ function ManualOrderFields({
                   <option value="">{text("请选择服务")}</option>
                   {catalog.map((service) => (
                     <option key={service.id} value={service.id}>
-                      {service.name} · {text(service.pricingUnit === "per_kg" ? "按公斤" : "按件")} · {formatOrderMoney(service.amount, service.currency)}
+                      {service.name} ·{" "}
+                      {text(
+                        service.pricingUnit === "per_kg" ? "按公斤" : "按件",
+                      )}{" "}
+                      · {formatOrderMoney(service.amount, service.currency)}
                     </option>
                   ))}
                 </select>
@@ -462,7 +467,9 @@ function ManualOrderFields({
                   />
                   <TextField
                     label="袋数"
-                    onChange={(value) => onUpdateItem(index, { bagCount: value })}
+                    onChange={(value) =>
+                      onUpdateItem(index, { bagCount: value })
+                    }
                     type="number"
                     value={item.bagCount}
                   />
@@ -515,7 +522,9 @@ function ManualOrderFields({
               />
               <TextField
                 label={text("瑕疵")}
-                onChange={(value) => onUpdateItem(index, { defectNotes: value })}
+                onChange={(value) =>
+                  onUpdateItem(index, { defectNotes: value })
+                }
                 value={item.defectNotes}
               />
               <TextField
@@ -724,9 +733,7 @@ function ServiceTicketPicker({
         ) : null}
         {locked ? null : (
           <OptionList
-            emptyText={text(
-              loading ? "加载工单中..." : "没有可生成订单的工单",
-            )}
+            emptyText={text(loading ? "加载工单中..." : "没有可生成订单的工单")}
             options={options.map((ticket) => ({
               id: ticket.id,
               title: ticket.ticketNo ?? ticket.id,

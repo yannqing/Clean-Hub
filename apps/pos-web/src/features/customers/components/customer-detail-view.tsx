@@ -26,7 +26,11 @@ import {
   CUSTOMER_ORDER_PAYMENT_LABELS,
   CUSTOMER_ORDER_TYPE_LABELS,
 } from "../constants";
-import { changeProfileStatus, fetchCustomerOrderStats, updateProfile } from "../queries";
+import {
+  changeProfileStatus,
+  fetchCustomerOrderStats,
+  updateProfile,
+} from "../queries";
 import type {
   CustomerDialogState,
   PosCustomerAccountDetail,
@@ -89,7 +93,9 @@ export function CustomerDetailView({
   const [activeTicketCount, setActiveTicketCount] = useState(0);
   const [orderCount, setOrderCount] = useState(0);
   const [totalPaid, setTotalPaid] = useState(0);
-  const [recentTickets, setRecentTickets] = useState<ServiceTicketSummary[]>([]);
+  const [recentTickets, setRecentTickets] = useState<ServiceTicketSummary[]>(
+    [],
+  );
   const [recentOrders, setRecentOrders] = useState<PosOrderSummary[]>([]);
   const [tab, setTab] = useState<DetailTab>("overview");
   const [dialog, setDialog] = useState<CustomerDialogState>({ type: "none" });
@@ -127,7 +133,9 @@ export function CustomerDetailView({
         posApi.pos.orders.list({ customerId, limit: 5, offset: 0 }),
       ]);
 
-      setAccount(accountDetail.status === "fulfilled" ? accountDetail.value : null);
+      setAccount(
+        accountDetail.status === "fulfilled" ? accountDetail.value : null,
+      );
       setActiveTicketCount(
         ticketsResult.status === "fulfilled" ? ticketsResult.value.total : 0,
       );
@@ -280,7 +288,11 @@ export function CustomerDetailView({
               value: formatPosMoney(0, currency, locale),
               hint: "暂未实现",
             },
-            { label: "历史工单", value: String(activeTicketCount), hint: "工单总数" },
+            {
+              label: "历史工单",
+              value: String(activeTicketCount),
+              hint: "工单总数",
+            },
             { label: "历史订单", value: String(orderCount), hint: "订单总数" },
             {
               label: "累计消费",
@@ -443,9 +455,7 @@ export function CustomerDetailView({
         />
       ) : null}
 
-      {tab === "orders" ? (
-        <CustomerOrderList customerId={customerId} />
-      ) : null}
+      {tab === "orders" ? <CustomerOrderList customerId={customerId} /> : null}
 
       {tab === "items" ? (
         <CustomerServiceItemList
@@ -665,7 +675,9 @@ function CurrentServiceCard({
       </div>
     );
   }
-  const tone = CUSTOMER_TICKET_STATUS_TONES[ticket.ticketStatus] ?? "bg-slate-100 text-slate-600";
+  const tone =
+    CUSTOMER_TICKET_STATUS_TONES[ticket.ticketStatus] ??
+    "bg-slate-100 text-slate-600";
   return (
     <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-[minmax(0,1fr)_130px_120px] sm:items-center">
       <div className="min-w-0">
@@ -682,8 +694,11 @@ function CurrentServiceCard({
           ? formatDateShort(ticket.expectedPickupAt, locale)
           : "未设置取件"}
       </span>
-      <span className={`justify-self-end rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}>
-        {CUSTOMER_TICKET_STATUS_LABELS[ticket.ticketStatus] ?? ticket.ticketStatus}
+      <span
+        className={`justify-self-end rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}
+      >
+        {CUSTOMER_TICKET_STATUS_LABELS[ticket.ticketStatus] ??
+          ticket.ticketStatus}
       </span>
     </div>
   );
@@ -713,25 +728,25 @@ function RecentActivity({
     ...tickets
       .slice(0, 3)
       .map<ActivityItem & { timestamp: string }>((ticket) => ({
-      title: "工单创建",
-      detail: `${CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType} · ${ticket.itemCount} 个项目`,
-      time: formatDateShort(ticket.createdAt, locale),
-      timestamp: ticket.createdAt,
-      amount: ticket.totalAmount
-        ? formatMoney(ticket.totalAmount, locale, ticket.currency)
-        : undefined,
-    })),
+        title: "工单创建",
+        detail: `${CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType} · ${ticket.itemCount} 个项目`,
+        time: formatDateShort(ticket.createdAt, locale),
+        timestamp: ticket.createdAt,
+        amount: ticket.totalAmount
+          ? formatMoney(ticket.totalAmount, locale, ticket.currency)
+          : undefined,
+      })),
     ...orders
       .slice(0, 3)
       .map<ActivityItem & { timestamp: string }>((order) => ({
-      title: "订单记录",
-      detail: `${CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ?? order.orderType} · ${CUSTOMER_ORDER_PAYMENT_LABELS[order.paymentStatus] ?? order.paymentStatus}`,
-      time: formatDateShort(order.createdAt, locale),
-      timestamp: order.createdAt,
-      amount: order.totalAmount
-        ? formatMoney(order.totalAmount, locale, order.currency)
-        : undefined,
-    })),
+        title: "订单记录",
+        detail: `${CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ?? order.orderType} · ${CUSTOMER_ORDER_PAYMENT_LABELS[order.paymentStatus] ?? order.paymentStatus}`,
+        time: formatDateShort(order.createdAt, locale),
+        timestamp: order.createdAt,
+        amount: order.totalAmount
+          ? formatMoney(order.totalAmount, locale, order.currency)
+          : undefined,
+      })),
   ]
     .sort(
       (a, b) =>
@@ -750,16 +765,23 @@ function RecentActivity({
   return (
     <div className="mt-4 divide-y divide-slate-100">
       {items.map((item, index) => (
-        <div className="flex items-center gap-3 py-3 first:pt-0 last:pb-0" key={index}>
+        <div
+          className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
+          key={index}
+        >
           <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-slate-800">{item.title}</div>
+            <div className="text-sm font-semibold text-slate-800">
+              {item.title}
+            </div>
             <div className="text-xs text-slate-500">{item.detail}</div>
           </div>
           <div className="text-right">
             <div className="text-xs text-slate-400">{item.time}</div>
             {item.amount ? (
-              <div className="mt-1 text-sm font-semibold text-slate-950">{item.amount}</div>
+              <div className="mt-1 text-sm font-semibold text-slate-950">
+                {item.amount}
+              </div>
             ) : null}
           </div>
         </div>

@@ -30,9 +30,7 @@ function toOffset(page: number, pageSize: number): number {
   return Math.max(0, (page - 1) * pageSize);
 }
 
-function toRow(
-  entry: PosCustomerListResult["data"][number],
-): CustomerListRow {
+function toRow(entry: PosCustomerListResult["data"][number]): CustomerListRow {
   if (entry.kind === "account") {
     return {
       kind: "account",
@@ -58,7 +56,9 @@ function toRow(
 }
 
 /** Fetch all accounts for the profile form dropdown (not paginated). */
-export async function fetchAccountOptions(): Promise<PosCustomerAccountSummary[]> {
+export async function fetchAccountOptions(): Promise<
+  PosCustomerAccountSummary[]
+> {
   const result = await posApi.pos.customers.list({
     resultType: "account",
     limit: 100,
@@ -72,7 +72,12 @@ export async function fetchAccountOptions(): Promise<PosCustomerAccountSummary[]
 /** Fetch the hybrid customer list, flattening the wire rows for rendering. */
 export async function fetchCustomerList(
   filters: CustomerFilterState,
-): Promise<{ rows: CustomerListRow[]; total: number; totalAccounts: number; totalProfiles: number }> {
+): Promise<{
+  rows: CustomerListRow[];
+  total: number;
+  totalAccounts: number;
+  totalProfiles: number;
+}> {
   const result = await posApi.pos.customers.list({
     q: filters.query.trim() || undefined,
     resultType: filters.resultType === "all" ? undefined : filters.resultType,
@@ -99,8 +104,8 @@ export async function fetchAccountProfiles(
     offset: toOffset(filters.page, filters.pageSize),
   });
 
-  const rows: Extract<CustomerListRow, { kind: "profile" }>[] = response.data.map(
-    (profile: PosCustomerProfileSummary) => ({
+  const rows: Extract<CustomerListRow, { kind: "profile" }>[] =
+    response.data.map((profile: PosCustomerProfileSummary) => ({
       kind: "profile" as const,
       id: profile.id,
       customerAccountId: profile.customerAccountId,
@@ -110,8 +115,7 @@ export async function fetchAccountProfiles(
       email: profile.email,
       status: profile.status,
       createdAt: profile.createdAt,
-    }),
-  );
+    }));
 
   return { rows, total: response.total };
 }
@@ -190,7 +194,10 @@ export async function fetchCustomerTickets(
     createdAfter?: string;
     createdBefore?: string;
   },
-): Promise<{ rows: import("@cleanhub/api-client").ServiceTicketSummary[]; total: number }> {
+): Promise<{
+  rows: import("@cleanhub/api-client").ServiceTicketSummary[];
+  total: number;
+}> {
   const result = await posApi.pos.serviceTickets.list({
     customerId,
     q: filters?.q?.trim() || undefined,
@@ -209,7 +216,10 @@ export async function fetchCustomerOrders(
   page: number,
   pageSize: number,
   query = "",
-): Promise<{ rows: import("@cleanhub/api-client").PosOrderSummary[]; total: number }> {
+): Promise<{
+  rows: import("@cleanhub/api-client").PosOrderSummary[];
+  total: number;
+}> {
   const result = await posApi.pos.orders.list({
     customerId,
     q: query.trim() || undefined,

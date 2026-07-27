@@ -2,7 +2,10 @@
 
 import { cn } from "@cleanhub/ui";
 import { useTranslation } from "@cleanhub/i18n/react";
-import type { PosOrderPaymentStatus, PosOrderStatus } from "@cleanhub/api-client";
+import type {
+  PosOrderPaymentStatus,
+  PosOrderStatus,
+} from "@cleanhub/api-client";
 import type { ReactNode } from "react";
 
 import { translatePosText } from "@/components/i18n/pos-runtime-text";

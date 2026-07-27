@@ -98,15 +98,13 @@ export const TICKET_PRIORITY_TONES: Record<ServiceTicketPriority, BadgeTone> = {
 
 // --- 来源渠道 -------------------------------------------------------------
 
-export const TICKET_SOURCE_LABELS: Record<
-  ServiceTicketSourceChannel,
-  string
-> = {
-  pos: "POS",
-  app: "App",
-  phone: "电话",
-  whatsapp: "WhatsApp",
-};
+export const TICKET_SOURCE_LABELS: Record<ServiceTicketSourceChannel, string> =
+  {
+    pos: "POS",
+    app: "App",
+    phone: "电话",
+    whatsapp: "WhatsApp",
+  };
 
 export const TICKET_SOURCE_TONES: Record<
   ServiceTicketSourceChannel,
@@ -130,7 +128,10 @@ export const TICKET_TYPE_LABELS: Record<ServiceTicketType, string> = {
 // --- 工单项目：颜色 / 品牌 / 材质预设选项 -----------------------------------
 
 /** 常见颜色选项（洗衣/干洗场景），按色系分组。 */
-export const ITEM_COLOR_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+export const ITEM_COLOR_OPTIONS: ReadonlyArray<{
+  value: string;
+  label: string;
+}> = [
   // 基础色
   { value: "白色", label: "白色" },
   { value: "黑色", label: "黑色" },
@@ -166,7 +167,10 @@ export const ITEM_COLOR_OPTIONS: ReadonlyArray<{ value: string; label: string }>
 ];
 
 /** 常见品牌选项（覆盖国际/国内主流服装品牌）。 */
-export const ITEM_BRAND_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+export const ITEM_BRAND_OPTIONS: ReadonlyArray<{
+  value: string;
+  label: string;
+}> = [
   // 国际快时尚
   { value: "ZARA", label: "ZARA" },
   { value: "H&M", label: "H&M" },
@@ -219,7 +223,10 @@ export const ITEM_BRAND_OPTIONS: ReadonlyArray<{ value: string; label: string }>
 ];
 
 /** 常见材质选项（覆盖天然/化学/混纺纤维）。 */
-export const ITEM_MATERIAL_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+export const ITEM_MATERIAL_OPTIONS: ReadonlyArray<{
+  value: string;
+  label: string;
+}> = [
   // 天然纤维
   { value: "棉", label: "棉" },
   { value: "麻", label: "麻" },
@@ -297,34 +304,38 @@ export const TICKET_ITEM_STATUS_TRANSITIONS: Record<
 export const TICKET_STATUS_OPTIONS: ReadonlyArray<{
   value: ServiceTicketStatus;
   label: string;
-}> = (
-  Object.keys(TICKET_STATUS_LABELS) as ServiceTicketStatus[]
-).map((value) => ({ value, label: TICKET_STATUS_LABELS[value] }));
+}> = (Object.keys(TICKET_STATUS_LABELS) as ServiceTicketStatus[]).map(
+  (value) => ({ value, label: TICKET_STATUS_LABELS[value] }),
+);
 
 export const TICKET_PRIORITY_OPTIONS: ReadonlyArray<{
   value: ServiceTicketPriority;
   label: string;
-}> = (
-  Object.keys(TICKET_PRIORITY_LABELS) as ServiceTicketPriority[]
-).map((value) => ({ value, label: TICKET_PRIORITY_LABELS[value] }));
+}> = (Object.keys(TICKET_PRIORITY_LABELS) as ServiceTicketPriority[]).map(
+  (value) => ({ value, label: TICKET_PRIORITY_LABELS[value] }),
+);
 
-export const TICKET_TYPE_OPTIONS: ReadonlyArray<{ value: ServiceTicketType; label: string }> = (
-  Object.keys(TICKET_TYPE_LABELS) as ServiceTicketType[]
-).map((value) => ({ value, label: TICKET_TYPE_LABELS[value] }));
+export const TICKET_TYPE_OPTIONS: ReadonlyArray<{
+  value: ServiceTicketType;
+  label: string;
+}> = (Object.keys(TICKET_TYPE_LABELS) as ServiceTicketType[]).map((value) => ({
+  value,
+  label: TICKET_TYPE_LABELS[value],
+}));
 
 export const TICKET_SOURCE_OPTIONS: ReadonlyArray<{
   value: ServiceTicketSourceChannel;
   label: string;
-}> = (
-  Object.keys(TICKET_SOURCE_LABELS) as ServiceTicketSourceChannel[]
-).map((value) => ({ value, label: TICKET_SOURCE_LABELS[value] }));
+}> = (Object.keys(TICKET_SOURCE_LABELS) as ServiceTicketSourceChannel[]).map(
+  (value) => ({ value, label: TICKET_SOURCE_LABELS[value] }),
+);
 
 export const TICKET_ITEM_TYPE_OPTIONS: ReadonlyArray<{
   value: ServiceTicketItemType;
   label: string;
-}> = (
-  Object.keys(TICKET_ITEM_TYPE_LABELS) as ServiceTicketItemType[]
-).map((value) => ({ value, label: TICKET_ITEM_TYPE_LABELS[value] }));
+}> = (Object.keys(TICKET_ITEM_TYPE_LABELS) as ServiceTicketItemType[]).map(
+  (value) => ({ value, label: TICKET_ITEM_TYPE_LABELS[value] }),
+);
 
 // --- 格式化 --------------------------------------------------------------
 

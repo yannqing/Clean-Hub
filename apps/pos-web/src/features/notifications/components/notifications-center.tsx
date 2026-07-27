@@ -28,7 +28,10 @@ import {
   NOTICE_TYPE_OPTIONS,
   NOTIFICATION_FILTER_KEYS,
 } from "../constants";
-import type { NotificationActionResult, PosNotificationOverview } from "../types";
+import type {
+  NotificationActionResult,
+  PosNotificationOverview,
+} from "../types";
 
 type NotificationsCenterProps = {
   notifications: PosNotificationInboxItem[];
@@ -71,11 +74,14 @@ export function NotificationsCenter({
   const params = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [draft, setDraft] = useState(params.get(NOTIFICATION_FILTER_KEYS.q) ?? "");
+  const [draft, setDraft] = useState(
+    params.get(NOTIFICATION_FILTER_KEYS.q) ?? "",
+  );
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const selected =
-    notifications.find((notification) => notification.id === selectedId) ?? null;
+    notifications.find((notification) => notification.id === selectedId) ??
+    null;
 
   const grouped = useMemo(() => {
     const initial: Record<NotificationGroupKey, PosNotificationInboxItem[]> = {
@@ -103,7 +109,9 @@ export function NotificationsCenter({
       }
 
       startTransition(() => {
-        router.replace(`/notifications?${search.toString()}`, { scroll: false });
+        router.replace(`/notifications?${search.toString()}`, {
+          scroll: false,
+        });
       });
     },
     [params, router],
@@ -455,7 +463,9 @@ function NotificationRow({
             {notification.content}
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
-            <span>{formatNotificationDateTime(notification.sentAt, locale)}</span>
+            <span>
+              {formatNotificationDateTime(notification.sentAt, locale)}
+            </span>
             {notification.relatedType ? (
               <span>
                 {NOTICE_RELATED_TYPE_LABELS[notification.relatedType]} ·{" "}

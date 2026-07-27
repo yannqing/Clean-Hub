@@ -72,8 +72,9 @@ export function HardwareSettingsCard({
 
     setOpeningDrawer(true);
     try {
-      const authorization =
-        await posApi.pos.hardware.authorizeManualDrawerOpen({ reason });
+      const authorization = await posApi.pos.hardware.authorizeManualDrawerOpen(
+        { reason },
+      );
       const bridge = getDesktopBridge();
       if (!bridge) {
         throw new Error(
@@ -96,10 +97,7 @@ export function HardwareSettingsCard({
       setDrawerReason("");
     } catch (error) {
       toast.error(
-        getPosApiErrorMessage(
-          error,
-          "开钱箱失败，请检查硬件连接后重试。",
-        ),
+        getPosApiErrorMessage(error, "开钱箱失败，请检查硬件连接后重试。"),
       );
     } finally {
       setOpeningDrawer(false);
@@ -140,9 +138,11 @@ export function HardwareSettingsCard({
                       {device.name}
                     </p>
                     <p className="text-xs text-slate-400">
-                      {DEVICE_TYPE_LABELS[device.deviceType] ?? device.deviceType}
+                      {DEVICE_TYPE_LABELS[device.deviceType] ??
+                        device.deviceType}
                       {" · "}
-                      {CONNECTION_TYPE_LABELS[device.connectionType] ?? device.connectionType}
+                      {CONNECTION_TYPE_LABELS[device.connectionType] ??
+                        device.connectionType}
                     </p>
                   </div>
                 </div>
@@ -166,7 +166,9 @@ export function HardwareSettingsCard({
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-800">钱箱控制</p>
             <p className="mt-1 text-xs text-slate-500">
-              {configuredDrawer ? configuredDrawer.name : "当前门店未配置可用钱箱"}
+              {configuredDrawer
+                ? configuredDrawer.name
+                : "当前门店未配置可用钱箱"}
             </p>
           </div>
           <button

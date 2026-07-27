@@ -18,10 +18,10 @@ export namespace JSX {
     extends ReactJSX.ElementAttributesProperty {}
   export interface ElementChildrenAttribute
     extends ReactJSX.ElementChildrenAttribute {}
-  export interface IntrinsicAttributes
-    extends ReactJSX.IntrinsicAttributes {}
-  export interface IntrinsicClassAttributes<T>
-    extends ReactJSX.IntrinsicClassAttributes<T> {}
+  export interface IntrinsicAttributes extends ReactJSX.IntrinsicAttributes {}
+  export interface IntrinsicClassAttributes<
+    T,
+  > extends ReactJSX.IntrinsicClassAttributes<T> {}
   export interface IntrinsicElements extends ReactJSX.IntrinsicElements {}
 }
 

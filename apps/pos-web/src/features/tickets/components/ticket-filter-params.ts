@@ -43,33 +43,36 @@ export function parseStatusParam(
   value: string | null | undefined,
 ): ServiceTicketStatus | undefined {
   return (
-    value &&
-    (TICKET_STATUS_OPTIONS.some((o) => o.value === value)
-      ? (value as ServiceTicketStatus)
-      : undefined)
-  ) || undefined;
+    (value &&
+      (TICKET_STATUS_OPTIONS.some((o) => o.value === value)
+        ? (value as ServiceTicketStatus)
+        : undefined)) ||
+    undefined
+  );
 }
 
 export function parseTypeParam(
   value: string | null | undefined,
 ): ServiceTicketType | undefined {
   return (
-    value &&
-    (TICKET_TYPE_OPTIONS.some((o) => o.value === value)
-      ? (value as ServiceTicketType)
-      : undefined)
-  ) || undefined;
+    (value &&
+      (TICKET_TYPE_OPTIONS.some((o) => o.value === value)
+        ? (value as ServiceTicketType)
+        : undefined)) ||
+    undefined
+  );
 }
 
 export function parsePriorityParam(
   value: string | null | undefined,
 ): ServiceTicketPriority | undefined {
   return (
-    value &&
-    (TICKET_PRIORITY_OPTIONS.some((o) => o.value === value)
-      ? (value as ServiceTicketPriority)
-      : undefined)
-  ) || undefined;
+    (value &&
+      (TICKET_PRIORITY_OPTIONS.some((o) => o.value === value)
+        ? (value as ServiceTicketPriority)
+        : undefined)) ||
+    undefined
+  );
 }
 
 /**

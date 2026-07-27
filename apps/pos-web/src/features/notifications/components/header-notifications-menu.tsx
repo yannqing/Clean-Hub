@@ -299,7 +299,9 @@ export function HeaderNotificationsMenu({
                           </p>
                           <div className="mt-2 flex items-center justify-between gap-3">
                             <span className="min-w-0 truncate text-[11px] font-medium text-slate-400">
-                              {[statusLabel, sentAt].filter(Boolean).join(" · ")}
+                              {[statusLabel, sentAt]
+                                .filter(Boolean)
+                                .join(" · ")}
                             </span>
                             {unread ? (
                               <button

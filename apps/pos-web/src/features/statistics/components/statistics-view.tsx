@@ -170,7 +170,9 @@ function MetricCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-medium text-slate-500">{label}</p>
-          <p className="mt-2 truncate text-2xl font-bold text-slate-950">{value}</p>
+          <p className="mt-2 truncate text-2xl font-bold text-slate-950">
+            {value}
+          </p>
         </div>
         <span
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
@@ -179,7 +181,9 @@ function MetricCard({
           <Icon className="h-5 w-5" name={icon} />
         </span>
       </div>
-      <p className="mt-3 truncate text-xs font-medium text-slate-500">{helper}</p>
+      <p className="mt-3 truncate text-xs font-medium text-slate-500">
+        {helper}
+      </p>
     </article>
   );
 }
@@ -301,7 +305,11 @@ function VerticalBarChart({
   maxValue?: number;
   valueFormatter: (value: number, locale: string) => string;
 }) {
-  const chartMax = Math.max(maxValue ?? 0, ...data.map((item) => item.value), 1);
+  const chartMax = Math.max(
+    maxValue ?? 0,
+    ...data.map((item) => item.value),
+    1,
+  );
 
   return (
     <PosChartContainer className="mt-5 h-56">
@@ -335,7 +343,11 @@ function VerticalBarChart({
           isAnimationActive={false}
         />
         <Bar
-          activeBar={{ fillOpacity: 0.86, stroke: "#0f172a", strokeOpacity: 0.12 }}
+          activeBar={{
+            fillOpacity: 0.86,
+            stroke: "#0f172a",
+            strokeOpacity: 0.12,
+          }}
           background={{ fill: "#f1f5f9", radius: 8 }}
           dataKey="value"
           maxBarSize={46}
@@ -538,10 +550,7 @@ function OrderStructureChart({
   ];
 
   return (
-    <ChartCard
-      description="今日订单完成、取消与待收款情况"
-      title="订单构成图"
-    >
+    <ChartCard description="今日订单完成、取消与待收款情况" title="订单构成图">
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_220px]">
         <VerticalBarChart
           ariaLabel="今日订单构成图"
@@ -555,7 +564,13 @@ function OrderStructureChart({
               color={item.color}
               key={item.label}
               label={item.label}
-              value={formatCountUnit(item.value, locale, "单", "orders", "commandes")}
+              value={formatCountUnit(
+                item.value,
+                locale,
+                "单",
+                "orders",
+                "commandes",
+              )}
             />
           ))}
         </div>
@@ -643,22 +658,24 @@ function DonutChart({
 }) {
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
   const total = data.reduce((sum, item) => sum + item.value, 0);
-  const chartData = total > 0
-    ? data.map((item) => ({
-        ...item,
-        displayValue: valueFormatter(item.value),
-        helper: formatPercent((item.value / total) * 100, locale),
-      }))
-    : [
-        {
-          color: "#e2e8f0",
-          displayValue: valueFormatter(0),
-          helper: undefined,
-          label: "暂无数据",
-          value: 1,
-        },
-      ];
-  const activeItem = activeIndex === undefined ? undefined : chartData[activeIndex];
+  const chartData =
+    total > 0
+      ? data.map((item) => ({
+          ...item,
+          displayValue: valueFormatter(item.value),
+          helper: formatPercent((item.value / total) * 100, locale),
+        }))
+      : [
+          {
+            color: "#e2e8f0",
+            displayValue: valueFormatter(0),
+            helper: undefined,
+            label: "暂无数据",
+            value: 1,
+          },
+        ];
+  const activeItem =
+    activeIndex === undefined ? undefined : chartData[activeIndex];
   const displayCenterLabel = activeItem?.label ?? centerLabel;
   const displayCenterValue = activeItem?.displayValue ?? centerValue;
 
@@ -760,9 +777,10 @@ function BusinessStructureChart({
     totalCustomerCount - todayNewCustomerCount,
     0,
   );
-  const newCustomerPercent = totalCustomerCount > 0
-    ? clampPercent((todayNewCustomerCount / totalCustomerCount) * 100)
-    : 0;
+  const newCustomerPercent =
+    totalCustomerCount > 0
+      ? clampPercent((todayNewCustomerCount / totalCustomerCount) * 100)
+      : 0;
   const customerChartData = [
     {
       color: CHART_COLORS.customers,
@@ -800,9 +818,10 @@ function BusinessStructureChart({
             <div className="flex flex-col justify-center gap-3">
               {ticketChartData.length > 0 ? (
                 ticketChartData.map((item) => {
-                  const percentage = ticketTotal > 0
-                    ? clampPercent((item.value / ticketTotal) * 100)
-                    : 0;
+                  const percentage =
+                    ticketTotal > 0
+                      ? clampPercent((item.value / ticketTotal) * 100)
+                      : 0;
 
                   return (
                     <LegendRow
@@ -839,7 +858,9 @@ function BusinessStructureChart({
             <div className="flex flex-col justify-center gap-3">
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-medium text-slate-500">新增客户占比</p>
+                  <p className="text-xs font-medium text-slate-500">
+                    新增客户占比
+                  </p>
                   <p className="text-sm font-semibold text-slate-900">
                     {formatPercent(newCustomerPercent, locale)}
                   </p>
@@ -889,19 +910,23 @@ function CustomerPanel({
   const ticketedCustomerCount = toNumber(customers.ticketedCustomerCount);
   const engagedCustomerCount = toNumber(customers.engagedCustomerCount);
   const repeatOrderCustomerCount = toNumber(customers.repeatOrderCustomerCount);
-  const repeatTicketCustomerCount = toNumber(customers.repeatTicketCustomerCount);
-  const activeAccountPercent = totalCount > 0
-    ? clampPercent((activeCount / totalCount) * 100)
-    : 0;
-  const activeProfilePercent = profileCount > 0
-    ? clampPercent((activeProfileCount / profileCount) * 100)
-    : 0;
-  const engagementPercent = profileCount > 0
-    ? clampPercent((engagedCustomerCount / profileCount) * 100)
-    : 0;
-  const repeatOrderPercent = orderedCustomerCount > 0
-    ? clampPercent((repeatOrderCustomerCount / orderedCustomerCount) * 100)
-    : 0;
+  const repeatTicketCustomerCount = toNumber(
+    customers.repeatTicketCustomerCount,
+  );
+  const activeAccountPercent =
+    totalCount > 0 ? clampPercent((activeCount / totalCount) * 100) : 0;
+  const activeProfilePercent =
+    profileCount > 0
+      ? clampPercent((activeProfileCount / profileCount) * 100)
+      : 0;
+  const engagementPercent =
+    profileCount > 0
+      ? clampPercent((engagedCustomerCount / profileCount) * 100)
+      : 0;
+  const repeatOrderPercent =
+    orderedCustomerCount > 0
+      ? clampPercent((repeatOrderCustomerCount / orderedCustomerCount) * 100)
+      : 0;
   const trendData = customers.sevenDayNewAccounts.map((item) => ({
     date: item.date,
     count: toNumber(item.count),
@@ -1133,7 +1158,8 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
   const unpaidCount = toNumber(orders.unpaidCount);
   const deliveredCount = toNumber(orders.deliveredCount);
   const cancelledCount = toNumber(orders.cancelledCount);
-  const paidPercent = totalAmount > 0 ? clampPercent((paidAmount / totalAmount) * 100) : 0;
+  const paidPercent =
+    totalAmount > 0 ? clampPercent((paidAmount / totalAmount) * 100) : 0;
   const ticketStatusEntries = Object.entries(tickets.byStatus)
     .filter(([, count]) => toNumber(count) > 0)
     .map(([status, count]) => [status, toNumber(count)] as [string, number]);
@@ -1245,7 +1271,13 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
           title="工单统计"
           action={
             <span className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">
-              {formatCountUnit(totalTicketCount, locale, "个工单", "tickets", "tickets")}
+              {formatCountUnit(
+                totalTicketCount,
+                locale,
+                "个工单",
+                "tickets",
+                "tickets",
+              )}
             </span>
           }
         />
@@ -1297,10 +1329,7 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
           icon="users"
           title="客户统计"
         />
-        <CustomerPanel
-          customers={customers}
-          locale={locale}
-        />
+        <CustomerPanel customers={customers} locale={locale} />
       </section>
     </div>
   );

@@ -16,7 +16,13 @@ export const DEFAULT_ORDER_PAGE_SIZE = 20;
 export const DEFAULT_ORDER_CURRENCY = DEFAULT_POS_CURRENCY;
 export const ORDER_EMPTY_PLACEHOLDER = "—";
 
-export type BadgeTone = "slate" | "blue" | "violet" | "emerald" | "amber" | "red";
+export type BadgeTone =
+  | "slate"
+  | "blue"
+  | "violet"
+  | "emerald"
+  | "amber"
+  | "red";
 
 export const BADGE_TONE_CLASSES: Record<BadgeTone, string> = {
   slate: "bg-slate-100 text-slate-600",

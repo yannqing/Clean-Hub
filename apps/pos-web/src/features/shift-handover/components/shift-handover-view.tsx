@@ -20,10 +20,7 @@ import { DEFAULT_POS_CURRENCY } from "@/lib/money";
 import type { PosSessionUser } from "@/lib/session";
 import { posToast as toast } from "@/lib/pos-toast";
 
-import {
-  clockShiftAction,
-  createShiftHandoverAction,
-} from "../actions";
+import { clockShiftAction, createShiftHandoverAction } from "../actions";
 import type { ShiftHandoverSummary } from "../types";
 
 const DRAFT_STORAGE_KEY = "cleanhub.pos-web.shift-handover-draft";
@@ -314,7 +311,10 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
   },
 };
 
-const PAYMENT_METHOD_LABELS: Record<string, Record<"zh-CN" | "en" | "fr", string>> = {
+const PAYMENT_METHOD_LABELS: Record<
+  string,
+  Record<"zh-CN" | "en" | "fr", string>
+> = {
   app: {
     "zh-CN": "App",
     en: "App",
@@ -500,9 +500,7 @@ function OrderRow({
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
         <span>{formatDateTime(order.createdAt, locale)}</span>
-        <span>
-          {formatMoney(toNumber(order.paidAmount), currency, locale)}
-        </span>
+        <span>{formatMoney(toNumber(order.paidAmount), currency, locale)}</span>
       </div>
     </Link>
   );
@@ -1055,7 +1053,9 @@ export function ShiftHandoverView({
                     <span className="font-medium text-slate-600">
                       {PAYMENT_METHOD_LABELS[item.provider ?? item.method]?.[
                         resolvedLocale
-                      ] ?? item.provider ?? item.method}
+                      ] ??
+                        item.provider ??
+                        item.method}
                     </span>
                     <span className="font-semibold text-slate-950">
                       {formatMoney(toNumber(item.amount), currency, locale)}
@@ -1098,7 +1098,11 @@ export function ShiftHandoverView({
                     <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                       <span className="text-slate-500">{copy.grossSales}</span>
                       <span className="text-right font-semibold text-slate-900">
-                        {formatMoney(toNumber(report.grossSales), report.currency, locale)}
+                        {formatMoney(
+                          toNumber(report.grossSales),
+                          report.currency,
+                          locale,
+                        )}
                       </span>
                       <span className="text-slate-500">{copy.discounts}</span>
                       <span className="text-right font-semibold text-slate-900">
@@ -1110,34 +1114,58 @@ export function ShiftHandoverView({
                       </span>
                       <span className="text-slate-500">{copy.refunds}</span>
                       <span className="text-right font-semibold text-red-700">
-                        {formatMoney(toNumber(report.refundAmount), report.currency, locale)}
+                        {formatMoney(
+                          toNumber(report.refundAmount),
+                          report.currency,
+                          locale,
+                        )}
                       </span>
                       <span className="text-slate-500">{copy.corrections}</span>
                       <span className="text-right font-semibold text-slate-900">
-                        {formatMoney(toNumber(report.correctionAmount), report.currency, locale)}
+                        {formatMoney(
+                          toNumber(report.correctionAmount),
+                          report.currency,
+                          locale,
+                        )}
                       </span>
                       <span className="text-slate-500">{copy.netSales}</span>
                       <span className="text-right font-semibold text-slate-900">
-                        {formatMoney(toNumber(report.netSales), report.currency, locale)}
+                        {formatMoney(
+                          toNumber(report.netSales),
+                          report.currency,
+                          locale,
+                        )}
                       </span>
                     </div>
                     <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-200 pt-3 text-center text-xs">
                       <div>
                         <p className="text-slate-500">{copy.expectedCash}</p>
                         <p className="mt-1 font-semibold text-slate-900">
-                          {formatMoney(toNumber(report.expectedCash), report.currency, locale)}
+                          {formatMoney(
+                            toNumber(report.expectedCash),
+                            report.currency,
+                            locale,
+                          )}
                         </p>
                       </div>
                       <div>
                         <p className="text-slate-500">{copy.cashCounted}</p>
                         <p className="mt-1 font-semibold text-slate-900">
-                          {formatMoney(toNumber(report.countedCash), report.currency, locale)}
+                          {formatMoney(
+                            toNumber(report.countedCash),
+                            report.currency,
+                            locale,
+                          )}
                         </p>
                       </div>
                       <div>
                         <p className="text-slate-500">{copy.variance}</p>
                         <p className="mt-1 font-semibold text-slate-900">
-                          {formatMoney(toNumber(report.variance), report.currency, locale)}
+                          {formatMoney(
+                            toNumber(report.variance),
+                            report.currency,
+                            locale,
+                          )}
                         </p>
                       </div>
                     </div>

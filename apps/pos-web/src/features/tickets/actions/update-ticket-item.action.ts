@@ -22,7 +22,12 @@ export async function updateTicketItemAction(
 ): Promise<TicketActionResult<ServiceTicketItem>> {
   const result = await runTicketAction(async () => {
     const options = await getPosServerApiRequestOptions();
-    return posApi.pos.serviceTickets.updateItem(ticketId, itemId, input, options);
+    return posApi.pos.serviceTickets.updateItem(
+      ticketId,
+      itemId,
+      input,
+      options,
+    );
   });
 
   if (result.ok) {

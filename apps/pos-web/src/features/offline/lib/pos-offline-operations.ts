@@ -9,10 +9,7 @@ import {
   type ServiceTicketDetail,
 } from "@cleanhub/api-client";
 import { createId } from "@cleanhub/id";
-import type {
-  EnqueueInput,
-  OfflineQueueItem,
-} from "@cleanhub/offline";
+import type { EnqueueInput, OfflineQueueItem } from "@cleanhub/offline";
 
 export const POS_OFFLINE_ENTITIES = {
   customerAccountCreate: "pos.customer-account.create",

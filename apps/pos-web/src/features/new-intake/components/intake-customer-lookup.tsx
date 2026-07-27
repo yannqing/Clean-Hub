@@ -86,37 +86,37 @@ export function IntakeCustomerLookup({
   });
   const [createProfileDialogOpen, setCreateProfileDialogOpen] = useState(false);
 
-  const reload = useCallback(async (
-    next: IntakeProfileQuery,
-    account: IntakeAccountOption | null,
-  ) => {
-    const requestId = reloadRequestIdRef.current + 1;
-    reloadRequestIdRef.current = requestId;
-    setLoading(true);
-    try {
-      const result = account
-        ? await listIntakeAccountProfiles(account, next)
-        : await searchIntakeProfiles(next);
-      if (reloadRequestIdRef.current !== requestId) return;
-      setRows(result.rows);
-      setTotal(result.total);
-    } catch (error) {
-      if (reloadRequestIdRef.current !== requestId) return;
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : account
-            ? "查询账户档案失败，请重试。"
-            : "查询客户档案失败，请重试。",
-      );
-      setRows([]);
-      setTotal(0);
-    } finally {
-      if (reloadRequestIdRef.current === requestId) {
-        setLoading(false);
+  const reload = useCallback(
+    async (next: IntakeProfileQuery, account: IntakeAccountOption | null) => {
+      const requestId = reloadRequestIdRef.current + 1;
+      reloadRequestIdRef.current = requestId;
+      setLoading(true);
+      try {
+        const result = account
+          ? await listIntakeAccountProfiles(account, next)
+          : await searchIntakeProfiles(next);
+        if (reloadRequestIdRef.current !== requestId) return;
+        setRows(result.rows);
+        setTotal(result.total);
+      } catch (error) {
+        if (reloadRequestIdRef.current !== requestId) return;
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : account
+              ? "查询账户档案失败，请重试。"
+              : "查询客户档案失败，请重试。",
+        );
+        setRows([]);
+        setTotal(0);
+      } finally {
+        if (reloadRequestIdRef.current === requestId) {
+          setLoading(false);
+        }
       }
-    }
-  }, []);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!selectedAccount && !hasSearched) return;

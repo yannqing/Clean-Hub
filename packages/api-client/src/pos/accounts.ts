@@ -61,10 +61,7 @@ export function createPosAccountsApi(client: ApiClient) {
       ),
 
     /** Change account status (active/disabled). POST /pos/accounts/:accountId/status-changes */
-    changeStatus: (
-      accountId: string,
-      input: PosCustomerStatusChangeRequest,
-    ) =>
+    changeStatus: (accountId: string, input: PosCustomerStatusChangeRequest) =>
       client.post<PosCustomerAccountDetail>(
         `/pos/accounts/${accountId}/status-changes`,
         input,

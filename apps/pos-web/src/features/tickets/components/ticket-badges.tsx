@@ -36,11 +36,7 @@ export function TicketBadge({
   );
 }
 
-export function TicketStatusBadge({
-  status,
-}: {
-  status: ServiceTicketStatus;
-}) {
+export function TicketStatusBadge({ status }: { status: ServiceTicketStatus }) {
   return (
     <TicketBadge tone={TICKET_STATUS_TONES[status]}>
       {TICKET_STATUS_LABELS[status]}

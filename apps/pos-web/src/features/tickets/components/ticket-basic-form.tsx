@@ -87,7 +87,10 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
           <select
             className={inputClass}
             onChange={(event) =>
-              update("ticketType", event.target.value as TicketBasicFormValues["ticketType"])
+              update(
+                "ticketType",
+                event.target.value as TicketBasicFormValues["ticketType"],
+              )
             }
             value={values.ticketType}
           >
@@ -102,7 +105,10 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
           <select
             className={inputClass}
             onChange={(event) =>
-              update("priority", event.target.value as TicketBasicFormValues["priority"])
+              update(
+                "priority",
+                event.target.value as TicketBasicFormValues["priority"],
+              )
             }
             value={values.priority}
           >

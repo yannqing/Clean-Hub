@@ -174,10 +174,7 @@ export function TerminalSettingsCard({
               </SelectTrigger>
               <SelectContent>
                 {PRINT_COPIES_OPTIONS.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={String(option.value)}
-                  >
+                  <SelectItem key={option.value} value={String(option.value)}>
                     {option.label}
                   </SelectItem>
                 ))}
@@ -199,10 +196,7 @@ export function TerminalSettingsCard({
               </SelectTrigger>
               <SelectContent>
                 {LOCK_TIMEOUT_OPTIONS.map((option) => (
-                  <SelectItem
-                    key={option.value}
-                    value={String(option.value)}
-                  >
+                  <SelectItem key={option.value} value={String(option.value)}>
                     {option.label}
                   </SelectItem>
                 ))}

@@ -107,7 +107,9 @@ function KpiCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-medium text-slate-500">{label}</p>
-          <p className="mt-2 truncate text-2xl font-bold text-slate-950">{value}</p>
+          <p className="mt-2 truncate text-2xl font-bold text-slate-950">
+            {value}
+          </p>
         </div>
         <span
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
@@ -116,7 +118,9 @@ function KpiCard({
           <Icon className="h-5 w-5" name={icon} />
         </span>
       </div>
-      <p className="mt-3 truncate text-xs font-medium text-slate-500">{helper}</p>
+      <p className="mt-3 truncate text-xs font-medium text-slate-500">
+        {helper}
+      </p>
     </article>
   );
 }
@@ -164,31 +168,32 @@ function PaymentChart({
 }) {
   const unpaidAmount = Math.max(totalAmount - paidAmount, 0);
   const percentLabel = formatPercent(paidPercent, locale);
-  const chartData = totalAmount > 0
-    ? [
-        {
-          color: CHART_COLORS.paid,
-          displayValue: formatCurrency(paidAmount, locale, currency),
-          helper: percentLabel,
-          label: "已收款",
-          value: paidAmount,
-        },
-        {
-          color: "#cbd5e1",
-          displayValue: formatCurrency(unpaidAmount, locale, currency),
-          helper: `未付款订单 ${formatOrderUnitCount(unpaidCount, locale)}`,
-          label: "待收款",
-          value: unpaidAmount,
-        },
-      ]
-    : [
-        {
-          color: "#e2e8f0",
-          displayValue: formatCurrency(0, locale, currency),
-          label: "暂无收款",
-          value: 1,
-        },
-      ];
+  const chartData =
+    totalAmount > 0
+      ? [
+          {
+            color: CHART_COLORS.paid,
+            displayValue: formatCurrency(paidAmount, locale, currency),
+            helper: percentLabel,
+            label: "已收款",
+            value: paidAmount,
+          },
+          {
+            color: "#cbd5e1",
+            displayValue: formatCurrency(unpaidAmount, locale, currency),
+            helper: `未付款订单 ${formatOrderUnitCount(unpaidCount, locale)}`,
+            label: "待收款",
+            value: unpaidAmount,
+          },
+        ]
+      : [
+          {
+            color: "#e2e8f0",
+            displayValue: formatCurrency(0, locale, currency),
+            label: "暂无收款",
+            value: 1,
+          },
+        ];
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -232,8 +237,12 @@ function PaymentChart({
             </PieChart>
           </PosChartContainer>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-2xl font-bold text-slate-950">{percentLabel}</span>
-            <span className="mt-0.5 text-xs font-medium text-slate-500">实收占比</span>
+            <span className="text-2xl font-bold text-slate-950">
+              {percentLabel}
+            </span>
+            <span className="mt-0.5 text-xs font-medium text-slate-500">
+              实收占比
+            </span>
           </div>
         </div>
 
@@ -274,21 +283,28 @@ function TicketBars({
     {
       color: CHART_COLORS.orders,
       displayValue: formatNumber(todayCreatedCount, locale),
-      helper: total > 0 ? formatPercent((todayCreatedCount / total) * 100, locale) : "0%",
+      helper:
+        total > 0
+          ? formatPercent((todayCreatedCount / total) * 100, locale)
+          : "0%",
       label: "今日新建",
       value: todayCreatedCount,
     },
     {
       color: CHART_COLORS.paid,
       displayValue: formatNumber(todayPickedUpCount, locale),
-      helper: total > 0 ? formatPercent((todayPickedUpCount / total) * 100, locale) : "0%",
+      helper:
+        total > 0
+          ? formatPercent((todayPickedUpCount / total) * 100, locale)
+          : "0%",
       label: "今日取件",
       value: todayPickedUpCount,
     },
     {
       color: CHART_COLORS.overdue,
       displayValue: formatNumber(overdueCount, locale),
-      helper: total > 0 ? formatPercent((overdueCount / total) * 100, locale) : "0%",
+      helper:
+        total > 0 ? formatPercent((overdueCount / total) * 100, locale) : "0%",
       label: "逾期工单",
       value: overdueCount,
     },
@@ -300,7 +316,9 @@ function TicketBars({
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">工单动态</h3>
-          <p className="mt-1 text-xs text-slate-500">今日创建、取件与逾期情况</p>
+          <p className="mt-1 text-xs text-slate-500">
+            今日创建、取件与逾期情况
+          </p>
         </div>
         <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
           共 {formatNumber(total, locale)}
@@ -318,11 +336,7 @@ function TicketBars({
             stroke="#e2e8f0"
             strokeDasharray="4 4"
           />
-          <XAxis
-            domain={[0, maxValue]}
-            hide
-            type="number"
-          />
+          <XAxis domain={[0, maxValue]} hide type="number" />
           <YAxis
             axisLine={false}
             dataKey="label"
@@ -337,7 +351,11 @@ function TicketBars({
             isAnimationActive={false}
           />
           <Bar
-            activeBar={{ fillOpacity: 0.86, stroke: "#0f172a", strokeOpacity: 0.12 }}
+            activeBar={{
+              fillOpacity: 0.86,
+              stroke: "#0f172a",
+              strokeOpacity: 0.12,
+            }}
             background={{ fill: "#f1f5f9", radius: 8 }}
             dataKey="value"
             maxBarSize={18}
@@ -363,33 +381,35 @@ function CustomerGrowth({
   todayNewCount: number;
   totalCount: number;
 }) {
-  const newCustomerPercent = totalCount > 0 ? clampPercent((todayNewCount / totalCount) * 100) : 0;
+  const newCustomerPercent =
+    totalCount > 0 ? clampPercent((todayNewCount / totalCount) * 100) : 0;
   const existingCount = Math.max(totalCount - todayNewCount, 0);
-  const chartData = totalCount > 0
-    ? [
-        {
-          color: CHART_COLORS.customers,
-          displayValue: formatNumber(existingCount, locale),
-          helper: formatPercent(100 - newCustomerPercent, locale),
-          label: "存量客户",
-          value: existingCount,
-        },
-        {
-          color: CHART_COLORS.paid,
-          displayValue: formatNumber(todayNewCount, locale),
-          helper: formatPercent(newCustomerPercent, locale),
-          label: "今日新增",
-          value: todayNewCount,
-        },
-      ]
-    : [
-        {
-          color: "#e2e8f0",
-          displayValue: formatNumber(0, locale),
-          label: "暂无客户",
-          value: 1,
-        },
-      ];
+  const chartData =
+    totalCount > 0
+      ? [
+          {
+            color: CHART_COLORS.customers,
+            displayValue: formatNumber(existingCount, locale),
+            helper: formatPercent(100 - newCustomerPercent, locale),
+            label: "存量客户",
+            value: existingCount,
+          },
+          {
+            color: CHART_COLORS.paid,
+            displayValue: formatNumber(todayNewCount, locale),
+            helper: formatPercent(newCustomerPercent, locale),
+            label: "今日新增",
+            value: todayNewCount,
+          },
+        ]
+      : [
+          {
+            color: "#e2e8f0",
+            displayValue: formatNumber(0, locale),
+            label: "暂无客户",
+            value: 1,
+          },
+        ];
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -458,7 +478,9 @@ function CustomerGrowth({
             <span className="text-lg font-bold text-slate-950">
               {formatPercent(newCustomerPercent, locale)}
             </span>
-            <span className="text-[11px] font-medium text-slate-500">新增占比</span>
+            <span className="text-[11px] font-medium text-slate-500">
+              新增占比
+            </span>
           </div>
         </div>
       </div>
@@ -479,7 +501,8 @@ export function WorkspaceStatistics({ statistics }: WorkspaceStatisticsProps) {
   const totalAmount = toNumber(orders.totalAmount);
   const paidAmount = toNumber(orders.paidAmount);
   const unpaidCount = toNumber(orders.unpaidCount);
-  const paidPercent = totalAmount > 0 ? clampPercent((paidAmount / totalAmount) * 100) : 0;
+  const paidPercent =
+    totalAmount > 0 ? clampPercent((paidAmount / totalAmount) * 100) : 0;
   const ticketTotal = toNumber(tickets.total);
   const todayCreatedCount = toNumber(tickets.todayCreatedCount);
   const todayPickedUpCount = toNumber(tickets.todayPickedUpCount);
@@ -499,7 +522,9 @@ export function WorkspaceStatistics({ statistics }: WorkspaceStatisticsProps) {
           </span>
           <div>
             <h2 className="text-sm font-semibold text-slate-900">今日概况</h2>
-            <p className="mt-0.5 text-xs text-slate-500">订单、收款、工单与客户的实时概览</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              订单、收款、工单与客户的实时概览
+            </p>
           </div>
         </div>
         <span className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">

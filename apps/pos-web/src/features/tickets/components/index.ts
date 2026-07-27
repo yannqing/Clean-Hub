@@ -13,7 +13,10 @@ export { TicketItemEditor } from "./ticket-item-editor";
 export { TicketMetrics } from "./ticket-metrics";
 export { TicketPagination } from "./ticket-pagination";
 export { TicketRelatedOrders } from "./ticket-related-orders";
-export { TicketStatusDialog, useTicketStatusDialog } from "./ticket-status-dialog";
+export {
+  TicketStatusDialog,
+  useTicketStatusDialog,
+} from "./ticket-status-dialog";
 export { TicketsPageHeader } from "./tickets-page-header";
 export { TicketsTable } from "./tickets-table";
 export { TicketsToolbar } from "./tickets-toolbar";

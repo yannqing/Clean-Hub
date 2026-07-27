@@ -58,9 +58,7 @@ export function validateTicketItemForm(
 }
 
 /** Coerce a raw string into a valid item type (or "" for "unspecified"). */
-export function coerceTicketItemType(
-  raw: unknown,
-): ServiceTicketItemType | "" {
+export function coerceTicketItemType(raw: unknown): ServiceTicketItemType | "" {
   return raw === "cloth" || raw === "car" || raw === "shoe" || raw === "carpet"
     ? raw
     : "";

@@ -172,7 +172,15 @@ export function OfflineSyncProvider({
       refresh,
       registerReplayHandler,
     }),
-    [error, pendingCount, queue, refresh, registerReplayHandler, replayQueue, status],
+    [
+      error,
+      pendingCount,
+      queue,
+      refresh,
+      registerReplayHandler,
+      replayQueue,
+      status,
+    ],
   );
 
   return (

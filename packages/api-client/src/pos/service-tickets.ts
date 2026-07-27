@@ -36,15 +36,14 @@ export function createPosServiceTicketsApi(client: ApiClient) {
     list: (query?: ServiceTicketListQuery, options?: RequestOptions) =>
       client.get<ServiceTicketListResponse>(BASE, { ...options, query }),
 
-    create: (
-      input: CreateServiceTicketRequest,
-      options?: RequestOptions,
-    ) => client.post<ServiceTicketDetail>(BASE, input, options),
+    create: (input: CreateServiceTicketRequest, options?: RequestOptions) =>
+      client.post<ServiceTicketDetail>(BASE, input, options),
 
-    getOverview: (
-      query?: { branchId?: string },
-      options?: RequestOptions,
-    ) => client.get<ServiceTicketOverview>(`${BASE}/overview`, { ...options, query }),
+    getOverview: (query?: { branchId?: string }, options?: RequestOptions) =>
+      client.get<ServiceTicketOverview>(`${BASE}/overview`, {
+        ...options,
+        query,
+      }),
 
     get: (ticketId: string, options?: RequestOptions) =>
       client.get<ServiceTicketDetail>(`${BASE}/${ticketId}`, options),
@@ -86,7 +85,11 @@ export function createPosServiceTicketsApi(client: ApiClient) {
       input: CreateServiceTicketItemRequest,
       options?: RequestOptions,
     ) =>
-      client.post<ServiceTicketItem>(`${BASE}/${ticketId}/items`, input, options),
+      client.post<ServiceTicketItem>(
+        `${BASE}/${ticketId}/items`,
+        input,
+        options,
+      ),
 
     updateItem: (
       ticketId: string,

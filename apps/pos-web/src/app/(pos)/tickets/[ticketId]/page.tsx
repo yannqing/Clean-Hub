@@ -21,15 +21,14 @@ export default async function TicketDetailPage({
   params,
   searchParams,
 }: TicketDetailPageProps) {
-  const [{ ticketId }, { from, q }] = await Promise.all([
-    params,
-    searchParams,
-  ]);
+  const [{ ticketId }, { from, q }] = await Promise.all([params, searchParams]);
 
   const [ticket, relatedOrders, catalog, user] = await Promise.all([
     getTicketDetailQuery(ticketId),
     // Related orders are best-effort: a failure here must not break the page.
-    getRelatedOrdersQuery(ticketId).catch(() => ({ data: [] as RelatedOrderSummary[] })),
+    getRelatedOrdersQuery(ticketId).catch(() => ({
+      data: [] as RelatedOrderSummary[],
+    })),
     getPosCatalogQuery().catch(() => ({ data: [] as PosCatalogService[] })),
     getCurrentUser(),
   ]);

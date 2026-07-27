@@ -62,10 +62,11 @@ export const NOTICE_PRIORITY_OPTIONS: ReadonlyArray<{
   { value: "low", label: NOTICE_PRIORITY_LABELS.low },
 ];
 
-export const NOTICE_RELATED_TYPE_LABELS: Record<PosNoticeRelatedType, string> = {
-  order: "订单",
-  ticket: "工单",
-};
+export const NOTICE_RELATED_TYPE_LABELS: Record<PosNoticeRelatedType, string> =
+  {
+    order: "订单",
+    ticket: "工单",
+  };
 
 export const NOTICE_RELATED_TYPE_OPTIONS: ReadonlyArray<{
   value: PosNoticeRelatedType;
@@ -107,11 +108,7 @@ export function getNotificationDateGroup(
   }
 
   const now = new Date();
-  const todayStart = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate(),
-  );
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
 
   if (date >= todayStart) {

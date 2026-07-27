@@ -182,11 +182,7 @@ export function CustomerOrderList({
                     </span>
                   </div>
                   <div className="text-right font-semibold text-slate-950">
-                    {formatPosMoney(
-                      order.totalAmount,
-                      order.currency,
-                      locale,
-                    )}
+                    {formatPosMoney(order.totalAmount, order.currency, locale)}
                   </div>
                 </button>
               );

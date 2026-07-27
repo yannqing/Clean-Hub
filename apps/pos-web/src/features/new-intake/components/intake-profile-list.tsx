@@ -258,14 +258,10 @@ export function IntakeProfileList({
 
                 <div className="min-w-0">
                   <div className="truncate text-slate-700">
-                    <RawText
-                      value={row.phone || text("未填写账户手机号")}
-                    />
+                    <RawText value={row.phone || text("未填写账户手机号")} />
                   </div>
                   <div className="truncate text-xs text-slate-500">
-                    <RawText
-                      value={row.email || text("未填写账户邮箱")}
-                    />
+                    <RawText value={row.email || text("未填写账户邮箱")} />
                   </div>
                 </div>
 
@@ -314,14 +310,10 @@ export function IntakeProfileList({
 
                 <div className="min-w-0">
                   <div className="truncate text-slate-700">
-                    <RawText
-                      value={row.phone || text("未填写档案手机号")}
-                    />
+                    <RawText value={row.phone || text("未填写档案手机号")} />
                   </div>
                   <div className="truncate text-xs text-slate-500">
-                    <RawText
-                      value={row.email || text("未填写档案邮箱")}
-                    />
+                    <RawText value={row.email || text("未填写档案邮箱")} />
                   </div>
                 </div>
 

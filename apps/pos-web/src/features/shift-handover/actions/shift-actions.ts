@@ -21,7 +21,8 @@ async function run<T>(task: () => Promise<T>): Promise<ShiftActionResult<T>> {
   } catch (error) {
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "操作失败，请稍后重试。",
+      message:
+        error instanceof Error ? error.message : "操作失败，请稍后重试。",
     };
   }
 }

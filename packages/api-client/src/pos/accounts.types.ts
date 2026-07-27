@@ -10,10 +10,7 @@ import type {
   PosCustomerStatusChangeRequest,
 } from "./customers.types";
 
-export type {
-  PosCustomerStatus,
-  PosCustomerStatusChangeRequest,
-};
+export type { PosCustomerStatus, PosCustomerStatusChangeRequest };
 
 import type { PosCustomerProfileSummary } from "./customers.types";
 

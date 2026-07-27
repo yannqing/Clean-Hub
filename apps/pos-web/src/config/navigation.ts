@@ -23,21 +23,33 @@ export const posSidebarNavigation: PosNavSection[] = [
         href: posRoutes.workspace,
         icon: "layout-dashboard",
       },
-      { labelKey: "pos.nav.newIntake", href: posRoutes.newIntake, icon: "user-plus" },
+      {
+        labelKey: "pos.nav.newIntake",
+        href: posRoutes.newIntake,
+        icon: "user-plus",
+      },
       { labelKey: "pos.nav.scan", href: posRoutes.scan, icon: "scan-line" },
     ],
   },
   {
     titleKey: "pos.nav.records",
     items: [
-      { labelKey: "pos.nav.customers", href: posRoutes.customers, icon: "users" },
+      {
+        labelKey: "pos.nav.customers",
+        href: posRoutes.customers,
+        icon: "users",
+      },
       {
         labelKey: "pos.nav.tickets",
         href: posRoutes.tickets,
         icon: "clipboard-list",
       },
       { labelKey: "pos.nav.orders", href: posRoutes.orders, icon: "receipt" },
-      { labelKey: "pos.nav.statistics", href: posRoutes.statistics, icon: "chart" },
+      {
+        labelKey: "pos.nav.statistics",
+        href: posRoutes.statistics,
+        icon: "chart",
+      },
       { labelKey: "pos.nav.garments", href: posRoutes.garments, icon: "shirt" },
     ],
   },
@@ -49,8 +61,16 @@ export const posSidebarNavigation: PosNavSection[] = [
         href: posRoutes.shiftHandover,
         icon: "replace",
       },
-      { labelKey: "pos.nav.notifications", href: posRoutes.notifications, icon: "bell" },
-      { labelKey: "pos.nav.settings", href: posRoutes.settings, icon: "settings" },
+      {
+        labelKey: "pos.nav.notifications",
+        href: posRoutes.notifications,
+        icon: "bell",
+      },
+      {
+        labelKey: "pos.nav.settings",
+        href: posRoutes.settings,
+        icon: "settings",
+      },
     ],
   },
 ];

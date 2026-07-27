@@ -79,11 +79,12 @@ async function buildTicketListQuery(
   const expectedPickupBefore =
     date === "pickup_today" ? endOfToday.toISOString() : undefined;
 
-  const statuses: ServiceTicketStatus[] | undefined = date === "overdue"
-    ? ["pending", "in_progress", "ready_to_pick"]
-    : status
-      ? [status]
-      : undefined;
+  const statuses: ServiceTicketStatus[] | undefined =
+    date === "overdue"
+      ? ["pending", "in_progress", "ready_to_pick"]
+      : status
+        ? [status]
+        : undefined;
 
   const sharedFilters: Omit<
     ServiceTicketListQuery,
@@ -93,8 +94,7 @@ async function buildTicketListQuery(
     status: statuses,
     ticketType: type,
     priority,
-    expectedPickupAfter:
-      date === "overdue" ? undefined : expectedPickupAfter,
+    expectedPickupAfter: date === "overdue" ? undefined : expectedPickupAfter,
     expectedPickupBefore:
       date === "overdue" ? now.toISOString() : expectedPickupBefore,
   };
@@ -123,10 +123,7 @@ async function buildTicketListQuery(
 }
 
 export default async function TicketsPage({ searchParams }: TicketsPageProps) {
-  const [user, params] = await Promise.all([
-    getCurrentUser(),
-    searchParams,
-  ]);
+  const [user, params] = await Promise.all([getCurrentUser(), searchParams]);
   const normalized = params as Record<string, string | string[] | undefined>;
 
   const query = await buildTicketListQuery(normalized, user?.userId);

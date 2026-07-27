@@ -62,10 +62,13 @@ export function LoginForm() {
       return;
     }
 
-    const validationErrors = validateLoginForm({ pin }, {
-      pinRequired: t("pos.auth.validation.pinRequired"),
-      pinInvalid: t("pos.auth.validation.pinInvalid"),
-    });
+    const validationErrors = validateLoginForm(
+      { pin },
+      {
+        pinRequired: t("pos.auth.validation.pinRequired"),
+        pinInvalid: t("pos.auth.validation.pinInvalid"),
+      },
+    );
     if (validationErrors) {
       submittedPinRef.current = null;
       setFieldErrors(validationErrors);
@@ -137,10 +140,7 @@ export function LoginForm() {
   return (
     <form className="grid gap-5" onSubmit={handleSubmit}>
       <div className="grid gap-2">
-        <label
-          className="text-sm font-semibold text-slate-700"
-          htmlFor="pin"
-        >
+        <label className="text-sm font-semibold text-slate-700" htmlFor="pin">
           {t("pos.auth.pin")}
         </label>
         <input
@@ -210,9 +210,7 @@ export function LoginForm() {
       {posTenantCode ? (
         <p className="text-center text-xs text-slate-400">
           {t("pos.auth.currentStore")}
-          <span className="font-semibold text-slate-500">
-            {posTenantCode}
-          </span>
+          <span className="font-semibold text-slate-500">{posTenantCode}</span>
         </p>
       ) : null}
     </form>

@@ -81,7 +81,9 @@ export default function ScanPage() {
 
       setValue(query);
       setStatus("searching");
-      setRecent((current) => [query, ...current.filter((item) => item !== query)].slice(0, 5));
+      setRecent((current) =>
+        [query, ...current.filter((item) => item !== query)].slice(0, 5),
+      );
 
       try {
         const result = await posApi.pos.search.global({ q: query, limit: 3 });
@@ -140,12 +142,18 @@ export default function ScanPage() {
             void resolveScan(value);
           }}
         >
-          <label className="block text-sm font-semibold text-slate-700" htmlFor="scan-code">
+          <label
+            className="block text-sm font-semibold text-slate-700"
+            htmlFor="scan-code"
+          >
             {labels.field}
           </label>
           <div className="mt-3 flex gap-2">
             <div className="flex min-w-0 flex-1 items-center border border-slate-300 bg-white px-3 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100">
-              <Icon className="mr-3 h-5 w-5 shrink-0 text-slate-400" name="scan-line" />
+              <Icon
+                className="mr-3 h-5 w-5 shrink-0 text-slate-400"
+                name="scan-line"
+              />
               <input
                 autoComplete="off"
                 className="h-14 min-w-0 flex-1 bg-transparent font-mono text-base font-semibold text-slate-950 outline-none"
@@ -182,7 +190,9 @@ export default function ScanPage() {
         </form>
 
         <aside className="border border-slate-200 bg-white p-5">
-          <h2 className="text-sm font-semibold text-slate-950">{labels.recent}</h2>
+          <h2 className="text-sm font-semibold text-slate-950">
+            {labels.recent}
+          </h2>
           <div className="mt-4 space-y-2">
             {recent.map((item) => (
               <button

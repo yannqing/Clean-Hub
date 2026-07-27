@@ -4,10 +4,7 @@ import { getPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
 
 type PosErrorLocale = "zh-CN" | "en" | "fr";
 
-const POS_API_ERROR_MESSAGES: Record<
-  string,
-  Record<PosErrorLocale, string>
-> = {
+const POS_API_ERROR_MESSAGES: Record<string, Record<PosErrorLocale, string>> = {
   INVALID_CREDENTIALS: {
     "zh-CN": "PIN 码不正确，请重新输入。",
     en: "The PIN is incorrect. Try again.",
@@ -90,7 +87,9 @@ export function getPosApiErrorMessage(
   fallback = "操作失败，请重试。",
 ): string {
   if (isApiHttpError(error)) {
-    const messages = error.code ? POS_API_ERROR_MESSAGES[error.code] : undefined;
+    const messages = error.code
+      ? POS_API_ERROR_MESSAGES[error.code]
+      : undefined;
     return messages?.[getPosRuntimeLocale()] ?? fallback;
   }
 

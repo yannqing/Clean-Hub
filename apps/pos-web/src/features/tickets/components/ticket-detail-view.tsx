@@ -75,13 +75,13 @@ export function TicketDetailView({
     : fromCustomer
       ? [
           { href: posRoutes.customers, label: "客户管理" },
-          { href: customerDetailHref, label: ticket.customerName || "客户档案" },
+          {
+            href: customerDetailHref,
+            label: ticket.customerName || "客户档案",
+          },
           { label: "工单详情" },
         ]
-      : [
-          { href: posRoutes.tickets, label: "工单管理" },
-          { label: "工单详情" },
-        ];
+      : [{ href: posRoutes.tickets, label: "工单管理" }, { label: "工单详情" }];
   const backHref =
     fromIntake || fromCustomer ? customerDetailHref : posRoutes.tickets;
   const backLabel =
@@ -203,7 +203,9 @@ export function TicketDetailView({
           <HeaderMetric
             label="预计取件"
             value={formatTicketDateTime(ticket.expectedPickupAt, locale)}
-            note={ticket.expectedPickupAt ? "请按时完成" : TICKET_EMPTY_PLACEHOLDER}
+            note={
+              ticket.expectedPickupAt ? "请按时完成" : TICKET_EMPTY_PLACEHOLDER
+            }
           />
           <HeaderMetric
             label="工单金额"
@@ -217,7 +219,10 @@ export function TicketDetailView({
         {/* Left column: basic info / editor + items */}
         <div className="min-w-0 space-y-5">
           {editing ? (
-            <TicketBasicForm onCancel={() => setEditing(false)} ticket={ticket} />
+            <TicketBasicForm
+              onCancel={() => setEditing(false)}
+              ticket={ticket}
+            />
           ) : (
             <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
               <div className="flex items-center justify-between">
@@ -232,9 +237,18 @@ export function TicketDetailView({
                 </button>
               </div>
               <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-4">
-                <Detail label="工单类型" value={TICKET_TYPE_LABELS[ticket.ticketType]} />
-                <Detail label="优先级" value={TICKET_PRIORITY_LABELS[ticket.priority]} />
-                <Detail label="来源渠道" value={TICKET_SOURCE_LABELS[ticket.sourceChannel]} />
+                <Detail
+                  label="工单类型"
+                  value={TICKET_TYPE_LABELS[ticket.ticketType]}
+                />
+                <Detail
+                  label="优先级"
+                  value={TICKET_PRIORITY_LABELS[ticket.priority]}
+                />
+                <Detail
+                  label="来源渠道"
+                  value={TICKET_SOURCE_LABELS[ticket.sourceChannel]}
+                />
                 <Detail
                   label="预计取件"
                   value={formatTicketDateTime(ticket.expectedPickupAt, locale)}

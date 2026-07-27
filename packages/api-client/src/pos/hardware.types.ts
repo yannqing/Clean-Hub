@@ -7,7 +7,11 @@
 
 export type PosHardwareDeviceType = "printer" | "scanner" | "cash_drawer";
 
-export type PosHardwareConnectionType = "usb" | "bluetooth" | "network" | "other";
+export type PosHardwareConnectionType =
+  | "usb"
+  | "bluetooth"
+  | "network"
+  | "other";
 
 export type PosHardwareDeviceStatus = "active" | "inactive";
 
@@ -28,9 +32,7 @@ export type PosHardwareDeviceListResponse = {
   data: PosHardwareDeviceSummary[];
 };
 
-export type PosHardwareAction =
-  | "manual_drawer_open"
-  | "privileged_reprint";
+export type PosHardwareAction = "manual_drawer_open" | "privileged_reprint";
 
 export type AuthorizeManualDrawerOpenRequest = {
   reason: string;

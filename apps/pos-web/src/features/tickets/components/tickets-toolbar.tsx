@@ -15,17 +15,21 @@ import {
 import { TICKET_FILTER_KEYS } from "./ticket-filter-params";
 import type { TicketListDateFilter, TicketListScope } from "../types";
 
-const DATE_OPTIONS: ReadonlyArray<{ value: TicketListDateFilter; label: string }> = [
+const DATE_OPTIONS: ReadonlyArray<{
+  value: TicketListDateFilter;
+  label: string;
+}> = [
   { value: "all", label: "全部日期" },
   { value: "pickup_today", label: "今日取件" },
   { value: "overdue", label: "已逾期" },
   { value: "last_7d", label: "近 7 天" },
 ];
 
-const SCOPE_OPTIONS: ReadonlyArray<{ value: TicketListScope; label: string }> = [
-  { value: "mine", label: "我的工单" },
-  { value: "all", label: "全部工单" },
-];
+const SCOPE_OPTIONS: ReadonlyArray<{ value: TicketListScope; label: string }> =
+  [
+    { value: "mine", label: "我的工单" },
+    { value: "all", label: "全部工单" },
+  ];
 
 type TicketsToolbarProps = {
   /** Total visible under the currently selected scope and filters. */
@@ -59,7 +63,8 @@ export function TicketsToolbar({
   const status = params.get(TICKET_FILTER_KEYS.status) ?? "";
   const type = params.get(TICKET_FILTER_KEYS.type) ?? "";
   const priority = params.get(TICKET_FILTER_KEYS.priority) ?? "";
-  const date = (params.get(TICKET_FILTER_KEYS.date) as TicketListDateFilter) ?? "all";
+  const date =
+    (params.get(TICKET_FILTER_KEYS.date) as TicketListDateFilter) ?? "all";
 
   const apply = useCallback(
     (next: Record<string, string | undefined>, resetPage = true) => {
@@ -115,7 +120,9 @@ export function TicketsToolbar({
               }`}
               disabled={isPending}
               key={option.value}
-              onClick={() => apply({ [TICKET_FILTER_KEYS.scope]: option.value })}
+              onClick={() =>
+                apply({ [TICKET_FILTER_KEYS.scope]: option.value })
+              }
               type="button"
             >
               {option.label}

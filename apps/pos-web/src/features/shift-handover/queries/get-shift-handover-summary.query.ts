@@ -5,7 +5,10 @@ import type {
   ServiceTicketListResponse,
 } from "@cleanhub/api-client";
 
-import { getOrderOverviewQuery, getOrdersListQuery } from "@/features/orders/queries";
+import {
+  getOrderOverviewQuery,
+  getOrdersListQuery,
+} from "@/features/orders/queries";
 import {
   getTicketOverviewQuery,
   getTicketsListQuery,
@@ -23,7 +26,9 @@ function todayRange(): { createdAfter: string; createdBefore: string } {
 
   return {
     createdAfter: start.toISOString(),
-    createdBefore: new Date(start.getTime() + 24 * 60 * 60 * 1000).toISOString(),
+    createdBefore: new Date(
+      start.getTime() + 24 * 60 * 60 * 1000,
+    ).toISOString(),
   };
 }
 

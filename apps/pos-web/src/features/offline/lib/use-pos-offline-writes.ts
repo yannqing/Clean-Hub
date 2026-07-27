@@ -59,7 +59,10 @@ export function usePosOfflineWrites() {
       try {
         return { queued: false, data: await write() };
       } catch (error) {
-        if (error instanceof ApiNetworkError || error instanceof ApiTimeoutError) {
+        if (
+          error instanceof ApiNetworkError ||
+          error instanceof ApiTimeoutError
+        ) {
           return enqueue();
         }
         throw error;

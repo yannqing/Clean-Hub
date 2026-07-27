@@ -2,10 +2,7 @@
 
 import { createContext, useContext, useMemo } from "react";
 
-import {
-  DEFAULT_POS_CURRENCY,
-  normalizeCurrencyCode,
-} from "@/lib/money";
+import { DEFAULT_POS_CURRENCY, normalizeCurrencyCode } from "@/lib/money";
 
 type PosRuntimeConfig = {
   tenantId: string | null;

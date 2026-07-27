@@ -89,7 +89,9 @@ export function TicketStatusDialog({
       <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-xl bg-white shadow-2xl">
         <div className="flex items-start justify-between border-b border-slate-200 p-5">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">更新工单状态</h2>
+            <h2 className="text-lg font-semibold text-slate-950">
+              更新工单状态
+            </h2>
             <p className="mt-1 text-sm text-slate-500">
               状态更新会记录操作人员与时间。
             </p>
@@ -167,5 +169,9 @@ export function TicketStatusDialog({
 /** Small controller so callers can render a trigger without managing state. */
 export function useTicketStatusDialog() {
   const [open, setOpen] = useState(false);
-  return { open, openDialog: () => setOpen(true), closeDialog: () => setOpen(false) };
+  return {
+    open,
+    openDialog: () => setOpen(true),
+    closeDialog: () => setOpen(false),
+  };
 }

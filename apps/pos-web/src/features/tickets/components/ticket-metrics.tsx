@@ -44,7 +44,11 @@ function MetricCard({ label, value, note, icon, tone }: MetricCardProps) {
  * Top metrics row on the list page. Derives four counts from the overview DTO.
  * Renders nothing when the overview call failed (e.g. no permission).
  */
-export function TicketMetrics({ overview }: { overview: ServiceTicketOverview | null }) {
+export function TicketMetrics({
+  overview,
+}: {
+  overview: ServiceTicketOverview | null;
+}) {
   const { locale } = useTranslation();
 
   if (!overview) {
@@ -54,8 +58,7 @@ export function TicketMetrics({ overview }: { overview: ServiceTicketOverview | 
   const text = (value: string) => translatePosText(value, locale);
 
   const openCount =
-    (overview.byStatus.pending ?? 0) +
-    (overview.byStatus.in_progress ?? 0);
+    (overview.byStatus.pending ?? 0) + (overview.byStatus.in_progress ?? 0);
   const readyCount = overview.byStatus.ready_to_pick ?? 0;
   const overdueCount = overview.overdueCount ?? 0;
   const todayCreatedCount = overview.todayCreatedCount ?? 0;

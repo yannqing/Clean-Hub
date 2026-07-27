@@ -73,10 +73,7 @@ export function WorkspaceBranchCard({ branch }: WorkspaceBranchCardProps) {
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1.5 border-t border-slate-100 pt-3 text-xs text-slate-500">
           {branch.phone && (
             <span className="inline-flex items-center gap-1.5">
-              <Icon
-                name="languages"
-                className="h-3.5 w-3.5 text-slate-400"
-              />
+              <Icon name="languages" className="h-3.5 w-3.5 text-slate-400" />
               {branch.phone}
             </span>
           )}

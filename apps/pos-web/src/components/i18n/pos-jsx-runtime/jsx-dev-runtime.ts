@@ -1,8 +1,5 @@
 /* eslint-disable @typescript-eslint/no-empty-object-type, @typescript-eslint/no-namespace */
-import {
-  Fragment,
-  jsxDEV as reactJsxDEV,
-} from "react/jsx-dev-runtime";
+import { Fragment, jsxDEV as reactJsxDEV } from "react/jsx-dev-runtime";
 import type { JSX as ReactJSX } from "react";
 
 import { localizeJsxProps } from "./shared";
@@ -17,10 +14,10 @@ export namespace JSX {
     extends ReactJSX.ElementAttributesProperty {}
   export interface ElementChildrenAttribute
     extends ReactJSX.ElementChildrenAttribute {}
-  export interface IntrinsicAttributes
-    extends ReactJSX.IntrinsicAttributes {}
-  export interface IntrinsicClassAttributes<T>
-    extends ReactJSX.IntrinsicClassAttributes<T> {}
+  export interface IntrinsicAttributes extends ReactJSX.IntrinsicAttributes {}
+  export interface IntrinsicClassAttributes<
+    T,
+  > extends ReactJSX.IntrinsicClassAttributes<T> {}
   export interface IntrinsicElements extends ReactJSX.IntrinsicElements {}
 }
 

@@ -172,7 +172,9 @@ export function OrderItemsManager({
           catalog={catalog}
           currency={order.currency}
           disabled={isPending}
-          key={itemDialog.type === "edit" ? `edit-${itemDialog.item.id}` : "create"}
+          key={
+            itemDialog.type === "edit" ? `edit-${itemDialog.item.id}` : "create"
+          }
           mode={itemDialog}
           onClose={() => setItemDialog(null)}
           onSaved={() => {
@@ -196,7 +198,8 @@ export function OrderItemsManager({
           <DialogHeader>
             <DialogTitle>删除订单条目</DialogTitle>
             <DialogDescription>
-              删除「{deleteTarget?.itemName}」需要 Owner 或 Manager 权限，原因会写入审计记录。
+              删除「{deleteTarget?.itemName}」需要 Owner 或 Manager
+              权限，原因会写入审计记录。
             </DialogDescription>
           </DialogHeader>
           <label className="grid gap-2 text-sm font-medium text-slate-700">
@@ -225,7 +228,8 @@ export function OrderItemsManager({
               className="h-10 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50"
               disabled={isPending || !deleteReason.trim()}
               onClick={() => {
-                if (deleteTarget) removeItem(deleteTarget.id, deleteReason.trim());
+                if (deleteTarget)
+                  removeItem(deleteTarget.id, deleteReason.trim());
               }}
               type="button"
             >
@@ -357,9 +361,11 @@ function OrderItemDialog({
       standardUnitAmount: service.amount,
       chargedUnitAmount: service.amount,
       priceTouched: true,
-      quantity: service.pricingUnit === "per_item" ? current.quantity || "1" : "1",
+      quantity:
+        service.pricingUnit === "per_item" ? current.quantity || "1" : "1",
       weight: service.pricingUnit === "per_kg" ? current.weight : "",
-      bagCount: service.pricingUnit === "per_kg" ? current.bagCount || "1" : "1",
+      bagCount:
+        service.pricingUnit === "per_kg" ? current.bagCount || "1" : "1",
       overrideReason: "",
     }));
   }
@@ -397,11 +403,15 @@ function OrderItemDialog({
 
     const common = {
       serviceId: draft.serviceId,
-      quantity: draft.pricingUnit === "per_item" ? draft.quantity.trim() : undefined,
+      quantity:
+        draft.pricingUnit === "per_item" ? draft.quantity.trim() : undefined,
       weight: draft.pricingUnit === "per_kg" ? draft.weight.trim() : undefined,
-      bagCount: draft.pricingUnit === "per_kg" ? Number(draft.bagCount) : undefined,
+      bagCount:
+        draft.pricingUnit === "per_kg" ? Number(draft.bagCount) : undefined,
       chargedUnitAmount:
-        !editingItem || draft.priceTouched ? draft.chargedUnitAmount.trim() : undefined,
+        !editingItem || draft.priceTouched
+          ? draft.chargedUnitAmount.trim()
+          : undefined,
       overrideReason:
         draft.priceTouched && draft.overrideReason.trim()
           ? draft.overrideReason.trim()
@@ -454,7 +464,9 @@ function OrderItemDialog({
           }}
         >
           <DialogHeader>
-            <DialogTitle>{editingItem ? "编辑订单条目" : "新增订单条目"}</DialogTitle>
+            <DialogTitle>
+              {editingItem ? "编辑订单条目" : "新增订单条目"}
+            </DialogTitle>
           </DialogHeader>
 
           <label className="block">
@@ -470,7 +482,9 @@ function OrderItemDialog({
               <option value="">请选择服务</option>
               {catalog.map((service) => (
                 <option key={service.id} value={service.id}>
-                  {service.name} · {service.pricingUnit === "per_kg" ? "按公斤" : "按件"} · {formatOrderMoney(service.amount, service.currency)}
+                  {service.name} ·{" "}
+                  {service.pricingUnit === "per_kg" ? "按公斤" : "按件"} ·{" "}
+                  {formatOrderMoney(service.amount, service.currency)}
                 </option>
               ))}
             </select>
@@ -521,7 +535,10 @@ function OrderItemDialog({
           <div className="rounded-lg bg-blue-50 px-4 py-3">
             <div className="text-xs font-semibold text-blue-600">计算小计</div>
             <div className="mt-1 text-lg font-semibold text-blue-950">
-              {formatOrderMoney(units * Number(draft.chargedUnitAmount || 0), currency)}
+              {formatOrderMoney(
+                units * Number(draft.chargedUnitAmount || 0),
+                currency,
+              )}
             </div>
             {priceOverridden ? (
               <div className="mt-1 text-xs text-amber-700">
@@ -614,7 +631,9 @@ function ReadOnlyItemRow({
         <ItemHeading item={item} />
         <IntakeDetails item={item} />
       </div>
-      <div className="font-medium text-slate-600">{formatMeasurement(item)}</div>
+      <div className="font-medium text-slate-600">
+        {formatMeasurement(item)}
+      </div>
       <div className="font-medium text-slate-600">
         {formatOrderMoney(item.chargedUnitAmount, currency)}
         {item.chargedUnitAmount !== item.standardUnitAmount ? (
@@ -657,7 +676,9 @@ function ReadOnlyItemRow({
 function ItemHeading({ item }: { item: PosOrderItem }) {
   return (
     <div>
-      <div className="truncate font-semibold text-slate-900">{item.itemName}</div>
+      <div className="truncate font-semibold text-slate-900">
+        {item.itemName}
+      </div>
       {item.itemIdentifier ? (
         <div className="mt-1 font-mono text-[11px] text-blue-600">
           标识 {item.itemIdentifier}
@@ -668,9 +689,15 @@ function ItemHeading({ item }: { item: PosOrderItem }) {
 }
 
 function IntakeDetails({ item }: { item: PosOrderItem }) {
-  const details = [item.itemColor ? `颜色：${item.itemColor}` : null, item.defectNotes ? `瑕疵：${item.defectNotes}` : null, item.specialRequest ? `要求：${item.specialRequest}` : null].filter(Boolean);
+  const details = [
+    item.itemColor ? `颜色：${item.itemColor}` : null,
+    item.defectNotes ? `瑕疵：${item.defectNotes}` : null,
+    item.specialRequest ? `要求：${item.specialRequest}` : null,
+  ].filter(Boolean);
   return details.length > 0 ? (
-    <div className="mt-2 text-xs leading-5 text-slate-500">{details.join(" · ")}</div>
+    <div className="mt-2 text-xs leading-5 text-slate-500">
+      {details.join(" · ")}
+    </div>
   ) : null;
 }
 
@@ -684,7 +711,13 @@ function moneyEquals(left: string, right: string): boolean {
   return Number(left).toFixed(2) === Number(right).toFixed(2);
 }
 
-function OrderItemCardDetail({ label, value }: { label: string; value: string }) {
+function OrderItemCardDetail({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
   return (
     <div>
       <dt className="text-xs text-slate-400">{label}</dt>
@@ -711,7 +744,9 @@ function SmallInput({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-semibold text-slate-500">{label}</span>
+      <span className="mb-1 block text-xs font-semibold text-slate-500">
+        {label}
+      </span>
       <input
         className={inputClass}
         disabled={disabled}

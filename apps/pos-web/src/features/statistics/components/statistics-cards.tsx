@@ -66,13 +66,13 @@ function StatCardItem({ card }: { card: StatCard }) {
     <div className={`rounded-xl border border-slate-200 ${colors.bg} p-4`}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-slate-500">{card.label}</span>
-        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${colors.badge}`}>
+        <span
+          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${colors.badge}`}
+        >
           {card.value}
         </span>
       </div>
-      <p className={`mt-2 text-2xl font-bold ${colors.text}`}>
-        {card.value}
-      </p>
+      <p className={`mt-2 text-2xl font-bold ${colors.text}`}>{card.value}</p>
     </div>
   );
 }

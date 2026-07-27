@@ -22,10 +22,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/app-shell";
 import { posToast as toast } from "@/lib/pos-toast";
 
-import {
-  createPaymentCorrectionAction,
-  createRefundAction,
-} from "../actions";
+import { createPaymentCorrectionAction, createRefundAction } from "../actions";
 import { formatOrderDateTime, formatOrderMoney } from "../constants";
 
 type AdjustmentMode = "refund" | "correction";
@@ -131,8 +128,7 @@ export function OrderPaymentAdjustments({
     }
 
     const idempotencyKey =
-      idempotencyKeyRef.current ??
-      (idempotencyKeyRef.current = createId());
+      idempotencyKeyRef.current ?? (idempotencyKeyRef.current = createId());
 
     startTransition(async () => {
       const result =
@@ -245,7 +241,9 @@ export function OrderPaymentAdjustments({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{mode === "refund" ? "记录退款" : "记录支付修正"}</DialogTitle>
+            <DialogTitle>
+              {mode === "refund" ? "记录退款" : "记录支付修正"}
+            </DialogTitle>
             <DialogDescription>
               仅限 Owner 或 Manager，提交后会保留原因与操作审计。
             </DialogDescription>
@@ -270,7 +268,8 @@ export function OrderPaymentAdjustments({
               >
                 {refundablePayments.map(({ payment, remaining }) => (
                   <option key={payment.id} value={payment.id}>
-                    {payment.id.slice(-8)} · 可退 {formatOrderMoney(remaining, payment.currency)}
+                    {payment.id.slice(-8)} · 可退{" "}
+                    {formatOrderMoney(remaining, payment.currency)}
                   </option>
                 ))}
               </select>
@@ -290,7 +289,8 @@ export function OrderPaymentAdjustments({
                 >
                   {paidPayments.map((payment) => (
                     <option key={payment.id} value={payment.id}>
-                      {payment.id.slice(-8)} · {formatOrderMoney(payment.amount, payment.currency)}
+                      {payment.id.slice(-8)} ·{" "}
+                      {formatOrderMoney(payment.amount, payment.currency)}
                     </option>
                   ))}
                 </select>

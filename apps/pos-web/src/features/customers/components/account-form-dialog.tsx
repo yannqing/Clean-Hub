@@ -68,9 +68,7 @@ export function AccountFormDialog({
         email: form.email.trim() || undefined,
       };
       const createResult =
-        mode === "edit" && accountId
-          ? null
-          : await createCustomerAccount(body);
+        mode === "edit" && accountId ? null : await createCustomerAccount(body);
       const result =
         mode === "edit" && accountId
           ? await updateAccount(accountId, body)

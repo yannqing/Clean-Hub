@@ -40,25 +40,15 @@ export function WorkspaceStatistics({ overview }: WorkspaceStatisticsProps) {
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-semibold text-slate-700">
-        今日概况
-      </h2>
+      <h2 className="mb-3 text-sm font-semibold text-slate-700">今日概况</h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <MiniStatCard
-          label="订单数"
-          value={orders.orderCount}
-          color="blue"
-        />
+        <MiniStatCard label="订单数" value={orders.orderCount} color="blue" />
         <MiniStatCard
           label="销售额"
           value={`¥${orders.totalAmount}`}
           color="green"
         />
-        <MiniStatCard
-          label="工单数"
-          value={tickets.total}
-          color="purple"
-        />
+        <MiniStatCard label="工单数" value={tickets.total} color="purple" />
         <MiniStatCard
           label="新增客户"
           value={customers.todayNewCount}

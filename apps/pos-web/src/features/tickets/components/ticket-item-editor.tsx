@@ -338,7 +338,7 @@ function ItemRow({
           <div className="mt-1 text-sm font-medium text-slate-700">
             {item.pricingUnit === "per_kg"
               ? `${item.weight ?? "0"} kg${item.bagCount ? ` · ${item.bagCount} 袋` : ""}`
-              : `${item.quantity} 件`} {" "}
+              : `${item.quantity} 件`}{" "}
             × {formatTicketMoney(item.chargedUnitAmount, currency)}
           </div>
           {item.chargedUnitAmount !== item.standardUnitAmount ? (
@@ -511,9 +511,13 @@ function ItemForm({
                 standardUnitAmount: service.amount,
                 chargedUnitAmount: service.amount,
                 priceTouched: true,
-                quantity: service.pricingUnit === "per_item" ? form.quantity || "1" : "1",
+                quantity:
+                  service.pricingUnit === "per_item"
+                    ? form.quantity || "1"
+                    : "1",
                 weight: service.pricingUnit === "per_kg" ? form.weight : "",
-                bagCount: service.pricingUnit === "per_kg" ? form.bagCount || "1" : "1",
+                bagCount:
+                  service.pricingUnit === "per_kg" ? form.bagCount || "1" : "1",
                 overrideReason: "",
               });
             }}
@@ -522,7 +526,9 @@ function ItemForm({
             <option value="">请选择服务</option>
             {catalog.map((service) => (
               <option key={service.id} value={service.id}>
-                {service.name} · {service.pricingUnit === "per_kg" ? "按公斤" : "按件"} · {formatTicketMoney(service.amount, service.currency)}
+                {service.name} ·{" "}
+                {service.pricingUnit === "per_kg" ? "按公斤" : "按件"} ·{" "}
+                {formatTicketMoney(service.amount, service.currency)}
               </option>
             ))}
           </select>

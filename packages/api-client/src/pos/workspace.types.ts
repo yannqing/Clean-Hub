@@ -66,7 +66,10 @@ export type PosRecentActivitiesResponse = {
   activities: PosRecentActivity[];
 };
 
-export type PosPendingTaskType = "overdue_ticket" | "unpaid_order" | "pending_pickup";
+export type PosPendingTaskType =
+  | "overdue_ticket"
+  | "unpaid_order"
+  | "pending_pickup";
 
 export type PosPendingTask = {
   id: string;

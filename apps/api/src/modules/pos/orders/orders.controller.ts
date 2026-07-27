@@ -214,9 +214,7 @@ export async function listPosOrderPaymentsController(c: Context<AppBindings>) {
   }
 }
 
-export async function createPosOrderPaymentController(
-  c: Context<AppBindings>,
-) {
+export async function createPosOrderPaymentController(c: Context<AppBindings>) {
   const params = posOrderParamsSchema.parse(c.req.param());
   const rawBody = await c.req.json().catch(() => ({}));
   const data = createPosPaymentBodySchema.parse(rawBody);

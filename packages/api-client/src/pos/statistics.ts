@@ -19,13 +19,19 @@ export function createPosStatisticsApi(client: ApiClient) {
         ...options,
       }),
 
-    getTicketStatistics: (query?: PosStatisticsQuery, options?: RequestOptions) =>
+    getTicketStatistics: (
+      query?: PosStatisticsQuery,
+      options?: RequestOptions,
+    ) =>
       client.get<PosTicketStatisticsDetail>(`${BASE}/tickets`, {
         query,
         ...options,
       }),
 
-    getOrderStatistics: (query?: PosStatisticsQuery, options?: RequestOptions) =>
+    getOrderStatistics: (
+      query?: PosStatisticsQuery,
+      options?: RequestOptions,
+    ) =>
       client.get<PosOrderStatisticsDetail>(`${BASE}/orders`, {
         query,
         ...options,

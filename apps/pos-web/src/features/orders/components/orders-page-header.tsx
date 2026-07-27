@@ -24,10 +24,7 @@ export function OrdersPageHeader({
 
   return (
     <>
-      <PosBreadcrumb
-        className="mb-5"
-        items={[{ label: text("订单管理") }]}
-      />
+      <PosBreadcrumb className="mb-5" items={[{ label: text("订单管理") }]} />
 
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>

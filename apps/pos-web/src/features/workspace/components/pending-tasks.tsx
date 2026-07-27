@@ -76,7 +76,12 @@ function iconAccentStyle(color: string): CSSProperties {
   };
 }
 
-function SectionHeader({ action, description, icon, title }: SectionHeaderProps) {
+function SectionHeader({
+  action,
+  description,
+  icon,
+  title,
+}: SectionHeaderProps) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2">
@@ -126,7 +131,8 @@ function TaskCard({
   };
   const priority = task.priority in PRIORITY_LABELS ? task.priority : "low";
   const color = CHART_COLORS[priority];
-  const width = task.count > 0 ? Math.max((task.count / maxCount) * 100, 10) : 0;
+  const width =
+    task.count > 0 ? Math.max((task.count / maxCount) * 100, 10) : 0;
 
   return (
     <Link

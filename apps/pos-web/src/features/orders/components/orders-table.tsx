@@ -35,9 +35,7 @@ export function OrdersTable({ orders, total }: OrdersTableProps) {
     <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
         <div>
-          <h2 className="font-semibold text-slate-950">
-            {text("订单列表")}
-          </h2>
+          <h2 className="font-semibold text-slate-950">{text("订单列表")}</h2>
           <p className="mt-1 text-xs text-slate-500">
             {text("共")} {total} {text("条结果 · 点击订单号或查看按钮打开详情")}
           </p>

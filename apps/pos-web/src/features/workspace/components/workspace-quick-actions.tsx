@@ -115,9 +115,7 @@ function QuickActionCard({ action }: { action: PosQuickAction }) {
   );
 }
 
-export function WorkspaceQuickActions({
-  actions,
-}: WorkspaceQuickActionsProps) {
+export function WorkspaceQuickActions({ actions }: WorkspaceQuickActionsProps) {
   const { locale } = useTranslation();
 
   if (actions.length === 0) {

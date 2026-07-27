@@ -48,8 +48,10 @@ export function CustomersView({
   const router = useRouter();
   const normalizedInitialQuery = initialQuery.trim();
   const [viewMode, setViewMode] = useState<CustomerViewMode>("list");
-  const [accountContext, setAccountContext] =
-    useState<{ accountId: string; accountName: string } | null>(null);
+  const [accountContext, setAccountContext] = useState<{
+    accountId: string;
+    accountName: string;
+  } | null>(null);
   const [previousFilters, setPreviousFilters] =
     useState<CustomerFilterState | null>(null);
 
@@ -246,8 +248,7 @@ export function CustomersView({
 
   // ---- header actions ------------------------------------------------------
 
-  const currentAccount =
-    viewMode === "account" ? accountContext : null;
+  const currentAccount = viewMode === "account" ? accountContext : null;
 
   return (
     <div className="px-6 py-5">
@@ -264,7 +265,9 @@ export function CustomersView({
             <PosBreadcrumb items={[{ label: "客户管理" }]} />
           )}
           <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-            {currentAccount ? `${currentAccount.accountName}的客户档案` : "客户管理"}
+            {currentAccount
+              ? `${currentAccount.accountName}的客户档案`
+              : "客户管理"}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
             {currentAccount
@@ -374,7 +377,9 @@ export function CustomersView({
           if (!open) setDialog({ type: "none" });
         }}
         onSaved={() => void reload()}
-        open={dialog.type === "create-account" || dialog.type === "edit-account"}
+        open={
+          dialog.type === "create-account" || dialog.type === "edit-account"
+        }
       />
 
       <ProfileFormDialog
@@ -414,7 +419,9 @@ export function CustomersView({
           if (!open) setDialog({ type: "none" });
         }}
         onSaved={() => void reload()}
-        open={dialog.type === "create-profile" || dialog.type === "edit-profile"}
+        open={
+          dialog.type === "create-profile" || dialog.type === "edit-profile"
+        }
       />
 
       <CustomerDeleteDialog
@@ -430,7 +437,8 @@ export function CustomersView({
           dialog.type === "delete-account"
             ? rows.filter(
                 (row) =>
-                  row.kind === "profile" && row.customerAccountId === dialog.accountId,
+                  row.kind === "profile" &&
+                  row.customerAccountId === dialog.accountId,
               ).length
             : 0
         }
@@ -448,7 +456,9 @@ export function CustomersView({
         onOpenChange={(open) => {
           if (!open) setDialog({ type: "none" });
         }}
-        open={dialog.type === "delete-account" || dialog.type === "delete-profile"}
+        open={
+          dialog.type === "delete-account" || dialog.type === "delete-profile"
+        }
       />
     </div>
   );

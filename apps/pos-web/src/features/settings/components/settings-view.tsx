@@ -9,9 +9,17 @@ import { posToast as toast } from "@/lib/pos-toast";
 import { posApi } from "@/lib/api-client";
 import { getPosDeviceIdSync } from "@/features/auth/utils/device-id";
 
-import { SETTINGS_PAGE_DESCRIPTION, SETTINGS_PAGE_TITLE, TERMINAL_SETTINGS_DEFAULTS } from "../constants";
+import {
+  SETTINGS_PAGE_DESCRIPTION,
+  SETTINGS_PAGE_TITLE,
+  TERMINAL_SETTINGS_DEFAULTS,
+} from "../constants";
 import { fetchTerminalSettings, updateTerminalSettings } from "../queries";
-import type { PosTerminalSettings, SettingsPageState, TerminalSettingsFormValues } from "../types";
+import type {
+  PosTerminalSettings,
+  SettingsPageState,
+  TerminalSettingsFormValues,
+} from "../types";
 import { GeneralSettingsCard } from "./general-settings-card";
 import { HardwareSettingsCard } from "./hardware-settings-card";
 import { TerminalSettingsCard } from "./terminal-settings-card";
@@ -70,7 +78,9 @@ export function SettingsView() {
   const [branchInfo, setBranchInfo] = useState<BranchInfo | null>(null);
 
   // Hardware devices
-  const [hardwareDevices, setHardwareDevices] = useState<PosHardwareDeviceSummary[]>([]);
+  const [hardwareDevices, setHardwareDevices] = useState<
+    PosHardwareDeviceSummary[]
+  >([]);
   const [hardwareLoading, setHardwareLoading] = useState(true);
   const [canManageSensitiveHardware, setCanManageSensitiveHardware] =
     useState(false);
@@ -191,7 +201,9 @@ export function SettingsView() {
         <h1 className="mt-2 text-2xl font-semibold text-slate-950">
           {SETTINGS_PAGE_TITLE}
         </h1>
-        <p className="mt-1 text-sm text-slate-500">{SETTINGS_PAGE_DESCRIPTION}</p>
+        <p className="mt-1 text-sm text-slate-500">
+          {SETTINGS_PAGE_DESCRIPTION}
+        </p>
       </div>
 
       {/* Terminal settings (editable) */}

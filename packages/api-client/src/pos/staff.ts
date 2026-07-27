@@ -24,14 +24,9 @@ export function createPosStaffApi(client: ApiClient) {
       client.get<ShiftRecord | null>("/pos/staff/current-shift", options),
     clock: (input: ClockRequest, options?: RequestOptions) =>
       client.post<ShiftRecord>("/pos/staff/clock", input, options),
-    createHandover: (
-      input: CreateHandoverRequest,
-      options?: RequestOptions,
-    ) => client.post<HandoverRecord>("/pos/staff/handovers", input, options),
-    listZReports: (
-      query?: PosZReportListQuery,
-      options?: RequestOptions,
-    ) =>
+    createHandover: (input: CreateHandoverRequest, options?: RequestOptions) =>
+      client.post<HandoverRecord>("/pos/staff/handovers", input, options),
+    listZReports: (query?: PosZReportListQuery, options?: RequestOptions) =>
       client.get<PosZReportListResponse>("/pos/staff/z-reports", {
         query,
         ...options,

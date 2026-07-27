@@ -287,7 +287,11 @@ export function RecentActivities({
           {activities.map((activity) => (
             <ActivityItem
               activity={activity}
-              formattedTime={formatRelativeTime(activity.timestamp, locale, now)}
+              formattedTime={formatRelativeTime(
+                activity.timestamp,
+                locale,
+                now,
+              )}
               key={activity.id}
             />
           ))}

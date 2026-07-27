@@ -34,7 +34,11 @@ export type {
 export type TicketListScope = "mine" | "all";
 
 /** Quick date filter on the list page (text values map to query params). */
-export type TicketListDateFilter = "all" | "pickup_today" | "overdue" | "last_7d";
+export type TicketListDateFilter =
+  | "all"
+  | "pickup_today"
+  | "overdue"
+  | "last_7d";
 
 /** Form values for the basic-info edit form (mirrors UpdateServiceTicketRequest). */
 export type TicketBasicFormValues = {

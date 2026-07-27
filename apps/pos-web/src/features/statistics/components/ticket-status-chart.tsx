@@ -1,17 +1,40 @@
 "use client";
 
-import { type ServiceTicketOverview, type ServiceTicketStatus } from "@cleanhub/api-client";
+import {
+  type ServiceTicketOverview,
+  type ServiceTicketStatus,
+} from "@cleanhub/api-client";
 
 const STATUS_CONFIG: Record<
   ServiceTicketStatus,
   { label: string; color: string; bgColor: string }
 > = {
   draft: { label: "草稿", color: "text-slate-600", bgColor: "bg-slate-100" },
-  pending: { label: "待处理", color: "text-yellow-600", bgColor: "bg-yellow-100" },
-  in_progress: { label: "处理中", color: "text-blue-600", bgColor: "bg-blue-100" },
-  ready_to_pick: { label: "待取件", color: "text-purple-600", bgColor: "bg-purple-100" },
-  picked_up: { label: "已取件", color: "text-green-600", bgColor: "bg-green-100" },
-  cancelled: { label: "已取消", color: "text-gray-600", bgColor: "bg-gray-100" },
+  pending: {
+    label: "待处理",
+    color: "text-yellow-600",
+    bgColor: "bg-yellow-100",
+  },
+  in_progress: {
+    label: "处理中",
+    color: "text-blue-600",
+    bgColor: "bg-blue-100",
+  },
+  ready_to_pick: {
+    label: "待取件",
+    color: "text-purple-600",
+    bgColor: "bg-purple-100",
+  },
+  picked_up: {
+    label: "已取件",
+    color: "text-green-600",
+    bgColor: "bg-green-100",
+  },
+  cancelled: {
+    label: "已取消",
+    color: "text-gray-600",
+    bgColor: "bg-gray-100",
+  },
   exception: { label: "异常", color: "text-red-600", bgColor: "bg-red-100" },
 };
 
@@ -29,7 +52,9 @@ function StatusRow({
 
   return (
     <div className="flex items-center gap-3">
-      <div className="w-20 text-xs font-medium text-slate-600">{config.label}</div>
+      <div className="w-20 text-xs font-medium text-slate-600">
+        {config.label}
+      </div>
       <div className="flex-1">
         <div className="h-2 rounded-full bg-slate-100">
           <div
@@ -83,12 +108,7 @@ export function TicketStatusChart({
       </h3>
       <div className="space-y-3">
         {activeStatuses.map(([status, count]) => (
-          <StatusRow
-            key={status}
-            status={status}
-            count={count}
-            total={total}
-          />
+          <StatusRow key={status} status={status} count={count} total={total} />
         ))}
       </div>
       <div className="mt-4 border-t border-slate-100 pt-3">

@@ -17,7 +17,12 @@ export async function deleteTicketItemAction(
 ): Promise<TicketActionResult<void>> {
   const result = await runTicketAction(async () => {
     const options = await getPosServerApiRequestOptions();
-    await posApi.pos.serviceTickets.removeItem(ticketId, itemId, reason, options);
+    await posApi.pos.serviceTickets.removeItem(
+      ticketId,
+      itemId,
+      reason,
+      options,
+    );
   });
 
   if (result.ok) {

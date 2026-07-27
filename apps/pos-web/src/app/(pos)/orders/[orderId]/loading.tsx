@@ -5,10 +5,7 @@ export default function OrderDetailLoading() {
     <section>
       <PosBreadcrumb
         className="mb-5"
-        items={[
-          { label: "订单管理" },
-          { label: "订单详情" },
-        ]}
+        items={[{ label: "订单管理" }, { label: "订单详情" }]}
       />
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">

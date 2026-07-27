@@ -73,7 +73,9 @@ export function TicketRelatedOrders({
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
                 <span className="text-slate-500">
-                  支付：{PAYMENT_STATUS_LABELS[order.paymentStatus] ?? order.paymentStatus}
+                  支付：
+                  {PAYMENT_STATUS_LABELS[order.paymentStatus] ??
+                    order.paymentStatus}
                 </span>
                 <span className="font-semibold text-slate-950">
                   {formatTicketMoney(order.paidAmount, order.currency)} /{" "}

@@ -40,7 +40,10 @@ export function OfflineSyncBadge() {
         title={error ?? t("pos.shell.syncRetry")}
         type="button"
       >
-        <Icon className="h-4 w-4" name={status === "error" ? "alert" : "rotate-ccw"} />
+        <Icon
+          className="h-4 w-4"
+          name={status === "error" ? "alert" : "rotate-ccw"}
+        />
         <span>{label}</span>
       </button>
     );

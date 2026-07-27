@@ -25,7 +25,9 @@ type PosChartDatum = {
   value?: number | string;
 };
 
-type PosChartTooltipProps = Partial<TooltipContentProps<TooltipValueType, string>> & {
+type PosChartTooltipProps = Partial<
+  TooltipContentProps<TooltipValueType, string>
+> & {
   hideLabel?: boolean;
   labelFormatter?: (
     label: string | number | undefined,
@@ -82,7 +84,7 @@ export function PosChartTooltip({
   const firstPayload = getTooltipPayload(payload[0]);
   const title = labelFormatter
     ? labelFormatter(label, firstPayload)
-    : firstPayload.label ?? firstPayload.name ?? label;
+    : (firstPayload.label ?? firstPayload.name ?? label);
 
   return (
     <div className="min-w-36 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-xl">
@@ -94,9 +96,10 @@ export function PosChartTooltip({
           const entryPayload = getTooltipPayload(entry);
           const color = resolveTooltipColor(entry, entryPayload);
           const name = entryPayload.label ?? entry.name;
-          const value = entryPayload.displayValue
-            ?? valueFormatter?.(entry.value, entry.name, entryPayload)
-            ?? String(entry.value ?? "");
+          const value =
+            entryPayload.displayValue ??
+            valueFormatter?.(entry.value, entry.name, entryPayload) ??
+            String(entry.value ?? "");
 
           return (
             <div className="space-y-0.5" key={`${String(entry.name)}-${index}`}>

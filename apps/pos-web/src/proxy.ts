@@ -192,7 +192,9 @@ async function requestAuthContext(
   }
 }
 
-async function resolveAuth(request: NextRequest): Promise<AuthResolution | null> {
+async function resolveAuth(
+  request: NextRequest,
+): Promise<AuthResolution | null> {
   const accessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
   const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
 

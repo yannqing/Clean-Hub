@@ -172,7 +172,10 @@ export function PrintJobControl({
       .catch((error) => {
         reportingRef.current.delete(reportKey);
         setAuditError(
-          getPosApiErrorMessage(error, "打印结果审计尚未同步，联网后请刷新重试。"),
+          getPosApiErrorMessage(
+            error,
+            "打印结果审计尚未同步，联网后请刷新重试。",
+          ),
         );
       });
   }, [latestJob]);
@@ -188,12 +191,18 @@ export function PrintJobControl({
         );
         await refresh();
         if (result.status === "printed") {
-          toast.success(`${documentType === "receipt" ? "小票" : "标签"}已打印。`);
+          toast.success(
+            `${documentType === "receipt" ? "小票" : "标签"}已打印。`,
+          );
         } else {
-          toast.error(result.lastError ?? "打印失败，请检查打印机后重试原任务。");
+          toast.error(
+            result.lastError ?? "打印失败，请检查打印机后重试原任务。",
+          );
         }
       } catch (error) {
-        toast.error(error instanceof Error ? error.message : "打印任务处理失败。");
+        toast.error(
+          error instanceof Error ? error.message : "打印任务处理失败。",
+        );
         await refresh().catch(() => undefined);
       } finally {
         setBusy(false);
@@ -225,12 +234,13 @@ export function PrintJobControl({
 
     setBusy(true);
     try {
-      const authorization = await posApi.pos.hardware.authorizePrivilegedReprint({
-        reason,
-        documentType,
-        entityId,
-        originalPrintJobId: latestJob.id,
-      });
+      const authorization =
+        await posApi.pos.hardware.authorizePrivilegedReprint({
+          reason,
+          documentType,
+          entityId,
+          originalPrintJobId: latestJob.id,
+        });
       const reprintJob = await queue.enqueue({
         id: createId(),
         idempotencyKey: `pos-print:${documentType}:${entityId}:reprint:${authorization.authorizationId}`,
@@ -278,9 +288,7 @@ export function PrintJobControl({
       <button
         className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
         disabled={
-          busy ||
-          !queue ||
-          (latestJob?.status === "printed" && !canReprint)
+          busy || !queue || (latestJob?.status === "printed" && !canReprint)
         }
         onClick={() => {
           if (retryable) {
@@ -322,7 +330,8 @@ export function PrintJobControl({
               重打{documentType === "receipt" ? "小票" : "标签"}
             </DialogTitle>
             <DialogDescription>
-              已成功打印的文件再次打印需要 Owner 或 Manager 授权，原因和终端会写入审计记录。
+              已成功打印的文件再次打印需要 Owner 或 Manager
+              授权，原因和终端会写入审计记录。
             </DialogDescription>
           </DialogHeader>
           <label className="grid gap-2 text-sm font-medium text-slate-700">
