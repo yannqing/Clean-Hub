@@ -9,12 +9,15 @@ import { writeAuditLog } from "../../audit/audit.helper.js";
 import { PosTerminalSettingsError } from "./terminal-settings.errors.js";
 import {
   findTerminalSettingsByTenantAndDevice,
+  findTenantPosTerminalDefaults,
   insertTerminalSettings,
+  updateTerminalHeartbeat,
   updateTerminalLastSeen,
   updateTerminalSettingsRecord,
 } from "./terminal-settings.repository.js";
 import type {
   CreatePosTerminalSettingsRequest,
+  PosTerminalHeartbeatRequest,
   PosTerminalSettingsSummary,
   UpdatePosTerminalSettingsRequest,
 } from "./terminal-settings.types.js";
@@ -100,11 +103,21 @@ export async function createPosTerminalSettings(
       );
     }
 
+    const defaults = await findTenantPosTerminalDefaults(tx, tenantId);
     const settings = await insertTerminalSettings(
       tx,
       tenantId,
       authContext.userId,
-      data,
+      {
+        ...data,
+        defaultPaymentMethod:
+          data.defaultPaymentMethod ?? defaults.defaultPaymentMethod,
+        roundingRule: data.roundingRule ?? defaults.roundingRule,
+        autoPrintReceipt: data.autoPrintReceipt ?? defaults.autoPrintReceipt,
+        printCopies: data.printCopies ?? defaults.printCopies,
+        lockTimeoutSeconds:
+          data.lockTimeoutSeconds ?? defaults.lockTimeoutSeconds,
+      },
     );
 
     await writeAuditLog(tx, {
@@ -122,6 +135,39 @@ export async function createPosTerminalSettings(
 
     return settings;
   });
+}
+
+export async function heartbeatPosTerminal(
+  authContext: AuthContext,
+  data: PosTerminalHeartbeatRequest,
+  db: Database = getDb(),
+): Promise<PosTerminalSettingsSummary> {
+  const tenantId = requirePosTenantId(authContext);
+  const terminalId = authContext.terminalId;
+
+  if (!terminalId) {
+    throw new PosTerminalSettingsError(
+      "POS_TERMINAL_REQUIRED",
+      "An enrolled POS terminal is required.",
+      403,
+    );
+  }
+
+  const terminal = await updateTerminalHeartbeat(db, {
+    tenantId,
+    terminalId,
+    data,
+  });
+
+  if (!terminal) {
+    throw new PosTerminalSettingsError(
+      "TERMINAL_SETTINGS_NOT_FOUND",
+      "Active terminal settings were not found.",
+      404,
+    );
+  }
+
+  return terminal;
 }
 
 // ---------------------------------------------------------------------------

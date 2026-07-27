@@ -4,6 +4,7 @@ import type { AppBindings } from "../../../http/types.js";
 import {
   createTerminalSettingsController,
   getTerminalSettingsController,
+  heartbeatTerminalController,
   updateTerminalSettingsController,
 } from "./terminal-settings.controller.js";
 
@@ -18,6 +19,7 @@ export function createPosTerminalSettingsRoutes() {
   routes.get("/", getTerminalSettingsController);
   routes.post("/", createTerminalSettingsController);
   routes.patch("/", updateTerminalSettingsController);
+  routes.post("/heartbeat", heartbeatTerminalController);
 
   return routes;
 }

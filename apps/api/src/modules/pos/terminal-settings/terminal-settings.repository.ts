@@ -1,10 +1,15 @@
 import { and, eq } from "drizzle-orm";
 
-import { posTerminalSettings, type Database } from "@cleanhub/db";
+import {
+  posChannelSettings,
+  posTerminalSettings,
+  type Database,
+} from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
 
 import type {
   CreatePosTerminalSettingsRequest,
+  PosTerminalHeartbeatRequest,
   PosTerminalSettingsSummary,
   UpdatePosTerminalSettingsRequest,
 } from "./terminal-settings.types.js";
@@ -18,6 +23,10 @@ function toSummary(
     branchId: row.branchId,
     deviceId: row.deviceId,
     label: row.label,
+    deviceType: row.deviceType,
+    platform: row.platform,
+    platformVersion: row.platformVersion,
+    appVersion: row.appVersion,
     defaultPaymentMethod: row.defaultPaymentMethod,
     roundingRule: row.roundingRule,
     autoPrintReceipt: row.autoPrintReceipt,
@@ -25,6 +34,9 @@ function toSummary(
     lockTimeoutSeconds: row.lockTimeoutSeconds,
     status: row.status,
     lastSeenAt: row.lastSeenAt ? row.lastSeenAt.toISOString() : null,
+    syncStatus: row.syncStatus,
+    lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
+    lastSyncError: row.lastSyncError,
     metadata: (row.metadata as Record<string, unknown>) ?? {},
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -32,6 +44,39 @@ function toSummary(
     updatedBy: row.updatedBy,
     version: row.version,
   };
+}
+
+export async function findTenantPosTerminalDefaults(
+  db: Database,
+  tenantId: string,
+): Promise<{
+  defaultPaymentMethod: "cash" | "card" | "app";
+  roundingRule: "none" | "round_yuan" | "round_jiao";
+  autoPrintReceipt: boolean;
+  printCopies: number;
+  lockTimeoutSeconds: number;
+}> {
+  const rows = await db
+    .select({
+      defaultPaymentMethod: posChannelSettings.defaultPaymentMethod,
+      roundingRule: posChannelSettings.defaultRoundingRule,
+      autoPrintReceipt: posChannelSettings.defaultAutoPrintReceipt,
+      printCopies: posChannelSettings.defaultPrintCopies,
+      lockTimeoutSeconds: posChannelSettings.defaultLockTimeoutSeconds,
+    })
+    .from(posChannelSettings)
+    .where(eq(posChannelSettings.tenantId, tenantId))
+    .limit(1);
+
+  return (
+    rows[0] ?? {
+      defaultPaymentMethod: "cash",
+      roundingRule: "none",
+      autoPrintReceipt: true,
+      printCopies: 1,
+      lockTimeoutSeconds: 300,
+    }
+  );
 }
 
 export async function findTerminalSettingsByTenantAndDevice(
@@ -117,10 +162,12 @@ export async function updateTerminalSettingsRecord(
   if (input.label !== undefined) setValues.label = input.label;
   if (input.defaultPaymentMethod !== undefined)
     setValues.defaultPaymentMethod = input.defaultPaymentMethod;
-  if (input.roundingRule !== undefined) setValues.roundingRule = input.roundingRule;
+  if (input.roundingRule !== undefined)
+    setValues.roundingRule = input.roundingRule;
   if (input.autoPrintReceipt !== undefined)
     setValues.autoPrintReceipt = input.autoPrintReceipt;
-  if (input.printCopies !== undefined) setValues.printCopies = input.printCopies;
+  if (input.printCopies !== undefined)
+    setValues.printCopies = input.printCopies;
   if (input.lockTimeoutSeconds !== undefined)
     setValues.lockTimeoutSeconds = input.lockTimeoutSeconds;
 
@@ -153,4 +200,55 @@ export async function updateTerminalLastSeen(
         eq(posTerminalSettings.deviceId, deviceId),
       ),
     );
+}
+
+export async function updateTerminalHeartbeat(
+  db: Database,
+  input: {
+    tenantId: string;
+    terminalId: string;
+    data: PosTerminalHeartbeatRequest;
+  },
+): Promise<PosTerminalSettingsSummary | null> {
+  const setValues: Partial<typeof posTerminalSettings.$inferInsert> = {
+    lastSeenAt: new Date(),
+  };
+
+  if (input.data.deviceType !== undefined) {
+    setValues.deviceType = input.data.deviceType;
+  }
+  if (input.data.platform !== undefined) {
+    setValues.platform = input.data.platform;
+  }
+  if (input.data.platformVersion !== undefined) {
+    setValues.platformVersion = input.data.platformVersion;
+  }
+  if (input.data.appVersion !== undefined) {
+    setValues.appVersion = input.data.appVersion;
+  }
+  if (input.data.syncStatus !== undefined) {
+    setValues.syncStatus = input.data.syncStatus;
+  }
+  if (input.data.lastSyncedAt !== undefined) {
+    setValues.lastSyncedAt = input.data.lastSyncedAt
+      ? new Date(input.data.lastSyncedAt)
+      : null;
+  }
+  if (input.data.lastSyncError !== undefined) {
+    setValues.lastSyncError = input.data.lastSyncError;
+  }
+
+  const rows = await db
+    .update(posTerminalSettings)
+    .set(setValues)
+    .where(
+      and(
+        eq(posTerminalSettings.id, input.terminalId),
+        eq(posTerminalSettings.tenantId, input.tenantId),
+        eq(posTerminalSettings.status, "active"),
+      ),
+    )
+    .returning();
+
+  return rows[0] ? toSummary(rows[0]) : null;
 }

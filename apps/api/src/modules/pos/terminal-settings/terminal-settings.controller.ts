@@ -6,10 +6,12 @@ import { PosTerminalSettingsError } from "./terminal-settings.errors.js";
 import {
   createPosTerminalSettings,
   getPosTerminalSettings,
+  heartbeatPosTerminal,
   updatePosTerminalSettings,
 } from "./terminal-settings.service.js";
 import {
   createTerminalSettingsBodySchema,
+  terminalHeartbeatBodySchema,
   updateTerminalSettingsBodySchema,
 } from "./terminal-settings.validation.js";
 
@@ -27,13 +29,26 @@ function createErrorResponse(
   );
 }
 
+export async function heartbeatTerminalController(c: Context<AppBindings>) {
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = terminalHeartbeatBodySchema.parse(rawBody);
+
+  try {
+    return c.json(await heartbeatPosTerminal(c.get("authContext"), data));
+  } catch (error) {
+    if (error instanceof PosTerminalSettingsError) {
+      return createErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // GET /pos/terminal-settings?deviceId=...
 // ---------------------------------------------------------------------------
 
-export async function getTerminalSettingsController(
-  c: Context<AppBindings>,
-) {
+export async function getTerminalSettingsController(c: Context<AppBindings>) {
   const deviceId = c.req.query("deviceId");
 
   if (!deviceId) {
