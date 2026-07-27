@@ -22,9 +22,10 @@ function decimalStringSchema(input: {
   integerDigits: number;
   scale: number;
   positive?: boolean;
+  signed?: boolean;
 }) {
   const pattern = new RegExp(
-    `^(?:0|[1-9]\\d{0,${input.integerDigits - 1}})(?:\\.\\d{1,${input.scale}})?$`,
+    `^${input.signed ? "-?" : ""}(?:0|[1-9]\\d{0,${input.integerDigits - 1}})(?:\\.\\d{1,${input.scale}})?$`,
   );
 
   return z
@@ -40,6 +41,11 @@ function decimalStringSchema(input: {
 const productQuantitySchema = decimalStringSchema({
   integerDigits: 11,
   scale: 3,
+});
+const signedProductQuantitySchema = decimalStringSchema({
+  integerDigits: 11,
+  scale: 3,
+  signed: true,
 });
 const positiveProductQuantitySchema = decimalStringSchema({
   integerDigits: 11,
@@ -117,6 +123,25 @@ const tenantProductMediaObjectKeysSchema = z
       }
 
       seen.add(objectKey);
+    });
+  });
+
+const tenantProductRetainedMediaIdsSchema = z
+  .array(z.string().regex(ULID_PATTERN))
+  .max(10)
+  .superRefine((mediaIds, context) => {
+    const seen = new Set<string>();
+
+    mediaIds.forEach((mediaId, index) => {
+      if (seen.has(mediaId)) {
+        context.addIssue({
+          code: "custom",
+          message: "Retained media IDs must be unique.",
+          path: [index],
+        });
+      }
+
+      seen.add(mediaId);
     });
   });
 
@@ -250,6 +275,166 @@ export const createTenantProductBodySchema = z
           path: ["branchSettings", index, "reorderPoint"],
         });
       }
+    });
+  });
+
+const updateTenantProductBranchSettingsSchema = z
+  .array(
+    z
+      .object({
+        branchId: z.string().regex(ULID_PATTERN),
+        expectedStockOnHand: signedProductQuantitySchema,
+        stockOnHand: signedProductQuantitySchema,
+        reorderPoint: productQuantitySchema,
+      })
+      .strict(),
+  )
+  .min(1)
+  .superRefine((branchSettings, context) => {
+    const seen = new Set<string>();
+
+    branchSettings.forEach((setting, index) => {
+      if (seen.has(setting.branchId)) {
+        context.addIssue({
+          code: "custom",
+          message: "Branch settings must have unique branch IDs.",
+          path: [index, "branchId"],
+        });
+      }
+
+      seen.add(setting.branchId);
+    });
+  });
+
+export const updateTenantProductBodySchema = z
+  .object({
+    version: z.number().int().positive(),
+    skuId: z.string().regex(ULID_PATTERN),
+    skuVersion: z.number().int().positive(),
+    name: z.string().trim().min(1).max(200),
+    categoryId: z.string().regex(ULID_PATTERN).optional(),
+    categoryName: optionalTrimmedStringSchema(120),
+    categoryAttributes: tenantProductCategoryAttributesSchema.default([]),
+    brand: optionalTrimmedStringSchema(120),
+    description: optionalTrimmedStringSchema(5_000),
+    tags: tenantProductTagsSchema,
+    status: tenantProductStatusSchema,
+    skuCode: z.string().trim().min(1).max(80),
+    barcode: optionalTrimmedStringSchema(80),
+    variantName: optionalTrimmedStringSchema(160),
+    unitOfMeasure: z.string().trim().min(1).max(32),
+    unitsPerSale: positiveProductQuantitySchema,
+    salePrice: productMoneySchema,
+    currency: z
+      .string()
+      .trim()
+      .transform((value) => value.toUpperCase())
+      .pipe(z.string().regex(CURRENCY_PATTERN)),
+    referenceCost: productMoneySchema.nullable().optional(),
+    trackInventory: z.boolean(),
+    allowNegativeStock: z.boolean(),
+    allowOfflineSale: z.boolean(),
+    branchSettings: updateTenantProductBranchSettingsSchema,
+    retainedMediaIds: tenantProductRetainedMediaIdsSchema,
+    newMediaObjectKeys: tenantProductMediaObjectKeysSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.categoryId && value.categoryName) {
+      context.addIssue({
+        code: "custom",
+        message: "Provide either categoryId or categoryName, not both.",
+        path: ["categoryId"],
+      });
+    }
+
+    if (!value.categoryId && value.categoryAttributes.length > 0) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Category attributes can only be submitted with an existing category ID.",
+        path: ["categoryAttributes"],
+      });
+    }
+
+    if (value.retainedMediaIds.length + value.newMediaObjectKeys.length > 10) {
+      context.addIssue({
+        code: "custom",
+        message: "A product can have at most 10 images.",
+        path: ["newMediaObjectKeys"],
+      });
+    }
+
+    if (value.trackInventory) {
+      return;
+    }
+
+    if (value.allowNegativeStock) {
+      context.addIssue({
+        code: "custom",
+        message:
+          "Negative stock cannot be enabled when inventory tracking is disabled.",
+        path: ["allowNegativeStock"],
+      });
+    }
+
+    value.branchSettings.forEach((setting, index) => {
+      if (Number(setting.stockOnHand) !== 0) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "Stock on hand must be zero when inventory tracking is disabled.",
+          path: ["branchSettings", index, "stockOnHand"],
+        });
+      }
+
+      if (Number(setting.reorderPoint) !== 0) {
+        context.addIssue({
+          code: "custom",
+          message:
+            "Reorder point must be zero when inventory tracking is disabled.",
+          path: ["branchSettings", index, "reorderPoint"],
+        });
+      }
+    });
+  });
+
+export const tenantProductParamsSchema = z
+  .object({
+    productId: z.string().regex(ULID_PATTERN),
+  })
+  .strict();
+
+export const requestTenantProductMediaDownloadsBodySchema = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({
+            productId: z.string().regex(ULID_PATTERN),
+            mediaId: z.string().regex(ULID_PATTERN),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(10),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const seen = new Set<string>();
+
+    value.items.forEach((item, index) => {
+      const key = `${item.productId}:${item.mediaId}`;
+
+      if (seen.has(key)) {
+        context.addIssue({
+          code: "custom",
+          message: "Product media download items must be unique.",
+          path: ["items", index],
+        });
+      }
+
+      seen.add(key);
     });
   });
 

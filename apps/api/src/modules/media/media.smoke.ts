@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 
 import { MediaService } from "./media.service.js";
-import type { MediaObjectRecord } from "./media.types.js";
+import { MediaError, type MediaObjectRecord } from "./media.types.js";
 
 function record(input: Partial<MediaObjectRecord>): MediaObjectRecord {
   return {
@@ -104,6 +104,21 @@ export async function runMediaSmokeChecks(): Promise<void> {
   assert.equal(result.failed, 0);
   assert.deepEqual(deletedKeys, [expired.objectKey]);
   assert.deepEqual(softDeletedKeys, [expired.objectKey]);
+
+  const knownCommittedDownload =
+    await service.createDownloadLinkForKnownCommittedObject({
+      tenantId: expired.tenantId,
+      objectKey: expired.objectKey,
+    });
+  assert.equal(knownCommittedDownload.downloadUrl, "https://download.local");
+  await assert.rejects(
+    service.createDownloadLinkForKnownCommittedObject({
+      tenantId: "tenant_2",
+      objectKey: expired.objectKey,
+    }),
+    (error: unknown) =>
+      error instanceof MediaError && error.code === "MEDIA_FORBIDDEN",
+  );
 
   const failedDeleteClaimedAt = new Date().toISOString();
   const failedDeleteRecord = record({

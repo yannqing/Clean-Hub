@@ -59,6 +59,7 @@ import type { BranchSummary } from "../../branches/types";
 import {
   createProductAction,
   getProductCategoryAttributesAction,
+  updateProductAction,
   uploadProductMediaAction,
 } from "../actions";
 import type {
@@ -67,6 +68,7 @@ import type {
   ProductFormValues,
   TenantProductCategoryAttributeDefinition,
   TenantProductCategorySummary,
+  TenantProductDetail,
   TenantProductStatus,
 } from "../types";
 import {
@@ -90,13 +92,24 @@ type BranchInventoryValue = {
   reorderPoint: string;
 };
 
-type SelectedProductImage = {
+type ExistingProductImage = {
+  kind: "existing";
+  id: string;
+  mediaId: string;
+  objectKey: string;
+  previewUrl: string;
+};
+
+type NewProductImage = {
+  kind: "new";
   id: string;
   file: File;
   previewUrl: string;
   objectKey?: string;
   expiresAt?: string;
 };
+
+type SelectedProductImage = ExistingProductImage | NewProductImage;
 
 function hasCategoryAttributeValue(
   attribute: CreateTenantProductCategoryAttribute,
@@ -116,6 +129,36 @@ function createRequiredCategoryAttributes(
         ? { definitionId: definition.id, textValue: "" }
         : { definitionId: definition.id, optionIds: [] },
     );
+}
+
+function mergeCategoryAttributes(
+  definitions: TenantProductCategoryAttributeDefinition[],
+  existingValues: CreateTenantProductCategoryAttribute[],
+): CreateTenantProductCategoryAttribute[] {
+  const definitionIds = new Set(definitions.map((definition) => definition.id));
+  const values = existingValues.filter((value) =>
+    definitionIds.has(value.definitionId),
+  );
+  const selectedDefinitionIds = new Set(
+    values.map((value) => value.definitionId),
+  );
+
+  return [
+    ...values,
+    ...createRequiredCategoryAttributes(
+      definitions.filter(
+        (definition) => !selectedDefinitionIds.has(definition.id),
+      ),
+    ),
+  ];
+}
+
+function getProductImageName(image: SelectedProductImage): string {
+  if (image.kind === "new") {
+    return image.file.name;
+  }
+
+  return image.objectKey.split("/").at(-1) || image.objectKey;
 }
 
 function RequiredMark() {
@@ -141,25 +184,63 @@ function setsEqual(left: ReadonlySet<string>, right: ReadonlySet<string>) {
 }
 
 type ProductCreateViewProps = {
+  availableCurrencies?: string[];
   branches?: BranchSummary[];
   branchLoadFailed?: boolean;
   categories?: TenantProductCategorySummary[];
   categoryLoadFailed?: boolean;
+  currencyLoadFailed?: boolean;
+  defaultCurrency?: string | null;
+  initialProduct?: TenantProductDetail;
+  mode?: "create" | "edit";
 };
 
 export function ProductCreateView({
+  availableCurrencies = [],
   branches = [],
   branchLoadFailed = false,
   categories = [],
   categoryLoadFailed = false,
+  currencyLoadFailed = false,
+  defaultCurrency = null,
+  initialProduct,
+  mode = "create",
 }: ProductCreateViewProps) {
   const router = useRouter();
   const { m } = useTenantI18n();
+  const isEditMode = mode === "edit";
+  const initialPublishedBranchSettings =
+    initialProduct?.branchSettings.filter((setting) => setting.isAvailable) ??
+    [];
+  const initialBranchSetting = initialPublishedBranchSettings[0];
+  const initialBranchSettingsById = new Map(
+    initialProduct?.branchSettings.map((setting) => [
+      setting.branchId,
+      setting,
+    ]) ?? [],
+  );
   const imageInputRef = useRef<HTMLInputElement>(null);
   const selectedImagesRef = useRef<SelectedProductImage[]>([]);
   const categoryRequestSequenceRef = useRef(0);
+  const initialCategoryAttributesRef = useRef(
+    initialProduct?.categoryAttributes ?? [],
+  );
   const [excludedBranchIds, setExcludedBranchIds] = useState<Set<string>>(
-    () => new Set(),
+    () => {
+      if (!isEditMode) {
+        return new Set();
+      }
+
+      const publishedBranchIds = new Set(
+        initialPublishedBranchSettings.map((setting) => setting.branchId),
+      );
+
+      return new Set(
+        branches
+          .filter((branch) => !publishedBranchIds.has(branch.id))
+          .map((branch) => branch.id),
+      );
+    },
   );
   const [branchDialogOpen, setBranchDialogOpen] = useState(false);
   const [draftExcludedBranchIds, setDraftExcludedBranchIds] = useState<
@@ -172,23 +253,45 @@ export function ProductCreateView({
     Object.fromEntries(
       branches.map((branch) => [
         branch.id,
-        { openingStock: "0", reorderPoint: "0" },
+        {
+          openingStock:
+            initialBranchSettingsById.get(branch.id)?.onHandQuantity ?? "0",
+          reorderPoint:
+            initialBranchSettingsById.get(branch.id)?.reorderPoint ?? "0",
+        },
       ]),
     ),
   );
   const [selectedImages, setSelectedImages] = useState<SelectedProductImage[]>(
-    [],
+    () =>
+      [...(initialProduct?.media ?? [])]
+        .sort(
+          (left, right) =>
+            left.sortOrder - right.sortOrder ||
+            Number(right.isPrimary) - Number(left.isPrimary),
+        )
+        .map((media) => ({
+          kind: "existing",
+          id: `existing-${media.id}`,
+          mediaId: media.id,
+          objectKey: media.objectKey,
+          previewUrl: media.downloadUrl,
+        })),
   );
-  const [tags, setTags] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>(() => initialProduct?.tags ?? []);
   const [tagInput, setTagInput] = useState("");
-  const [categoryId, setCategoryId] = useState("");
+  const [categoryId, setCategoryId] = useState(
+    () => initialProduct?.categoryId ?? "",
+  );
   const [categoryAttributes, setCategoryAttributes] = useState<
     CreateTenantProductCategoryAttribute[]
-  >([]);
+  >(() => initialProduct?.categoryAttributes ?? []);
   const [categoryAttributeDefinitions, setCategoryAttributeDefinitions] =
     useState<TenantProductCategoryAttributeDefinition[]>([]);
   const [categoryMetafieldsLoadState, setCategoryMetafieldsLoadState] =
-    useState<CategoryMetafieldsLoadState>("idle");
+    useState<CategoryMetafieldsLoadState>(
+      initialProduct?.categoryId ? "loading" : "idle",
+    );
   const [
     invalidCategoryAttributeDefinitionIds,
     setInvalidCategoryAttributeDefinitionIds,
@@ -197,16 +300,36 @@ export function ProductCreateView({
     categoryAttributesValidationAttempted,
     setCategoryAttributesValidationAttempted,
   ] = useState(false);
-  const [status, setStatus] = useState<TenantProductStatus>("active");
-  const [unitOfMeasure, setUnitOfMeasure] = useState("piece");
-  const [trackInventory, setTrackInventory] = useState(true);
-  const [allowNegativeStock, setAllowNegativeStock] = useState(false);
-  const [allowOfflineSale, setAllowOfflineSale] = useState(false);
-  const [salePrice, setSalePrice] = useState("");
-  const [currency, setCurrency] = useState("");
-  const [referenceCost, setReferenceCost] = useState("");
-  const [showMoreInventorySettings, setShowMoreInventorySettings] =
-    useState(false);
+  const [status, setStatus] = useState<TenantProductStatus>(
+    () => initialProduct?.status ?? "active",
+  );
+  const [unitOfMeasure, setUnitOfMeasure] = useState(
+    () => initialProduct?.sku.unitOfMeasure ?? "piece",
+  );
+  const [trackInventory, setTrackInventory] = useState(
+    () => initialProduct?.sku.trackInventory ?? true,
+  );
+  const [allowNegativeStock, setAllowNegativeStock] = useState(
+    () => initialBranchSetting?.allowNegativeStock ?? false,
+  );
+  const [allowOfflineSale, setAllowOfflineSale] = useState(
+    () => initialBranchSetting?.allowOfflineSale ?? false,
+  );
+  const [salePrice, setSalePrice] = useState(
+    () => initialProduct?.salePrice ?? "",
+  );
+  const [currency, setCurrency] = useState(
+    () => initialProduct?.currency ?? defaultCurrency ?? "",
+  );
+  const [referenceCost, setReferenceCost] = useState(
+    () => initialProduct?.sku.referenceCost ?? "",
+  );
+  const [showMoreInventorySettings, setShowMoreInventorySettings] = useState(
+    () =>
+      Boolean(initialProduct?.sku.barcode) ||
+      Boolean(initialBranchSetting?.allowNegativeStock) ||
+      Boolean(initialBranchSetting?.allowOfflineSale),
+  );
   const [errors, setErrors] = useState<ProductFormErrors>({});
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -217,7 +340,12 @@ export function ProductCreateView({
   );
   const selectedBranchCount = selectedBranches.length;
   const formUnavailable =
-    branchLoadFailed || categoryLoadFailed || branches.length === 0;
+    branchLoadFailed ||
+    categoryLoadFailed ||
+    currencyLoadFailed ||
+    availableCurrencies.length === 0 ||
+    branches.length === 0 ||
+    (isEditMode && !initialProduct);
   const allBranchesSelected =
     branches.length > 0 && selectedBranchCount === branches.length;
   const draftSelectedBranchCount =
@@ -256,6 +384,44 @@ export function ProductCreateView({
   useEffect(() => {
     selectedImagesRef.current = selectedImages;
   }, [selectedImages]);
+
+  useEffect(() => {
+    const initialCategoryId = initialProduct?.categoryId;
+
+    if (!initialCategoryId) {
+      return;
+    }
+
+    const requestSequence = ++categoryRequestSequenceRef.current;
+
+    void getProductCategoryAttributesAction(initialCategoryId).then(
+      (result) => {
+        if (requestSequence !== categoryRequestSequenceRef.current) {
+          return;
+        }
+
+        if (!result.ok) {
+          setCategoryMetafieldsLoadState("error");
+          return;
+        }
+
+        const definitions = [...result.data.data].sort(
+          (left, right) =>
+            left.sortOrder - right.sortOrder ||
+            left.code.localeCompare(right.code),
+        );
+
+        setCategoryAttributeDefinitions(definitions);
+        setCategoryAttributes(
+          mergeCategoryAttributes(
+            definitions,
+            initialCategoryAttributesRef.current,
+          ),
+        );
+        setCategoryMetafieldsLoadState("loaded");
+      },
+    );
+  }, [initialProduct?.categoryId]);
 
   useEffect(() => {
     if (!isDirty) {
@@ -314,9 +480,11 @@ export function ProductCreateView({
 
   useEffect(
     () => () => {
-      selectedImagesRef.current.forEach((image) =>
-        URL.revokeObjectURL(image.previewUrl),
-      );
+      selectedImagesRef.current.forEach((image) => {
+        if (image.kind === "new") {
+          URL.revokeObjectURL(image.previewUrl);
+        }
+      });
     },
     [],
   );
@@ -361,7 +529,10 @@ export function ProductCreateView({
     }
   }
 
-  async function loadCategoryAttributeDefinitions(nextCategoryId: string) {
+  async function loadCategoryAttributeDefinitions(
+    nextCategoryId: string,
+    existingValues: CreateTenantProductCategoryAttribute[] = [],
+  ) {
     const requestSequence = ++categoryRequestSequenceRef.current;
 
     setCategoryMetafieldsLoadState("loading");
@@ -388,7 +559,7 @@ export function ProductCreateView({
     );
 
     setCategoryAttributeDefinitions(definitions);
-    setCategoryAttributes(createRequiredCategoryAttributes(definitions));
+    setCategoryAttributes(mergeCategoryAttributes(definitions, existingValues));
     setCategoryMetafieldsLoadState("loaded");
   }
 
@@ -439,7 +610,7 @@ export function ProductCreateView({
 
   function retryCategoryAttributeDefinitions() {
     if (categoryId) {
-      void loadCategoryAttributeDefinitions(categoryId);
+      void loadCategoryAttributeDefinitions(categoryId, categoryAttributes);
     }
   }
 
@@ -558,9 +729,10 @@ export function ProductCreateView({
     }
 
     const existingFiles = new Set(
-      selectedImages.map(
-        (image) =>
-          `${image.file.name}:${image.file.size}:${image.file.lastModified}`,
+      selectedImages.flatMap((image) =>
+        image.kind === "new"
+          ? [`${image.file.name}:${image.file.size}:${image.file.lastModified}`]
+          : [],
       ),
     );
     const availableSlots = MAX_PRODUCT_IMAGES - selectedImages.length;
@@ -578,6 +750,7 @@ export function ProductCreateView({
       setSelectedImages((current) => [
         ...current,
         ...uniqueFiles.map((file) => ({
+          kind: "new" as const,
           id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
           file,
           previewUrl: URL.createObjectURL(file),
@@ -595,7 +768,7 @@ export function ProductCreateView({
   function removeProductImage(imageId: string) {
     const image = selectedImages.find((item) => item.id === imageId);
 
-    if (image) {
+    if (image?.kind === "new") {
       URL.revokeObjectURL(image.previewUrl);
     }
 
@@ -609,6 +782,10 @@ export function ProductCreateView({
     const objectKeys: string[] = [];
 
     for (const image of selectedImages) {
+      if (image.kind === "existing") {
+        continue;
+      }
+
       const uploadExpiresAt = image.expiresAt
         ? new Date(image.expiresAt).getTime()
         : 0;
@@ -659,7 +836,7 @@ export function ProductCreateView({
       objectKeys.push(result.ticket.objectKey);
       setSelectedImages((current) =>
         current.map((item) =>
-          item.id === image.id
+          item.kind === "new" && item.id === image.id
             ? {
                 ...item,
                 objectKey: result.ticket.objectKey,
@@ -673,7 +850,7 @@ export function ProductCreateView({
     return objectKeys;
   }
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (saving) {
@@ -695,7 +872,7 @@ export function ProductCreateView({
       description: String(formData.get("description") ?? ""),
       tags: normalizeProductTags([...tags, ...pendingTags]),
       mediaObjectKeys: selectedImages.flatMap((image) =>
-        image.objectKey ? [image.objectKey] : [],
+        image.kind === "new" && image.objectKey ? [image.objectKey] : [],
       ),
       status,
       skuCode: String(formData.get("skuCode") ?? ""),
@@ -722,7 +899,7 @@ export function ProductCreateView({
         };
       }),
     };
-    const clientValidation = validateProductForm(formValues);
+    const clientValidation = validateProductForm(formValues, mode);
     setCategoryAttributesValidationAttempted(true);
 
     if (!clientValidation.ok) {
@@ -746,18 +923,42 @@ export function ProductCreateView({
       }
 
       formValues.mediaObjectKeys = mediaObjectKeys;
-      const result = await createProductAction(formValues);
+      const retainedMediaIds = selectedImages.flatMap((image) =>
+        image.kind === "existing" ? [image.mediaId] : [],
+      );
+      const result =
+        isEditMode && initialProduct
+          ? await updateProductAction(
+              initialProduct.id,
+              initialProduct.version,
+              initialProduct.sku.id,
+              initialProduct.sku.version,
+              formValues,
+              retainedMediaIds,
+              Object.fromEntries(
+                initialProduct.branchSettings.map((setting) => [
+                  setting.branchId,
+                  setting.onHandQuantity,
+                ]),
+              ),
+            )
+          : await createProductAction(formValues);
 
       if (!result.ok) {
         const isMediaError = result.code?.startsWith("PRODUCT_MEDIA_") ?? false;
 
         if (isMediaError) {
           setSelectedImages((current) =>
-            current.map((image) => ({
-              id: image.id,
-              file: image.file,
-              previewUrl: image.previewUrl,
-            })),
+            current.map((image) =>
+              image.kind === "existing"
+                ? image
+                : {
+                    kind: "new",
+                    id: image.id,
+                    file: image.file,
+                    previewUrl: image.previewUrl,
+                  },
+            ),
           );
         }
 
@@ -771,22 +972,35 @@ export function ProductCreateView({
         toast.error(
           isMediaError
             ? m.products.create.mediaCreateConflict
-            : Object.keys(result.errors).length > 0
-              ? m.products.create.checkForm
-              : result.code === "PRODUCT_SKU_CODE_DUPLICATE" ||
-                  result.code === "PRODUCT_BARCODE_DUPLICATE"
-                ? m.products.create.productConflict
-                : m.products.create.createFailed,
+            : result.code === "PRODUCT_VERSION_CONFLICT" ||
+                result.code === "PRODUCT_SKU_VERSION_CONFLICT"
+              ? m.products.edit.versionConflict
+              : result.code === "PRODUCT_INVENTORY_CONFLICT"
+                ? m.products.edit.inventoryConflict
+                : Object.keys(result.errors).length > 0
+                  ? m.products.create.checkForm
+                  : result.code === "PRODUCT_SKU_CODE_DUPLICATE" ||
+                      result.code === "PRODUCT_BARCODE_DUPLICATE"
+                    ? m.products.create.productConflict
+                    : isEditMode
+                      ? m.products.edit.updateFailed
+                      : m.products.create.createFailed,
         );
         return;
       }
 
       setIsDirty(false);
-      toast.success(m.products.create.created);
+      toast.success(
+        isEditMode ? m.products.edit.updated : m.products.create.created,
+      );
       router.push(webAdminRoutes.tenant.products);
       router.refresh();
     } catch {
-      toast.error(m.products.create.createFailed);
+      toast.error(
+        isEditMode
+          ? m.products.edit.updateFailed
+          : m.products.create.createFailed,
+      );
     } finally {
       setSaving(false);
     }
@@ -795,13 +1009,20 @@ export function ProductCreateView({
   const selectedBranchCopy = m.products.create.selectedBranchCount
     .replace("{selected}", String(selectedBranchCount))
     .replace("{total}", String(branches.length));
+  const pageTitle = isEditMode
+    ? m.products.edit.title
+    : m.products.create.title;
+  const stockQuantityLabel = isEditMode
+    ? m.products.edit.stockOnHand
+    : m.products.create.fields.openingStock;
 
   return (
     <section
       className="mx-auto w-full max-w-[960px] space-y-3 pb-20"
+      data-mode={mode}
       data-testid="tenant-product-create-view"
     >
-      <h1 className="sr-only">{m.products.create.title}</h1>
+      <h1 className="sr-only">{pageTitle}</h1>
       <nav aria-label={m.products.create.breadcrumbLabel}>
         <ol className="flex items-center gap-2 text-sm">
           <li>
@@ -819,7 +1040,7 @@ export function ProductCreateView({
           </li>
           <li>
             <span aria-current="page" className="font-medium">
-              {m.products.create.title}
+              {pageTitle}
             </span>
           </li>
         </ol>
@@ -830,14 +1051,21 @@ export function ProductCreateView({
         className="space-y-5"
         noValidate
         onInput={handleFormInput}
-        onSubmit={handleCreate}
+        onSubmit={handleSubmit}
       >
-        {branchLoadFailed || categoryLoadFailed ? (
+        {branchLoadFailed || categoryLoadFailed || currencyLoadFailed ? (
           <p
             className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
             role="alert"
           >
-            {m.products.create.loadFailed}
+            {isEditMode
+              ? m.products.edit.loadFailed
+              : m.products.create.loadFailed}
+          </p>
+        ) : null}
+        {isEditMode && initialProduct && initialProduct.skuCount > 1 ? (
+          <p className="rounded-md border bg-muted/40 px-3 py-2.5 text-sm text-muted-foreground">
+            {m.products.edit.multipleSkuNotice}
           </p>
         ) : null}
 
@@ -853,6 +1081,7 @@ export function ProductCreateView({
                     <Input
                       aria-invalid={Boolean(errors.name)}
                       aria-required="true"
+                      defaultValue={initialProduct?.name ?? ""}
                       id="product-name"
                       maxLength={200}
                       name="name"
@@ -869,6 +1098,7 @@ export function ProductCreateView({
                     <ProductRichTextEditor
                       aria-invalid={Boolean(errors.description)}
                       id="product-description"
+                      initialValue={initialProduct?.description ?? ""}
                       maxLength={5000}
                       name="description"
                       onChange={() => markChanged("description")}
@@ -952,7 +1182,7 @@ export function ProductCreateView({
                             key={image.id}
                           >
                             <Image
-                              alt={image.file.name}
+                              alt={getProductImageName(image)}
                               className="object-cover"
                               fill
                               priority={index === 0}
@@ -961,7 +1191,7 @@ export function ProductCreateView({
                               unoptimized
                             />
                             <Button
-                              aria-label={`${m.products.create.removeImage} ${image.file.name}`}
+                              aria-label={`${m.products.create.removeImage} ${getProductImageName(image)}`}
                               className="absolute right-1.5 top-1.5 size-7 bg-background/90 opacity-100 shadow-sm sm:opacity-0 sm:group-hover:opacity-100"
                               onClick={() => removeProductImage(image.id)}
                               size="icon"
@@ -1036,20 +1266,34 @@ export function ProductCreateView({
                       <Label htmlFor="product-currency">
                         {m.products.create.fields.currency} <RequiredMark />
                       </Label>
-                      <Input
-                        aria-invalid={Boolean(errors.currency)}
-                        aria-required="true"
-                        id="product-currency"
-                        maxLength={3}
+                      <Select
                         name="currency"
-                        onChange={(event) => {
-                          setCurrency(event.target.value.toUpperCase());
+                        onValueChange={(value) => {
+                          setCurrency(value);
                           markChanged("currency");
                         }}
-                        placeholder={m.products.create.placeholders.currency}
-                        required
                         value={currency}
-                      />
+                      >
+                        <SelectTrigger
+                          aria-invalid={Boolean(errors.currency)}
+                          aria-required="true"
+                          className="w-full"
+                          id="product-currency"
+                        >
+                          <SelectValue
+                            placeholder={
+                              m.products.create.placeholders.currency
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableCurrencies.map((currencyCode) => (
+                            <SelectItem key={currencyCode} value={currencyCode}>
+                              {currencyCode}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FieldError message={getErrorMessage("currency")} />
                     </div>
                   </div>
@@ -1133,6 +1377,7 @@ export function ProductCreateView({
                     <Input
                       aria-invalid={Boolean(errors.skuCode)}
                       aria-required="true"
+                      defaultValue={initialProduct?.sku.skuCode ?? ""}
                       id="product-sku-code"
                       maxLength={80}
                       name="skuCode"
@@ -1146,7 +1391,7 @@ export function ProductCreateView({
                     <div className="overflow-hidden rounded-md border">
                       <div className="hidden grid-cols-[minmax(0,1fr)_120px_120px] gap-3 border-b bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground sm:grid">
                         <span>{m.products.create.fields.branch}</span>
-                        <span>{m.products.create.fields.openingStock}</span>
+                        <span>{stockQuantityLabel}</span>
                         <span>{m.products.create.fields.reorderPoint}</span>
                       </div>
                       <div className="divide-y">
@@ -1172,12 +1417,12 @@ export function ProductCreateView({
                                   className="text-xs text-muted-foreground sm:sr-only"
                                   htmlFor={`product-opening-stock-${branch.id}`}
                                 >
-                                  {m.products.create.fields.openingStock}
+                                  {stockQuantityLabel}
                                 </Label>
                                 <Input
-                                  aria-label={`${branch.name} ${m.products.create.fields.openingStock}`}
+                                  aria-label={`${branch.name} ${stockQuantityLabel}`}
                                   id={`product-opening-stock-${branch.id}`}
-                                  min="0"
+                                  min={isEditMode ? undefined : "0"}
                                   onChange={(event) =>
                                     updateBranchInventory(
                                       branch.id,
@@ -1257,6 +1502,7 @@ export function ProductCreateView({
                         </Label>
                         <Input
                           aria-invalid={Boolean(errors.barcode)}
+                          defaultValue={initialProduct?.sku.barcode ?? ""}
                           id="product-barcode"
                           maxLength={80}
                           name="barcode"
@@ -1317,6 +1563,7 @@ export function ProductCreateView({
                     </Label>
                     <Input
                       aria-invalid={Boolean(errors.variantName)}
+                      defaultValue={initialProduct?.sku.variantName ?? ""}
                       id="product-variant-name"
                       maxLength={160}
                       name="variantName"
@@ -1368,7 +1615,7 @@ export function ProductCreateView({
                       </Label>
                       <Input
                         aria-invalid={Boolean(errors.unitsPerSale)}
-                        defaultValue="1"
+                        defaultValue={initialProduct?.sku.unitsPerSale ?? "1"}
                         id="product-units-per-sale"
                         min="0.001"
                         name="unitsPerSale"
@@ -1603,6 +1850,7 @@ export function ProductCreateView({
                     </Label>
                     <Input
                       aria-invalid={Boolean(errors.brand)}
+                      defaultValue={initialProduct?.brand ?? ""}
                       id="product-brand"
                       maxLength={120}
                       name="brand"
@@ -1752,7 +2000,11 @@ export function ProductCreateView({
                   icon={saving ? LoaderCircle : Check}
                   size={14}
                 />
-                {saving ? m.common.saving : m.products.create.saveProduct}
+                {saving
+                  ? m.common.saving
+                  : isEditMode
+                    ? m.products.edit.saveProduct
+                    : m.products.create.saveProduct}
               </Button>
             </div>
           </div>

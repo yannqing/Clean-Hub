@@ -37,19 +37,33 @@ import {
   TriangleAlert,
   Upload,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { interpolate, useTenantI18n } from "@/i18n";
 import { formatMoney } from "@/lib/format";
 
 import {
+  getTenantProductMediaDownloadsQuery,
   getTenantProductDatasetQuery,
   getTenantProductOverviewQuery,
 } from "../queries";
 
 const PAGE_SIZE = 10;
+const PRODUCT_IMAGE_REFRESH_BUFFER_MS = 30_000;
+const PRODUCT_IMAGE_RETRY_DELAY_MS = 60_000;
+
+type ProductImageSource = {
+  downloadUrl: string;
+};
 
 type ProductStatusFilter = "all" | TenantProductStatus;
 type ProductDateFilter =
@@ -92,6 +106,10 @@ const DEFAULT_VISIBLE_COLUMNS: Record<ProductColumnKey, boolean> = {
   inventory: true,
   status: true,
   createdAt: true,
+};
+
+type TenantProductsViewProps = {
+  canEditProducts: boolean;
 };
 
 function buildDateRange(filter: ProductDateFilter): {
@@ -174,11 +192,47 @@ function isProductsFeatureDisabled(error: unknown): boolean {
   return isApiHttpError(error) && error.code === "FEATURE_DISABLED";
 }
 
-export function TenantProductsView() {
+function getProductImageKey(productId: string, mediaId: string): string {
+  return `${productId}:${mediaId}`;
+}
+
+function ProductThumbnail({ imageUrl }: { imageUrl: string | null }) {
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+
+  return (
+    <span
+      aria-hidden
+      className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted text-muted-foreground"
+    >
+      <Icon aria-hidden icon={Package} size={14} />
+      {imageUrl && failedImageUrl !== imageUrl ? (
+        <Image
+          alt=""
+          className="absolute inset-0 size-full object-cover"
+          height={32}
+          onError={() => setFailedImageUrl(imageUrl)}
+          sizes="32px"
+          src={imageUrl}
+          unoptimized
+          width={32}
+        />
+      ) : null}
+    </span>
+  );
+}
+
+export function TenantProductsView({
+  canEditProducts,
+}: TenantProductsViewProps) {
+  const router = useRouter();
   const { formatDateTime, locale, m } = useTenantI18n();
   const [productDataset, setProductDataset] = useState<TenantProductSummary[]>(
     [],
   );
+  const [productImageSources, setProductImageSources] = useState<
+    Record<string, ProductImageSource>
+  >({});
+  const [imageRefreshVersion, setImageRefreshVersion] = useState(0);
   const [overview, setOverview] = useState<TenantProductOverview | null>(null);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<ProductStatusFilter>("all");
@@ -336,6 +390,86 @@ export function TenantProductsView() {
       ),
     [currentPage, filteredAndSortedProducts],
   );
+
+  useEffect(() => {
+    const items = products.flatMap((product) =>
+      product.primaryImage
+        ? [
+            {
+              productId: product.id,
+              mediaId: product.primaryImage.id,
+            },
+          ]
+        : [],
+    );
+
+    if (items.length === 0) {
+      return;
+    }
+
+    let current = true;
+    let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
+    const controller = new AbortController();
+
+    getTenantProductMediaDownloadsQuery({ items }, controller.signal)
+      .then((result) => {
+        if (!current) {
+          return;
+        }
+
+        setProductImageSources((currentSources) => {
+          const nextSources = { ...currentSources };
+
+          for (const download of result.data) {
+            nextSources[
+              getProductImageKey(download.productId, download.mediaId)
+            ] = {
+              downloadUrl: download.downloadUrl,
+            };
+          }
+
+          return nextSources;
+        });
+
+        const expirationTimes = result.data
+          .map((download) => Date.parse(download.expiresAt))
+          .filter(Number.isFinite);
+
+        if (expirationTimes.length > 0) {
+          const nextExpiration = Math.min(...expirationTimes);
+          const refreshDelay = Math.max(
+            PRODUCT_IMAGE_REFRESH_BUFFER_MS,
+            nextExpiration - Date.now() - PRODUCT_IMAGE_REFRESH_BUFFER_MS,
+          );
+
+          refreshTimeout = setTimeout(() => {
+            setImageRefreshVersion((version) => version + 1);
+          }, refreshDelay);
+        }
+      })
+      .catch((error: unknown) => {
+        if (
+          !current ||
+          (error instanceof DOMException && error.name === "AbortError")
+        ) {
+          return;
+        }
+
+        refreshTimeout = setTimeout(() => {
+          setImageRefreshVersion((version) => version + 1);
+        }, PRODUCT_IMAGE_RETRY_DELAY_MS);
+      });
+
+    return () => {
+      current = false;
+      controller.abort();
+
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+    };
+  }, [imageRefreshVersion, products]);
+
   const visibleColumnCount =
     Object.values(visibleColumns).filter(Boolean).length;
   const sortOptions: Array<{ label: string; value: ProductSort }> = [
@@ -483,6 +617,26 @@ export function TenantProductsView() {
         [column]: checked,
       };
     });
+  }
+
+  function openProductFromRow(
+    event: ReactMouseEvent<HTMLTableRowElement>,
+    productId: string,
+  ) {
+    if (!canEditProducts) {
+      return;
+    }
+
+    const target = event.target;
+
+    if (
+      target instanceof Element &&
+      target.closest("a, button, input, select, textarea, [role='button']")
+    ) {
+      return;
+    }
+
+    router.push(webAdminRoutes.tenant.product(productId));
   }
 
   return (
@@ -745,6 +899,7 @@ export function TenantProductsView() {
                     </p>
                     <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
                       {PRODUCT_COLUMN_KEYS.map((column) => {
+                        const isRequiredColumn = column === "product";
                         const isLastVisible =
                           visibleColumns[column] && visibleColumnCount === 1;
 
@@ -756,7 +911,7 @@ export function TenantProductsView() {
                           >
                             <Checkbox
                               checked={visibleColumns[column]}
-                              disabled={isLastVisible}
+                              disabled={isRequiredColumn || isLastVisible}
                               id={`tenant-product-column-${column}`}
                               onCheckedChange={(checked) =>
                                 setColumnVisible(column, checked === true)
@@ -849,15 +1004,52 @@ export function TenantProductsView() {
                     const price = formatPriceRanges(product, locale);
 
                     return (
-                      <TableRow key={product.id}>
+                      <TableRow
+                        className={cn(
+                          "transition-colors",
+                          canEditProducts && "cursor-pointer hover:bg-muted/50",
+                        )}
+                        key={product.id}
+                        onClick={(event) =>
+                          openProductFromRow(event, product.id)
+                        }
+                      >
                         {visibleColumns.product ? (
                           <TableCell>
-                            <span className="block font-medium">
-                              {product.name}
-                            </span>
-                            <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                              {product.brand || m.products.noBrand}
-                            </span>
+                            <div className="flex min-w-0 items-center gap-2">
+                              <ProductThumbnail
+                                imageUrl={
+                                  product.primaryImage
+                                    ? (productImageSources[
+                                        getProductImageKey(
+                                          product.id,
+                                          product.primaryImage.id,
+                                        )
+                                      ]?.downloadUrl ?? null)
+                                    : null
+                                }
+                              />
+                              <div className="min-w-0">
+                                {canEditProducts ? (
+                                  <Link
+                                    aria-label={`${m.products.edit.title}: ${product.name}`}
+                                    className="block truncate font-medium underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                    href={webAdminRoutes.tenant.product(
+                                      product.id,
+                                    )}
+                                  >
+                                    {product.name}
+                                  </Link>
+                                ) : (
+                                  <span className="block truncate font-medium">
+                                    {product.name}
+                                  </span>
+                                )}
+                                <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
+                                  {product.brand || m.products.noBrand}
+                                </span>
+                              </div>
+                            </div>
                           </TableCell>
                         ) : null}
                         {visibleColumns.category ? (

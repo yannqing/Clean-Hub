@@ -41,6 +41,7 @@ import type {
   CreateTenantProductResponse,
   TenantProductCategoryAttributeDefinition,
   TenantProductCategoryAttributeListResponse,
+  TenantProductDetailRecord,
   TenantProductListQuery,
   TenantProductListResponse,
   TenantProductCategoryListResponse,
@@ -49,6 +50,7 @@ import type {
   TenantProductPriceRange,
   TenantProductRepositoryScope,
   TenantProductSummary,
+  UpdateTenantProductRequest,
 } from "./products.types.js";
 
 type ProductFilterInput = {
@@ -87,6 +89,14 @@ type CreateTenantProductRecordInput = CreateTenantProductRequest & {
   createTenantDefaultPrice: boolean;
   requestMeta?: AuthRequestMeta;
 };
+
+type UpdateTenantProductRecordInput = UpdateTenantProductRequest &
+  TenantProductRepositoryScope & {
+    productId: string;
+    actorUserId: string;
+    updateTenantDefaultPrice: boolean;
+    requestMeta?: AuthRequestMeta;
+  };
 
 function normalizeNullable(value: string | undefined): string | null {
   return value ?? null;
@@ -348,6 +358,7 @@ async function requireUniqueSkuIdentifiers(
     tenantId: string;
     skuCode: string;
     barcode?: string;
+    excludeSkuId?: string;
   },
 ): Promise<void> {
   const skuRows = await db
@@ -362,7 +373,7 @@ async function requireUniqueSkuIdentifiers(
     )
     .limit(1);
 
-  if (skuRows[0]) {
+  if (skuRows[0] && skuRows[0].id !== input.excludeSkuId) {
     throw new TenantProductsError(
       "PRODUCT_SKU_CODE_DUPLICATE",
       "SKU code already exists in this tenant.",
@@ -386,7 +397,7 @@ async function requireUniqueSkuIdentifiers(
     )
     .limit(1);
 
-  if (barcodeRows[0]) {
+  if (barcodeRows[0] && barcodeRows[0].id !== input.excludeSkuId) {
     throw new TenantProductsError(
       "PRODUCT_BARCODE_DUPLICATE",
       "Barcode already exists in this tenant.",
@@ -1319,6 +1330,953 @@ export async function createTenantProductRecord(
   }
 }
 
+function quantityToMillis(value: string): bigint {
+  const negative = value.startsWith("-");
+  const unsignedValue = negative ? value.slice(1) : value;
+  const [integerPart, decimalPart = ""] = unsignedValue.split(".");
+  const quantity =
+    BigInt(integerPart ?? "0") * BigInt(1_000) +
+    BigInt(decimalPart.padEnd(3, "0").slice(0, 3));
+  return negative ? -quantity : quantity;
+}
+
+function millisToQuantity(value: bigint): string {
+  const negative = value < BigInt(0);
+  const absolute = negative ? -value : value;
+  const integerPart = absolute / BigInt(1_000);
+  const decimalPart = (absolute % BigInt(1_000)).toString().padStart(3, "0");
+
+  return `${negative ? "-" : ""}${integerPart}.${decimalPart}`;
+}
+
+function moneyToCents(value: string): bigint {
+  const [integerPart, decimalPart = ""] = value.split(".");
+
+  return (
+    BigInt(integerPart ?? "0") * BigInt(100) +
+    BigInt(decimalPart.padEnd(2, "0").slice(0, 2))
+  );
+}
+
+function nullableMoneyEquals(
+  left: string | null,
+  right: string | null,
+): boolean {
+  if (left === null || right === null) {
+    return left === right;
+  }
+
+  return moneyToCents(left) === moneyToCents(right);
+}
+
+export async function updateTenantProductRecord(
+  db: Database,
+  input: UpdateTenantProductRecordInput,
+): Promise<TenantProductDetailRecord> {
+  try {
+    return await db.transaction(async (tx) => {
+      const branchScopeFilter = buildProductBranchScopeFilter(
+        input.allowedBranchIds,
+      );
+      const productRows = await tx
+        .select({
+          id: products.id,
+          version: products.version,
+        })
+        .from(products)
+        .where(
+          and(
+            eq(products.tenantId, input.tenantId),
+            eq(products.id, input.productId),
+            isNull(products.deletedAt),
+            ...(branchScopeFilter ? [branchScopeFilter] : []),
+          ),
+        )
+        .limit(1)
+        .for("update");
+      const product = productRows[0];
+
+      if (!product) {
+        throw new TenantProductsError(
+          "PRODUCT_NOT_FOUND",
+          "Product was not found.",
+          404,
+        );
+      }
+
+      if (product.version !== input.version) {
+        throw new TenantProductsError(
+          "PRODUCT_VERSION_CONFLICT",
+          "Product has been modified. Refresh and try again.",
+          409,
+        );
+      }
+
+      const skuBranchScopeFilter = buildSkuBranchScopeFilter(
+        input.allowedBranchIds,
+      );
+      const skuRows = await tx
+        .select({
+          id: productSkus.id,
+          version: productSkus.version,
+        })
+        .from(productSkus)
+        .where(
+          and(
+            eq(productSkus.tenantId, input.tenantId),
+            eq(productSkus.productId, input.productId),
+            eq(productSkus.id, input.skuId),
+            isNull(productSkus.deletedAt),
+            ...(skuBranchScopeFilter ? [skuBranchScopeFilter] : []),
+          ),
+        )
+        .limit(1)
+        .for("update");
+      const sku = skuRows[0];
+
+      if (!sku) {
+        throw new TenantProductsError(
+          "PRODUCT_SKU_NOT_FOUND",
+          "Product SKU was not found.",
+          404,
+        );
+      }
+
+      if (sku.version !== input.skuVersion) {
+        throw new TenantProductsError(
+          "PRODUCT_SKU_VERSION_CONFLICT",
+          "Product SKU has been modified. Refresh and try again.",
+          409,
+        );
+      }
+
+      const before = await findTenantProductDetailRecord(tx, {
+        tenantId: input.tenantId,
+        allowedBranchIds: input.allowedBranchIds,
+        productId: input.productId,
+        preferTenantDefaultPrice: input.updateTenantDefaultPrice,
+      });
+
+      if (!before) {
+        throw new TenantProductsError(
+          "PRODUCT_NOT_FOUND",
+          "Product was not found.",
+          404,
+        );
+      }
+
+      const branchIds = input.branchSettings.map((setting) => setting.branchId);
+      await requireProductBranches(tx, {
+        tenantId: input.tenantId,
+        branchIds,
+      });
+      await requireUniqueSkuIdentifiers(tx, {
+        tenantId: input.tenantId,
+        skuCode: input.skuCode,
+        barcode: input.barcode,
+        excludeSkuId: input.skuId,
+      });
+
+      const existingMediaRows = await tx
+        .select({
+          id: productMedia.id,
+          mediaObjectId: productMedia.mediaObjectId,
+        })
+        .from(productMedia)
+        .where(
+          and(
+            eq(productMedia.tenantId, input.tenantId),
+            eq(productMedia.productId, input.productId),
+            isNull(productMedia.productSkuId),
+            isNull(productMedia.deletedAt),
+          ),
+        )
+        .orderBy(asc(productMedia.id))
+        .for("update");
+      const existingMediaById = new Map(
+        existingMediaRows.map((media) => [media.id, media]),
+      );
+
+      if (
+        input.retainedMediaIds.some(
+          (mediaId) => !existingMediaById.has(mediaId),
+        )
+      ) {
+        throw new TenantProductsError(
+          "PRODUCT_MEDIA_NOT_FOUND",
+          "One or more retained product images were not found.",
+          404,
+        );
+      }
+
+      const lockedMediaObjects = await lockPendingProductMediaObjects(tx, {
+        tenantId: input.tenantId,
+        actorUserId: input.actorUserId,
+        objectKeys: input.newMediaObjectKeys,
+      });
+      const category = await resolveProductCategory(tx, input);
+      const resolvedCategoryAttributes = await resolveProductCategoryAttributes(
+        tx,
+        {
+          tenantId: input.tenantId,
+          categoryId: category.id,
+          attributes: input.categoryAttributes,
+        },
+      );
+      const now = new Date();
+      const referenceCost = input.referenceCost ?? null;
+      const priceValuesChanged =
+        moneyToCents(input.salePrice) !== moneyToCents(before.salePrice) ||
+        input.currency !== before.currency;
+      const priceStatusChanged = input.status !== before.status;
+      const referenceCostChanged = !nullableMoneyEquals(
+        referenceCost,
+        before.sku.referenceCost,
+      );
+      const nextReferenceCostCurrency =
+        referenceCost === null
+          ? null
+          : referenceCostChanged
+            ? input.currency
+            : (before.sku.referenceCostCurrency ?? input.currency);
+      const representativeBranchSetting =
+        before.branchSettings.find((setting) => setting.isAvailable) ??
+        before.branchSettings[0];
+      const negativeStockPolicyChanged =
+        !representativeBranchSetting ||
+        representativeBranchSetting.allowNegativeStock !==
+          input.allowNegativeStock;
+      const offlineSalePolicyChanged =
+        !representativeBranchSetting ||
+        representativeBranchSetting.allowOfflineSale !== input.allowOfflineSale;
+      const inventoryTrackingChanged =
+        before.sku.trackInventory !== input.trackInventory;
+      const beforeBranchSettingByBranchId = new Map(
+        before.branchSettings.map((setting) => [setting.branchId, setting]),
+      );
+
+      const updatedProductRows = await tx
+        .update(products)
+        .set({
+          categoryId: category.id,
+          name: input.name,
+          brand: normalizeNullable(input.brand),
+          description: normalizeNullable(input.description),
+          tags: input.tags,
+          status: input.status,
+          updatedAt: now,
+          updatedBy: input.actorUserId,
+          version: sql`${products.version} + 1`,
+        })
+        .where(
+          and(
+            eq(products.tenantId, input.tenantId),
+            eq(products.id, input.productId),
+            eq(products.version, input.version),
+            isNull(products.deletedAt),
+          ),
+        )
+        .returning({ id: products.id });
+
+      if (!updatedProductRows[0]) {
+        throw new TenantProductsError(
+          "PRODUCT_VERSION_CONFLICT",
+          "Product has been modified. Refresh and try again.",
+          409,
+        );
+      }
+
+      const existingAttributeValueRows = await tx
+        .select({ id: productAttributeValues.id })
+        .from(productAttributeValues)
+        .where(
+          and(
+            eq(productAttributeValues.tenantId, input.tenantId),
+            eq(productAttributeValues.productId, input.productId),
+            isNull(productAttributeValues.deletedAt),
+          ),
+        )
+        .for("update");
+      const existingAttributeValueIds = existingAttributeValueRows.map(
+        (attribute) => attribute.id,
+      );
+
+      if (existingAttributeValueIds.length > 0) {
+        await tx
+          .update(productAttributeValueOptions)
+          .set({
+            deletedAt: now,
+            deletedBy: input.actorUserId,
+          })
+          .where(
+            and(
+              eq(productAttributeValueOptions.tenantId, input.tenantId),
+              inArray(
+                productAttributeValueOptions.attributeValueId,
+                existingAttributeValueIds,
+              ),
+              isNull(productAttributeValueOptions.deletedAt),
+            ),
+          );
+        await tx
+          .update(productAttributeValues)
+          .set({
+            updatedAt: now,
+            updatedBy: input.actorUserId,
+            deletedAt: now,
+            deletedBy: input.actorUserId,
+            version: sql`${productAttributeValues.version} + 1`,
+          })
+          .where(
+            and(
+              eq(productAttributeValues.tenantId, input.tenantId),
+              inArray(productAttributeValues.id, existingAttributeValueIds),
+              isNull(productAttributeValues.deletedAt),
+            ),
+          );
+      }
+
+      if (resolvedCategoryAttributes.length > 0) {
+        const attributeValueRecords = resolvedCategoryAttributes.map(
+          (attribute) => ({
+            id: createId(),
+            attribute,
+          }),
+        );
+
+        await tx.insert(productAttributeValues).values(
+          attributeValueRecords.map(({ id, attribute }) => ({
+            id,
+            tenantId: input.tenantId,
+            productId: input.productId,
+            definitionId: attribute.definitionId,
+            textValue: attribute.textValue,
+            createdAt: now,
+            updatedAt: now,
+            createdBy: input.actorUserId,
+            updatedBy: input.actorUserId,
+          })),
+        );
+
+        const selectedOptionRecords = attributeValueRecords.flatMap(
+          ({ id: attributeValueId, attribute }) =>
+            attribute.options.map((option) => ({
+              id: createId(),
+              tenantId: input.tenantId,
+              attributeValueId,
+              definitionId: attribute.definitionId,
+              optionId: option.id,
+              createdAt: now,
+              createdBy: input.actorUserId,
+            })),
+        );
+
+        if (selectedOptionRecords.length > 0) {
+          await tx
+            .insert(productAttributeValueOptions)
+            .values(selectedOptionRecords);
+        }
+      }
+
+      const updatedSkuRows = await tx
+        .update(productSkus)
+        .set({
+          skuCode: input.skuCode,
+          barcode: normalizeNullable(input.barcode),
+          variantName: normalizeNullable(input.variantName),
+          unitOfMeasure: input.unitOfMeasure,
+          unitsPerSale: input.unitsPerSale,
+          trackInventory: input.trackInventory,
+          referenceCostAmount: referenceCost,
+          costCurrency: nextReferenceCostCurrency,
+          status: input.status,
+          updatedAt: now,
+          updatedBy: input.actorUserId,
+          version: sql`${productSkus.version} + 1`,
+        })
+        .where(
+          and(
+            eq(productSkus.tenantId, input.tenantId),
+            eq(productSkus.productId, input.productId),
+            eq(productSkus.id, input.skuId),
+            eq(productSkus.version, input.skuVersion),
+            isNull(productSkus.deletedAt),
+          ),
+        )
+        .returning({ id: productSkus.id });
+
+      if (!updatedSkuRows[0]) {
+        throw new TenantProductsError(
+          "PRODUCT_SKU_VERSION_CONFLICT",
+          "Product SKU has been modified. Refresh and try again.",
+          409,
+        );
+      }
+
+      const priceScopes: Array<string | null> = input.updateTenantDefaultPrice
+        ? [null]
+        : branchIds;
+
+      for (const branchId of priceScopes) {
+        const currentPriceRows = await tx
+          .select({
+            id: productPrices.id,
+            amount: productPrices.amount,
+            currency: productPrices.currency,
+          })
+          .from(productPrices)
+          .where(
+            and(
+              eq(productPrices.tenantId, input.tenantId),
+              eq(productPrices.productSkuId, input.skuId),
+              branchId === null
+                ? isNull(productPrices.branchId)
+                : eq(productPrices.branchId, branchId),
+              isNull(productPrices.deletedAt),
+            ),
+          )
+          .orderBy(asc(productPrices.createdAt), asc(productPrices.id))
+          .for("update");
+        const wasPublished =
+          branchId === null ||
+          beforeBranchSettingByBranchId.get(branchId)?.isAvailable === true;
+        const shouldApplyDisplayedPrice = priceValuesChanged || !wasPublished;
+        const targetCurrencyPrice = currentPriceRows.find(
+          (price) => price.currency === input.currency,
+        );
+        const sourceCurrencyPrice = currentPriceRows.find(
+          (price) => price.currency === before.currency,
+        );
+        let appliedPriceId: string | null = null;
+
+        if (shouldApplyDisplayedPrice && targetCurrencyPrice) {
+          appliedPriceId = targetCurrencyPrice.id;
+          await tx
+            .update(productPrices)
+            .set({
+              amount: input.salePrice,
+              status: input.status,
+              updatedAt: now,
+              updatedBy: input.actorUserId,
+              version: sql`${productPrices.version} + 1`,
+            })
+            .where(
+              and(
+                eq(productPrices.tenantId, input.tenantId),
+                eq(productPrices.id, targetCurrencyPrice.id),
+                isNull(productPrices.deletedAt),
+              ),
+            );
+        } else if (shouldApplyDisplayedPrice && sourceCurrencyPrice) {
+          appliedPriceId = sourceCurrencyPrice.id;
+          await tx
+            .update(productPrices)
+            .set({
+              amount: input.salePrice,
+              currency: input.currency,
+              status: input.status,
+              updatedAt: now,
+              updatedBy: input.actorUserId,
+              version: sql`${productPrices.version} + 1`,
+            })
+            .where(
+              and(
+                eq(productPrices.tenantId, input.tenantId),
+                eq(productPrices.id, sourceCurrencyPrice.id),
+                isNull(productPrices.deletedAt),
+              ),
+            );
+        } else if (shouldApplyDisplayedPrice) {
+          appliedPriceId = createId();
+          await tx.insert(productPrices).values({
+            id: appliedPriceId,
+            tenantId: input.tenantId,
+            branchId,
+            productSkuId: input.skuId,
+            amount: input.salePrice,
+            currency: input.currency,
+            status: input.status,
+            createdAt: now,
+            updatedAt: now,
+            createdBy: input.actorUserId,
+            updatedBy: input.actorUserId,
+          });
+        } else if (priceStatusChanged && currentPriceRows.length > 0) {
+          await tx
+            .update(productPrices)
+            .set({
+              status: input.status,
+              updatedAt: now,
+              updatedBy: input.actorUserId,
+              version: sql`${productPrices.version} + 1`,
+            })
+            .where(
+              and(
+                eq(productPrices.tenantId, input.tenantId),
+                inArray(
+                  productPrices.id,
+                  currentPriceRows.map((price) => price.id),
+                ),
+                isNull(productPrices.deletedAt),
+              ),
+            );
+        }
+
+        const shouldCollapseToDisplayedCurrency =
+          shouldApplyDisplayedPrice &&
+          (input.currency !== before.currency || !wasPublished);
+        const supersededPriceIds =
+          shouldCollapseToDisplayedCurrency && appliedPriceId
+            ? currentPriceRows
+                .filter((price) => price.id !== appliedPriceId)
+                .map((price) => price.id)
+            : [];
+
+        if (supersededPriceIds.length > 0) {
+          await tx
+            .update(productPrices)
+            .set({
+              status: "inactive",
+              updatedAt: now,
+              updatedBy: input.actorUserId,
+              deletedAt: now,
+              deletedBy: input.actorUserId,
+              version: sql`${productPrices.version} + 1`,
+            })
+            .where(
+              and(
+                eq(productPrices.tenantId, input.tenantId),
+                inArray(productPrices.id, supersededPriceIds),
+                isNull(productPrices.deletedAt),
+              ),
+            );
+        }
+      }
+
+      const branchSettingFilters: SQL[] = [
+        eq(branchProductSettings.tenantId, input.tenantId),
+        eq(branchProductSettings.productSkuId, input.skuId),
+      ];
+
+      if (input.allowedBranchIds) {
+        branchSettingFilters.push(
+          input.allowedBranchIds.length === 0
+            ? sql`false`
+            : inArray(branchProductSettings.branchId, input.allowedBranchIds),
+        );
+      }
+
+      const currentBranchSettingRows = await tx
+        .select({
+          id: branchProductSettings.id,
+          branchId: branchProductSettings.branchId,
+          isAvailable: branchProductSettings.isAvailable,
+          allowNegativeStock: branchProductSettings.allowNegativeStock,
+          allowOfflineSale: branchProductSettings.allowOfflineSale,
+        })
+        .from(branchProductSettings)
+        .where(and(...branchSettingFilters))
+        .orderBy(asc(branchProductSettings.branchId))
+        .for("update");
+      const currentBranchSettingByBranchId = new Map(
+        currentBranchSettingRows.map((setting) => [setting.branchId, setting]),
+      );
+      const effectiveAllowNegativeStockByBranchId = new Map<string, boolean>();
+
+      for (const setting of input.branchSettings) {
+        const currentSetting = currentBranchSettingByBranchId.get(
+          setting.branchId,
+        );
+
+        if (currentSetting) {
+          const shouldApplyNegativeStockPolicy =
+            !currentSetting.isAvailable ||
+            negativeStockPolicyChanged ||
+            (inventoryTrackingChanged && !input.trackInventory);
+          const shouldApplyOfflineSalePolicy =
+            !currentSetting.isAvailable || offlineSalePolicyChanged;
+          const effectiveAllowNegativeStock = shouldApplyNegativeStockPolicy
+            ? input.allowNegativeStock
+            : currentSetting.allowNegativeStock;
+          effectiveAllowNegativeStockByBranchId.set(
+            setting.branchId,
+            effectiveAllowNegativeStock,
+          );
+
+          await tx
+            .update(branchProductSettings)
+            .set({
+              isAvailable: true,
+              ...(shouldApplyNegativeStockPolicy
+                ? { allowNegativeStock: input.allowNegativeStock }
+                : {}),
+              ...(shouldApplyOfflineSalePolicy
+                ? { allowOfflineSale: input.allowOfflineSale }
+                : {}),
+              reorderPoint: setting.reorderPoint,
+              updatedAt: now,
+              updatedBy: input.actorUserId,
+              version: sql`${branchProductSettings.version} + 1`,
+            })
+            .where(
+              and(
+                eq(branchProductSettings.tenantId, input.tenantId),
+                eq(branchProductSettings.id, currentSetting.id),
+              ),
+            );
+        } else {
+          effectiveAllowNegativeStockByBranchId.set(
+            setting.branchId,
+            input.allowNegativeStock,
+          );
+          await tx.insert(branchProductSettings).values({
+            id: createId(),
+            tenantId: input.tenantId,
+            branchId: setting.branchId,
+            productSkuId: input.skuId,
+            isAvailable: true,
+            allowNegativeStock: input.allowNegativeStock,
+            allowOfflineSale: input.allowOfflineSale,
+            reorderPoint: setting.reorderPoint,
+            createdAt: now,
+            updatedAt: now,
+            createdBy: input.actorUserId,
+            updatedBy: input.actorUserId,
+          });
+        }
+      }
+
+      const unavailableSettingIds = currentBranchSettingRows
+        .filter((setting) => !branchIds.includes(setting.branchId))
+        .map((setting) => setting.id);
+
+      if (unavailableSettingIds.length > 0) {
+        await tx
+          .update(branchProductSettings)
+          .set({
+            isAvailable: false,
+            updatedAt: now,
+            updatedBy: input.actorUserId,
+            version: sql`${branchProductSettings.version} + 1`,
+          })
+          .where(
+            and(
+              eq(branchProductSettings.tenantId, input.tenantId),
+              inArray(branchProductSettings.id, unavailableSettingIds),
+            ),
+          );
+      }
+
+      if (input.trackInventory) {
+        const currentBalanceRows = await tx
+          .select({
+            id: inventoryBalances.id,
+            branchId: inventoryBalances.branchId,
+            onHandQuantity: inventoryBalances.onHandQuantity,
+            reservedQuantity: inventoryBalances.reservedQuantity,
+          })
+          .from(inventoryBalances)
+          .where(
+            and(
+              eq(inventoryBalances.tenantId, input.tenantId),
+              eq(inventoryBalances.productSkuId, input.skuId),
+              inArray(inventoryBalances.branchId, branchIds),
+            ),
+          )
+          .orderBy(asc(inventoryBalances.branchId))
+          .for("update");
+        const currentBalanceByBranchId = new Map(
+          currentBalanceRows.map((balance) => [balance.branchId, balance]),
+        );
+
+        for (const setting of input.branchSettings) {
+          const currentBalance = currentBalanceByBranchId.get(setting.branchId);
+          const currentOnHand = quantityToMillis(
+            currentBalance?.onHandQuantity ?? "0",
+          );
+          const expectedOnHand = quantityToMillis(setting.expectedStockOnHand);
+          const requestedOnHand = quantityToMillis(setting.stockOnHand);
+          const reservedQuantity = quantityToMillis(
+            currentBalance?.reservedQuantity ?? "0",
+          );
+          const stockWasEdited = requestedOnHand !== expectedOnHand;
+
+          if (stockWasEdited && currentOnHand !== expectedOnHand) {
+            throw new TenantProductsError(
+              "PRODUCT_INVENTORY_CONFLICT",
+              "Stock changed after this product was loaded. Refresh and try again.",
+              409,
+            );
+          }
+
+          // Saving unrelated product fields must not restore a stale stock
+          // snapshot after a sale, receipt, or another adjustment.
+          const targetOnHand = stockWasEdited ? requestedOnHand : currentOnHand;
+
+          if (
+            !effectiveAllowNegativeStockByBranchId.get(setting.branchId) &&
+            targetOnHand < reservedQuantity
+          ) {
+            throw new TenantProductsError(
+              "PRODUCT_INVENTORY_CONFLICT",
+              "Stock on hand cannot be lower than the reserved quantity.",
+              409,
+            );
+          }
+
+          const delta = targetOnHand - currentOnHand;
+
+          if (delta !== BigInt(0)) {
+            await tx.insert(inventoryMovements).values({
+              id: createId(),
+              tenantId: input.tenantId,
+              branchId: setting.branchId,
+              productSkuId: input.skuId,
+              movementType:
+                delta > BigInt(0) ? "adjustment_in" : "adjustment_out",
+              quantityDelta: millisToQuantity(delta),
+              unitCost: referenceCost,
+              currency: nextReferenceCostCurrency,
+              referenceType: "product_update",
+              referenceId: input.productId,
+              idempotencyKey: `product-update:${createId()}`,
+              reason: "Stock adjusted while updating the product.",
+              occurredAt: now,
+              serverReceivedAt: now,
+              createdAt: now,
+              createdBy: input.actorUserId,
+            });
+          }
+
+          if (currentBalance) {
+            if (delta !== BigInt(0)) {
+              await tx
+                .update(inventoryBalances)
+                .set({
+                  onHandQuantity: setting.stockOnHand,
+                  lastMovementAt: now,
+                  updatedAt: now,
+                  updatedBy: input.actorUserId,
+                  version: sql`${inventoryBalances.version} + 1`,
+                })
+                .where(
+                  and(
+                    eq(inventoryBalances.tenantId, input.tenantId),
+                    eq(inventoryBalances.id, currentBalance.id),
+                  ),
+                );
+            }
+          } else {
+            await tx.insert(inventoryBalances).values({
+              id: createId(),
+              tenantId: input.tenantId,
+              branchId: setting.branchId,
+              productSkuId: input.skuId,
+              onHandQuantity: millisToQuantity(targetOnHand),
+              reservedQuantity: "0",
+              averageUnitCost: referenceCost,
+              currency: nextReferenceCostCurrency,
+              lastMovementAt: delta === BigInt(0) ? null : now,
+              createdAt: now,
+              updatedAt: now,
+              updatedBy: input.actorUserId,
+            });
+          }
+        }
+      }
+
+      if (existingMediaRows.length > 0) {
+        await tx
+          .update(productMedia)
+          .set({ isPrimary: false })
+          .where(
+            and(
+              eq(productMedia.tenantId, input.tenantId),
+              eq(productMedia.productId, input.productId),
+              isNull(productMedia.productSkuId),
+              isNull(productMedia.deletedAt),
+            ),
+          );
+      }
+
+      const retainedMediaIdSet = new Set(input.retainedMediaIds);
+      const removedMediaRows = existingMediaRows.filter(
+        (media) => !retainedMediaIdSet.has(media.id),
+      );
+      const removedMediaIds = removedMediaRows.map((media) => media.id);
+
+      if (removedMediaIds.length > 0) {
+        await tx
+          .update(productMedia)
+          .set({
+            deletedAt: now,
+            deletedBy: input.actorUserId,
+          })
+          .where(
+            and(
+              eq(productMedia.tenantId, input.tenantId),
+              inArray(productMedia.id, removedMediaIds),
+              isNull(productMedia.deletedAt),
+            ),
+          );
+
+        // Object storage deletion happens outside this transaction. Mark
+        // detached objects as an immediately reclaimable cleanup claim so the
+        // media cleanup job can delete the bytes without risking a
+        // database/object-storage split-brain during this update.
+        await tx
+          .update(mediaObjects)
+          .set({
+            status: "deleting",
+            cleanupClaimToken: createId(),
+            cleanupClaimedAt: new Date(0),
+          })
+          .where(
+            and(
+              eq(mediaObjects.tenantId, input.tenantId),
+              inArray(
+                mediaObjects.id,
+                removedMediaRows.map((media) => media.mediaObjectId),
+              ),
+              eq(mediaObjects.status, "committed"),
+              isNull(mediaObjects.deletedAt),
+            ),
+          );
+      }
+
+      for (const [index, mediaId] of input.retainedMediaIds.entries()) {
+        await tx
+          .update(productMedia)
+          .set({
+            isPrimary: index === 0,
+            sortOrder: index,
+          })
+          .where(
+            and(
+              eq(productMedia.tenantId, input.tenantId),
+              eq(productMedia.id, mediaId),
+              isNull(productMedia.deletedAt),
+            ),
+          );
+      }
+
+      if (lockedMediaObjects.length > 0) {
+        await tx.insert(productMedia).values(
+          lockedMediaObjects.map((mediaObject, index) => {
+            const sortOrder = input.retainedMediaIds.length + index;
+
+            return {
+              id: createId(),
+              tenantId: input.tenantId,
+              productId: input.productId,
+              productSkuId: null,
+              mediaObjectId: mediaObject.id,
+              isPrimary: sortOrder === 0,
+              sortOrder,
+              createdAt: now,
+              createdBy: input.actorUserId,
+            };
+          }),
+        );
+
+        const committedRows = await tx
+          .update(mediaObjects)
+          .set({
+            status: "committed",
+            committedAt: now,
+            cleanupClaimToken: null,
+            cleanupClaimedAt: null,
+          })
+          .where(
+            and(
+              eq(mediaObjects.tenantId, input.tenantId),
+              inArray(
+                mediaObjects.id,
+                lockedMediaObjects.map((mediaObject) => mediaObject.id),
+              ),
+              eq(mediaObjects.status, "pending"),
+              isNull(mediaObjects.deletedAt),
+            ),
+          )
+          .returning({ id: mediaObjects.id });
+
+        if (committedRows.length !== lockedMediaObjects.length) {
+          throw new TenantProductsError(
+            "PRODUCT_MEDIA_CONFLICT",
+            "One or more product images have already been used.",
+            409,
+          );
+        }
+      }
+
+      if (category.reactivated && category.id) {
+        await writeAuditLog(tx, {
+          actorUserId: input.actorUserId,
+          tenantId: input.tenantId,
+          eventCategory: "tenant_product_category",
+          eventType: "product_category.reactivated",
+          entityType: "product_category",
+          entityId: category.id,
+          before: {
+            id: category.id,
+            name: input.categoryName,
+            status: "inactive",
+          },
+          after: {
+            id: category.id,
+            name: input.categoryName,
+            status: "active",
+          },
+          ipAddress: input.requestMeta?.ipAddress,
+          userAgent: input.requestMeta?.userAgent,
+        });
+      }
+
+      const after = await findTenantProductDetailRecord(tx, {
+        tenantId: input.tenantId,
+        allowedBranchIds: input.allowedBranchIds,
+        productId: input.productId,
+        preferTenantDefaultPrice: input.updateTenantDefaultPrice,
+      });
+
+      if (!after) {
+        throw new TenantProductsError(
+          "PRODUCT_NOT_FOUND",
+          "Product was not found after it was updated.",
+          404,
+        );
+      }
+
+      await writeAuditLog(tx, {
+        actorUserId: input.actorUserId,
+        tenantId: input.tenantId,
+        eventCategory: "tenant_product",
+        eventType: "product.updated",
+        entityType: "product",
+        entityId: input.productId,
+        before,
+        after,
+        ipAddress: input.requestMeta?.ipAddress,
+        userAgent: input.requestMeta?.userAgent,
+      });
+
+      return after;
+    });
+  } catch (error) {
+    if (error instanceof TenantProductsError) {
+      throw error;
+    }
+
+    const productError = mapProductCreateConstraint(error);
+
+    if (productError) {
+      throw productError;
+    }
+
+    throw error;
+  }
+}
+
 function buildProductFilters(input: ProductFilterInput): SQL[] {
   const filters: SQL[] = [
     eq(products.tenantId, input.tenantId),
@@ -1603,6 +2561,381 @@ export async function findTenantProductCategoryAttributes(
   };
 }
 
+export async function findTenantProductDetailRecord(
+  db: Database,
+  input: TenantProductRepositoryScope & {
+    productId: string;
+    preferTenantDefaultPrice: boolean;
+  },
+): Promise<TenantProductDetailRecord | null> {
+  const branchScopeFilter = buildProductBranchScopeFilter(
+    input.allowedBranchIds,
+  );
+  const productRows = await db
+    .select({
+      id: products.id,
+      version: products.version,
+      name: products.name,
+      categoryId: products.categoryId,
+      categoryName: productCategories.name,
+      brand: products.brand,
+      description: products.description,
+      tags: products.tags,
+      status: products.status,
+    })
+    .from(products)
+    .leftJoin(
+      productCategories,
+      and(
+        eq(productCategories.tenantId, products.tenantId),
+        eq(productCategories.id, products.categoryId),
+        isNull(productCategories.deletedAt),
+      ),
+    )
+    .where(
+      and(
+        eq(products.tenantId, input.tenantId),
+        eq(products.id, input.productId),
+        isNull(products.deletedAt),
+        ...(branchScopeFilter ? [branchScopeFilter] : []),
+      ),
+    )
+    .limit(1);
+  const product = productRows[0];
+
+  if (!product) {
+    return null;
+  }
+
+  const skuBranchScopeFilter = buildSkuBranchScopeFilter(
+    input.allowedBranchIds,
+  );
+  const skuRows = await db
+    .select({
+      id: productSkus.id,
+      productId: productSkus.productId,
+      version: productSkus.version,
+      skuCode: productSkus.skuCode,
+      barcode: productSkus.barcode,
+      variantName: productSkus.variantName,
+      unitOfMeasure: productSkus.unitOfMeasure,
+      unitsPerSale: productSkus.unitsPerSale,
+      trackInventory: productSkus.trackInventory,
+      referenceCost: productSkus.referenceCostAmount,
+      costCurrency: productSkus.costCurrency,
+      status: productSkus.status,
+      createdAt: productSkus.createdAt,
+    })
+    .from(productSkus)
+    .where(
+      and(
+        eq(productSkus.tenantId, input.tenantId),
+        eq(productSkus.productId, input.productId),
+        isNull(productSkus.deletedAt),
+        ...(skuBranchScopeFilter ? [skuBranchScopeFilter] : []),
+      ),
+    );
+
+  if (skuRows.length === 0) {
+    return null;
+  }
+
+  const orderedSkus = [...skuRows].sort((left, right) => {
+    const createdAtDifference =
+      left.createdAt.getTime() - right.createdAt.getTime();
+
+    return createdAtDifference || left.id.localeCompare(right.id);
+  });
+  const primarySku = orderedSkus[0]!;
+  const branchScope =
+    input.allowedBranchIds === undefined
+      ? []
+      : input.allowedBranchIds.length === 0
+        ? [sql`false`]
+        : [inArray(branchProductSettings.branchId, input.allowedBranchIds)];
+  const priceBranchScope =
+    input.allowedBranchIds === undefined
+      ? []
+      : input.allowedBranchIds.length === 0
+        ? [isNull(productPrices.branchId)]
+        : [
+            or(
+              isNull(productPrices.branchId),
+              inArray(productPrices.branchId, input.allowedBranchIds),
+            )!,
+          ];
+  // Keep these reads sequential because this repository is also used from an
+  // open transaction. The pg driver does not support concurrent queries on a
+  // single transaction client.
+  const skuCountRows = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(productSkus)
+    .where(
+      and(
+        eq(productSkus.tenantId, input.tenantId),
+        eq(productSkus.productId, input.productId),
+        isNull(productSkus.deletedAt),
+      ),
+    );
+  const attributeValueRows = await db
+    .select({
+      id: productAttributeValues.id,
+      definitionId: productAttributeValues.definitionId,
+      textValue: productAttributeValues.textValue,
+    })
+    .from(productAttributeValues)
+    .where(
+      and(
+        eq(productAttributeValues.tenantId, input.tenantId),
+        eq(productAttributeValues.productId, input.productId),
+        isNull(productAttributeValues.deletedAt),
+      ),
+    )
+    .orderBy(
+      asc(productAttributeValues.createdAt),
+      asc(productAttributeValues.id),
+    );
+  const priceRows = await db
+    .select({
+      id: productPrices.id,
+      branchId: productPrices.branchId,
+      amount: productPrices.amount,
+      currency: productPrices.currency,
+      createdAt: productPrices.createdAt,
+    })
+    .from(productPrices)
+    .where(
+      and(
+        eq(productPrices.tenantId, input.tenantId),
+        eq(productPrices.productSkuId, primarySku.id),
+        isNull(productPrices.deletedAt),
+        ...priceBranchScope,
+      ),
+    );
+  const branchSettingRows = await db
+    .select({
+      branchId: branchProductSettings.branchId,
+      isAvailable: branchProductSettings.isAvailable,
+      reorderPoint: branchProductSettings.reorderPoint,
+      allowNegativeStock: branchProductSettings.allowNegativeStock,
+      allowOfflineSale: branchProductSettings.allowOfflineSale,
+      onHandQuantity: inventoryBalances.onHandQuantity,
+      reservedQuantity: inventoryBalances.reservedQuantity,
+    })
+    .from(branchProductSettings)
+    .leftJoin(
+      inventoryBalances,
+      and(
+        eq(inventoryBalances.tenantId, branchProductSettings.tenantId),
+        eq(inventoryBalances.branchId, branchProductSettings.branchId),
+        eq(inventoryBalances.productSkuId, branchProductSettings.productSkuId),
+      ),
+    )
+    .where(
+      and(
+        eq(branchProductSettings.tenantId, input.tenantId),
+        eq(branchProductSettings.productSkuId, primarySku.id),
+        ...branchScope,
+      ),
+    )
+    .orderBy(asc(branchProductSettings.branchId));
+  const mediaRows = await db
+    .select({
+      id: productMedia.id,
+      objectKey: mediaObjects.objectKey,
+      isPrimary: productMedia.isPrimary,
+      sortOrder: productMedia.sortOrder,
+    })
+    .from(productMedia)
+    .innerJoin(
+      mediaObjects,
+      and(
+        eq(mediaObjects.tenantId, productMedia.tenantId),
+        eq(mediaObjects.id, productMedia.mediaObjectId),
+        eq(mediaObjects.status, "committed"),
+        isNull(mediaObjects.deletedAt),
+      ),
+    )
+    .where(
+      and(
+        eq(productMedia.tenantId, input.tenantId),
+        eq(productMedia.productId, input.productId),
+        isNull(productMedia.productSkuId),
+        isNull(productMedia.deletedAt),
+      ),
+    )
+    .orderBy(
+      desc(productMedia.isPrimary),
+      asc(productMedia.sortOrder),
+      asc(productMedia.id),
+    );
+  const attributeValueIds = attributeValueRows.map((row) => row.id);
+  const attributeOptionRows =
+    attributeValueIds.length === 0
+      ? []
+      : await db
+          .select({
+            attributeValueId: productAttributeValueOptions.attributeValueId,
+            optionId: productAttributeValueOptions.optionId,
+          })
+          .from(productAttributeValueOptions)
+          .where(
+            and(
+              eq(productAttributeValueOptions.tenantId, input.tenantId),
+              inArray(
+                productAttributeValueOptions.attributeValueId,
+                attributeValueIds,
+              ),
+              isNull(productAttributeValueOptions.deletedAt),
+            ),
+          )
+          .orderBy(
+            asc(productAttributeValueOptions.createdAt),
+            asc(productAttributeValueOptions.id),
+          );
+  const optionIdsByAttributeValueId = new Map<string, string[]>();
+
+  for (const option of attributeOptionRows) {
+    const optionIds =
+      optionIdsByAttributeValueId.get(option.attributeValueId) ?? [];
+    optionIds.push(option.optionId);
+    optionIdsByAttributeValueId.set(option.attributeValueId, optionIds);
+  }
+
+  const categoryAttributes: CreateTenantProductCategoryAttribute[] =
+    attributeValueRows.map((attribute) =>
+      attribute.textValue !== null
+        ? {
+            definitionId: attribute.definitionId,
+            textValue: attribute.textValue,
+          }
+        : {
+            definitionId: attribute.definitionId,
+            optionIds: optionIdsByAttributeValueId.get(attribute.id) ?? [],
+          },
+    );
+  const sortedPrices = [...priceRows].sort((left, right) => {
+    const leftPreferred = input.preferTenantDefaultPrice
+      ? left.branchId === null
+      : left.branchId !== null;
+    const rightPreferred = input.preferTenantDefaultPrice
+      ? right.branchId === null
+      : right.branchId !== null;
+
+    return (
+      Number(rightPreferred) - Number(leftPreferred) ||
+      left.createdAt.getTime() - right.createdAt.getTime() ||
+      left.id.localeCompare(right.id)
+    );
+  });
+  const selectedPrice = sortedPrices[0] ?? null;
+
+  return {
+    id: product.id,
+    version: product.version,
+    name: product.name,
+    categoryId: product.categoryId,
+    categoryName: product.categoryName,
+    brand: product.brand,
+    description: product.description,
+    tags: product.tags,
+    status: product.status,
+    skuCount: skuCountRows[0]?.count ?? skuRows.length,
+    sku: {
+      id: primarySku.id,
+      version: primarySku.version,
+      skuCode: primarySku.skuCode,
+      barcode: primarySku.barcode,
+      variantName: primarySku.variantName,
+      unitOfMeasure: primarySku.unitOfMeasure,
+      unitsPerSale: primarySku.unitsPerSale,
+      trackInventory: primarySku.trackInventory,
+      referenceCost: primarySku.referenceCost,
+      referenceCostCurrency: primarySku.costCurrency,
+    },
+    salePrice: selectedPrice?.amount ?? "0.00",
+    currency: selectedPrice?.currency ?? primarySku.costCurrency ?? "CNY",
+    branchSettings: branchSettingRows.map((setting) => ({
+      branchId: setting.branchId,
+      isAvailable: setting.isAvailable,
+      reorderPoint: setting.reorderPoint,
+      onHandQuantity: setting.onHandQuantity ?? "0.000",
+      reservedQuantity: setting.reservedQuantity ?? "0.000",
+      allowNegativeStock: setting.allowNegativeStock,
+      allowOfflineSale: setting.allowOfflineSale,
+    })),
+    categoryAttributes,
+    media: mediaRows,
+  };
+}
+
+export async function findTenantProductMediaRecords(
+  db: Database,
+  input: TenantProductRepositoryScope & {
+    items: Array<{
+      productId: string;
+      mediaId: string;
+    }>;
+  },
+): Promise<
+  Array<{
+    productId: string;
+    mediaId: string;
+    objectKey: string;
+  }>
+> {
+  if (input.items.length === 0) {
+    return [];
+  }
+
+  const branchScopeFilter = buildProductBranchScopeFilter(
+    input.allowedBranchIds,
+  );
+  const productIds = [...new Set(input.items.map((item) => item.productId))];
+  const mediaIds = [...new Set(input.items.map((item) => item.mediaId))];
+  const requestedPairs = new Set(
+    input.items.map((item) => `${item.productId}:${item.mediaId}`),
+  );
+  const rows = await db
+    .select({
+      productId: productMedia.productId,
+      mediaId: productMedia.id,
+      objectKey: mediaObjects.objectKey,
+    })
+    .from(productMedia)
+    .innerJoin(
+      products,
+      and(
+        eq(products.tenantId, productMedia.tenantId),
+        eq(products.id, productMedia.productId),
+        isNull(products.deletedAt),
+      ),
+    )
+    .innerJoin(
+      mediaObjects,
+      and(
+        eq(mediaObjects.tenantId, productMedia.tenantId),
+        eq(mediaObjects.id, productMedia.mediaObjectId),
+        eq(mediaObjects.status, "committed"),
+        isNull(mediaObjects.deletedAt),
+      ),
+    )
+    .where(
+      and(
+        eq(productMedia.tenantId, input.tenantId),
+        inArray(productMedia.productId, productIds),
+        inArray(productMedia.id, mediaIds),
+        isNull(productMedia.productSkuId),
+        isNull(productMedia.deletedAt),
+        ...(branchScopeFilter ? [branchScopeFilter] : []),
+      ),
+    );
+
+  return rows.filter((row) =>
+    requestedPairs.has(`${row.productId}:${row.mediaId}`),
+  );
+}
+
 async function findLowStockSkuIds(
   db: Database,
   input: TenantProductRepositoryScope &
@@ -1720,26 +3053,65 @@ export async function findTenantProducts(
   const skuBranchScopeFilter = buildSkuBranchScopeFilter(
     input.allowedBranchIds,
   );
-  const skuRows: ProductSkuRow[] = await db
-    .select({
-      id: productSkus.id,
-      productId: productSkus.productId,
-      skuCode: productSkus.skuCode,
-      barcode: productSkus.barcode,
-      status: productSkus.status,
-      trackInventory: productSkus.trackInventory,
-      createdAt: productSkus.createdAt,
-    })
-    .from(productSkus)
-    .where(
-      and(
-        eq(productSkus.tenantId, input.tenantId),
-        inArray(productSkus.productId, productIds),
-        isNull(productSkus.deletedAt),
-        ...(skuBranchScopeFilter ? [skuBranchScopeFilter] : []),
+  const [skuRows, mediaRows] = await Promise.all([
+    db
+      .select({
+        id: productSkus.id,
+        productId: productSkus.productId,
+        skuCode: productSkus.skuCode,
+        barcode: productSkus.barcode,
+        status: productSkus.status,
+        trackInventory: productSkus.trackInventory,
+        createdAt: productSkus.createdAt,
+      })
+      .from(productSkus)
+      .where(
+        and(
+          eq(productSkus.tenantId, input.tenantId),
+          inArray(productSkus.productId, productIds),
+          isNull(productSkus.deletedAt),
+          ...(skuBranchScopeFilter ? [skuBranchScopeFilter] : []),
+        ),
       ),
-    );
+    db
+      .select({
+        id: productMedia.id,
+        productId: productMedia.productId,
+      })
+      .from(productMedia)
+      .innerJoin(
+        mediaObjects,
+        and(
+          eq(mediaObjects.tenantId, productMedia.tenantId),
+          eq(mediaObjects.id, productMedia.mediaObjectId),
+          eq(mediaObjects.status, "committed"),
+          isNull(mediaObjects.deletedAt),
+        ),
+      )
+      .where(
+        and(
+          eq(productMedia.tenantId, input.tenantId),
+          inArray(productMedia.productId, productIds),
+          isNull(productMedia.productSkuId),
+          isNull(productMedia.deletedAt),
+        ),
+      )
+      .orderBy(
+        desc(productMedia.isPrimary),
+        asc(productMedia.sortOrder),
+        asc(productMedia.id),
+      ),
+  ]);
   const skuIds = skuRows.map((sku) => sku.id);
+  const primaryImageByProduct = new Map<string, { id: string }>();
+
+  for (const media of mediaRows) {
+    if (!primaryImageByProduct.has(media.productId)) {
+      primaryImageByProduct.set(media.productId, {
+        id: media.id,
+      });
+    }
+  }
 
   const [branchRows, priceRows, stockRows, lowStockSkuIds] = await Promise.all([
     input.allowedBranchIds?.length === 0
@@ -1894,6 +3266,7 @@ export async function findTenantProducts(
         skus.map((sku) => stockBySku.get(sku.id)?.reservedQuantity ?? "0"),
       ),
       lowStockSkuCount: skus.filter((sku) => lowStockSkuIds.has(sku.id)).length,
+      primaryImage: primaryImageByProduct.get(product.id) ?? null,
       createdAt: product.createdAt.toISOString(),
       updatedAt: product.updatedAt.toISOString(),
       version: product.version,

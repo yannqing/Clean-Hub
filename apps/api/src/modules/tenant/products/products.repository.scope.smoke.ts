@@ -16,6 +16,7 @@ import {
 import { createId } from "@cleanhub/id";
 
 import {
+  findTenantProductDetailRecord,
   findTenantProductOverview,
   findTenantProducts,
 } from "./products.repository.js";
@@ -103,6 +104,35 @@ export async function runTenantProductScopeSmokeChecks(): Promise<void> {
       [productIds[0]],
     );
     assert.equal(unassignedManagerList.total, 0);
+
+    const ownerDetail = await findTenantProductDetailRecord(db, {
+      tenantId,
+      productId: productIds[0]!,
+      preferTenantDefaultPrice: true,
+    });
+    const managerDetail = await findTenantProductDetailRecord(db, {
+      tenantId,
+      allowedBranchIds: [branchIds[0]!],
+      productId: productIds[0]!,
+      preferTenantDefaultPrice: false,
+    });
+    const crossBranchDetail = await findTenantProductDetailRecord(db, {
+      tenantId,
+      allowedBranchIds: [branchIds[0]!],
+      productId: productIds[1]!,
+      preferTenantDefaultPrice: false,
+    });
+    const unassignedManagerDetail = await findTenantProductDetailRecord(db, {
+      tenantId,
+      allowedBranchIds: [],
+      productId: productIds[0]!,
+      preferTenantDefaultPrice: false,
+    });
+
+    assert.equal(ownerDetail?.id, productIds[0]);
+    assert.equal(managerDetail?.id, productIds[0]);
+    assert.equal(crossBranchDetail, null);
+    assert.equal(unassignedManagerDetail, null);
 
     const ownerOverview = await findTenantProductOverview(db, {
       tenantId,

@@ -4,7 +4,10 @@ import { MediaError } from "../../media/index.js";
 import { mapProductMediaError } from "./products.service.js";
 import {
   createTenantProductBodySchema,
+  requestTenantProductMediaDownloadsBodySchema,
   requestTenantProductMediaUploadBodySchema,
+  tenantProductParamsSchema,
+  updateTenantProductBodySchema,
 } from "./products.validation.js";
 
 const BRANCH_A = "01KRERJN800000000000000001";
@@ -13,6 +16,9 @@ const CATEGORY_A = "01KRERJN820000000000000003";
 const DEFINITION_A = "01KRERJN830000000000000004";
 const OPTION_A = "01KRERJN840000000000000005";
 const OPTION_B = "01KRERJN850000000000000006";
+const PRODUCT_A = "01KRERJN860000000000000007";
+const SKU_A = "01KRERJN870000000000000008";
+const MEDIA_A = "01KRERJN880000000000000009";
 
 function validProductBody() {
   return {
@@ -44,6 +50,36 @@ function validProductBody() {
       `tenant/${BRANCH_A}/product_image/unassigned/image-1.jpg`,
       `tenant/${BRANCH_A}/product_image/unassigned/image-2.jpg`,
     ],
+  };
+}
+
+function validUpdateBody() {
+  const product = validProductBody();
+
+  return {
+    version: 1,
+    skuId: SKU_A,
+    skuVersion: 1,
+    name: product.name,
+    categoryAttributes: product.categoryAttributes,
+    tags: product.tags,
+    status: product.status,
+    skuCode: product.skuCode,
+    unitOfMeasure: product.unitOfMeasure,
+    unitsPerSale: product.unitsPerSale,
+    salePrice: product.salePrice,
+    currency: product.currency,
+    trackInventory: product.trackInventory,
+    allowNegativeStock: product.allowNegativeStock,
+    allowOfflineSale: product.allowOfflineSale,
+    branchSettings: product.branchSettings.map((setting) => ({
+      branchId: setting.branchId,
+      expectedStockOnHand: setting.openingStock,
+      stockOnHand: setting.openingStock,
+      reorderPoint: setting.reorderPoint,
+    })),
+    retainedMediaIds: [MEDIA_A],
+    newMediaObjectKeys: [product.mediaObjectKeys[0]!],
   };
 }
 
@@ -229,6 +265,76 @@ export function runTenantProductValidationSmokeChecks(): void {
       contentType: "image/jpeg",
       sizeBytes: 5 * 1_024 * 1_024 + 1,
     }).success,
+    false,
+  );
+  assert.equal(
+    requestTenantProductMediaDownloadsBodySchema.safeParse({
+      items: [{ productId: PRODUCT_A, mediaId: MEDIA_A }],
+    }).success,
+    true,
+  );
+  assert.equal(
+    requestTenantProductMediaDownloadsBodySchema.safeParse({
+      items: [
+        { productId: PRODUCT_A, mediaId: MEDIA_A },
+        { productId: PRODUCT_A, mediaId: MEDIA_A },
+      ],
+    }).success,
+    false,
+    "product media download items must be unique",
+  );
+
+  const updateBody = validUpdateBody();
+  const parsedUpdate = updateTenantProductBodySchema.parse(updateBody);
+  assert.deepEqual(
+    parsedUpdate.branchSettings.map((setting) => setting.stockOnHand),
+    ["2", "8"],
+    "product updates must preserve each branch's target stock on hand",
+  );
+
+  assert.equal(
+    updateTenantProductBodySchema.safeParse({
+      ...updateBody,
+      version: 0,
+    }).success,
+    false,
+    "product updates require a positive optimistic-lock version",
+  );
+  assert.equal(
+    updateTenantProductBodySchema.safeParse({
+      ...updateBody,
+      retainedMediaIds: [MEDIA_A, MEDIA_A],
+    }).success,
+    false,
+    "retained product media IDs must be unique",
+  );
+  assert.equal(
+    updateTenantProductBodySchema.safeParse({
+      ...updateBody,
+      retainedMediaIds: Array.from(
+        { length: 10 },
+        (_, index) => `01KRERJN88${index.toString().padStart(16, "0")}`,
+      ),
+      newMediaObjectKeys: [updateBody.newMediaObjectKeys[0]!],
+    }).success,
+    false,
+    "retained and newly uploaded media share the ten-image limit",
+  );
+  assert.equal(
+    updateTenantProductBodySchema.safeParse({
+      ...updateBody,
+      trackInventory: false,
+    }).success,
+    false,
+    "untracked product updates cannot submit target stock or reorder points",
+  );
+  assert.equal(
+    tenantProductParamsSchema.safeParse({ productId: PRODUCT_A }).success,
+    true,
+  );
+  assert.equal(
+    tenantProductParamsSchema.safeParse({ productId: "not-a-product-id" })
+      .success,
     false,
   );
 }

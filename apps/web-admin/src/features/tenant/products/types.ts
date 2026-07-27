@@ -8,7 +8,10 @@ import type {
   TenantProductCategoryAttributeOption,
   TenantProductCategoryAttributeValueType,
   TenantProductCategorySummary,
+  TenantProductDetail,
   TenantProductStatus,
+  UpdateTenantProductRequest,
+  UpdateTenantProductResponse,
 } from "@cleanhub/api-client";
 
 export type {
@@ -21,7 +24,10 @@ export type {
   TenantProductCategoryAttributeOption,
   TenantProductCategoryAttributeValueType,
   TenantProductCategorySummary,
+  TenantProductDetail,
   TenantProductStatus,
+  UpdateTenantProductRequest,
+  UpdateTenantProductResponse,
 };
 
 export type ProductFormValues = {

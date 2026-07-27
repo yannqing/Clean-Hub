@@ -46,6 +46,86 @@ export type CreateTenantProductResponse = {
   id: string;
 };
 
+export type UpdateTenantProductBranchSetting = {
+  branchId: string;
+  expectedStockOnHand: string;
+  stockOnHand: string;
+  reorderPoint: string;
+};
+
+export type UpdateTenantProductRequest = Omit<
+  CreateTenantProductRequest,
+  "branchSettings" | "mediaObjectKeys"
+> & {
+  version: number;
+  skuId: string;
+  skuVersion: number;
+  branchSettings: UpdateTenantProductBranchSetting[];
+  retainedMediaIds: string[];
+  newMediaObjectKeys: string[];
+};
+
+export type TenantProductDetailSku = {
+  id: string;
+  version: number;
+  skuCode: string;
+  barcode: string | null;
+  variantName: string | null;
+  unitOfMeasure: string;
+  unitsPerSale: string;
+  trackInventory: boolean;
+  referenceCost: string | null;
+  referenceCostCurrency: string | null;
+};
+
+export type TenantProductDetailBranchSetting = {
+  branchId: string;
+  isAvailable: boolean;
+  reorderPoint: string;
+  onHandQuantity: string;
+  reservedQuantity: string;
+  allowNegativeStock: boolean;
+  allowOfflineSale: boolean;
+};
+
+export type TenantProductDetailMedia = {
+  id: string;
+  objectKey: string;
+  downloadUrl: string;
+  expiresAt: string;
+  isPrimary: boolean;
+  sortOrder: number;
+};
+
+export type TenantProductDetail = {
+  id: string;
+  version: number;
+  name: string;
+  categoryId: string | null;
+  categoryName: string | null;
+  brand: string | null;
+  description: string | null;
+  tags: string[];
+  status: TenantProductStatus;
+  skuCount: number;
+  sku: TenantProductDetailSku;
+  salePrice: string;
+  currency: string;
+  branchSettings: TenantProductDetailBranchSetting[];
+  categoryAttributes: CreateTenantProductCategoryAttribute[];
+  media: TenantProductDetailMedia[];
+};
+
+export type UpdateTenantProductResponse = {
+  id: string;
+  version: number;
+  skuVersion: number;
+};
+
+export type TenantProductDetailRecord = Omit<TenantProductDetail, "media"> & {
+  media: Array<Omit<TenantProductDetailMedia, "downloadUrl" | "expiresAt">>;
+};
+
 export type RequestTenantProductMediaUpload = {
   contentType: string;
   sizeBytes: number;
@@ -56,6 +136,24 @@ export type TenantProductMediaUploadTicket = {
   uploadUrl: string;
   headers: Record<string, string>;
   expiresAt: string;
+};
+
+export type RequestTenantProductMediaDownloads = {
+  items: Array<{
+    productId: string;
+    mediaId: string;
+  }>;
+};
+
+export type TenantProductMediaDownload = {
+  productId: string;
+  mediaId: string;
+  downloadUrl: string;
+  expiresAt: string;
+};
+
+export type TenantProductMediaDownloadListResponse = {
+  data: TenantProductMediaDownload[];
 };
 
 export type TenantProductCategorySummary = {
@@ -106,6 +204,10 @@ export type TenantProductPriceRange = {
   maxAmount: string;
 };
 
+export type TenantProductSummaryImage = {
+  id: string;
+};
+
 export type TenantProductSummary = {
   id: string;
   name: string;
@@ -125,6 +227,7 @@ export type TenantProductSummary = {
   onHandQuantity: string;
   reservedQuantity: string;
   lowStockSkuCount: number;
+  primaryImage: TenantProductSummaryImage | null;
   createdAt: string;
   updatedAt: string;
   version: number;

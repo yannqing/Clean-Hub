@@ -9,13 +9,14 @@ import {
   RemoveFormatting,
   Underline,
 } from "lucide-react";
-import { useRef, useState, type ClipboardEvent } from "react";
+import { useEffect, useRef, useState, type ClipboardEvent } from "react";
 
 import { useTenantI18n } from "@/i18n";
 
 type ProductRichTextEditorProps = {
   "aria-invalid"?: boolean;
   id: string;
+  initialValue?: string;
   maxLength: number;
   name: string;
   onChange?: (value: string) => void;
@@ -34,9 +35,45 @@ function getEditorValue(editor: HTMLDivElement): string {
   return editor.textContent?.trim() ? editor.innerHTML : "";
 }
 
+const ALLOWED_EDITOR_TAGS = new Set([
+  "B",
+  "BR",
+  "DIV",
+  "EM",
+  "I",
+  "LI",
+  "OL",
+  "P",
+  "STRONG",
+  "U",
+  "UL",
+]);
+
+function sanitizeEditorValue(value: string): string {
+  const template = document.createElement("template");
+  template.innerHTML = value;
+
+  for (const element of Array.from(template.content.querySelectorAll("*"))) {
+    if (!ALLOWED_EDITOR_TAGS.has(element.tagName)) {
+      element.replaceWith(...Array.from(element.childNodes));
+      continue;
+    }
+
+    for (const attribute of Array.from(element.attributes)) {
+      element.removeAttribute(attribute.name);
+    }
+  }
+
+  const container = document.createElement("div");
+  container.append(template.content.cloneNode(true));
+
+  return container.textContent?.trim() ? container.innerHTML : "";
+}
+
 export function ProductRichTextEditor({
   "aria-invalid": ariaInvalid = false,
   id,
+  initialValue = "",
   maxLength,
   name,
   onChange,
@@ -46,6 +83,19 @@ export function ProductRichTextEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const lastValueRef = useRef("");
   const [value, setValue] = useState("");
+
+  useEffect(() => {
+    const editor = editorRef.current;
+
+    if (!editor) {
+      return;
+    }
+
+    const nextValue = sanitizeEditorValue(initialValue);
+    editor.innerHTML = nextValue;
+    lastValueRef.current = nextValue;
+    setValue(nextValue);
+  }, [initialValue]);
 
   function commitValue() {
     const editor = editorRef.current;

@@ -57,7 +57,9 @@ export class MediaService {
       options.objectStorage ?? new ObjectStorage(this.storageConfig);
   }
 
-  async requestUpload(input: RequestMediaUploadInput): Promise<MediaUploadTicket> {
+  async requestUpload(
+    input: RequestMediaUploadInput,
+  ): Promise<MediaUploadTicket> {
     this.validateContent(input.contentType, input.sizeBytes);
 
     const objectId = createId();
@@ -183,7 +185,10 @@ export class MediaService {
       );
     }
 
-    if (input.expectedCreatedBy && record.createdBy !== input.expectedCreatedBy) {
+    if (
+      input.expectedCreatedBy &&
+      record.createdBy !== input.expectedCreatedBy
+    ) {
       throw new MediaError(
         "MEDIA_FORBIDDEN",
         "Media object is not accessible.",
@@ -257,6 +262,27 @@ export class MediaService {
     };
   }
 
+  /**
+   * Creates a link for an object that an owning domain has already selected
+   * from a tenant-scoped, committed-media query.
+   */
+  async createDownloadLinkForKnownCommittedObject(input: {
+    tenantId: string;
+    objectKey: string;
+  }): Promise<MediaDownloadTicket> {
+    this.assertTenantKey(input.tenantId, input.objectKey);
+
+    const download = await this.objectStorage.presignDownload({
+      objectKey: input.objectKey,
+    });
+
+    return {
+      objectKey: download.objectKey,
+      downloadUrl: download.downloadUrl,
+      expiresAt: download.expiresAt.toISOString(),
+    };
+  }
+
   async cleanupExpiredPending(
     input: {
       now?: Date;
@@ -317,15 +343,14 @@ export class MediaService {
 
   private validateContent(contentType: string, sizeBytes: number): void {
     try {
-      validateMediaContentType(contentType, this.storageConfig.allowedContentTypes);
+      validateMediaContentType(
+        contentType,
+        this.storageConfig.allowedContentTypes,
+      );
       validateMediaFileSize(sizeBytes, this.storageConfig.maxFileSizeBytes);
     } catch (error) {
       if (error instanceof StorageValidationError) {
-        throw new MediaError(
-          "MEDIA_VALIDATION_ERROR",
-          error.message,
-          422,
-        );
+        throw new MediaError("MEDIA_VALIDATION_ERROR", error.message, 422);
       }
 
       throw error;
@@ -361,7 +386,9 @@ export class MediaService {
       )}/${input.entityId}/`;
 
       if (!input.objectKey.startsWith(prefix)) {
-        throw new StorageValidationError("Object key does not belong to this entity.");
+        throw new StorageValidationError(
+          "Object key does not belong to this entity.",
+        );
       }
     } catch (error) {
       if (error instanceof StorageValidationError) {
@@ -391,11 +418,7 @@ export class MediaService {
       });
     } catch (error) {
       if (error instanceof StorageValidationError) {
-        throw new MediaError(
-          "MEDIA_VALIDATION_ERROR",
-          error.message,
-          422,
-        );
+        throw new MediaError("MEDIA_VALIDATION_ERROR", error.message, 422);
       }
 
       throw error;
@@ -439,7 +462,8 @@ export class MediaService {
 
     if (
       objectMetadata.contentType &&
-      objectMetadata.contentType.toLowerCase() !== record.contentType.toLowerCase()
+      objectMetadata.contentType.toLowerCase() !==
+        record.contentType.toLowerCase()
     ) {
       throw new MediaError(
         "MEDIA_VALIDATION_ERROR",

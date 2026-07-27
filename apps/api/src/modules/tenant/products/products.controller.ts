@@ -4,18 +4,24 @@ import type { AppBindings } from "../../../http/types.js";
 import { TenantProductsError } from "./products.errors.js";
 import {
   createTenantProduct,
+  getTenantProductDetail,
   getTenantProductCategoryAttributes,
   getTenantProductOverview,
   listTenantProductCategories,
   listTenantProducts,
+  requestTenantProductMediaDownloads,
   requestTenantProductMediaUpload,
+  updateTenantProduct,
 } from "./products.service.js";
 import {
   createTenantProductBodySchema,
+  requestTenantProductMediaDownloadsBodySchema,
   requestTenantProductMediaUploadBodySchema,
   tenantProductCategoryParamsSchema,
   tenantProductListQuerySchema,
   tenantProductOverviewQuerySchema,
+  tenantProductParamsSchema,
+  updateTenantProductBodySchema,
 } from "./products.validation.js";
 
 function getRequestMeta(c: Context<AppBindings>) {
@@ -53,6 +59,70 @@ export async function createTenantProductController(c: Context<AppBindings>) {
     );
 
     return c.json(product, 201);
+  } catch (error) {
+    if (error instanceof TenantProductsError) {
+      return createTenantProductsErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function getTenantProductController(c: Context<AppBindings>) {
+  const { productId } = tenantProductParamsSchema.parse(c.req.param());
+
+  try {
+    const product = await getTenantProductDetail(
+      c.get("authContext"),
+      productId,
+    );
+
+    return c.json(product);
+  } catch (error) {
+    if (error instanceof TenantProductsError) {
+      return createTenantProductsErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function requestTenantProductMediaDownloadsController(
+  c: Context<AppBindings>,
+) {
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = requestTenantProductMediaDownloadsBodySchema.parse(rawBody);
+
+  try {
+    const result = await requestTenantProductMediaDownloads(
+      c.get("authContext"),
+      data,
+    );
+
+    return c.json(result);
+  } catch (error) {
+    if (error instanceof TenantProductsError) {
+      return createTenantProductsErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function updateTenantProductController(c: Context<AppBindings>) {
+  const { productId } = tenantProductParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = updateTenantProductBodySchema.parse(rawBody);
+
+  try {
+    const product = await updateTenantProduct(
+      c.get("authContext"),
+      productId,
+      data,
+      getRequestMeta(c),
+    );
+
+    return c.json(product);
   } catch (error) {
     if (error instanceof TenantProductsError) {
       return createTenantProductsErrorResponse(c, error);

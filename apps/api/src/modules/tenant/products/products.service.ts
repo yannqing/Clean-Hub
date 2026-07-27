@@ -19,24 +19,33 @@ import {
 import {
   bootstrapDefaultProductCategoryMetadata,
   createTenantProductRecord,
+  findTenantProductDetailRecord,
   findTenantProductCategoryAttributes,
   findTenantProductCategories,
+  findTenantProductMediaRecords,
   findTenantProductOverview,
   findTenantProducts,
+  updateTenantProductRecord,
 } from "./products.repository.js";
 import { TenantProductsError } from "./products.errors.js";
 import type {
   CreateTenantProductRequest,
   CreateTenantProductResponse,
+  RequestTenantProductMediaDownloads,
   RequestTenantProductMediaUpload,
   TenantProductCategoryAttributeListResponse,
   TenantProductCategoryListResponse,
+  TenantProductDetail,
+  TenantProductDetailRecord,
   TenantProductListQuery,
   TenantProductListResponse,
+  TenantProductMediaDownloadListResponse,
   TenantProductMediaUploadTicket,
   TenantProductOverview,
   TenantProductOverviewQuery,
   TenantProductRepositoryScope,
+  UpdateTenantProductRequest,
+  UpdateTenantProductResponse,
 } from "./products.types.js";
 
 const TENANT_OWNER_ROLE: TenantRole = "owner";
@@ -49,6 +58,16 @@ type TenantProductAccess = TenantProductRepositoryScope & {
 export type TenantProductMediaServiceLike = Pick<
   MediaService,
   "requestUpload" | "assertOwnedPendingAndUploaded"
+>;
+
+export type TenantProductMediaDownloadServiceLike = Pick<
+  MediaService,
+  "createDownloadLink"
+>;
+
+export type TenantProductBatchMediaDownloadServiceLike = Pick<
+  MediaService,
+  "createDownloadLinkForKnownCommittedObject"
 >;
 
 export function mapProductMediaError(error: MediaError): TenantProductsError {
@@ -104,6 +123,40 @@ async function resolveProductAccess(
   };
 }
 
+async function addProductMediaDownloadLinks(
+  tenantId: string,
+  record: TenantProductDetailRecord,
+  mediaService: TenantProductMediaDownloadServiceLike,
+): Promise<TenantProductDetail> {
+  try {
+    const media = await Promise.all(
+      record.media.map(async (item) => {
+        const ticket = await mediaService.createDownloadLink({
+          tenantId,
+          objectKey: item.objectKey,
+        });
+
+        return {
+          ...item,
+          downloadUrl: ticket.downloadUrl,
+          expiresAt: ticket.expiresAt,
+        };
+      }),
+    );
+
+    return {
+      ...record,
+      media,
+    };
+  } catch (error) {
+    if (error instanceof MediaError) {
+      throw mapProductMediaError(error);
+    }
+
+    throw error;
+  }
+}
+
 export async function createTenantProduct(
   authContext: AuthContext,
   data: CreateTenantProductRequest,
@@ -145,6 +198,123 @@ export async function createTenantProduct(
     createTenantDefaultPrice: scope.role === TENANT_OWNER_ROLE,
     requestMeta,
   });
+}
+
+export async function getTenantProductDetail(
+  authContext: AuthContext,
+  productId: string,
+  db: Database = getDb(),
+  mediaService: TenantProductMediaDownloadServiceLike = new MediaService(),
+): Promise<TenantProductDetail> {
+  const scope = await resolveProductAccess(authContext, db);
+  const product = await findTenantProductDetailRecord(db, {
+    tenantId: scope.tenantId,
+    allowedBranchIds: scope.allowedBranchIds,
+    productId,
+    preferTenantDefaultPrice: scope.role === TENANT_OWNER_ROLE,
+  });
+
+  if (!product) {
+    throw new TenantProductsError(
+      "PRODUCT_NOT_FOUND",
+      "Product was not found.",
+      404,
+    );
+  }
+
+  return addProductMediaDownloadLinks(scope.tenantId, product, mediaService);
+}
+
+export async function requestTenantProductMediaDownloads(
+  authContext: AuthContext,
+  data: RequestTenantProductMediaDownloads,
+  db: Database = getDb(),
+  mediaService: TenantProductBatchMediaDownloadServiceLike = new MediaService(),
+): Promise<TenantProductMediaDownloadListResponse> {
+  const scope = await resolveProductAccess(authContext, db);
+  const mediaRecords = await findTenantProductMediaRecords(db, {
+    tenantId: scope.tenantId,
+    allowedBranchIds: scope.allowedBranchIds,
+    items: data.items,
+  });
+
+  try {
+    const downloads = await Promise.all(
+      mediaRecords.map(async (media) => {
+        const ticket =
+          await mediaService.createDownloadLinkForKnownCommittedObject({
+            tenantId: scope.tenantId,
+            objectKey: media.objectKey,
+          });
+
+        return {
+          productId: media.productId,
+          mediaId: media.mediaId,
+          downloadUrl: ticket.downloadUrl,
+          expiresAt: ticket.expiresAt,
+        };
+      }),
+    );
+
+    return { data: downloads };
+  } catch (error) {
+    if (error instanceof MediaError) {
+      throw mapProductMediaError(error);
+    }
+
+    throw error;
+  }
+}
+
+export async function updateTenantProduct(
+  authContext: AuthContext,
+  productId: string,
+  data: UpdateTenantProductRequest,
+  requestMeta: AuthRequestMeta = {},
+  db: Database = getDb(),
+  mediaService: TenantProductMediaServiceLike = new MediaService(),
+): Promise<UpdateTenantProductResponse> {
+  requireTenantRole(authContext, [TENANT_OWNER_ROLE]);
+  const scope = await resolveProductAccess(authContext, db);
+  const branchIds = data.branchSettings.map((setting) => setting.branchId);
+  await assertBranchIdsSubset(authContext, branchIds, db);
+
+  if (data.newMediaObjectKeys.length > 0) {
+    try {
+      await Promise.all(
+        data.newMediaObjectKeys.map((objectKey) =>
+          mediaService.assertOwnedPendingAndUploaded({
+            tenantId: scope.tenantId,
+            objectKey,
+            expectedPurpose: PRODUCT_IMAGE_PURPOSE,
+            expectedCreatedBy: authContext.userId,
+          }),
+        ),
+      );
+    } catch (error) {
+      if (error instanceof MediaError) {
+        throw mapProductMediaError(error);
+      }
+
+      throw error;
+    }
+  }
+
+  const product = await updateTenantProductRecord(db, {
+    ...data,
+    productId,
+    tenantId: scope.tenantId,
+    allowedBranchIds: scope.allowedBranchIds,
+    actorUserId: authContext.userId,
+    updateTenantDefaultPrice: scope.role === TENANT_OWNER_ROLE,
+    requestMeta,
+  });
+
+  return {
+    id: product.id,
+    version: product.version,
+    skuVersion: product.sku.version,
+  };
 }
 
 export async function requestTenantProductMediaUpload(
