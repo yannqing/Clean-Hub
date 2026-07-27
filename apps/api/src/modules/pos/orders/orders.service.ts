@@ -36,7 +36,6 @@ import {
   insertOrderItemsFromTicketItems,
   listPaymentTransactions,
   recalculateOrderPaymentState,
-  recalculateOrderTotalFromItems,
   resolveManualPaymentTransaction,
   softDeleteOrderItemRecord,
   softDeleteOrderRecord,
@@ -46,6 +45,9 @@ import {
   type ResolvedPosOrderItemInput,
 } from "./orders.repository.js";
 import { findPosCatalogServiceById } from "../catalog/catalog.repository.js";
+import { releaseActivePosOrderDiscounts } from "../discounts/discounts.repository.js";
+import { repricePosOrderDiscounts } from "../discounts/discounts.service.js";
+import { moneyToMinor } from "../discounts/pricing-engine.js";
 import type {
   ChangePosOrderStatusRequest,
   CreatePosOrderInput,
@@ -147,7 +149,7 @@ function assertOrderCanChangeItems(order: {
   status: PosOrderStatus;
   paidAmount: string;
 }): void {
-  if (Number(order.paidAmount) > 0 || order.status === "paid") {
+  if (moneyToMinor(order.paidAmount) > BigInt(0) || order.status === "paid") {
     throw new PosOrderError(
       "ORDER_ALREADY_PAID",
       "Paid orders cannot be edited.",
@@ -163,8 +165,22 @@ function assertOrderCanChangeItems(order: {
   }
 }
 
+async function assertOrderHasNoPendingManualPayment(
+  db: Database,
+  input: { tenantId: string; orderId: string },
+): Promise<void> {
+  const pendingPayment = await findPendingManualPaymentForOrder(db, input);
+  if (pendingPayment) {
+    throw new PosOrderError(
+      "PAYMENT_ALREADY_PENDING",
+      "Resolve the pending Wave or Orange Money payment before changing order pricing.",
+      409,
+    );
+  }
+}
+
 function moneyEquals(left: string, right: string): boolean {
-  return Number(left).toFixed(2) === Number(right).toFixed(2);
+  return moneyToMinor(left) === moneyToMinor(right);
 }
 
 function resolveNullableField(
@@ -311,8 +327,8 @@ function assertAllowedStatusTransition(
   to: PosOrderStatus,
 ): void {
   const allowed: Record<PosOrderStatus, PosOrderStatus[]> = {
-    draft: ["received", "cancelled"],
-    received: ["cancelled"],
+    draft: ["received", "paid", "cancelled"],
+    received: ["paid", "cancelled"],
     paid: ["delivered"],
     delivered: [],
     cancelled: [],
@@ -504,6 +520,14 @@ async function createTicketOrder(
     items,
     actorUserId: input.authContext.userId,
   });
+  const createdOrder = await findPosOrderRaw(db, { tenantId, orderId });
+  if (!createdOrder) {
+    throw new Error("Created order could not be loaded for pricing.");
+  }
+  await repricePosOrderDiscounts(db, {
+    order: createdOrder,
+    actorUserId: input.authContext.userId,
+  });
 
   const detail = await findPosOrderDetail(db, { tenantId, orderId });
   if (!detail) {
@@ -579,6 +603,14 @@ async function createManualOrder(
     customerId: input.data.customerId,
     orderId,
     items: resolvedItems,
+    actorUserId: input.authContext.userId,
+  });
+  const createdOrder = await findPosOrderRaw(db, { tenantId, orderId });
+  if (!createdOrder) {
+    throw new Error("Created order could not be loaded for pricing.");
+  }
+  await repricePosOrderDiscounts(db, {
+    order: createdOrder,
     actorUserId: input.authContext.userId,
   });
 
@@ -683,17 +715,23 @@ export async function changePosOrderStatus(
     const before = await lockOrderOrThrow(tx, { tenantId, orderId });
     requirePosBranchAccess(authContext, before.branchId);
 
-    if (data.to === "draft" || data.to === "paid") {
+    if (data.to === "draft") {
       throw new PosOrderError(
         "INVALID_STATUS_TRANSITION",
-        data.to === "paid"
-          ? "Paid status is controlled by payment transactions."
-          : "Orders cannot transition back to draft.",
+        "Orders cannot transition back to draft.",
         422,
       );
     }
 
     if (before.status === data.to) {
+      if (data.to === "cancelled") {
+        await releaseActivePosOrderDiscounts(tx, {
+          tenantId,
+          orderId,
+          actorUserId: authContext.userId,
+          reason: sensitiveReason ?? "Order cancelled.",
+        });
+      }
       const detail = await findPosOrderDetail(tx, { tenantId, orderId });
       if (!detail) {
         throw new Error("Order could not be loaded for status replay.");
@@ -703,6 +741,22 @@ export async function changePosOrderStatus(
 
     assertAllowedStatusTransition(before.status, data.to);
 
+    const confirmsZeroTotalOrder =
+      data.to === "paid" &&
+      moneyToMinor(before.subtotalAmount) > BigInt(0) &&
+      moneyToMinor(before.totalAmount) === BigInt(0) &&
+      moneyToMinor(before.discountAmount) ===
+        moneyToMinor(before.subtotalAmount) &&
+      moneyToMinor(before.paidAmount) === BigInt(0) &&
+      before.paymentStatus === "paid";
+    if (data.to === "paid" && !confirmsZeroTotalOrder) {
+      throw new PosOrderError(
+        "INVALID_STATUS_TRANSITION",
+        "Paid status is controlled by payment transactions unless a fully discounted zero-total order is being confirmed.",
+        422,
+      );
+    }
+
     if (data.to === "delivered" && before.paymentStatus !== "paid") {
       throw new PosOrderError(
         "ORDER_NOT_PAID",
@@ -711,7 +765,10 @@ export async function changePosOrderStatus(
       );
     }
 
-    if (data.to === "cancelled" && Number(before.paidAmount) > 0) {
+    if (
+      data.to === "cancelled" &&
+      moneyToMinor(before.paidAmount) > BigInt(0)
+    ) {
       throw new PosOrderError(
         "ORDER_ALREADY_PAID",
         "Paid orders cannot be cancelled.",
@@ -738,6 +795,15 @@ export async function changePosOrderStatus(
       );
     }
 
+    const releasedDiscounts =
+      data.to === "cancelled"
+        ? await releaseActivePosOrderDiscounts(tx, {
+            tenantId,
+            orderId,
+            actorUserId: authContext.userId,
+            reason: sensitiveReason ?? "Order cancelled.",
+          })
+        : [];
     const detail = await findPosOrderDetail(tx, { tenantId, orderId });
     if (!detail) {
       throw new Error("Updated order could not be loaded.");
@@ -745,12 +811,34 @@ export async function changePosOrderStatus(
 
     await writeOrderAudit(tx, authContext, requestMeta, {
       branchId: detail.branchId,
-      eventType: "pos.order.status_changed",
+      eventType: confirmsZeroTotalOrder
+        ? "pos.order.zero_total_confirmed"
+        : "pos.order.status_changed",
       entityId: orderId,
       reason: sensitiveReason,
-      before: { status: before.status },
-      after: { status: data.to },
-      metadata: data.note ? { note: data.note } : undefined,
+      before: {
+        status: before.status,
+        subtotalAmount: before.subtotalAmount,
+        discountAmount: before.discountAmount,
+        totalAmount: before.totalAmount,
+        paidAmount: before.paidAmount,
+        paymentStatus: before.paymentStatus,
+        paidAt: before.paidAt,
+      },
+      after: {
+        status: detail.status,
+        subtotalAmount: detail.subtotalAmount,
+        discountAmount: detail.discountAmount,
+        totalAmount: detail.totalAmount,
+        paidAmount: detail.paidAmount,
+        paymentStatus: detail.paymentStatus,
+        paidAt: detail.paidAt,
+      },
+      metadata: {
+        ...(data.note ? { note: data.note } : {}),
+        zeroTotalConfirmation: confirmsZeroTotalOrder,
+        releasedDiscountApplications: releasedDiscounts,
+      },
     });
 
     return detail;
@@ -772,12 +860,12 @@ export async function deletePosOrder(
   );
 
   await db.transaction(async (tx) => {
-    const before = await loadOrderOrThrow(tx, { tenantId, orderId });
+    const before = await lockOrderOrThrow(tx, { tenantId, orderId });
     requirePosBranchAccess(authContext, before.branchId);
 
     if (
       !["draft", "received", "cancelled"].includes(before.status) ||
-      Number(before.paidAmount) > 0
+      moneyToMinor(before.paidAmount) > BigInt(0)
     ) {
       throw new PosOrderError(
         "ORDER_CANNOT_BE_DELETED",
@@ -786,6 +874,12 @@ export async function deletePosOrder(
       );
     }
 
+    const releasedDiscounts = await releaseActivePosOrderDiscounts(tx, {
+      tenantId,
+      orderId,
+      actorUserId: authContext.userId,
+      reason,
+    });
     const deleted = await softDeleteOrderRecord(tx, {
       tenantId,
       orderId,
@@ -802,7 +896,18 @@ export async function deletePosOrder(
       entityId: orderId,
       reason,
       before,
-      after: { deleted: true },
+      after: {
+        deleted: true,
+        discountAmount:
+          releasedDiscounts.length > 0 ? "0.00" : before.discountAmount,
+        totalAmount:
+          releasedDiscounts.length > 0
+            ? before.subtotalAmount
+            : before.totalAmount,
+        paymentStatus:
+          releasedDiscounts.length > 0 ? "unpaid" : before.paymentStatus,
+      },
+      metadata: { releasedDiscountApplications: releasedDiscounts },
     });
   });
 }
@@ -1153,9 +1258,10 @@ export async function createPosOrderItem(
   const tenantId = requirePosTenantId(authContext);
 
   return db.transaction(async (tx) => {
-    const order = await loadOrderOrThrow(tx, { tenantId, orderId });
+    const order = await lockOrderOrThrow(tx, { tenantId, orderId });
     requirePosBranchAccess(authContext, order.branchId);
     assertOrderCanChangeItems(order);
+    await assertOrderHasNoPendingManualPayment(tx, { tenantId, orderId });
 
     const resolved = await resolveOrderItemPricing(tx, {
       authContext,
@@ -1173,14 +1279,8 @@ export async function createPosOrderItem(
       actorUserId: authContext.userId,
     });
 
-    await recalculateOrderTotalFromItems(tx, {
-      tenantId,
-      orderId,
-      actorUserId: authContext.userId,
-    });
-    await recalculateOrderPaymentState(tx, {
-      tenantId,
-      orderId,
+    await repricePosOrderDiscounts(tx, {
+      order,
       actorUserId: authContext.userId,
     });
 
@@ -1221,9 +1321,10 @@ export async function updatePosOrderItem(
   const tenantId = requirePosTenantId(authContext);
 
   return db.transaction(async (tx) => {
-    const order = await loadOrderOrThrow(tx, { tenantId, orderId });
+    const order = await lockOrderOrThrow(tx, { tenantId, orderId });
     requirePosBranchAccess(authContext, order.branchId);
     assertOrderCanChangeItems(order);
+    await assertOrderHasNoPendingManualPayment(tx, { tenantId, orderId });
 
     const existing = await findPosOrderItemById(tx, {
       tenantId,
@@ -1269,14 +1370,8 @@ export async function updatePosOrderItem(
       );
     }
 
-    await recalculateOrderTotalFromItems(tx, {
-      tenantId,
-      orderId,
-      actorUserId: authContext.userId,
-    });
-    await recalculateOrderPaymentState(tx, {
-      tenantId,
-      orderId,
+    await repricePosOrderDiscounts(tx, {
+      order,
       actorUserId: authContext.userId,
     });
 
@@ -1331,9 +1426,10 @@ export async function deletePosOrderItem(
   );
 
   return db.transaction(async (tx) => {
-    const order = await loadOrderOrThrow(tx, { tenantId, orderId });
+    const order = await lockOrderOrThrow(tx, { tenantId, orderId });
     requirePosBranchAccess(authContext, order.branchId);
     assertOrderCanChangeItems(order);
+    await assertOrderHasNoPendingManualPayment(tx, { tenantId, orderId });
 
     const item = await findPosOrderItemById(tx, { tenantId, orderId, itemId });
     if (!item) {
@@ -1359,14 +1455,8 @@ export async function deletePosOrderItem(
       );
     }
 
-    await recalculateOrderTotalFromItems(tx, {
-      tenantId,
-      orderId,
-      actorUserId: authContext.userId,
-    });
-    await recalculateOrderPaymentState(tx, {
-      tenantId,
-      orderId,
+    await repricePosOrderDiscounts(tx, {
+      order,
       actorUserId: authContext.userId,
     });
 

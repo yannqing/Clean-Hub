@@ -13,6 +13,7 @@ import {
   calculateHandoverSnapshot,
   createHandoverAndZReport,
   createShiftRecord,
+  findActiveBranchCurrency,
   findOpenShift,
   findOpenShiftForUpdate,
   findStaffForBranch,
@@ -99,7 +100,9 @@ export async function listPosStaff(
     branchId: terminal.branchId,
     query: input.query,
   });
-  return staff.map(({ email: _email, phone: _phone, branchId: _branchId, ...item }) => item);
+  return staff.map(
+    ({ email: _email, phone: _phone, branchId: _branchId, ...item }) => item,
+  );
 }
 
 export async function getPosStaff(
@@ -158,11 +161,24 @@ export async function clockAction(
         );
       }
 
+      const currency = await findActiveBranchCurrency(tx, {
+        tenantId,
+        branchId: terminal.branchId,
+      });
+      if (!currency) {
+        throw new PosStaffError(
+          "BRANCH_NOT_FOUND",
+          "The active POS branch was not found.",
+          404,
+        );
+      }
+
       const shift = await createShiftRecord(tx, {
         tenantId,
         branchId: terminal.branchId,
         terminalId: terminal.terminalId,
         staffId: input.authContext.userId,
+        currency,
         openingFloat: input.data.openingFloat ?? "0",
         actorUserId: input.authContext.userId,
       });
@@ -268,6 +284,7 @@ export async function createHandover(
     const snapshot = await calculateHandoverSnapshot(tx, {
       tenantId,
       branchId: terminal.branchId,
+      currency: shift.currency,
       startedAt: new Date(shift.startedAt),
       cutoffAt,
       openingFloat: shift.openingFloat,

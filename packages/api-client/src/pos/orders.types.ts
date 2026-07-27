@@ -23,6 +23,59 @@ export type PosOrderItemSourceType =
   | "delivery_fee"
   | "product";
 
+export type PosOrderItemKind =
+  | "service"
+  | "product"
+  | "subscription"
+  | "delivery_fee";
+
+export type PosOrderDiscountAllocation = {
+  id: string;
+  orderItemId: string;
+  amount: string;
+};
+
+export type PosOrderDiscountApplication = {
+  id: string;
+  discountId: string;
+  discountCodeId: string | null;
+  title: string;
+  code: string | null;
+  method: "code" | "automatic";
+  type:
+    | "amount_off_items"
+    | "buy_x_get_y"
+    | "amount_off_order"
+    | "free_shipping";
+  valueType: "percentage" | "fixed_amount" | "free" | null;
+  valueAmount: string | null;
+  amount: string;
+  currency: string;
+  appliedAt: string;
+  allocations: PosOrderDiscountAllocation[];
+};
+
+export type ApplyPosOrderDiscountRequest =
+  | {
+      code: string;
+      discountId?: never;
+      reason: string;
+      version: number;
+      idempotencyKey: string;
+    }
+  | {
+      code?: never;
+      discountId: string;
+      reason: string;
+      version: number;
+      idempotencyKey: string;
+    };
+
+export type RemovePosOrderDiscountRequest = {
+  version: number;
+  reason: string;
+};
+
 export type PosPaymentTransactionStatus =
   | "pending"
   | "paid"
@@ -35,12 +88,20 @@ export type PosOrderItem = {
   id: string;
   orderId: string;
   ticketId: string | null;
+  itemKind: PosOrderItemKind;
   sourceType: PosOrderItemSourceType;
   sourceId: string;
   serviceId: string | null;
+  productSkuId: string | null;
+  productPriceId: string | null;
   itemName: string;
+  sku: string | null;
+  barcode: string | null;
+  variantName: string | null;
+  unitOfMeasure: string | null;
+  unitCostAmount: string | null;
   quantity: string;
-  pricingUnit: "per_item" | "per_kg";
+  pricingUnit: "per_item" | "per_kg" | null;
   standardUnitAmount: string;
   chargedUnitAmount: string;
   weight: string | null;
@@ -79,6 +140,8 @@ export type PosOrderSummary = {
   customerName: string;
   orderType: PosOrderType;
   status: PosOrderStatus;
+  subtotalAmount: string;
+  discountAmount: string;
   totalAmount: string;
   paymentStatus: PosOrderPaymentStatus;
   paidAmount: string;
@@ -93,6 +156,7 @@ export type PosOrderSummary = {
 
 export type PosOrderDetail = PosOrderSummary & {
   items: PosOrderItem[];
+  discountApplications: PosOrderDiscountApplication[];
 };
 
 export type PosOrderListQuery = {

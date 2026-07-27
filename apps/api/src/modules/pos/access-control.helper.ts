@@ -9,6 +9,7 @@ export type PosRole = Extract<AdminRole, "owner" | "manager" | "cashier">;
 export type PosSensitiveOperation =
   | "cancel"
   | "delete"
+  | "discount"
   | "manual_drawer_open"
   | "payment_correction"
   | "price_override"
@@ -26,7 +27,9 @@ const sensitiveOperationReasonSchema = z
   .max(500, "Reason must be at most 500 characters.");
 
 function terminalBranchId(authContext: AuthContext): string | undefined {
-  return (authContext as TerminalBoundAuthContext).terminalBranchId ?? undefined;
+  return (
+    (authContext as TerminalBoundAuthContext).terminalBranchId ?? undefined
+  );
 }
 
 function forbidden(message: string): never {

@@ -1,5 +1,6 @@
 export type PosStaffErrorCode =
   | "POS_TERMINAL_REQUIRED"
+  | "BRANCH_NOT_FOUND"
   | "STAFF_NOT_FOUND"
   | "SHIFT_NOT_FOUND"
   | "SHIFT_ALREADY_OPEN"

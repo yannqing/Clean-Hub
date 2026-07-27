@@ -1,5 +1,6 @@
 import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
+  ApplyPosOrderDiscountRequest,
   ChangePosOrderStatusRequest,
   CreatePosOrderItemRequest,
   CreatePosOrderRequest,
@@ -13,6 +14,7 @@ import type {
   PosOrderOverview,
   PosOrderOverviewQuery,
   PosOrderPaymentsResponse,
+  RemovePosOrderDiscountRequest,
   ResolvePosPaymentRequest,
   UpdatePosOrderItemRequest,
   UpdatePosOrderRequest,
@@ -57,6 +59,26 @@ export function createPosOrdersApi(client: ApiClient) {
         `/pos/orders/${orderId}/status-changes`,
         input,
         options,
+      ),
+    applyDiscount: (
+      orderId: string,
+      input: ApplyPosOrderDiscountRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<PosOrderDetail>(
+        `/pos/orders/${orderId}/discounts`,
+        input,
+        options,
+      ),
+    removeDiscount: (
+      orderId: string,
+      applicationId: string,
+      input: RemovePosOrderDiscountRequest,
+      options?: RequestOptions,
+    ) =>
+      client.delete<PosOrderDetail>(
+        `/pos/orders/${orderId}/discounts/${applicationId}`,
+        { body: input, ...options },
       ),
     listPayments: (orderId: string, options?: RequestOptions) =>
       client.get<PosOrderPaymentsResponse>(
@@ -122,9 +144,9 @@ export function createPosOrdersApi(client: ApiClient) {
       input: DeletePosOrderItemRequest,
       options?: RequestOptions,
     ) =>
-      client.delete<PosOrderDetail>(
-        `/pos/orders/${orderId}/items/${itemId}`,
-        { body: input, ...options },
-      ),
+      client.delete<PosOrderDetail>(`/pos/orders/${orderId}/items/${itemId}`, {
+        body: input,
+        ...options,
+      }),
   };
 }

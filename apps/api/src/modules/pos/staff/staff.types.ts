@@ -26,7 +26,11 @@ export type PosStaffListQuery = {
   offset?: number;
 };
 
-export type ClockAction = "clock_in" | "clock_out" | "break_start" | "break_end";
+export type ClockAction =
+  | "clock_in"
+  | "clock_out"
+  | "break_start"
+  | "break_end";
 
 export type ClockRequest = {
   action: ClockAction;
@@ -40,6 +44,7 @@ export type ShiftRecord = {
   branchId: string;
   terminalId: string;
   staffId: string;
+  currency: string;
   status: PosShiftStatus;
   startedAt: string;
   endedAt: string | null;

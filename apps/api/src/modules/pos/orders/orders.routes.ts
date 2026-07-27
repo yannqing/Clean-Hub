@@ -3,6 +3,10 @@ import { Hono } from "hono";
 import type { AppBindings } from "../../../http/types.js";
 import type { NotificationPublisher } from "../../notifications/index.js";
 import {
+  applyPosOrderDiscountController,
+  removePosOrderDiscountController,
+} from "../discounts/discounts.controller.js";
+import {
   changePosOrderStatusController,
   confirmPosManualPaymentController,
   createPosOrderController,
@@ -49,6 +53,11 @@ export function createPosOrdersRoutes({
     failPosManualPaymentController,
   );
   routes.post("/:orderId/status-changes", changePosOrderStatusController);
+  routes.post("/:orderId/discounts", applyPosOrderDiscountController);
+  routes.delete(
+    "/:orderId/discounts/:applicationId",
+    removePosOrderDiscountController,
+  );
   routes.post("/:orderId/items", createPosOrderItemController);
   routes.patch("/:orderId/items/:itemId", updatePosOrderItemController);
   routes.delete("/:orderId/items/:itemId", deletePosOrderItemController);

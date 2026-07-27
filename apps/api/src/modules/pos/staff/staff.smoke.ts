@@ -1,10 +1,6 @@
 import assert from "node:assert/strict";
 
-import {
-  posShiftHandovers,
-  posStaffShifts,
-  posZReports,
-} from "@cleanhub/db";
+import { posShiftHandovers, posStaffShifts, posZReports } from "@cleanhub/db";
 import { getTableConfig } from "drizzle-orm/pg-core";
 
 import { AuthError } from "../../auth/auth.errors.js";
@@ -39,7 +35,9 @@ assert.ok(
   "concurrent clock-in needs a staff-scoped open-shift uniqueness guard",
 );
 assert.ok(
-  uniqueIndexNames(shiftConfig).includes("pos_staff_shifts_terminal_open_unique"),
+  uniqueIndexNames(shiftConfig).includes(
+    "pos_staff_shifts_terminal_open_unique",
+  ),
   "concurrent clock-in needs a terminal-scoped open-shift uniqueness guard",
 );
 assert.ok(
@@ -142,10 +140,11 @@ assert.deepEqual(adjustments, {
   cashAdjustment: -13,
 });
 assert.equal(calculateCashVariance("97.25", "100.00"), "-2.75");
+assert.equal(calculateNetSales("100.00", "10.00"), "90.00");
 assert.equal(
-  calculateNetSales("100.00", "10.00"),
-  "90.00",
-  "refunds and payment corrections must not change net sales",
+  calculateNetSales("100.00", "10.00", "20.00", "5.00"),
+  "75.00",
+  "refunds and corrections must be reflected in closed net sales",
 );
 
 const shift: ShiftRecord = {
@@ -154,6 +153,7 @@ const shift: ShiftRecord = {
   branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
   terminalId: "01ARZ3NDEKTSV4RRFFQ69G5FB1",
   staffId: "01ARZ3NDEKTSV4RRFFQ69G5FB2",
+  currency: "XOF",
   status: "open",
   startedAt: new Date().toISOString(),
   endedAt: null,
@@ -169,8 +169,7 @@ assert.throws(
       branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
       terminalId: shift.terminalId,
     }),
-  (error: unknown) =>
-    error instanceof AuthError && error.code === "FORBIDDEN",
+  (error: unknown) => error instanceof AuthError && error.code === "FORBIDDEN",
   "cross-branch shift access must fail before mutation",
 );
 assert.throws(
@@ -179,8 +178,7 @@ assert.throws(
       branchId: shift.branchId,
       terminalId: "01ARZ3NDEKTSV4RRFFQ69G5FB3",
     }),
-  (error: unknown) =>
-    error instanceof AuthError && error.code === "FORBIDDEN",
+  (error: unknown) => error instanceof AuthError && error.code === "FORBIDDEN",
   "cross-terminal shift access must fail before mutation",
 );
 

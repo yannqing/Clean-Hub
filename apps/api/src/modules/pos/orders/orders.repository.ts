@@ -15,6 +15,7 @@ import {
 import {
   branches,
   customers,
+  orderDiscountApplications,
   orderItems,
   orders,
   paymentTransactions,
@@ -35,7 +36,6 @@ import type {
   PosOrderListInput,
   PosOrderOverview,
   PosOrderOverviewPeriod,
-  PosOrderPaymentStatus,
   PosOrderSort,
   PosOrderSummary,
   PosOrderType,
@@ -44,6 +44,9 @@ import type {
   PosPaymentTransaction,
   UpdatePosOrderRequest,
 } from "./orders.types.js";
+import { listPosOrderDiscountApplications } from "../discounts/discounts.repository.js";
+import { minorToMoney, moneyToMinor } from "../discounts/pricing-engine.js";
+import { projectPosOrderPaymentState } from "./order-payment-state.js";
 
 export type ResolvedPosOrderItemInput = {
   serviceId: string;
@@ -95,12 +98,20 @@ function toOrderItem(row: typeof orderItems.$inferSelect): PosOrderItem {
     id: row.id,
     orderId: row.orderId,
     ticketId: row.ticketId,
+    itemKind: row.itemKind,
     sourceType: row.sourceType,
     sourceId: row.sourceId,
     serviceId: row.serviceId,
+    productSkuId: row.productSkuId,
+    productPriceId: row.productPriceId,
     itemName: row.itemName,
+    sku: row.skuSnapshot,
+    barcode: row.barcodeSnapshot,
+    variantName: row.variantNameSnapshot,
+    unitOfMeasure: row.unitOfMeasureSnapshot,
+    unitCostAmount: row.unitCostAmount,
     quantity: row.quantity,
-    pricingUnit: row.pricingUnit ?? "per_item",
+    pricingUnit: row.pricingUnit,
     standardUnitAmount: row.standardUnitAmount ?? row.unitAmount,
     chargedUnitAmount: row.chargedUnitAmount ?? row.unitAmount,
     weight: row.weight,
@@ -132,6 +143,8 @@ function toOrderSummary(row: OrderJoinedRow): PosOrderSummary {
     customerName: row.customerName ?? "",
     orderType: row.orderType,
     status: row.status,
+    subtotalAmount: row.subtotalAmount,
+    discountAmount: row.discountAmount,
     totalAmount: row.totalAmount,
     paymentStatus: row.paymentStatus,
     paidAmount: row.paidAmount,
@@ -329,10 +342,15 @@ export async function findPosOrderDetail(
       ),
     )
     .orderBy(orderItems.createdAt);
+  const discountApplications = await listPosOrderDiscountApplications(
+    db,
+    input,
+  );
 
   return {
     ...summary,
     items: itemRows.map(toOrderItem),
+    discountApplications,
   };
 }
 
@@ -389,6 +407,8 @@ export async function findPosOrderAuditSnapshot(
     customerId: order.customerId,
     orderType: order.orderType,
     status: order.status,
+    subtotalAmount: order.subtotalAmount,
+    discountAmount: order.discountAmount,
     totalAmount: order.totalAmount,
     paymentStatus: order.paymentStatus,
     paidAmount: order.paidAmount,
@@ -529,6 +549,8 @@ export async function createOrderRecord(
     customerId: input.customerId,
     orderType: input.orderType,
     status: input.status,
+    subtotalAmount: input.totalAmount,
+    discountAmount: "0",
     totalAmount: input.totalAmount,
     paymentStatus: "unpaid",
     paidAmount: "0",
@@ -678,7 +700,7 @@ export async function changeOrderStatusRecord(
     tenantId: string;
     orderId: string;
     actorUserId: string;
-    to: "received" | "delivered" | "cancelled";
+    to: "received" | "paid" | "delivered" | "cancelled";
     version: number;
   },
 ): Promise<{ updated: boolean; exists: boolean }> {
@@ -942,22 +964,27 @@ export async function recalculateOrderPaymentState(
       ),
     );
 
-  const paidAmount = Number(rows[0]?.paidAmount ?? "0");
-  const totalAmount = Number(order.totalAmount);
-  const paymentStatus: PosOrderPaymentStatus =
-    paidAmount <= 0 ? "unpaid" : paidAmount < totalAmount ? "partial" : "paid";
-  const nextStatus =
-    paymentStatus === "paid" && order.status !== "delivered"
-      ? "paid"
-      : order.status;
+  const paidAmount = rows[0]?.paidAmount ?? "0";
+  const latestPaidTransactionAt = rows[0]?.paidAt
+    ? new Date(rows[0].paidAt)
+    : null;
+  const payment = projectPosOrderPaymentState({
+    current: order,
+    nextTotalAmount: order.totalAmount,
+    nextPaidAmount: paidAmount,
+    zeroTotalSettlement:
+      moneyToMinor(order.subtotalAmount) > BigInt(0) &&
+      moneyToMinor(order.discountAmount) === moneyToMinor(order.subtotalAmount),
+    latestPaidTransactionAt,
+  });
 
   await db
     .update(orders)
     .set({
-      paidAmount: paidAmount.toFixed(2),
-      paidAt: rows[0]?.paidAt ? new Date(rows[0].paidAt) : null,
-      paymentStatus,
-      status: nextStatus,
+      paidAmount,
+      paidAt: payment.paidAt,
+      paymentStatus: payment.paymentStatus,
+      status: payment.status,
       updatedAt: new Date(),
       updatedBy: input.actorUserId,
       version: sql`${orders.version} + 1`,
@@ -1114,7 +1141,14 @@ export async function recalculateOrderTotalFromItems(
 ): Promise<void> {
   const rows = await db
     .select({
-      totalAmount: sql<string>`coalesce(sum(${orderItems.lineAmount}), 0)`,
+      subtotalAmount: sql<string>`coalesce(sum(${orderItems.lineAmount}), 0)`,
+      discountAmount: sql<string>`(
+        select coalesce(sum(${orderDiscountApplications.amount}), 0)
+        from ${orderDiscountApplications}
+        where ${orderDiscountApplications.tenantId} = ${input.tenantId}
+          and ${orderDiscountApplications.orderId} = ${input.orderId}
+          and ${orderDiscountApplications.status} = 'applied'
+      )`,
     })
     .from(orderItems)
     .where(
@@ -1125,10 +1159,19 @@ export async function recalculateOrderTotalFromItems(
       ),
     );
 
+  const subtotalMinor = moneyToMinor(rows[0]?.subtotalAmount ?? "0");
+  const requestedDiscountMinor = moneyToMinor(rows[0]?.discountAmount ?? "0");
+  const discountMinor =
+    requestedDiscountMinor > subtotalMinor
+      ? subtotalMinor
+      : requestedDiscountMinor;
+
   await db
     .update(orders)
     .set({
-      totalAmount: Number(rows[0]?.totalAmount ?? "0").toFixed(2),
+      subtotalAmount: minorToMoney(subtotalMinor),
+      discountAmount: minorToMoney(discountMinor),
+      totalAmount: minorToMoney(subtotalMinor - discountMinor),
       updatedAt: new Date(),
       updatedBy: input.actorUserId,
       version: sql`${orders.version} + 1`,

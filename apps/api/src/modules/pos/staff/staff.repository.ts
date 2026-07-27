@@ -53,6 +53,7 @@ function toShift(row: typeof posStaffShifts.$inferSelect): ShiftRecord {
     branchId: row.branchId,
     terminalId: row.terminalId,
     staffId: row.staffId,
+    currency: row.currency,
     status: row.status,
     startedAt: row.startedAt.toISOString(),
     endedAt: row.endedAt?.toISOString() ?? null,
@@ -140,8 +141,15 @@ export function calculateCashVariance(
 export function calculateNetSales(
   grossSales: string | number,
   discountAmount: string | number,
+  refundAmount: string | number = 0,
+  correctionAmount: string | number = 0,
 ): string {
-  return money(Number(grossSales) - Number(discountAmount));
+  return money(
+    Number(grossSales) -
+      Number(discountAmount) -
+      Number(refundAmount) +
+      Number(correctionAmount),
+  );
 }
 
 export async function findStaffForBranch(
@@ -243,7 +251,9 @@ export async function findStaffForBranch(
       };
     })
     .filter((staff) => !input.query?.role || staff.role === input.query.role)
-    .filter((staff) => !input.query?.status || staff.status === input.query.status)
+    .filter(
+      (staff) => !input.query?.status || staff.status === input.query.status,
+    )
     .filter(
       (staff) =>
         !normalizedQuery ||
@@ -302,6 +312,7 @@ export async function createShiftRecord(
     branchId: string;
     terminalId: string;
     staffId: string;
+    currency: string;
     openingFloat: string;
     actorUserId: string;
   },
@@ -318,6 +329,26 @@ export async function createShiftRecord(
     .onConflictDoNothing()
     .returning();
   return rows[0] ? toShift(rows[0]) : null;
+}
+
+export async function findActiveBranchCurrency(
+  db: Database,
+  input: { tenantId: string; branchId: string },
+): Promise<string | null> {
+  const rows = await db
+    .select({ currency: branches.defaultCurrency })
+    .from(branches)
+    .where(
+      and(
+        eq(branches.id, input.branchId),
+        eq(branches.tenantId, input.tenantId),
+        eq(branches.status, "active"),
+        isNull(branches.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0]?.currency ?? null;
 }
 
 export async function transitionShiftRecord(
@@ -372,108 +403,104 @@ export async function calculateHandoverSnapshot(
   input: {
     tenantId: string;
     branchId: string;
+    currency: string;
     startedAt: Date;
     cutoffAt: Date;
     openingFloat: string;
   },
 ): Promise<HandoverSnapshot> {
-  const [currencyRows, orderRows, paymentRows, adjustmentRows, outstandingOrderRows, outstandingTicketRows] =
-    await Promise.all([
-      db
-        .select({ currency: branches.defaultCurrency })
-        .from(branches)
-        .where(
-          and(
-            eq(branches.id, input.branchId),
-            eq(branches.tenantId, input.tenantId),
-            isNull(branches.deletedAt),
-          ),
-        )
-        .limit(1),
-      db
-        .select({
-          count: sql<number>`count(*)::int`,
-          gross: sql<string>`coalesce(sum(${orders.totalAmount}), 0)`,
-        })
-        .from(orders)
-        .where(
-          and(
-            eq(orders.tenantId, input.tenantId),
-            eq(orders.branchId, input.branchId),
-            gte(orders.createdAt, input.startedAt),
-            lte(orders.createdAt, input.cutoffAt),
-            ne(orders.status, "cancelled"),
-            isNull(orders.deletedAt),
-          ),
+  const [
+    orderRows,
+    paymentRows,
+    adjustmentRows,
+    outstandingOrderRows,
+    outstandingTicketRows,
+  ] = await Promise.all([
+    db
+      .select({
+        count: sql<number>`count(*)::int`,
+        gross: sql<string>`coalesce(sum(${orders.subtotalAmount}), 0)`,
+        discount: sql<string>`coalesce(sum(${orders.discountAmount}), 0)`,
+      })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.tenantId, input.tenantId),
+          eq(orders.branchId, input.branchId),
+          eq(orders.currency, input.currency),
+          gte(orders.createdAt, input.startedAt),
+          lte(orders.createdAt, input.cutoffAt),
+          ne(orders.status, "cancelled"),
+          isNull(orders.deletedAt),
         ),
-      db
-        .select({
-          amount: paymentTransactions.amount,
-          method: paymentTransactions.paymentMethod,
-          provider: paymentTransactions.gateway,
-        })
-        .from(paymentTransactions)
-        .where(
-          and(
-            eq(paymentTransactions.tenantId, input.tenantId),
-            eq(paymentTransactions.branchId, input.branchId),
-            eq(paymentTransactions.paymentStatus, "paid"),
-            gte(paymentTransactions.paidAt, input.startedAt),
-            lte(paymentTransactions.paidAt, input.cutoffAt),
-            isNull(paymentTransactions.deletedAt),
-          ),
+      ),
+    db
+      .select({
+        amount: paymentTransactions.amount,
+        method: paymentTransactions.paymentMethod,
+        provider: paymentTransactions.gateway,
+      })
+      .from(paymentTransactions)
+      .where(
+        and(
+          eq(paymentTransactions.tenantId, input.tenantId),
+          eq(paymentTransactions.branchId, input.branchId),
+          eq(paymentTransactions.currency, input.currency),
+          eq(paymentTransactions.paymentStatus, "paid"),
+          gte(paymentTransactions.paidAt, input.startedAt),
+          lte(paymentTransactions.paidAt, input.cutoffAt),
+          isNull(paymentTransactions.deletedAt),
         ),
-      db
-        .select({
-          amount: posPaymentAdjustments.amount,
-          adjustmentType: posPaymentAdjustments.adjustmentType,
-          direction: posPaymentAdjustments.direction,
-          method: paymentTransactions.paymentMethod,
-          provider: paymentTransactions.gateway,
-        })
-        .from(posPaymentAdjustments)
-        .leftJoin(
-          paymentTransactions,
-          eq(paymentTransactions.id, posPaymentAdjustments.originalPaymentId),
-        )
-        .where(
-          and(
-            eq(posPaymentAdjustments.tenantId, input.tenantId),
-            eq(posPaymentAdjustments.branchId, input.branchId),
-            gte(posPaymentAdjustments.occurredAt, input.startedAt),
-            lte(posPaymentAdjustments.occurredAt, input.cutoffAt),
-          ),
+      ),
+    db
+      .select({
+        amount: posPaymentAdjustments.amount,
+        adjustmentType: posPaymentAdjustments.adjustmentType,
+        direction: posPaymentAdjustments.direction,
+        method: paymentTransactions.paymentMethod,
+        provider: paymentTransactions.gateway,
+      })
+      .from(posPaymentAdjustments)
+      .leftJoin(
+        paymentTransactions,
+        eq(paymentTransactions.id, posPaymentAdjustments.originalPaymentId),
+      )
+      .where(
+        and(
+          eq(posPaymentAdjustments.tenantId, input.tenantId),
+          eq(posPaymentAdjustments.branchId, input.branchId),
+          eq(posPaymentAdjustments.currency, input.currency),
+          gte(posPaymentAdjustments.occurredAt, input.startedAt),
+          lte(posPaymentAdjustments.occurredAt, input.cutoffAt),
         ),
-      db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(orders)
-        .where(
-          and(
-            eq(orders.tenantId, input.tenantId),
-            eq(orders.branchId, input.branchId),
-            lte(orders.createdAt, input.cutoffAt),
-            notInArray(orders.status, ["delivered", "cancelled"]),
-            isNull(orders.deletedAt),
-          ),
+      ),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(orders)
+      .where(
+        and(
+          eq(orders.tenantId, input.tenantId),
+          eq(orders.branchId, input.branchId),
+          lte(orders.createdAt, input.cutoffAt),
+          notInArray(orders.status, ["delivered", "cancelled"]),
+          isNull(orders.deletedAt),
         ),
-      db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(serviceTickets)
-        .where(
-          and(
-            eq(serviceTickets.tenantId, input.tenantId),
-            eq(serviceTickets.branchId, input.branchId),
-            lte(serviceTickets.createdAt, input.cutoffAt),
-            notInArray(serviceTickets.ticketStatus, ["picked_up", "cancelled"]),
-            isNull(serviceTickets.deletedAt),
-          ),
+      ),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(serviceTickets)
+      .where(
+        and(
+          eq(serviceTickets.tenantId, input.tenantId),
+          eq(serviceTickets.branchId, input.branchId),
+          lte(serviceTickets.createdAt, input.cutoffAt),
+          notInArray(serviceTickets.ticketStatus, ["picked_up", "cancelled"]),
+          isNull(serviceTickets.deletedAt),
         ),
-    ]);
+      ),
+  ]);
 
-  const breakdown = new Map<
-    string,
-    PosZReportPaymentBreakdown
-  >();
+  const breakdown = new Map<string, PosZReportPaymentBreakdown>();
   for (const payment of paymentRows) {
     const provider = payment.provider || null;
     const key = `${payment.method}:${provider ?? "default"}`;
@@ -485,8 +512,12 @@ export async function calculateHandoverSnapshot(
       netAmount: "0.00",
       transactionCount: 0,
     };
-    current.grossAmount = money(Number(current.grossAmount) + Number(payment.amount));
-    current.netAmount = money(Number(current.netAmount) + Number(payment.amount));
+    current.grossAmount = money(
+      Number(current.grossAmount) + Number(payment.amount),
+    );
+    current.netAmount = money(
+      Number(current.netAmount) + Number(payment.amount),
+    );
     current.transactionCount += 1;
     breakdown.set(key, current);
   }
@@ -521,16 +552,21 @@ export async function calculateHandoverSnapshot(
     .filter((row) => row.method === "cash")
     .reduce((total, row) => total + Number(row.amount), 0);
   const grossSales = Number(orderRows[0]?.gross ?? 0);
-  const discountAmount = 0;
+  const discountAmount = Number(orderRows[0]?.discount ?? 0);
 
   return {
-    currency: currencyRows[0]?.currency ?? "XOF",
+    currency: input.currency,
     orderCount: orderRows[0]?.count ?? 0,
     grossSales: money(grossSales),
     discountAmount: money(discountAmount),
     refundAmount: money(refundAmount),
     correctionAmount: money(correctionAmount),
-    netSales: calculateNetSales(grossSales, discountAmount),
+    netSales: calculateNetSales(
+      grossSales,
+      discountAmount,
+      refundAmount,
+      correctionAmount,
+    ),
     expectedCash: money(
       Number(input.openingFloat) + cashPayments + cashAdjustment,
     ),
