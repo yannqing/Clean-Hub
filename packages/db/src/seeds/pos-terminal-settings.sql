@@ -11,6 +11,7 @@
 -- Coverage:
 --   hardware_configs (3) — printer, scanner, cash drawer for the demo branch
 --   pos_terminal_settings (2) — two demo POS terminals with different configs
+--     and telemetry states (one recently online, one stale with a sync error)
 
 -- ───────────────────────────────────────────────
 -- 0) Shared constants for readability
@@ -87,10 +88,11 @@ ON CONFLICT (id) DO UPDATE SET
 INSERT INTO pos_terminal_settings (
   id, tenant_id, branch_id,
   device_id, label,
+  device_type, platform, platform_version, app_version,
   default_payment_method, rounding_rule,
   auto_print_receipt, print_copies,
   lock_timeout_seconds,
-  status,
+  status, sync_status, last_seen_at, last_synced_at, last_sync_error,
   created_by, updated_by, version
 ) VALUES
   (
@@ -99,12 +101,20 @@ INSERT INTO pos_terminal_settings (
     '01KRERJN8G0000000000000040',
     'pos-web-default',
     '前台收银机',
+    'desktop',
+    'macOS',
+    '15',
+    '0.1.0',
     'cash',
     'none',
     true,
     1,
     300,
     'active',
+    'synced',
+    now() - interval '2 minutes',
+    now() - interval '3 minutes',
+    NULL,
     '01KRERJN8F0000000000000031',
     '01KRERJN8F0000000000000031',
     1
@@ -115,12 +125,20 @@ INSERT INTO pos_terminal_settings (
     '01KRERJN8G0000000000000040',
     'pos-web-backoffice',
     '后台收银机',
+    'tablet',
+    'Android',
+    '14',
+    '0.1.0',
     'card',
     'round_jiao',
     false,
     2,
     600,
     'active',
+    'error',
+    now() - interval '30 minutes',
+    now() - interval '45 minutes',
+    'Demo terminal could not upload its latest offline queue.',
     '01KRERJN8F0000000000000031',
     '01KRERJN8F0000000000000031',
     1
@@ -128,12 +146,20 @@ INSERT INTO pos_terminal_settings (
 ON CONFLICT (tenant_id, device_id) DO UPDATE SET
   branch_id             = EXCLUDED.branch_id,
   label                 = EXCLUDED.label,
+  device_type           = EXCLUDED.device_type,
+  platform              = EXCLUDED.platform,
+  platform_version      = EXCLUDED.platform_version,
+  app_version           = EXCLUDED.app_version,
   default_payment_method = EXCLUDED.default_payment_method,
   rounding_rule         = EXCLUDED.rounding_rule,
   auto_print_receipt    = EXCLUDED.auto_print_receipt,
   print_copies          = EXCLUDED.print_copies,
   lock_timeout_seconds  = EXCLUDED.lock_timeout_seconds,
   status                = EXCLUDED.status,
+  sync_status           = EXCLUDED.sync_status,
+  last_seen_at           = EXCLUDED.last_seen_at,
+  last_synced_at         = EXCLUDED.last_synced_at,
+  last_sync_error        = EXCLUDED.last_sync_error,
   updated_by            = EXCLUDED.updated_by,
   updated_at            = now(),
   version               = pos_terminal_settings.version + 1;

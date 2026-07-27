@@ -6,6 +6,7 @@ import {
   pgEnum,
   pgTable,
   smallint,
+  text,
   timestamp,
   uniqueIndex,
   varchar,
@@ -33,6 +34,21 @@ export const posTerminalStatusEnum = pgEnum("pos_terminal_status", [
   "inactive",
 ]);
 
+export const posTerminalDeviceTypeEnum = pgEnum("pos_terminal_device_type", [
+  "unknown",
+  "desktop",
+  "tablet",
+  "phone",
+  "browser",
+]);
+
+export const posTerminalSyncStatusEnum = pgEnum("pos_terminal_sync_status", [
+  "never",
+  "syncing",
+  "synced",
+  "error",
+]);
+
 export const posTerminalSettings = pgTable(
   "pos_terminal_settings",
   {
@@ -45,6 +61,12 @@ export const posTerminalSettings = pgTable(
       .references(() => branches.id),
     deviceId: varchar("device_id", { length: 128 }).notNull(),
     label: varchar("label", { length: 64 }),
+    deviceType: posTerminalDeviceTypeEnum("device_type")
+      .notNull()
+      .default("unknown"),
+    platform: varchar("platform", { length: 64 }),
+    platformVersion: varchar("platform_version", { length: 64 }),
+    appVersion: varchar("app_version", { length: 64 }),
     defaultPaymentMethod: posPaymentMethodEnum("default_payment_method")
       .notNull()
       .default("cash"),
@@ -67,6 +89,11 @@ export const posTerminalSettings = pgTable(
       withTimezone: true,
     }),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    syncStatus: posTerminalSyncStatusEnum("sync_status")
+      .notNull()
+      .default("never"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    lastSyncError: text("last_sync_error"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -86,5 +113,14 @@ export const posTerminalSettings = pgTable(
     index("pos_terminal_settings_tenant_id_idx").on(table.tenantId),
     index("pos_terminal_settings_branch_id_idx").on(table.branchId),
     index("pos_terminal_settings_status_idx").on(table.status),
+    index("pos_terminal_settings_last_seen_at_idx").on(table.lastSeenAt),
+    index("pos_terminal_settings_tenant_last_seen_at_idx").on(
+      table.tenantId,
+      table.lastSeenAt,
+    ),
+    index("pos_terminal_settings_tenant_sync_status_idx").on(
+      table.tenantId,
+      table.syncStatus,
+    ),
   ],
 );

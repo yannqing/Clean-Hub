@@ -54,6 +54,7 @@ export const posStaffShifts = pgTable(
     staffId: ulidColumn("staff_id")
       .notNull()
       .references(() => users.id),
+    currency: varchar("currency", { length: 3 }).notNull().default("XOF"),
     status: posShiftStatusEnum("status").notNull().default("open"),
     startedAt: timestamp("started_at", { withTimezone: true })
       .notNull()

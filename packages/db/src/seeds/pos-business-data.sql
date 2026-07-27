@@ -412,61 +412,63 @@ ON CONFLICT (id) DO UPDATE SET
 -- order_payment_status   : unpaid / paid / partial / refunded
 INSERT INTO orders (
   id, tenant_id, branch_id, customer_id, order_type, status,
-  total_amount, payment_status, paid_amount, paid_at, expire_at, notes, created_by, created_at
+  subtotal_amount, discount_amount, total_amount, payment_status, paid_amount, paid_at, expire_at, notes, created_by, created_at
 )
 VALUES
   (
     '01SEED01000RD0000000000001', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
     '01SEED0100CPS0000000000001', 'ticket', 'delivered',
-    95.00, 'paid', 95.00, '2026-06-16 14:30:00+08', '2026-06-17 18:00:00+08',
+    95.00, 0.00, 95.00, 'paid', 95.00, '2026-06-16 14:30:00+08', '2026-06-17 18:00:00+08',
     '基于工单 T20260618004', '01KRERJN8F0000000000000031', '2026-06-16 14:00:00+08'
   ),
   (
     '01SEED01000RD0000000000002', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
     '01SEED0100CPS0000000000001', 'ticket', 'paid',
-    95.00, 'partial', 50.00, '2026-06-17 10:10:00+08', '2026-06-19 18:00:00+08',
+    95.00, 0.00, 95.00, 'partial', 50.00, '2026-06-17 10:10:00+08', '2026-06-19 18:00:00+08',
     '基于工单 T20260618001,部分支付,取件时补齐', '01KRERJN8F0000000000000031', '2026-06-17 10:08:00+08'
   ),
   (
     '01SEED01000RD0000000000003', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
     '01SEED0100CPS0000000000003', 'ticket', 'received',
-    55.00, 'unpaid', 0.00, NULL, '2026-06-19 18:00:00+08',
+    55.00, 0.00, 55.00, 'unpaid', 0.00, NULL, '2026-06-19 18:00:00+08',
     '基于工单 T20260618002,等客户确认价格', '01KRERJN8F0000000000000032', '2026-06-17 11:25:00+08'
   ),
   (
     '01SEED01000RD0000000000004', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
     '01SEED0100CPS0000000000005', 'ticket', 'received',
-    80.00, 'unpaid', 0.00, NULL, '2026-06-18 12:00:00+08',
+    80.00, 0.00, 80.00, 'unpaid', 0.00, NULL, '2026-06-18 12:00:00+08',
     '基于工单 T20260618003,车辆精洗', '01KRERJN8F0000000000000031', '2026-06-18 09:35:00+08'
   ),
   (
     '01SEED01000RD0000000000005', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
     '01SEED0100CPS0000000000006', 'ticket', 'received',
-    40.00, 'unpaid', 0.00, NULL, '2026-06-18 18:00:00+08',
+    40.00, 0.00, 40.00, 'unpaid', 0.00, NULL, '2026-06-18 18:00:00+08',
     '基于工单 T20260618005,异常工单,等店长确认后处理', '01KRERJN8F0000000000000032', '2026-06-17 15:45:00+08'
   ),
   (
     '01SEED01000RD0000000000006', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
     '01SEED0100CPS0000000000007', 'manual', 'cancelled',
-    99.00, 'refunded', 0.00, NULL, '2026-06-17 23:59:00+08',
+    99.00, 0.00, 99.00, 'refunded', 0.00, NULL, '2026-06-17 23:59:00+08',
     '银卡月度会员订阅,客户取消已退款', '01KRERJN8F0000000000000032', '2026-06-16 09:05:00+08'
   ),
   (
     '01SEED01000RD0000000000007', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
     '01SEED0100CPS0000000000002', 'manual', 'paid',
-    12.00, 'paid', 12.00, '2026-06-18 10:20:00+08', '2026-06-19 18:00:00+08',
+    12.00, 0.00, 12.00, 'paid', 12.00, '2026-06-18 10:20:00+08', '2026-06-19 18:00:00+08',
     '零售:织物除味剂', '01KRERJN8F0000000000000031', '2026-06-18 10:15:00+08'
   ),
   (
     '01SEED01000RD0000000000008', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
     '01SEED0100CPS0000000000004', 'ticket', 'draft',
-    40.00, 'unpaid', 0.00, NULL, NULL,
+    40.00, 0.00, 40.00, 'unpaid', 0.00, NULL, NULL,
     '基于工单 T20260618006,草稿', '01KRERJN8F0000000000000031', '2026-06-18 10:15:00+08'
   )
 ON CONFLICT (id) DO UPDATE SET
   customer_id = EXCLUDED.customer_id,
   order_type = EXCLUDED.order_type,
   status = EXCLUDED.status,
+  subtotal_amount = EXCLUDED.subtotal_amount,
+  discount_amount = EXCLUDED.discount_amount,
   total_amount = EXCLUDED.total_amount,
   payment_status = EXCLUDED.payment_status,
   paid_amount = EXCLUDED.paid_amount,
@@ -765,37 +767,39 @@ ON CONFLICT (id) DO UPDATE SET
 
 INSERT INTO orders (
   id, tenant_id, branch_id, customer_id, order_type, status,
-  total_amount, payment_status, paid_amount, paid_at, expire_at, notes, created_by, created_at
+  subtotal_amount, discount_amount, total_amount, payment_status, paid_amount, paid_at, expire_at, notes, created_by, created_at
 )
 VALUES
   ('01SEED01000RD0000000000009', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
    '01SEED0100CPS0000000000009', 'ticket', 'received',
-   70.00, 'unpaid', 0.00, NULL, '2026-07-09 18:00:00+08',
+   70.00, 0.00, 70.00, 'unpaid', 0.00, NULL, '2026-07-09 18:00:00+08',
    '基于工单 T20260708001,今日未收款', '01KRERJN8F0000000000000031', '2026-07-08 09:15:00+08'),
   ('01SEED01000RD0000000000010', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
    '01SEED0100CPS0000000000011', 'ticket', 'paid',
-   70.00, 'partial', 30.00, '2026-07-08 09:50:00+08', '2026-07-10 18:00:00+08',
+   70.00, 0.00, 70.00, 'partial', 30.00, '2026-07-08 09:50:00+08', '2026-07-10 18:00:00+08',
    '基于工单 T20260708002,已收定金', '01KRERJN8F0000000000000032', '2026-07-08 09:50:00+08'),
   ('01SEED01000RD0000000000011', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
    '01SEED0100CPS0000000000012', 'ticket', 'paid',
-   50.00, 'paid', 50.00, '2026-07-08 10:30:00+08', '2026-07-08 17:00:00+08',
+   50.00, 0.00, 50.00, 'paid', 50.00, '2026-07-08 10:30:00+08', '2026-07-08 17:00:00+08',
    '基于工单 T20260708003,车辆精洗', '01KRERJN8F0000000000000031', '2026-07-08 10:30:00+08'),
   ('01SEED01000RD0000000000012', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
    '01SEED0100CPS0000000000013', 'ticket', 'received',
-   40.00, 'unpaid', 0.00, NULL, '2026-07-09 12:00:00+08',
+   40.00, 0.00, 40.00, 'unpaid', 0.00, NULL, '2026-07-09 12:00:00+08',
    '基于工单 T20260708004,异常确认后付款', '01KRERJN8F0000000000000032', '2026-07-08 11:40:00+08'),
   ('01SEED01000RD0000000000013', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
    '01SEED0100CPS0000000000014', 'ticket', 'delivered',
-   30.00, 'paid', 30.00, '2026-07-08 12:35:00+08', '2026-07-08 13:30:00+08',
+   30.00, 0.00, 30.00, 'paid', 30.00, '2026-07-08 12:35:00+08', '2026-07-08 13:30:00+08',
    '基于工单 T20260708005,现金已结清', '01KRERJN8F0000000000000031', '2026-07-08 12:30:00+08'),
   ('01SEED01000RD0000000000014', '01KRERJN800000000000000001', '01KRERJN8G0000000000000040',
    '01SEED0100CPS0000000000010', 'manual', 'paid',
-   12.00, 'paid', 12.00, '2026-07-08 13:25:00+08', '2026-07-09 18:00:00+08',
+   12.00, 0.00, 12.00, 'paid', 12.00, '2026-07-08 13:25:00+08', '2026-07-09 18:00:00+08',
    '零售:织物除味剂', '01KRERJN8F0000000000000032', '2026-07-08 13:20:00+08')
 ON CONFLICT (id) DO UPDATE SET
   customer_id = EXCLUDED.customer_id,
   order_type = EXCLUDED.order_type,
   status = EXCLUDED.status,
+  subtotal_amount = EXCLUDED.subtotal_amount,
+  discount_amount = EXCLUDED.discount_amount,
   total_amount = EXCLUDED.total_amount,
   payment_status = EXCLUDED.payment_status,
   paid_amount = EXCLUDED.paid_amount,

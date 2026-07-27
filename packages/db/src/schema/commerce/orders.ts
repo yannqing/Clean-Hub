@@ -101,6 +101,12 @@ export const orders = pgTable(
       .references(() => customers.id),
     orderType: orderTypeEnum("order_type").notNull().default("ticket"),
     status: orderStatusEnum("status").notNull().default("draft"),
+    subtotalAmount: numeric("subtotal_amount", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    discountAmount: numeric("discount_amount", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
     totalAmount: numeric("total_amount", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
@@ -133,6 +139,13 @@ export const orders = pgTable(
     index("orders_tenant_id_status_idx").on(table.tenantId, table.status),
     index("orders_customer_id_idx").on(table.customerId),
     index("orders_deleted_at_idx").on(table.deletedAt),
+    check(
+      "orders_amounts_check",
+      sql`${table.subtotalAmount} >= 0
+        and ${table.discountAmount} >= 0
+        and ${table.discountAmount} <= ${table.subtotalAmount}
+        and ${table.totalAmount} = ${table.subtotalAmount} - ${table.discountAmount}`,
+    ),
   ],
 );
 
