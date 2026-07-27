@@ -13,8 +13,11 @@ export const webAdminNavigation = {
     { label: "Branches", href: webAdminRoutes.tenant.branches },
     { label: "Services", href: webAdminRoutes.tenant.services },
     { label: "Prices", href: webAdminRoutes.tenant.prices },
+    { label: "Discounts", href: webAdminRoutes.tenant.discounts },
     { label: "Hardware", href: webAdminRoutes.tenant.hardware },
+    { label: "Point of sale", href: webAdminRoutes.tenant.pointOfSale.home },
     { label: "Reports", href: webAdminRoutes.tenant.reports },
+    { label: "Finance", href: webAdminRoutes.tenant.finance },
   ],
 } as const;
 
@@ -28,7 +31,10 @@ export const webAdminWorkspaceTabs = {
   tenant: [
     { label: "Dashboard", href: webAdminRoutes.tenant.home },
     { label: "Branches", href: webAdminRoutes.tenant.branches },
+    { label: "Discounts", href: webAdminRoutes.tenant.discounts },
+    { label: "Point of sale", href: webAdminRoutes.tenant.pointOfSale.home },
     { label: "Reports", href: webAdminRoutes.tenant.reports },
+    { label: "Finance", href: webAdminRoutes.tenant.finance },
   ],
 } as const;
 
@@ -75,7 +81,13 @@ export const webAdminSidebarNavigation = {
       title: "Main",
       items: [
         { label: "Dashboard", href: webAdminRoutes.tenant.home },
+        {
+          label: "Point of sale",
+          href: webAdminRoutes.tenant.pointOfSale.home,
+        },
+        { label: "Discounts", href: webAdminRoutes.tenant.discounts },
         { label: "Reports", href: webAdminRoutes.tenant.reports },
+        { label: "Finance", href: webAdminRoutes.tenant.finance },
       ],
     },
     {

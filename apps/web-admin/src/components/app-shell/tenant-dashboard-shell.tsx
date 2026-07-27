@@ -75,13 +75,27 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
     webAdminRoutes.tenant.customers,
   );
   const isProductsPage = isActivePath(pathname, webAdminRoutes.tenant.products);
+  const isDiscountsPage = isActivePath(
+    pathname,
+    webAdminRoutes.tenant.discounts,
+  );
   const isServicesPage = isActivePath(pathname, webAdminRoutes.tenant.services);
+  const isReportsPage = isActivePath(pathname, webAdminRoutes.tenant.reports);
+  const isFinancePage = isActivePath(pathname, webAdminRoutes.tenant.finance);
+  const isPointOfSalePage = isActivePath(
+    pathname,
+    webAdminRoutes.tenant.pointOfSale.home,
+  );
   const usesFlatPageLayout =
     isHomePage ||
     isOrdersPage ||
     isCustomersPage ||
     isProductsPage ||
-    isServicesPage;
+    isDiscountsPage ||
+    isServicesPage ||
+    isReportsPage ||
+    isFinancePage ||
+    isPointOfSalePage;
   const serviceActive = isActivePath(pathname, webAdminRoutes.tenant.services);
   const displayName = useMemo(() => getDisplayName(authContext), [authContext]);
   const profileInitials = useMemo(

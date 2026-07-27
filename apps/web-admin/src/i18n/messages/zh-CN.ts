@@ -74,7 +74,13 @@ export const zhCNMessages: WebAdminMessages = {
           { label: "订单", href: webAdminRoutes.tenant.orders },
           { label: "顾客", href: webAdminRoutes.tenant.customers },
           { label: "产品", href: webAdminRoutes.tenant.products },
+          { label: "折扣", href: webAdminRoutes.tenant.discounts },
+          {
+            label: "销售点",
+            href: webAdminRoutes.tenant.pointOfSale.home,
+          },
           { label: "报表", href: webAdminRoutes.tenant.reports },
+          { label: "财务", href: webAdminRoutes.tenant.finance },
         ],
       },
       {

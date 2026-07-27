@@ -92,7 +92,13 @@ export const enMessages: WebAdminMessages = {
           { label: "Orders", href: webAdminRoutes.tenant.orders },
           { label: "Customers", href: webAdminRoutes.tenant.customers },
           { label: "Products", href: webAdminRoutes.tenant.products },
+          { label: "Discounts", href: webAdminRoutes.tenant.discounts },
+          {
+            label: "Point of sale",
+            href: webAdminRoutes.tenant.pointOfSale.home,
+          },
           { label: "Reports", href: webAdminRoutes.tenant.reports },
+          { label: "Finance", href: webAdminRoutes.tenant.finance },
         ],
       },
       {

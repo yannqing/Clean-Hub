@@ -398,6 +398,17 @@ export type TenantMessages = {
         pack: string;
       };
     };
+    edit: {
+      title: string;
+      saveProduct: string;
+      updated: string;
+      updateFailed: string;
+      loadFailed: string;
+      versionConflict: string;
+      inventoryConflict: string;
+      multipleSkuNotice: string;
+      stockOnHand: string;
+    };
     columns: {
       product: string;
       category: string;
@@ -430,6 +441,271 @@ export type TenantMessages = {
     loadError: string;
     overviewError: string;
     pageSummary: string;
+  };
+
+  discounts: {
+    title: string;
+    description: string;
+    createAction: string;
+    exportAction: string;
+    exportCurrentPage: string;
+    exportCurrentSearch: string;
+    exportEmpty: string;
+    created: string;
+    updated: string;
+    statusUpdated: string;
+    deleted: string;
+    loadError: string;
+    optionsLoadError: string;
+    permissionDescription: string;
+    emptyTitle: string;
+    emptyDescription: string;
+    pageCount: string;
+    statuses: {
+      all: string;
+      active: string;
+      scheduled: string;
+      expired: string;
+      inactive: string;
+    };
+    methods: {
+      all: string;
+      code: string;
+      automatic: string;
+    };
+    types: {
+      all: string;
+      amount_off_items: string;
+      amount_off_order: string;
+      buy_x_get_y: string;
+      free_shipping: string;
+    };
+    valueTypes: {
+      percentage: string;
+      fixed_amount: string;
+      free: string;
+    };
+    eligibility: {
+      all_customers: string;
+      specific_customers: string;
+    };
+    minimumRequirements: {
+      none: string;
+      minimum_amount: string;
+      minimum_quantity: string;
+    };
+    purchaseRequirements: {
+      minimum_amount: string;
+      minimum_quantity: string;
+    };
+    targetTypes: {
+      product: string;
+      product_category: string;
+      service: string;
+      service_category: string;
+    };
+    targetRoles: {
+      applies_to: string;
+      customer_buys: string;
+      customer_gets: string;
+    };
+    countryScopes: {
+      all: string;
+      selected: string;
+    };
+    list: {
+      searchPlaceholder: string;
+      filterStatus: string;
+      filterMethod: string;
+      filterType: string;
+      filterBranch: string;
+      allBranches: string;
+      sortLabel: string;
+      sortOptions: {
+        createdDesc: string;
+        createdAsc: string;
+        updatedDesc: string;
+        titleAsc: string;
+        titleDesc: string;
+        startsDesc: string;
+        usageDesc: string;
+      };
+      columns: {
+        discount: string;
+        status: string;
+        method: string;
+        type: string;
+        value: string;
+        combinations: string;
+        uses: string;
+        startsAt: string;
+        endsAt: string;
+        actions: string;
+      };
+      noCode: string;
+      unlimited: string;
+      noEndDate: string;
+      noCombinations: string;
+      combinationItem: string;
+      combinationOrder: string;
+      combinationShipping: string;
+      enabledValue: string;
+      disabledValue: string;
+      edit: string;
+      enable: string;
+      disable: string;
+      delete: string;
+      deleteTitle: string;
+      deleteDescription: string;
+      confirmDelete: string;
+      exportTitle: string;
+    };
+    typePicker: {
+      title: string;
+      description: string;
+      amountOffItemsDescription: string;
+      amountOffOrderDescription: string;
+      buyXGetYDescription: string;
+      freeShippingDescription: string;
+    };
+    form: {
+      createTitle: string;
+      editTitle: string;
+      breadcrumbLabel: string;
+      requiredHint: string;
+      sections: {
+        identity: string;
+        value: string;
+        targets: string;
+        minimum: string;
+        eligibility: string;
+        limits: string;
+        combinations: string;
+        dates: string;
+        channels: string;
+        branches: string;
+        shipping: string;
+        tags: string;
+        summary: string;
+      };
+      fields: {
+        title: string;
+        method: string;
+        code: string;
+        enabled: string;
+        valueType: string;
+        valueAmount: string;
+        currency: string;
+        minimumRequirement: string;
+        minimumPurchaseAmount: string;
+        minimumQuantity: string;
+        eligibility: string;
+        usageLimit: string;
+        oncePerCustomer: string;
+        combinesWithItemDiscounts: string;
+        combinesWithOrderDiscounts: string;
+        combinesWithShippingDiscounts: string;
+        startsAt: string;
+        hasEndDate: string;
+        endsAt: string;
+        allBranches: string;
+        selectedBranches: string;
+        posEnabled: string;
+        customerMobileEnabled: string;
+        deliveryEnabled: string;
+        buyRequirementType: string;
+        buyRequirementValue: string;
+        getQuantity: string;
+        maxUsesPerOrder: string;
+        countryScope: string;
+        countryCodes: string;
+        maximumShippingPrice: string;
+        tags: string;
+      };
+      placeholders: {
+        title: string;
+        code: string;
+        amount: string;
+        quantity: string;
+        usageLimit: string;
+        countries: string;
+        tags: string;
+      };
+      options: {
+        allItems: string;
+        specificTargets: string;
+        unlimitedUsage: string;
+        generateCode: string;
+      };
+      hints: {
+        code: string;
+        method: string;
+        combinations: string;
+        branches: string;
+        channels: string;
+        countries: string;
+        tags: string;
+        timezone: string;
+        fixedCurrency: string;
+      };
+      buttons: {
+        cancel: string;
+        save: string;
+        saving: string;
+        addTargets: string;
+        chooseCustomers: string;
+        chooseBranches: string;
+      };
+      picker: {
+        targetsTitle: string;
+        targetsDescription: string;
+        customersTitle: string;
+        customersDescription: string;
+        branchesTitle: string;
+        branchesDescription: string;
+        search: string;
+        noMatches: string;
+        selectedCount: string;
+        confirm: string;
+      };
+      summary: {
+        type: string;
+        method: string;
+        value: string;
+        customers: string;
+        branches: string;
+        channels: string;
+        schedule: string;
+        noValue: string;
+        selectedCount: string;
+      };
+      validation: {
+        checkForm: string;
+        titleRequired: string;
+        titleTooLong: string;
+        codeRequired: string;
+        codeInvalid: string;
+        valueInvalid: string;
+        currencyRequired: string;
+        minimumInvalid: string;
+        usageLimitInvalid: string;
+        customersRequired: string;
+        targetsRequired: string;
+        branchesRequired: string;
+        buyRequirementInvalid: string;
+        getQuantityInvalid: string;
+        maxUsesPerOrderInvalid: string;
+        datesInvalid: string;
+        countriesRequired: string;
+        shippingPriceInvalid: string;
+        tagsInvalid: string;
+        serverInvalid: string;
+      };
+      saveFailed: string;
+      codeConflict: string;
+      versionConflict: string;
+      unsavedChanges: string;
+    };
   };
 
   branches: {
@@ -709,63 +985,517 @@ export type TenantMessages = {
     requestFailed: string;
   };
 
-  reports: {
-    eyebrow: string;
+  pointOfSale: {
     title: string;
     description: string;
-    formLabels: {
-      from: string;
-      to: string;
-      branchId: string;
-      branchPlaceholder: string;
-      preset: string;
+    updatedAt: string;
+    tabs: {
+      overview: string;
+      devices: string;
+      registerSessions: string;
+      settings: string;
+    };
+    filters: {
+      dateRange: string;
+      branch: string;
+      allBranches: string;
+      currency: string;
+      status: string;
+      allStatuses: string;
+      search: string;
+      clear: string;
     };
     presets: {
-      none: string;
       today: string;
-      yesterday: string;
-      thisWeek: string;
-      lastWeek: string;
+      last7Days: string;
+      last30Days: string;
+      last90Days: string;
       thisMonth: string;
       lastMonth: string;
     };
-    applyFilters: string;
-    cards: {
+    overview: {
+      noticeBadge: string;
+      noticeTitle: string;
+      noticeDescription: string;
+      metricsLabel: string;
+      metrics: {
+        grossSales: string;
+        grossProfit: string;
+        orderCount: string;
+        registeredDevices: string;
+        openSessions: string;
+        activeBranches: string;
+      };
+      grossProfitCoverage: string;
+      branchPerformance: {
+        title: string;
+        description: string;
+        branch: string;
+        orders: string;
+        grossSales: string;
+        grossProfit: string;
+        devices: string;
+        empty: string;
+      };
+      devices: {
+        title: string;
+        description: string;
+        active: string;
+        inactive: string;
+        online: string;
+        offline: string;
+        neverSeen: string;
+        action: string;
+      };
+      cashTracking: {
+        title: string;
+        description: string;
+        expectedCash: string;
+        countedCash: string;
+        variance: string;
+        action: string;
+      };
+      staff: {
+        title: string;
+        description: string;
+        onDuty: string;
+        onBreak: string;
+        offDuty: string;
+      };
+      quickLinks: {
+        title: string;
+        devices: string;
+        devicesDescription: string;
+        sessions: string;
+        sessionsDescription: string;
+        hardware: string;
+        hardwareDescription: string;
+        orders: string;
+        ordersDescription: string;
+        finance: string;
+        financeDescription: string;
+      };
+      emptyTitle: string;
+      emptyDescription: string;
+      errorTitle: string;
+      errorDescription: string;
+    };
+    devices: {
+      title: string;
+      description: string;
+      setupGuide: string;
+      setupNotice: string;
+      metrics: {
+        total: string;
+        active: string;
+        online: string;
+        syncIssues: string;
+      };
+      searchPlaceholder: string;
+      columns: {
+        device: string;
+        typePlatform: string;
+        version: string;
+        branch: string;
+        enabledStatus: string;
+        heartbeatStatus: string;
+        lastSeen: string;
+        syncStatus: string;
+        currentSession: string;
+      };
+      deviceTypes: {
+        desktop: string;
+        tablet: string;
+        phone: string;
+        browser: string;
+        unknown: string;
+      };
+      enabledStatuses: {
+        active: string;
+        inactive: string;
+      };
+      heartbeatStatuses: {
+        online: string;
+        offline: string;
+        never: string;
+      };
+      syncStatuses: {
+        synced: string;
+        syncing: string;
+        error: string;
+        never: string;
+      };
+      noCurrentSession: string;
+      neverSeen: string;
+      empty: string;
+      errorTitle: string;
+      errorDescription: string;
+      previous: string;
+      next: string;
+      count: string;
+    };
+    registerSessions: {
+      title: string;
+      description: string;
+      exportCsv: string;
+      metrics: {
+        total: string;
+        open: string;
+        onBreak: string;
+        closed: string;
+        netSales: string;
+        cashVariance: string;
+      };
+      searchPlaceholder: string;
+      columns: {
+        session: string;
+        branch: string;
+        terminal: string;
+        staff: string;
+        status: string;
+        startedAt: string;
+        endedAt: string;
+        openingFloat: string;
+        closingFloat: string;
+        netSales: string;
+        cashVariance: string;
+      };
+      statuses: {
+        open: string;
+        onBreak: string;
+        closed: string;
+      };
+      roleLabels: {
+        owner: string;
+        manager: string;
+        cashier: string;
+      };
+      notClosed: string;
+      unavailable: string;
+      empty: string;
+      errorTitle: string;
+      errorDescription: string;
+      previous: string;
+      next: string;
+      count: string;
+      exportHeaders: {
+        id: string;
+        branch: string;
+        terminal: string;
+        staff: string;
+        status: string;
+        startedAt: string;
+        endedAt: string;
+        openingFloat: string;
+        closingFloat: string;
+        netSales: string;
+        cashVariance: string;
+        currency: string;
+      };
+    };
+    settings: {
+      title: string;
+      description: string;
+      ownerOnlyTitle: string;
+      ownerOnlyDescription: string;
+      sections: {
+        cashTracking: string;
+        cashTrackingDescription: string;
+        operations: string;
+        operationsDescription: string;
+        offline: string;
+        offlineDescription: string;
+        deviceDefaults: string;
+        deviceDefaultsDescription: string;
+      };
+      fields: {
+        cashTrackingEnabled: string;
+        openingFloatRequired: string;
+        closingCountRequired: string;
+        returnReasonRequired: string;
+        recentCartRetentionHours: string;
+        offlineModeEnabled: string;
+        syncIntervalSeconds: string;
+        deviceOfflineAfterSeconds: string;
+        defaultPaymentMethod: string;
+        roundingRule: string;
+        autoPrintReceipt: string;
+        printCopies: string;
+        lockTimeoutSeconds: string;
+      };
+      hints: {
+        cashTrackingEnabled: string;
+        openingFloatRequired: string;
+        closingCountRequired: string;
+        returnReasonRequired: string;
+        recentCartRetentionHours: string;
+        offlineModeEnabled: string;
+        syncIntervalSeconds: string;
+        deviceOfflineAfterSeconds: string;
+        autoPrintReceipt: string;
+      };
+      paymentMethods: {
+        cash: string;
+        card: string;
+        app: string;
+      };
+      roundingRules: {
+        none: string;
+        roundYuan: string;
+        roundJiao: string;
+      };
+      seconds: string;
+      minutes: string;
+      hours: string;
+      copies: string;
+      validation: {
+        offlineThresholdMinimum: string;
+      };
+      save: string;
+      saving: string;
+      saved: string;
+      noChanges: string;
+      loadError: string;
+      saveError: string;
+    };
+  };
+
+  reports: {
+    title: string;
+    generatedAt: string;
+    hero: {
+      badge: string;
+      title: string;
+      description: string;
+      viewOrders: string;
+      viewBranches: string;
+    };
+    performance: {
+      title: string;
+      description: string;
+      dateRange: string;
+      branch: string;
+      allBranches: string;
+      currency: string;
+    };
+    presets: {
+      custom: string;
+      today: string;
+      last7Days: string;
+      last30Days: string;
+      last90Days: string;
+      thisMonth: string;
+      lastMonth: string;
+    };
+    customRange: {
+      title: string;
+      description: string;
+      from: string;
+      to: string;
+      cancel: string;
+      apply: string;
+    };
+    metrics: {
       grossSales: string;
       orders: string;
-      pendingPickup: string;
-      inProgress: string;
+      averageOrderValue: string;
+      customers: string;
     };
-    paymentBreakdown: string;
-    paymentMethodLabels: {
+    salesTrend: {
+      title: string;
+      description: string;
+      empty: string;
+    };
+    orderStatus: {
+      title: string;
+      description: string;
+      empty: string;
+      labels: {
+        draft: string;
+        received: string;
+        paid: string;
+        delivered: string;
+        cancelled: string;
+      };
+    };
+    payments: {
+      title: string;
+      description: string;
+      empty: string;
+    };
+    paymentMethods: {
       cash: string;
       mobile: string;
       card: string;
       other: string;
     };
-    exports: string;
-    exportButtons: {
-      export: string;
-      zReport: string;
-    };
-    exportToasts: {
-      exported: string;
-      zReportExported: string;
-      failed: string;
-      noData: string;
-    };
-    csv: {
-      metricHeader: string;
-      valueHeader: string;
-      generatedAt: string;
-    };
-    zReport: {
+    operations: {
       title: string;
-      storeName: string;
-      period: string;
-      generatedAt: string;
-      totals: string;
+      description: string;
+      pendingPickup: string;
+      inProgress: string;
+      overdue: string;
+      snapshotHint: string;
     };
+    insight: {
+      badge: string;
+      overdueTitle: string;
+      overdueDescription: string;
+      pickupTitle: string;
+      pickupDescription: string;
+      topBranchTitle: string;
+      topBranchDescription: string;
+      healthyTitle: string;
+      healthyDescription: string;
+      action: string;
+    };
+    branches: {
+      title: string;
+      description: string;
+      branch: string;
+      orders: string;
+      sales: string;
+      share: string;
+      emptyTitle: string;
+      emptyDescription: string;
+    };
+    errorTitle: string;
+    errorDescription: string;
+  };
+
+  finance: {
+    title: string;
+    description: string;
+    generatedAt: string;
+    documentation: string;
+    exportCsv: string;
+    exporting: string;
+    notice: {
+      badge: string;
+      title: string;
+      description: string;
+    };
+    filters: {
+      dateRange: string;
+      branch: string;
+      allBranches: string;
+      currency: string;
+    };
+    presets: {
+      today: string;
+      last7Days: string;
+      last30Days: string;
+      last90Days: string;
+      thisMonth: string;
+      lastMonth: string;
+      custom: string;
+    };
+    customRange: {
+      title: string;
+      description: string;
+      from: string;
+      to: string;
+      cancel: string;
+      apply: string;
+    };
+    overview: {
+      title: string;
+      description: string;
+      netCollected: string;
+      netCollectedHint: string;
+      grossCollected: string;
+      refunds: string;
+      corrections: string;
+      transactions: string;
+      paidOrders: string;
+    };
+    trend: {
+      title: string;
+      description: string;
+      grossCollected: string;
+      netCollected: string;
+      empty: string;
+    };
+    position: {
+      title: string;
+      description: string;
+      pendingRefunds: string;
+      pendingRefundCount: string;
+      outstandingOrders: string;
+      outstandingOrderCount: string;
+    };
+    tools: {
+      title: string;
+      reports: string;
+      reportsDescription: string;
+      orders: string;
+      ordersDescription: string;
+    };
+    paymentMethods: {
+      title: string;
+      description: string;
+      gross: string;
+      refunds: string;
+      net: string;
+      transactions: string;
+      labels: {
+        cash: string;
+        card: string;
+        app: string;
+        unknown: string;
+      };
+      empty: string;
+    };
+    branches: {
+      title: string;
+      description: string;
+      branch: string;
+      gross: string;
+      refunds: string;
+      net: string;
+      transactions: string;
+      empty: string;
+    };
+    activity: {
+      title: string;
+      description: string;
+      date: string;
+      transaction: string;
+      branch: string;
+      method: string;
+      status: string;
+      amount: string;
+      order: string;
+      kinds: {
+        payment: string;
+        refund: string;
+        correction: string;
+      };
+      directions: {
+        credit: string;
+        debit: string;
+      };
+      statuses: {
+        paid: string;
+        refunded: string;
+        completed: string;
+      };
+      empty: string;
+    };
+    exportHeaders: {
+      id: string;
+      date: string;
+      type: string;
+      direction: string;
+      status: string;
+      amount: string;
+      currency: string;
+      method: string;
+      branch: string;
+      order: string;
+    };
+    errorTitle: string;
+    errorDescription: string;
   };
 
   auditLogs: {

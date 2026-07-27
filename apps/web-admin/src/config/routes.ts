@@ -30,12 +30,25 @@ export const webAdminRoutes = {
     customers: "/tenant/customers",
     products: "/tenant/products",
     newProduct: "/tenant/products/new",
+    product: (productId: string) =>
+      `/tenant/products/${encodeURIComponent(productId)}`,
+    discounts: "/tenant/discounts",
+    newDiscount: "/tenant/discounts/new",
+    discount: (discountId: string) =>
+      `/tenant/discounts/${encodeURIComponent(discountId)}`,
+    pointOfSale: {
+      home: "/tenant/point-of-sale",
+      devices: "/tenant/point-of-sale/devices",
+      registerSessions: "/tenant/point-of-sale/register-sessions",
+      settings: "/tenant/point-of-sale/settings",
+    },
     branches: "/tenant/branches",
     services: "/tenant/services",
     newService: "/tenant/services/new",
     prices: "/tenant/prices",
     hardware: "/tenant/hardware",
     reports: "/tenant/reports",
+    finance: "/tenant/finance",
     config: {
       branches: "/tenant/branches",
       services: "/tenant/services",

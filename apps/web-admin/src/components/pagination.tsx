@@ -32,6 +32,11 @@ type PaginationProps = {
   onOffsetChange: (nextOffset: number) => void;
   previousLabel: string;
   nextLabel: string;
+  formatCountLabel?: (range: {
+    from: number;
+    to: number;
+    total: number;
+  }) => string;
 };
 
 export function Pagination({
@@ -42,6 +47,7 @@ export function Pagination({
   onOffsetChange,
   previousLabel,
   nextLabel,
+  formatCountLabel,
 }: PaginationProps) {
   const hasPrev = offset > 0;
   const hasNext =
@@ -57,7 +63,13 @@ export function Pagination({
     <div className="flex items-center justify-between border-t px-5 py-3">
       {total != null ? (
         <span className="text-sm text-muted-foreground">
-          {rangeStart}–{rangeEnd} of {total}
+          {formatCountLabel
+            ? formatCountLabel({
+                from: rangeStart,
+                to: rangeEnd,
+                total,
+              })
+            : `${rangeStart}–${rangeEnd} of ${total}`}
         </span>
       ) : (
         <span />

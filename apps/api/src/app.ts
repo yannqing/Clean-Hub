@@ -27,9 +27,12 @@ import { createSaasRolesRoutes } from "./modules/saas/users/saas-roles.routes.js
 import { createSaasUsersRoutes } from "./modules/saas/users/saas-users.routes.js";
 import { createTenantAuditRoutes } from "./modules/tenant/audit/audit.routes.js";
 import { createTenantBackupRoutes } from "./modules/tenant/backups/backups.routes.js";
+import { createTenantDiscountRoutes } from "./modules/tenant/discounts/discounts.routes.js";
+import { createTenantFinanceRoutes } from "./modules/tenant/finance/finance.routes.js";
 import { createTenantHardwareRoutes } from "./modules/tenant/hardware/hardware.routes.js";
 import { createTenantBranchRoutes } from "./modules/tenant/branches/branches.routes.js";
 import { createTenantOverviewRoutes } from "./modules/tenant/overview/overview.routes.js";
+import { createTenantPosChannelRoutes } from "./modules/tenant/pos-channel/pos-channel.routes.js";
 import { createTenantPriceRoutes } from "./modules/tenant/prices/prices.routes.js";
 import { createTenantProductRoutes } from "./modules/tenant/products/products.routes.js";
 import { createTenantReportRoutes } from "./modules/tenant/reports/reports.routes.js";
@@ -131,6 +134,9 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.route("/tenant/prices", createTenantPriceRoutes());
   app.route("/tenant/products", createTenantProductRoutes());
   app.route("/tenant/backups", createTenantBackupRoutes());
+  app.route("/tenant/discounts", createTenantDiscountRoutes());
+  app.route("/tenant/finance", createTenantFinanceRoutes());
+  app.route("/tenant/pos-channel", createTenantPosChannelRoutes());
   app.route("/tenant/reports", createTenantReportRoutes());
 
   // POS 终端侧（收银员 / 店长 / 店主）
