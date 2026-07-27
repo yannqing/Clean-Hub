@@ -1,6 +1,12 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull, isNull } from "drizzle-orm";
 
-import { getDb, userBranches, type Database } from "@cleanhub/db";
+import {
+  getDb,
+  roles,
+  userBranches,
+  userRoles,
+  type Database,
+} from "@cleanhub/db";
 
 import { BranchScopeError } from "./branch-scope.errors.js";
 import { AuthError } from "./auth.errors.js";
@@ -19,17 +25,39 @@ export async function resolveAllowedBranchIds(
     return "all";
   }
 
-  const rows = await db
-    .select({ branchId: userBranches.branchId })
-    .from(userBranches)
-    .where(
-      and(
-        eq(userBranches.userId, authContext.userId),
-        eq(userBranches.tenantId, authContext.tenantId!),
+  const [directBranchRows, roleBranchRows] = await Promise.all([
+    db
+      .select({ branchId: userBranches.branchId })
+      .from(userBranches)
+      .where(
+        and(
+          eq(userBranches.userId, authContext.userId),
+          eq(userBranches.tenantId, authContext.tenantId!),
+        ),
       ),
-    );
+    db
+      .select({ branchId: userRoles.branchId })
+      .from(userRoles)
+      .innerJoin(roles, eq(roles.id, userRoles.roleId))
+      .where(
+        and(
+          eq(userRoles.userId, authContext.userId),
+          eq(userRoles.tenantId, authContext.tenantId!),
+          isNotNull(userRoles.branchId),
+          isNull(userRoles.revokedAt),
+          eq(roles.status, "active"),
+          isNull(roles.deletedAt),
+        ),
+      ),
+  ]);
 
-  return rows.map((row) => row.branchId);
+  return [
+    ...new Set(
+      [...directBranchRows, ...roleBranchRows]
+        .map((row) => row.branchId)
+        .filter((branchId): branchId is string => Boolean(branchId)),
+    ),
+  ];
 }
 
 export async function assertBranchAccess(
