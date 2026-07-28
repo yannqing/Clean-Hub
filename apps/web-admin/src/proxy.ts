@@ -67,6 +67,67 @@ function appendSetCookieHeaders(
   return response;
 }
 
+function createNextResponse(
+  request: NextRequest,
+  setCookieHeaders: string[] = [],
+): NextResponse {
+  if (setCookieHeaders.length === 0) {
+    return NextResponse.next();
+  }
+
+  const requestHeaders = new Headers(request.headers);
+  const cookieValues = new Map<string, string>();
+
+  for (const cookie of request.headers.get("cookie")?.split(";") ?? []) {
+    const separatorIndex = cookie.indexOf("=");
+
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    cookieValues.set(
+      cookie.slice(0, separatorIndex).trim(),
+      cookie.slice(separatorIndex + 1).trim(),
+    );
+  }
+
+  for (const setCookie of setCookieHeaders) {
+    const cookie = setCookie.split(";", 1)[0];
+    const separatorIndex = cookie?.indexOf("=") ?? -1;
+
+    if (!cookie || separatorIndex <= 0) {
+      continue;
+    }
+
+    const name = cookie.slice(0, separatorIndex).trim();
+    const value = cookie.slice(separatorIndex + 1).trim();
+
+    if (value) {
+      cookieValues.set(name, value);
+    } else {
+      cookieValues.delete(name);
+    }
+  }
+
+  if (cookieValues.size > 0) {
+    requestHeaders.set(
+      "cookie",
+      [...cookieValues].map(([name, value]) => `${name}=${value}`).join("; "),
+    );
+  } else {
+    requestHeaders.delete("cookie");
+  }
+
+  return appendSetCookieHeaders(
+    NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      },
+    }),
+    setCookieHeaders,
+  );
+}
+
 function createRedirect(
   request: NextRequest,
   path: string,
@@ -129,7 +190,9 @@ async function requestAuthContext(
   }
 }
 
-async function resolveAuth(request: NextRequest): Promise<AuthResolution | null> {
+async function resolveAuth(
+  request: NextRequest,
+): Promise<AuthResolution | null> {
   const accessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
   const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
 
@@ -159,10 +222,7 @@ export async function proxy(request: NextRequest) {
 
     const defaultPath = getWebAdminHomePath(auth.authContext);
     if (!defaultPath) {
-      return appendSetCookieHeaders(
-        NextResponse.next(),
-        auth.setCookieHeaders,
-      );
+      return createNextResponse(request, auth.setCookieHeaders);
     }
 
     return createRedirect(request, defaultPath, auth.setCookieHeaders);
@@ -194,7 +254,7 @@ export async function proxy(request: NextRequest) {
     return createRedirect(request, defaultPath, auth.setCookieHeaders);
   }
 
-  return appendSetCookieHeaders(NextResponse.next(), auth.setCookieHeaders);
+  return createNextResponse(request, auth.setCookieHeaders);
 }
 
 export const config = {
