@@ -24,7 +24,7 @@ import { todoCenterTotal } from "../types";
  * a load error just leaves the previous count (or none) so a transient backend
  * issue never blocks the header. The bell link itself stays clickable regardless.
  */
-export function TodoCenterBell() {
+export function TodoCenterBell({ className }: { className?: string }) {
   const { m } = useSaasI18n();
   const pathname = usePathname();
   const [count, setCount] = useState<number | null>(null);
@@ -67,6 +67,7 @@ export function TodoCenterBell() {
         "relative inline-flex size-9 shrink-0 items-center justify-center rounded-md text-foreground transition-colors",
         "hover:bg-accent hover:text-accent-foreground",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        className,
       )}
       href={webAdminRoutes.saas.todos}
       onClick={() => void refresh()}

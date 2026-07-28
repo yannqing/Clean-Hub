@@ -110,7 +110,36 @@ export const saasMessagesZhCN: SaasMessages = {
   overview: {
     badge: "SaaS 平台",
     title: "平台概览",
+    welcomeTitle: "欢迎来到 CleanHub！今天想先处理什么？",
+    searchLabel: "在平台工作区搜索",
+    searchPlaceholder: "搜索租户、用户、工单或日志...",
+    quickActionsLabel: "打开快捷入口",
+    sendLabel: "发送搜索内容",
+    recommendations: [
+      "查看最近新增的租户",
+      "有哪些反馈工单需要跟进？",
+      "查看今日平台运营数据",
+      "检查最近的安全事件",
+    ],
     loadError: "加载平台概览失败。",
+    quickEntries: {
+      tenants: {
+        title: "租户管理",
+        description: "查看租户资料、运行状态与平台配置。",
+      },
+      users: {
+        title: "平台用户",
+        description: "管理运营成员、角色与账户状态。",
+      },
+      feedback: {
+        title: "反馈工单",
+        description: "集中处理客户反馈与待跟进事项。",
+      },
+      security: {
+        title: "安全中心",
+        description: "查看安全策略、登录规则与风险事件。",
+      },
+    },
     metrics: {
       tenants: "租户",
       activeTenants: "活跃租户",
@@ -273,6 +302,7 @@ export const saasMessagesZhCN: SaasMessages = {
     inviteMember: "邀请成员",
     readOnlyHint:
       "支持人员可查看平台成员与角色。成员编辑、角色变更与禁用操作需要超级管理员权限。",
+    sessionReadOnlyHint: "当前会话无法验证，成员管理已切换为只读：{error}",
     roleRefreshError: "无法刷新角色选项：{error}",
     loadError: "加载平台成员失败。",
     emptyTitle: "未找到平台成员",
@@ -319,6 +349,13 @@ export const saasMessagesZhCN: SaasMessages = {
       timezone: "时区",
       success: "平台成员已更新。",
       failed: "更新失败。",
+    },
+    detail: {
+      title: "平台成员详情",
+      account: "账户",
+      activity: "活动",
+      userId: "用户 ID",
+      notProvided: "未提供",
     },
     roles: {
       title: "编辑平台角色",
@@ -397,6 +434,14 @@ export const saasMessagesZhCN: SaasMessages = {
       actor: "操作者",
       request: "请求",
       none: "无",
+    },
+    detail: {
+      title: "操作日志详情",
+      id: "日志 ID",
+      eventType: "事件类型",
+      branch: "门店",
+      metadata: "元数据",
+      noMetadata: "没有记录元数据",
     },
   },
   backups: {
@@ -505,6 +550,13 @@ export const saasMessagesZhCN: SaasMessages = {
       eventTypePlaceholder: "login_failed",
       tenantId: "租户 ID",
       noDescription: "无描述",
+      detailTitle: "安全事件详情",
+      eventId: "事件 ID",
+      branch: "门店",
+      userAgent: "用户代理",
+      metadata: "元数据",
+      notCaptured: "未记录",
+      noMetadata: "无元数据",
       columns: {
         created: "创建时间",
         description: "描述",
@@ -555,6 +607,7 @@ export const saasMessagesZhCN: SaasMessages = {
       submit: "更新受理人",
     },
     batch: {
+      ariaLabel: "批量操作",
       selected: "已选",
       selectAll: "全选",
       clear: "清除选择",

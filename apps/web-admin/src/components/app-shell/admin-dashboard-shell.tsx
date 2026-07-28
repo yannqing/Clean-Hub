@@ -1,42 +1,37 @@
 "use client";
 
 import type { AuthContext } from "@cleanhub/api-client";
-import { Card, CardContent, Icon, cn } from "@cleanhub/ui";
+import { Icon, cn } from "@cleanhub/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { LanguageSwitcher } from "@/components/i18n";
 import { filterSidebarSections } from "@/config/feature-visibility";
 import { getNavIcon } from "@/config/nav-icons";
 import { webAdminRoutes } from "@/config/routes";
-import { LogoutButton } from "@/features/auth/components";
 import { getAuthSessionQuery } from "@/features/auth/queries";
-import { TodoCenterBell } from "@/features/saas/todo-center/components";
+import {
+  SAAS_PROFILE_UPDATED_EVENT,
+  type SaasProfileUpdatedEventDetail,
+} from "@/features/saas/profile";
 import { useWebAdminLocale } from "@/i18n";
+
+import { SaasGlobalHeader } from "./saas-global-header";
 
 type AdminDashboardShellProps = {
   children: React.ReactNode;
   scope: "saas" | "tenant";
 };
 
-function isDashboardHref(href: string): boolean {
-  return href === "/saas" || href === "/tenant";
-}
-
 function isActivePath(pathname: string, href: string): boolean {
-  if (href === "/") {
-    return pathname === href;
-  }
-
-  if (isDashboardHref(href)) {
+  if (href === webAdminRoutes.saas.home) {
     return pathname === href;
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function getProfileLabel(authContext: AuthContext | null): string {
+function getRoleLabel(authContext: AuthContext | null): string {
   if (!authContext) {
     return "Admin User";
   }
@@ -47,16 +42,8 @@ function getProfileLabel(authContext: AuthContext | null): string {
     .join(" ");
 }
 
-function getProfileInitials(authContext: AuthContext | null): string {
-  if (!authContext) {
-    return "AD";
-  }
-
-  return authContext.role
-    .split("_")
-    .slice(0, 2)
-    .map((part: string) => part.charAt(0).toUpperCase())
-    .join("");
+function getDisplayName(authContext: AuthContext | null): string {
+  return authContext?.displayName.trim() || getRoleLabel(authContext);
 }
 
 export function AdminDashboardShell({
@@ -67,19 +54,17 @@ export function AdminDashboardShell({
   const router = useRouter();
   const { messages } = useWebAdminLocale();
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
-  const copy = messages.shell[scope];
-  const sidebarSections = useMemo(
-    () => filterSidebarSections(messages.sidebar[scope]),
-    [messages.sidebar, scope],
+  const platformSettingsHref = webAdminRoutes.saas.config.platformSettings;
+  const sidebarItems = useMemo(
+    () =>
+      filterSidebarSections(messages.sidebar.saas)
+        .flatMap((section) => section.items)
+        .filter((item) => item.href !== platformSettingsHref),
+    [messages.sidebar.saas, platformSettingsHref],
   );
-  const profileHref =
-    scope === "saas" ? webAdminRoutes.saas.profile : webAdminRoutes.tenant.profile;
-  const profileActive = isActivePath(pathname, profileHref);
-  const profileLabel = useMemo(() => getProfileLabel(authContext), [authContext]);
-  const profileInitials = useMemo(
-    () => getProfileInitials(authContext),
-    [authContext],
-  );
+  const settingsActive = isActivePath(pathname, platformSettingsHref);
+  const SettingsIcon = getNavIcon(platformSettingsHref);
+  const displayName = useMemo(() => getDisplayName(authContext), [authContext]);
 
   useEffect(() => {
     let active = true;
@@ -105,140 +90,123 @@ export function AdminDashboardShell({
     };
   }, [router]);
 
+  useEffect(() => {
+    function handleProfileUpdated(event: Event) {
+      const detail = (event as CustomEvent<SaasProfileUpdatedEventDetail>)
+        .detail;
+
+      if (!detail?.displayName) {
+        return;
+      }
+
+      setAuthContext((current) =>
+        current ? { ...current, displayName: detail.displayName } : current,
+      );
+    }
+
+    window.addEventListener(SAAS_PROFILE_UPDATED_EVENT, handleProfileUpdated);
+
+    return () => {
+      window.removeEventListener(
+        SAAS_PROFILE_UPDATED_EVENT,
+        handleProfileUpdated,
+      );
+    };
+  }, []);
+
+  if (scope !== "saas") {
+    return children;
+  }
+
   return (
-    <div className="min-h-screen bg-muted/30 text-foreground">
-      <div className="grid min-h-screen lg:grid-cols-[280px_1fr]">
-        <aside className="flex min-h-screen flex-col border-b bg-sidebar px-4 py-5 text-sidebar-foreground lg:border-b-0 lg:border-r">
-          <div className="flex items-center gap-3 border-b pb-5">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-semibold text-primary-foreground">
-              CH
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">CleanHub</p>
-              <p className="truncate text-xs text-muted-foreground">
-                {copy.eyebrow}
-              </p>
-            </div>
-          </div>
+    <div
+      className="min-h-screen bg-muted/30 text-foreground"
+      data-testid="saas-dashboard-shell"
+    >
+      <SaasGlobalHeader
+        authContext={authContext}
+        copy={messages.shell.saas.header}
+        displayName={displayName}
+      />
 
+      <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-[240px_minmax(0,1fr)]">
+        <aside
+          className="flex flex-col border-b bg-sidebar px-3 py-4 text-sidebar-foreground lg:sticky lg:top-16 lg:h-[calc(100vh-4rem)] lg:border-b-0 lg:border-r"
+          data-testid="saas-sidebar"
+        >
           <nav
-            aria-label={`${scope} sidebar`}
-            className="mt-5 grid flex-1 content-start gap-6 overflow-y-auto pb-5"
+            aria-label="saas sidebar"
+            className="grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pb-5"
           >
-            {sidebarSections.map((section) => (
-              <section className="grid gap-2" key={section.title}>
-                <p className="px-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {section.title}
-                </p>
-                <div className="grid gap-1">
-                  {section.items.map((item) => {
-                    const active = isActivePath(pathname, item.href);
-                    const IconComponent = getNavIcon(item.href);
+            {sidebarItems.map((item) => {
+              const active = isActivePath(pathname, item.href);
+              const IconComponent = getNavIcon(item.href);
 
-                    return (
-                      <Link
-                        aria-current={active ? "page" : undefined}
-                        className={cn(
-                          "group relative flex h-9 items-center gap-2.5 rounded-md px-3 text-sm font-medium transition-colors",
-                          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                          active
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
-                            : "text-muted-foreground",
-                        )}
-                        href={item.href}
-                        key={item.href}
-                      >
-                        <span
-                          className={cn(
-                            "absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity",
-                            active && "opacity-100",
-                          )}
-                        />
-                        {IconComponent ? (
-                          <Icon
-                            aria-hidden
-                            className={cn(
-                              "text-muted-foreground transition-colors",
-                              active &&
-                                "text-sidebar-accent-foreground",
-                            )}
-                            icon={IconComponent}
-                          />
-                        ) : null}
-                        <span className="truncate">{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </section>
-            ))}
+              return (
+                <Link
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "group relative flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                    "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    active
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                      : "text-muted-foreground",
+                  )}
+                  href={item.href}
+                  key={item.href}
+                >
+                  <span
+                    className={cn(
+                      "absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity",
+                      active && "opacity-100",
+                    )}
+                  />
+                  {IconComponent ? (
+                    <Icon
+                      aria-hidden
+                      className={cn(
+                        "text-muted-foreground transition-colors",
+                        active && "text-sidebar-accent-foreground",
+                      )}
+                      icon={IconComponent}
+                      size={16}
+                    />
+                  ) : null}
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
           </nav>
 
-          <div className="border-t pt-4">
-            <div className="flex items-center gap-2">
-              <Link
-                aria-current={profileActive ? "page" : undefined}
-                className={cn(
-                  "group flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 transition-colors",
-                  "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  profileActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground",
-                )}
-                href={profileHref}
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground ring-1 ring-border">
-                  {profileInitials}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">
-                    {profileLabel}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {messages.common.personalCenter}
-                  </span>
-                </span>
-              </Link>
-
-              <LogoutButton
-                className="h-9 px-3 text-xs"
-                signOutLabel={messages.common.signOut}
-                signingOutLabel={messages.common.signingOut}
-              />
-            </div>
+          <div className="border-t pt-3">
+            <Link
+              aria-current={settingsActive ? "page" : undefined}
+              className={cn(
+                "flex h-9 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                settingsActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-muted-foreground",
+              )}
+              href={platformSettingsHref}
+            >
+              {SettingsIcon ? (
+                <Icon aria-hidden icon={SettingsIcon} size={16} />
+              ) : null}
+              <span className="truncate">
+                {
+                  messages.sidebar.saas
+                    .flatMap((section) => section.items)
+                    .find((item) => item.href === platformSettingsHref)?.label
+                }
+              </span>
+            </Link>
           </div>
         </aside>
 
-        <div className="min-w-0">
-          <header className="border-b bg-background/95 px-5 py-4 lg:px-8">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  {copy.eyebrow}
-                </p>
-                <h2 className="mt-1 text-2xl font-semibold">{copy.title}</h2>
-                <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                  {copy.description}
-                </p>
-              </div>
-
-              {scope === "saas" ? (
-                <div className="flex items-center gap-2">
-                  <TodoCenterBell />
-                  <LanguageSwitcher />
-                </div>
-              ) : null}
-            </div>
-          </header>
-
-          <main className="px-5 py-6 lg:px-8">
-            <Card className="rounded-lg">
-              <CardContent className="p-0">{children}</CardContent>
-            </Card>
-          </main>
-        </div>
+        <main className="min-w-0 px-5 py-6 lg:px-8">{children}</main>
       </div>
     </div>
   );

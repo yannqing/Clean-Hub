@@ -111,7 +111,36 @@ export const saasMessagesEn: SaasMessages = {
   overview: {
     badge: "SaaS platform",
     title: "Platform Overview",
+    welcomeTitle: "Welcome to CleanHub. What would you like to handle first?",
+    searchLabel: "Search the platform workspace",
+    searchPlaceholder: "Search tenants, users, tickets, or logs...",
+    quickActionsLabel: "Open quick actions",
+    sendLabel: "Submit search",
+    recommendations: [
+      "Review recently added tenants",
+      "Which feedback tickets need attention?",
+      "Show today's platform activity",
+      "Check recent security events",
+    ],
     loadError: "Failed to load platform overview.",
+    quickEntries: {
+      tenants: {
+        title: "Tenant management",
+        description: "Review tenant profiles, status, and platform settings.",
+      },
+      users: {
+        title: "Platform users",
+        description: "Manage operators, roles, and account status.",
+      },
+      feedback: {
+        title: "Feedback tickets",
+        description: "Triage customer feedback and outstanding follow-ups.",
+      },
+      security: {
+        title: "Security center",
+        description: "Review policies, sign-in rules, and risk events.",
+      },
+    },
     metrics: {
       tenants: "Tenants",
       activeTenants: "Active tenants",
@@ -251,7 +280,8 @@ export const saasMessagesEn: SaasMessages = {
         },
         carWash: {
           label: "Car wash",
-          description: "Car wash services, pricing, and operations entry points.",
+          description:
+            "Car wash services, pricing, and operations entry points.",
         },
         retail: {
           label: "Retail products",
@@ -276,6 +306,8 @@ export const saasMessagesEn: SaasMessages = {
     inviteMember: "Invite member",
     readOnlyHint:
       "Support users can view platform members and roles. Member edits, role changes, and disable actions require Super Admin.",
+    sessionReadOnlyHint:
+      "Member management is read-only because the current session could not be verified: {error}",
     roleRefreshError: "Role options could not be refreshed: {error}",
     loadError: "Failed to load platform members.",
     emptyTitle: "No platform members found",
@@ -323,6 +355,13 @@ export const saasMessagesEn: SaasMessages = {
       timezone: "Timezone",
       success: "Platform member updated successfully.",
       failed: "Update failed.",
+    },
+    detail: {
+      title: "Platform member details",
+      account: "Account",
+      activity: "Activity",
+      userId: "User ID",
+      notProvided: "Not provided",
     },
     roles: {
       title: "Edit platform roles",
@@ -404,6 +443,14 @@ export const saasMessagesEn: SaasMessages = {
       actor: "Actor",
       request: "Request",
       none: "None",
+    },
+    detail: {
+      title: "Operation log detail",
+      id: "Log ID",
+      eventType: "Event type",
+      branch: "Branch",
+      metadata: "Metadata",
+      noMetadata: "No metadata was recorded",
     },
   },
   backups: {
@@ -513,6 +560,13 @@ export const saasMessagesEn: SaasMessages = {
       eventTypePlaceholder: "login_failed",
       tenantId: "Tenant ID",
       noDescription: "No description",
+      detailTitle: "Security Event Detail",
+      eventId: "Event ID",
+      branch: "Branch",
+      userAgent: "User agent",
+      metadata: "Metadata",
+      notCaptured: "Not captured",
+      noMetadata: "No metadata",
       columns: {
         created: "Created",
         description: "Description",
@@ -564,6 +618,7 @@ export const saasMessagesEn: SaasMessages = {
       submit: "Update assignee",
     },
     batch: {
+      ariaLabel: "Batch actions",
       selected: "selected",
       selectAll: "Select all",
       clear: "Clear selection",
@@ -617,7 +672,12 @@ export const saasMessagesEn: SaasMessages = {
       title: "Feature Flags",
       description:
         "Platform feature switches used to control tenant rollout, experiments, and module visibility.",
-      items: ["Tenant rollout", "Module switches", "Experiments", "Release notes"],
+      items: [
+        "Tenant rollout",
+        "Module switches",
+        "Experiments",
+        "Release notes",
+      ],
     },
     localization: {
       title: "Localization",
@@ -629,7 +689,8 @@ export const saasMessagesEn: SaasMessages = {
   todoCenter: {
     openTodoCenter: "Open My Todo",
     emptyTitle: "You're all caught up",
-    emptyBody: "No actionable items across feedback, restore requests, or security events.",
+    emptyBody:
+      "No actionable items across feedback, restore requests, or security events.",
     badge: "My Todo",
     title: "My Todo",
     description:

@@ -7,9 +7,21 @@ export const webAdminRoutes = {
     profile: "/saas/profile",
     tenants: "/saas/tenants",
     newTenant: "/saas/tenants/new",
+    tenant: (tenantId: string) =>
+      `/saas/tenants/${encodeURIComponent(tenantId)}`,
+    tenantSettings: (tenantId: string) =>
+      `/saas/tenants/${encodeURIComponent(tenantId)}/settings`,
     users: "/saas/users",
+    newUser: "/saas/users/new",
+    user: (userId: string) => `/saas/users/${encodeURIComponent(userId)}`,
+    editUser: (userId: string) =>
+      `/saas/users/${encodeURIComponent(userId)}/edit`,
     auditLogs: "/saas/audit-logs",
+    auditLog: (logId: string) =>
+      `/saas/audit-logs/${encodeURIComponent(logId)}`,
     feedbackTickets: "/saas/feedback-tickets",
+    feedbackTicket: (ticketId: string) =>
+      `/saas/feedback-tickets/${encodeURIComponent(ticketId)}`,
     todos: "/saas/todos",
     config: {
       tenants: "/saas/tenants",
@@ -19,8 +31,12 @@ export const webAdminRoutes = {
     },
     system: {
       logs: "/saas/system/logs",
+      operationLog: (logId: string) =>
+        `/saas/system/logs/${encodeURIComponent(logId)}`,
       backups: "/saas/system/backups",
       security: "/saas/system/security",
+      securityEvent: (eventId: string) =>
+        `/saas/system/security/${encodeURIComponent(eventId)}`,
     },
   },
   tenant: {

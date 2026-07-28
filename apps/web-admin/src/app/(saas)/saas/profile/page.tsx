@@ -1,5 +1,5 @@
-import { SaasPagePlaceholder } from "@/components/app-shell/saas-page-placeholder";
+import { SaasProfileView } from "@/features/saas/profile";
 
 export default function SaasProfilePage() {
-  return <SaasPagePlaceholder page="profile" />;
+  return <SaasProfileView />;
 }

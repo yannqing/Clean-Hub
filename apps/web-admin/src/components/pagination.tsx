@@ -28,6 +28,8 @@ type PaginationProps = {
   total?: number;
   /** Number of items actually returned for the current page. */
   currentPageCount: number;
+  /** Explicit next-page availability when the caller fetched one look-ahead row. */
+  hasNext?: boolean;
   /** Called with the next offset to load. */
   onOffsetChange: (nextOffset: number) => void;
   previousLabel: string;
@@ -44,6 +46,7 @@ export function Pagination({
   pageSize,
   total,
   currentPageCount,
+  hasNext: hasNextOverride,
   onOffsetChange,
   previousLabel,
   nextLabel,
@@ -51,7 +54,8 @@ export function Pagination({
 }: PaginationProps) {
   const hasPrev = offset > 0;
   const hasNext =
-    total != null ? offset + pageSize < total : currentPageCount >= pageSize;
+    hasNextOverride ??
+    (total != null ? offset + pageSize < total : currentPageCount >= pageSize);
 
   // When the page is empty (e.g. zero results) the "1–0 of 0" range is noise,
   // so prefer "0 of 0" in that case.

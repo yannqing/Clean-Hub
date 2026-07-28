@@ -109,7 +109,31 @@ export type SaasMessages = {
   overview: {
     badge: string;
     title: string;
+    welcomeTitle: string;
+    searchLabel: string;
+    searchPlaceholder: string;
+    quickActionsLabel: string;
+    sendLabel: string;
+    recommendations: string[];
     loadError: string;
+    quickEntries: {
+      tenants: {
+        title: string;
+        description: string;
+      };
+      users: {
+        title: string;
+        description: string;
+      };
+      feedback: {
+        title: string;
+        description: string;
+      };
+      security: {
+        title: string;
+        description: string;
+      };
+    };
     metrics: {
       tenants: string;
       activeTenants: string;
@@ -254,6 +278,7 @@ export type SaasMessages = {
     title: string;
     inviteMember: string;
     readOnlyHint: string;
+    sessionReadOnlyHint: string;
     roleRefreshError: string;
     loadError: string;
     emptyTitle: string;
@@ -299,6 +324,13 @@ export type SaasMessages = {
       timezone: string;
       success: string;
       failed: string;
+    };
+    detail: {
+      title: string;
+      account: string;
+      activity: string;
+      userId: string;
+      notProvided: string;
     };
     roles: {
       title: string;
@@ -377,6 +409,14 @@ export type SaasMessages = {
       actor: string;
       request: string;
       none: string;
+    };
+    detail: {
+      title: string;
+      id: string;
+      eventType: string;
+      branch: string;
+      metadata: string;
+      noMetadata: string;
     };
   };
   backups: {
@@ -485,6 +525,13 @@ export type SaasMessages = {
       eventTypePlaceholder: string;
       tenantId: string;
       noDescription: string;
+      detailTitle: string;
+      eventId: string;
+      branch: string;
+      userAgent: string;
+      metadata: string;
+      notCaptured: string;
+      noMetadata: string;
       columns: {
         created: string;
         description: string;
@@ -535,6 +582,7 @@ export type SaasMessages = {
       submit: string;
     };
     batch: {
+      ariaLabel: string;
       selected: string;
       selectAll: string;
       clear: string;
