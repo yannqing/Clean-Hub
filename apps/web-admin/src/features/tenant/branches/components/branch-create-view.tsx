@@ -1,8 +1,10 @@
 "use client";
 
 import {
-  Badge,
   Button,
+  Card,
+  CardContent,
+  Icon,
   Input,
   Label,
   Select,
@@ -13,6 +15,7 @@ import {
   Textarea,
   toast,
 } from "@cleanhub/ui";
+import { Check, ChevronRight, LoaderCircle, Store } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
@@ -21,23 +24,27 @@ import { webAdminRoutes } from "@/config/routes";
 import { useTenantI18n } from "@/i18n";
 
 import { createBranchAction } from "../actions";
-import {
-  branchLanguageValues,
-  emptyBranchFormValues,
-} from "../constants";
-import type {
-  BranchFormValues,
-  BranchLanguage,
-  BranchStatus,
-} from "../types";
+import { branchLanguageValues, emptyBranchFormValues } from "../constants";
+import type { BranchFormValues, BranchLanguage, BranchStatus } from "../types";
 
 export type BranchCreateViewProps = {
+  basePath?: string;
   defaultsWarning?: string;
+  embedded?: boolean;
   initialDefaultCurrency?: string;
   initialDefaultLanguage?: BranchLanguage;
 };
 
+function FieldError({ message }: { message?: string }) {
+  return message ? (
+    <p className="text-xs text-destructive" role="alert">
+      {message}
+    </p>
+  ) : null;
+}
+
 export function BranchCreateView({
+  basePath = webAdminRoutes.tenant.branches,
   defaultsWarning,
   initialDefaultCurrency,
   initialDefaultLanguage,
@@ -61,14 +68,8 @@ export function BranchCreateView({
     key: K,
     value: BranchFormValues[K],
   ): void {
-    setFormValues((current) => ({
-      ...current,
-      [key]: value,
-    }));
-    setErrors((current) => ({
-      ...current,
-      [key]: undefined,
-    }));
+    setFormValues((current) => ({ ...current, [key]: value }));
+    setErrors((current) => ({ ...current, [key]: undefined }));
     setFormError(null);
   }
 
@@ -88,13 +89,11 @@ export function BranchCreateView({
       }
 
       toast.success(m.branches.create.created);
-      router.push(`${webAdminRoutes.tenant.branches}/${result.data.id}`);
+      router.push(`${basePath}/${result.data.id}`);
       router.refresh();
     } catch (submitError) {
       const message =
-        submitError instanceof Error
-          ? submitError.message
-          : m.common.requestFailed;
+        submitError instanceof Error ? submitError.message : m.common.requestFailed;
       setFormError(message);
       toast.error(message);
     } finally {
@@ -102,258 +101,276 @@ export function BranchCreateView({
     }
   }
 
+  const pageTitle = m.branches.create.title;
+
   return (
-    <section className="grid gap-6 p-5">
-      <div className="flex flex-col gap-4 border-b pb-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <Badge variant="secondary">{m.branches.create.badge}</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {m.branches.create.title}
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            {m.branches.create.description}
-          </p>
-        </div>
+    <section
+      className="mx-auto w-full max-w-[960px] space-y-3 pb-20"
+      data-testid="tenant-branch-create-view"
+    >
+      <h1 className="sr-only">{pageTitle}</h1>
+      <nav aria-label={m.branches.title}>
+        <ol className="flex items-center gap-2 text-sm">
+          <li>
+            <Link
+              aria-label={m.branches.title}
+              className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              href={basePath}
+              title={m.branches.title}
+            >
+              <Icon aria-hidden icon={Store} size={16} />
+            </Link>
+          </li>
+          <li aria-hidden className="text-muted-foreground">
+            <Icon aria-hidden icon={ChevronRight} size={14} />
+          </li>
+          <li>
+            <span aria-current="page" className="font-medium">
+              {pageTitle}
+            </span>
+          </li>
+        </ol>
+      </nav>
 
-        <Button asChild type="button" variant="outline">
-          <Link href={webAdminRoutes.tenant.branches}>
-            {m.common.backToList}
-          </Link>
-        </Button>
-      </div>
-
-      <form
-        className="grid gap-5 rounded-md border bg-background p-5"
-        onSubmit={handleCreate}
-      >
+      <form className="space-y-5" noValidate onSubmit={handleCreate}>
         {defaultsWarning ? (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm text-foreground">
+          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm" role="alert">
             {defaultsWarning}
-          </div>
+          </p>
         ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-[1fr_180px_160px]">
-          <div className="grid gap-2">
-            <Label htmlFor="branch-name">{m.branches.create.fields.name}</Label>
-            <Input
-              aria-invalid={Boolean(errors.name)}
-              id="branch-name"
-              onChange={(event) => updateForm("name", event.target.value)}
-              value={formValues.name}
-            />
-            {errors.name ? (
-              <p className="text-xs text-destructive">{errors.name}</p>
-            ) : null}
+        <fieldset className="contents" disabled={saving}>
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="grid gap-5">
+              <Card className="gap-0 rounded-lg py-0 shadow-none">
+                <CardContent className="grid gap-4 py-5">
+                  <div className="grid gap-2">
+                    <Label htmlFor="branch-name">
+                      {m.branches.create.fields.name}
+                    </Label>
+                    <Input
+                      aria-invalid={Boolean(errors.name)}
+                      id="branch-name"
+                      onChange={(event) => updateForm("name", event.target.value)}
+                      required
+                      value={formValues.name}
+                    />
+                    <FieldError message={errors.name} />
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="branch-phone">
+                        {m.branches.create.fields.phone}
+                      </Label>
+                      <Input
+                        aria-invalid={Boolean(errors.phone)}
+                        id="branch-phone"
+                        onChange={(event) => updateForm("phone", event.target.value)}
+                        value={formValues.phone}
+                      />
+                      <FieldError message={errors.phone} />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="branch-logo-url">
+                        {m.branches.create.fields.logoUrl}
+                      </Label>
+                      <Input
+                        aria-invalid={Boolean(errors.logoUrl)}
+                        id="branch-logo-url"
+                        onChange={(event) => updateForm("logoUrl", event.target.value)}
+                        value={formValues.logoUrl}
+                      />
+                      <FieldError message={errors.logoUrl} />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="gap-0 rounded-lg py-0 shadow-none">
+                <CardContent className="grid gap-4 py-5">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Label htmlFor="branch-receipt-name">
+                        {m.branches.create.fields.receiptName}
+                      </Label>
+                      <Input
+                        aria-invalid={Boolean(errors.receiptName)}
+                        id="branch-receipt-name"
+                        onChange={(event) =>
+                          updateForm("receiptName", event.target.value)
+                        }
+                        value={formValues.receiptName}
+                      />
+                      <FieldError message={errors.receiptName} />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="branch-receipt-phone">
+                        {m.branches.create.fields.receiptPhone}
+                      </Label>
+                      <Input
+                        aria-invalid={Boolean(errors.receiptPhone)}
+                        id="branch-receipt-phone"
+                        onChange={(event) =>
+                          updateForm("receiptPhone", event.target.value)
+                        }
+                        value={formValues.receiptPhone}
+                      />
+                      <FieldError message={errors.receiptPhone} />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="branch-address">
+                      {m.branches.create.fields.address}
+                    </Label>
+                    <Textarea
+                      aria-invalid={Boolean(errors.address)}
+                      id="branch-address"
+                      onChange={(event) => updateForm("address", event.target.value)}
+                      value={formValues.address}
+                    />
+                    <FieldError message={errors.address} />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="branch-receipt-address">
+                      {m.branches.create.fields.receiptAddress}
+                    </Label>
+                    <Textarea
+                      aria-invalid={Boolean(errors.receiptAddress)}
+                      id="branch-receipt-address"
+                      onChange={(event) =>
+                        updateForm("receiptAddress", event.target.value)
+                      }
+                      value={formValues.receiptAddress}
+                    />
+                    <FieldError message={errors.receiptAddress} />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="branch-business-hours">
+                      {m.branches.create.fields.businessHoursJson}
+                    </Label>
+                    <Textarea
+                      aria-invalid={Boolean(errors.businessHoursJson)}
+                      id="branch-business-hours"
+                      onChange={(event) =>
+                        updateForm("businessHoursJson", event.target.value)
+                      }
+                      placeholder={m.branches.create.businessHoursPlaceholder}
+                      value={formValues.businessHoursJson}
+                    />
+                    <FieldError message={errors.businessHoursJson} />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <aside className="grid self-start gap-5 lg:sticky lg:top-20">
+              <Card className="gap-0 rounded-lg py-0 shadow-none">
+                <CardContent className="grid gap-4 py-5">
+                  <div className="grid gap-2">
+                    <Label htmlFor="branch-currency">
+                      {m.branches.create.fields.currency}
+                    </Label>
+                    <Input
+                      aria-invalid={Boolean(errors.defaultCurrency)}
+                      id="branch-currency"
+                      maxLength={3}
+                      onChange={(event) =>
+                        updateForm("defaultCurrency", event.target.value.toUpperCase())
+                      }
+                      value={formValues.defaultCurrency}
+                    />
+                    <FieldError message={errors.defaultCurrency} />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="branch-language">
+                      {m.branches.create.fields.defaultLanguage}
+                    </Label>
+                    <Select
+                      onValueChange={(value) =>
+                        updateForm("defaultLanguage", value as BranchLanguage)
+                      }
+                      value={formValues.defaultLanguage}
+                    >
+                      <SelectTrigger id="branch-language">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {branchLanguageValues.map((value) => (
+                          <SelectItem key={value} value={value}>
+                            {m.common.languageLabels[value]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldError message={errors.defaultLanguage} />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="branch-form-status">
+                      {m.branches.create.fields.status}
+                    </Label>
+                    <Select
+                      onValueChange={(value) =>
+                        updateForm("status", value as BranchStatus)
+                      }
+                      value={formValues.status}
+                    >
+                      <SelectTrigger id="branch-form-status">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">
+                          {m.common.statusLabels.active}
+                        </SelectItem>
+                        <SelectItem value="inactive">
+                          {m.common.statusLabels.inactive}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FieldError message={errors.status} />
+                  </div>
+                </CardContent>
+              </Card>
+            </aside>
           </div>
 
-          <div className="grid gap-2">
-            <Label htmlFor="branch-phone">
-              {m.branches.create.fields.phone}
-            </Label>
-            <Input
-              aria-invalid={Boolean(errors.phone)}
-              id="branch-phone"
-              onChange={(event) => updateForm("phone", event.target.value)}
-              value={formValues.phone}
-            />
-            {errors.phone ? (
-              <p className="text-xs text-destructive">{errors.phone}</p>
-            ) : null}
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="branch-currency">
-              {m.branches.create.fields.currency}
-            </Label>
-            <Input
-              aria-invalid={Boolean(errors.defaultCurrency)}
-              id="branch-currency"
-              maxLength={3}
-              onChange={(event) =>
-                updateForm("defaultCurrency", event.target.value.toUpperCase())
-              }
-              value={formValues.defaultCurrency}
-            />
-            {errors.defaultCurrency ? (
-              <p className="text-xs text-destructive">
-                {errors.defaultCurrency}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-3">
-          <div className="grid gap-2">
-            <Label htmlFor="branch-language">
-              {m.branches.create.fields.defaultLanguage}
-            </Label>
-            <Select
-              onValueChange={(value) =>
-                updateForm("defaultLanguage", value as BranchLanguage)
-              }
-              value={formValues.defaultLanguage}
+          {formError ? (
+            <p
+              className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+              role="alert"
             >
-              <SelectTrigger id="branch-language">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {branchLanguageValues.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    {m.common.languageLabels[value]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.defaultLanguage ? (
-              <p className="text-xs text-destructive">
-                {errors.defaultLanguage}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="branch-form-status">
-              {m.branches.create.fields.status}
-            </Label>
-            <Select
-              onValueChange={(value) =>
-                updateForm("status", value as BranchStatus)
-              }
-              value={formValues.status}
-            >
-              <SelectTrigger id="branch-form-status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">
-                  {m.common.statusLabels.active}
-                </SelectItem>
-                <SelectItem value="inactive">
-                  {m.common.statusLabels.inactive}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            {errors.status ? (
-              <p className="text-xs text-destructive">{errors.status}</p>
-            ) : null}
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="branch-logo-url">
-              {m.branches.create.fields.logoUrl}
-            </Label>
-            <Input
-              aria-invalid={Boolean(errors.logoUrl)}
-              id="branch-logo-url"
-              onChange={(event) => updateForm("logoUrl", event.target.value)}
-              value={formValues.logoUrl}
-            />
-            {errors.logoUrl ? (
-              <p className="text-xs text-destructive">{errors.logoUrl}</p>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="grid gap-2">
-            <Label htmlFor="branch-receipt-name">
-              {m.branches.create.fields.receiptName}
-            </Label>
-            <Input
-              aria-invalid={Boolean(errors.receiptName)}
-              id="branch-receipt-name"
-              onChange={(event) => updateForm("receiptName", event.target.value)}
-              value={formValues.receiptName}
-            />
-            {errors.receiptName ? (
-              <p className="text-xs text-destructive">{errors.receiptName}</p>
-            ) : null}
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="branch-receipt-phone">
-              {m.branches.create.fields.receiptPhone}
-            </Label>
-            <Input
-              aria-invalid={Boolean(errors.receiptPhone)}
-              id="branch-receipt-phone"
-              onChange={(event) =>
-                updateForm("receiptPhone", event.target.value)
-              }
-              value={formValues.receiptPhone}
-            />
-            {errors.receiptPhone ? (
-              <p className="text-xs text-destructive">{errors.receiptPhone}</p>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="branch-address">
-            {m.branches.create.fields.address}
-          </Label>
-          <Textarea
-            aria-invalid={Boolean(errors.address)}
-            id="branch-address"
-            onChange={(event) => updateForm("address", event.target.value)}
-            value={formValues.address}
-          />
-          {errors.address ? (
-            <p className="text-xs text-destructive">{errors.address}</p>
-          ) : null}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="branch-receipt-address">
-            {m.branches.create.fields.receiptAddress}
-          </Label>
-          <Textarea
-            aria-invalid={Boolean(errors.receiptAddress)}
-            id="branch-receipt-address"
-            onChange={(event) =>
-              updateForm("receiptAddress", event.target.value)
-            }
-            value={formValues.receiptAddress}
-          />
-          {errors.receiptAddress ? (
-            <p className="text-xs text-destructive">{errors.receiptAddress}</p>
-          ) : null}
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="branch-business-hours">
-            {m.branches.create.fields.businessHoursJson}
-          </Label>
-          <Textarea
-            aria-invalid={Boolean(errors.businessHoursJson)}
-            id="branch-business-hours"
-            onChange={(event) =>
-              updateForm("businessHoursJson", event.target.value)
-            }
-            placeholder={m.branches.create.businessHoursPlaceholder}
-            value={formValues.businessHoursJson}
-          />
-          {errors.businessHoursJson ? (
-            <p className="text-xs text-destructive">
-              {errors.businessHoursJson}
+              {formError}
             </p>
           ) : null}
-        </div>
 
-        {formError ? (
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-            {formError}
+          <div className="pointer-events-none sticky bottom-4 z-30 flex justify-end px-1">
+            <div className="pointer-events-auto grid w-full grid-cols-2 items-center gap-1.5 rounded-xl border border-border/80 bg-background/90 p-1.5 shadow-[0_14px_40px_-16px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:flex sm:w-auto">
+              <Button asChild className="rounded-lg" size="sm" type="button" variant="ghost">
+                <Link href={basePath}>{m.common.cancel}</Link>
+              </Button>
+              <Button
+                aria-busy={saving}
+                className="min-w-28 gap-2 rounded-lg"
+                disabled={saving}
+                size="sm"
+                type="submit"
+              >
+                <Icon
+                  aria-hidden
+                  className={saving ? "animate-spin" : undefined}
+                  icon={saving ? LoaderCircle : Check}
+                  size={14}
+                />
+                {saving ? m.common.saving : m.branches.create.createButton}
+              </Button>
+            </div>
           </div>
-        ) : null}
-
-        <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:items-center">
-          <Button disabled={saving} type="submit">
-            {saving ? m.common.saving : m.branches.create.createButton}
-          </Button>
-          <Button asChild type="button" variant="outline">
-            <Link href={webAdminRoutes.tenant.branches}>{m.common.cancel}</Link>
-          </Button>
-        </div>
+        </fieldset>
       </form>
     </section>
   );
