@@ -1,19 +1,27 @@
 "use client";
 
-import { Badge, Button, Card, CardContent, cn } from "@cleanhub/ui";
+import { Button, Icon, cn } from "@cleanhub/ui";
 import {
   AlertTriangle,
+  CircleCheckBig,
   DatabaseBackup,
+  ListChecks,
   MessageSquareWarning,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { SaasMetricStrip, SaasPageHeader } from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 
 import { getTodoCenterQuery } from "../queries";
-import { todoCenterTotal, type TodoCenterResult, type TodoItem } from "../types";
+import {
+  todoCenterTotal,
+  type TodoCenterResult,
+  type TodoItem,
+} from "../types";
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "";
@@ -67,72 +75,80 @@ export function TodoCenterView() {
   const total = result ? todoCenterTotal(result) : 0;
 
   return (
-    <section className="min-h-[560px]">
-      <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <Badge variant="secondary">{copy.badge}</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {copy.title}
-          </h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            {copy.description}
-          </p>
-        </div>
-
-        <Button onClick={load} type="button" variant="outline">
-          {m.common.refresh}
-        </Button>
-      </div>
+    <section className="space-y-7 pb-8">
+      <SaasPageHeader
+        actions={
+          <Button
+            className="h-8 gap-1.5 px-2.5 text-xs"
+            disabled={loading}
+            onClick={load}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Icon
+              aria-hidden
+              className={loading ? "animate-spin" : undefined}
+              icon={RefreshCw}
+              size={14}
+            />
+            {m.common.refresh}
+          </Button>
+        }
+        description={copy.description}
+        icon={ListChecks}
+        title={copy.title}
+      />
 
       {loading ? (
-        <div className="grid gap-3 p-5 md:grid-cols-3">
+        <div className="grid gap-3 md:grid-cols-3">
           {[0, 1, 2].map((item) => (
-            <div className="h-40 animate-pulse rounded-md bg-muted" key={item} />
+            <div
+              className="h-40 animate-pulse rounded-md bg-muted"
+              key={item}
+            />
           ))}
         </div>
       ) : error ? (
-        <div className="p-5">
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            {error}
-          </div>
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          {error}
         </div>
       ) : total === 0 ? (
-        <div className="p-5">
-          <div className="rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">{copy.emptyTitle}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {copy.emptyBody}
-            </p>
-          </div>
+        <div className="border-y border-dashed bg-background px-5 py-14 text-center">
+          <span className="mx-auto flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+            <Icon aria-hidden icon={CircleCheckBig} size={18} />
+          </span>
+          <h2 className="mt-3 text-base font-semibold">{copy.emptyTitle}</h2>
+          <p className="mt-1 text-sm text-muted-foreground">{copy.emptyBody}</p>
         </div>
       ) : (
-        <div className="grid gap-3 p-5">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Card className="rounded-lg">
-              <CardContent className="p-4">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {copy.total}
-                </p>
-                <p className="mt-2 text-2xl font-semibold">
-                  {total.toLocaleString()}
-                </p>
-              </CardContent>
-            </Card>
-            <TodoCountCard
-              count={result?.feedbackTickets.count ?? 0}
-              label={copy.feedbackQueue.title}
-            />
-            <TodoCountCard
-              count={result?.restoreRequests.count ?? 0}
-              label={copy.restoreQueue.title}
-            />
-            <TodoCountCard
-              count={result?.securityEvents.count ?? 0}
-              label={copy.securityQueue.title}
-            />
-          </div>
+        <div className="grid gap-7">
+          <SaasMetricStrip
+            metrics={[
+              {
+                icon: ListChecks,
+                label: copy.total,
+                value: total.toLocaleString(),
+              },
+              {
+                icon: MessageSquareWarning,
+                label: copy.feedbackQueue.title,
+                value: <TodoCount count={result?.feedbackTickets.count ?? 0} />,
+              },
+              {
+                icon: DatabaseBackup,
+                label: copy.restoreQueue.title,
+                value: <TodoCount count={result?.restoreRequests.count ?? 0} />,
+              },
+              {
+                icon: AlertTriangle,
+                label: copy.securityQueue.title,
+                value: <TodoCount count={result?.securityEvents.count ?? 0} />,
+              },
+            ]}
+          />
 
-          <div className="grid gap-3 lg:grid-cols-3">
+          <div className="grid overflow-hidden border-y bg-background lg:grid-cols-3 lg:divide-x">
             <TodoQueueCard
               emptyText={copy.feedbackQueue.empty}
               href={webAdminRoutes.saas.feedbackTickets}
@@ -146,7 +162,9 @@ export function TodoCenterView() {
               }}
               renderMeta={(item) => {
                 if (item.kind === "feedbackTicket") {
-                  return formatDateTime(item.data.createdAt) || m.common.invalidDate;
+                  return (
+                    formatDateTime(item.data.createdAt) || m.common.invalidDate
+                  );
                 }
                 return "";
               }}
@@ -166,7 +184,9 @@ export function TodoCenterView() {
               }}
               renderMeta={(item) => {
                 if (item.kind === "restoreRequest") {
-                  return formatDateTime(item.data.createdAt) || m.common.invalidDate;
+                  return (
+                    formatDateTime(item.data.createdAt) || m.common.invalidDate
+                  );
                 }
                 return "";
               }}
@@ -186,7 +206,9 @@ export function TodoCenterView() {
               }}
               renderMeta={(item) => {
                 if (item.kind === "securityEvent") {
-                  return formatDateTime(item.data.createdAt) || m.common.invalidDate;
+                  return (
+                    formatDateTime(item.data.createdAt) || m.common.invalidDate
+                  );
                 }
                 return "";
               }}
@@ -200,23 +222,11 @@ export function TodoCenterView() {
   );
 }
 
-function TodoCountCard({ count, label }: { count: number; label: string }) {
+function TodoCount({ count }: { count: number }) {
   return (
-    <Card className="rounded-lg">
-      <CardContent className="p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <p
-          className={cn(
-            "mt-2 text-2xl font-semibold",
-            count > 0 && "text-destructive",
-          )}
-        >
-          {count.toLocaleString()}
-        </p>
-      </CardContent>
-    </Card>
+    <span className={cn(count > 0 && "text-destructive")}>
+      {count.toLocaleString()}
+    </span>
   );
 }
 
@@ -244,11 +254,11 @@ function TodoQueueCard({
   renderMeta,
 }: TodoQueueCardProps) {
   return (
-    <Card className="flex flex-col rounded-lg">
-      <CardContent className="flex flex-1 flex-col gap-3 p-4">
+    <section className="flex min-w-0 flex-col border-b p-4 last:border-b-0 lg:border-b-0">
+      <div className="flex flex-1 flex-col gap-3">
         <div className="flex items-center gap-2">
           <span className="flex size-7 items-center justify-center rounded-md bg-muted text-muted-foreground">
-            <Icon aria-hidden className="size-4" />
+            <Icon aria-hidden />
           </span>
           <h2 className="text-sm font-semibold">{title}</h2>
         </div>
@@ -275,10 +285,16 @@ function TodoQueueCard({
           </ul>
         )}
 
-        <Button asChild size="sm" type="button" variant="outline">
+        <Button
+          asChild
+          className="h-8 text-xs"
+          size="sm"
+          type="button"
+          variant="outline"
+        >
           <Link href={href}>{viewAll}</Link>
         </Button>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }

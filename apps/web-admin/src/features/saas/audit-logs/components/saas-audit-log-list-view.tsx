@@ -3,13 +3,8 @@
 import {
   Badge,
   Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  Icon,
   Input,
-  Label,
   Select,
   SelectContent,
   SelectItem,
@@ -22,9 +17,18 @@ import {
   TableHeader,
   TableRow,
 } from "@cleanhub/ui";
+import { RefreshCw, ScrollText, Search } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Pagination } from "@/components/pagination";
+import { webAdminRoutes } from "@/config/routes";
+import {
+  SaasPageHeader,
+  SaasTableSurface,
+  saasCompactTableClassName,
+} from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 import {
   getAuditEventDescription,
@@ -32,13 +36,11 @@ import {
 } from "@/features/audit/event-description";
 
 import { auditEventCategoryOptions } from "../constants";
-import {
-  getSaasAuditLogDetailQuery,
-  getSaasAuditLogListQuery,
-} from "../queries";
-import type { AuditLogDetail, AuditLogListQuery, AuditLogSummary } from "../types";
+import { getSaasAuditLogListQuery } from "../queries";
+import type { AuditLogListQuery, AuditLogSummary } from "../types";
 
-const limit = 50;
+const PAGE_SIZE = 10;
+const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 type SuccessFilter = "all" | "true" | "false";
 
@@ -47,7 +49,8 @@ function getErrorMessage(error: unknown): string {
 }
 
 export function SaasAuditLogListView() {
-  const { m, formatDateTime } = useSaasI18n();
+  const router = useRouter();
+  const { locale, m, formatDateTime } = useSaasI18n();
   const [logs, setLogs] = useState<AuditLogSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -59,30 +62,43 @@ export function SaasAuditLogListView() {
   const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedLog, setSelectedLog] = useState<AuditLogSummary | null>(null);
-  const [detail, setDetail] = useState<AuditLogDetail | null>(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState<string | null>(null);
+  const normalizedActorUserId = actorUserId.trim();
+  const actorUserIdFilter = ULID_PATTERN.test(normalizedActorUserId)
+    ? normalizedActorUserId
+    : undefined;
 
   const listQuery = useMemo<AuditLogListQuery>(
     () => ({
-      limit,
+      limit: PAGE_SIZE,
       offset,
       eventCategory: eventCategory.trim() || undefined,
       eventType: eventType.trim() || undefined,
-      actorUserId: actorUserId.trim() || undefined,
+      actorUserId: actorUserIdFilter,
       success: success === "all" ? undefined : success,
-      dateFrom: dateFrom ? new Date(dateFrom).toISOString() : undefined,
-      dateTo: dateTo ? new Date(dateTo).toISOString() : undefined,
+      dateFrom: dateFrom
+        ? new Date(`${dateFrom}T00:00:00`).toISOString()
+        : undefined,
+      dateTo: dateTo
+        ? new Date(`${dateTo}T23:59:59.999`).toISOString()
+        : undefined,
     }),
-    [actorUserId, dateFrom, dateTo, eventCategory, eventType, offset, success],
+    [
+      actorUserIdFilter,
+      dateFrom,
+      dateTo,
+      eventCategory,
+      eventType,
+      offset,
+      success,
+    ],
   );
 
   // Cascading eventType options: picking a category narrows the list to that
   // category's events; "all" exposes every known event type.
   const eventTypeOptions = useMemo(
-    () => getAuditEventTypesByCategory(eventCategory.trim() || undefined),
-    [eventCategory],
+    () =>
+      getAuditEventTypesByCategory(eventCategory.trim() || undefined, locale),
+    [eventCategory, locale],
   );
 
   const loadLogs = useCallback(async () => {
@@ -98,7 +114,7 @@ export function SaasAuditLogListView() {
     } finally {
       setLoading(false);
     }
-  }, [listQuery]);
+  }, [listQuery, m.auditLogs.loadError]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -129,42 +145,31 @@ export function SaasAuditLogListView() {
     };
   }, [listQuery, m.auditLogs.loadError]);
 
-  const openDetail = useCallback((log: AuditLogSummary) => {
-    setSelectedLog(log);
-    setDetail(null);
-    setDetailError(null);
-    setDetailLoading(true);
-
-    getSaasAuditLogDetailQuery(log.id)
-      .then((data) => {
-        setDetail(data);
-      })
-      .catch((err: unknown) => {
-        setDetailError(getErrorMessage(err) || m.auditLogs.loadError);
-      })
-      .finally(() => {
-        setDetailLoading(false);
-      });
-  }, []);
-
   return (
-    <section className="min-h-[560px]">
-      <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <Badge variant="secondary">{m.auditLogs.badge}</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {m.auditLogs.title}
-          </h1>
-        </div>
+    <section className="space-y-7 pb-8" data-testid="saas-audit-log-list-view">
+      <SaasPageHeader
+        actions={
+          <Button
+            className="h-8 gap-1.5 px-2.5 text-xs"
+            disabled={loading}
+            onClick={loadLogs}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Icon aria-hidden icon={RefreshCw} size={14} />
+            <span>{m.common.refresh}</span>
+          </Button>
+        }
+        icon={ScrollText}
+        title={m.auditLogs.title}
+      />
 
-        <Button onClick={loadLogs} type="button" variant="outline">
-          {m.common.refresh}
-        </Button>
-      </div>
-
-      <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-6">
-        <div className="grid gap-2">
-          <Label htmlFor="audit-category-filter">{m.auditLogs.category}</Label>
+      <SaasTableSurface>
+        <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2.5">
+          <label className="sr-only" htmlFor="audit-category-filter">
+            {m.auditLogs.category}
+          </label>
           <Select
             onValueChange={(value) => {
               setOffset(0);
@@ -177,7 +182,10 @@ export function SaasAuditLogListView() {
             }}
             value={eventCategory || "all"}
           >
-            <SelectTrigger className="w-full" id="audit-category-filter">
+            <SelectTrigger
+              className="h-8 w-36 text-xs"
+              id="audit-category-filter"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -195,10 +203,10 @@ export function SaasAuditLogListView() {
               ))}
             </SelectContent>
           </Select>
-        </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="audit-event-type-filter">{m.auditLogs.eventType}</Label>
+          <label className="sr-only" htmlFor="audit-event-type-filter">
+            {m.auditLogs.eventType}
+          </label>
           <Select
             onValueChange={(value) => {
               setOffset(0);
@@ -207,7 +215,10 @@ export function SaasAuditLogListView() {
             }}
             value={eventType || "all"}
           >
-            <SelectTrigger className="w-full" id="audit-event-type-filter">
+            <SelectTrigger
+              className="h-8 w-44 text-xs"
+              id="audit-event-type-filter"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -219,10 +230,10 @@ export function SaasAuditLogListView() {
               ))}
             </SelectContent>
           </Select>
-        </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="audit-success-filter">{m.auditLogs.result}</Label>
+          <label className="sr-only" htmlFor="audit-success-filter">
+            {m.auditLogs.result}
+          </label>
           <Select
             onValueChange={(value) => {
               setOffset(0);
@@ -231,34 +242,54 @@ export function SaasAuditLogListView() {
             }}
             value={success}
           >
-            <SelectTrigger className="w-full" id="audit-success-filter">
+            <SelectTrigger
+              className="h-8 w-32 text-xs"
+              id="audit-success-filter"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{m.common.allResults}</SelectItem>
-              <SelectItem value="true">{m.common.resultLabels.success}</SelectItem>
-              <SelectItem value="false">{m.common.resultLabels.failed}</SelectItem>
+              <SelectItem value="true">
+                {m.common.resultLabels.success}
+              </SelectItem>
+              <SelectItem value="false">
+                {m.common.resultLabels.failed}
+              </SelectItem>
             </SelectContent>
           </Select>
-        </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="audit-actor-filter">{m.auditLogs.actorUserId}</Label>
-          <Input
-            id="audit-actor-filter"
-            onChange={(event) => {
-              setOffset(0);
-              setLoading(true);
-              setActorUserId(event.target.value);
-            }}
-            placeholder={m.common.optionalUlid}
-            value={actorUserId}
-          />
-        </div>
+          <div className="relative min-w-44 flex-1 sm:max-w-60">
+            <label className="sr-only" htmlFor="audit-actor-filter">
+              {m.auditLogs.actorUserId}
+            </label>
+            <Icon
+              aria-hidden
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              icon={Search}
+              size={14}
+            />
+            <Input
+              className="h-8 pl-8 text-xs"
+              id="audit-actor-filter"
+              onChange={(event) => {
+                const value = event.target.value;
+                setOffset(0);
+                setActorUserId(value);
+                if (!value.trim() || ULID_PATTERN.test(value.trim())) {
+                  setLoading(true);
+                }
+              }}
+              placeholder={m.common.optionalUlid}
+              value={actorUserId}
+            />
+          </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="audit-date-from">{m.common.from}</Label>
+          <label className="sr-only" htmlFor="audit-date-from">
+            {m.common.from}
+          </label>
           <Input
+            className="h-8 w-36 text-xs"
             id="audit-date-from"
             onChange={(event) => {
               setOffset(0);
@@ -268,11 +299,12 @@ export function SaasAuditLogListView() {
             type="date"
             value={dateFrom}
           />
-        </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="audit-date-to">{m.common.to}</Label>
+          <label className="sr-only" htmlFor="audit-date-to">
+            {m.common.to}
+          </label>
           <Input
+            className="h-8 w-36 text-xs"
             id="audit-date-to"
             onChange={(event) => {
               setOffset(0);
@@ -283,201 +315,121 @@ export function SaasAuditLogListView() {
             value={dateTo}
           />
         </div>
-      </div>
 
-      {loading ? (
-        <div className="grid gap-3 p-5">
-          {[0, 1, 2].map((item) => (
-            <div
-              className="h-14 animate-pulse rounded-md bg-muted"
-              key={item}
-            />
-          ))}
-        </div>
-      ) : error ? (
-        <div className="p-5">
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            {error}
+        {loading ? (
+          <div className="grid gap-2 p-3">
+            {[0, 1, 2, 3, 4].map((item) => (
+              <div
+                className="h-10 animate-pulse rounded-md bg-muted"
+                key={item}
+              />
+            ))}
           </div>
-        </div>
-      ) : logs.length === 0 ? (
-        <div className="p-5">
-          <div className="rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">{m.auditLogs.emptyTitle}</h2>
+        ) : error ? (
+          <div className="p-4">
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              {error}
+            </div>
           </div>
-        </div>
-      ) : (
-        <>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{m.auditLogs.columns.created}</TableHead>
-                <TableHead>{m.auditLogs.category}</TableHead>
-                <TableHead>{m.auditLogs.columns.event}</TableHead>
-                <TableHead>{m.auditLogs.columns.entity}</TableHead>
-                <TableHead>{m.auditLogs.columns.actor}</TableHead>
-                <TableHead>{m.auditLogs.result}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {logs.map((log) => (
-                <TableRow
-                  className="cursor-pointer"
-                  key={log.id}
-                  onClick={() => {
-                    openDetail(log);
-                  }}
-                >
-                  <TableCell>
-                    {formatDateTime(log.createdAt) || m.common.invalidDate}
-                  </TableCell>
-                  <TableCell>
-                    {log.eventCategory === "auth"
-                      ? m.common.auditCategoryLabels.auth
-                      : log.eventCategory === "saas_platform"
-                        ? m.common.auditCategoryLabels.saasPlatform
-                        : log.eventCategory === "saas_tenant"
-                          ? m.common.auditCategoryLabels.saasTenant
-                          : log.eventCategory === "saas_user"
-                            ? m.common.auditCategoryLabels.saasUser
-                            : log.eventCategory}
-                  </TableCell>
-                  <TableCell>{getAuditEventDescription(log.eventType)}</TableCell>
-                  <TableCell>{log.entityType ?? m.common.notSet}</TableCell>
-                  <TableCell>
-                    {log.actorDisplayName ?? log.actorUserId ?? m.common.system}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={log.success ? "default" : "destructive"}>
-                      {log.success
-                        ? m.common.resultLabels.success
-                        : m.common.resultLabels.failed}
-                    </Badge>
-                  </TableCell>
+        ) : logs.length === 0 ? (
+          <div className="p-4">
+            <div className="border-y border-dashed px-4 py-14 text-center">
+              <h2 className="text-sm font-semibold">
+                {m.auditLogs.emptyTitle}
+              </h2>
+            </div>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table className={saasCompactTableClassName}>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{m.auditLogs.columns.created}</TableHead>
+                  <TableHead>{m.auditLogs.category}</TableHead>
+                  <TableHead>{m.auditLogs.columns.event}</TableHead>
+                  <TableHead>{m.auditLogs.columns.entity}</TableHead>
+                  <TableHead>{m.auditLogs.columns.actor}</TableHead>
+                  <TableHead>{m.auditLogs.result}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log) => (
+                  <TableRow
+                    className="cursor-pointer hover:bg-muted/40"
+                    key={log.id}
+                    onClick={() => {
+                      router.push(webAdminRoutes.saas.auditLog(log.id));
+                    }}
+                    onMouseEnter={() =>
+                      router.prefetch(webAdminRoutes.saas.auditLog(log.id))
+                    }
+                  >
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {formatDateTime(log.createdAt) || m.common.invalidDate}
+                    </TableCell>
+                    <TableCell>
+                      {log.eventCategory === "auth"
+                        ? m.common.auditCategoryLabels.auth
+                        : log.eventCategory === "saas_platform"
+                          ? m.common.auditCategoryLabels.saasPlatform
+                          : log.eventCategory === "saas_tenant"
+                            ? m.common.auditCategoryLabels.saasTenant
+                            : log.eventCategory === "saas_user"
+                              ? m.common.auditCategoryLabels.saasUser
+                              : log.eventCategory}
+                    </TableCell>
+                    <TableCell>
+                      <Link
+                        className="font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        href={webAdminRoutes.saas.auditLog(log.id)}
+                        onClick={(event) => event.stopPropagation()}
+                        onFocus={() =>
+                          router.prefetch(webAdminRoutes.saas.auditLog(log.id))
+                        }
+                      >
+                        {getAuditEventDescription(log.eventType, locale)}
+                      </Link>
+                    </TableCell>
+                    <TableCell>{log.entityType ?? m.common.notSet}</TableCell>
+                    <TableCell>
+                      {log.actorDisplayName ??
+                        log.actorUserId ??
+                        m.common.system}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className="px-1.5 py-px text-[11px]"
+                        variant={log.success ? "default" : "destructive"}
+                      >
+                        {log.success
+                          ? m.common.resultLabels.success
+                          : m.common.resultLabels.failed}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
+        {!loading && !error ? (
           <Pagination
             currentPageCount={logs.length}
+            formatCountLabel={({ from, to, total: itemTotal }) =>
+              locale === "zh-CN"
+                ? `${from}–${to} / 共 ${itemTotal} 条`
+                : `${from}–${to} of ${itemTotal}`
+            }
             nextLabel={m.common.nextPage}
             offset={offset}
             onOffsetChange={setOffset}
-            pageSize={limit}
+            pageSize={PAGE_SIZE}
             previousLabel={m.common.previousPage}
             total={total}
           />
-        </>
-      )}
-
-      <Dialog
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelectedLog(null);
-            setDetail(null);
-            setDetailError(null);
-          }
-        }}
-        open={Boolean(selectedLog)}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{m.auditLogs.detail.title}</DialogTitle>
-            <DialogDescription className="sr-only">
-              {m.auditLogs.detail.description}
-            </DialogDescription>
-          </DialogHeader>
-
-          {detailLoading ? (
-            <div className="grid gap-3">
-              <div className="h-8 animate-pulse rounded-md bg-muted" />
-              <div className="h-32 animate-pulse rounded-md bg-muted" />
-            </div>
-          ) : detailError ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-              {detailError}
-            </div>
-          ) : detail ? (
-            <div className="grid gap-3 text-sm">
-              <div className="grid grid-cols-[140px_1fr] gap-y-2">
-                <span className="text-muted-foreground">{m.auditLogs.detail.id}</span>
-                <span className="break-all font-mono text-xs">{detail.id}</span>
-                <span className="text-muted-foreground">{m.auditLogs.category}</span>
-                <span>
-                  {detail.eventCategory === "auth"
-                    ? m.common.auditCategoryLabels.auth
-                    : detail.eventCategory === "saas_platform"
-                      ? m.common.auditCategoryLabels.saasPlatform
-                      : detail.eventCategory === "saas_tenant"
-                        ? m.common.auditCategoryLabels.saasTenant
-                        : detail.eventCategory === "saas_user"
-                          ? m.common.auditCategoryLabels.saasUser
-                          : detail.eventCategory}
-                </span>
-                <span className="text-muted-foreground">{m.auditLogs.columns.event}</span>
-                <span>{getAuditEventDescription(detail.eventType)}</span>
-                <span className="text-muted-foreground">{m.auditLogs.detail.entityType}</span>
-                <span>{detail.entityType ?? m.common.notSet}</span>
-                <span className="text-muted-foreground">{m.auditLogs.detail.entityId}</span>
-                <span className="break-all font-mono text-xs">
-                  {detail.entityId ?? m.common.notSet}
-                </span>
-                <span className="text-muted-foreground">{m.auditLogs.columns.actor}</span>
-                <span>{detail.actorDisplayName ?? detail.actorUserId ?? m.common.system}</span>
-                <span className="text-muted-foreground">{m.auditLogs.detail.tenant}</span>
-                <span className="break-all font-mono text-xs">
-                  {detail.tenantId ?? m.common.platform}
-                </span>
-                <span className="text-muted-foreground">{m.auditLogs.result}</span>
-                <Badge
-                  className="w-fit"
-                  variant={detail.success ? "default" : "destructive"}
-                >
-                  {detail.success
-                    ? m.common.resultLabels.success
-                    : m.common.resultLabels.failed}
-                </Badge>
-                {detail.reason ? (
-                  <>
-                    <span className="text-muted-foreground">{m.auditLogs.detail.reason}</span>
-                    <span>{detail.reason}</span>
-                  </>
-                ) : null}
-                <span className="text-muted-foreground">{m.auditLogs.detail.ipAddress}</span>
-                <span>{detail.ipAddress ?? m.common.notSet}</span>
-                <span className="text-muted-foreground">{m.auditLogs.columns.created}</span>
-                <span>{formatDateTime(detail.createdAt) || m.common.invalidDate}</span>
-              </div>
-
-              {detail.before ?? detail.after ? (
-                <div className="grid gap-2">
-                  {detail.before ? (
-                    <div className="grid gap-1">
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {m.auditLogs.detail.before}
-                      </span>
-                      <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">
-                        {JSON.stringify(detail.before, null, 2)}
-                      </pre>
-                    </div>
-                  ) : null}
-                  {detail.after ? (
-                    <div className="grid gap-1">
-                      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {m.auditLogs.detail.after}
-                      </span>
-                      <pre className="overflow-auto rounded-md bg-muted p-3 text-xs">
-                        {JSON.stringify(detail.after, null, 2)}
-                      </pre>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
+        ) : null}
+      </SaasTableSurface>
     </section>
   );
 }

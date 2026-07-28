@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   Checkbox,
+  Icon,
   Input,
   Label,
   Select,
@@ -19,32 +20,34 @@ import {
   TableRow,
   cn,
 } from "@cleanhub/ui";
+import { MessageSquareWarning, RefreshCw } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Pagination } from "@/components/pagination";
+import { webAdminRoutes } from "@/config/routes";
+import {
+  SaasPageHeader,
+  SaasTableSurface,
+  saasCompactTableClassName,
+} from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 
 import {
   feedbackTicketPriorityOptions,
   feedbackTicketStatusOptions,
 } from "../constants";
-import {
-  getFeedbackTicketDetailQuery,
-  getFeedbackTicketListQuery,
-} from "../queries";
+import { getFeedbackTicketListQuery } from "../queries";
 import { computeTicketSla } from "../sla";
-import type {
-  FeedbackTicketDetail,
-  FeedbackTicketListItem,
-  FeedbackTicketStatus,
-} from "../types";
-import { FeedbackTicketAssigneeControl } from "./feedback-ticket-assignee-control";
+import type { FeedbackTicketListItem, FeedbackTicketStatus } from "../types";
 import { FeedbackTicketBatchToolbar } from "./feedback-ticket-batch-toolbar";
 import { FeedbackTicketSlaBadge } from "./feedback-ticket-sla-badge";
-import { FeedbackTicketStatusControl } from "./feedback-ticket-status-control";
-import { FeedbackTicketTimeline } from "./feedback-ticket-timeline";
 
 type StatusFilter = "all" | FeedbackTicketStatus;
 type PriorityFilter = "all" | string;
+const PAGE_SIZE = 10;
+const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "";
@@ -62,24 +65,6 @@ function getStatusVariant(
   }
 
   return "outline";
-}
-
-function getSelectedTicket(
-  detail: FeedbackTicketDetail | null,
-  tickets: FeedbackTicketListItem[],
-): FeedbackTicketDetail | null {
-  if (!detail) {
-    return null;
-  }
-
-  const latest = tickets.find((ticket) => ticket.id === detail.id);
-
-  return latest
-    ? {
-        ...detail,
-        ...latest,
-      }
-    : detail;
 }
 
 function statusLabel(
@@ -112,29 +97,36 @@ function priorityLabel(
 
 export function FeedbackTicketListView() {
   const { m, formatDateTime } = useSaasI18n();
+  const router = useRouter();
   const [tickets, setTickets] = useState<FeedbackTicketListItem[]>([]);
-  const [selectedTicket, setSelectedTicket] =
-    useState<FeedbackTicketDetail | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [status, setStatus] = useState<StatusFilter>("all");
   const [priority, setPriority] = useState<PriorityFilter>("all");
   const [tenantId, setTenantId] = useState("");
   const [assigneeUserId, setAssigneeUserId] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [hasNextPage, setHasNextPage] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [detailError, setDetailError] = useState<string | null>(null);
+  const normalizedTenantId = tenantId.trim();
+  const normalizedAssigneeUserId = assigneeUserId.trim();
+  const tenantIdFilter = ULID_PATTERN.test(normalizedTenantId)
+    ? normalizedTenantId
+    : undefined;
+  const assigneeUserIdFilter = ULID_PATTERN.test(normalizedAssigneeUserId)
+    ? normalizedAssigneeUserId
+    : undefined;
 
   const listQuery = useMemo(
     () => ({
-      limit: 50,
-      offset: 0,
+      limit: PAGE_SIZE + 1,
+      offset,
       status: status === "all" ? undefined : status,
       priority: priority === "all" ? undefined : priority,
-      tenantId: tenantId.trim() || undefined,
-      assigneeUserId: assigneeUserId.trim() || undefined,
+      tenantId: tenantIdFilter,
+      assigneeUserId: assigneeUserIdFilter,
     }),
-    [assigneeUserId, priority, status, tenantId],
+    [assigneeUserIdFilter, offset, priority, status, tenantIdFilter],
   );
 
   const loadTickets = useCallback(async () => {
@@ -143,51 +135,14 @@ export function FeedbackTicketListView() {
 
     try {
       const data = await getFeedbackTicketListQuery(listQuery);
-      setTickets(data);
-      setSelectedTicket((current) => getSelectedTicket(current, data));
+      setTickets(data.slice(0, PAGE_SIZE));
+      setHasNextPage(data.length > PAGE_SIZE);
     } catch (loadError) {
       setError(getErrorMessage(loadError) || m.feedbackTickets.loadError);
     } finally {
       setLoading(false);
     }
-  }, [listQuery]);
-
-  async function loadTicketDetail(ticketId: string) {
-    setDetailLoading(true);
-    setDetailError(null);
-
-    try {
-      const detail = await getFeedbackTicketDetailQuery(ticketId);
-      setSelectedTicket(detail);
-    } catch (loadError) {
-      setDetailError(getErrorMessage(loadError) || m.feedbackTickets.loadError);
-    } finally {
-      setDetailLoading(false);
-    }
-  }
-
-  function handleTicketUpdated(ticket: FeedbackTicketDetail) {
-    setSelectedTicket(ticket);
-    setTickets((current) =>
-      current.map((item) =>
-        item.id === ticket.id
-          ? {
-              id: ticket.id,
-              tenantId: ticket.tenantId,
-              branchId: ticket.branchId,
-              title: ticket.title,
-              status: ticket.status,
-              priority: ticket.priority,
-              source: ticket.source,
-              reporterUserId: ticket.reporterUserId,
-              assigneeUserId: ticket.assigneeUserId,
-              createdAt: ticket.createdAt,
-              updatedAt: ticket.updatedAt,
-            }
-          : item,
-      ),
-    );
-  }
+  }, [listQuery, m.feedbackTickets.loadError]);
 
   function toggleSelected(id: string, checked: boolean) {
     setSelectedIds((current) => {
@@ -215,8 +170,7 @@ export function FeedbackTicketListView() {
    * changes never reach the batch toolbar or the "select all" checkbox.
    */
   const selectedVisibleIds = useMemo(
-    () =>
-      [...selectedIds].filter((id) => visibleTicketIds.has(id)),
+    () => [...selectedIds].filter((id) => visibleTicketIds.has(id)),
     [selectedIds, visibleTicketIds],
   );
 
@@ -243,10 +197,7 @@ export function FeedbackTicketListView() {
     });
   }
 
-  /**
-   * After a batch operation, drop stale IDs, re-load the list to reflect the
-   * server state, and refresh the open detail (if it was in the batch).
-   */
+  /** Drop updated IDs from the selection and reload the server-backed list. */
   async function handleBatchOutcome(succeededIds: string[]) {
     setSelectedIds((current) => {
       const next = new Set(current);
@@ -259,15 +210,6 @@ export function FeedbackTicketListView() {
     });
 
     await loadTickets();
-
-    setSelectedTicket((current) => {
-      if (current && succeededIds.includes(current.id)) {
-        // Re-hydrate the detail panel with the updated ticket.
-        void loadTicketDetail(current.id);
-      }
-
-      return current;
-    });
   }
 
   useEffect(() => {
@@ -279,8 +221,8 @@ export function FeedbackTicketListView() {
           return;
         }
 
-        setTickets(data);
-        setSelectedTicket((current) => getSelectedTicket(current, data));
+        setTickets(data.slice(0, PAGE_SIZE));
+        setHasNextPage(data.length > PAGE_SIZE);
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
@@ -296,34 +238,50 @@ export function FeedbackTicketListView() {
     return () => {
       isCurrent = false;
     };
-  }, [listQuery]);
+  }, [listQuery, m.feedbackTickets.loadError]);
 
   return (
-    <section className="min-h-[560px]">
-      <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <Badge variant="secondary">{m.feedbackTickets.badge}</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {m.feedbackTickets.title}
-          </h1>
-        </div>
+    <section className="space-y-7 pb-8">
+      <SaasPageHeader
+        actions={
+          <Button
+            className="h-8 gap-1.5 px-2.5 text-xs"
+            disabled={loading}
+            onClick={loadTickets}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Icon
+              aria-hidden
+              className={loading ? "animate-spin" : undefined}
+              icon={RefreshCw}
+              size={14}
+            />
+            {m.common.refresh}
+          </Button>
+        }
+        icon={MessageSquareWarning}
+        title={m.feedbackTickets.title}
+      />
 
-        <Button onClick={loadTickets} type="button" variant="outline">
-          {m.common.refresh}
-        </Button>
-      </div>
-
-      <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-2 border-y bg-background px-3 py-2.5 md:grid-cols-2 xl:grid-cols-4">
         <div className="grid gap-2">
-          <Label htmlFor="feedback-status-filter">{m.common.status}</Label>
+          <Label className="sr-only" htmlFor="feedback-status-filter">
+            {m.common.status}
+          </Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
               setStatus(value as StatusFilter);
+              setOffset(0);
             }}
             value={status}
           >
-            <SelectTrigger className="w-full" id="feedback-status-filter">
+            <SelectTrigger
+              className="h-8 w-full text-xs"
+              id="feedback-status-filter"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -338,15 +296,21 @@ export function FeedbackTicketListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="feedback-priority-filter">{m.feedbackTickets.priority}</Label>
+          <Label className="sr-only" htmlFor="feedback-priority-filter">
+            {m.feedbackTickets.priority}
+          </Label>
           <Select
             onValueChange={(value) => {
               setLoading(true);
               setPriority(value);
+              setOffset(0);
             }}
             value={priority}
           >
-            <SelectTrigger className="w-full" id="feedback-priority-filter">
+            <SelectTrigger
+              className="h-8 w-full text-xs"
+              id="feedback-priority-filter"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -361,12 +325,19 @@ export function FeedbackTicketListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="feedback-tenant-filter">{m.feedbackTickets.tenantId}</Label>
+          <Label className="sr-only" htmlFor="feedback-tenant-filter">
+            {m.feedbackTickets.tenantId}
+          </Label>
           <Input
+            className="h-8 text-xs"
             id="feedback-tenant-filter"
             onChange={(event) => {
-              setLoading(true);
-              setTenantId(event.target.value);
+              const value = event.target.value;
+              setTenantId(value);
+              setOffset(0);
+              if (!value.trim() || ULID_PATTERN.test(value.trim())) {
+                setLoading(true);
+              }
             }}
             placeholder={m.common.optionalTenantUlid}
             value={tenantId}
@@ -374,12 +345,19 @@ export function FeedbackTicketListView() {
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="feedback-assignee-filter">{m.feedbackTickets.assigneeId}</Label>
+          <Label className="sr-only" htmlFor="feedback-assignee-filter">
+            {m.feedbackTickets.assigneeId}
+          </Label>
           <Input
+            className="h-8 text-xs"
             id="feedback-assignee-filter"
             onChange={(event) => {
-              setLoading(true);
-              setAssigneeUserId(event.target.value);
+              const value = event.target.value;
+              setAssigneeUserId(value);
+              setOffset(0);
+              if (!value.trim() || ULID_PATTERN.test(value.trim())) {
+                setLoading(true);
+              }
             }}
             placeholder={m.feedbackTickets.assigneePlaceholder}
             value={assigneeUserId}
@@ -392,33 +370,33 @@ export function FeedbackTicketListView() {
         selectedIds={selectedVisibleIds}
       />
 
-      <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="border-b xl:border-b-0 xl:border-r">
-          {loading ? (
-            <div className="grid gap-3 p-5">
-              {[0, 1, 2].map((item) => (
-                <div
-                  className="h-14 animate-pulse rounded-md bg-muted"
-                  key={item}
-                />
-              ))}
+      <SaasTableSurface>
+        {loading ? (
+          <div className="grid gap-2 p-3">
+            {[0, 1, 2, 3, 4].map((item) => (
+              <div
+                className="h-10 animate-pulse rounded-md bg-muted"
+                key={item}
+              />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="p-5">
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+              {error}
             </div>
-          ) : error ? (
-            <div className="p-5">
-              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                {error}
-              </div>
+          </div>
+        ) : tickets.length === 0 ? (
+          <div className="p-5">
+            <div className="rounded-md border border-dashed p-8 text-center">
+              <h2 className="text-base font-semibold">
+                {m.feedbackTickets.emptyTitle}
+              </h2>
             </div>
-          ) : tickets.length === 0 ? (
-            <div className="p-5">
-              <div className="rounded-md border border-dashed p-8 text-center">
-                <h2 className="text-base font-semibold">
-                  {m.feedbackTickets.emptyTitle}
-                </h2>
-              </div>
-            </div>
-          ) : (
-            <Table>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table className={saasCompactTableClassName}>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-9">
@@ -443,7 +421,6 @@ export function FeedbackTicketListView() {
                   <TableHead>{m.feedbackTickets.columns.tenant}</TableHead>
                   <TableHead>{m.feedbackTickets.columns.assignee}</TableHead>
                   <TableHead>{m.feedbackTickets.columns.created}</TableHead>
-                  <TableHead className="text-right">{m.common.actions}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -452,22 +429,26 @@ export function FeedbackTicketListView() {
                   const sla = computeTicketSla(ticket);
                   const isUrgent = ticket.priority === "urgent";
                   const isOverdue = sla.status === "overdue";
+                  const href = webAdminRoutes.saas.feedbackTicket(ticket.id);
                   // Urgent tickets get a red left edge; overdue ones get a
                   // destructive-tinted row. Both highlight together when both apply.
                   const rowAccent = cn(
                     isUrgent &&
                       "border-l-2 border-l-destructive/70 bg-destructive/5",
-                    isOverdue &&
-                      !isUrgent &&
-                      "bg-amber-500/5",
+                    isOverdue && !isUrgent && "bg-amber-500/5",
                   );
 
                   return (
                     <TableRow
-                      className={rowAccent}
+                      className={cn(
+                        "cursor-pointer transition-colors",
+                        rowAccent,
+                      )}
                       data-priority={isUrgent ? "urgent" : undefined}
                       data-sla={sla.status}
                       key={ticket.id}
+                      onClick={() => router.push(href)}
+                      onMouseEnter={() => router.prefetch(href)}
                     >
                       <TableCell>
                         <Checkbox
@@ -476,10 +457,18 @@ export function FeedbackTicketListView() {
                           onCheckedChange={(value) =>
                             toggleSelected(ticket.id, value === true)
                           }
+                          onClick={(event) => event.stopPropagation()}
                         />
                       </TableCell>
                       <TableCell>
-                        <div className="font-medium">{ticket.title}</div>
+                        <Link
+                          className="font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          href={href}
+                          onClick={(event) => event.stopPropagation()}
+                          onFocus={() => router.prefetch(href)}
+                        >
+                          {ticket.title}
+                        </Link>
                         <div className="text-xs text-muted-foreground">
                           {ticket.id}
                         </div>
@@ -499,100 +488,40 @@ export function FeedbackTicketListView() {
                       <TableCell>
                         <FeedbackTicketSlaBadge ticket={ticket} />
                       </TableCell>
-                      <TableCell>{ticket.tenantId ?? m.common.platform}</TableCell>
                       <TableCell>
-                        {ticket.assigneeUserId ?? m.common.roleLabels.unassigned}
+                        {ticket.tenantId ?? m.common.platform}
                       </TableCell>
                       <TableCell>
-                        {formatDateTime(ticket.createdAt) || m.common.invalidDate}
+                        {ticket.assigneeUserId ??
+                          m.common.roleLabels.unassigned}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          onClick={() => loadTicketDetail(ticket.id)}
-                          size="sm"
-                          type="button"
-                          variant="outline"
-                        >
-                          {m.feedbackTickets.detail}
-                        </Button>
+                      <TableCell>
+                        {formatDateTime(ticket.createdAt) ||
+                          m.common.invalidDate}
                       </TableCell>
                     </TableRow>
                   );
                 })}
               </TableBody>
             </Table>
-          )}
-        </div>
-
-        <aside className="grid content-start gap-5 p-5">
-          <div>
-            <h2 className="text-base font-semibold">{m.feedbackTickets.detailTitle}</h2>
           </div>
+        )}
 
-          {detailLoading ? (
-            <div className="grid gap-3">
-              <div className="h-24 animate-pulse rounded-md bg-muted" />
-              <div className="h-44 animate-pulse rounded-md bg-muted" />
-            </div>
-          ) : detailError ? (
-            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-              {detailError}
-            </div>
-          ) : selectedTicket ? (
-            <>
-              <div className="grid gap-3 rounded-md border p-4">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {m.feedbackTickets.fields.title}
-                  </p>
-                  <p className="mt-1 font-medium">{selectedTicket.title}</p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    {m.feedbackTickets.fields.description}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm">
-                    {selectedTicket.description ?? m.feedbackTickets.fields.noDescription}
-                  </p>
-                </div>
-                <div className="grid gap-2 text-sm">
-                  <p>
-                    {m.feedbackTickets.fields.reporter}{" "}
-                    {selectedTicket.reporterUserId ?? m.common.unknown}
-                  </p>
-                  <p>
-                    {m.feedbackTickets.fields.source} {selectedTicket.source ?? m.common.unknown}
-                  </p>
-                  <p>
-                    {m.feedbackTickets.fields.updated}{" "}
-                    {formatDateTime(selectedTicket.updatedAt) || m.common.invalidDate}
-                  </p>
-                </div>
-              </div>
-
-              <FeedbackTicketStatusControl
-                key={`status-${selectedTicket.id}-${selectedTicket.status}`}
-                onUpdated={handleTicketUpdated}
-                status={selectedTicket.status}
-                ticketId={selectedTicket.id}
-              />
-
-              <FeedbackTicketAssigneeControl
-                assigneeUserId={selectedTicket.assigneeUserId}
-                key={`assignee-${selectedTicket.id}-${selectedTicket.assigneeUserId ?? "none"}`}
-                onUpdated={handleTicketUpdated}
-                ticketId={selectedTicket.id}
-              />
-
-              <FeedbackTicketTimeline detail={selectedTicket} />
-            </>
-          ) : (
-            <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
-              {m.feedbackTickets.selectHint}
-            </div>
-          )}
-        </aside>
-      </div>
+        {!loading && !error ? (
+          <Pagination
+            currentPageCount={tickets.length}
+            hasNext={hasNextPage}
+            nextLabel={m.common.nextPage}
+            offset={offset}
+            onOffsetChange={(nextOffset) => {
+              setLoading(true);
+              setOffset(nextOffset);
+            }}
+            pageSize={PAGE_SIZE}
+            previousLabel={m.common.previousPage}
+          />
+        ) : null}
+      </SaasTableSurface>
     </section>
   );
 }

@@ -86,18 +86,47 @@ export type AuditEventCategory = keyof typeof AUDIT_EVENT_DICTIONARY;
  * Flat lookup kept for backward compatibility with the detail/list rows that
  * only need a description for a single `eventType` string.
  */
-const AUDIT_EVENT_DESCRIPTIONS: Record<string, string> =
-  Object.fromEntries(
-    Object.values(AUDIT_EVENT_DICTIONARY).flatMap((group) =>
-      Object.entries(group),
-    ),
-  );
+const AUDIT_EVENT_DESCRIPTIONS: Record<string, string> = Object.fromEntries(
+  Object.values(AUDIT_EVENT_DICTIONARY).flatMap((group) =>
+    Object.entries(group),
+  ),
+);
+
+const AUDIT_EVENT_DESCRIPTIONS_ZH_CN: Record<string, string> = {
+  "auth.login.success": "用户登录成功",
+  "auth.login.failed": "用户登录失败",
+  "auth.logout": "用户已退出登录",
+  "auth.refresh.reuse_detected": "检测到刷新令牌重复使用",
+  "platform_settings.updated": "平台设置已更新",
+  "security_settings.updated": "安全设置已更新",
+  "security.settings.updated": "安全设置已更新",
+  "backup_job.created": "备份任务已创建",
+  "restore_request.created": "恢复请求已创建",
+  "feedback_ticket.status_updated": "反馈工单状态已更新",
+  "feedback_ticket.assignee_updated": "反馈工单受理人已更新",
+  "tenant.created": "租户已创建",
+  "tenant.updated": "租户资料已更新",
+  "tenant.status_updated": "租户状态已更新",
+  "tenant_settings.updated": "租户设置已更新",
+  "tenant_feature_flags.updated": "租户功能开关已更新",
+  "saas_user.created": "平台用户已创建",
+  "saas_user.updated": "平台用户资料已更新",
+  "saas_user.roles_updated": "平台用户角色已更新",
+  "saas_user.status_updated": "平台用户状态已更新",
+};
 
 function toTitleCase(value: string): string {
   return value.replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-export function getAuditEventDescription(eventType: string): string {
+export function getAuditEventDescription(
+  eventType: string,
+  locale?: string,
+): string {
+  if (locale === "zh-CN" && AUDIT_EVENT_DESCRIPTIONS_ZH_CN[eventType]) {
+    return AUDIT_EVENT_DESCRIPTIONS_ZH_CN[eventType];
+  }
+
   if (AUDIT_EVENT_DESCRIPTIONS[eventType]) {
     return AUDIT_EVENT_DESCRIPTIONS[eventType];
   }
@@ -115,17 +144,27 @@ export function getAuditEventDescription(eventType: string): string {
  */
 export function getAuditEventTypesByCategory(
   category?: string,
+  locale?: string,
 ): Array<{ value: string; label: string }> {
   if (category && category in AUDIT_EVENT_DICTIONARY) {
     const group = AUDIT_EVENT_DICTIONARY[
       category as AuditEventCategory
     ] as Record<string, string>;
 
-    return Object.entries(group).map(([value, label]) => ({ value, label }));
+    return Object.entries(group).map(([value, label]) => ({
+      value,
+      label:
+        locale === "zh-CN"
+          ? (AUDIT_EVENT_DESCRIPTIONS_ZH_CN[value] ?? label)
+          : label,
+    }));
   }
 
   return Object.entries(AUDIT_EVENT_DESCRIPTIONS).map(([value, label]) => ({
     value,
-    label,
+    label:
+      locale === "zh-CN"
+        ? (AUDIT_EVENT_DESCRIPTIONS_ZH_CN[value] ?? label)
+        : label,
   }));
 }

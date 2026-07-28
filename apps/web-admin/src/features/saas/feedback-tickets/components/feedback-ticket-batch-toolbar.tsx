@@ -11,7 +11,6 @@ import {
   SelectValue,
   Textarea,
   toast,
-  cn,
 } from "@cleanhub/ui";
 import { useState } from "react";
 
@@ -65,9 +64,7 @@ export function FeedbackTicketBatchToolbar({
 
   const noneSelected = selectedIds.length === 0;
 
-  function classifyOutcome(
-    succeededIds: string[],
-  ): BatchOutcome {
+  function classifyOutcome(succeededIds: string[]): BatchOutcome {
     if (succeededIds.length === 0) {
       return "failed";
     }
@@ -75,7 +72,12 @@ export function FeedbackTicketBatchToolbar({
     return succeededIds.length === selectedIds.length ? "all" : "partial";
   }
 
-  function notify(outcome: BatchOutcome, all: string, partial: string, failed: string) {
+  function notify(
+    outcome: BatchOutcome,
+    all: string,
+    partial: string,
+    failed: string,
+  ) {
     if (outcome === "all") {
       toast.success(all);
     } else if (outcome === "partial") {
@@ -190,24 +192,20 @@ export function FeedbackTicketBatchToolbar({
     }
   }
 
+  if (noneSelected) {
+    return null;
+  }
+
   return (
     <div
-      className={cn(
-        "grid gap-5 border-b bg-muted/40 p-5",
-        noneSelected && "opacity-60",
-      )}
-      aria-label="Batch actions"
+      className="grid gap-5 border-b bg-muted/40 p-5"
+      aria-label={copy.ariaLabel}
       role="group"
     >
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-sm font-medium">
           {selectedIds.length} {copy.selected}
         </span>
-        {noneSelected ? (
-          <span className="text-xs text-muted-foreground">
-            {copy.noneSelected}
-          </span>
-        ) : null}
       </div>
 
       <div className="grid gap-5 md:grid-cols-3">
@@ -263,10 +261,7 @@ export function FeedbackTicketBatchToolbar({
         </fieldset>
 
         {/* Reassign */}
-        <fieldset
-          className="grid content-start gap-2"
-          disabled={noneSelected}
-        >
+        <fieldset className="grid content-start gap-2" disabled={noneSelected}>
           <legend className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
             {copy.reassign}
           </legend>
