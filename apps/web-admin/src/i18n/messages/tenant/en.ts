@@ -1004,6 +1004,11 @@ export const tenantMessagesEn: TenantMessages = {
     listDescription:
       "Owner sees all tenant branches. Manager visibility is enforced by the tenant branches API through branch scope.",
     newBranch: "New branch",
+    metrics: {
+      total: "Total branches",
+      active: "Active branches",
+      inactive: "Inactive branches",
+    },
 
     list: {
       searchPlaceholder: "Branch name or phone",
@@ -1104,6 +1109,7 @@ export const tenantMessagesEn: TenantMessages = {
       pricing: "Pricing unit",
       labelRule: "Label rule",
       standardPrice: "Standard price",
+      currency: "Currency",
     },
     labelRuleLabels: {
       none: "Do not print labels",
@@ -1125,7 +1131,7 @@ export const tenantMessagesEn: TenantMessages = {
       descriptionPlaceholder: "Enter an optional service description",
       displayOrderHint: "Lower numbers appear earlier in the service catalog.",
       pricingHint:
-        "The standard price uses the tenant default currency and can be adjusted on the Prices page after saving.",
+        "The standard price uses the tenant default currency. Its amount and currency can be updated from the service catalog after saving.",
       categoriesLoadFailed:
         "Service categories could not be loaded, so this service cannot be created yet.",
       currencyLoadFailed:
@@ -1153,6 +1159,7 @@ export const tenantMessagesEn: TenantMessages = {
       labelRuleInvalid: "Choose a supported label rule.",
       standardPriceInvalid:
         "Standard price must be greater than 0, no more than 9,999,999,999.99, and use at most 2 decimal places.",
+      currencyInvalid: "Choose a supported 3-letter currency code.",
       statusInvalid: "Choose a supported service status.",
       versionRequired: "This service is out of date. Refresh and try again.",
     },
@@ -1172,7 +1179,6 @@ export const tenantMessagesEn: TenantMessages = {
       deactivate: "Deactivate",
       delete: "Delete",
       edit: "Edit",
-      managePrice: "Manage price",
     },
     empty: "No services yet",
     emptyDescription: "Services created for this tenant will appear here.",
@@ -1195,8 +1201,6 @@ export const tenantMessagesEn: TenantMessages = {
       categoriesLoading: "Loading service categories…",
       categoriesLoadFailed:
         "Service categories could not be loaded, so category changes cannot be saved.",
-      priceManagedSeparately:
-        "Standard price is managed separately on the Prices page to avoid service and price version conflicts.",
     },
     delete: {
       title: "Delete Service",
@@ -1207,42 +1211,19 @@ export const tenantMessagesEn: TenantMessages = {
     },
   },
 
-  prices: {
-    eyebrow: "Tenant pricing",
-    title: "Prices",
-    searchPlaceholder: "Service name",
-    formLabels: {
-      search: "Search",
-      businessLine: "Business line",
-      status: "Status",
-      amount: "Amount",
-      currency: "Currency",
-    },
-    columns: {
-      service: "Service",
-      businessLine: "Business line",
-      amount: "Amount",
-      status: "Status",
-      actions: "Actions",
-    },
-    actions: {
-      activate: "Activate",
-      deactivate: "Deactivate",
-      edit: "Edit",
-    },
-    empty: "No prices yet",
-    requestFailed: "Price request failed.",
-    formFallbackError: "Check the price form.",
-    versionConflict:
-      "This price was updated by another request. Refresh and try again.",
-    updatePrice: "Update price",
-  },
-
   hardware: {
-    eyebrow: "Tenant hardware",
-    title: "Hardware Devices",
-    addDevice: "Add Device",
-    noDevices: "No devices found.",
+    eyebrow: "Tenant peripheral hardware",
+    title: "Peripheral hardware",
+    description:
+      "Manage printers, scanners, cash drawers, and other peripherals used by each branch.",
+    addDevice: "Add peripheral hardware",
+    metrics: {
+      total: "Total devices",
+      active: "Active devices",
+      inactive: "Inactive devices",
+      printers: "Printers",
+    },
+    noDevices: "No peripheral hardware found.",
     noBranches: "No branches available. Create a branch first.",
     typeReadonlyHint: "Device type cannot be changed after creation.",
     columns: {
@@ -1255,8 +1236,8 @@ export const tenantMessagesEn: TenantMessages = {
       actions: "Actions",
     },
     create: {
-      title: "Add Device",
-      description: "Register a hardware device to a branch.",
+      title: "Add peripheral hardware",
+      description: "Register a printer, scanner, or cash drawer to a branch.",
       labels: {
         branchId: "Branch",
         branchPlaceholder: "Select a branch",
@@ -1265,10 +1246,11 @@ export const tenantMessagesEn: TenantMessages = {
         connectionType: "Connection Type",
       },
       adding: "Adding...",
-      action: "Add Device",
+      action: "Add peripheral hardware",
+      created: "Peripheral hardware added.",
     },
     edit: {
-      title: "Edit Device",
+      title: "Edit peripheral hardware",
       labels: {
         deviceName: "Device Name",
         branchId: "Branch",
@@ -1277,11 +1259,12 @@ export const tenantMessagesEn: TenantMessages = {
       },
       savingChanges: "Saving...",
       saveChanges: "Save Changes",
+      updated: "Peripheral hardware updated.",
     },
     delete: {
-      title: "Delete Device",
+      title: "Delete peripheral hardware",
       description:
-        "Are you sure you want to delete this device? The record is retained for audit history.",
+        "Are you sure you want to delete this peripheral device? The record is retained for audit history.",
       deleting: "Deleting...",
       action: "Delete",
     },
@@ -1299,7 +1282,7 @@ export const tenantMessagesEn: TenantMessages = {
     updatedAt: "Updated",
     tabs: {
       overview: "Overview",
-      devices: "Devices",
+      devices: "POS terminals",
       registerSessions: "Register sessions",
       settings: "Settings",
     },
@@ -1331,7 +1314,7 @@ export const tenantMessagesEn: TenantMessages = {
         grossSales: "Gross sales",
         grossProfit: "Gross profit",
         orderCount: "Orders",
-        registeredDevices: "Registered devices",
+        registeredDevices: "Registered terminals",
         openSessions: "Open sessions",
         activeBranches: "Active branches",
       },
@@ -1345,19 +1328,19 @@ export const tenantMessagesEn: TenantMessages = {
         orders: "Orders",
         grossSales: "Gross sales",
         grossProfit: "Gross profit",
-        devices: "Devices",
+        devices: "POS terminals",
         empty: "No branch POS activity for this period",
       },
       devices: {
-        title: "Device status",
+        title: "POS terminal status",
         description:
-          "Enabled status and heartbeat status are tracked separately.",
+          "Enabled state and live connectivity are tracked separately for each POS terminal.",
         active: "Enabled",
         inactive: "Disabled",
         online: "Online",
         offline: "Offline",
         neverSeen: "Never connected",
-        action: "View devices",
+        action: "View POS terminals",
       },
       cashTracking: {
         title: "Cash tracking",
@@ -1376,11 +1359,11 @@ export const tenantMessagesEn: TenantMessages = {
       },
       quickLinks: {
         title: "Point-of-sale tools",
-        devices: "Devices",
-        devicesDescription: "Review terminal health and synchronization.",
+        devices: "POS terminals",
+        devicesDescription: "Review POS terminal health and synchronization.",
         sessions: "Register sessions",
         sessionsDescription: "Review shifts, cash counts, and variances.",
-        hardware: "Hardware",
+        hardware: "Peripheral hardware",
         hardwareDescription: "Manage printers, scanners, and cash drawers.",
         orders: "Orders",
         ordersDescription: "Review POS orders and payment status.",
@@ -1395,21 +1378,21 @@ export const tenantMessagesEn: TenantMessages = {
         "Try again in a moment. Contact your administrator if the problem continues.",
     },
     devices: {
-      title: "Devices",
+      title: "POS terminals",
       description:
         "Review registered POS terminals without confusing enabled state with live connectivity.",
-      setupGuide: "Set up a device",
+      setupGuide: "Register a POS terminal",
       setupNotice:
-        "Complete registration on the target POS device with a full owner or manager sign-in. Terminal credentials must never be copied or exposed from this admin page.",
+        "Complete registration on the target POS terminal with a full owner or manager sign-in. Terminal credentials must never be copied or exposed from this admin page.",
       metrics: {
         total: "Registered",
         active: "Enabled",
         online: "Online",
         syncIssues: "Sync issues",
       },
-      searchPlaceholder: "Device name, ID, branch, or version",
+      searchPlaceholder: "Terminal name, ID, branch, or version",
       columns: {
-        device: "Device",
+        device: "Terminal",
         typePlatform: "Type / platform",
         version: "POS version",
         branch: "Branch",
@@ -1443,8 +1426,8 @@ export const tenantMessagesEn: TenantMessages = {
       },
       noCurrentSession: "No open session",
       neverSeen: "Never online",
-      empty: "No devices match these filters",
-      errorTitle: "Devices could not be loaded",
+      empty: "No POS terminals match these filters",
+      errorTitle: "POS terminal data could not be loaded",
       errorDescription:
         "Try again in a moment. Contact your administrator if the problem continues.",
       previous: "Previous",
@@ -1870,7 +1853,7 @@ export const tenantMessagesEn: TenantMessages = {
       users: "Users",
       services: "Services",
       prices: "Prices",
-      hardware: "Hardware",
+      hardware: "Peripheral hardware",
       notifications: "Notifications",
       settings: "Settings",
       backups: "Backups",
@@ -1943,20 +1926,16 @@ export const tenantMessagesEn: TenantMessages = {
     },
     quickEntries: {
       branches: {
-        title: "Branch settings",
+        title: "Branches",
         description: "Manage locations, business hours, and branch details.",
       },
       services: {
         title: "Service catalog",
         description: "Organize services and operating options.",
       },
-      prices: {
-        title: "Price books",
-        description: "Maintain service prices and pricing rules.",
-      },
       hardware: {
-        title: "Hardware devices",
-        description: "Configure printers, scanners, and store devices.",
+        title: "Peripheral hardware",
+        description: "Configure printers, scanners, cash drawers, and other store peripherals.",
       },
       reports: {
         title: "Reports",
@@ -1982,7 +1961,6 @@ export const tenantMessagesEn: TenantMessages = {
       settings: "Settings",
       branches: "Branches",
       services: "Services",
-      prices: "Prices",
       reports: "Reports",
     },
     unavailable: "Tenant overview is unavailable.",
@@ -1993,6 +1971,95 @@ export const tenantMessagesEn: TenantMessages = {
     eyebrow: "Tenant Settings",
     description:
       "Tenant defaults and read-only feature flags for the current account.",
+    navigation: {
+      ariaLabel: "Tenant settings navigation",
+      searchLabel: "Search settings",
+      searchPlaceholder: "Search settings",
+      workspaceSubtitle: "CleanHub tenant workspace",
+      closeLabel: "Close settings",
+      noResults: "No matching settings",
+      accountFallback: "Administrator",
+      roleLabels: {
+        super_admin: "Super administrator",
+        support: "Platform support",
+        owner: "Tenant owner",
+        manager: "Branch manager",
+        cashier: "Cashier",
+      },
+      items: {
+        general: "General",
+        locations: "Locations",
+        pricing: "Pricing",
+        pointOfSale: "Point of sale",
+        hardware: "Peripheral hardware",
+        activityLog: "Activity log",
+      },
+    },
+    general: {
+      title: "General",
+      businessDetailsTitle: "Business details",
+      businessDetailsDescription:
+        "The business entity this tenant uses in CleanHub.",
+      entityLabel: "Tenant business entity",
+      businessDetailsHint:
+        "The tenant name and pilot status are maintained by a SaaS administrator.",
+      readOnlyTitle: "These settings are read-only",
+      storeDefaultsTitle: "Store defaults",
+      storeDefaultsDescription:
+        "Set the tenant's default language, currency, and business timezone.",
+      currencyHint:
+        "The default currency for new prices, orders, and business reports.",
+      languageHint:
+        "The default business language for new locations and the admin workspace.",
+      timezoneHint: "Used to record orders, reports, and operating times.",
+      featureAccessTitle: "Feature access",
+      featureAccessDescription:
+        "View the features enabled for this tenant by a SaaS administrator.",
+      resourcesTitle: "More settings",
+      resourcesDescription:
+        "Open the related area to manage locations, pricing, point of sale, and peripheral hardware.",
+      resourceDescriptions: {
+        general: "Manage tenant defaults.",
+        locations: "Manage location details and operating configuration.",
+        pricing: "Maintain service and product prices.",
+        pointOfSale: "Configure terminals, register sessions, and offline behavior.",
+        hardware: "Manage printers, scanners, and cash drawers.",
+        activityLog: "Review tenant actions and audit records.",
+      },
+    },
+    pricingHub: {
+      title: "Prices stay with what you sell",
+      description:
+        "The separate price book has been removed. Manage each price directly with its product or service so catalog information stays together.",
+      productsTitle: "Product prices",
+      productsDescription:
+        "Manage sale price, currency, variants, and branch availability from the product catalog.",
+      servicesTitle: "Service prices",
+      servicesDescription:
+        "Manage the current standard price and pricing unit from the service catalog.",
+      openProducts: "Open products",
+      openServices: "Open services",
+      noteTitle: "About existing pricing data",
+      noteDescription:
+        "Existing prices remain stored and continue to be used by POS and orders. Only the duplicate price-book screen was removed.",
+    },
+    pilotStatusLabels: {
+      pilot: "Pilot",
+      live: "Live",
+      paused: "Paused",
+    },
+    languageLabels: {
+      en: "English",
+      fr: "French",
+      "zh-CN": "Simplified Chinese",
+    },
+    featureFlagLabels: {
+      laundryEnabled: "Laundry and dry cleaning",
+      carWashEnabled: "Car wash",
+      retailProductsEnabled: "Retail products",
+      deliveryEnabled: "Pickup and delivery",
+      notificationsEnabled: "Notifications",
+    },
     labels: {
       pilotStatus: "Pilot status",
       defaultLanguage: "Default language",
@@ -2022,6 +2089,58 @@ export const tenantMessagesEn: TenantMessages = {
     requestFailed: "Tenant settings failed to load.",
     invalidDate: "Invalid date",
     notUpdated: "Not updated",
+  },
+
+  notificationCenter: {
+    eyebrow: "Tenant communications",
+    title: "Notifications",
+    description: "Review system and business notifications for your tenant.",
+    stats: {
+      total: "Total",
+      unread: "Unread",
+      urgent: "Urgent",
+    },
+    toolbar: {
+      searchPlaceholder: "Search notifications",
+      searchLabel: "Search notifications",
+      filters: "Filters",
+      refresh: "Refresh",
+      readStatus: "Read status",
+      noticeType: "Type",
+      priority: "Priority",
+      all: "All",
+      unread: "Unread",
+      read: "Read",
+      business: "Business",
+      system: "System",
+      low: "Low",
+      normal: "Normal",
+      high: "High",
+      critical: "Critical",
+    },
+    table: {
+      notification: "Notification",
+      type: "Type",
+      priority: "Priority",
+      status: "Status",
+      time: "Time",
+      actions: "Actions",
+      markRead: "Mark as read",
+      archive: "Archive",
+      openOrder: "Open order",
+    },
+    status: {
+      unread: "Unread",
+      read: "Read",
+      archived: "Archived",
+    },
+    empty: "No notifications match the current filters.",
+    loadError: "Notifications could not be loaded.",
+    retry: "Try again",
+    previous: "Previous",
+    next: "Next",
+    pageSummary: "Showing {from}-{to} of {total}",
+    updated: "Updated",
   },
 
   notifications: {
@@ -2110,6 +2229,112 @@ export const tenantMessagesEn: TenantMessages = {
         sent: "Sent",
         failed: "Failed",
       },
+    },
+  },
+
+  profile: {
+    title: "Personal center",
+    description: "Manage your personal preferences, access, and account security.",
+    tenantCode: "Tenant code",
+    branchCount: "Accessible branches",
+    notProvided: "Not provided",
+    never: "Never",
+    saveProfile: "Save profile",
+    saving: "Saving...",
+    retry: "Try again",
+    loadErrorTitle: "Your profile could not be loaded",
+    loadErrorDescription:
+      "Check the API connection and your tenant access, then try again.",
+    personal: {
+      title: "Personal information",
+      description:
+        "Your display name appears in the CleanHub header and activity records.",
+      displayName: "Display name",
+      displayNameHint: "Use the name you want other staff members to see.",
+      language: "Interface language",
+      languageHint: "This setting updates the web admin interface immediately.",
+      languageOptions: {
+        en: "English",
+        "zh-CN": "Simplified Chinese",
+      },
+    },
+    account: {
+      title: "Account information",
+      email: "Email",
+      phone: "Phone",
+      lastLogin: "Last login",
+      createdAt: "Account created",
+    },
+    access: {
+      title: "Roles and branch access",
+      description:
+        "These permissions are assigned by your tenant administrator and are read-only here.",
+      roles: "Assigned roles",
+      branches: "Accessible branches",
+      allBranches: "All branches",
+      unknownBranch: "Assigned branch",
+      noRoles: "No role assignments are available.",
+      noBranches: "No accessible branches are available.",
+    },
+    security: {
+      title: "Password and security",
+      description:
+        "Choose a password that meets the current platform security policy.",
+      currentPassword: "Current password",
+      newPassword: "New password",
+      confirmPassword: "Confirm new password",
+      showPassword: "Show password",
+      hidePassword: "Hide password",
+      requirementsTitle: "Password requirements",
+      minimumLength: "At least {count} characters",
+      requiresNumber: "Include at least one number",
+      requiresSymbol: "Include at least one symbol",
+      signOutNotice:
+        "Changing your password revokes active refresh sessions. You will be signed out and asked to sign in again.",
+      changePassword: "Change password",
+      changingPassword: "Changing...",
+    },
+    devices: {
+      title: "Login devices",
+      description: "Reviewing and revoking individual login devices.",
+      emptyTitle: "Device management is not available yet",
+      emptyDescription:
+        "CleanHub does not currently expose reliable per-device session data, so no placeholder devices are shown here.",
+    },
+    statusLabels: {
+      invited: "Invited",
+      active: "Active",
+      disabled: "Disabled",
+      suspended: "Suspended",
+    },
+    branchStatusLabels: {
+      active: "Active",
+      inactive: "Inactive",
+    },
+    validation: {
+      displayNameRequired: "Enter a display name.",
+      displayNameTooLong: "Display name must be 120 characters or fewer.",
+      invalidLanguage: "Select a supported interface language.",
+      currentPasswordRequired: "Enter your current password.",
+      newPasswordRequired: "Enter a new password.",
+      passwordTooShort: "Password must be at least {count} characters.",
+      passwordNumberRequired: "Password must include at least one number.",
+      passwordSymbolRequired: "Password must include at least one symbol.",
+      passwordConfirmationMismatch: "The new passwords do not match.",
+    },
+    feedback: {
+      profileSaved: "Profile updated.",
+      upToDate: "Your profile is already up to date.",
+      checkForm: "Check the highlighted profile fields.",
+      checkPassword: "Check the highlighted password fields.",
+      passwordChanged: "Password changed. Please sign in again.",
+      currentPasswordIncorrect: "The current password is incorrect.",
+      passwordUnchanged: "Choose a password different from the current one.",
+      passwordPolicyViolation:
+        "The new password does not meet the current security policy.",
+      conflict: "Your profile changed elsewhere. Refresh and try again.",
+      notFound: "Your tenant profile could not be found.",
+      requestFailed: "The request could not be completed. Please try again.",
     },
   },
 

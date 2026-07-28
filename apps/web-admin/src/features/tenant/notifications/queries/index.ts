@@ -1,3 +1,1 @@
-export * from "./get-notification-logs.query";
-export * from "./get-notification-settings.query";
-export * from "./get-whatsapp-credentials.query";
+export * from "./get-tenant-notification-center.query";

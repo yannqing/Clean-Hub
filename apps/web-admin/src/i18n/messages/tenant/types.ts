@@ -714,6 +714,11 @@ export type TenantMessages = {
     title: string;
     listDescription: string;
     newBranch: string;
+    metrics: {
+      total: string;
+      active: string;
+      inactive: string;
+    };
 
     // 列表页（branch-management-view）
     list: {
@@ -812,6 +817,7 @@ export type TenantMessages = {
       pricing: string;
       labelRule: string;
       standardPrice: string;
+      currency: string;
     };
     labelRuleLabels: {
       none: string;
@@ -853,6 +859,7 @@ export type TenantMessages = {
       pricingUnitInvalid: string;
       labelRuleInvalid: string;
       standardPriceInvalid: string;
+      currencyInvalid: string;
       statusInvalid: string;
       versionRequired: string;
     };
@@ -872,7 +879,6 @@ export type TenantMessages = {
       deactivate: string;
       delete: string;
       edit: string;
-      managePrice: string;
     };
     empty: string;
     emptyDescription: string;
@@ -892,7 +898,6 @@ export type TenantMessages = {
       editDescription: string;
       categoriesLoading: string;
       categoriesLoadFailed: string;
-      priceManagedSeparately: string;
     };
     delete: {
       title: string;
@@ -902,40 +907,17 @@ export type TenantMessages = {
     };
   };
 
-  prices: {
-    eyebrow: string;
-    title: string;
-    searchPlaceholder: string;
-    formLabels: {
-      search: string;
-      businessLine: string;
-      status: string;
-      amount: string;
-      currency: string;
-    };
-    columns: {
-      service: string;
-      businessLine: string;
-      amount: string;
-      status: string;
-      actions: string;
-    };
-    actions: {
-      activate: string;
-      deactivate: string;
-      edit: string;
-    };
-    empty: string;
-    requestFailed: string;
-    formFallbackError: string;
-    versionConflict: string;
-    updatePrice: string;
-  };
-
   hardware: {
     eyebrow: string;
     title: string;
+    description: string;
     addDevice: string;
+    metrics: {
+      total: string;
+      active: string;
+      inactive: string;
+      printers: string;
+    };
     noDevices: string;
     noBranches: string;
     typeReadonlyHint: string;
@@ -960,6 +942,7 @@ export type TenantMessages = {
       };
       adding: string;
       action: string;
+      created: string;
     };
     edit: {
       title: string;
@@ -971,6 +954,7 @@ export type TenantMessages = {
       };
       savingChanges: string;
       saveChanges: string;
+      updated: string;
     };
     delete: {
       title: string;
@@ -1593,10 +1577,6 @@ export type TenantMessages = {
         title: string;
         description: string;
       };
-      prices: {
-        title: string;
-        description: string;
-      };
       hardware: {
         title: string;
         description: string;
@@ -1624,7 +1604,6 @@ export type TenantMessages = {
       settings: string;
       branches: string;
       services: string;
-      prices: string;
       reports: string;
     };
     unavailable: string;
@@ -1634,6 +1613,84 @@ export type TenantMessages = {
   settings: {
     eyebrow: string;
     description: string;
+    navigation: {
+      ariaLabel: string;
+      searchLabel: string;
+      searchPlaceholder: string;
+      workspaceSubtitle: string;
+      closeLabel: string;
+      noResults: string;
+      accountFallback: string;
+      roleLabels: {
+        super_admin: string;
+        support: string;
+        owner: string;
+        manager: string;
+        cashier: string;
+      };
+      items: {
+        general: string;
+        locations: string;
+        pricing: string;
+        pointOfSale: string;
+        hardware: string;
+        activityLog: string;
+      };
+    };
+    general: {
+      title: string;
+      businessDetailsTitle: string;
+      businessDetailsDescription: string;
+      entityLabel: string;
+      businessDetailsHint: string;
+      readOnlyTitle: string;
+      storeDefaultsTitle: string;
+      storeDefaultsDescription: string;
+      currencyHint: string;
+      languageHint: string;
+      timezoneHint: string;
+      featureAccessTitle: string;
+      featureAccessDescription: string;
+      resourcesTitle: string;
+      resourcesDescription: string;
+      resourceDescriptions: {
+        general: string;
+        locations: string;
+        pricing: string;
+        pointOfSale: string;
+        hardware: string;
+        activityLog: string;
+      };
+    };
+    pricingHub: {
+      title: string;
+      description: string;
+      productsTitle: string;
+      productsDescription: string;
+      servicesTitle: string;
+      servicesDescription: string;
+      openProducts: string;
+      openServices: string;
+      noteTitle: string;
+      noteDescription: string;
+    };
+    pilotStatusLabels: {
+      pilot: string;
+      live: string;
+      paused: string;
+    };
+    languageLabels: {
+      en: string;
+      fr: string;
+      "zh-CN": string;
+    };
+    featureFlagLabels: {
+      laundryEnabled: string;
+      carWashEnabled: string;
+      retailProductsEnabled: string;
+      deliveryEnabled: string;
+      notificationsEnabled: string;
+    };
     labels: {
       pilotStatus: string;
       defaultLanguage: string;
@@ -1661,6 +1718,58 @@ export type TenantMessages = {
     requestFailed: string;
     invalidDate: string;
     notUpdated: string;
+  };
+
+  notificationCenter: {
+    eyebrow: string;
+    title: string;
+    description: string;
+    stats: {
+      total: string;
+      unread: string;
+      urgent: string;
+    };
+    toolbar: {
+      searchPlaceholder: string;
+      searchLabel: string;
+      filters: string;
+      refresh: string;
+      readStatus: string;
+      noticeType: string;
+      priority: string;
+      all: string;
+      unread: string;
+      read: string;
+      business: string;
+      system: string;
+      low: string;
+      normal: string;
+      high: string;
+      critical: string;
+    };
+    table: {
+      notification: string;
+      type: string;
+      priority: string;
+      status: string;
+      time: string;
+      actions: string;
+      markRead: string;
+      archive: string;
+      openOrder: string;
+    };
+    status: {
+      unread: string;
+      read: string;
+      archived: string;
+    };
+    empty: string;
+    loadError: string;
+    retry: string;
+    previous: string;
+    next: string;
+    pageSummary: string;
+    updated: string;
   };
 
   notifications: {
@@ -1744,6 +1853,105 @@ export type TenantMessages = {
         sent: string;
         failed: string;
       };
+    };
+  };
+
+  profile: {
+    title: string;
+    description: string;
+    tenantCode: string;
+    branchCount: string;
+    notProvided: string;
+    never: string;
+    saveProfile: string;
+    saving: string;
+    retry: string;
+    loadErrorTitle: string;
+    loadErrorDescription: string;
+    personal: {
+      title: string;
+      description: string;
+      displayName: string;
+      displayNameHint: string;
+      language: string;
+      languageHint: string;
+      languageOptions: {
+        en: string;
+        "zh-CN": string;
+      };
+    };
+    account: {
+      title: string;
+      email: string;
+      phone: string;
+      lastLogin: string;
+      createdAt: string;
+    };
+    access: {
+      title: string;
+      description: string;
+      roles: string;
+      branches: string;
+      allBranches: string;
+      unknownBranch: string;
+      noRoles: string;
+      noBranches: string;
+    };
+    security: {
+      title: string;
+      description: string;
+      currentPassword: string;
+      newPassword: string;
+      confirmPassword: string;
+      showPassword: string;
+      hidePassword: string;
+      requirementsTitle: string;
+      minimumLength: string;
+      requiresNumber: string;
+      requiresSymbol: string;
+      signOutNotice: string;
+      changePassword: string;
+      changingPassword: string;
+    };
+    devices: {
+      title: string;
+      description: string;
+      emptyTitle: string;
+      emptyDescription: string;
+    };
+    statusLabels: {
+      invited: string;
+      active: string;
+      disabled: string;
+      suspended: string;
+    };
+    branchStatusLabels: {
+      active: string;
+      inactive: string;
+    };
+    validation: {
+      displayNameRequired: string;
+      displayNameTooLong: string;
+      invalidLanguage: string;
+      currentPasswordRequired: string;
+      newPasswordRequired: string;
+      passwordTooShort: string;
+      passwordNumberRequired: string;
+      passwordSymbolRequired: string;
+      passwordConfirmationMismatch: string;
+    };
+    feedback: {
+      profileSaved: string;
+      upToDate: string;
+      checkForm: string;
+      checkPassword: string;
+      passwordChanged: string;
+      currentPasswordIncorrect: string;
+      passwordUnchanged: string;
+      passwordPolicyViolation: string;
+      conflict: string;
+      notFound: string;
+      requestFailed: string;
     };
   };
 

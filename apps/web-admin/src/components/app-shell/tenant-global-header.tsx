@@ -2,13 +2,18 @@
 
 import type { AuthContext } from "@cleanhub/api-client";
 import { Icon, Input } from "@cleanhub/ui";
-import { Bot, MessageSquare, Search, UserRound } from "lucide-react";
+import { Search } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
-import type { WebAdminMessages } from "@/i18n/messages-types";
-
-type TenantHeaderCopy = WebAdminMessages["shell"]["tenant"]["header"];
+import {
+  TenantHeaderAccountMenu,
+  TenantHeaderAssistant,
+  TenantHeaderMessages,
+  type TenantHeaderCopy,
+  type TenantHeaderPanel,
+} from "@/features/tenant/header";
 
 type TenantGlobalHeaderProps = {
   authContext: AuthContext | null;
@@ -22,6 +27,11 @@ export function TenantGlobalHeader({
   displayName,
 }: TenantGlobalHeaderProps) {
   const accountName = authContext?.displayName.trim() || displayName;
+  const [activePanel, setActivePanel] = useState<TenantHeaderPanel | null>(null);
+
+  function handlePanelChange(panel: TenantHeaderPanel, open: boolean) {
+    setActivePanel(open ? panel : null);
+  }
 
   return (
     <header
@@ -67,36 +77,24 @@ export function TenantGlobalHeader({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5 pr-0 sm:gap-2 lg:pr-5">
-          <span
-            aria-label={copy.assistantLabel}
-            className="flex size-9 items-center justify-center rounded-full border border-white/15 text-white/75"
-            data-testid="tenant-header-assistant"
-            role="img"
-            title={copy.assistantLabel}
-          >
-            <Icon aria-hidden icon={Bot} />
-          </span>
-          <span
-            aria-label={copy.messagesLabel}
-            className="flex size-9 items-center justify-center rounded-full border border-white/15 text-white/75"
-            data-testid="tenant-header-messages"
-            role="img"
-            title={copy.messagesLabel}
-          >
-            <Icon aria-hidden icon={MessageSquare} />
-          </span>
-          <div
-            aria-label={`${copy.accountLabel}: ${accountName}`}
-            className="flex min-w-0 items-center gap-2 border-l border-white/15 pl-2 sm:pl-3"
-            data-testid="tenant-header-user"
-          >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/85">
-              <Icon aria-hidden icon={UserRound} />
-            </span>
-            <span className="hidden max-w-40 truncate text-sm font-medium text-white sm:block">
-              {accountName}
-            </span>
-          </div>
+          <TenantHeaderAssistant
+            authContext={authContext}
+            copy={copy}
+            onOpenChange={(open) => handlePanelChange("assistant", open)}
+            open={activePanel === "assistant"}
+          />
+          <TenantHeaderMessages
+            copy={copy}
+            onOpenChange={(open) => handlePanelChange("messages", open)}
+            open={activePanel === "messages"}
+          />
+          <TenantHeaderAccountMenu
+            accountName={accountName}
+            authContext={authContext}
+            copy={copy}
+            onOpenChange={(open) => handlePanelChange("account", open)}
+            open={activePanel === "account"}
+          />
         </div>
       </div>
     </header>

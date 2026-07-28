@@ -47,6 +47,7 @@ export const webAdminRoutes = {
     newService: "/tenant/services/new",
     prices: "/tenant/prices",
     hardware: "/tenant/hardware",
+    notifications: "/tenant/notifications",
     reports: "/tenant/reports",
     finance: "/tenant/finance",
     config: {
@@ -54,7 +55,6 @@ export const webAdminRoutes = {
       services: "/tenant/services",
       prices: "/tenant/prices",
       hardware: "/tenant/hardware",
-      notifications: "/tenant/config/notifications",
     },
     system: {
       logs: "/tenant/system/logs",

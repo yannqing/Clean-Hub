@@ -23,6 +23,92 @@ type TenantShellCopy = ShellCopy & {
     assistantLabel: string;
     messagesLabel: string;
     accountLabel: string;
+    assistant: {
+      title: string;
+      description: string;
+      closeLabel: string;
+      searchLabel: string;
+      searchPlaceholder: string;
+      recommendedTitle: string;
+      quickActionsTitle: string;
+      emptyTitle: string;
+      emptyDescription: string;
+      actions: {
+        orders: {
+          label: string;
+          description: string;
+        };
+        customers: {
+          label: string;
+          description: string;
+        };
+        products: {
+          label: string;
+          description: string;
+        };
+        newProduct: {
+          label: string;
+          description: string;
+        };
+        services: {
+          label: string;
+          description: string;
+        };
+        newService: {
+          label: string;
+          description: string;
+        };
+        discounts: {
+          label: string;
+          description: string;
+        };
+        newDiscount: {
+          label: string;
+          description: string;
+        };
+        reports: {
+          label: string;
+          description: string;
+        };
+        finance: {
+          label: string;
+          description: string;
+        };
+        settings: {
+          label: string;
+          description: string;
+        };
+      };
+    };
+    messages: {
+      title: string;
+      unreadCount: string;
+      noUnread: string;
+      markAllRead: string;
+      marking: string;
+      loading: string;
+      errorTitle: string;
+      errorHint: string;
+      retry: string;
+      emptyTitle: string;
+      emptyHint: string;
+      businessType: string;
+      systemType: string;
+      unreadStatus: string;
+      readStatus: string;
+      markRead: string;
+      relatedOrder: string;
+      viewAll: string;
+    };
+    account: {
+      menuLabel: string;
+      roleLabel: string;
+      branchScopeLabel: string;
+      allBranches: string;
+      assignedBranches: string;
+      profile: string;
+      settings: string;
+    };
   };
 };
 
@@ -51,6 +137,8 @@ type AuthCopy = {
   identifierPlaceholder: string;
   passwordLabel: string;
   passwordPlaceholder: string;
+  passwordShow: string;
+  passwordHide: string;
   submit: string;
   submitting: string;
   signedIn: string;
