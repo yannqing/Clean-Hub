@@ -138,15 +138,16 @@ export function LoginForm() {
   }
 
   return (
-    <form className="grid gap-5" onSubmit={handleSubmit}>
+    <form className="grid gap-4" onSubmit={handleSubmit}>
       <div className="grid gap-2">
-        <label className="text-sm font-semibold text-slate-700" htmlFor="pin">
+        <label className="text-sm font-semibold text-zinc-800" htmlFor="pin">
           {t("pos.auth.pin")}
         </label>
         <input
           aria-invalid={Boolean(fieldErrors.pin)}
           autoComplete="one-time-code"
-          className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-center text-xl font-semibold text-slate-900 outline-none transition placeholder:text-sm placeholder:font-medium placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
+          className="h-12 w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 text-center text-xl font-semibold tracking-[0.16em] text-zinc-950 outline-none transition placeholder:text-sm placeholder:font-medium placeholder:tracking-normal placeholder:text-zinc-400 focus:border-zinc-400 focus:bg-white focus:shadow-[0_0_0_4px_rgba(24,24,27,0.08)] disabled:cursor-wait disabled:opacity-60"
+          disabled={submitting}
           id="pin"
           inputMode="numeric"
           maxLength={PIN_LENGTH}
@@ -159,14 +160,19 @@ export function LoginForm() {
           value={formState.pin}
         />
         {fieldErrors.pin ? (
-          <p className="text-xs text-red-500">{fieldErrors.pin}</p>
+          <p className="text-xs text-red-600">{fieldErrors.pin}</p>
+        ) : null}
+        {submitting ? (
+          <p className="text-center text-xs font-medium text-zinc-500">
+            {t("pos.auth.submitting")}
+          </p>
         ) : null}
       </div>
 
       <div className="grid grid-cols-3 gap-2">
         {KEYPAD_KEYS.map((digit) => (
           <button
-            className="flex h-12 items-center justify-center rounded-lg border border-slate-200 bg-white text-lg font-semibold text-slate-900 transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-12 items-center justify-center rounded-xl border border-zinc-200 bg-white text-lg font-semibold text-zinc-950 transition hover:border-zinc-400 hover:bg-zinc-50 active:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={submitting}
             key={digit}
             onClick={() => appendDigit(digit)}
@@ -176,7 +182,7 @@ export function LoginForm() {
           </button>
         ))}
         <button
-          className="flex h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex h-12 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 px-2 text-xs font-semibold text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={submitting || formState.pin.length === 0}
           onClick={clearPin}
           type="button"
@@ -184,7 +190,7 @@ export function LoginForm() {
           {t("pos.auth.clearPin")}
         </button>
         <button
-          className="flex h-12 items-center justify-center rounded-lg border border-slate-200 bg-white text-lg font-semibold text-slate-900 transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex h-12 items-center justify-center rounded-xl border border-zinc-200 bg-white text-lg font-semibold text-zinc-950 transition hover:border-zinc-400 hover:bg-zinc-50 active:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={submitting}
           onClick={() => appendDigit("0")}
           type="button"
@@ -192,7 +198,7 @@ export function LoginForm() {
           0
         </button>
         <button
-          className="flex h-12 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-500 transition hover:border-blue-200 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex h-12 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 px-2 text-xs font-semibold text-zinc-600 transition hover:border-zinc-400 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={submitting || formState.pin.length === 0}
           onClick={removeLastDigit}
           type="button"
@@ -202,15 +208,15 @@ export function LoginForm() {
       </div>
 
       {errorMessage ? (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
           {errorMessage}
         </p>
       ) : null}
 
       {posTenantCode ? (
-        <p className="text-center text-xs text-slate-400">
+        <p className="rounded-lg bg-zinc-50 px-3 py-2 text-center text-xs text-zinc-500">
           {t("pos.auth.currentStore")}
-          <span className="font-semibold text-slate-500">{posTenantCode}</span>
+          <span className="font-semibold text-zinc-800">{posTenantCode}</span>
         </p>
       ) : null}
     </form>

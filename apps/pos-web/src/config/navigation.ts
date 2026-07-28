@@ -9,69 +9,56 @@ export type PosNavItem = {
   icon: PosIconName;
 };
 
-export type PosNavSection = {
-  titleKey: TranslationKey;
-  items: PosNavItem[];
-};
-
-export const posSidebarNavigation: PosNavSection[] = [
+/**
+ * POS navigation is intentionally flat. Cashiers work through a short,
+ * task-oriented sequence and should not need to scan admin-style group
+ * headings before finding the next operation.
+ */
+export const posSidebarNavigation: PosNavItem[] = [
   {
-    titleKey: "pos.nav.operations",
-    items: [
-      {
-        labelKey: "pos.nav.workspace",
-        href: posRoutes.workspace,
-        icon: "layout-dashboard",
-      },
-      {
-        labelKey: "pos.nav.newIntake",
-        href: posRoutes.newIntake,
-        icon: "user-plus",
-      },
-      { labelKey: "pos.nav.scan", href: posRoutes.scan, icon: "scan-line" },
-    ],
+    labelKey: "pos.nav.workspace",
+    href: posRoutes.workspace,
+    icon: "home",
   },
   {
-    titleKey: "pos.nav.records",
-    items: [
-      {
-        labelKey: "pos.nav.customers",
-        href: posRoutes.customers,
-        icon: "users",
-      },
-      {
-        labelKey: "pos.nav.tickets",
-        href: posRoutes.tickets,
-        icon: "clipboard-list",
-      },
-      { labelKey: "pos.nav.orders", href: posRoutes.orders, icon: "receipt" },
-      {
-        labelKey: "pos.nav.statistics",
-        href: posRoutes.statistics,
-        icon: "chart",
-      },
-      { labelKey: "pos.nav.garments", href: posRoutes.garments, icon: "shirt" },
-    ],
+    labelKey: "pos.nav.newIntake",
+    href: posRoutes.newIntake,
+    icon: "user-plus",
   },
   {
-    titleKey: "pos.nav.store",
-    items: [
-      {
-        labelKey: "pos.nav.shiftHandover",
-        href: posRoutes.shiftHandover,
-        icon: "replace",
-      },
-      {
-        labelKey: "pos.nav.notifications",
-        href: posRoutes.notifications,
-        icon: "bell",
-      },
-      {
-        labelKey: "pos.nav.settings",
-        href: posRoutes.settings,
-        icon: "settings",
-      },
-    ],
+    labelKey: "pos.nav.scan",
+    href: posRoutes.scan,
+    icon: "scan-line",
+  },
+  {
+    labelKey: "pos.nav.customers",
+    href: posRoutes.customers,
+    icon: "users",
+  },
+  {
+    labelKey: "pos.nav.tickets",
+    href: posRoutes.tickets,
+    icon: "clipboard-list",
+  },
+  {
+    labelKey: "pos.nav.orders",
+    href: posRoutes.orders,
+    icon: "receipt",
+  },
+  {
+    labelKey: "pos.nav.statistics",
+    href: posRoutes.statistics,
+    icon: "chart",
+  },
+  {
+    labelKey: "pos.nav.shiftHandover",
+    href: posRoutes.shiftHandover,
+    icon: "replace",
+  },
+  {
+    labelKey: "pos.nav.notifications",
+    href: posRoutes.notifications,
+    icon: "bell",
   },
 ];
 

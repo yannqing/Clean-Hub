@@ -8,6 +8,7 @@ import { posRoutes } from "@/config/routes";
 import { posApi } from "@/lib/api-client";
 
 type LogoutButtonProps = {
+  "aria-label"?: string;
   className?: string;
   signOutLabel?: string;
   signingOutLabel?: string;
@@ -19,6 +20,7 @@ type LogoutButtonProps = {
 };
 
 export function LogoutButton({
+  "aria-label": ariaLabel,
   className,
   signOutLabel = "退出登录",
   signingOutLabel = "退出中…",
@@ -46,6 +48,7 @@ export function LogoutButton({
 
   return (
     <button
+      aria-label={ariaLabel}
       className={className}
       disabled={submitting}
       onClick={handleLogout}

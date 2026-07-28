@@ -691,6 +691,11 @@ export const frMessages = {
       syncRetry: "Réessayer la synchronisation",
       lockScreen: "Verrouiller",
       logout: "Se déconnecter",
+      openNavigation: "Ouvrir la navigation principale",
+      closeNavigation: "Fermer la navigation principale",
+      openSearch: "Ouvrir la recherche globale",
+      closeSearch: "Fermer la recherche globale",
+      accountMenu: "Menu du compte",
       messageCenter: "Centre de messages",
       unreadMessages: "Centre de messages, {count} messages non lus",
     },
@@ -708,7 +713,7 @@ export const frMessages = {
       errorHint:
         "Réessayez plus tard ou continuez depuis la liste correspondante.",
       itemCount: "{count} articles",
-      amount: "¥{amount}",
+      amount: "{amount}",
       groups: {
         customers: "Clients",
         tickets: "Tickets",

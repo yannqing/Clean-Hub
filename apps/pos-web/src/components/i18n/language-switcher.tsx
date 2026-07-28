@@ -14,9 +14,15 @@ import { Icon } from "@/components/app-shell/icons";
 
 type LanguageSwitcherProps = {
   className?: string;
+  compact?: boolean;
+  variant?: "default" | "dark";
 };
 
-export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
+export function LanguageSwitcher({
+  className,
+  compact = false,
+  variant = "default",
+}: LanguageSwitcherProps) {
   const { locale, setLocale, t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -52,15 +58,32 @@ export function LanguageSwitcher({ className }: LanguageSwitcherProps) {
       <button
         aria-expanded={open}
         aria-label={t("pos.language.switcherLabel")}
-        className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+        className={cn(
+          "flex items-center justify-center gap-2 rounded-lg border text-sm font-semibold transition",
+          variant === "dark" ? "h-10" : "h-11",
+          compact ? "w-10 px-0 2xl:w-auto 2xl:px-3" : "px-3",
+          variant === "dark"
+            ? "border-white/15 bg-white/10 text-white/80 hover:bg-white/15 hover:text-white"
+            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+        )}
         onClick={() => setOpen((current) => !current)}
         type="button"
       >
-        <Icon className="h-4 w-4 text-slate-500" name="languages" />
-        <span>{localeLabels[locale]}</span>
         <Icon
           className={cn(
-            "h-3.5 w-3.5 text-slate-400 transition",
+            "h-4 w-4",
+            variant === "dark" ? "text-white/65" : "text-slate-500",
+          )}
+          name="languages"
+        />
+        <span className={cn(compact && "hidden 2xl:inline")}>
+          {localeLabels[locale]}
+        </span>
+        <Icon
+          className={cn(
+            "h-3.5 w-3.5 transition",
+            compact && "hidden 2xl:block",
+            variant === "dark" ? "text-white/45" : "text-slate-400",
             open ? "rotate-180" : "",
           )}
           name="chevron-down"

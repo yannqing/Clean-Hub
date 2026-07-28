@@ -1,5 +1,5 @@
 import { PosDetailPageSkeleton } from "@/components/app-shell";
 
-export default function OrderDetailLoading() {
+export default function TicketDetailLoading() {
   return <PosDetailPageSkeleton />;
 }

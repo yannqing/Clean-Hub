@@ -15,8 +15,10 @@ import { posRoutes } from "@/config";
 import { posApi } from "@/lib/api-client";
 
 type HeaderNotificationsMenuProps = {
+  className?: string;
   unreadCount: number;
   onUnreadCountChange?: (count: number) => void;
+  variant?: "default" | "dark";
 };
 
 type LoadState = "idle" | "loading" | "success" | "error";
@@ -66,8 +68,10 @@ function getNoticeTypeLabel(
 }
 
 export function HeaderNotificationsMenu({
+  className,
   unreadCount,
   onUnreadCountChange,
+  variant = "default",
 }: HeaderNotificationsMenuProps) {
   const { locale, t } = useTranslation();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -165,7 +169,7 @@ export function HeaderNotificationsMenu({
   return (
     <div
       ref={rootRef}
-      className="relative"
+      className={cn("relative", className)}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           closeMenu();
@@ -188,7 +192,12 @@ export function HeaderNotificationsMenu({
             ? t("pos.shell.unreadMessages", { count: unreadCount })
             : t("pos.shell.messageCenter")
         }
-        className="relative z-50 flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+        className={cn(
+          "relative z-50 flex items-center justify-center rounded-lg border transition",
+          variant === "dark"
+            ? "h-10 w-10 border-white/15 bg-white/10 text-white/80 hover:bg-white/15 hover:text-white"
+            : "h-11 w-11 border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+        )}
         onClick={() => {
           void toggleMenu();
         }}
@@ -201,7 +210,7 @@ export function HeaderNotificationsMenu({
       </button>
 
       {open ? (
-        <section className="absolute right-0 top-[calc(100%+8px)] z-50 w-[380px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
+        <section className="absolute right-0 top-[calc(100%+8px)] z-50 w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
           <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
             <div>
               <div className="text-sm font-bold text-slate-950">

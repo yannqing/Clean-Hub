@@ -7,7 +7,15 @@ import { Icon } from "@/components/app-shell/icons";
 
 import { useOfflineSync } from "./offline-sync-provider";
 
-export function OfflineSyncBadge() {
+type OfflineSyncBadgeProps = {
+  className?: string;
+  variant?: "default" | "dark";
+};
+
+export function OfflineSyncBadge({
+  className,
+  variant = "default",
+}: OfflineSyncBadgeProps = {}) {
   const { t } = useTranslation();
   const { status, pendingCount, error, retry } = useOfflineSync();
   const retryable = status === "error" || status === "pending";
@@ -22,20 +30,25 @@ export function OfflineSyncBadge() {
             ? t("pos.shell.syncError")
             : t("pos.shell.syncPending", { count: pendingCount });
 
-  const className = cn(
-    "hidden h-9 items-center gap-2 rounded-lg px-3 text-sm font-semibold 2xl:flex",
-    status === "synced" && "bg-emerald-50 text-emerald-700",
-    status === "offline" && "bg-slate-100 text-slate-600",
-    (status === "pending" || status === "replaying") &&
+  const badgeClassName = cn(
+    "items-center justify-center gap-2 rounded-lg text-sm font-semibold transition",
+    variant === "dark"
+      ? "flex h-10 w-10 border border-white/15 bg-white/10 px-0 text-white/80 hover:bg-white/15 2xl:w-auto 2xl:px-3"
+      : "hidden h-9 px-3 2xl:flex",
+    variant === "default" && status === "synced" && "bg-emerald-50 text-emerald-700",
+    variant === "default" && status === "offline" && "bg-slate-100 text-slate-600",
+    variant === "default" &&
+      (status === "pending" || status === "replaying") &&
       "bg-amber-50 text-amber-700",
-    status === "error" && "bg-red-50 text-red-700",
+    variant === "default" && status === "error" && "bg-red-50 text-red-700",
+    className,
   );
 
   if (retryable) {
     return (
       <button
         aria-label={`${label}. ${t("pos.shell.syncRetry")}`}
-        className={className}
+        className={badgeClassName}
         onClick={() => void retry()}
         title={error ?? t("pos.shell.syncRetry")}
         type="button"
@@ -44,13 +57,20 @@ export function OfflineSyncBadge() {
           className="h-4 w-4"
           name={status === "error" ? "alert" : "rotate-ccw"}
         />
-        <span>{label}</span>
+        <span className={cn(variant === "dark" && "hidden 2xl:inline")}>
+          {label}
+        </span>
       </button>
     );
   }
 
   return (
-    <div aria-live="polite" className={className} title={error ?? label}>
+    <div
+      aria-label={label}
+      aria-live="polite"
+      className={badgeClassName}
+      title={error ?? label}
+    >
       {status === "replaying" ? (
         <Icon className="h-4 w-4 animate-spin" name="rotate-ccw" />
       ) : (
@@ -61,7 +81,9 @@ export function OfflineSyncBadge() {
           )}
         />
       )}
-      <span>{label}</span>
+      <span className={cn(variant === "dark" && "hidden 2xl:inline")}>
+        {label}
+      </span>
     </div>
   );
 }

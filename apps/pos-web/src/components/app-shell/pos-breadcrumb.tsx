@@ -18,45 +18,59 @@ type PosBreadcrumbProps = {
 };
 
 export function PosBreadcrumb({ className, items }: PosBreadcrumbProps) {
-  const breadcrumbs: PosBreadcrumbItem[] = [{ label: "POS" }, ...items];
-
   return (
     <nav
-      aria-label="Breadcrumb"
-      className={cn(
-        "flex items-center gap-1.5 text-xs font-semibold text-slate-400",
-        className,
-      )}
+      aria-label="POS breadcrumb / POS 面包屑"
+      className={cn("min-w-0", className)}
     >
-      {breadcrumbs.map((item, index) => {
-        const current = index === breadcrumbs.length - 1;
-        const contentClassName = current
-          ? "text-slate-600"
-          : "transition hover:text-blue-700";
+      <ol className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-slate-400">
+        <li className="shrink-0">
+          <Link
+            aria-label="POS 首页 / POS home"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            href="/"
+            title="POS 首页"
+          >
+            <Icon className="h-4 w-4" name="layout-dashboard" />
+          </Link>
+        </li>
 
-        return (
-          <span className="flex min-w-0 items-center gap-1.5" key={index}>
-            {index > 0 ? (
+        {items.map((item, index) => {
+          const current = index === items.length - 1;
+          const contentClassName = current
+            ? "max-w-72 truncate text-slate-700"
+            : "max-w-56 truncate text-slate-500 transition-colors hover:text-slate-950";
+
+          return (
+            <li
+              className={cn("flex min-w-0 items-center gap-1.5", current && "flex-1")}
+              key={index}
+            >
               <Icon className="h-3.5 w-3.5 shrink-0" name="chevron-right" />
-            ) : null}
-            {item.href && !current ? (
-              <Link className={contentClassName} href={item.href}>
-                {item.label}
-              </Link>
-            ) : item.onClick && !current ? (
-              <button
-                className={cn(contentClassName, "text-left")}
-                onClick={item.onClick}
-                type="button"
-              >
-                {item.label}
-              </button>
-            ) : (
-              <span className={contentClassName}>{item.label}</span>
-            )}
-          </span>
-        );
-      })}
+              {item.href && !current ? (
+                <Link className={contentClassName} href={item.href}>
+                  {item.label}
+                </Link>
+              ) : item.onClick && !current ? (
+                <button
+                  className={cn(contentClassName, "text-left")}
+                  onClick={item.onClick}
+                  type="button"
+                >
+                  {item.label}
+                </button>
+              ) : (
+                <span
+                  aria-current={current ? "page" : undefined}
+                  className={contentClassName}
+                >
+                  {item.label}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
     </nav>
   );
 }

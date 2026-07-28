@@ -1,5 +1,5 @@
 import { PosHomePageSkeleton } from "@/components/app-shell";
 
-export default function PosRouteLoading() {
+export default function StatisticsLoading() {
   return <PosHomePageSkeleton />;
 }

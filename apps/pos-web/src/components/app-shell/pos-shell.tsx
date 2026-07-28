@@ -1,24 +1,20 @@
 "use client";
 
-import { cn } from "@cleanhub/ui";
 import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
+import { cn } from "@cleanhub/ui";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-import { LogoutButton } from "@/features/auth/components";
-import { GlobalSearchBox } from "@/features/global-search";
-import { HeaderNotificationsMenu } from "@/features/notifications/components";
-import { OfflineSyncBadge } from "@/features/offline/components";
-import { LanguageSwitcher } from "@/components/i18n";
-import { posRoutes, posShellCopy, posSidebarNavigation } from "@/config";
+import { posRoutes, posSidebarNavigation } from "@/config";
 
 import { Icon } from "./icons";
+import { PosGlobalHeader } from "./pos-global-header";
 
 function isActivePath(pathname: string, href: string): boolean {
-  if (href === "/") {
-    return pathname === "/";
+  if (href === posRoutes.workspace) {
+    return pathname === href;
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);
@@ -117,178 +113,149 @@ export function PosShell({
   const [currentUnreadCount, setCurrentUnreadCount] = useState(
     notificationUnreadCount,
   );
-  const hasUnreadNotifications = currentUnreadCount > 0;
-  const resolvedProfile: PosShellProfile = profile
-    ? {
-        name: profile.name,
-        role: profile.role,
-        initials: profile.initials || buildInitials(profile.name),
-      }
-    : FALLBACK_PROFILE;
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const resolvedProfile = profile ?? FALLBACK_PROFILE;
   const roleLabelKey = ROLE_LABEL_KEYS[resolvedProfile.role];
   const roleLabel = roleLabelKey ? t(roleLabelKey) : resolvedProfile.role;
-  const profileName = localizeProfileName(
-    resolvedProfile.name,
-    roleLabel,
-    locale,
-  );
+  const profileName =
+    localizeProfileName(resolvedProfile.name, roleLabel, locale) || roleLabel;
   const displayInitials =
-    locale === "zh-CN"
-      ? resolvedProfile.initials
-      : (roleLabel.trim()[0]?.toUpperCase() ?? resolvedProfile.initials);
+    resolvedProfile.initials || buildInitials(profileName);
+  const settingsActive = isActivePath(pathname, posRoutes.settings);
+
   return (
-    <div className="flex h-screen h-dvh min-h-0 overflow-hidden bg-[#F7F9FC] pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-slate-900">
-      <aside
-        className="flex w-20 shrink-0 flex-col border-r border-slate-200 bg-white transition-[width] xl:w-[240px]"
-        data-pos-i18n-managed="true"
-      >
-        <div className="border-b border-slate-100 px-3 py-4 xl:px-5 xl:py-5">
-          <div className="flex items-center justify-center gap-3 xl:justify-start">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              alt="CleanHub mark"
-              className="h-10 w-10 rounded-xl object-cover xl:h-11 xl:w-11"
-              src="/cleanhub-logo-mark.jpg"
-            />
-            <div className="hidden xl:block">
-              <div className="text-lg font-extrabold tracking-tight">
-                <span className="text-slate-950">Clean</span>
-                <span className="bg-gradient-to-r from-blue-600 to-violet-600 bg-clip-text text-transparent">
-                  Hub
-                </span>
-              </div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                {t(posShellCopy.brandSuffixKey)}
-              </div>
-            </div>
-          </div>
+    <div className="flex h-screen h-dvh min-h-0 flex-col overflow-hidden bg-[#f6f6f6] pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-slate-900">
+      <PosGlobalHeader
+        displayInitials={displayInitials}
+        notificationUnreadCount={currentUnreadCount}
+        onOpenNavigation={() => setMobileNavigationOpen(true)}
+        onUnreadCountChange={setCurrentUnreadCount}
+        profileName={profileName}
+        roleLabel={roleLabel}
+      />
 
-          <Link
-            aria-label={t("pos.shell.create")}
-            className="mt-4 flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 text-sm font-semibold text-white transition hover:bg-blue-700 xl:mt-5"
-            href={posRoutes.newIntake}
-          >
-            <Icon className="h-4 w-4" name="user-plus" />
-            <span className="hidden xl:inline">{t("pos.shell.create")}</span>
-          </Link>
-        </div>
+      <div className="relative flex min-h-0 flex-1">
+        {mobileNavigationOpen ? (
+          <button
+            aria-label={t("pos.shell.closeNavigation")}
+            className="absolute inset-0 z-30 bg-black/35 backdrop-blur-[1px] lg:hidden"
+            onClick={() => setMobileNavigationOpen(false)}
+            type="button"
+          />
+        ) : null}
 
-        <nav className="pos-scrollbar flex-1 overflow-y-auto overflow-x-hidden px-2 py-4 xl:px-3">
-          <div className="space-y-4 xl:space-y-6">
-            {posSidebarNavigation.map((section) => (
-              <div key={section.titleKey}>
-                <div className="mb-2 hidden px-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 xl:block">
-                  {t(section.titleKey)}
-                </div>
-                <div className="space-y-1">
-                  {section.items.map((item) => {
-                    const active = isActivePath(activePathname, item.href);
-                    const label = t(item.labelKey);
-                    const showUnreadIndicator =
-                      hasUnreadNotifications &&
-                      item.href === posRoutes.notifications;
-
-                    return (
-                      <Link
-                        aria-current={active ? "page" : undefined}
-                        aria-label={
-                          showUnreadIndicator
-                            ? t("pos.shell.unreadMessages", {
-                                count: currentUnreadCount,
-                              })
-                            : label
-                        }
-                        className={cn(
-                          "relative flex h-11 w-full items-center justify-center gap-3 rounded-lg px-2 text-left text-sm transition xl:h-10 xl:justify-start xl:px-3",
-                          active
-                            ? "bg-blue-50 text-blue-700"
-                            : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
-                        )}
-                        href={item.href}
-                        key={item.labelKey}
-                      >
-                        {active ? (
-                          <span className="absolute left-0 h-5 w-1 rounded-r-full bg-blue-600" />
-                        ) : null}
-                        <span
-                          className={cn(
-                            "flex h-7 w-7 shrink-0 items-center justify-center rounded-md",
-                            active
-                              ? "bg-white text-blue-700 shadow-sm"
-                              : "text-slate-400",
-                          )}
-                        >
-                          <Icon className="h-4 w-4" name={item.icon} />
-                        </span>
-                        <span className="hidden min-w-0 flex-1 truncate font-medium xl:block">
-                          {label}
-                        </span>
-                        {showUnreadIndicator ? (
-                          <span className="absolute right-2 top-2 h-2 w-2 shrink-0 rounded-full bg-red-500 xl:static" />
-                        ) : null}
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            ))}
-          </div>
-        </nav>
-
-        <div className="border-t border-slate-100 p-2 xl:p-4">
-          <div className="flex items-center justify-center gap-3 rounded-lg bg-slate-50 p-2 xl:justify-start xl:p-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 via-blue-500 to-violet-500 text-xs font-bold text-white">
-              {displayInitials}
-            </div>
-            <div className="hidden min-w-0 flex-1 xl:block">
-              <div className="truncate text-sm font-semibold text-slate-900">
-                {profileName}
-              </div>
-              <div className="text-xs font-medium text-slate-500">
-                {roleLabel}
-              </div>
-            </div>
-            <LogoutButton
-              aria-label={t("pos.shell.logout")}
-              className="hidden h-8 w-8 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-200/60 hover:text-slate-700 xl:flex"
-            >
-              <Icon className="h-4 w-4" name="lock" />
-            </LogoutButton>
-          </div>
-        </div>
-      </aside>
-
-      <main className="flex min-w-0 flex-1 flex-col">
-        <header
-          className="flex h-[72px] items-center gap-2 border-b border-slate-200 bg-white px-3 sm:px-4 xl:gap-4 xl:px-6"
-          data-pos-i18n-managed="true"
+        <aside
+          className={cn(
+            "absolute inset-y-0 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white px-3 py-4 text-slate-900 shadow-xl transition-transform duration-200 lg:static lg:translate-x-0 lg:shadow-none",
+            mobileNavigationOpen ? "translate-x-0" : "-translate-x-full",
+          )}
+          data-testid="pos-sidebar"
         >
-          <GlobalSearchBox />
-
-          <div className="ml-auto flex items-center gap-2">
-            <OfflineSyncBadge />
-            <LanguageSwitcher />
-            <LogoutButton
-              aria-label={t("pos.shell.lockScreen")}
-              className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 xl:px-3"
-              signOutLabel={t("pos.shell.lockScreen")}
+          <div className="mb-3 flex items-center justify-between px-2 lg:hidden">
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+              CleanHub POS
+            </span>
+            <button
+              aria-label={t("pos.shell.closeNavigation")}
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
+              onClick={() => setMobileNavigationOpen(false)}
+              type="button"
             >
-              <Icon className="h-4 w-4 text-slate-500" name="lock" />
-              <span className="hidden xl:inline">
-                {t("pos.shell.lockScreen")}
-              </span>
-            </LogoutButton>
-            <HeaderNotificationsMenu
-              onUnreadCountChange={setCurrentUnreadCount}
-              unreadCount={currentUnreadCount}
-            />
+              <Icon className="h-[18px] w-[18px]" name="x" />
+            </button>
           </div>
-        </header>
 
-        <div className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-4 sm:px-5 sm:py-5 xl:px-6">
-          {children}
-        </div>
-      </main>
+          <nav
+            aria-label={t("common.mainNavigation")}
+            className="pos-scrollbar grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pb-5"
+          >
+            {posSidebarNavigation.map((item) => {
+              const active = isActivePath(activePathname, item.href);
+              const label = t(item.labelKey);
+              const showUnreadIndicator =
+                currentUnreadCount > 0 &&
+                item.href === posRoutes.notifications;
+
+              return (
+                <Link
+                  aria-current={active ? "page" : undefined}
+                  aria-label={
+                    showUnreadIndicator
+                      ? t("pos.shell.unreadMessages", {
+                          count: currentUnreadCount,
+                        })
+                      : label
+                  }
+                  className={cn(
+                    "group relative flex h-10 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+                    active
+                      ? "bg-slate-100 text-slate-950"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
+                  )}
+                  href={item.href}
+                  key={item.href}
+                  onClick={() => setMobileNavigationOpen(false)}
+                >
+                  <span
+                    className={cn(
+                      "absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-black opacity-0 transition-opacity",
+                      active && "opacity-100",
+                    )}
+                  />
+                  <Icon
+                    className={cn(
+                      "h-4 w-4 text-slate-400 transition-colors",
+                      active && "text-slate-950",
+                    )}
+                    name={item.icon}
+                  />
+                  <span className="min-w-0 flex-1 truncate">{label}</span>
+                  {showUnreadIndicator ? (
+                    <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                  ) : null}
+                </Link>
+              );
+            })}
+          </nav>
+
+          <div className="border-t border-slate-200 pt-3">
+            <Link
+              aria-current={settingsActive ? "page" : undefined}
+              className={cn(
+                "relative flex h-10 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+                settingsActive
+                  ? "bg-slate-100 text-slate-950"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
+              )}
+              href={posRoutes.settings}
+              onClick={() => setMobileNavigationOpen(false)}
+            >
+              <span
+                className={cn(
+                  "absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-black opacity-0 transition-opacity",
+                  settingsActive && "opacity-100",
+                )}
+              />
+              <Icon
+                className={cn(
+                  "h-4 w-4 text-slate-400",
+                  settingsActive && "text-slate-950",
+                )}
+                name="settings"
+              />
+              <span className="truncate">{t("pos.nav.settings")}</span>
+            </Link>
+          </div>
+        </aside>
+
+        <main className="flex min-w-0 flex-1 flex-col">
+          <div className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 sm:px-5 lg:px-7">
+            {children}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

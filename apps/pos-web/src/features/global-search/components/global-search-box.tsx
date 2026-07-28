@@ -29,6 +29,12 @@ const SEARCH_DEBOUNCE_MS = 300;
 const SEARCH_LIMIT = 5;
 
 type SearchStatus = "idle" | "loading" | "success" | "error";
+type GlobalSearchBoxVariant = "default" | "dark";
+
+type GlobalSearchBoxProps = {
+  className?: string;
+  variant?: GlobalSearchBoxVariant;
+};
 
 type SearchGroup = {
   key: keyof PosGlobalSearchResponse["groups"];
@@ -92,7 +98,10 @@ function formatAmount(
   return formatPosMoney(value, currency, locale);
 }
 
-export function GlobalSearchBox() {
+export function GlobalSearchBox({
+  className,
+  variant = "default",
+}: GlobalSearchBoxProps = {}) {
   const router = useRouter();
   const { locale, t } = useTranslation();
   const { currency } = usePosRuntimeConfig();
@@ -359,10 +368,23 @@ export function GlobalSearchBox() {
   }
 
   return (
-    <div ref={rootRef} className="relative min-w-0 w-full max-w-[620px]">
-      <div className="flex h-12 w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-3 transition focus-within:border-blue-300 focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]">
+    <div
+      ref={rootRef}
+      className={cn("relative w-full min-w-0 max-w-[620px]", className)}
+    >
+      <div
+        className={cn(
+          "flex w-full items-center rounded-lg border px-3 transition",
+          variant === "dark"
+            ? "h-10 border-white/15 bg-white/10 focus-within:border-white/30 focus-within:bg-white/[0.14] focus-within:ring-2 focus-within:ring-white/10"
+            : "h-12 border-slate-200 bg-slate-50 focus-within:border-blue-300 focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]",
+        )}
+      >
         <Icon
-          className="mr-2.5 h-[18px] w-[18px] text-slate-400"
+          className={cn(
+            "mr-2.5 h-[18px] w-[18px]",
+            variant === "dark" ? "text-white/55" : "text-slate-400",
+          )}
           name="search"
         />
         <input
@@ -371,7 +393,12 @@ export function GlobalSearchBox() {
           aria-controls={listboxId}
           aria-expanded={showPanel}
           aria-label={t("pos.globalSearch.label")}
-          className="h-full min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-900 outline-none placeholder:text-slate-400"
+          className={cn(
+            "h-full min-w-0 flex-1 bg-transparent text-sm font-medium outline-none",
+            variant === "dark"
+              ? "text-white placeholder:text-white/45"
+              : "text-slate-900 placeholder:text-slate-400",
+          )}
           id={inputId}
           onChange={(event) => {
             const nextQuery = event.target.value;
@@ -392,7 +419,12 @@ export function GlobalSearchBox() {
           value={query}
         />
         <button
-          className="ml-2 flex h-11 shrink-0 items-center gap-1.5 rounded-md bg-white px-2.5 text-xs font-semibold text-slate-500 shadow-sm transition hover:text-slate-800"
+          className={cn(
+            "ml-2 flex shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition",
+            variant === "dark"
+              ? "h-8 bg-white/10 text-white/75 hover:bg-white/15 hover:text-white"
+              : "h-11 bg-white text-slate-500 shadow-sm hover:text-slate-800",
+          )}
           onClick={() => router.push(posRoutes.scan)}
           type="button"
         >
