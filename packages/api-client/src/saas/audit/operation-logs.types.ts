@@ -22,3 +22,14 @@ export type OperationLogListItem = {
   actorUserId: string | null;
   createdAt: string;
 };
+
+export type OperationLogDetail = OperationLogListItem & {
+  metadata: Record<string, unknown> | null;
+};
+
+export type OperationLogListResult = {
+  items: OperationLogListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+};

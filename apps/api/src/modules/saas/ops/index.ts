@@ -1,4 +1,5 @@
 export * from "./operation-logs.controller.js";
+export * from "./operation-logs.errors.js";
 export * from "./operation-logs.helper.js";
 export * from "./operation-logs.repository.js";
 export * from "./operation-logs.routes.js";

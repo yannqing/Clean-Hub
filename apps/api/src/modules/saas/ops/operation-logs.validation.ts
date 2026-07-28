@@ -15,6 +15,10 @@ export const operationLogListQuerySchema = z.object({
   tenantId: z.string().regex(ULID_PATTERN).optional(),
   dateFrom: optionalDateSchema,
   dateTo: optionalDateSchema,
-  limit: z.coerce.number().int().min(1).max(100).default(50),
+  limit: z.coerce.number().int().min(1).max(100).default(10),
   offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const operationLogParamsSchema = z.object({
+  logId: z.string().regex(ULID_PATTERN),
 });

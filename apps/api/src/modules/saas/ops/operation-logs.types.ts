@@ -23,6 +23,17 @@ export type OperationLogListItem = {
   createdAt: string;
 };
 
+export type OperationLogDetail = OperationLogListItem & {
+  metadata: Record<string, unknown> | null;
+};
+
+export type OperationLogListResult = {
+  items: OperationLogListItem[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 export type WriteOperationLogInput = {
   tenantId?: string | null;
   branchId?: string | null;
