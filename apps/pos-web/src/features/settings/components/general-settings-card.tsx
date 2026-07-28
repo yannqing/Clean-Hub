@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@cleanhub/ui";
+import { Icon } from "@/components/app-shell";
 
 type GeneralSettingsCardProps = {
   branchName: string;
@@ -26,41 +20,42 @@ export function GeneralSettingsCard({
   receiptAddress,
 }: GeneralSettingsCardProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>门店信息</CardTitle>
-        <CardDescription>
-          当前门店的基本信息和收据抬头，如需修改请联系管理员。
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-6 sm:grid-cols-2">
-          {/* 门店基本信息 */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-slate-700">门店信息</h4>
-            <InfoRow label="门店名称" value={branchName} />
-            <InfoRow label="地址" value={branchAddress} />
-            <InfoRow label="电话" value={branchPhone} />
-          </div>
-
-          {/* 收据抬头 */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-semibold text-slate-700">收据抬头</h4>
-            <InfoRow label="名称" value={receiptName ?? branchName} />
-            <InfoRow label="电话" value={receiptPhone ?? branchPhone} />
-            <InfoRow label="地址" value={receiptAddress ?? branchAddress} />
-          </div>
+    <section className="overflow-hidden border-y border-slate-200 bg-white">
+      <header className="border-b border-slate-200 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-slate-500" name="store" />
+          <h2 className="text-sm font-semibold text-slate-950">门店信息</h2>
         </div>
-      </CardContent>
-    </Card>
+        <p className="mt-1 text-xs leading-5 text-slate-500">
+          当前门店的基本信息和收据抬头，如需修改请联系管理员。
+        </p>
+      </header>
+      <div className="grid gap-5 p-4">
+        <div className="space-y-3">
+          <h3 className="text-xs font-semibold text-slate-700">基本信息</h3>
+          <InfoRow label="门店名称" value={branchName} />
+          <InfoRow label="地址" value={branchAddress} />
+          <InfoRow label="电话" value={branchPhone} />
+        </div>
+
+        <div className="space-y-3 border-t border-slate-100 pt-4">
+          <h3 className="text-xs font-semibold text-slate-700">收据抬头</h3>
+          <InfoRow label="名称" value={receiptName ?? branchName} />
+          <InfoRow label="电话" value={receiptPhone ?? branchPhone} />
+          <InfoRow label="地址" value={receiptAddress ?? branchAddress} />
+        </div>
+      </div>
+    </section>
   );
 }
 
 function InfoRow({ label, value }: { label: string; value: string | null }) {
   return (
-    <div className="flex items-baseline gap-2">
-      <span className="w-16 shrink-0 text-xs text-slate-400">{label}</span>
-      <span className="text-sm text-slate-700">{value || "—"}</span>
+    <div className="grid grid-cols-[64px_minmax(0,1fr)] items-start gap-2">
+      <span className="text-xs text-slate-400">{label}</span>
+      <span className="min-w-0 break-words text-sm text-slate-700">
+        {value || "—"}
+      </span>
     </div>
   );
 }

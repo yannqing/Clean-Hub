@@ -63,7 +63,7 @@ function StatCardItem({ card }: { card: StatCard }) {
   const colors = COLOR_MAP[card.color];
 
   return (
-    <div className={`rounded-xl border border-slate-200 ${colors.bg} p-4`}>
+    <div className={`rounded-md border border-slate-200 ${colors.bg} p-3`}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-slate-500">{card.label}</span>
         <span
@@ -72,7 +72,9 @@ function StatCardItem({ card }: { card: StatCard }) {
           {card.value}
         </span>
       </div>
-      <p className={`mt-2 text-2xl font-bold ${colors.text}`}>{card.value}</p>
+      <p className={`mt-1 text-lg font-semibold ${colors.text}`}>
+        {card.value}
+      </p>
     </div>
   );
 }

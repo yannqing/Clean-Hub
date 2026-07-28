@@ -3,12 +3,6 @@
 import { useState } from "react";
 
 import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardFooter,
   Checkbox,
   Input,
   Label,
@@ -18,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@cleanhub/ui";
+
+import { Icon } from "@/components/app-shell";
 
 import {
   LOCK_TIMEOUT_OPTIONS,
@@ -56,30 +52,42 @@ export function TerminalSettingsCard({
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>终端设置</CardTitle>
-          <CardDescription>加载中…</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex h-40 items-center justify-center">
-            <div className="text-sm text-slate-400">正在加载终端设置…</div>
+      <section
+        aria-busy="true"
+        className="overflow-hidden border-y border-slate-200 bg-white"
+      >
+        <header className="border-b border-slate-200 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <Icon className="h-4 w-4 text-slate-500" name="settings" />
+            <h2 className="text-sm font-semibold text-slate-950">终端设置</h2>
           </div>
-        </CardContent>
-      </Card>
+          <p className="mt-1 text-xs text-slate-500">正在加载终端设置…</p>
+        </header>
+        <div className="grid gap-3 p-4">
+          {[0, 1, 2, 3].map((item) => (
+            <div
+              className="h-11 animate-pulse rounded-md bg-slate-100"
+              key={item}
+            />
+          ))}
+        </div>
+      </section>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>终端设置</CardTitle>
-        <CardDescription>
+    <section className="overflow-hidden border-y border-slate-200 bg-white">
+      <header className="border-b border-slate-200 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-slate-500" name="settings" />
+          <h2 className="text-sm font-semibold text-slate-950">终端设置</h2>
+        </div>
+        <p className="mt-1 text-xs leading-5 text-slate-500">
           配置当前终端的收银偏好、打印和锁屏策略。
-        </CardDescription>
-      </CardHeader>
+        </p>
+      </header>
       <form onSubmit={handleSubmit}>
-        <CardContent className="space-y-5">
+        <div className="space-y-5 p-4">
           {/* 设备标签 */}
           <div className="space-y-1.5">
             <Label htmlFor="terminal-label">设备标签</Label>
@@ -206,17 +214,17 @@ export function TerminalSettingsCard({
               无操作后自动锁定终端，需输入 PIN 解锁。
             </p>
           </div>
-        </CardContent>
-        <CardFooter className="mt-4">
+        </div>
+        <footer className="flex justify-end border-t border-slate-200 px-4 py-3">
           <button
-            className="h-11 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white disabled:opacity-50"
+            className="h-11 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
             disabled={saving}
             type="submit"
           >
             {saving ? "保存中…" : "保存设置"}
           </button>
-        </CardFooter>
+        </footer>
       </form>
-    </Card>
+    </section>
   );
 }

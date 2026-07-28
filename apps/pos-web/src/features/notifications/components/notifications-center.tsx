@@ -7,7 +7,13 @@ import { useCallback, useMemo, useState, useTransition } from "react";
 import type { PosNotificationInboxItem } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 
-import { Icon, PosBreadcrumb } from "@/components/app-shell";
+import {
+  Icon,
+  PosBreadcrumb,
+  PosMetricStrip,
+  PosPageHeader,
+  PosTableSurface,
+} from "@/components/app-shell";
 import { posRoutes } from "@/config";
 
 import {
@@ -141,41 +147,38 @@ export function NotificationsCenter({
   );
 
   return (
-    <section>
-      <PosBreadcrumb className="mb-5" items={[{ label: "通知中心" }]} />
+    <section className="space-y-5 pb-8">
+      <PosBreadcrumb items={[{ label: "通知中心" }]} />
 
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-            通知中心
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            查看系统与业务通知，处理未读消息并跳转到关联订单或工单。
-          </p>
-        </div>
-        <button
-          className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={isPending || overview.unreadCount === 0}
-          onClick={() => runAction(markAllNotificationsReadAction)}
-          type="button"
-        >
-          <Icon className="h-4 w-4 text-blue-600" name="bell" />
-          全部已读
-        </button>
-      </div>
+      <PosPageHeader
+        actions={
+          <button
+            className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={isPending || overview.unreadCount === 0}
+            onClick={() => runAction(markAllNotificationsReadAction)}
+            type="button"
+          >
+            <Icon className="h-4 w-4" name="bell" />
+            全部已读
+          </button>
+        }
+        description="查看系统与业务通知，处理未读消息并跳转到关联订单或工单。"
+        icon="bell"
+        title="通知中心"
+      />
 
       <NotificationMetrics overview={overview} />
 
-      <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <PosTableSurface>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-3 py-2.5">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <Icon className="h-4 w-4 text-blue-600" name="search" />
+            <Icon className="h-4 w-4 text-slate-500" name="search" />
             通知筛选
           </div>
           <div className="text-xs text-slate-500">当前结果 · 共 {total} 条</div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
-          <div className="flex h-11 min-w-[260px] flex-1 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 focus-within:border-blue-300 focus-within:bg-white">
+        <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
+          <div className="flex h-10 min-w-[240px] flex-1 items-center rounded-md border border-slate-200 bg-slate-50 px-3 focus-within:border-slate-400 focus-within:bg-white">
             <Icon className="mr-2 h-4 w-4 text-slate-400" name="search" />
             <input
               className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
@@ -244,7 +247,7 @@ export function NotificationsCenter({
             value={params.get(NOTIFICATION_FILTER_KEYS.relatedType) ?? ""}
           />
           <button
-            className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            className="flex h-10 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
             disabled={isPending}
             onClick={() => router.replace("/notifications", { scroll: false })}
             type="button"
@@ -253,18 +256,18 @@ export function NotificationsCenter({
             重置
           </button>
         </div>
-      </section>
+      </PosTableSurface>
 
       {actionMessage ? (
-        <div className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+        <div className="border-y border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
           {actionMessage}
         </div>
       ) : null}
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_420px]">
-        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <h2 className="font-semibold text-slate-950">通知列表</h2>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_380px]">
+        <PosTableSurface className="overflow-hidden">
+          <div className="border-b border-slate-200 px-3 py-3">
+            <h2 className="text-sm font-semibold text-slate-950">通知列表</h2>
             <p className="mt-1 text-xs text-slate-500">
               默认显示未归档通知，按送达时间倒序排列。
             </p>
@@ -293,7 +296,7 @@ export function NotificationsCenter({
               )}
             </div>
           )}
-        </section>
+        </PosTableSurface>
 
         <NotificationDetailPanel
           disabled={isPending}
@@ -316,72 +319,35 @@ function NotificationMetrics({
   overview: PosNotificationOverview;
 }) {
   return (
-    <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
-      <MetricCard
-        icon="bell"
-        label="未读通知"
-        note="当前未处理"
-        tone="blue"
-        value={overview.unreadCount}
-      />
-      <MetricCard
-        icon="alert"
-        label="紧急未读"
-        note="高优先级与紧急"
-        tone="amber"
-        value={overview.urgentUnreadCount}
-      />
-      <MetricCard
-        icon="receipt"
-        label="业务通知"
-        note="订单与工单相关"
-        tone="violet"
-        value={overview.businessCount}
-      />
-      <MetricCard
-        icon="settings"
-        label="系统通知"
-        note="门店与系统消息"
-        tone="slate"
-        value={overview.systemCount}
-      />
-    </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  note,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  note: string;
-  icon: Parameters<typeof Icon>[0]["name"];
-  tone: "blue" | "amber" | "violet" | "slate";
-}) {
-  const toneClass = {
-    blue: "bg-blue-50 text-blue-700",
-    amber: "bg-amber-50 text-amber-700",
-    violet: "bg-violet-50 text-violet-700",
-    slate: "bg-slate-100 text-slate-600",
-  }[tone];
-
-  return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-medium text-slate-500">{label}</div>
-        <span
-          className={`flex h-9 w-9 items-center justify-center rounded-lg ${toneClass}`}
-        >
-          <Icon className="h-4 w-4" name={icon} />
-        </span>
-      </div>
-      <div className="mt-2 text-2xl font-semibold text-slate-950">{value}</div>
-      <div className="mt-1 text-xs text-slate-400">{note}</div>
-    </section>
+    <PosMetricStrip
+      ariaLabel="通知概览"
+      metrics={[
+        {
+          icon: "bell",
+          label: "未读通知",
+          note: "当前未处理",
+          value: overview.unreadCount,
+        },
+        {
+          icon: "alert",
+          label: "紧急未读",
+          note: "高优先级与紧急",
+          value: overview.urgentUnreadCount,
+        },
+        {
+          icon: "receipt",
+          label: "业务通知",
+          note: "订单与工单相关",
+          value: overview.businessCount,
+        },
+        {
+          icon: "settings",
+          label: "系统通知",
+          note: "门店与系统消息",
+          value: overview.systemCount,
+        },
+      ]}
+    />
   );
 }
 
@@ -404,7 +370,7 @@ function NotificationGroup({
 }) {
   return (
     <div>
-      <div className="border-b border-slate-100 bg-slate-50 px-5 py-2 text-xs font-semibold text-slate-500">
+      <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
         {label}
       </div>
       {notifications.map((notification) => (
@@ -441,8 +407,8 @@ function NotificationRow({
 
   return (
     <div
-      className={`border-b border-slate-100 px-5 py-4 ${
-        isSelected ? "bg-blue-50/50" : "hover:bg-slate-50/70"
+      className={`border-b border-slate-100 px-3 py-3 ${
+        isSelected ? "bg-slate-100" : "hover:bg-slate-50/70"
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -528,7 +494,7 @@ function NotificationDetailPanel({
 
   if (!notification) {
     return (
-      <aside className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <aside className="border-y border-slate-200 bg-white p-5 text-sm text-slate-500">
         选择一条通知查看详情。
       </aside>
     );
@@ -537,8 +503,8 @@ function NotificationDetailPanel({
   const relatedHref = getRelatedHref(notification);
 
   return (
-    <aside className="rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="border-b border-slate-200 px-5 py-4">
+    <aside className="border-y border-slate-200 bg-white">
+      <div className="border-b border-slate-200 px-4 py-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="font-semibold text-slate-950">通知详情</h2>
@@ -552,7 +518,7 @@ function NotificationDetailPanel({
           />
         </div>
       </div>
-      <div className="space-y-4 p-5">
+      <div className="space-y-4 p-4">
         <div>
           <div className="flex flex-wrap gap-1.5">
             <NotificationBadge
@@ -646,7 +612,7 @@ function FilterSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm">
+    <label className="flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm">
       <span className="font-medium text-slate-500">{label}</span>
       <select
         className="bg-transparent text-sm text-slate-700 outline-none"
@@ -667,7 +633,7 @@ function FilterSelect({
 function NotificationsEmptyState() {
   return (
     <div className="px-5 py-14 text-center">
-      <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
+      <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-md bg-slate-100 text-slate-400">
         <Icon className="h-5 w-5" name="bell" />
       </span>
       <div className="mt-3 font-semibold text-slate-700">暂无匹配通知</div>

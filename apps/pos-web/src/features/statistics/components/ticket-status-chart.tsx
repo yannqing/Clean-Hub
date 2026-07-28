@@ -95,14 +95,14 @@ export function TicketStatusChart({
 
   if (total === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center">
+      <div className="rounded-md border border-dashed border-slate-300 bg-white p-6 text-center">
         <p className="text-sm text-slate-500">暂无工单数据</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <div className="rounded-lg border border-slate-200 bg-white p-4">
       <h3 className="mb-4 text-sm font-semibold text-slate-700">
         工单状态分布
       </h3>

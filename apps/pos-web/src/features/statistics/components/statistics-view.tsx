@@ -21,7 +21,12 @@ import {
 import type { PosStatisticsOverview } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 
-import { Icon, type PosIconName } from "@/components/app-shell/icons";
+import {
+  Icon,
+  PosBreadcrumb,
+  PosPageHeader,
+  type PosIconName,
+} from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import {
   PosChartContainer,
@@ -166,24 +171,24 @@ function MetricCard({
   value: string;
 }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <article className="flex min-h-20 items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2.5">
+      <span
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
+        style={iconAccentStyle(color)}
+      >
+        <Icon className="h-4 w-4" name={icon} />
+      </span>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-medium text-slate-500">{label}</p>
-          <p className="mt-2 truncate text-2xl font-bold text-slate-950">
+          <p className="text-[11px] font-medium text-slate-500">{label}</p>
+          <p className="mt-0.5 truncate text-lg font-semibold text-slate-950">
             {value}
           </p>
+          <p className="mt-0.5 truncate text-[11px] text-slate-400">
+            {helper}
+          </p>
         </div>
-        <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
-          style={iconAccentStyle(color)}
-        >
-          <Icon className="h-5 w-5" name={icon} />
-        </span>
       </div>
-      <p className="mt-3 truncate text-xs font-medium text-slate-500">
-        {helper}
-      </p>
     </article>
   );
 }
@@ -276,7 +281,7 @@ function ChartCard({
   title: string;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-5">
       <div>
         <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
         <p className="mt-1 text-xs text-slate-500">{description}</p>
@@ -933,7 +938,7 @@ function CustomerPanel({
   }));
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">客户运营概览</h3>
@@ -1120,12 +1125,14 @@ function CustomerPanel({
 
 function EmptyState() {
   return (
-    <div className="space-y-6">
-      <div>
-        <p className="text-xs font-semibold text-slate-500">业务记录</p>
-        <h1 className="mt-2 text-2xl font-bold text-slate-950">统计数据</h1>
-      </div>
-      <div className="rounded-lg border border-dashed border-slate-300 bg-white p-12 text-center">
+    <div className="space-y-5">
+      <PosBreadcrumb items={[{ label: "统计数据" }]} />
+      <PosPageHeader
+        description="查看门店经营数据：订单、工单和客户统计。"
+        icon="chart"
+        title="统计数据"
+      />
+      <div className="border-y border-dashed border-slate-300 bg-white p-12 text-center">
         <div
           className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg border"
           style={iconAccentStyle(CHART_COLORS.tickets)}
@@ -1175,32 +1182,29 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
   const todayNewCustomerCount = toNumber(customers.todayNewCount);
 
   return (
-    <div className="space-y-7">
-      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-end justify-between gap-5">
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-slate-500">业务记录</p>
-            <h1 className="mt-2 text-2xl font-bold text-slate-950">统计数据</h1>
-            <p className="mt-1 text-sm text-slate-500">
-              查看门店经营数据：订单、工单和客户统计。
-            </p>
-          </div>
+    <div className="space-y-7 pb-8">
+      <PosBreadcrumb items={[{ label: "统计数据" }]} />
+      <PosPageHeader
+        actions={
           <div className="grid min-w-[260px] grid-cols-2 gap-3">
-            <div className="rounded-lg bg-slate-50 p-3 text-right">
+            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-right">
               <p className="text-xs font-medium text-slate-500">今日销售额</p>
-              <p className="mt-1 truncate text-xl font-bold text-slate-950">
+              <p className="mt-0.5 truncate text-base font-semibold text-slate-950">
                 {formatCurrency(totalAmount, locale, currency)}
               </p>
             </div>
-            <div className="rounded-lg bg-slate-50 p-3 text-right">
+            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-right">
               <p className="text-xs font-medium text-slate-500">收款完成率</p>
-              <p className="mt-1 text-xl font-bold text-slate-950">
+              <p className="mt-0.5 text-base font-semibold text-slate-950">
                 {formatPercent(paidPercent, locale)}
               </p>
             </div>
           </div>
-        </div>
-      </section>
+        }
+        description="查看门店经营数据：订单、工单和客户统计。"
+        icon="chart"
+        title="统计数据"
+      />
 
       <section className="space-y-4">
         <SectionHeader
@@ -1209,7 +1213,7 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
           icon="receipt"
           title="订单统计"
           action={
-            <span className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">
+            <span className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600">
               {formatCountUnit(orderCount, locale, "单", "orders", "commandes")}
             </span>
           }
@@ -1270,7 +1274,7 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
           icon="clipboard-list"
           title="工单统计"
           action={
-            <span className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">
+            <span className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600">
               {formatCountUnit(
                 totalTicketCount,
                 locale,

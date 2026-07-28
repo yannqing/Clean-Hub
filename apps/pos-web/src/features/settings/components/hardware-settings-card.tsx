@@ -5,12 +5,6 @@ import { useState } from "react";
 import type { PosHardwareDeviceSummary } from "@cleanhub/api-client";
 
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -105,14 +99,17 @@ export function HardwareSettingsCard({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>硬件设备</CardTitle>
-        <CardDescription>
+    <section className="overflow-hidden border-y border-slate-200 bg-white">
+      <header className="border-b border-slate-200 px-4 py-3">
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-slate-500" name="printer" />
+          <h2 className="text-sm font-semibold text-slate-950">硬件设备</h2>
+        </div>
+        <p className="mt-1 text-xs leading-5 text-slate-500">
           当前门店已配置的硬件设备。如需添加或修改，请联系管理员在后台操作。
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+        </p>
+      </header>
+      <div className="p-4">
         {loading ? (
           <div className="flex h-24 items-center justify-center">
             <div className="text-sm text-slate-400">正在加载设备列表…</div>
@@ -125,16 +122,16 @@ export function HardwareSettingsCard({
           <div className="space-y-2">
             {devices.map((device) => (
               <div
+                className="flex items-center justify-between gap-3 border-b border-slate-100 py-3 last:border-b-0"
                 key={device.id}
-                className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 items-center gap-3">
                   <Icon
-                    className="h-5 w-5 text-slate-500"
+                    className="h-5 w-5 shrink-0 text-slate-500"
                     name={DEVICE_ICONS[device.deviceType] ?? "settings"}
                   />
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-slate-800">
                       {device.name}
                     </p>
                     <p className="text-xs text-slate-400">
@@ -159,10 +156,10 @@ export function HardwareSettingsCard({
             ))}
           </div>
         )}
-      </CardContent>
+      </div>
 
       {canManageSensitiveHardware ? (
-        <CardFooter className="mt-5 flex items-center justify-between gap-4 border-t border-slate-100 pt-5">
+        <footer className="flex items-center justify-between gap-4 border-t border-slate-200 px-4 py-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-800">钱箱控制</p>
             <p className="mt-1 text-xs text-slate-500">
@@ -180,7 +177,7 @@ export function HardwareSettingsCard({
             <Icon className="h-4 w-4" name="wallet-cards" />
             开钱箱
           </button>
-        </CardFooter>
+        </footer>
       ) : null}
 
       <Dialog
@@ -231,6 +228,6 @@ export function HardwareSettingsCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </Card>
+    </section>
   );
 }

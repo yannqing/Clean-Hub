@@ -14,7 +14,12 @@ import type {
 } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 
-import { Icon, PosBreadcrumb, type PosIconName } from "@/components/app-shell";
+import {
+  Icon,
+  PosBreadcrumb,
+  PosPageHeader,
+  type PosIconName,
+} from "@/components/app-shell";
 import { posRoutes } from "@/config/routes";
 import { DEFAULT_POS_CURRENCY } from "@/lib/money";
 import type { PosSessionUser } from "@/lib/session";
@@ -445,19 +450,19 @@ function MetricCard({
   }[tone];
 
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <article className="flex min-h-20 items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2.5">
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${toneClass}`}
+      >
+        <Icon className="h-4 w-4" name={icon} />
+      </span>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-medium text-slate-500">{label}</p>
-          <p className="mt-2 truncate text-2xl font-bold text-slate-950">
+          <p className="text-[11px] font-medium text-slate-500">{label}</p>
+          <p className="mt-0.5 truncate text-lg font-semibold text-slate-950">
             {value}
           </p>
         </div>
-        <span
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${toneClass}`}
-        >
-          <Icon className="h-5 w-5" name={icon} />
-        </span>
       </div>
     </article>
   );
@@ -757,18 +762,8 @@ export function ShiftHandoverView({
     <section className="space-y-5">
       <PosBreadcrumb items={[{ label: copy.breadcrumb }]} />
 
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 rounded-md bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-              <Icon className="h-3.5 w-3.5" name="replace" />
-              {copy.currentShift}
-            </div>
-            <h1 className="mt-3 text-2xl font-bold text-slate-950">
-              {copy.title}
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">{copy.description}</p>
-          </div>
+      <PosPageHeader
+        actions={
           <span
             className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${
               currentShift?.status === "open"
@@ -791,24 +786,29 @@ export function ShiftHandoverView({
               ? copy.active
               : currentShift?.status === "on_break"
                 ? copy.onBreak
-                : copy.noOpenShift}
+              : copy.noOpenShift}
           </span>
-        </div>
+        }
+        description={copy.description}
+        icon="replace"
+        title={copy.title}
+      />
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-3">
-          <div className="rounded-lg bg-slate-50 p-4">
+      <div className="border-y border-slate-200 bg-white py-4">
+        <div className="grid gap-3 lg:grid-cols-3">
+          <div className="rounded-md bg-slate-50 p-3">
             <p className="text-xs font-medium text-slate-500">{copy.cashier}</p>
             <p className="mt-1 truncate text-sm font-semibold text-slate-950">
               {cashierName}
             </p>
           </div>
-          <div className="rounded-lg bg-slate-50 p-4">
+          <div className="rounded-md bg-slate-50 p-3">
             <p className="text-xs font-medium text-slate-500">{copy.branch}</p>
             <p className="mt-1 truncate text-sm font-semibold text-slate-950">
               {branchName}
             </p>
           </div>
-          <div className="rounded-lg bg-slate-50 p-4">
+          <div className="rounded-md bg-slate-50 p-3">
             <p className="text-xs font-medium text-slate-500">
               {copy.generatedAt}
             </p>
@@ -908,7 +908,7 @@ export function ShiftHandoverView({
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-sm font-semibold text-slate-950">
@@ -1039,7 +1039,7 @@ export function ShiftHandoverView({
         </section>
 
         <aside className="space-y-5">
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-lg border border-slate-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-slate-950">
               {copy.paymentBreakdown}
             </h2>
@@ -1074,7 +1074,7 @@ export function ShiftHandoverView({
             </div>
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-lg border border-slate-200 bg-white p-5">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-sm font-semibold text-slate-950">
                 {copy.recentRecords}
@@ -1205,7 +1205,7 @@ export function ShiftHandoverView({
       </div>
 
       <div className="grid gap-5 xl:grid-cols-3">
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-slate-950">
               {copy.pendingOrders}
@@ -1233,7 +1233,7 @@ export function ShiftHandoverView({
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-slate-950">
               {copy.readyTickets}
@@ -1262,7 +1262,7 @@ export function ShiftHandoverView({
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <section className="rounded-lg border border-slate-200 bg-white p-5">
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg bg-amber-50 p-4">
               <p className="text-xs font-medium text-amber-700">

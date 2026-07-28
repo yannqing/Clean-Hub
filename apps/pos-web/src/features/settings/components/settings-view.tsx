@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 
 import type { PosHardwareDeviceSummary } from "@cleanhub/api-client";
-import { PosBreadcrumb } from "@/components/app-shell";
+import {
+  PosBreadcrumb,
+  PosFormLayout,
+  PosPageHeader,
+} from "@/components/app-shell";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import { posApi } from "@/lib/api-client";
@@ -194,44 +198,42 @@ export function SettingsView() {
   const isLoading = pageState === "loading";
 
   return (
-    <div className="px-6 py-5 space-y-5">
-      {/* Page header */}
-      <div>
-        <PosBreadcrumb items={[{ label: SETTINGS_PAGE_TITLE }]} />
-        <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-          {SETTINGS_PAGE_TITLE}
-        </h1>
-        <p className="mt-1 text-sm text-slate-500">
-          {SETTINGS_PAGE_DESCRIPTION}
-        </p>
-      </div>
-
-      {/* Terminal settings (editable) */}
-      {/* key forces remount when server data arrives, so useState re-initializes. */}
-      <TerminalSettingsCard
-        key={`terminal-${terminalSettings?.version ?? "new"}-${isLoading}`}
-        initial={formValues}
-        loading={isLoading}
-        saving={saving}
-        onSave={handleSave}
+    <div className="mx-auto w-full max-w-[960px] space-y-4">
+      <PosBreadcrumb items={[{ label: SETTINGS_PAGE_TITLE }]} />
+      <PosPageHeader
+        description={SETTINGS_PAGE_DESCRIPTION}
+        icon="settings"
+        title={SETTINGS_PAGE_TITLE}
       />
 
-      {/* General info (read-only) */}
-      <GeneralSettingsCard
-        branchAddress={branchInfo?.address ?? null}
-        branchName={branchInfo?.name ?? ""}
-        branchPhone={branchInfo?.phone ?? null}
-        receiptAddress={branchInfo?.receiptAddress ?? null}
-        receiptName={branchInfo?.receiptName ?? null}
-        receiptPhone={branchInfo?.receiptPhone ?? null}
-      />
-
-      {/* Hardware devices (read-only list via POS endpoint) */}
-      <HardwareSettingsCard
-        canManageSensitiveHardware={canManageSensitiveHardware}
-        devices={hardwareDevices}
-        loading={hardwareLoading}
-      />
+      <PosFormLayout
+        aside={
+          <div className="grid gap-5">
+            <GeneralSettingsCard
+              branchAddress={branchInfo?.address ?? null}
+              branchName={branchInfo?.name ?? ""}
+              branchPhone={branchInfo?.phone ?? null}
+              receiptAddress={branchInfo?.receiptAddress ?? null}
+              receiptName={branchInfo?.receiptName ?? null}
+              receiptPhone={branchInfo?.receiptPhone ?? null}
+            />
+            <HardwareSettingsCard
+              canManageSensitiveHardware={canManageSensitiveHardware}
+              devices={hardwareDevices}
+              loading={hardwareLoading}
+            />
+          </div>
+        }
+      >
+        {/* key forces remount when server data arrives, so useState re-initializes. */}
+        <TerminalSettingsCard
+          key={`terminal-${terminalSettings?.version ?? "new"}-${isLoading}`}
+          initial={formValues}
+          loading={isLoading}
+          saving={saving}
+          onSave={handleSave}
+        />
+      </PosFormLayout>
     </div>
   );
 }
