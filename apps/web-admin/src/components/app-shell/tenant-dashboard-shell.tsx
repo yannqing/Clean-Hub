@@ -9,8 +9,11 @@ import { useEffect, useMemo, useState } from "react";
 import { filterSidebarSections } from "@/config/feature-visibility";
 import { getNavIcon } from "@/config/nav-icons";
 import { webAdminRoutes } from "@/config/routes";
-import { LogoutButton } from "@/features/auth/components";
 import { getAuthSessionQuery } from "@/features/auth/queries";
+import {
+  TENANT_PROFILE_UPDATED_EVENT,
+  type TenantProfileUpdatedEventDetail,
+} from "@/features/tenant/profile/events";
 import { useWebAdminLocale } from "@/i18n";
 
 import { TenantGlobalHeader } from "./tenant-global-header";
@@ -42,18 +45,6 @@ function getDisplayName(authContext: AuthContext | null): string {
   return authContext?.displayName.trim() || getRoleLabel(authContext);
 }
 
-function getProfileInitials(displayName: string): string {
-  const initials = displayName
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("");
-
-  return initials || "AD";
-}
-
 export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -61,14 +52,17 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const sidebarItems = useMemo(
     () =>
-      filterSidebarSections(messages.sidebar.tenant).flatMap(
-        (section) => section.items,
-      ),
+      filterSidebarSections(messages.sidebar.tenant)
+        .flatMap((section) => section.items)
+        .filter((item) => item.href !== webAdminRoutes.tenant.system.settings),
     [messages.sidebar.tenant],
   );
-  const profileHref = webAdminRoutes.tenant.profile;
-  const profileActive = isActivePath(pathname, profileHref);
+  const settingsHref = webAdminRoutes.tenant.system.settings;
+  const settingsActive = isActivePath(pathname, settingsHref);
+  const SettingsIcon = getNavIcon(settingsHref);
   const isHomePage = pathname === webAdminRoutes.tenant.home;
+  const isBranchesPage = isActivePath(pathname, webAdminRoutes.tenant.branches);
+  const isHardwarePage = isActivePath(pathname, webAdminRoutes.tenant.hardware);
   const isOrdersPage = isActivePath(pathname, webAdminRoutes.tenant.orders);
   const isCustomersPage = isActivePath(
     pathname,
@@ -82,12 +76,24 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
   const isServicesPage = isActivePath(pathname, webAdminRoutes.tenant.services);
   const isReportsPage = isActivePath(pathname, webAdminRoutes.tenant.reports);
   const isFinancePage = isActivePath(pathname, webAdminRoutes.tenant.finance);
+  const isSystemLogsPage = isActivePath(pathname, webAdminRoutes.tenant.system.logs);
+  const isNotificationsPage = isActivePath(
+    pathname,
+    webAdminRoutes.tenant.notifications,
+  );
   const isPointOfSalePage = isActivePath(
     pathname,
     webAdminRoutes.tenant.pointOfSale.home,
   );
+  const isProfilePage = isActivePath(pathname, webAdminRoutes.tenant.profile);
+  const isSettingsWorkspace = isActivePath(
+    pathname,
+    webAdminRoutes.tenant.system.settings,
+  );
   const usesFlatPageLayout =
     isHomePage ||
+    isBranchesPage ||
+    isHardwarePage ||
     isOrdersPage ||
     isCustomersPage ||
     isProductsPage ||
@@ -95,13 +101,30 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
     isServicesPage ||
     isReportsPage ||
     isFinancePage ||
-    isPointOfSalePage;
+    isSystemLogsPage ||
+    isNotificationsPage ||
+    isPointOfSalePage ||
+    isProfilePage;
   const serviceActive = isActivePath(pathname, webAdminRoutes.tenant.services);
+  const pointOfSaleTabs = [
+    {
+      href: webAdminRoutes.tenant.pointOfSale.home,
+      label: messages.tenant.pointOfSale.tabs.overview,
+    },
+    {
+      href: webAdminRoutes.tenant.pointOfSale.devices,
+      label: messages.tenant.pointOfSale.tabs.devices,
+    },
+    {
+      href: webAdminRoutes.tenant.pointOfSale.registerSessions,
+      label: messages.tenant.pointOfSale.tabs.registerSessions,
+    },
+    {
+      href: webAdminRoutes.tenant.pointOfSale.settings,
+      label: messages.tenant.pointOfSale.tabs.settings,
+    },
+  ];
   const displayName = useMemo(() => getDisplayName(authContext), [authContext]);
-  const profileInitials = useMemo(
-    () => getProfileInitials(displayName),
-    [displayName],
-  );
 
   useEffect(() => {
     let active = true;
@@ -127,6 +150,54 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
     };
   }, [router]);
 
+  useEffect(() => {
+    function handleProfileUpdated(event: Event) {
+      const detail = (event as CustomEvent<TenantProfileUpdatedEventDetail>)
+        .detail;
+
+      if (!detail?.displayName) {
+        return;
+      }
+
+      setAuthContext((current) =>
+        current
+          ? {
+              ...current,
+              displayName: detail.displayName,
+            }
+          : current,
+      );
+    }
+
+    window.addEventListener(
+      TENANT_PROFILE_UPDATED_EVENT,
+      handleProfileUpdated,
+    );
+
+    return () => {
+      window.removeEventListener(
+        TENANT_PROFILE_UPDATED_EVENT,
+        handleProfileUpdated,
+      );
+    };
+  }, []);
+
+  if (isSettingsWorkspace) {
+    return (
+      <div
+        className="min-h-screen bg-[#f1f1f1] text-foreground"
+        data-testid="tenant-settings-shell"
+      >
+        <TenantGlobalHeader
+          authContext={authContext}
+          copy={messages.shell.tenant.header}
+          displayName={displayName}
+        />
+        <main className="min-w-0">{children}</main>
+      </div>
+    );
+  }
+
   return (
     <div
       className="min-h-screen bg-muted/30 text-foreground"
@@ -151,15 +222,23 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
               const selfActive = isActivePath(pathname, item.href);
               const isProductsItem =
                 item.href === webAdminRoutes.tenant.products;
+              const isPointOfSaleItem =
+                item.href === webAdminRoutes.tenant.pointOfSale.home;
               const visualActive =
-                selfActive || (isProductsItem && serviceActive);
+                selfActive ||
+                (isProductsItem && serviceActive) ||
+                (isPointOfSaleItem && isPointOfSalePage);
               const IconComponent = getNavIcon(item.href);
 
               return (
                 <div key={item.href}>
                   <Link
                     aria-current={selfActive ? "page" : undefined}
-                    aria-expanded={isProductsItem ? visualActive : undefined}
+                    aria-expanded={
+                      isProductsItem || isPointOfSaleItem
+                        ? visualActive
+                        : undefined
+                    }
                     className={cn(
                       "group relative flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] font-medium transition-colors",
                       "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -217,44 +296,67 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
                       </Link>
                     </div>
                   ) : null}
+
+                  {isPointOfSaleItem && visualActive ? (
+                    <div className="ml-4 mt-1 border-l border-sidebar-border pl-2">
+                      {pointOfSaleTabs.map((tab) => {
+                        const tabActive =
+                          tab.href === webAdminRoutes.tenant.pointOfSale.home
+                            ? pathname === tab.href
+                            : isActivePath(pathname, tab.href);
+
+                        return (
+                          <Link
+                            aria-current={tabActive ? "page" : undefined}
+                            className={cn(
+                              "flex h-7 items-center gap-2 rounded-md px-2.5 text-xs font-medium transition-colors",
+                              "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                              tabActive
+                                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                                : "text-muted-foreground",
+                            )}
+                            href={tab.href}
+                            key={tab.href}
+                          >
+                            <span
+                              aria-hidden
+                              className={cn(
+                                "size-1.5 rounded-full bg-muted-foreground/50",
+                                tabActive && "bg-sidebar-accent-foreground",
+                              )}
+                            />
+                            <span className="truncate">{tab.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
           </nav>
 
-          <div className="border-t pt-4">
-            <div className="flex items-center gap-2">
-              <Link
-                aria-current={profileActive ? "page" : undefined}
-                className={cn(
-                  "group flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 transition-colors",
-                  "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  profileActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground",
-                )}
-                href={profileHref}
-              >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-foreground ring-1 ring-border">
-                  {profileInitials}
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">
-                    {displayName}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {messages.common.personalCenter}
-                  </span>
-                </span>
-              </Link>
-
-              <LogoutButton
-                className="h-9 px-3 text-xs"
-                signOutLabel={messages.common.signOut}
-                signingOutLabel={messages.common.signingOut}
-              />
-            </div>
+          <div className="border-t pt-3">
+            <Link
+              aria-current={settingsActive ? "page" : undefined}
+              className={cn(
+                "flex h-9 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                settingsActive
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-muted-foreground",
+              )}
+              href={settingsHref}
+            >
+              {SettingsIcon ? (
+                <Icon aria-hidden icon={SettingsIcon} size={16} />
+              ) : null}
+              <span className="truncate">
+                {messages.tenant.settings.eyebrow}
+              </span>
+            </Link>
           </div>
         </aside>
 
