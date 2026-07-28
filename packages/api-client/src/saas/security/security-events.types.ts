@@ -21,3 +21,8 @@ export type SecurityEventListItem = {
   description: string | null;
   createdAt: string;
 };
+
+export type SecurityEventDetail = SecurityEventListItem & {
+  userAgent: string | null;
+  metadata: Record<string, unknown> | null;
+};

@@ -1,3 +1,5 @@
+import type { AuthContext } from "../../auth/auth.types.js";
+
 export type SecurityEventSeverity = "low" | "medium" | "high" | "critical";
 
 export type SecurityEventListInput = {
@@ -20,6 +22,16 @@ export type SecurityEventListItem = {
   ipAddress: string | null;
   description: string | null;
   createdAt: string;
+};
+
+export type SecurityEventDetail = SecurityEventListItem & {
+  userAgent: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
+export type GetSecurityEventDetailInput = {
+  authContext: AuthContext;
+  eventId: string;
 };
 
 export type WriteSecurityEventInput = {

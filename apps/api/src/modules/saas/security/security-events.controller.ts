@@ -1,11 +1,32 @@
+import type { Context } from "hono";
+
 import type { AppBindings } from "../../../http/types.js";
 import { requireSaasRole } from "../../auth/permission.helper.js";
-import { listSecurityEvents } from "./security-events.service.js";
-import { securityEventListQuerySchema } from "./security-events.validation.js";
+import { SecurityEventError } from "./security-events.errors.js";
+import {
+  getSecurityEventDetail,
+  listSecurityEvents,
+} from "./security-events.service.js";
+import {
+  getSecurityEventParamsSchema,
+  securityEventListQuerySchema,
+} from "./security-events.validation.js";
 
-export async function listSecurityEventsController(
-  c: import("hono").Context<AppBindings>,
+function createSecurityEventErrorResponse(
+  c: Context<AppBindings>,
+  error: SecurityEventError,
 ) {
+  return c.json(
+    {
+      message: error.message,
+      code: error.code,
+      requestId: c.get("requestId"),
+    },
+    error.status,
+  );
+}
+
+export async function listSecurityEventsController(c: Context<AppBindings>) {
   const authContext = c.get("authContext");
 
   requireSaasRole(authContext, ["super_admin", "support"]);
@@ -22,4 +43,27 @@ export async function listSecurityEventsController(
   const events = await listSecurityEvents(query);
 
   return c.json(events);
+}
+
+export async function getSecurityEventController(c: Context<AppBindings>) {
+  const authContext = c.get("authContext");
+
+  requireSaasRole(authContext, ["super_admin", "support"]);
+
+  const params = getSecurityEventParamsSchema.parse(c.req.param());
+
+  try {
+    const event = await getSecurityEventDetail({
+      authContext,
+      eventId: params.eventId,
+    });
+
+    return c.json(event);
+  } catch (error) {
+    if (error instanceof SecurityEventError) {
+      return createSecurityEventErrorResponse(c, error);
+    }
+
+    throw error;
+  }
 }

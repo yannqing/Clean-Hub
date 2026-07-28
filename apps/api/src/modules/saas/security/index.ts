@@ -1,6 +1,7 @@
 export * from "./security-policy.js";
 export * from "./security.routes.js";
 export * from "./security-events.controller.js";
+export * from "./security-events.errors.js";
 export * from "./security-events.helper.js";
 export * from "./security-events.repository.js";
 export * from "./security-events.routes.js";

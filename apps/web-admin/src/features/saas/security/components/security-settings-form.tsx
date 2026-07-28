@@ -6,10 +6,7 @@ import { useState, type FormEvent } from "react";
 import { useSaasI18n } from "@/i18n";
 import { updateSecuritySettingsAction } from "../actions";
 import { securitySettingsDefaultValues } from "../constants";
-import type {
-  SecuritySettings,
-  SecuritySettingsFormValues,
-} from "../types";
+import type { SecuritySettings, SecuritySettingsFormValues } from "../types";
 
 type SecuritySettingsFormProps = {
   initialValues?: SecuritySettingsFormValues;
@@ -64,10 +61,11 @@ export function SecuritySettingsForm({
   }
 
   return (
-    <form className="grid gap-4 rounded-md border p-4" onSubmit={handleSubmit}>
-      <div>
-        <h2 className="text-base font-semibold">{m.security.settings.title}</h2>
-      </div>
+    <form
+      className="grid gap-5 border-y bg-background px-5 py-6"
+      onSubmit={handleSubmit}
+    >
+      <p className="text-sm font-semibold">{m.security.settings.title}</p>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <div className="grid gap-2">
@@ -81,9 +79,11 @@ export function SecuritySettingsForm({
               updateValue("passwordMinLength", toNumber(event.target.value))
             }
             type="number"
-            value={Number.isNaN(values.passwordMinLength)
-              ? ""
-              : values.passwordMinLength}
+            value={
+              Number.isNaN(values.passwordMinLength)
+                ? ""
+                : values.passwordMinLength
+            }
           />
         </div>
 
@@ -98,14 +98,18 @@ export function SecuritySettingsForm({
               updateValue("loginMaxAttempts", toNumber(event.target.value))
             }
             type="number"
-            value={Number.isNaN(values.loginMaxAttempts)
-              ? ""
-              : values.loginMaxAttempts}
+            value={
+              Number.isNaN(values.loginMaxAttempts)
+                ? ""
+                : values.loginMaxAttempts
+            }
           />
         </div>
 
         <div className="grid gap-2">
-          <Label htmlFor="lockout-minutes">{m.security.settings.lockoutMinutes}</Label>
+          <Label htmlFor="lockout-minutes">
+            {m.security.settings.lockoutMinutes}
+          </Label>
           <Input
             id="lockout-minutes"
             min={1}
@@ -113,9 +117,9 @@ export function SecuritySettingsForm({
               updateValue("lockoutMinutes", toNumber(event.target.value))
             }
             type="number"
-            value={Number.isNaN(values.lockoutMinutes)
-              ? ""
-              : values.lockoutMinutes}
+            value={
+              Number.isNaN(values.lockoutMinutes) ? "" : values.lockoutMinutes
+            }
           />
         </div>
 
@@ -137,7 +141,7 @@ export function SecuritySettingsForm({
           />
         </div> */}
 
-        <label className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
+        <label className="flex min-h-10 items-center gap-3 rounded-md border px-3 py-2 text-sm">
           <Checkbox
             checked={values.passwordRequiresNumber}
             onCheckedChange={(checked) =>
@@ -147,7 +151,7 @@ export function SecuritySettingsForm({
           {m.security.settings.requireNumber}
         </label>
 
-        <label className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
+        <label className="flex min-h-10 items-center gap-3 rounded-md border px-3 py-2 text-sm">
           <Checkbox
             checked={values.passwordRequiresSymbol}
             onCheckedChange={(checked) =>
@@ -159,7 +163,7 @@ export function SecuritySettingsForm({
       </div>
 
       <div className="flex justify-end">
-        <Button disabled={submitting} type="submit">
+        <Button className="h-9" disabled={submitting} size="sm" type="submit">
           {submitting ? m.common.saving : m.security.settings.saveSettings}
         </Button>
       </div>

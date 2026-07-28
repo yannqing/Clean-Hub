@@ -1,6 +1,7 @@
 import type { SecuritySettings } from "@cleanhub/api-client";
 
 export type {
+  SecurityEventDetail,
   SecurityEventListItem,
   SecurityEventListQuery,
   SecurityEventSeverity,
