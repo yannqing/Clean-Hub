@@ -1,4 +1,5 @@
 import { webAdminApi } from "@/lib/api-client";
+import type { ApiRequestOptions } from "@cleanhub/api-client";
 
 import type { HardwareConfigSummary } from "../types";
 
@@ -12,6 +13,7 @@ export type HardwareListQuery = {
 
 export async function getDeviceListQuery(
   query?: HardwareListQuery,
+  options: Omit<ApiRequestOptions, "method" | "body" | "query"> = {},
 ): Promise<HardwareConfigSummary[]> {
-  return webAdminApi.tenant.hardware.listDevices(query);
+  return webAdminApi.tenant.hardware.listDevices(query, options);
 }

@@ -1,4 +1,4 @@
-import type { ApiClient, QueryParams } from "../../types";
+import type { ApiClient, ApiRequestOptions, QueryParams } from "../../types";
 import type {
   CreateHardwareConfigRequest,
   DeleteHardwareConfigRequest,
@@ -6,10 +6,15 @@ import type {
   UpdateHardwareConfigRequest,
 } from "./hardware.types";
 
+type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
+
 export function createTenantHardwareApi(client: ApiClient) {
   return {
-    listDevices: (query?: QueryParams) =>
-      client.get<HardwareConfigSummary[]>("/tenant/hardware-configs", { query }),
+    listDevices: (query?: QueryParams, options?: RequestOptions) =>
+      client.get<HardwareConfigSummary[]>("/tenant/hardware-configs", {
+        ...options,
+        query,
+      }),
     createDevice: (input: CreateHardwareConfigRequest) =>
       client.post<HardwareConfigSummary>("/tenant/hardware-configs", input),
     updateDevice: (hardwareId: string, input: UpdateHardwareConfigRequest) =>
