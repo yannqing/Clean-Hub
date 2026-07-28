@@ -54,7 +54,7 @@ export type CreateServiceRequest = {
 };
 
 export type UpdateServiceRequest = Partial<
-  Omit<CreateServiceRequest, "standardPrice">
+  CreateServiceRequest & { currency: string }
 > & {
   /** Optimistic-concurrency version from the record the editor last read. */
   version: number;
@@ -76,5 +76,18 @@ export type ServiceAuditSnapshot = {
   displayOrder: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
+  standardPrice: string;
+  currency: string;
+  status: ServiceStatus;
+};
+
+export type ServicePriceAuditSnapshot = {
+  id: string;
+  tenantId: string;
+  serviceId: string;
+  serviceName: string;
+  businessLine: ServiceBusinessLine;
+  amount: string;
+  currency: string;
   status: ServiceStatus;
 };

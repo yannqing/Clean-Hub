@@ -75,6 +75,16 @@ import type {
 } from "../types";
 
 const PAGE_SIZE = 10;
+const SERVICE_CURRENCY_OPTIONS = [
+  "XOF",
+  "CNY",
+  "USD",
+  "EUR",
+  "GBP",
+  "CAD",
+  "AUD",
+  "JPY",
+] as const;
 
 type BusinessLineFilter = "all" | ServiceBusinessLine;
 type StatusFilter = "all" | ServiceStatus;
@@ -127,6 +137,7 @@ const defaultFormValues: ServiceFormValues = {
   pricingUnit: "per_item",
   labelRule: "per_order_item",
   standardPrice: "",
+  currency: "",
   status: "active",
   version: 0,
 };
@@ -153,6 +164,7 @@ function toFormValues(service: ServiceSummary): ServiceFormValues {
     pricingUnit: service.pricingUnit,
     labelRule: service.labelRule,
     standardPrice: service.standardPrice,
+    currency: service.currency,
     status: service.status,
     version: service.version,
   };
@@ -260,12 +272,6 @@ export function ServiceCatalogView() {
       ),
     [categories, formValues.businessLine, formValues.categoryId],
   );
-  const editingService = useMemo(
-    () =>
-      serviceDataset.find((service) => service.id === editingServiceId) ?? null,
-    [editingServiceId, serviceDataset],
-  );
-
   const loadServices = useCallback(
     async (signal?: AbortSignal) => {
       setLoading(true);
@@ -1497,29 +1503,57 @@ export function ServiceCatalogView() {
               <FieldError message={getFieldError("status")} />
             </div>
 
-            <div className="grid gap-2 rounded-md border bg-muted/30 p-3 sm:col-span-2">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div className="min-w-0">
-                  <Label>{m.services.formLabels.standardPrice}</Label>
-                  <p className="mt-1 text-base font-semibold">
-                    {editingService
-                      ? formatMoney(
-                          Number(editingService.standardPrice),
-                          editingService.currency,
-                          locale,
-                        )
-                      : "—"}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {m.services.formDialog.priceManagedSeparately}
-                  </p>
-                </div>
-                <Button asChild size="sm" type="button" variant="outline">
-                  <Link href={webAdminRoutes.tenant.prices}>
-                    {m.services.actions.managePrice}
-                  </Link>
-                </Button>
+            <div className="grid gap-2">
+              <Label htmlFor="service-form-standard-price">
+                {m.services.formLabels.standardPrice}
+              </Label>
+              <div className="relative">
+                <Input
+                  aria-invalid={Boolean(formErrors.standardPrice)}
+                  id="service-form-standard-price"
+                  inputMode="decimal"
+                  min="0.01"
+                  onChange={(event) =>
+                    updateFormField("standardPrice", event.target.value)
+                  }
+                  step="0.01"
+                  type="number"
+                  value={formValues.standardPrice}
+                />
               </div>
+              <FieldError message={getFieldError("standardPrice")} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="service-form-currency">
+                {m.services.formLabels.currency}
+              </Label>
+              <Select
+                onValueChange={(value) => updateFormField("currency", value)}
+                value={formValues.currency}
+              >
+                <SelectTrigger
+                  aria-invalid={Boolean(formErrors.currency)}
+                  id="service-form-currency"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from(
+                    new Set([
+                      formValues.currency,
+                      ...SERVICE_CURRENCY_OPTIONS,
+                    ]),
+                  )
+                    .filter(Boolean)
+                    .map((currency) => (
+                      <SelectItem key={currency} value={currency}>
+                        {currency}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <FieldError message={getFieldError("currency")} />
             </div>
           </div>
 

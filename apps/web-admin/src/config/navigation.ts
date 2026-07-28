@@ -12,9 +12,9 @@ export const webAdminNavigation = {
     { label: "Overview", href: webAdminRoutes.tenant.home },
     { label: "Branches", href: webAdminRoutes.tenant.branches },
     { label: "Services", href: webAdminRoutes.tenant.services },
-    { label: "Prices", href: webAdminRoutes.tenant.prices },
     { label: "Discounts", href: webAdminRoutes.tenant.discounts },
-    { label: "Hardware", href: webAdminRoutes.tenant.hardware },
+    { label: "Peripheral hardware", href: webAdminRoutes.tenant.hardware },
+    { label: "Notifications", href: webAdminRoutes.tenant.notifications },
     { label: "Point of sale", href: webAdminRoutes.tenant.pointOfSale.home },
     { label: "Reports", href: webAdminRoutes.tenant.reports },
     { label: "Finance", href: webAdminRoutes.tenant.finance },
@@ -94,21 +94,20 @@ export const webAdminSidebarNavigation = {
       title: "Configuration Management",
       items: [
         {
-          label: "Branch Settings",
+          label: "Branches",
           href: webAdminRoutes.tenant.config.branches,
         },
         {
           label: "Service Catalog",
           href: webAdminRoutes.tenant.config.services,
         },
-        { label: "Price Books", href: webAdminRoutes.tenant.config.prices },
         {
-          label: "Hardware Devices",
+          label: "Peripheral hardware",
           href: webAdminRoutes.tenant.config.hardware,
         },
         {
           label: "Notifications",
-          href: webAdminRoutes.tenant.config.notifications,
+          href: webAdminRoutes.tenant.notifications,
         },
       ],
     },

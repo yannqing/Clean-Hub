@@ -14,6 +14,7 @@ import {
   findServiceAuditSnapshotById,
   findServiceById,
   findServiceByName,
+  findServicePriceAuditSnapshotByServiceId,
   findServices,
   softDeleteServiceRecord,
   updateServiceRecord,
@@ -25,6 +26,7 @@ import type {
   ServiceListInput,
   ServiceStatus,
   ServiceSummary,
+  ServicePriceAuditSnapshot,
   UpdateServiceRequest,
 } from "./services.types.js";
 
@@ -83,6 +85,54 @@ async function requireCompatibleServiceCategory(
       422,
     );
   }
+}
+
+function didPriceChange(
+  before: ServicePriceAuditSnapshot,
+  after: ServicePriceAuditSnapshot,
+): boolean {
+  return (
+    before.amount !== after.amount ||
+    before.currency !== after.currency ||
+    before.status !== after.status
+  );
+}
+
+async function writeServicePriceUpdatedAuditLog(
+  db: Database,
+  input: {
+    authContext: AuthContext;
+    requestMeta: AuthRequestMeta;
+    before: ServicePriceAuditSnapshot;
+    after: ServicePriceAuditSnapshot;
+  },
+): Promise<void> {
+  if (!didPriceChange(input.before, input.after)) {
+    return;
+  }
+
+  const toAuditPayload = (snapshot: ServicePriceAuditSnapshot) => ({
+    tenantId: snapshot.tenantId,
+    serviceId: snapshot.serviceId,
+    serviceName: snapshot.serviceName,
+    businessLine: snapshot.businessLine,
+    amount: snapshot.amount,
+    currency: snapshot.currency,
+    status: snapshot.status,
+  });
+
+  await writeAuditLog(db, {
+    actorUserId: input.authContext.userId,
+    tenantId: input.authContext.tenantId,
+    eventCategory: "tenant_price",
+    eventType: "price.updated",
+    entityType: "price",
+    entityId: input.after.id,
+    before: toAuditPayload(input.before),
+    after: toAuditPayload(input.after),
+    ipAddress: input.requestMeta.ipAddress,
+    userAgent: input.requestMeta.userAgent,
+  });
 }
 
 export async function listTenantServices(
@@ -207,12 +257,18 @@ export async function updateTenantService(
   }
 
   return db.transaction(async (tx) => {
-    const before = await findServiceAuditSnapshotById(tx, {
-      tenantId,
-      serviceId,
-    });
+    const [before, beforePrice] = await Promise.all([
+      findServiceAuditSnapshotById(tx, {
+        tenantId,
+        serviceId,
+      }),
+      findServicePriceAuditSnapshotByServiceId(tx, {
+        tenantId,
+        serviceId,
+      }),
+    ]);
 
-    if (!before) {
+    if (!before || !beforePrice) {
       throw new TenantServicesError(
         "SERVICE_NOT_FOUND",
         "Service was not found.",
@@ -248,6 +304,19 @@ export async function updateTenantService(
       );
     }
 
+    const afterPrice = await findServicePriceAuditSnapshotByServiceId(tx, {
+      tenantId,
+      serviceId,
+    });
+
+    if (!afterPrice) {
+      throw new TenantServicesError(
+        "SERVICE_NOT_FOUND",
+        "The service price was not found.",
+        404,
+      );
+    }
+
     await writeAuditLog(tx, {
       actorUserId: authContext.userId,
       tenantId,
@@ -259,6 +328,12 @@ export async function updateTenantService(
       after: service,
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
+    });
+    await writeServicePriceUpdatedAuditLog(tx, {
+      authContext,
+      requestMeta,
+      before: beforePrice,
+      after: afterPrice,
     });
 
     return service;
@@ -278,12 +353,18 @@ export async function updateTenantServiceStatus(
   await requireTenantReadyForServices(authContext, db);
 
   return db.transaction(async (tx) => {
-    const before = await findServiceAuditSnapshotById(tx, {
-      tenantId,
-      serviceId,
-    });
+    const [before, beforePrice] = await Promise.all([
+      findServiceAuditSnapshotById(tx, {
+        tenantId,
+        serviceId,
+      }),
+      findServicePriceAuditSnapshotByServiceId(tx, {
+        tenantId,
+        serviceId,
+      }),
+    ]);
 
-    if (!before) {
+    if (!before || !beforePrice) {
       throw new TenantServicesError(
         "SERVICE_NOT_FOUND",
         "Service was not found.",
@@ -309,6 +390,19 @@ export async function updateTenantServiceStatus(
       );
     }
 
+    const afterPrice = await findServicePriceAuditSnapshotByServiceId(tx, {
+      tenantId,
+      serviceId,
+    });
+
+    if (!afterPrice) {
+      throw new TenantServicesError(
+        "SERVICE_NOT_FOUND",
+        "The service price was not found.",
+        404,
+      );
+    }
+
     await writeAuditLog(tx, {
       actorUserId: authContext.userId,
       tenantId,
@@ -324,6 +418,12 @@ export async function updateTenantServiceStatus(
       },
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
+    });
+    await writeServicePriceUpdatedAuditLog(tx, {
+      authContext,
+      requestMeta,
+      before: beforePrice,
+      after: afterPrice,
     });
 
     return service;

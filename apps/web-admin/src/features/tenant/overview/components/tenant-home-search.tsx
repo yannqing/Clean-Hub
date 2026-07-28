@@ -12,7 +12,6 @@ import {
   ArrowUp,
   ArrowUpRight,
   AtSign,
-  BadgeDollarSign,
   ChartNoAxesCombined,
   Check,
   ClipboardList,
@@ -59,11 +58,6 @@ export function TenantHomeSearch() {
       copy: m.overview.quickEntries.services,
       href: webAdminRoutes.tenant.services,
       icon: ClipboardList,
-    },
-    {
-      copy: m.overview.quickEntries.prices,
-      href: webAdminRoutes.tenant.prices,
-      icon: BadgeDollarSign,
     },
     {
       copy: m.overview.quickEntries.hardware,

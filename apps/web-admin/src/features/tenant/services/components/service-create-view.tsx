@@ -55,6 +55,7 @@ const DEFAULT_FORM_VALUES: ServiceFormValues = {
   pricingUnit: "per_item",
   labelRule: "per_order_item",
   standardPrice: "",
+  currency: "",
   status: "active",
   version: 0,
 };

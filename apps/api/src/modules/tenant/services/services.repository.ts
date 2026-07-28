@@ -13,6 +13,7 @@ import type {
   CreateServiceRequest,
   ServiceAuditSnapshot,
   ServiceListInput,
+  ServicePriceAuditSnapshot,
   ServiceStatus,
   ServiceSummary,
   UpdateServiceRequest,
@@ -105,6 +106,8 @@ function toAuditSnapshot(row: ServiceSummary): ServiceAuditSnapshot {
     displayOrder: row.displayOrder,
     pricingUnit: row.pricingUnit,
     labelRule: row.labelRule,
+    standardPrice: row.standardPrice,
+    currency: row.currency,
     status: row.status,
   };
 }
@@ -205,6 +208,42 @@ export async function findServiceAuditSnapshotById(
   const service = await findServiceById(db, input);
 
   return service ? toAuditSnapshot(service) : null;
+}
+
+export async function findServicePriceAuditSnapshotByServiceId(
+  db: Database,
+  input: { tenantId: string; serviceId: string },
+): Promise<ServicePriceAuditSnapshot | null> {
+  const rows = await db
+    .select({
+      id: prices.id,
+      tenantId: prices.tenantId,
+      serviceId: prices.serviceId,
+      serviceName: services.name,
+      businessLine: services.businessLine,
+      amount: prices.amount,
+      currency: prices.currency,
+      status: prices.status,
+    })
+    .from(prices)
+    .innerJoin(
+      services,
+      and(
+        eq(services.id, prices.serviceId),
+        eq(services.tenantId, prices.tenantId),
+      ),
+    )
+    .where(
+      and(
+        eq(prices.tenantId, input.tenantId),
+        eq(prices.serviceId, input.serviceId),
+        isNull(prices.deletedAt),
+        isNull(services.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
 }
 
 export async function findServiceByName(
@@ -331,6 +370,39 @@ export async function updateServiceRecord(
     );
   }
 
+  if (
+    input.standardPrice !== undefined ||
+    input.currency !== undefined ||
+    input.status !== undefined
+  ) {
+    const updatedPriceRows = await db
+      .update(prices)
+      .set({
+        amount: input.standardPrice ?? existing.standardPrice,
+        currency: input.currency ?? existing.currency,
+        status: input.status ?? existing.status,
+        updatedAt: new Date(),
+        updatedBy: input.actorUserId,
+        version: sql`${prices.version} + 1`,
+      })
+      .where(
+        and(
+          eq(prices.serviceId, input.serviceId),
+          eq(prices.tenantId, input.tenantId),
+          isNull(prices.deletedAt),
+        ),
+      )
+      .returning({ id: prices.id });
+
+    if (!updatedPriceRows[0]) {
+      throw new TenantServicesError(
+        "SERVICE_NOT_FOUND",
+        "The service price was not found.",
+        404,
+      );
+    }
+  }
+
   return findServiceById(db, input);
 }
 
@@ -369,6 +441,22 @@ export async function updateServiceStatusRecord(
       409,
     );
   }
+
+  await db
+    .update(prices)
+    .set({
+      status: input.status,
+      updatedAt: new Date(),
+      updatedBy: input.actorUserId,
+      version: sql`${prices.version} + 1`,
+    })
+    .where(
+      and(
+        eq(prices.serviceId, input.serviceId),
+        eq(prices.tenantId, input.tenantId),
+        isNull(prices.deletedAt),
+      ),
+    );
 
   return findServiceById(db, input);
 }

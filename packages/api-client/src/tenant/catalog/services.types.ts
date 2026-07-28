@@ -42,7 +42,7 @@ export type CreateServiceRequest = {
 };
 
 export type UpdateServiceRequest = Partial<
-  Omit<CreateServiceRequest, "standardPrice">
+  CreateServiceRequest & { currency: string }
 > & {
   /** Optimistic-concurrency version from the record the editor last read. */
   version: number;

@@ -10,7 +10,6 @@ import {
 import { createTenantBackupsApi } from "./backups";
 import { createTenantBranchesApi } from "./branches";
 import {
-  createTenantPricesApi,
   createTenantProductsApi,
   createTenantServicesApi,
 } from "./catalog";
@@ -51,7 +50,6 @@ export function createTenantApi(client: ApiClient) {
   const overview = createTenantOverviewApi(client);
   const settings = createTenantSettingsApi(client);
   const services = createTenantServicesApi(client);
-  const prices = createTenantPricesApi(client);
   const products = createTenantProductsApi(client);
   const discounts = createTenantDiscountsApi(client);
   const finance = createTenantFinanceApi(client);
@@ -68,7 +66,6 @@ export function createTenantApi(client: ApiClient) {
     overview,
     settings,
     services,
-    prices,
     products,
     discounts,
     finance,

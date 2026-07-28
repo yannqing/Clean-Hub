@@ -143,6 +143,20 @@ export function validateServiceUpdateForm(
 ): ServiceFormValidationResult<UpdateServiceRequest> {
   const result = validateBase(input);
   const errors = { ...result.errors };
+  const standardPrice = input.standardPrice.trim();
+  const currency = input.currency.trim().toUpperCase();
+
+  if (
+    !STANDARD_PRICE_PATTERN.test(standardPrice) ||
+    Number(standardPrice) <= 0 ||
+    Number(standardPrice) > 9_999_999_999.99
+  ) {
+    errors.standardPrice = "standardPriceInvalid";
+  }
+
+  if (!/^[A-Z]{3}$/.test(currency)) {
+    errors.currency = "currencyInvalid";
+  }
 
   if (!Number.isInteger(input.version) || input.version < 1) {
     errors.version = "versionRequired";
@@ -159,6 +173,8 @@ export function validateServiceUpdateForm(
     ok: true,
     data: {
       ...result.data,
+      standardPrice,
+      currency,
       version: input.version,
     },
   };

@@ -1,5 +1,6 @@
 import {
   BadgePercent,
+  Bell,
   Building2,
   ClipboardList,
   ContactRound,
@@ -18,6 +19,7 @@ import {
   SquareTerminal,
   Store,
   Users,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -59,9 +61,8 @@ const navIconByHref: Record<string, LucideIcon> = {
   [webAdminRoutes.tenant.finance]: HandCoins,
   [webAdminRoutes.tenant.config.branches]: Store,
   [webAdminRoutes.tenant.config.services]: ClipboardList,
-  [webAdminRoutes.tenant.config.prices]: Flag,
-  [webAdminRoutes.tenant.config.hardware]: ShieldCheck,
-  [webAdminRoutes.tenant.config.notifications]: MessageSquareWarning,
+  [webAdminRoutes.tenant.config.hardware]: Wrench,
+  [webAdminRoutes.tenant.notifications]: Bell,
   [webAdminRoutes.tenant.system.logs]: ScrollText,
   [webAdminRoutes.tenant.system.backups]: DatabaseBackup,
   [webAdminRoutes.tenant.system.settings]: Settings,

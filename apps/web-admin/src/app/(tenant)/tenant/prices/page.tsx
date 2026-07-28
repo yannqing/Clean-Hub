@@ -1,5 +1,7 @@
-import { PriceCatalogView } from "@/features/tenant/prices";
+import { redirect } from "next/navigation";
 
-export default function PricesPage() {
-  return <PriceCatalogView />;
+import { webAdminRoutes } from "@/config/routes";
+
+export default function TenantPricesPage() {
+  redirect(webAdminRoutes.tenant.services);
 }

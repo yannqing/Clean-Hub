@@ -26,6 +26,7 @@ const serviceFormFields = new Set<ServiceFieldName>([
   "pricingUnit",
   "labelRule",
   "standardPrice",
+  "currency",
   "status",
   "version",
 ]);
@@ -39,6 +40,7 @@ const serviceFieldMap: Record<string, ServiceFieldName> = {
   pricingUnit: "pricingUnit",
   labelRule: "labelRule",
   standardPrice: "standardPrice",
+  currency: "currency",
   status: "status",
   version: "version",
 };

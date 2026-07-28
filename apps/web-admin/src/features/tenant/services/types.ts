@@ -23,6 +23,7 @@ export type ServiceFormErrorCode =
   | "pricingUnitInvalid"
   | "labelRuleInvalid"
   | "standardPriceInvalid"
+  | "currencyInvalid"
   | "statusInvalid"
   | "versionRequired";
 
@@ -62,6 +63,7 @@ export type ServiceFormValues = {
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   standardPrice: string;
+  currency: string;
   status: ServiceStatus;
   /**
    * Optimistic-concurrency version captured when a service is loaded for

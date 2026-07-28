@@ -84,10 +84,6 @@ export function TenantOverviewView({
           href: webAdminRoutes.tenant.services,
         },
         {
-          label: m.overview.quickLinks.prices,
-          href: webAdminRoutes.tenant.prices,
-        },
-        {
           label: m.overview.quickLinks.reports,
           href: webAdminRoutes.tenant.reports,
         },

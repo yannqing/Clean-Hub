@@ -30,6 +30,11 @@ const standardPriceSchema = z
   .refine((value) => Number(value) <= 9_999_999_999.99, {
     message: "Standard price exceeds the supported maximum.",
   });
+const currencySchema = z
+  .string()
+  .trim()
+  .toUpperCase()
+  .regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code.");
 
 export const serviceListQuerySchema = z.object({
   businessLine: serviceBusinessLineSchema.optional(),
@@ -61,6 +66,8 @@ export const createServiceBodySchema = serviceProfileBodySchema.extend({
 export const updateServiceBodySchema = serviceProfileBodySchema
   .partial()
   .extend({
+    standardPrice: standardPriceSchema.optional(),
+    currency: currencySchema.optional(),
     version: z.number().int().positive(),
   })
   .refine(
