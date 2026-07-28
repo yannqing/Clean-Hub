@@ -43,6 +43,7 @@ export async function updatePointOfSaleSettingsAction(
     );
     revalidatePath(webAdminRoutes.tenant.pointOfSale.home);
     revalidatePath(webAdminRoutes.tenant.pointOfSale.settings);
+    revalidatePath(webAdminRoutes.tenant.system.settingsSections.pointOfSale);
 
     return { ok: true, data: settings };
   } catch (error) {

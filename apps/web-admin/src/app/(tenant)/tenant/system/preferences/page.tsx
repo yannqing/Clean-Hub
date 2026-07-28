@@ -1,11 +1,7 @@
-import { TenantSettingsView } from "@/features/tenant/settings/components";
-import { getTenantSettingsQuery } from "@/features/tenant/settings/queries";
-import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
+import { redirect } from "next/navigation";
 
-export default async function TenantSystemPreferencesPage() {
-  const settings = await getTenantSettingsQuery(
-    await getTenantServerApiRequestOptions(),
-  ).catch(() => undefined);
+import { webAdminRoutes } from "@/config/routes";
 
-  return <TenantSettingsView initialSettings={settings} />;
+export default function TenantSystemPreferencesPage() {
+  redirect(webAdminRoutes.tenant.system.settings);
 }

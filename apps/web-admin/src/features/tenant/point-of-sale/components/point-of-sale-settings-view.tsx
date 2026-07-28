@@ -36,6 +36,7 @@ import type {
 import type { PointOfSaleSettingsFormValues } from "../validators";
 
 type PointOfSaleSettingsViewProps = {
+  embedded?: boolean;
   error?: string;
   initialSettings?: PointOfSaleSettings;
 };
@@ -97,6 +98,7 @@ function BooleanSetting({
 }
 
 export function PointOfSaleSettingsView({
+  embedded = false,
   error,
   initialSettings,
 }: PointOfSaleSettingsViewProps) {
@@ -173,14 +175,16 @@ export function PointOfSaleSettingsView({
 
   return (
     <form className="mx-auto max-w-[900px] space-y-5" onSubmit={submit}>
-      <div>
-        <h2 className="text-base font-semibold">
-          {m.pointOfSale.settings.title}
-        </h2>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          {m.pointOfSale.settings.description}
-        </p>
-      </div>
+      {!embedded ? (
+        <div>
+          <h2 className="text-base font-semibold">
+            {m.pointOfSale.settings.title}
+          </h2>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {m.pointOfSale.settings.description}
+          </p>
+        </div>
+      ) : null}
 
       {!canManage ? (
         <div className="flex items-start gap-3 rounded-lg border bg-muted/30 px-4 py-3.5">
