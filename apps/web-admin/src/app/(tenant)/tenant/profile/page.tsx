@@ -1,11 +1,12 @@
-import { PagePlaceholder } from "@/components/app-shell";
+import {
+  getTenantProfileQuery,
+  TenantProfileView,
+} from "@/features/tenant/profile";
+import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
 
-export default function TenantProfilePage() {
-  return (
-    <PagePlaceholder
-      description="Personal profile, tenant identity, branch access, language preference, and account security."
-      items={["Profile", "Branch access", "Security", "Preferences"]}
-      title="Personal Center"
-    />
-  );
+export default async function TenantProfilePage() {
+  const requestOptions = await getTenantServerApiRequestOptions();
+  const profile = await getTenantProfileQuery(requestOptions).catch(() => null);
+
+  return <TenantProfileView initialProfile={profile} />;
 }
