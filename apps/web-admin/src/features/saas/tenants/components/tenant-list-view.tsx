@@ -4,15 +4,11 @@ import type { AuthContext } from "@cleanhub/api-client";
 import {
   Badge,
   Button,
-  Dialog,
-  DialogContent,
+  Icon,
   Input,
-  Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Table,
   TableBody,
   TableCaption,
@@ -20,30 +16,59 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  cn,
 } from "@cleanhub/ui";
+import {
+  Building2,
+  Check,
+  CircleCheck,
+  CirclePause,
+  CircleX,
+  ListFilter,
+  Plus,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
+import { Pagination } from "@/components/pagination";
 import { webAdminRoutes } from "@/config/routes";
+import {
+  SaasMetricStrip,
+  SaasPageHeader,
+  SaasTableSurface,
+  saasCompactTableClassName,
+} from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 import { canCreateTenant } from "@/lib/permissions";
 
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
-import { tenantDialogContentClass, tenantStatusOptions } from "../constants";
+import { tenantStatusOptions } from "../constants";
 import { getCurrentAuthQuery } from "@/features/auth/queries";
 import { getTenantListQuery } from "../queries";
 import type { TenantStatus, TenantStatusCounts, TenantSummary } from "../types";
-import { TenantDetailView } from "./tenant-detail-view";
-import { TenantSettingsView } from "./tenant-settings-view";
 
 type StatusFilter = "all" | TenantStatus;
 type TenantMetrics = TenantStatusCounts & {
   total: number;
 };
 type MetricItem = {
+  icon: typeof Building2;
   label: string;
   value: number;
 };
+
+const PAGE_SIZE = 10;
 
 const emptyMetrics: TenantMetrics = {
   active: 0,
@@ -80,27 +105,29 @@ function getEmptyStateMessage(
 }
 
 export function TenantListView() {
-  const { m, formatDate } = useSaasI18n();
+  const router = useRouter();
+  const { locale, m, formatDate } = useSaasI18n();
   const captionId = useId();
   const requestIdRef = useRef(0);
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<StatusFilter>("all");
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
   const [metrics, setMetrics] = useState<TenantMetrics>(emptyMetrics);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [detailTenantId, setDetailTenantId] = useState<string | null>(null);
-  const [settingsTenantId, setSettingsTenantId] = useState<string | null>(null);
 
   const listQuery = useMemo(
     () => ({
-      limit: 50,
-      offset: 0,
+      limit: PAGE_SIZE,
+      offset,
       q: query.trim() || undefined,
       status: status === "all" ? undefined : status,
     }),
-    [query, status],
+    [offset, query, status],
   );
   const metricsQuery = useMemo(
     () => ({
@@ -112,13 +139,42 @@ export function TenantListView() {
   );
   const metricItems: MetricItem[] = useMemo(
     () => [
-      { label: m.tenants.list.metrics.total, value: metrics.total },
-      { label: m.tenants.list.metrics.active, value: metrics.active },
-      { label: m.tenants.list.metrics.suspended, value: metrics.suspended },
-      { label: m.tenants.list.metrics.disabled, value: metrics.disabled },
+      {
+        icon: Building2,
+        label: m.tenants.list.metrics.total,
+        value: metrics.total,
+      },
+      {
+        icon: CircleCheck,
+        label: m.tenants.list.metrics.active,
+        value: metrics.active,
+      },
+      {
+        icon: CirclePause,
+        label: m.tenants.list.metrics.suspended,
+        value: metrics.suspended,
+      },
+      {
+        icon: CircleX,
+        label: m.tenants.list.metrics.disabled,
+        value: metrics.disabled,
+      },
     ],
     [m.tenants.list.metrics, metrics],
   );
+  const statusFilterOptions = useMemo(
+    () => [
+      { label: m.common.allStatuses, value: "all" as const },
+      ...tenantStatusOptions.map((option) => ({
+        label: m.common.statusLabels[option.value],
+        value: option.value,
+      })),
+    ],
+    [m.common.allStatuses, m.common.statusLabels],
+  );
+  const selectedStatusLabel =
+    statusFilterOptions.find((option) => option.value === status)?.label ??
+    m.common.allStatuses;
 
   const loadTenants = useCallback(async () => {
     const requestId = requestIdRef.current + 1;
@@ -159,6 +215,7 @@ export function TenantListView() {
       const [response, metricsResponse] = tenantResults.value;
 
       setTenants(response.data);
+      setTotal(response.meta.total);
       setMetrics({
         ...metricsResponse.meta.statusCounts,
         total: metricsResponse.meta.total,
@@ -179,6 +236,7 @@ export function TenantListView() {
   function resetFilters() {
     setQuery("");
     setStatus("all");
+    setOffset(0);
   }
 
   useEffect(() => {
@@ -192,109 +250,141 @@ export function TenantListView() {
   }, [loadTenants]);
 
   return (
-    <section className="min-h-[560px]">
-      <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <Badge variant="secondary">{m.tenants.list.badge}</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {m.tenants.list.title}
-          </h1>
-        </div>
+    <section className="space-y-7 pb-8" data-testid="saas-tenant-list-view">
+      <SaasPageHeader
+        actions={
+          canCreateTenant(authContext) ? (
+            <Button asChild className="h-8 gap-1.5 px-2.5 text-xs" size="sm">
+              <Link href={webAdminRoutes.saas.newTenant}>
+                <Icon aria-hidden icon={Plus} size={14} />
+                <span>{m.tenants.list.newTenant}</span>
+              </Link>
+            </Button>
+          ) : null
+        }
+        icon={Building2}
+        title={m.tenants.list.title}
+      />
 
-        {canCreateTenant(authContext) ? (
-          <Button asChild>
-            <Link href={webAdminRoutes.saas.newTenant}>{m.tenants.list.newTenant}</Link>
-          </Button>
-        ) : null}
-      </div>
+      <SaasMetricStrip
+        ariaLabel={m.tenants.list.title}
+        loading={loading}
+        metrics={metricItems}
+      />
 
-      <div className="grid gap-3 border-b p-5 sm:grid-cols-2 lg:grid-cols-4">
-        {metricItems.map((item) => (
-          <div className="rounded-md border bg-background p-4" key={item.label}>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {item.label}
-            </p>
-            <p className="mt-2 text-2xl font-semibold">{item.value}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="grid gap-3 border-b p-5 lg:grid-cols-[minmax(0,1fr)_220px_auto_auto] lg:items-end">
-        <div className="grid gap-2">
-          <Label htmlFor="tenant-search">{m.common.search}</Label>
-          <Input
-            id="tenant-search"
-            onChange={(event) => {
-              setQuery(event.target.value);
-            }}
-            placeholder={m.tenants.list.searchPlaceholder}
-            value={query}
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="tenant-status-filter">{m.common.status}</Label>
-          <Select
-            onValueChange={(value) => {
-              setStatus(value as StatusFilter);
-            }}
-            value={status}
-          >
-            <SelectTrigger className="w-full" id="tenant-status-filter">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{m.common.allStatuses}</SelectItem>
-              {tenantStatusOptions.map((option) => {
-                const label =
-                  option.value === "active"
-                    ? m.common.statusLabels.active
-                    : option.value === "suspended"
-                      ? m.common.statusLabels.suspended
-                      : m.common.statusLabels.disabled;
-                return (
-                  <SelectItem key={option.value} value={option.value}>
-                    {label}
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <Button
-          disabled={loading}
-          onClick={loadTenants}
-          type="button"
-          variant="outline"
-        >
-          {m.common.refresh}
-        </Button>
-        <Button
-          disabled={loading || (!query.trim() && status === "all")}
-          onClick={resetFilters}
-          type="button"
-          variant="outline"
-        >
-          {m.common.clear}
-        </Button>
-      </div>
-
-      {loading ? (
-        <div className="grid gap-3 p-5">
-          {[0, 1, 2].map((item) => (
-            <div
-              className="h-14 animate-pulse rounded-md bg-muted"
-              key={item}
-            />
-          ))}
-        </div>
-      ) : error ? (
-        <div className="p-5">
-          <div className="grid gap-4 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            <p>{error}</p>
-            <div>
+      <SaasTableSurface>
+        <div className="flex items-center gap-2 border-b px-3 py-2.5">
+          <Popover onOpenChange={setStatusMenuOpen} open={statusMenuOpen}>
+            <PopoverTrigger asChild>
               <Button
+                aria-label={`${m.common.status}: ${selectedStatusLabel}`}
+                className={cn(status !== "all" && "bg-accent")}
+                size="icon-sm"
+                title={`${m.common.status}: ${selectedStatusLabel}`}
+                type="button"
+                variant="outline"
+              >
+                <Icon aria-hidden icon={ListFilter} size={15} />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-44 p-1.5">
+              <div className="grid gap-1">
+                {statusFilterOptions.map((option) => (
+                  <button
+                    aria-pressed={status === option.value}
+                    className={cn(
+                      "flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs transition-colors hover:bg-accent",
+                      status === option.value && "bg-accent",
+                    )}
+                    key={option.value}
+                    onClick={() => {
+                      setStatus(option.value);
+                      setOffset(0);
+                      setStatusMenuOpen(false);
+                    }}
+                    type="button"
+                  >
+                    <Icon
+                      aria-hidden
+                      className={cn(
+                        status === option.value ? "opacity-100" : "opacity-0",
+                      )}
+                      icon={Check}
+                      size={14}
+                    />
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <div className="relative w-full max-w-sm">
+            <label className="sr-only" htmlFor="tenant-search">
+              {m.common.search}
+            </label>
+            <Icon
+              aria-hidden
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              icon={Search}
+              size={14}
+            />
+            <Input
+              className="h-8 pl-8 text-xs"
+              id="tenant-search"
+              inputMode="search"
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setOffset(0);
+              }}
+              placeholder={m.tenants.list.searchPlaceholder}
+              type="search"
+              value={query}
+            />
+          </div>
+
+          {query.trim() || status !== "all" ? (
+            <Button
+              aria-label={m.common.clearFilters}
+              onClick={resetFilters}
+              size="icon-sm"
+              title={m.common.clearFilters}
+              type="button"
+              variant="ghost"
+            >
+              <Icon aria-hidden icon={X} size={15} />
+            </Button>
+          ) : null}
+
+          <Button
+            aria-label={m.common.refresh}
+            className="ml-auto"
+            disabled={loading}
+            onClick={loadTenants}
+            size="icon-sm"
+            title={m.common.refresh}
+            type="button"
+            variant="outline"
+          >
+            <Icon aria-hidden icon={RefreshCw} size={15} />
+          </Button>
+        </div>
+
+        {loading ? (
+          <div className="grid gap-2 p-3">
+            {[0, 1, 2, 3, 4].map((item) => (
+              <div
+                className="h-10 animate-pulse rounded-md bg-muted"
+                key={item}
+              />
+            ))}
+          </div>
+        ) : error ? (
+          <div className="p-4">
+            <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
+              <span>{error}</span>
+              <Button
+                className="h-8 px-2.5 text-xs"
                 onClick={loadTenants}
                 size="sm"
                 type="button"
@@ -304,139 +394,108 @@ export function TenantListView() {
               </Button>
             </div>
           </div>
-        </div>
-      ) : tenants.length === 0 ? (
-        <div className="p-5">
-          <div className="grid gap-3 rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">{m.tenants.list.emptyTitle}</h2>
-            <p className="text-sm text-muted-foreground">
-              {getEmptyStateMessage(
-                query,
-                status,
-                m.tenants.list.emptyFiltered,
-                m.tenants.list.emptyDefault,
-              )}
-            </p>
-            {(query.trim() || status !== "all") && (
-              <div>
-                <Button onClick={resetFilters} type="button" variant="outline">
-                  {m.common.clearFilters}
-                </Button>
-              </div>
-            )}
+        ) : tenants.length === 0 ? (
+          <div className="p-4">
+            <div className="border-y border-dashed px-4 py-14 text-center">
+              <h2 className="text-sm font-semibold">
+                {m.tenants.list.emptyTitle}
+              </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                {getEmptyStateMessage(
+                  query,
+                  status,
+                  m.tenants.list.emptyFiltered,
+                  m.tenants.list.emptyDefault,
+                )}
+              </p>
+            </div>
           </div>
-        </div>
-      ) : (
-        <Table aria-describedby={captionId}>
-          <TableCaption className="sr-only" id={captionId}>
-            {m.tenants.list.title}
-          </TableCaption>
-          <TableHeader>
-              <TableRow>
-                <TableHead>{m.tenants.list.columns.name}</TableHead>
-                <TableHead>{m.tenants.list.columns.pressingCode}</TableHead>
-                <TableHead>{m.tenants.list.columns.status}</TableHead>
-                <TableHead>{m.tenants.list.columns.country}</TableHead>
-                <TableHead>{m.tenants.list.columns.city}</TableHead>
-                <TableHead>{m.tenants.list.columns.createdAt}</TableHead>
-                <TableHead className="text-right">{m.common.actions}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tenants.map((tenant) => (
-                <TableRow key={tenant.id}>
-                  <TableCell>
-                    <div className="font-medium">{tenant.name}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {tenant.id}
-                    </div>
-                  </TableCell>
-                  <TableCell>{tenant.pressingCode}</TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusVariant(tenant.status)}>
-                      {m.common.statusLabels[tenant.status]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>{tenant.country?.trim() || m.common.notSet}</TableCell>
-                  <TableCell>{tenant.city?.trim() || m.common.notSet}</TableCell>
-                  <TableCell>
-                    {formatDate(tenant.createdAt) || m.common.invalidDate}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        onClick={() => {
-                          setSettingsTenantId(null);
-                          setDetailTenantId(tenant.id);
-                        }}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        {m.tenants.list.detail}
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setDetailTenantId(null);
-                          setSettingsTenantId(tenant.id);
-                        }}
-                        size="sm"
-                        type="button"
-                        variant="outline"
-                      >
-                        {m.tenants.list.settings}
-                      </Button>
-                    </div>
-                  </TableCell>
+        ) : (
+          <div className="overflow-x-auto">
+            <Table
+              aria-describedby={captionId}
+              className={saasCompactTableClassName}
+            >
+              <TableCaption className="sr-only" id={captionId}>
+                {m.tenants.list.title}
+              </TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{m.tenants.list.columns.name}</TableHead>
+                  <TableHead>{m.tenants.list.columns.pressingCode}</TableHead>
+                  <TableHead>{m.tenants.list.columns.status}</TableHead>
+                  <TableHead>{m.tenants.list.columns.country}</TableHead>
+                  <TableHead>{m.tenants.list.columns.city}</TableHead>
+                  <TableHead>{m.tenants.list.columns.createdAt}</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-      )}
+              </TableHeader>
+              <TableBody>
+                {tenants.map((tenant) => {
+                  const detailHref = webAdminRoutes.saas.tenant(tenant.id);
 
-      <Dialog
-        onOpenChange={(open) => {
-          if (!open) {
-            setDetailTenantId(null);
-          }
-        }}
-        open={detailTenantId !== null}
-      >
-        <DialogContent className={tenantDialogContentClass}>
-          {detailTenantId ? (
-            <TenantDetailView
-              key={detailTenantId}
-              onOpenSettings={() => {
-                setSettingsTenantId(detailTenantId);
-                setDetailTenantId(null);
-              }}
-              onTenantUpdated={loadTenants}
-              presentation="dialog"
-              tenantId={detailTenantId}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
+                  return (
+                    <TableRow
+                      className="cursor-pointer hover:bg-muted/40"
+                      key={tenant.id}
+                      onClick={() => router.push(detailHref)}
+                      onMouseEnter={() => router.prefetch(detailHref)}
+                    >
+                      <TableCell>
+                        <Link
+                          className="font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          href={detailHref}
+                          onClick={(event) => event.stopPropagation()}
+                          onFocus={() => router.prefetch(detailHref)}
+                        >
+                          {tenant.name}
+                        </Link>
+                        <div className="max-w-52 truncate text-[11px] text-muted-foreground">
+                          {tenant.id}
+                        </div>
+                      </TableCell>
+                      <TableCell>{tenant.pressingCode}</TableCell>
+                      <TableCell>
+                        <Badge
+                          className="px-1.5 py-px text-[11px]"
+                          variant={getStatusVariant(tenant.status)}
+                        >
+                          {m.common.statusLabels[tenant.status]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {tenant.country?.trim() || m.common.notSet}
+                      </TableCell>
+                      <TableCell>
+                        {tenant.city?.trim() || m.common.notSet}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {formatDate(tenant.createdAt) || m.common.invalidDate}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
-      <Dialog
-        onOpenChange={(open) => {
-          if (!open) {
-            setSettingsTenantId(null);
-          }
-        }}
-        open={settingsTenantId !== null}
-      >
-        <DialogContent className={tenantDialogContentClass}>
-          {settingsTenantId ? (
-            <TenantSettingsView
-              key={settingsTenantId}
-              onTenantUpdated={loadTenants}
-              presentation="dialog"
-              tenantId={settingsTenantId}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
+        {!loading && !error ? (
+          <Pagination
+            currentPageCount={tenants.length}
+            formatCountLabel={({ from, to, total: itemTotal }) =>
+              locale === "zh-CN"
+                ? `${from}–${to} / 共 ${itemTotal} 条`
+                : `${from}–${to} of ${itemTotal}`
+            }
+            nextLabel={m.common.nextPage}
+            offset={offset}
+            onOffsetChange={setOffset}
+            pageSize={PAGE_SIZE}
+            previousLabel={m.common.previousPage}
+            total={total}
+          />
+        ) : null}
+      </SaasTableSurface>
     </section>
   );
 }

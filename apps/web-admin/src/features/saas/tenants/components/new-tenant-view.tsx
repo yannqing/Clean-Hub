@@ -1,13 +1,13 @@
 "use client";
 
 import type { AuthContext } from "@cleanhub/api-client";
-import { Badge, Button } from "@cleanhub/ui";
-import Link from "next/link";
+import { Building2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { getCurrentAuthQuery } from "@/features/auth/queries";
+import { SaasBreadcrumbs } from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 import { canCreateTenant } from "@/lib/permissions";
 
@@ -42,10 +42,7 @@ export function NewTenantView() {
 
         setAuthContext(null);
         setAuthError(
-          getTenantLoadErrorMessage(
-            error,
-            m.tenants.new.sessionError,
-          ),
+          getTenantLoadErrorMessage(error, m.tenants.new.sessionError),
         );
       })
       .finally(() => {
@@ -60,26 +57,20 @@ export function NewTenantView() {
   }, [m.tenants.new.sessionError]);
 
   return (
-    <section className="min-h-[560px]">
-      <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <Badge variant="secondary">{m.tenants.new.badge}</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {m.tenants.new.title}
-          </h1>
-        </div>
-
-        <Button asChild variant="outline">
-          <Link href={webAdminRoutes.saas.tenants}>
-            {m.tenants.new.backToTenants}
-          </Link>
-        </Button>
-      </div>
+    <section className="mx-auto min-h-[560px] w-full max-w-[960px] space-y-3 pb-20">
+      <h1 className="sr-only">{m.tenants.new.title}</h1>
+      <SaasBreadcrumbs
+        ariaLabel={m.tenants.new.title}
+        items={[{ label: m.tenants.new.title }]}
+        rootHref={webAdminRoutes.saas.tenants}
+        rootIcon={Building2}
+        rootLabel={m.tenants.list.title}
+      />
 
       {!authLoading && (authError || !canManageTenantCreation) ? (
-        <div className="mx-5 mt-5 rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
+        <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
           {authError
-            ? `Tenant creation is disabled because the current session could not be verified: ${authError}`
+            ? `${m.tenants.new.sessionError} ${authError}`
             : m.tenants.new.permissionHint}
         </div>
       ) : null}
@@ -89,7 +80,7 @@ export function NewTenantView() {
         mode="create"
         onSubmit={createTenantAction}
         onSuccess={(tenant) => {
-          router.push(`${webAdminRoutes.saas.tenants}/${tenant.id}`);
+          router.push(webAdminRoutes.saas.tenant(tenant.id));
           router.refresh();
         }}
       />

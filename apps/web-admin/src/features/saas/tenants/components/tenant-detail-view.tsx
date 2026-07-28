@@ -4,6 +4,8 @@ import type { AuthContext } from "@cleanhub/api-client";
 import {
   Badge,
   Button,
+  Card,
+  CardContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
@@ -11,21 +13,20 @@ import {
   Label,
   toast,
 } from "@cleanhub/ui";
+import { Building2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { getCurrentAuthQuery } from "@/features/auth/queries";
+import { SaasBreadcrumbs } from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 import { interpolate } from "@/i18n/messages/saas";
-import {
-  canUpdateTenantStatus,
-  canWriteTenant,
-} from "@/lib/permissions";
+import { canUpdateTenantStatus, canWriteTenant } from "@/lib/permissions";
 
 import { updateTenantAction, updateTenantStatusAction } from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantDefaultValues } from "../constants";
-import { getCurrentAuthQuery } from "@/features/auth/queries";
 import { getTenantDetailQuery } from "../queries";
 import type { TenantDetail, TenantFormValues, TenantStatus } from "../types";
 import { TenantForm } from "./tenant-form";
@@ -154,10 +155,7 @@ export function TenantDetailView({
   useEffect(() => {
     let isCurrent = true;
 
-    Promise.allSettled([
-      getCurrentAuthQuery(),
-      getTenantDetailQuery(tenantId),
-    ])
+    Promise.allSettled([getCurrentAuthQuery(), getTenantDetailQuery(tenantId)])
       .then(([authResult, tenantResult]) => {
         if (!isCurrent) {
           return;
@@ -202,33 +200,22 @@ export function TenantDetailView({
   }, [m.tenants.detail.loadError, m.tenants.detail.sessionError, tenantId]);
 
   const pageHeader = !isDialog ? (
-    <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
-      <div className="min-w-0">
-        <Badge variant="secondary">{m.tenants.detail.badge}</Badge>
-        <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-          {tenant?.name ?? m.tenants.detail.title}
-        </h1>
-        <p className="mt-2 break-all text-sm text-muted-foreground">
-          {tenant?.id ?? tenantId}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {tenant ? (
-          <Button asChild variant="outline">
-            <Link
-              href={`${webAdminRoutes.saas.tenants}/${tenant.id}/settings`}
-            >
-              {m.tenants.detail.settings}
-            </Link>
-          </Button>
-        ) : null}
-        <Button asChild variant="outline">
-          <Link href={webAdminRoutes.saas.tenants}>
-            {m.tenants.detail.backToTenants}
+    <div className="flex min-h-8 flex-wrap items-center justify-between gap-3">
+      <SaasBreadcrumbs
+        ariaLabel={m.tenants.detail.title}
+        className="flex-1"
+        items={[{ label: tenant?.name ?? m.tenants.detail.title }]}
+        rootHref={webAdminRoutes.saas.tenants}
+        rootIcon={Building2}
+        rootLabel={m.tenants.list.title}
+      />
+      {tenant ? (
+        <Button asChild size="sm" variant="outline">
+          <Link href={webAdminRoutes.saas.tenantSettings(tenant.id)}>
+            {m.tenants.detail.settings}
           </Link>
         </Button>
-      </div>
+      ) : null}
     </div>
   ) : (
     <DialogHeader className="shrink-0 space-y-1 border-b px-6 py-4 text-left">
@@ -242,7 +229,12 @@ export function TenantDetailView({
           </p>
         </div>
         {tenant && onOpenSettings ? (
-          <Button onClick={onOpenSettings} size="sm" type="button" variant="outline">
+          <Button
+            onClick={onOpenSettings}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
             {m.tenants.detail.settings}
           </Button>
         ) : null}
@@ -256,175 +248,26 @@ export function TenantDetailView({
   const body = (
     <>
       {loading ? (
-        <div className="grid gap-4 p-5">
-          <div className="h-24 animate-pulse rounded-md bg-muted" />
-          <div className="h-80 animate-pulse rounded-md bg-muted" />
+        <div
+          aria-busy="true"
+          className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]"
+        >
+          <div className="grid gap-5">
+            <div className="h-56 animate-pulse rounded-lg border bg-muted/70" />
+            <div className="h-44 animate-pulse rounded-lg border bg-muted/70" />
+          </div>
+          <div className="h-80 animate-pulse rounded-lg border bg-muted/70" />
         </div>
       ) : error ? (
-        <div className="p-5">
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            {error}
-          </div>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          {error}
         </div>
       ) : tenant ? (
-        <>
-          <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.pressingCode}
-              </p>
-              <p className="mt-2 font-semibold">{tenant.pressingCode}</p>
-            </div>
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.status}
-              </p>
-              <Badge className="mt-2" variant={getStatusVariant(tenant.status)}>
-                {m.common.statusLabels[tenant.status]}
-              </Badge>
-            </div>
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.defaultLanguage}
-              </p>
-              <p className="mt-2 font-semibold">{tenant.defaultLanguage}</p>
-            </div>
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.users}
-              </p>
-              <p className="mt-2 font-semibold">{tenant.userCount ?? 0}</p>
-            </div>
-          </div>
-
-          <div className="grid gap-3 border-b p-5 lg:grid-cols-3">
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.country}
-              </p>
-              <p className="mt-2 font-semibold">
-                {tenant.country?.trim() || m.common.notSet}
-              </p>
-            </div>
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.city}
-              </p>
-              <p className="mt-2 font-semibold">
-                {tenant.city?.trim() || m.common.notSet}
-              </p>
-            </div>
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.defaultCurrency}
-              </p>
-              <p className="mt-2 font-semibold">{tenant.defaultCurrency}</p>
-            </div>
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.contactName}
-              </p>
-              <p className="mt-2 font-semibold">
-                {tenant.contactName?.trim() || m.common.notSet}
-              </p>
-            </div>
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.contactPhone}
-              </p>
-              <p className="mt-2 font-semibold">
-                {tenant.contactPhone?.trim() || m.common.notSet}
-              </p>
-            </div>
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.contactEmail}
-              </p>
-              <p className="mt-2 break-all font-semibold">
-                {tenant.contactEmail?.trim() || m.common.notSet}
-              </p>
-            </div>
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.createdAt}
-              </p>
-              <p className="mt-2 font-semibold">
-                {formatDate(tenant.createdAt) || m.common.invalidDate}
-              </p>
-            </div>
-            <div className="rounded-md border bg-background p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.tenants.detail.fields.updatedAt}
-              </p>
-              <p className="mt-2 font-semibold">
-                {formatDate(tenant.updatedAt) || m.common.invalidDate}
-              </p>
-            </div>
-          </div>
-
-          <section className="grid gap-4 border-b p-5">
-            <div>
-              <h2 className="text-base font-semibold text-foreground">
-                {m.tenants.detail.statusSection}
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {m.tenants.detail.statusReasonHint}
-              </p>
-            </div>
-
-            {statusError ? (
-              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-                {statusError}
-              </div>
-            ) : null}
-
-            {!canManageStatus ? (
-              <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-                {m.tenants.detail.statusPermissionHint}
-              </div>
-            ) : null}
-
-            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-              <div className="grid gap-2">
-                <Label htmlFor="tenant-status-reason">{m.tenants.detail.reason}</Label>
-                <Input
-                  disabled={!canManageStatus || Boolean(statusSubmitting)}
-                  id="tenant-status-reason"
-                  onChange={(event) => {
-                    setStatusReason(event.target.value);
-                    setStatusError(null);
-                  }}
-                  placeholder={m.tenants.detail.reasonPlaceholder}
-                  value={statusReason}
-                />
-              </div>
-
-              <div className="flex flex-wrap gap-2">
-                {(["active", "suspended", "disabled"] as const)
-                  .filter((status) => status !== tenant.status)
-                  .map((status) => (
-                    <Button
-                      disabled={!canManageStatus || Boolean(statusSubmitting)}
-                      key={status}
-                      onClick={() => {
-                        void handleUpdateStatus(status);
-                      }}
-                      type="button"
-                      variant={status === "active" ? "default" : "outline"}
-                    >
-                      {statusSubmitting === status
-                        ? m.common.updating
-                        : getStatusActionLabel(status, m)}
-                    </Button>
-                  ))}
-              </div>
-            </div>
-          </section>
-
+        <div className="grid gap-3">
           {authError || !canManageTenant ? (
-            <div className="mx-5 mt-5 rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
+            <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
               {authError
-                ? `Tenant editing is read-only because the current session could not be verified: ${authError}`
+                ? `${m.tenants.detail.sessionError} ${authError}`
                 : m.tenants.detail.readOnlyHint}
             </div>
           ) : null}
@@ -434,32 +277,170 @@ export function TenantDetailView({
             initialValues={toFormValues(tenant)}
             key={`${tenant.id}-${tenant.updatedAt}`}
             mode="edit"
+            aside={
+              <>
+                <Card className="gap-0 rounded-lg py-0 shadow-none">
+                  <CardContent className="grid gap-4 py-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h2 className="truncate text-sm font-semibold">
+                          {tenant.name}
+                        </h2>
+                        <p className="mt-1 break-all text-xs text-muted-foreground">
+                          {tenant.id}
+                        </p>
+                      </div>
+                      <Badge
+                        className="shrink-0"
+                        variant={getStatusVariant(tenant.status)}
+                      >
+                        {m.common.statusLabels[tenant.status]}
+                      </Badge>
+                    </div>
+
+                    <dl className="divide-y text-sm">
+                      <div className="grid gap-1 py-2 first:pt-0">
+                        <dt className="text-xs text-muted-foreground">
+                          {m.tenants.detail.fields.pressingCode}
+                        </dt>
+                        <dd className="break-all font-medium">
+                          {tenant.pressingCode}
+                        </dd>
+                      </div>
+                      <div className="grid gap-1 py-2">
+                        <dt className="text-xs text-muted-foreground">
+                          {m.tenants.detail.fields.defaultLanguage}
+                        </dt>
+                        <dd className="font-medium">
+                          {tenant.defaultLanguage}
+                        </dd>
+                      </div>
+                      <div className="grid gap-1 py-2">
+                        <dt className="text-xs text-muted-foreground">
+                          {m.tenants.detail.fields.defaultCurrency}
+                        </dt>
+                        <dd className="font-medium">
+                          {tenant.defaultCurrency}
+                        </dd>
+                      </div>
+                      <div className="grid gap-1 py-2">
+                        <dt className="text-xs text-muted-foreground">
+                          {m.tenants.detail.fields.users}
+                        </dt>
+                        <dd className="font-medium">{tenant.userCount ?? 0}</dd>
+                      </div>
+                      <div className="grid gap-1 py-2">
+                        <dt className="text-xs text-muted-foreground">
+                          {m.tenants.detail.fields.createdAt}
+                        </dt>
+                        <dd className="font-medium">
+                          {formatDate(tenant.createdAt) || m.common.invalidDate}
+                        </dd>
+                      </div>
+                      <div className="grid gap-1 py-2 last:pb-0">
+                        <dt className="text-xs text-muted-foreground">
+                          {m.tenants.detail.fields.updatedAt}
+                        </dt>
+                        <dd className="font-medium">
+                          {formatDate(tenant.updatedAt) || m.common.invalidDate}
+                        </dd>
+                      </div>
+                    </dl>
+                  </CardContent>
+                </Card>
+
+                <Card className="gap-0 rounded-lg py-0 shadow-none">
+                  <CardContent className="grid gap-4 py-5">
+                    <div>
+                      <h2 className="text-sm font-semibold text-foreground">
+                        {m.tenants.detail.statusSection}
+                      </h2>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {m.tenants.detail.statusReasonHint}
+                      </p>
+                    </div>
+
+                    {statusError ? (
+                      <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                        {statusError}
+                      </div>
+                    ) : null}
+
+                    {!canManageStatus ? (
+                      <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+                        {m.tenants.detail.statusPermissionHint}
+                      </div>
+                    ) : null}
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="tenant-status-reason">
+                        {m.tenants.detail.reason}
+                      </Label>
+                      <Input
+                        disabled={!canManageStatus || Boolean(statusSubmitting)}
+                        id="tenant-status-reason"
+                        onChange={(event) => {
+                          setStatusReason(event.target.value);
+                          setStatusError(null);
+                        }}
+                        placeholder={m.tenants.detail.reasonPlaceholder}
+                        value={statusReason}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      {(["active", "suspended", "disabled"] as const)
+                        .filter((status) => status !== tenant.status)
+                        .map((status) => (
+                          <Button
+                            className="w-full"
+                            disabled={
+                              !canManageStatus || Boolean(statusSubmitting)
+                            }
+                            key={status}
+                            onClick={() => {
+                              void handleUpdateStatus(status);
+                            }}
+                            size="sm"
+                            type="button"
+                            variant={
+                              status === "active" ? "default" : "outline"
+                            }
+                          >
+                            {statusSubmitting === status
+                              ? m.common.updating
+                              : getStatusActionLabel(status, m)}
+                          </Button>
+                        ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </>
+            }
             onSubmit={handleUpdateTenant}
             onSuccess={(updatedTenant) => {
               setTenant(updatedTenant);
               onTenantUpdated?.();
             }}
           />
-        </>
+        </div>
       ) : (
-        <div className="p-5">
-          <div className="grid gap-3 rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">
-              {m.tenants.detail.notFoundTitle}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {m.tenants.detail.notFoundDescription}
-            </p>
-            {!isDialog ? (
-              <div>
-                <Button asChild variant="outline">
-                  <Link href={webAdminRoutes.saas.tenants}>
-                    {m.tenants.detail.backToTenants}
-                  </Link>
-                </Button>
-              </div>
-            ) : null}
-          </div>
+        <div className="grid gap-3 rounded-lg border border-dashed p-8 text-center">
+          <h2 className="text-base font-semibold">
+            {m.tenants.detail.notFoundTitle}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {m.tenants.detail.notFoundDescription}
+          </p>
+          {!isDialog ? (
+            <div>
+              <Button asChild variant="outline">
+                <Link href={webAdminRoutes.saas.tenants}>
+                  {m.tenants.detail.backToTenants}
+                </Link>
+              </Button>
+            </div>
+          ) : null}
         </div>
       )}
     </>
@@ -469,13 +450,14 @@ export function TenantDetailView({
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {pageHeader}
-        <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">{body}</div>
       </div>
     );
   }
 
   return (
-    <section className="min-h-[560px]">
+    <section className="mx-auto min-h-[560px] w-full max-w-[960px] space-y-3 pb-20">
+      <h1 className="sr-only">{tenant?.name ?? m.tenants.detail.title}</h1>
       {pageHeader}
       {body}
     </section>

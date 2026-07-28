@@ -1,7 +1,16 @@
-import { webAdminApi } from "@/lib/api-client";
+import type { ApiRequestOptions } from "@cleanhub/api-client";
+
+import { apiClient } from "@/lib/api-client";
 
 import type { SaasRoleSummary } from "../types";
 
-export async function getSaasRoleListQuery(): Promise<SaasRoleSummary[]> {
-  return webAdminApi.saas.roles.list();
+type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
+
+export async function getSaasRoleListQuery(
+  options: RequestOptions = {},
+): Promise<SaasRoleSummary[]> {
+  return apiClient<SaasRoleSummary[]>("/saas/roles", {
+    ...options,
+    method: "GET",
+  });
 }

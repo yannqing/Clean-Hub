@@ -4,6 +4,8 @@ import type { AuthContext } from "@cleanhub/api-client";
 import {
   Badge,
   Button,
+  Card,
+  CardContent,
   Checkbox,
   DialogDescription,
   DialogHeader,
@@ -17,17 +19,15 @@ import {
   SelectValue,
   toast,
 } from "@cleanhub/ui";
-import Link from "next/link";
+import { Building2 } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { getCurrentAuthQuery } from "@/features/auth/queries";
+import { SaasBreadcrumbs } from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 import { interpolate } from "@/i18n/messages/saas";
-import {
-  canUpdateTenantStatus,
-  canWriteTenant,
-} from "@/lib/permissions";
+import { canUpdateTenantStatus, canWriteTenant } from "@/lib/permissions";
 
 import {
   updateTenantFeatureFlagsAction,
@@ -35,10 +35,7 @@ import {
   updateTenantStatusAction,
 } from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
-import {
-  tenantFeatureFlagOptions,
-  tenantLanguageOptions,
-} from "../constants";
+import { tenantFeatureFlagOptions, tenantLanguageOptions } from "../constants";
 import {
   getTenantDetailQuery,
   getTenantFeatureFlagsQuery,
@@ -127,42 +124,50 @@ function SettingsSummary({
   settings: TenantSettings;
   featureFlags: TenantFeatureFlags;
 }) {
-  const { m, formatDateTime } = useSaasI18n();
+  const { m } = useSaasI18n();
   const enabledCount = Object.values(
     toFeatureFlagsFormValues(featureFlags),
   ).filter(Boolean).length;
 
   return (
-    <div className="grid gap-3 border-b p-5 md:grid-cols-2 xl:grid-cols-4">
-      <div className="rounded-md border bg-background p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {m.tenants.settings.pilotStatus}
-        </p>
-        <Badge className="mt-2" variant={getStatusVariant(tenant.status)}>
-          {m.common.statusLabels[tenant.status]}
-        </Badge>
-      </div>
-      <div className="rounded-md border bg-background p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {m.tenants.detail.fields.defaultLanguage}
-        </p>
-        <p className="mt-2 font-semibold">{settings.defaultLanguage}</p>
-      </div>
-      <div className="rounded-md border bg-background p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {m.tenants.detail.fields.defaultCurrency}
-        </p>
-        <p className="mt-2 font-semibold">{settings.defaultCurrency}</p>
-      </div>
-      <div className="rounded-md border bg-background p-4">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          {m.tenants.settings.enabledFeatures}
-        </p>
-        <p className="mt-2 font-semibold">
-          {enabledCount} / {tenantFeatureFlagOptions.length}
-        </p>
-      </div>
-    </div>
+    <Card className="gap-0 rounded-lg py-0 shadow-none">
+      <CardContent className="grid gap-4 py-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold">{tenant.name}</h2>
+            <p className="mt-1 break-all text-xs text-muted-foreground">
+              {tenant.id}
+            </p>
+          </div>
+          <Badge className="shrink-0" variant={getStatusVariant(tenant.status)}>
+            {m.common.statusLabels[tenant.status]}
+          </Badge>
+        </div>
+
+        <dl className="divide-y text-sm">
+          <div className="grid gap-1 py-2 first:pt-0">
+            <dt className="text-xs text-muted-foreground">
+              {m.tenants.detail.fields.defaultLanguage}
+            </dt>
+            <dd className="font-medium">{settings.defaultLanguage}</dd>
+          </div>
+          <div className="grid gap-1 py-2">
+            <dt className="text-xs text-muted-foreground">
+              {m.tenants.detail.fields.defaultCurrency}
+            </dt>
+            <dd className="font-medium">{settings.defaultCurrency}</dd>
+          </div>
+          <div className="grid gap-1 py-2 last:pb-0">
+            <dt className="text-xs text-muted-foreground">
+              {m.tenants.settings.enabledFeatures}
+            </dt>
+            <dd className="font-medium">
+              {enabledCount} / {tenantFeatureFlagOptions.length}
+            </dd>
+          </div>
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -236,69 +241,75 @@ function TenantSettingsForm({
   }
 
   return (
-    <form className="grid gap-4 rounded-md border p-4" onSubmit={handleSubmit}>
-      <div>
-        <h2 className="text-base font-semibold">
-          {m.tenants.settings.defaultsSection}
-        </h2>
-      </div>
+    <form onSubmit={handleSubmit}>
+      <Card className="gap-0 rounded-lg py-0 shadow-none">
+        <CardContent className="grid gap-4 py-5">
+          <h2 className="text-sm font-semibold">
+            {m.tenants.settings.defaultsSection}
+          </h2>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="grid gap-2">
-          <Label htmlFor="tenant-settings-language">
-            {m.tenants.detail.fields.defaultLanguage}
-          </Label>
-          <Select
-            disabled={disabled || submitting}
-            onValueChange={(value) =>
-              updateValue(
-                "defaultLanguage",
-                value as TenantSettingsFormValues["defaultLanguage"],
-              )
-            }
-            value={values.defaultLanguage}
-          >
-            <SelectTrigger className="w-full" id="tenant-settings-language">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {tenantLanguageOptions.map((option) => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.defaultLanguage ? (
-            <p className="text-xs text-destructive">{errors.defaultLanguage}</p>
-          ) : null}
-        </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="tenant-settings-language">
+                {m.tenants.detail.fields.defaultLanguage}
+              </Label>
+              <Select
+                disabled={disabled || submitting}
+                onValueChange={(value) =>
+                  updateValue(
+                    "defaultLanguage",
+                    value as TenantSettingsFormValues["defaultLanguage"],
+                  )
+                }
+                value={values.defaultLanguage}
+              >
+                <SelectTrigger className="w-full" id="tenant-settings-language">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {tenantLanguageOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {errors.defaultLanguage ? (
+                <p className="text-xs text-destructive">
+                  {errors.defaultLanguage}
+                </p>
+              ) : null}
+            </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="tenant-settings-currency">
-            {m.tenants.detail.fields.defaultCurrency}
-          </Label>
-          <Input
-            aria-invalid={Boolean(errors.defaultCurrency)}
-            disabled={disabled || submitting}
-            id="tenant-settings-currency"
-            maxLength={3}
-            onChange={(event) =>
-              updateValue("defaultCurrency", event.target.value)
-            }
-            value={values.defaultCurrency}
-          />
-          {errors.defaultCurrency ? (
-            <p className="text-xs text-destructive">{errors.defaultCurrency}</p>
-          ) : null}
-        </div>
-      </div>
+            <div className="grid gap-2">
+              <Label htmlFor="tenant-settings-currency">
+                {m.tenants.detail.fields.defaultCurrency}
+              </Label>
+              <Input
+                aria-invalid={Boolean(errors.defaultCurrency)}
+                disabled={disabled || submitting}
+                id="tenant-settings-currency"
+                maxLength={3}
+                onChange={(event) =>
+                  updateValue("defaultCurrency", event.target.value)
+                }
+                value={values.defaultCurrency}
+              />
+              {errors.defaultCurrency ? (
+                <p className="text-xs text-destructive">
+                  {errors.defaultCurrency}
+                </p>
+              ) : null}
+            </div>
+          </div>
 
-      <div className="flex justify-end">
-        <Button disabled={disabled || submitting} type="submit">
-          {submitting ? m.common.saving : m.tenants.settings.saveDefaults}
-        </Button>
-      </div>
+          <div className="flex justify-end">
+            <Button disabled={disabled || submitting} type="submit">
+              {submitting ? m.common.saving : m.tenants.settings.saveDefaults}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </form>
   );
 }
@@ -359,41 +370,47 @@ function TenantFeatureFlagsForm({
   }
 
   return (
-    <form className="grid gap-4 rounded-md border p-4" onSubmit={handleSubmit}>
-      <div>
-        <h2 className="text-base font-semibold">
-          {m.tenants.settings.featureFlagsSection}
-        </h2>
-      </div>
+    <form onSubmit={handleSubmit}>
+      <Card className="gap-0 rounded-lg py-0 shadow-none">
+        <CardContent className="grid gap-4 py-5">
+          <h2 className="text-sm font-semibold">
+            {m.tenants.settings.featureFlagsSection}
+          </h2>
 
-      <div className="grid gap-3 md:grid-cols-2">
-        {tenantFeatureFlagOptions.map((option) => (
-          <label
-            className="flex min-h-24 items-start gap-3 rounded-md border px-3 py-3 text-sm"
-            key={option.key}
-          >
-            <Checkbox
-              checked={values[option.key]}
-              disabled={disabled || submitting}
-              onCheckedChange={(checked) =>
-                updateValue(option.key, checked === true)
-              }
-            />
-            <span className="grid gap-1">
-              <span className="font-medium leading-none">{option.label}</span>
-              <span className="text-muted-foreground">
-                {option.description}
-              </span>
-            </span>
-          </label>
-        ))}
-      </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            {tenantFeatureFlagOptions.map((option) => (
+              <label
+                className="flex min-h-24 items-start gap-3 rounded-lg bg-muted/45 px-3 py-3 text-sm transition-colors hover:bg-muted/70"
+                key={option.key}
+              >
+                <Checkbox
+                  checked={values[option.key]}
+                  disabled={disabled || submitting}
+                  onCheckedChange={(checked) =>
+                    updateValue(option.key, checked === true)
+                  }
+                />
+                <span className="grid gap-1">
+                  <span className="font-medium leading-none">
+                    {option.label}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {option.description}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </div>
 
-      <div className="flex justify-end">
-        <Button disabled={disabled || submitting} type="submit">
-          {submitting ? m.common.saving : m.tenants.settings.saveFeatureFlags}
-        </Button>
-      </div>
+          <div className="flex justify-end">
+            <Button disabled={disabled || submitting} type="submit">
+              {submitting
+                ? m.common.saving
+                : m.tenants.settings.saveFeatureFlags}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </form>
   );
 }
@@ -450,18 +467,18 @@ function TenantStatusForm({
   }
 
   return (
-    <section className="grid gap-4 rounded-md border p-4">
-      <div>
-        <h2 className="text-base font-semibold">{m.tenants.settings.pilotSection}</h2>
-      </div>
+    <Card className="gap-0 rounded-lg py-0 shadow-none">
+      <CardContent className="grid gap-4 py-5">
+        <h2 className="text-sm font-semibold">
+          {m.tenants.settings.pilotSection}
+        </h2>
 
-      {error ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
+        {error ? (
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+            {error}
+          </div>
+        ) : null}
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
         <div className="grid gap-2">
           <Label htmlFor="tenant-settings-status-reason">
             {m.tenants.detail.reason}
@@ -478,16 +495,18 @@ function TenantStatusForm({
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="grid gap-2">
           {(["active", "suspended", "disabled"] as const)
             .filter((status) => status !== tenant.status)
             .map((status) => (
               <Button
+                className="w-full"
                 disabled={disabled || Boolean(submitting)}
                 key={status}
                 onClick={() => {
                   void handleStatusUpdate(status);
                 }}
+                size="sm"
                 type="button"
                 variant={status === "active" ? "default" : "outline"}
               >
@@ -497,8 +516,8 @@ function TenantStatusForm({
               </Button>
             ))}
         </div>
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -558,7 +577,7 @@ export function TenantSettingsView({
       setFeatureFlags(featureFlagsResult.value);
       setError(null);
     },
-    [],
+    [m.tenants.settings.sessionError],
   );
 
   const loadSettings = useCallback(
@@ -579,16 +598,13 @@ export function TenantSettingsView({
         applyLoadResults(results);
       } catch (loadError) {
         setError(
-          getTenantLoadErrorMessage(
-            loadError,
-            m.tenants.settings.loadError,
-          ),
+          getTenantLoadErrorMessage(loadError, m.tenants.settings.loadError),
         );
       } finally {
         setLoading(false);
       }
     },
-    [applyLoadResults, tenantId],
+    [applyLoadResults, m.tenants.settings.loadError, tenantId],
   );
 
   useEffect(() => {
@@ -610,10 +626,7 @@ export function TenantSettingsView({
       .catch((loadError: unknown) => {
         if (isCurrent) {
           setError(
-            getTenantLoadErrorMessage(
-              loadError,
-              m.tenants.settings.loadError,
-            ),
+            getTenantLoadErrorMessage(loadError, m.tenants.settings.loadError),
           );
         }
       })
@@ -643,25 +656,22 @@ export function TenantSettingsView({
   );
 
   const pageHeader = !isDialog ? (
-    <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
-      <div className="min-w-0">
-        <Badge variant="secondary">{m.tenants.settings.badge}</Badge>
-        <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-          {tenant?.name ?? m.tenants.settings.title}
-        </h1>
-        <p className="mt-2 break-all text-sm text-muted-foreground">
-          {tenant?.id ?? tenantId}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {refreshButton}
-        <Button asChild variant="outline">
-          <Link href={`${webAdminRoutes.saas.tenants}/${tenantId}`}>
-            {m.tenants.settings.backToDetail}
-          </Link>
-        </Button>
-      </div>
+    <div className="flex min-h-8 flex-wrap items-center justify-between gap-3">
+      <SaasBreadcrumbs
+        ariaLabel={m.tenants.settings.title}
+        className="flex-1"
+        items={[
+          {
+            href: webAdminRoutes.saas.tenant(tenantId),
+            label: tenant?.name ?? m.tenants.detail.title,
+          },
+          { label: m.tenants.settings.title },
+        ]}
+        rootHref={webAdminRoutes.saas.tenants}
+        rootIcon={Building2}
+        rootLabel={m.tenants.list.title}
+      />
+      {refreshButton}
     </div>
   ) : (
     <DialogHeader className="shrink-0 space-y-1 border-b px-6 py-4 text-left">
@@ -685,114 +695,129 @@ export function TenantSettingsView({
   const body = (
     <>
       {loading ? (
-        <div className="grid gap-4 p-5">
-          <div className="h-28 animate-pulse rounded-md bg-muted" />
-          <div className="h-52 animate-pulse rounded-md bg-muted" />
-          <div className="h-72 animate-pulse rounded-md bg-muted" />
+        <div
+          aria-busy="true"
+          className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]"
+        >
+          <div className="grid gap-5">
+            <div className="h-48 animate-pulse rounded-lg border bg-muted/70" />
+            <div className="h-72 animate-pulse rounded-lg border bg-muted/70" />
+          </div>
+          <div className="grid gap-5">
+            <div className="h-52 animate-pulse rounded-lg border bg-muted/70" />
+            <div className="h-60 animate-pulse rounded-lg border bg-muted/70" />
+          </div>
         </div>
       ) : error ? (
-        <div className="p-5">
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            {error}
-          </div>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          {error}
         </div>
       ) : tenant && settings && featureFlags ? (
-        <>
-          <SettingsSummary
-            tenant={tenant}
-            settings={settings}
-            featureFlags={featureFlags}
-          />
-
-          <div className="grid gap-5 p-5">
-            {authError || !canManageTenantSettings ? (
-              <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-                {authError
-                  ? `Tenant settings are read-only because the current session could not be verified: ${authError}`
-                  : m.tenants.settings.readOnlyHint}
-              </div>
-            ) : null}
-
-            {!canManageTenantStatus ? (
-              <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-                {m.tenants.settings.statusPermissionHint}
-              </div>
-            ) : null}
-
-            <TenantSettingsForm
-              disabled={!canManageTenantSettings}
-              initialValues={toSettingsFormValues(settings)}
-              key={`${settings.tenantId}-${settings.updatedAt ?? "settings"}`}
-              onUpdated={(nextSettings) => {
-                setSettings(nextSettings);
-                onTenantUpdated?.();
-              }}
-              tenantId={tenantId}
-            />
-
-            <TenantStatusForm
-              disabled={!canManageTenantStatus}
-              key={`${tenant.id}-${tenant.status}-${tenant.updatedAt}`}
-              onTenantUpdated={onTenantUpdated}
-              onUpdated={setTenant}
-              tenant={tenant}
-            />
-
-            <TenantFeatureFlagsForm
-              disabled={!canManageTenantSettings}
-              initialValues={toFeatureFlagsFormValues(featureFlags)}
-              key={`${featureFlags.tenantId}-${featureFlags.updatedAt ?? "flags"}`}
-              onUpdated={(nextFlags) => {
-                setFeatureFlags(nextFlags);
-                onTenantUpdated?.();
-              }}
-              tenantId={tenantId}
-            />
-
-            <div className="grid gap-3 rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground md:grid-cols-3">
-              <div>
-                <span className="font-medium text-foreground">
-                  {m.tenants.settings.tenantUpdated}
-                </span>
-                <p className="mt-1">
-                  {tenant.updatedAt
-                    ? formatDateTime(tenant.updatedAt)
-                    : m.common.notSet}
-                </p>
-              </div>
-              <div>
-                <span className="font-medium text-foreground">
-                  {m.tenants.settings.settingsUpdated}
-                </span>
-                <p className="mt-1">
-                  {settings.updatedAt
-                    ? formatDateTime(settings.updatedAt)
-                    : m.common.notSet}
-                </p>
-              </div>
-              <div>
-                <span className="font-medium text-foreground">
-                  {m.tenants.settings.flagsUpdated}
-                </span>
-                <p className="mt-1">
-                  {featureFlags.updatedAt
-                    ? formatDateTime(featureFlags.updatedAt)
-                    : m.common.notSet}
-                </p>
-              </div>
+        <div className="grid gap-3">
+          {authError || !canManageTenantSettings ? (
+            <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+              {authError
+                ? `${m.tenants.settings.sessionError} ${authError}`
+                : m.tenants.settings.readOnlyHint}
             </div>
+          ) : null}
+
+          {!canManageTenantStatus ? (
+            <div className="rounded-lg border bg-muted/30 p-4 text-sm text-muted-foreground">
+              {m.tenants.settings.statusPermissionHint}
+            </div>
+          ) : null}
+
+          <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="grid gap-5">
+              <TenantSettingsForm
+                disabled={!canManageTenantSettings}
+                initialValues={toSettingsFormValues(settings)}
+                key={`settings-${settings.tenantId}-${settings.updatedAt ?? "initial"}`}
+                onUpdated={(nextSettings) => {
+                  setSettings(nextSettings);
+                  onTenantUpdated?.();
+                }}
+                tenantId={tenantId}
+              />
+
+              <TenantFeatureFlagsForm
+                disabled={!canManageTenantSettings}
+                initialValues={toFeatureFlagsFormValues(featureFlags)}
+                key={`flags-${featureFlags.tenantId}-${featureFlags.updatedAt ?? "initial"}`}
+                onUpdated={(nextFlags) => {
+                  setFeatureFlags(nextFlags);
+                  onTenantUpdated?.();
+                }}
+                tenantId={tenantId}
+              />
+            </div>
+
+            <aside className="grid gap-5">
+              <SettingsSummary
+                featureFlags={featureFlags}
+                settings={settings}
+                tenant={tenant}
+              />
+
+              <TenantStatusForm
+                disabled={!canManageTenantStatus}
+                key={`${tenant.id}-${tenant.status}-${tenant.updatedAt}`}
+                onTenantUpdated={onTenantUpdated}
+                onUpdated={setTenant}
+                tenant={tenant}
+              />
+
+              <Card className="gap-0 rounded-lg py-0 shadow-none">
+                <CardContent className="grid gap-4 py-5">
+                  <h2 className="text-sm font-semibold">
+                    {m.tenants.settings.settingsUpdated}
+                  </h2>
+                  <dl className="divide-y text-sm">
+                    <div className="grid gap-1 py-2 first:pt-0">
+                      <dt className="text-xs text-muted-foreground">
+                        {m.tenants.settings.tenantUpdated}
+                      </dt>
+                      <dd className="break-words font-medium">
+                        {tenant.updatedAt
+                          ? formatDateTime(tenant.updatedAt)
+                          : m.common.notSet}
+                      </dd>
+                    </div>
+                    <div className="grid gap-1 py-2">
+                      <dt className="text-xs text-muted-foreground">
+                        {m.tenants.settings.settingsUpdated}
+                      </dt>
+                      <dd className="break-words font-medium">
+                        {settings.updatedAt
+                          ? formatDateTime(settings.updatedAt)
+                          : m.common.notSet}
+                      </dd>
+                    </div>
+                    <div className="grid gap-1 py-2 last:pb-0">
+                      <dt className="text-xs text-muted-foreground">
+                        {m.tenants.settings.flagsUpdated}
+                      </dt>
+                      <dd className="break-words font-medium">
+                        {featureFlags.updatedAt
+                          ? formatDateTime(featureFlags.updatedAt)
+                          : m.common.notSet}
+                      </dd>
+                    </div>
+                  </dl>
+                </CardContent>
+              </Card>
+            </aside>
           </div>
-        </>
+        </div>
       ) : (
-        <div className="p-5">
-          <div className="grid gap-3 rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">
-              {m.tenants.settings.notFoundTitle}
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              {m.tenants.settings.notFoundDescription}
-            </p>
-          </div>
+        <div className="grid gap-3 rounded-lg border border-dashed p-8 text-center">
+          <h2 className="text-base font-semibold">
+            {m.tenants.settings.notFoundTitle}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {m.tenants.settings.notFoundDescription}
+          </p>
         </div>
       )}
     </>
@@ -802,13 +827,14 @@ export function TenantSettingsView({
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {pageHeader}
-        <div className="min-h-0 flex-1 overflow-y-auto">{body}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">{body}</div>
       </div>
     );
   }
 
   return (
-    <section className="min-h-[560px]">
+    <section className="mx-auto min-h-[560px] w-full max-w-[960px] space-y-3 pb-20">
+      <h1 className="sr-only">{tenant?.name ?? m.tenants.settings.title}</h1>
       {pageHeader}
       {body}
     </section>
