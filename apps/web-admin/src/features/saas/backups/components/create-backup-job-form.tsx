@@ -52,10 +52,11 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
   }
 
   return (
-    <form className="grid gap-4 rounded-md border p-4" onSubmit={handleSubmit}>
-      <div>
-        <h2 className="text-base font-semibold">{m.backups.manualBackup}</h2>
-      </div>
+    <form
+      className="grid gap-4 border-y bg-background px-4 py-4"
+      onSubmit={handleSubmit}
+    >
+      <h2 className="text-sm font-semibold">{m.backups.manualBackup}</h2>
 
       <div className="grid gap-3 md:grid-cols-2">
         <div className="grid gap-2">
@@ -64,7 +65,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
             onValueChange={(value) => setScope(value as BackupJobScope)}
             value={scope}
           >
-            <SelectTrigger className="w-full" id="backup-scope">
+            <SelectTrigger className="h-9 w-full" id="backup-scope">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -80,6 +81,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
         <div className="grid gap-2">
           <Label htmlFor="backup-tenant-id">{m.systemLogs.tenantId}</Label>
           <Input
+            className="h-9"
             disabled={scope === "platform"}
             id="backup-tenant-id"
             onChange={(event) => setTenantId(event.target.value)}
@@ -92,6 +94,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
       <div className="grid gap-2">
         <Label htmlFor="backup-reason">{m.backups.reason}</Label>
         <Textarea
+          className="min-h-20"
           id="backup-reason"
           maxLength={500}
           onChange={(event) => setReason(event.target.value)}
@@ -101,7 +104,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
       </div>
 
       <div className="flex justify-end">
-        <Button disabled={submitting} type="submit">
+        <Button className="h-9" disabled={submitting} size="sm" type="submit">
           {submitting ? m.common.creating : m.backups.createBackupTask}
         </Button>
       </div>

@@ -1,9 +1,9 @@
 "use client";
 
 import {
-  Badge,
   Button,
   Checkbox,
+  Icon,
   Input,
   Label,
   Select,
@@ -12,11 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@cleanhub/ui";
+import { RefreshCw, Settings } from "lucide-react";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 
+import { SaasPageHeader } from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 import { updatePlatformSettingsAction } from "../actions";
-import { platformLanguageOptions, platformSettingsDefaultValues } from "../constants";
+import {
+  platformLanguageOptions,
+  platformSettingsDefaultValues,
+} from "../constants";
 import { getPlatformSettingsQuery } from "../queries";
 import type { PlatformSettings, PlatformSettingsFormValues } from "../types";
 
@@ -54,11 +59,13 @@ export function PlatformSettingsView() {
       setSettings(data);
       setForm(toFormValues(data));
     } catch (loadError) {
-      setSettingsError(getErrorMessage(loadError) || m.platformSettings.loadError);
+      setSettingsError(
+        getErrorMessage(loadError) || m.platformSettings.loadError,
+      );
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [m.platformSettings.loadError]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -75,7 +82,9 @@ export function PlatformSettingsView() {
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
-          setSettingsError(getErrorMessage(loadError) || m.platformSettings.loadError);
+          setSettingsError(
+            getErrorMessage(loadError) || m.platformSettings.loadError,
+          );
         }
       })
       .finally(() => {
@@ -87,7 +96,7 @@ export function PlatformSettingsView() {
     return () => {
       isCurrent = false;
     };
-  }, []);
+  }, [m.platformSettings.loadError]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -109,151 +118,164 @@ export function PlatformSettingsView() {
   }
 
   return (
-    <section className="min-h-[560px]">
-      <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <Badge variant="secondary">{m.platformSettings.badge}</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {m.platformSettings.title}
-          </h1>
-        </div>
-
-        <Button onClick={loadSettings} type="button" variant="outline">
-          {m.common.refresh}
-        </Button>
-      </div>
+    <section className="mx-auto w-full max-w-[860px] space-y-7 pb-16">
+      <SaasPageHeader
+        actions={
+          <Button
+            className="h-8 gap-1.5 px-2.5 text-xs"
+            disabled={loading}
+            onClick={loadSettings}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Icon
+              aria-hidden
+              className={loading ? "animate-spin" : undefined}
+              icon={RefreshCw}
+              size={14}
+            />
+            {m.common.refresh}
+          </Button>
+        }
+        icon={Settings}
+        title={m.platformSettings.title}
+      />
 
       {notice ? (
-        <div className="border-b p-5">
-          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 text-sm text-emerald-700">
-            {notice}
-          </div>
+        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700">
+          {notice}
         </div>
       ) : null}
 
-      <div className="p-5">
-        {loading ? (
-          <div className="grid gap-3 rounded-md border p-4">
-            <div className="h-8 animate-pulse rounded-md bg-muted" />
-            <div className="h-32 animate-pulse rounded-md bg-muted" />
-          </div>
-        ) : settingsError ? (
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            {settingsError}
-          </div>
-        ) : (
-          <form
-            className="grid gap-4 rounded-md border p-4"
-            noValidate
-            onSubmit={handleSubmit}
-          >
-            <h2 className="text-base font-semibold">
-              {m.platformSettings.defaultConfig}
-            </h2>
+      {loading ? (
+        <div className="grid gap-3 border-y bg-background px-5 py-6">
+          <div className="h-9 animate-pulse rounded-md bg-muted" />
+          <div className="h-36 animate-pulse rounded-md bg-muted" />
+        </div>
+      ) : settingsError ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+          {settingsError}
+        </div>
+      ) : (
+        <form
+          className="grid gap-5 border-y bg-background px-5 py-6"
+          noValidate
+          onSubmit={handleSubmit}
+        >
+          <p className="text-sm font-semibold">
+            {m.platformSettings.defaultConfig}
+          </p>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="platform-language">
-                  {m.platformSettings.defaultLanguage}
-                </Label>
-                <Select
-                  onValueChange={(value) => {
-                    setForm((current) => ({
-                      ...current,
-                      defaultLanguage:
-                        value as PlatformSettingsFormValues["defaultLanguage"],
-                    }));
-                  }}
-                  value={form.defaultLanguage}
-                >
-                  <SelectTrigger id="platform-language">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {platformLanguageOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.value === "en"
-                          ? m.common.languageLabels.en
-                          : option.value === "zh-CN"
-                            ? m.common.languageLabels.zhCN
-                            : option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="platform-currency">
-                  {m.platformSettings.defaultCurrency}
-                </Label>
-                <Input
-                  id="platform-currency"
-                  maxLength={8}
-                  onChange={(event) => {
-                    setForm((current) => ({
-                      ...current,
-                      defaultCurrency: event.target.value,
-                    }));
-                  }}
-                  placeholder="XOF"
-                  value={form.defaultCurrency}
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label htmlFor="platform-timezone">{m.platformSettings.timezone}</Label>
-                <Input
-                  id="platform-timezone"
-                  maxLength={64}
-                  onChange={(event) => {
-                    setForm((current) => ({
-                      ...current,
-                      timezone: event.target.value,
-                    }));
-                  }}
-                  placeholder="Africa/Dakar"
-                  value={form.timezone}
-                />
-              </div>
-
-              <label className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
-                <Checkbox
-                  checked={form.maintenanceMode}
-                  onCheckedChange={(checked) => {
-                    setForm((current) => ({
-                      ...current,
-                      maintenanceMode: checked === true,
-                    }));
-                  }}
-                />
-                {m.platformSettings.maintenanceMode}
-              </label>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-2">
+              <Label htmlFor="platform-language">
+                {m.platformSettings.defaultLanguage}
+              </Label>
+              <Select
+                onValueChange={(value) => {
+                  setForm((current) => ({
+                    ...current,
+                    defaultLanguage:
+                      value as PlatformSettingsFormValues["defaultLanguage"],
+                  }));
+                }}
+                value={form.defaultLanguage}
+              >
+                <SelectTrigger id="platform-language">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {platformLanguageOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.value === "en"
+                        ? m.common.languageLabels.en
+                        : option.value === "zh-CN"
+                          ? m.common.languageLabels.zhCN
+                          : option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
-            {settings ? (
-              <div className="text-xs text-muted-foreground">
-                {m.platformSettings.lastUpdated}{" "}
-                {settings.updatedAt
-                  ? formatDateTime(settings.updatedAt)
-                  : m.common.never}
-              </div>
-            ) : null}
-
-            {formError ? (
-              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-                {formError}
-              </div>
-            ) : null}
-
-            <div className="flex justify-end">
-              <Button disabled={submitting} type="submit">
-                {submitting ? m.common.saving : m.platformSettings.saveSettings}
-              </Button>
+            <div className="grid gap-2">
+              <Label htmlFor="platform-currency">
+                {m.platformSettings.defaultCurrency}
+              </Label>
+              <Input
+                id="platform-currency"
+                maxLength={8}
+                onChange={(event) => {
+                  setForm((current) => ({
+                    ...current,
+                    defaultCurrency: event.target.value,
+                  }));
+                }}
+                placeholder="XOF"
+                value={form.defaultCurrency}
+              />
             </div>
-          </form>
-        )}
-      </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="platform-timezone">
+                {m.platformSettings.timezone}
+              </Label>
+              <Input
+                id="platform-timezone"
+                maxLength={64}
+                onChange={(event) => {
+                  setForm((current) => ({
+                    ...current,
+                    timezone: event.target.value,
+                  }));
+                }}
+                placeholder="Africa/Dakar"
+                value={form.timezone}
+              />
+            </div>
+
+            <label className="flex min-h-10 items-center gap-3 rounded-md border px-3 py-2 text-sm">
+              <Checkbox
+                checked={form.maintenanceMode}
+                onCheckedChange={(checked) => {
+                  setForm((current) => ({
+                    ...current,
+                    maintenanceMode: checked === true,
+                  }));
+                }}
+              />
+              {m.platformSettings.maintenanceMode}
+            </label>
+          </div>
+
+          {settings ? (
+            <div className="text-xs text-muted-foreground">
+              {m.platformSettings.lastUpdated}{" "}
+              {settings.updatedAt
+                ? formatDateTime(settings.updatedAt)
+                : m.common.never}
+            </div>
+          ) : null}
+
+          {formError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {formError}
+            </div>
+          ) : null}
+
+          <div className="flex justify-end">
+            <Button
+              className="h-9"
+              disabled={submitting}
+              size="sm"
+              type="submit"
+            >
+              {submitting ? m.common.saving : m.platformSettings.saveSettings}
+            </Button>
+          </div>
+        </form>
+      )}
     </section>
   );
 }

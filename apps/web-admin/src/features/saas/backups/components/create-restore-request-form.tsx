@@ -46,6 +46,7 @@ export function CreateRestoreRequestForm({
           {m.backups.restoreReason}
         </Label>
         <Textarea
+          className="min-h-20"
           id={`restore-reason-${backupJobId}`}
           maxLength={500}
           onChange={(event) => setReason(event.target.value)}
@@ -54,7 +55,13 @@ export function CreateRestoreRequestForm({
         />
       </div>
 
-      <Button disabled={submitting} type="submit" variant="outline">
+      <Button
+        className="h-8 text-xs"
+        disabled={submitting}
+        size="sm"
+        type="submit"
+        variant="outline"
+      >
         {submitting ? m.common.submitting : m.backups.submitRestore}
       </Button>
     </form>

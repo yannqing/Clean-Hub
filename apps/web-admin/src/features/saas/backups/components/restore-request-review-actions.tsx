@@ -69,8 +69,15 @@ export function RestoreRequestReviewActions({
   async function handleAction(action: ReviewAction) {
     setPendingAction(action);
 
-    const input = action === "approve" || action === "reject" ? { reviewNote: note } : undefined;
-    const result = await reviewRestoreRequestAction(restoreRequest.id, action, input);
+    const input =
+      action === "approve" || action === "reject"
+        ? { reviewNote: note }
+        : undefined;
+    const result = await reviewRestoreRequestAction(
+      restoreRequest.id,
+      action,
+      input,
+    );
 
     setPendingAction(null);
 
@@ -103,7 +110,10 @@ export function RestoreRequestReviewActions({
 
   return (
     <div className="flex flex-col gap-2">
-      <Badge variant={getStatusVariant(restoreRequest.status)} className="w-fit">
+      <Badge
+        variant={getStatusVariant(restoreRequest.status)}
+        className="w-fit"
+      >
         {m.common.restoreStatusLabels[restoreRequest.status]}
       </Badge>
 
@@ -137,6 +147,7 @@ export function RestoreRequestReviewActions({
             action === "reject" || action === "cancel" ? "outline" : "default";
           return (
             <Button
+              className="h-7 px-2 text-[11px]"
               disabled={pendingAction !== null}
               key={action}
               onClick={() => handleAction(action)}
