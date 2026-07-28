@@ -132,14 +132,14 @@ export function TicketDetailView({
       </div>
 
       {/* Header */}
-      <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        <div className="flex flex-wrap items-center gap-4 p-5">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
-            <Icon className="h-5 w-5" name="clipboard-list" />
+      <section className="mt-3 overflow-hidden border-y border-slate-200 bg-white">
+        <div className="flex flex-wrap items-center gap-4 py-4">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-white">
+            <Icon className="h-[18px] w-[18px]" name="clipboard-list" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-mono text-xl font-semibold text-slate-950">
+              <h1 className="font-mono text-lg font-semibold text-slate-950">
                 {ticket.ticketNo ?? ticket.id.slice(-8).toUpperCase()}
               </h1>
               <TicketStatusBadge status={ticket.ticketStatus} />
@@ -224,7 +224,7 @@ export function TicketDetailView({
               ticket={ticket}
             />
           ) : (
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <section className="rounded-lg border border-slate-200 bg-white p-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-slate-950">工单信息</h2>
                 <button
@@ -284,8 +284,8 @@ export function TicketDetailView({
         </div>
 
         {/* Right column: customer, related orders, status meta */}
-        <aside className="space-y-5">
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+        <aside className="sticky top-4 space-y-5 self-start">
+          <section className="rounded-lg border border-slate-200 bg-white p-5">
             <h2 className="font-semibold text-slate-950">客户与取件信息</h2>
             <dl className="mt-4 space-y-3">
               <Detail
@@ -314,7 +314,7 @@ export function TicketDetailView({
             orders={relatedOrders ?? []}
           />
 
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <section className="rounded-lg border border-slate-200 bg-white p-5">
             <h2 className="font-semibold text-slate-950">状态与时间</h2>
             <dl className="mt-4 space-y-3">
               <DetailRow

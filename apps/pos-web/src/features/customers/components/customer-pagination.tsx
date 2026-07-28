@@ -56,7 +56,7 @@ export function CustomerPagination({
             <button
               className={`h-11 min-w-11 rounded-lg text-sm font-semibold ${
                 entry === page
-                  ? "bg-blue-600 text-white"
+                  ? "bg-slate-950 text-white"
                   : "border border-slate-200 text-slate-600"
               }`}
               key={entry}

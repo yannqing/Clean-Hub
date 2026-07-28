@@ -182,7 +182,7 @@ export function OrderActionsPanel({
   }
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <section className="sticky top-4 rounded-lg border border-slate-200 bg-white p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
           <h2 className="font-semibold text-slate-950">订单操作</h2>

@@ -25,16 +25,16 @@ type MetricCardProps = {
 
 function MetricCard({ label, value, note, icon, tone }: MetricCardProps) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <section className="border-y border-slate-200 bg-white px-3 py-3">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-medium text-slate-500">{label}</div>
+        <div className="text-xs font-medium text-slate-500">{label}</div>
         <span
-          className={`flex h-9 w-9 items-center justify-center rounded-lg ${METRIC_TONE_CLASSES[tone]}`}
+          className={`flex h-8 w-8 items-center justify-center rounded-md ${METRIC_TONE_CLASSES[tone]}`}
         >
           <Icon className="h-4 w-4" name={icon} />
         </span>
       </div>
-      <div className="mt-2 text-2xl font-semibold text-slate-950">{value}</div>
+      <div className="mt-1 text-xl font-semibold text-slate-950">{value}</div>
       <div className="mt-1 text-xs text-slate-400">{note}</div>
     </section>
   );
@@ -64,7 +64,7 @@ export function TicketMetrics({
   const todayCreatedCount = overview.todayCreatedCount ?? 0;
 
   return (
-    <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
       <MetricCard
         icon="clipboard-list"
         label={text("进行中工单")}

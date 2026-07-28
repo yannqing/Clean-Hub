@@ -103,22 +103,22 @@ function KpiCard({
   color: string;
 }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <article className="border-y border-slate-200 bg-white px-3 py-3">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-medium text-slate-500">{label}</p>
-          <p className="mt-2 truncate text-2xl font-bold text-slate-950">
+          <p className="mt-1 truncate text-xl font-semibold text-slate-950">
             {value}
           </p>
         </div>
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
           style={iconAccentStyle(color)}
         >
-          <Icon className="h-5 w-5" name={icon} />
+          <Icon className="h-4 w-4" name={icon} />
         </span>
       </div>
-      <p className="mt-3 truncate text-xs font-medium text-slate-500">
+      <p className="mt-2 truncate text-xs font-medium text-slate-500">
         {helper}
       </p>
     </article>
@@ -196,7 +196,7 @@ function PaymentChart({
         ];
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">订单收款</h3>
@@ -312,7 +312,7 @@ function TicketBars({
   const maxValue = Math.max(...bars.map((item) => item.value), 1);
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">工单动态</h3>
@@ -412,7 +412,7 @@ function CustomerGrowth({
         ];
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">客户增长</h3>
@@ -514,10 +514,7 @@ export function WorkspaceStatistics({ statistics }: WorkspaceStatisticsProps) {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span
-            className="flex h-9 w-9 items-center justify-center rounded-lg border"
-            style={iconAccentStyle(CHART_COLORS.orders)}
-          >
+          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-white">
             <Icon className="h-4 w-4" name="chart" />
           </span>
           <div>
@@ -527,7 +524,7 @@ export function WorkspaceStatistics({ statistics }: WorkspaceStatisticsProps) {
             </p>
           </div>
         </div>
-        <span className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">
+        <span className="inline-flex h-8 items-center gap-2 rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-600">
           <span
             aria-hidden
             className="h-2 w-2 rounded-full"

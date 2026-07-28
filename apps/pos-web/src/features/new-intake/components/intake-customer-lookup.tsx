@@ -5,7 +5,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 
 import { useRouter } from "next/navigation";
 
-import { PosBreadcrumb } from "@/components/app-shell";
+import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { posToast as toast } from "@/lib/pos-toast";
 
@@ -298,20 +298,27 @@ export function IntakeCustomerLookup({
   const pageCount = Math.max(1, Math.ceil(total / query.pageSize));
 
   return (
-    <div className="px-6 py-5">
-      <div className="mb-5 flex items-end justify-between gap-5">
-        <div>
+    <div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div className="min-w-0">
           <PosBreadcrumb items={[{ label: text("客户接待") }]} />
-          <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-            {text("查询客户档案")}
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {text(NEWINTAKE_PAGE_DESCRIPTION)}
-          </p>
+          <div className="mt-3 flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white">
+              <Icon className="h-[18px] w-[18px]" name="user-plus" />
+            </span>
+            <div>
+              <h1 className="text-lg font-semibold text-slate-950">
+                {text("查询客户档案")}
+              </h1>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {text(NEWINTAKE_PAGE_DESCRIPTION)}
+              </p>
+            </div>
+          </div>
         </div>
 
         <button
-          className="flex h-10 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+          className="flex h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
           type="button"
           onClick={handleCreateCustomer}
         >
@@ -320,7 +327,7 @@ export function IntakeCustomerLookup({
         </button>
       </div>
 
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <section className="overflow-hidden border-y border-slate-200 bg-white">
         <IntakeCustomerSearch
           draftQuery={draftQuery}
           onDraftQueryChange={setDraftQuery}

@@ -40,8 +40,8 @@ export function TicketsTable({ tickets, total }: TicketsTableProps) {
   }
 
   return (
-    <section className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+    <section className="mt-3 overflow-hidden border-y border-slate-200 bg-white">
+      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <div>
           <h2 className="font-semibold text-slate-950">工单列表</h2>
           <p className="mt-1 text-xs text-slate-500">
@@ -50,13 +50,13 @@ export function TicketsTable({ tickets, total }: TicketsTableProps) {
         </div>
       </div>
 
-      <div className="divide-y divide-slate-100 min-[1400px]:hidden">
+      <div className="divide-y divide-slate-100 min-[1180px]:hidden">
         {tickets.map((ticket) => (
           <TicketCard key={ticket.id} locale={locale} ticket={ticket} />
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto min-[1400px]:block">
+      <div className="hidden overflow-x-auto min-[1180px]:block">
         <div className="min-w-[1080px]">
           <div className="grid grid-cols-[130px_minmax(190px,1.2fr)_100px_110px_110px_150px_90px] bg-slate-50 px-5 py-3 text-[11px] font-semibold tracking-[0.1em] text-slate-400 uppercase">
             <div>工单 / 来源</div>
@@ -179,7 +179,7 @@ function TicketRow({
   const typeLabel = TICKET_TYPE_LABELS[ticket.ticketType];
 
   return (
-    <div className="grid grid-cols-[130px_minmax(190px,1.2fr)_100px_110px_110px_150px_90px] items-center border-t border-slate-100 px-5 py-4 text-sm hover:bg-slate-50/70">
+    <div className="grid grid-cols-[130px_minmax(190px,1.2fr)_100px_110px_110px_150px_90px] items-center border-t border-slate-100 px-5 py-3 text-sm hover:bg-slate-50/70">
       <div className="min-w-0">
         <Link
           className="font-mono text-xs font-semibold text-blue-700 hover:underline"
@@ -239,7 +239,7 @@ function TicketRow({
 
 function TicketsEmptyState() {
   return (
-    <section className="mt-4 rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <section className="mt-3 border-y border-slate-200 bg-white">
       <div className="px-5 py-14 text-center">
         <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
           <Icon className="h-5 w-5" name="search-x" />

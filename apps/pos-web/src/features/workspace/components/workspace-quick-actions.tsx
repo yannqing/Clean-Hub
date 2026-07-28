@@ -87,9 +87,8 @@ function QuickActionCard({ action }: { action: PosQuickAction }) {
 
   return (
     <Link
-      className="group flex min-h-[124px] flex-col justify-between rounded-lg border border-t-2 border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+      className="group flex min-h-[108px] flex-col justify-between border-y border-slate-200 bg-white px-3 py-4 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
       href={action.route}
-      style={{ borderTopColor: color }}
     >
       <div className="flex items-start justify-between gap-3">
         <span
@@ -98,12 +97,12 @@ function QuickActionCard({ action }: { action: PosQuickAction }) {
         >
           <Icon className="h-5 w-5" name={icon} />
         </span>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition group-hover:bg-slate-100 group-hover:text-slate-700">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition group-hover:bg-white group-hover:text-slate-700">
           <Icon className="h-4 w-4" name="chevron-right" />
         </span>
       </div>
 
-      <div className="mt-4 min-w-0">
+      <div className="mt-3 min-w-0">
         <h3 className="truncate text-sm font-semibold text-slate-950">
           {action.label}
         </h3>
@@ -126,23 +125,20 @@ export function WorkspaceQuickActions({ actions }: WorkspaceQuickActionsProps) {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span
-            className="flex h-9 w-9 items-center justify-center rounded-lg border"
-            style={iconAccentStyle(ACTION_COLORS.purple)}
-          >
-            <Icon className="h-4 w-4" name="replace" />
+          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-white">
+            <Icon className="h-4 w-4" name="plus" />
           </span>
           <div>
             <h2 className="text-sm font-semibold text-slate-900">快速操作</h2>
             <p className="mt-0.5 text-xs text-slate-500">门店常用业务入口</p>
           </div>
         </div>
-        <span className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">
+        <span className="inline-flex h-8 items-center rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-600">
           {formatActionCount(actions.length, locale)}
         </span>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-x-3 gap-y-2 sm:grid-cols-2 xl:grid-cols-4">
         {actions.map((action) => (
           <QuickActionCard action={action} key={action.id} />
         ))}

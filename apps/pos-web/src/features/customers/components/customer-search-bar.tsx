@@ -2,6 +2,7 @@
 
 import { CUSTOMER_RESULT_TYPE_OPTIONS } from "../constants";
 import type { CustomerFilterState, ResultTypeFilter } from "../types";
+import { Icon } from "@/components/app-shell";
 
 type CustomerSearchBarProps = {
   filters: CustomerFilterState;
@@ -27,10 +28,10 @@ export function CustomerSearchBar({
   onReset,
 }: CustomerSearchBarProps) {
   return (
-    <div className="border-b border-slate-200 bg-slate-50/60 p-4">
+    <div className="border-b border-slate-200 bg-white p-3">
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex h-10 min-w-[320px] flex-1 items-center rounded-lg border border-slate-200 bg-white px-3">
-          <span className="mr-2 text-slate-400">🔍</span>
+          <Icon className="mr-2 h-4 w-4 text-slate-400" name="search" />
           <input
             className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
             onChange={(event) => onDraftQueryChange(event.target.value)}
@@ -72,7 +73,7 @@ export function CustomerSearchBar({
           重置
         </button>
         <button
-          className="h-10 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white"
+          className="h-10 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800"
           type="button"
           onClick={onSearch}
         >

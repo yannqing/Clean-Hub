@@ -139,7 +139,7 @@ function PagerButton({
     <button
       className={`flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
         active
-          ? "bg-blue-600 text-white"
+          ? "bg-slate-950 text-white"
           : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
       }`}
       disabled={disabled}

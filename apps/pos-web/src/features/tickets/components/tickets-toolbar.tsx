@@ -103,8 +103,8 @@ export function TicketsToolbar({
   const text = (value: string) => translatePosText(value, locale);
 
   return (
-    <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <section className="mt-3 border-y border-slate-200 bg-white py-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div
           aria-label={text("工单范围")}
           className="flex rounded-lg bg-slate-100 p-1"
@@ -115,7 +115,7 @@ export function TicketsToolbar({
               aria-pressed={option.active}
               className={`flex h-8 items-center gap-2 rounded-md px-3 text-sm font-semibold transition ${
                 option.active
-                  ? "bg-white text-blue-700 shadow-sm"
+                  ? "bg-white text-slate-950 shadow-sm"
                   : "text-slate-500 hover:text-slate-800"
               }`}
               disabled={isPending}
@@ -129,7 +129,7 @@ export function TicketsToolbar({
               {option.count !== null ? (
                 <span
                   className={`rounded bg-slate-100 px-1.5 py-0.5 text-[11px] ${
-                    option.active ? "text-blue-600" : "text-slate-400"
+                    option.active ? "text-slate-700" : "text-slate-400"
                   }`}
                 >
                   {option.count}
@@ -143,8 +143,8 @@ export function TicketsToolbar({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
-        <div className="flex h-10 min-w-[250px] flex-1 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 focus-within:border-blue-300 focus-within:bg-white">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex h-10 min-w-[250px] flex-1 items-center rounded-lg border border-slate-200 bg-white px-3 focus-within:border-slate-400">
           <Icon className="mr-2 h-4 w-4 text-slate-400" name="search" />
           <input
             className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"

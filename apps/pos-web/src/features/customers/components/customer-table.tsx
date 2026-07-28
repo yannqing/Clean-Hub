@@ -60,7 +60,7 @@ export function CustomerTable({
         </div>
       ) : (
         <>
-          <div className="divide-y divide-slate-100 min-[1400px]:hidden">
+          <div className="divide-y divide-slate-100 min-[1180px]:hidden">
             {rows.map((row) => (
               <CustomerCard
                 key={`${row.kind}-${row.id}`}
@@ -82,7 +82,7 @@ export function CustomerTable({
             ))}
           </div>
 
-          <div className="hidden overflow-x-auto min-[1400px]:block">
+          <div className="hidden overflow-x-auto min-[1180px]:block">
             <div className="min-w-[1040px]">
               <div
                 className={`grid ${GRID_COLS} bg-slate-50 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400`}
@@ -241,7 +241,7 @@ function AccountRow({
 }: AccountRowProps) {
   return (
     <div
-      className={`grid ${GRID_COLS} items-center border-t border-slate-100 bg-blue-50/20 px-5 py-4 text-sm hover:bg-blue-50/50`}
+      className={`grid ${GRID_COLS} items-center border-t border-slate-100 bg-blue-50/20 px-5 py-3 text-sm hover:bg-blue-50/50`}
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2">
@@ -334,7 +334,7 @@ function ProfileRow({
 }: ProfileRowProps) {
   return (
     <div
-      className={`grid ${GRID_COLS} items-center border-t border-slate-100 px-5 py-4 text-sm hover:bg-slate-50/70`}
+      className={`grid ${GRID_COLS} items-center border-t border-slate-100 px-5 py-3 text-sm hover:bg-slate-50/70`}
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2">

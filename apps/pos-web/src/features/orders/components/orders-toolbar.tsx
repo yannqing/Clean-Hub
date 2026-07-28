@@ -58,10 +58,10 @@ export function OrdersToolbar({ totalCount }: { totalCount: number }) {
   );
 
   return (
-    <section className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <section className="mt-3 border-y border-slate-200 bg-white py-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <Icon className="h-4 w-4 text-blue-600" name="receipt" />
+          <Icon className="h-4 w-4 text-slate-500" name="receipt" />
           {text("订单筛选")}
         </div>
         <div className="text-xs text-slate-500">
@@ -69,8 +69,8 @@ export function OrdersToolbar({ totalCount }: { totalCount: number }) {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
-        <div className="flex h-10 min-w-[250px] flex-1 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 focus-within:border-blue-300 focus-within:bg-white">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex h-10 min-w-[250px] flex-1 items-center rounded-lg border border-slate-200 bg-white px-3 focus-within:border-slate-400">
           <Icon className="mr-2 h-4 w-4 text-slate-400" name="search" />
           <input
             className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"

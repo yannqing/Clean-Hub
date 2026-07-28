@@ -85,10 +85,7 @@ function SectionHeader({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2">
-        <span
-          className="flex h-9 w-9 items-center justify-center rounded-lg border"
-          style={iconAccentStyle(CHART_COLORS.section)}
-        >
+        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-white">
           <Icon className="h-4 w-4" name={icon} />
         </span>
         <div>
@@ -103,7 +100,7 @@ function SectionHeader({
 
 function EmptyTasks() {
   return (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
+    <div className="border-y border-dashed border-slate-300 bg-white p-8 text-center">
       <div
         className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg border"
         style={iconAccentStyle(CHART_COLORS.low)}
@@ -136,9 +133,8 @@ function TaskCard({
 
   return (
     <Link
-      className="group block rounded-lg border border-l-4 border-slate-200 bg-white p-4 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+      className="group block border-y border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
       href={task.actionRoute}
-      style={{ borderLeftColor: color }}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4">
         <div className="flex min-w-0 items-start gap-3">
@@ -203,7 +199,7 @@ export function PendingTasks({ tasks }: { tasks: PosPendingTask[] }) {
       <SectionHeader
         action={
           tasks.length > 0 ? (
-            <span className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">
+            <span className="inline-flex h-8 items-center rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-600">
               {formatPendingSummary(totalPending, locale)}
             </span>
           ) : null
@@ -216,7 +212,7 @@ export function PendingTasks({ tasks }: { tasks: PosPendingTask[] }) {
       {tasks.length === 0 ? (
         <EmptyTasks />
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2">
           {tasks.map((task) => (
             <TaskCard
               key={task.id}

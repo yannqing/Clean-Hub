@@ -140,10 +140,7 @@ function SectionHeader({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2">
-        <span
-          className="flex h-9 w-9 items-center justify-center rounded-lg border"
-          style={iconAccentStyle("var(--chart-3)")}
-        >
+        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-white">
           <Icon className="h-4 w-4" name="chart" />
         </span>
         <div>
@@ -154,7 +151,7 @@ function SectionHeader({
         </div>
       </div>
       {activityCount > 0 ? (
-        <span className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm">
+        <span className="inline-flex h-8 items-center rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-600">
           {formatActivityCount(activityCount, locale)}
         </span>
       ) : null}
@@ -164,7 +161,7 @@ function SectionHeader({
 
 function EmptyActivities() {
   return (
-    <div className="rounded-lg border border-dashed border-slate-300 bg-white p-8 text-center">
+    <div className="border-y border-dashed border-slate-300 bg-white p-8 text-center">
       <div
         className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg border"
         style={iconAccentStyle("var(--chart-3)")}
@@ -283,7 +280,7 @@ export function RecentActivities({
       {activities.length === 0 ? (
         <EmptyActivities />
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="overflow-hidden border-y border-slate-200 bg-white">
           {activities.map((activity) => (
             <ActivityItem
               activity={activity}

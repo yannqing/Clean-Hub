@@ -9,7 +9,7 @@ import type {
   ServiceTicketSummary,
 } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
-import { PosBreadcrumb } from "@/components/app-shell";
+import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
@@ -223,8 +223,8 @@ export function CustomerDetailView({
     profile.relationship ?? CUSTOMER_PROFILE_RELATIONSHIPS[0];
 
   return (
-    <div className="px-6 py-5">
-      <div className="mb-5 flex items-center justify-between">
+    <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <PosBreadcrumb
           items={[
             {
@@ -243,14 +243,14 @@ export function CustomerDetailView({
         </button>
       </div>
 
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-wrap items-center gap-5 p-5">
-          <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-gradient-to-br from-blue-600 via-blue-500 to-violet-500 text-base font-bold text-white">
-            {initials(profile.fullName)}
+      <section className="overflow-hidden border-y border-slate-200 bg-white">
+        <div className="flex flex-wrap items-center gap-4 py-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 text-sm font-semibold text-white">
+            <Icon className="h-5 w-5" name="user-circle" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h1 className="truncate text-xl font-semibold text-slate-950">
+              <h1 className="truncate text-lg font-semibold text-slate-950">
                 {profile.fullName}
               </h1>
             </div>
@@ -271,7 +271,7 @@ export function CustomerDetailView({
               编辑档案
             </button>
             <button
-              className="flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+              className="flex h-11 items-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800"
               type="button"
               onClick={handleCreateServiceTicket}
             >
@@ -330,7 +330,7 @@ export function CustomerDetailView({
             <button
               className={`relative h-12 shrink-0 px-4 text-sm font-semibold ${
                 tab === tabKey
-                  ? "text-blue-700"
+                  ? "text-slate-950"
                   : "text-slate-500 hover:text-slate-800"
               }`}
               key={tabKey}
@@ -339,7 +339,7 @@ export function CustomerDetailView({
             >
               {TAB_LABELS[tabKey]}
               {tab === tabKey ? (
-                <span className="absolute inset-x-3 bottom-0 h-0.5 bg-blue-600" />
+                <span className="absolute inset-x-3 bottom-0 h-0.5 bg-slate-950" />
               ) : null}
             </button>
           ))}
@@ -349,7 +349,7 @@ export function CustomerDetailView({
       {tab === "overview" ? (
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="space-y-5">
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="rounded-lg border border-slate-200 bg-white p-5">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="font-semibold text-slate-950">当前服务</h2>
@@ -367,7 +367,7 @@ export function CustomerDetailView({
               </div>
               <CurrentServiceCard locale={locale} ticket={recentTickets[0]} />
             </section>
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="rounded-lg border border-slate-200 bg-white p-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-slate-950">最近动态</h2>
                 <button
@@ -386,7 +386,7 @@ export function CustomerDetailView({
             </section>
           </div>
           <aside className="space-y-5 lg:col-start-2">
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="rounded-lg border border-slate-200 bg-white p-5">
               <h2 className="font-semibold text-slate-950">档案信息</h2>
               <div className="mt-4 space-y-3">
                 <Detail label="档案编号" value={profile.id} mono />
@@ -399,7 +399,7 @@ export function CustomerDetailView({
                 <Detail label="地址" value={profile.address ?? "未填写"} />
               </div>
             </section>
-            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <section className="rounded-lg border border-slate-200 bg-white p-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-slate-950">服务偏好</h2>
                 <button
@@ -420,7 +420,7 @@ export function CustomerDetailView({
 
       {tab === "notes" ? (
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <section className="rounded-lg border border-slate-200 bg-white p-5">
             <h2 className="font-semibold text-slate-950">档案备注</h2>
             <p className="mt-1 text-sm text-slate-500">
               该备注在选中此档案时对店员可见。
@@ -584,7 +584,7 @@ function NotificationPermissionsPanel({
   ];
 
   return (
-    <aside className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <aside className="rounded-lg border border-slate-200 bg-white p-5">
       <h2 className="font-semibold text-slate-950">通知权限</h2>
       <div className="mt-5 space-y-4">
         {options.map((option) => (
@@ -617,12 +617,6 @@ function NotificationPermissionsPanel({
       </div>
     </aside>
   );
-}
-
-function initials(name: string): string {
-  const trimmed = name.trim();
-  if (!trimmed) return "?";
-  return [...trimmed][0]?.toUpperCase() ?? "?";
 }
 
 function formatDate(iso: string, locale: string): string {

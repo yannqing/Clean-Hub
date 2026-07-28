@@ -124,7 +124,7 @@ export function TicketItemEditor({
   const formOpen = creating || editingId !== null;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="flex items-center justify-between border-b border-slate-200 p-5">
         <div>
           <h2 className="font-semibold text-slate-950">工单项目</h2>

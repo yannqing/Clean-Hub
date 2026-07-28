@@ -19,7 +19,7 @@ import { buildPosReceiptText, type PrintLocale } from "@cleanhub/hardware";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { PosBreadcrumb } from "@/components/app-shell";
+import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { customerDetailPath, posRoutes } from "@/config";
 import { PrintJobControl } from "@/features/hardware/components";
 
@@ -73,18 +73,23 @@ export function OrderDetailView({
 
   return (
     <section>
-      <PosBreadcrumb className="mb-5" items={breadcrumbItems} />
+      <PosBreadcrumb className="mb-3" items={breadcrumbItems} />
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="border-y border-slate-200 bg-white py-4">
         <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">
-              {displayOrderCode(order.id)}
-            </h1>
-            <p className="mt-1 text-sm text-slate-500">
-              {order.customerName || "未命名客户"} ·{" "}
-              {ORDER_TYPE_LABELS[order.orderType]}
-            </p>
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white">
+              <Icon className="h-[18px] w-[18px]" name="receipt" />
+            </span>
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight text-slate-950">
+                {displayOrderCode(order.id)}
+              </h1>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {order.customerName || "未命名客户"} ·{" "}
+                {ORDER_TYPE_LABELS[order.orderType]}
+              </p>
+            </div>
           </div>
           <div className="flex flex-wrap items-start gap-2">
             <PrintJobControl
@@ -101,7 +106,7 @@ export function OrderDetailView({
         </div>
       </div>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[1fr_360px]">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid gap-4">
           <OrderInfoEditor order={order} />
           <OrderItemsManager
@@ -374,7 +379,7 @@ function OrderPaymentsCard({
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
       <div className="border-b border-slate-200 px-5 py-4">
         <h2 className="font-semibold text-slate-950">支付流水</h2>
         <p className="mt-1 text-xs text-slate-500">

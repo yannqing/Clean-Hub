@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useRouter } from "next/navigation";
 
-import { PosBreadcrumb } from "@/components/app-shell";
+import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import { customerDetailPath } from "@/config";
@@ -251,9 +251,9 @@ export function CustomersView({
   const currentAccount = viewMode === "account" ? accountContext : null;
 
   return (
-    <div className="px-6 py-5">
-      <div className="mb-5 flex items-end justify-between gap-5">
-        <div>
+    <div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+        <div className="min-w-0">
           {currentAccount ? (
             <PosBreadcrumb
               items={[
@@ -264,16 +264,23 @@ export function CustomersView({
           ) : (
             <PosBreadcrumb items={[{ label: "客户管理" }]} />
           )}
-          <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-            {currentAccount
-              ? `${currentAccount.accountName}的客户档案`
-              : "客户管理"}
-          </h1>
-          <p className="mt-1 text-sm text-slate-500">
-            {currentAccount
-              ? "正在查看该账户下的全部客户档案。"
-              : "一次查询同时匹配客户账户和客户档案，店员无需提前判断手机号属于哪种数据。"}
-          </p>
+          <div className="mt-3 flex items-start gap-3">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white">
+              <Icon className="h-[18px] w-[18px]" name="users" />
+            </span>
+            <div className="min-w-0">
+              <h1 className="truncate text-lg font-semibold text-slate-950">
+                {currentAccount
+                  ? `${currentAccount.accountName}的客户档案`
+                  : "客户管理"}
+              </h1>
+              <p className="mt-0.5 text-sm text-slate-500">
+                {currentAccount
+                  ? "查看该账户下的全部客户档案。"
+                  : "统一查询客户账户与档案，快速进入接待与历史记录。"}
+              </p>
+            </div>
+          </div>
         </div>
         <div className="flex gap-2">
           {currentAccount ? (
@@ -286,7 +293,7 @@ export function CustomersView({
                 返回客户列表
               </button>
               <button
-                className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
+                className="h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
                 type="button"
                 onClick={openCreateProfile}
               >
@@ -303,7 +310,7 @@ export function CustomersView({
                 新增档案
               </button>
               <button
-                className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
+                className="h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
                 type="button"
                 onClick={openCreateAccount}
               >
@@ -314,7 +321,7 @@ export function CustomersView({
         </div>
       </div>
 
-      <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden border-y border-slate-200 bg-white">
         <CustomerSearchBar
           accountContext={viewMode === "account"}
           draftQuery={draftQuery}

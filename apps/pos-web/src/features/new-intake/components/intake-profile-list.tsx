@@ -4,6 +4,7 @@ import type { SupportedLocale } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
+import { Icon } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { formatPosMoney } from "@/lib/money";
 import { buildPaginationWindow } from "@/lib/pagination";
@@ -93,7 +94,7 @@ export function IntakeProfileList({
     return (
       <div className="flex min-h-[360px] flex-col items-center justify-center px-6 text-center">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
-          ⌕
+          <Icon className="h-5 w-5" name="search" />
         </div>
         <h2 className="mt-4 text-base font-semibold text-slate-950">
           {text(title)}
@@ -111,7 +112,7 @@ export function IntakeProfileList({
               返回搜索结果
             </button>
             <button
-              className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
+              className="h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white"
               type="button"
               onClick={onCreateProfile}
             >
@@ -120,7 +121,7 @@ export function IntakeProfileList({
           </div>
         ) : (
           <button
-            className="mt-5 h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white"
+            className="mt-5 h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white"
             type="button"
             onClick={onCreateCustomer}
           >
@@ -174,7 +175,7 @@ export function IntakeProfileList({
             </button>
           ) : null}
           <div className="flex h-11 w-full items-center rounded-lg border border-slate-200 bg-white px-3 sm:w-[260px]">
-            <span className="mr-2 text-slate-400">⌕</span>
+            <Icon className="mr-2 h-4 w-4 text-slate-400" name="search" />
             <input
               className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-slate-400"
               onChange={(event) => onFilterTextChange(event.target.value)}
@@ -197,7 +198,7 @@ export function IntakeProfileList({
         </div>
       </div>
 
-      <div className="divide-y divide-slate-100 min-[1400px]:hidden">
+      <div className="divide-y divide-slate-100 min-[1180px]:hidden">
         {rows.map((row) => (
           <IntakeResultCard
             key={`${row.kind}-${row.id}`}
@@ -210,7 +211,7 @@ export function IntakeProfileList({
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto min-[1400px]:block">
+      <div className="hidden overflow-x-auto min-[1180px]:block">
         <div className="min-w-[900px]">
           <div
             className={`grid ${GRID_COLS} bg-white px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400`}
@@ -279,7 +280,7 @@ export function IntakeProfileList({
                 onClick={() => onSelect(row)}
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 via-blue-500 to-violet-500 text-xs font-bold text-white">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-xs font-bold text-white">
                     <RawText value={initials(row.fullName)} />
                   </div>
                   <div className="min-w-0">
@@ -360,7 +361,7 @@ export function IntakeProfileList({
               <button
                 className={`h-11 min-w-11 rounded-lg text-sm font-semibold ${
                   entry === page
-                    ? "bg-blue-600 text-white"
+                    ? "bg-slate-950 text-white"
                     : "border border-slate-200 text-slate-600 hover:bg-slate-50"
                 }`}
                 key={entry}
@@ -409,7 +410,7 @@ function IntakeResultCard({
           className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white ${
             isAccount
               ? "bg-slate-800"
-              : "bg-gradient-to-br from-blue-600 via-blue-500 to-violet-500"
+              : "bg-slate-950"
           }`}
         >
           <RawText value={initials(name)} />

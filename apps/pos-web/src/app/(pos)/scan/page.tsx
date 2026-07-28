@@ -130,13 +130,16 @@ export default function ScanPage() {
   return (
     <section className="space-y-5">
       <PosBreadcrumb items={[{ label: labels.breadcrumb }]} />
-      <div className="border-b border-slate-200 pb-5">
-        <h1 className="text-2xl font-bold text-slate-950">{labels.title}</h1>
+      <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-950 text-white">
+          <Icon className="h-[18px] w-[18px]" name="scan-line" />
+        </span>
+        <h1 className="text-lg font-semibold text-slate-950">{labels.title}</h1>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
         <form
-          className="border-t-4 border-blue-600 bg-white p-6 shadow-sm"
+          className="border-y border-slate-200 bg-white py-5"
           onSubmit={(event) => {
             event.preventDefault();
             void resolveScan(value);
@@ -149,7 +152,7 @@ export default function ScanPage() {
             {labels.field}
           </label>
           <div className="mt-3 flex gap-2">
-            <div className="flex min-w-0 flex-1 items-center border border-slate-300 bg-white px-3 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-100">
+            <div className="flex min-w-0 flex-1 items-center rounded-lg border border-slate-300 bg-white px-3 focus-within:border-slate-500">
               <Icon
                 className="mr-3 h-5 w-5 shrink-0 text-slate-400"
                 name="scan-line"
@@ -168,7 +171,7 @@ export default function ScanPage() {
               />
             </div>
             <button
-              className="flex h-14 items-center gap-2 bg-blue-600 px-5 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300"
+              className="flex h-14 items-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800 disabled:bg-slate-300"
               disabled={!value.trim() || status === "searching"}
               type="submit"
             >
@@ -189,7 +192,7 @@ export default function ScanPage() {
           </div>
         </form>
 
-        <aside className="border border-slate-200 bg-white p-5">
+        <aside className="border-y border-slate-200 bg-white py-5">
           <h2 className="text-sm font-semibold text-slate-950">
             {labels.recent}
           </h2>
