@@ -165,6 +165,12 @@ export function LoginPageContent({ reason }: LoginPageContentProps) {
               <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">
                 {auth.title}
               </h1>
+              <p className="mt-3 text-[15px] font-medium leading-6 text-zinc-700 dark:text-zinc-300">
+                {auth.heroTitle}
+              </p>
+              <p className="mx-auto mt-1.5 max-w-sm text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+                {auth.description}
+              </p>
             </div>
 
             <LoginForm />

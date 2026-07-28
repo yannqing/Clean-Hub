@@ -158,7 +158,6 @@ async function loginByApi(
 
 async function loginPosOwnerByApi(api: APIRequestContext): Promise<void> {
   await apiPost(api, "/auth/login", {
-    tenantCode: TENANT_CODE,
     identifier: "tenant.admin1@cleanhub.local",
     password: PASSWORD,
     deviceId: `playwright-pos-owner-${Date.now()}`,

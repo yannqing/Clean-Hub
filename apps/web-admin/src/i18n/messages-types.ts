@@ -16,6 +16,69 @@ type ShellCopy = {
   description: string;
 };
 
+type SaasShellCopy = ShellCopy & {
+  header: {
+    searchLabel: string;
+    searchPlaceholder: string;
+    assistantLabel: string;
+    accountLabel: string;
+    assistant: {
+      title: string;
+      description: string;
+      closeLabel: string;
+      searchLabel: string;
+      searchPlaceholder: string;
+      quickActionsTitle: string;
+      emptyTitle: string;
+      emptyDescription: string;
+      actions: {
+        overview: {
+          label: string;
+          description: string;
+        };
+        tenants: {
+          label: string;
+          description: string;
+        };
+        users: {
+          label: string;
+          description: string;
+        };
+        feedbackTickets: {
+          label: string;
+          description: string;
+        };
+        todos: {
+          label: string;
+          description: string;
+        };
+        auditLogs: {
+          label: string;
+          description: string;
+        };
+        operationLogs: {
+          label: string;
+          description: string;
+        };
+        security: {
+          label: string;
+          description: string;
+        };
+        settings: {
+          label: string;
+          description: string;
+        };
+      };
+    };
+    account: {
+      menuLabel: string;
+      roleLabel: string;
+      profile: string;
+      settings: string;
+    };
+  };
+};
+
 type TenantShellCopy = ShellCopy & {
   header: {
     searchLabel: string;
@@ -124,15 +187,6 @@ type AuthCopy = {
   heroDescription: string;
   title: string;
   description: string;
-  signInAs: string;
-  tenantModeLabel: string;
-  tenantModeDescription: string;
-  platformModeLabel: string;
-  platformModeDescription: string;
-  tenantCodeLabel: string;
-  tenantCodePlaceholder: string;
-  tenantCodeHint: string;
-  platformHint: string;
   identifierLabel: string;
   identifierPlaceholder: string;
   passwordLabel: string;
@@ -144,8 +198,8 @@ type AuthCopy = {
   signedIn: string;
   validation: {
     identifierRequired: string;
+    identifierInvalid: string;
     passwordRequired: string;
-    tenantCodeRequired: string;
   };
   errors: {
     checkForm: string;
@@ -160,7 +214,7 @@ type AuthCopy = {
 
 export type WebAdminMessages = {
   shell: {
-    saas: ShellCopy;
+    saas: SaasShellCopy;
     tenant: TenantShellCopy;
   };
   sidebar: {

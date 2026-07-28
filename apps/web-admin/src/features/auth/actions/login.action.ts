@@ -63,8 +63,6 @@ export async function loginAction(
       {
         identifier: input.identifier,
         password: input.password,
-        tenantCode:
-          input.loginMode === "tenant" ? input.tenantCode.trim() : undefined,
         deviceId: input.deviceId,
       },
       {

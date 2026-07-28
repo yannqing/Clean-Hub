@@ -21,6 +21,68 @@ export const enMessages: WebAdminMessages = {
       title: "Platform Operations",
       description:
         "Manage tenants, platform users, configuration, logs, and system controls.",
+      header: {
+        searchLabel: "Search the platform workspace",
+        searchPlaceholder: "Search tenants, users, tickets, or settings...",
+        assistantLabel: "CleanHub assistant",
+        accountLabel: "Signed-in user",
+        assistant: {
+          title: "CleanHub assistant",
+          description:
+            "Quickly open common platform pages and operational tools.",
+          closeLabel: "Close assistant",
+          searchLabel: "Search platform actions",
+          searchPlaceholder: "Search tenants, users, logs...",
+          quickActionsTitle: "Platform shortcuts",
+          emptyTitle: "No matching action",
+          emptyDescription:
+            "Try a destination such as tenants, users, tickets, or security.",
+          actions: {
+            overview: {
+              label: "Overview",
+              description: "Review platform activity and key indicators.",
+            },
+            tenants: {
+              label: "Tenants",
+              description: "Manage tenant accounts and platform access.",
+            },
+            users: {
+              label: "Platform users",
+              description: "Manage SaaS operators and their roles.",
+            },
+            feedbackTickets: {
+              label: "Feedback tickets",
+              description: "Review and resolve incoming support requests.",
+            },
+            todos: {
+              label: "My todo",
+              description: "Open outstanding platform work in one place.",
+            },
+            auditLogs: {
+              label: "Audit logs",
+              description: "Trace important platform and account changes.",
+            },
+            operationLogs: {
+              label: "Operation logs",
+              description: "Inspect application and service activity.",
+            },
+            security: {
+              label: "Security",
+              description: "Review security policy and recent events.",
+            },
+            settings: {
+              label: "Platform settings",
+              description: "Configure platform-wide defaults and behavior.",
+            },
+          },
+        },
+        account: {
+          menuLabel: "Open account menu",
+          roleLabel: "Role",
+          profile: "Personal center",
+          settings: "Platform settings",
+        },
+      },
     },
     tenant: {
       eyebrow: "Tenant Admin",
@@ -128,22 +190,22 @@ export const enMessages: WebAdminMessages = {
       {
         title: "Main",
         items: [
-          { label: "Dashboard", href: webAdminRoutes.saas.home },
-          { label: "My Todo", href: webAdminRoutes.saas.todos },
+          { label: "Home", href: webAdminRoutes.saas.home },
+          {
+            label: "Tenant Management",
+            href: webAdminRoutes.saas.config.tenants,
+          },
           { label: "User Management", href: webAdminRoutes.saas.users },
           {
             label: "Feedback Tickets",
             href: webAdminRoutes.saas.feedbackTickets,
           },
+          { label: "My Todo", href: webAdminRoutes.saas.todos },
         ],
       },
       {
         title: "Configuration Management",
         items: [
-          {
-            label: "Tenant Management",
-            href: webAdminRoutes.saas.config.tenants,
-          },
           {
             label: "Feature Flags",
             href: webAdminRoutes.saas.config.featureFlags,
@@ -234,25 +296,13 @@ export const enMessages: WebAdminMessages = {
   auth: {
     brandName: "CleanHub Web Admin",
     brandSuffix: "Management Console",
-    heroTitle: "One workspace for every store.",
+    heroTitle: "Everyday operations, thoughtfully organized.",
     heroDescription:
       "Manage stores, staff, service configuration, reports, and operational settings from one secure place.",
     title: "Welcome back",
     description:
-      "Choose store or platform sign-in. Store administrators must also enter their store code.",
-    signInAs: "Sign in as",
-    tenantModeLabel: "Store admin",
-    tenantModeDescription: "Owner or manager for a laundry or pressing store",
-    platformModeLabel: "Platform admin",
-    platformModeDescription:
-      "CleanHub SaaS operations, super administrators, or support",
-    tenantCodeLabel: "Store code",
-    tenantCodePlaceholder: "e.g. SN-0042",
-    tenantCodeHint:
-      "The unique store code assigned by CleanHub. Required for store administrators.",
-    platformHint:
-      "Platform administrators sign in with an email address or phone number and a password. No store code is required.",
-    identifierLabel: "Email or phone",
+      "Sign in with your work email. CleanHub will take you to the right workspace for your account.",
+    identifierLabel: "Email",
     identifierPlaceholder: "admin@cleanhub.local",
     passwordLabel: "Password",
     passwordPlaceholder: "Enter password",
@@ -262,9 +312,9 @@ export const enMessages: WebAdminMessages = {
     submitting: "Signing in...",
     signedIn: "Signed in successfully.",
     validation: {
-      identifierRequired: "Email or phone is required.",
+      identifierRequired: "Email is required.",
+      identifierInvalid: "Enter a valid email address.",
       passwordRequired: "Password is required.",
-      tenantCodeRequired: "Store code is required for store login.",
     },
     errors: {
       checkForm: "Please check the login form.",

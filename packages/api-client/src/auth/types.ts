@@ -29,7 +29,6 @@ export type AuthContext = {
 export type LoginRequest = {
   identifier: string;
   password: string;
-  tenantCode?: string;
   deviceId?: string;
 };
 

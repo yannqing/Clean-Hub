@@ -7,45 +7,31 @@ import { z } from "zod";
  * shared by the client (via `react-hook-form`'s `zodResolver`) and by the
  * server action (`loginAction` calls `loginFormSchema.safeParse`), so the same
  * rules run on both sides — which is the goal called out in AGENTS.md.
- *
- * Cross-field rule: `tenantCode` is only required when `loginMode === "tenant"`,
- * so it lives in a `superRefine` rather than on the field itself.
  */
-
-export const LOGIN_MODES = ["platform", "tenant"] as const;
-export type LoginMode = (typeof LOGIN_MODES)[number];
 
 export type LoginValidationMessages = {
   identifierRequired: string;
+  identifierInvalid: string;
   passwordRequired: string;
-  tenantCodeRequired: string;
 };
 
 const defaultValidationMessages: LoginValidationMessages = {
-  identifierRequired: "Email or phone is required.",
+  identifierRequired: "Email is required.",
+  identifierInvalid: "Enter a valid email address.",
   passwordRequired: "Password is required.",
-  tenantCodeRequired: "Store code is required for store login.",
 };
 
 export function createLoginFormSchema(
   messages: LoginValidationMessages = defaultValidationMessages,
 ) {
-  return z
-    .object({
-      loginMode: z.enum(LOGIN_MODES),
-      identifier: z.string().trim().min(1, messages.identifierRequired),
-      password: z.string().min(1, messages.passwordRequired),
-      tenantCode: z.string().trim(),
-    })
-    .superRefine((value, ctx) => {
-      if (value.loginMode === "tenant" && !value.tenantCode) {
-        ctx.addIssue({
-          path: ["tenantCode"],
-          code: z.ZodIssueCode.custom,
-          message: messages.tenantCodeRequired,
-        });
-      }
-    });
+  return z.object({
+    identifier: z
+      .string()
+      .trim()
+      .min(1, messages.identifierRequired)
+      .email(messages.identifierInvalid),
+    password: z.string().min(1, messages.passwordRequired),
+  });
 }
 
 export const loginFormSchema = createLoginFormSchema();

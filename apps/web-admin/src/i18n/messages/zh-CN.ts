@@ -19,6 +19,66 @@ export const zhCNMessages: WebAdminMessages = {
       eyebrow: "SaaS 管理",
       title: "平台运营",
       description: "管理租户、平台用户、配置、日志与系统控制。",
+      header: {
+        searchLabel: "搜索平台工作区",
+        searchPlaceholder: "搜索租户、用户、工单或设置...",
+        assistantLabel: "CleanHub 助手",
+        accountLabel: "当前登录用户",
+        assistant: {
+          title: "CleanHub 助手",
+          description: "快速进入常用的平台页面与运营工具。",
+          closeLabel: "关闭助手",
+          searchLabel: "搜索平台操作",
+          searchPlaceholder: "搜索租户、用户或日志...",
+          quickActionsTitle: "平台快捷入口",
+          emptyTitle: "没有匹配的操作",
+          emptyDescription: "请尝试输入租户、用户、工单或安全等页面名称。",
+          actions: {
+            overview: {
+              label: "平台概览",
+              description: "查看平台动态与关键运营指标。",
+            },
+            tenants: {
+              label: "租户管理",
+              description: "管理租户账号及其平台访问状态。",
+            },
+            users: {
+              label: "平台用户",
+              description: "管理 SaaS 运营人员及其角色。",
+            },
+            feedbackTickets: {
+              label: "反馈工单",
+              description: "查看并处理收到的支持请求。",
+            },
+            todos: {
+              label: "我的待办",
+              description: "集中查看尚待处理的平台工作。",
+            },
+            auditLogs: {
+              label: "审计日志",
+              description: "追溯重要的平台与账号变更。",
+            },
+            operationLogs: {
+              label: "操作日志",
+              description: "查看应用与服务的运行记录。",
+            },
+            security: {
+              label: "安全设置",
+              description: "查看安全策略与近期安全事件。",
+            },
+            settings: {
+              label: "平台设置",
+              description: "配置全平台默认规则与运行方式。",
+            },
+          },
+        },
+        account: {
+          menuLabel: "打开账户菜单",
+          roleLabel: "角色",
+          profile: "个人中心",
+          settings: "平台设置",
+        },
+      },
     },
     tenant: {
       eyebrow: "租户管理",
@@ -125,16 +185,16 @@ export const zhCNMessages: WebAdminMessages = {
       {
         title: "主菜单",
         items: [
-          { label: "仪表盘", href: webAdminRoutes.saas.home },
-          { label: "我的待办", href: webAdminRoutes.saas.todos },
+          { label: "主页", href: webAdminRoutes.saas.home },
+          { label: "租户管理", href: webAdminRoutes.saas.config.tenants },
           { label: "用户管理", href: webAdminRoutes.saas.users },
           { label: "反馈工单", href: webAdminRoutes.saas.feedbackTickets },
+          { label: "我的待办", href: webAdminRoutes.saas.todos },
         ],
       },
       {
         title: "配置管理",
         items: [
-          { label: "租户管理", href: webAdminRoutes.saas.config.tenants },
           { label: "功能开关", href: webAdminRoutes.saas.config.featureFlags },
           { label: "本地化", href: webAdminRoutes.saas.config.localization },
           {
@@ -204,23 +264,13 @@ export const zhCNMessages: WebAdminMessages = {
   auth: {
     brandName: "CleanHub 管理后台",
     brandSuffix: "管理控制台",
-    heroTitle: "一个后台，管理每一家门店。",
+    heroTitle: "把日常经营，打理得井然有序。",
     heroDescription:
       "集中管理门店、员工、服务配置、报表与运营设置，让日常管理更清晰高效。",
     title: "欢迎回来",
     description:
-      "请选择门店管理员或平台管理员登录。门店管理员还需填写门店编码。",
-    signInAs: "登录身份",
-    tenantModeLabel: "门店管理员",
-    tenantModeDescription: "洗衣或洗护门店的业主、经理",
-    platformModeLabel: "平台管理员",
-    platformModeDescription: "CleanHub SaaS 运营、超级管理员或客服人员",
-    tenantCodeLabel: "门店编码",
-    tenantCodePlaceholder: "例如：SN-0042",
-    tenantCodeHint: "CleanHub 分配给门店的唯一编码，门店管理员登录时必填。",
-    platformHint:
-      "平台管理员使用邮箱或手机号并输入密码即可登录，无需填写门店编码。",
-    identifierLabel: "邮箱或手机号",
+      "使用工作邮箱登录，系统将根据账号权限，带你进入相应工作台。",
+    identifierLabel: "邮箱",
     identifierPlaceholder: "admin@cleanhub.local",
     passwordLabel: "密码",
     passwordPlaceholder: "请输入密码",
@@ -230,9 +280,9 @@ export const zhCNMessages: WebAdminMessages = {
     submitting: "正在登录...",
     signedIn: "登录成功。",
     validation: {
-      identifierRequired: "请输入邮箱或手机号。",
+      identifierRequired: "请输入邮箱。",
+      identifierInvalid: "请输入有效的邮箱地址。",
       passwordRequired: "请输入密码。",
-      tenantCodeRequired: "门店管理员登录时必须填写门店编码。",
     },
     errors: {
       checkForm: "请检查登录信息。",
