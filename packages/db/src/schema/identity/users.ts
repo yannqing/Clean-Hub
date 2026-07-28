@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -44,10 +46,11 @@ export const users = pgTable(
     version: integer("version").notNull().default(1),
   },
   (table) => [
-    uniqueIndex("users_tenant_normalized_email_unique").on(
-      table.tenantId,
-      table.normalizedEmail,
+    check(
+      "users_email_normalization_check",
+      sql`(${table.email} is null and ${table.normalizedEmail} is null) or (${table.email} is not null and ${table.normalizedEmail} is not null and ${table.normalizedEmail} = lower(btrim(${table.email})) and ${table.normalizedEmail} <> '')`,
     ),
+    uniqueIndex("users_normalized_email_unique").on(table.normalizedEmail),
     index("users_tenant_id_idx").on(table.tenantId),
     index("users_status_idx").on(table.status),
   ],

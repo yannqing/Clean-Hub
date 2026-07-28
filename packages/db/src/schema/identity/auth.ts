@@ -46,7 +46,7 @@ export const authLoginLockouts = pgTable(
   "auth_login_lockouts",
   {
     id: ulidPrimaryKey(),
-    lockKey: varchar("lock_key", { length: 320 }).notNull(),
+    lockKey: varchar("lock_key", { length: 512 }).notNull(),
     failedAttempts: integer("failed_attempts").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true })

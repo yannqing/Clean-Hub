@@ -134,6 +134,34 @@
       "when": 1785075987744,
       "tag": "0018_adorable_praxagora",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1785215881398,
+      "tag": "0019_worthless_beast",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1785216663710,
+      "tag": "0020_sour_thena",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1785216705034,
+      "tag": "0021_dusty_blackheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1785217006593,
+      "tag": "0022_classy_lake",
+      "breakpoints": true
     }
   ]
 }
