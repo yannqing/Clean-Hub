@@ -15,12 +15,12 @@ import {
   findActiveSaasUserRoleRecords,
   findActiveSaasRolesByCodes,
   findActiveSaasRoleByCode,
-  findOtherSaasUserByNormalizedEmail,
+  findOtherUserByNormalizedEmail,
   findOtherSaasUserByPhone,
   findSaasRoles,
   findSaasUserAuditSnapshotById,
   findSaasUserDetailById,
-  findSaasUserByNormalizedEmail,
+  findUserByNormalizedEmail,
   findSaasUserByPhone,
   findSaasUsers,
   lockSaasUserForRoleUpdate,
@@ -154,7 +154,7 @@ export async function createSaasUser(
   ]);
 
   return db.transaction(async (tx) => {
-    const existingUser = await findSaasUserByNormalizedEmail(
+    const existingUser = await findUserByNormalizedEmail(
       tx,
       normalizedEmail,
     );
@@ -162,7 +162,7 @@ export async function createSaasUser(
     if (existingUser) {
       throw new SaasUsersError(
         "SAAS_USER_EMAIL_CONFLICT",
-        "A SaaS user with this email already exists.",
+        "An account with this email already exists.",
         409,
       );
     }
@@ -244,7 +244,7 @@ export async function updateSaasUser(
     }
 
     if (normalizedEmail !== undefined) {
-      const existingUser = await findOtherSaasUserByNormalizedEmail(
+      const existingUser = await findOtherUserByNormalizedEmail(
         tx,
         normalizedEmail,
         input.userId,
@@ -253,7 +253,7 @@ export async function updateSaasUser(
       if (existingUser) {
         throw new SaasUsersError(
           "SAAS_USER_EMAIL_CONFLICT",
-          "A SaaS user with this email already exists.",
+          "An account with this email already exists.",
           409,
         );
       }

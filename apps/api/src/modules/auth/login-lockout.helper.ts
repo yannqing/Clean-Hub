@@ -10,7 +10,7 @@ export function buildLoginLockKey(
   normalizedIdentifier: string,
   tenantCode?: string,
 ): string {
-  const scope = tenantCode?.trim().toLowerCase() || "saas";
+  const scope = tenantCode?.trim().toLowerCase() || "global";
 
   return `${scope}:${normalizedIdentifier}`;
 }

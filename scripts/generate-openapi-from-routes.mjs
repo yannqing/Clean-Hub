@@ -73,9 +73,12 @@ const SCHEMAS = {
   LoginRequest: {
     type: "object",
     properties: {
-      identifier: { type: "string" },
+      identifier: {
+        type: "string",
+        format: "email",
+        example: "owner@example.com",
+      },
       password: { type: "string", format: "password" },
-      tenantCode: { type: "string" },
       deviceId: { type: "string", example: "apifox-local" },
     },
     required: ["identifier", "password"],

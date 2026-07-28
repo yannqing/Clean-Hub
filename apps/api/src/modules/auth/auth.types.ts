@@ -17,7 +17,6 @@ export type AuthRequestMeta = {
 export type LoginInput = AuthRequestMeta & {
   identifier: string;
   password: string;
-  tenantCode?: string;
 };
 
 export type PosPinLoginInput = AuthRequestMeta & {

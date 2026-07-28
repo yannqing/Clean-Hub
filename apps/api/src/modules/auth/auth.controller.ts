@@ -25,7 +25,6 @@ export function createAuthController({ authService }: AuthControllerOptions) {
       const result = await authService.login({
         identifier: body.identifier,
         password: body.password,
-        tenantCode: body.tenantCode,
         ...getRequestMeta(c, body.deviceId),
       });
 

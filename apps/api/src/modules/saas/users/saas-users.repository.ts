@@ -23,7 +23,9 @@ import {
 } from "@cleanhub/db";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { isNormalizedEmailUniqueViolation } from "../../auth/email-identity.helper.js";
 
+import { SaasUsersError } from "./saas-users.errors.js";
 import type {
   ListSaasUsersQuery,
   SaasRoleListItem,
@@ -100,7 +102,7 @@ function getLatestDate(primary: Date, secondary: Date | null): Date {
     : primary;
 }
 
-export async function findSaasUserByNormalizedEmail(
+export async function findUserByNormalizedEmail(
   db: Database,
   normalizedEmail: string,
 ): Promise<{ id: string } | null> {
@@ -109,20 +111,13 @@ export async function findSaasUserByNormalizedEmail(
       id: users.id,
     })
     .from(users)
-    .where(
-      and(
-        eq(users.userType, "saas"),
-        isNull(users.tenantId),
-        eq(users.normalizedEmail, normalizedEmail),
-        isNull(users.deletedAt),
-      ),
-    )
+    .where(eq(users.normalizedEmail, normalizedEmail))
     .limit(1);
 
   return rows[0] ?? null;
 }
 
-export async function findOtherSaasUserByNormalizedEmail(
+export async function findOtherUserByNormalizedEmail(
   db: Database,
   normalizedEmail: string,
   userId: string,
@@ -133,13 +128,7 @@ export async function findOtherSaasUserByNormalizedEmail(
     })
     .from(users)
     .where(
-      and(
-        eq(users.userType, "saas"),
-        isNull(users.tenantId),
-        eq(users.normalizedEmail, normalizedEmail),
-        ne(users.id, userId),
-        isNull(users.deletedAt),
-      ),
+      and(eq(users.normalizedEmail, normalizedEmail), ne(users.id, userId)),
     )
     .limit(1);
 
@@ -310,25 +299,44 @@ export async function createSaasUserRecord(
 ): Promise<SaasUserListItem> {
   const userId = createId();
   const userRoleId = createId();
-  const userRows = await db
-    .insert(users)
-    .values({
-      id: userId,
-      tenantId: null,
-      userType: "saas",
-      email: input.email,
-      phone: input.phone,
-      normalizedEmail: input.normalizedEmail,
-      passwordHash: input.passwordHash,
-      pinHash: input.pinHash,
-      status: "active",
-    })
-    .returning({
-      id: users.id,
-      email: users.email,
-      status: users.status,
-      createdAt: users.createdAt,
-    });
+  let userRows: {
+    id: string;
+    email: string | null;
+    status: SaasUserStatus;
+    createdAt: Date;
+  }[];
+
+  try {
+    userRows = await db
+      .insert(users)
+      .values({
+        id: userId,
+        tenantId: null,
+        userType: "saas",
+        email: input.email,
+        phone: input.phone,
+        normalizedEmail: input.normalizedEmail,
+        passwordHash: input.passwordHash,
+        pinHash: input.pinHash,
+        status: "active",
+      })
+      .returning({
+        id: users.id,
+        email: users.email,
+        status: users.status,
+        createdAt: users.createdAt,
+      });
+  } catch (error) {
+    if (isNormalizedEmailUniqueViolation(error)) {
+      throw new SaasUsersError(
+        "SAAS_USER_EMAIL_CONFLICT",
+        "An account with this email already exists.",
+        409,
+      );
+    }
+
+    throw error;
+  }
   const user = userRows[0];
 
   await db.insert(userProfiles).values({
@@ -760,17 +768,29 @@ export async function updateSaasUserRecord(
     shouldUpdateProfile = true;
   }
 
-  await db
-    .update(users)
-    .set(userUpdates)
-    .where(
-      and(
-        eq(users.id, input.userId),
-        eq(users.userType, "saas"),
-        isNull(users.tenantId),
-        isNull(users.deletedAt),
-      ),
-    );
+  try {
+    await db
+      .update(users)
+      .set(userUpdates)
+      .where(
+        and(
+          eq(users.id, input.userId),
+          eq(users.userType, "saas"),
+          isNull(users.tenantId),
+          isNull(users.deletedAt),
+        ),
+      );
+  } catch (error) {
+    if (isNormalizedEmailUniqueViolation(error)) {
+      throw new SaasUsersError(
+        "SAAS_USER_EMAIL_CONFLICT",
+        "An account with this email already exists.",
+        409,
+      );
+    }
+
+    throw error;
+  }
 
   if (shouldUpdateProfile) {
     await db

@@ -7639,14 +7639,13 @@
         "type": "object",
         "properties": {
           "identifier": {
-            "type": "string"
+            "type": "string",
+            "format": "email",
+            "example": "owner@example.com"
           },
           "password": {
             "type": "string",
             "format": "password"
-          },
-          "tenantCode": {
-            "type": "string"
           },
           "deviceId": {
             "type": "string",

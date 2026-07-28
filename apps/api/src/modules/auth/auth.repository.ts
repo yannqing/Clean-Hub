@@ -4,12 +4,11 @@ import {
   getTableColumns,
   inArray,
   isNull,
-  or,
-  sql,
 } from "drizzle-orm";
 
 import {
   authRefreshTokens,
+  branches,
   permissions,
   posTerminalSettings,
   rolePermissions,
@@ -29,7 +28,11 @@ import type {
   AuthenticatedUser,
   UserAccess,
 } from "./auth.types.js";
-import { resolveLoginScope } from "./login-scope.helper.js";
+import {
+  isRoleAssignmentAvailableForSession,
+  isRoleAssignmentConsistent,
+  type LoginSessionKind,
+} from "./login-identity.helper.js";
 
 export type PosTerminalLoginContext = {
   id: string;
@@ -38,6 +41,10 @@ export type PosTerminalLoginContext = {
   deviceId: string;
   status: "active" | "inactive";
   credentialDigest: string | null;
+};
+
+export type ValidatedUserAccess = UserAccess & {
+  identityConsistent: boolean;
 };
 
 type PosPinLoginCandidateAggregate = {
@@ -61,38 +68,23 @@ export type StoredRefreshToken = {
 export class AuthRepository {
   constructor(private readonly db: Database) {}
 
-  async findLoginUser({
-    identifier,
-    tenantCode,
-  }: {
-    identifier: string;
-    tenantCode?: string;
-  }): Promise<AuthenticatedUser | null> {
+  async findLoginUser(identifier: string): Promise<AuthenticatedUser | null> {
     const normalizedIdentifier = identifier.trim().toLowerCase();
-    const loginScope = resolveLoginScope(tenantCode);
 
     const rows = await this.db
       .select({
         ...getTableColumns(users),
       })
       .from(users)
-      .leftJoin(tenants, eq(users.tenantId, tenants.id))
       .where(
         and(
           isNull(users.deletedAt),
-          or(
-            eq(users.normalizedEmail, normalizedIdentifier),
-            eq(users.phone, identifier.trim()),
-          ),
-          eq(users.userType, loginScope.userType),
-          loginScope.userType === "tenant"
-            ? sql`upper(${tenants.pressingCode}) = ${loginScope.tenantCode}`
-            : isNull(users.tenantId),
+          eq(users.normalizedEmail, normalizedIdentifier),
         ),
       )
-      .limit(1);
+      .limit(2);
 
-    return rows[0] ?? null;
+    return rows.length === 1 ? rows[0]! : null;
   }
 
   async findUserById(userId: string): Promise<AuthenticatedUser | null> {
@@ -107,10 +99,32 @@ export class AuthRepository {
     return rows[0] ?? null;
   }
 
-  async getUserAccess(userId: string): Promise<UserAccess> {
+  async isTenantActive(tenantId: string): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: tenants.id })
+      .from(tenants)
+      .where(
+        and(
+          eq(tenants.id, tenantId),
+          eq(tenants.status, "active"),
+          isNull(tenants.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return Boolean(rows[0]);
+  }
+
+  async getUserAccess(
+    user: AuthenticatedUser,
+    sessionKind: LoginSessionKind,
+  ): Promise<ValidatedUserAccess> {
     const rows = await this.db
       .select({
         roleCode: roles.code,
+        roleScope: roles.scope,
+        roleTenantId: roles.tenantId,
+        assignmentTenantId: userRoles.tenantId,
         permissionCode: permissions.code,
         branchId: userRoles.branchId,
       })
@@ -120,45 +134,79 @@ export class AuthRepository {
       .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
       .where(
         and(
-          eq(userRoles.userId, userId),
+          eq(userRoles.userId, user.id),
           isNull(userRoles.revokedAt),
           eq(roles.status, "active"),
           isNull(roles.deletedAt),
         ),
       );
+    const consistentRows = rows.filter((row) =>
+      isRoleAssignmentConsistent(user, row),
+    );
+    const sessionRows = consistentRows.filter((row) =>
+      isRoleAssignmentAvailableForSession(user, row, sessionKind),
+    );
 
     const profileRows = await this.db
       .select({ displayName: userProfiles.displayName })
       .from(userProfiles)
-      .where(eq(userProfiles.userId, userId))
+      .where(eq(userProfiles.userId, user.id))
       .limit(1);
 
     const branchRows = await this.db
-      .select({ branchId: userBranches.branchId })
+      .select({
+        branchId: userBranches.branchId,
+        tenantId: userBranches.tenantId,
+      })
       .from(userBranches)
-      .where(eq(userBranches.userId, userId));
+      .where(eq(userBranches.userId, user.id));
+    const validBranchRows = branchRows.filter(
+      (row) =>
+        user.userType === "tenant" &&
+        user.tenantId !== null &&
+        row.tenantId === user.tenantId,
+    );
+    const candidateBranchIds = [
+      ...new Set(
+        [
+          ...sessionRows.map((row) => row.branchId),
+          ...validBranchRows.map((row) => row.branchId),
+        ].filter((branchId): branchId is string => Boolean(branchId)),
+      ),
+    ];
+    const activeBranchRows =
+      user.userType === "tenant" &&
+      user.tenantId !== null &&
+      candidateBranchIds.length > 0
+        ? await this.db
+            .select({ id: branches.id })
+            .from(branches)
+            .where(
+              and(
+                eq(branches.tenantId, user.tenantId),
+                inArray(branches.id, candidateBranchIds),
+                eq(branches.status, "active"),
+                isNull(branches.deletedAt),
+              ),
+            )
+        : [];
 
-    const displayName = profileRows[0]?.displayName ?? userId;
+    const displayName = profileRows[0]?.displayName ?? user.id;
 
     return {
-      roles: [...new Set(rows.map((row) => row.roleCode))],
+      roles: [...new Set(sessionRows.map((row) => row.roleCode))],
       permissions: [
         ...new Set(
-          rows
+          sessionRows
             .map((row) => row.permissionCode)
             .filter((code): code is string => Boolean(code)),
         ),
       ],
-      branchIds: [
-        ...new Set(
-          [
-            ...rows.map((row) => row.branchId),
-            ...branchRows.map((row) => row.branchId),
-          ]
-            .filter((branchId): branchId is string => Boolean(branchId)),
-        ),
-      ],
+      branchIds: activeBranchRows.map((row) => row.id),
       displayName,
+      identityConsistent:
+        consistentRows.length === rows.length &&
+        validBranchRows.length === branchRows.length,
     };
   }
 
@@ -281,7 +329,8 @@ export class AuthRepository {
           isNull(users.deletedAt),
           eq(userRoles.tenantId, tenantId),
           isNull(userRoles.revokedAt),
-          eq(roles.scope, "tenant"),
+          eq(roles.tenantId, tenantId),
+          inArray(roles.scope, ["tenant", "pos"]),
           inArray(roles.code, ["owner", "manager", "cashier"]),
           eq(roles.status, "active"),
           isNull(roles.deletedAt),

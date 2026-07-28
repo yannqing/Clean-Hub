@@ -10,6 +10,7 @@ import {
 } from "@cleanhub/db";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { isNormalizedEmailUniqueViolation } from "../../auth/email-identity.helper.js";
 import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js";
 import { hashPassword, hashPin } from "../../auth/password.service.js";
 import { resolveEffectiveSecurityPolicy } from "../security/security-policy.js";
@@ -133,22 +134,14 @@ async function countActiveOwners(
   return rows[0]?.value ?? 0;
 }
 
-async function findTenantUserByNormalizedEmail(
+async function findUserByNormalizedEmail(
   db: Database,
-  tenantId: string,
   normalizedEmail: string,
 ): Promise<{ id: string } | null> {
   const rows = await db
     .select({ id: users.id })
     .from(users)
-    .where(
-      and(
-        eq(users.tenantId, tenantId),
-        eq(users.userType, "tenant"),
-        eq(users.normalizedEmail, normalizedEmail),
-        isNull(users.deletedAt),
-      ),
-    )
+    .where(eq(users.normalizedEmail, normalizedEmail))
     .limit(1);
 
   return rows[0] ?? null;
@@ -169,16 +162,12 @@ export async function createTenantOwnerUser(
     );
   }
 
-  const existingUser = await findTenantUserByNormalizedEmail(
-    db,
-    input.tenantId,
-    normalizedEmail,
-  );
+  const existingUser = await findUserByNormalizedEmail(db, normalizedEmail);
 
   if (existingUser) {
     throw new TenantOwnerUserHelperError(
       "TENANT_USER_EMAIL_CONFLICT",
-      "A tenant user with this email already exists.",
+      "An account with this email already exists.",
       409,
     );
   }
@@ -194,17 +183,29 @@ export async function createTenantOwnerUser(
   const roleId = await ensureTenantOwnerRole(db, input.tenantId);
   const userId = createId();
 
-  await db.insert(users).values({
-    id: userId,
-    tenantId: input.tenantId,
-    userType: "tenant",
-    email: normalizedEmail,
-    normalizedEmail,
-    phone,
-    passwordHash,
-    pinHash,
-    status: "active",
-  });
+  try {
+    await db.insert(users).values({
+      id: userId,
+      tenantId: input.tenantId,
+      userType: "tenant",
+      email: normalizedEmail,
+      normalizedEmail,
+      phone,
+      passwordHash,
+      pinHash,
+      status: "active",
+    });
+  } catch (error) {
+    if (isNormalizedEmailUniqueViolation(error)) {
+      throw new TenantOwnerUserHelperError(
+        "TENANT_USER_EMAIL_CONFLICT",
+        "An account with this email already exists.",
+        409,
+      );
+    }
+
+    throw error;
+  }
 
   await db.insert(userProfiles).values({
     userId,

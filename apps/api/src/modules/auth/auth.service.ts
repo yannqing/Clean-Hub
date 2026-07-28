@@ -8,9 +8,9 @@ import { AuthError, invalidCredentials } from "./auth.errors.js";
 import {
   AuthRepository,
   type PosTerminalLoginContext,
+  type ValidatedUserAccess,
 } from "./auth.repository.js";
 import type {
-  AdminRole,
   AuthContext,
   AuthRequestMeta,
   AuthResult,
@@ -21,7 +21,6 @@ import type {
   PosPinLoginInput,
   RefreshInput,
   RefreshResult,
-  UserAccess,
 } from "./auth.types.js";
 import {
   createAuthCookieHeaders,
@@ -33,7 +32,11 @@ import {
   clearLoginLockout,
   recordLoginFailure,
 } from "./login-lockout.helper.js";
-import { resolveLoginScope } from "./login-scope.helper.js";
+import {
+  isUserIdentityShapeValid,
+  isWebRoleBranchScopeValid,
+  resolveSessionPrimaryRole,
+} from "./login-identity.helper.js";
 import { verifyPassword } from "./password.service.js";
 import {
   assertEnrolledTerminalCredential,
@@ -65,23 +68,6 @@ function assertActiveUser(user: AuthenticatedUser): void {
   if (user.status !== "active") {
     throw invalidCredentials();
   }
-}
-
-function resolvePrimaryRole(user: AuthenticatedUser, access: UserAccess): AdminRole {
-  const rolePriority: AdminRole[] =
-    user.userType === "saas"
-      ? ["super_admin", "support"]
-      : ["owner", "manager", "cashier"];
-
-  const role = rolePriority.find((candidate) =>
-    access.roles.includes(candidate),
-  );
-
-  if (!role) {
-    throw invalidCredentials();
-  }
-
-  return role;
 }
 
 async function assertLockKeysNotLocked(
@@ -167,7 +153,10 @@ export class AuthService {
       terminal?: PosTerminalLoginContext;
     },
   ): Promise<AuthResult> {
-    const access = await this.repository.getUserAccess(user.id);
+    const access = await this.repository.getUserAccess(
+      user,
+      input.terminal ? "pos" : "web",
+    );
     const authContextBase = this.buildAuthContextBase(
       user,
       access,
@@ -216,19 +205,12 @@ export class AuthService {
 
   async login(input: LoginInput): Promise<AuthResult> {
     const normalizedIdentifier = normalizeIdentifier(input.identifier);
-    const loginScope = resolveLoginScope(input.tenantCode);
-    const lockKey = buildLoginLockKey(
-      normalizedIdentifier,
-      loginScope.tenantCode,
-    );
+    const lockKey = buildLoginLockKey(normalizedIdentifier);
     const policy = await resolveEffectiveSecurityPolicy(this.db);
 
     await assertLoginNotLocked(this.db, lockKey);
 
-    const user = await this.repository.findLoginUser({
-      identifier: normalizedIdentifier,
-      tenantCode: loginScope.tenantCode,
-    });
+    const user = await this.repository.findLoginUser(normalizedIdentifier);
 
     if (!user) {
       try {
@@ -259,6 +241,7 @@ export class AuthService {
 
     try {
       assertActiveUser(user);
+      await this.assertUserIdentityAvailable(user, false);
       const passwordValid = await verifyPassword(input.password, user.passwordHash);
 
       if (!passwordValid) {
@@ -515,12 +498,24 @@ export class AuthService {
     }
 
     assertActiveUser(user);
+    await this.assertUserIdentityAvailable(user, true);
 
-    const access = await this.repository.getUserAccess(user.id);
+    if (storedToken.tenantId !== user.tenantId) {
+      await this.repository.revokeRefreshTokenFamily(storedToken.familyId);
+      throw new AuthError(
+        "TOKEN_INVALID",
+        "Refresh token tenant no longer matches the user account.",
+      );
+    }
+
     const terminal = storedToken.terminalId
       ? (await this.repository.findPosTerminalById(storedToken.terminalId)) ??
         undefined
       : undefined;
+    const access = await this.repository.getUserAccess(
+      user,
+      terminal ? "pos" : "web",
+    );
 
     if (
       storedToken.terminalId &&
@@ -614,12 +609,23 @@ export class AuthService {
     }
 
     assertActiveUser(user);
+    await this.assertUserIdentityAvailable(user, true);
 
-    const access = await this.repository.getUserAccess(user.id);
+    if (claims.tenantId !== user.tenantId) {
+      throw new AuthError(
+        "TOKEN_INVALID",
+        "Access token tenant no longer matches the user account.",
+      );
+    }
+
     const terminal = claims.terminalId
       ? (await this.repository.findPosTerminalById(claims.terminalId)) ??
         undefined
       : undefined;
+    const access = await this.repository.getUserAccess(
+      user,
+      terminal ? "pos" : "web",
+    );
 
     if (
       claims.terminalId &&
@@ -644,10 +650,26 @@ export class AuthService {
 
   private buildAuthContextBase(
     user: AuthenticatedUser,
-    access: UserAccess,
+    access: ValidatedUserAccess,
     terminal?: PosTerminalLoginContext,
   ): Omit<AuthContext, "accessTokenExpiresAt"> {
-    const role = resolvePrimaryRole(user, access);
+    if (!access.identityConsistent) {
+      throw invalidCredentials();
+    }
+
+    const role = resolveSessionPrimaryRole(
+      user,
+      access.roles,
+      terminal ? "pos" : "web",
+    );
+
+    if (!role) {
+      throw invalidCredentials();
+    }
+
+    if (!terminal && !isWebRoleBranchScopeValid(role, access.branchIds)) {
+      throw invalidCredentials();
+    }
 
     if (
       terminal &&
@@ -677,6 +699,33 @@ export class AuthService {
     }
 
     return context;
+  }
+
+  private async assertUserIdentityAvailable(
+    user: AuthenticatedUser,
+    tokenSession: boolean,
+  ): Promise<void> {
+    const invalidIdentity = () => {
+      if (tokenSession) {
+        return new AuthError(
+          "TOKEN_INVALID",
+          "Authenticated user identity is no longer available.",
+        );
+      }
+
+      return invalidCredentials();
+    };
+
+    if (!isUserIdentityShapeValid(user)) {
+      throw invalidIdentity();
+    }
+
+    if (
+      user.userType === "tenant" &&
+      (!user.tenantId || !(await this.repository.isTenantActive(user.tenantId)))
+    ) {
+      throw invalidIdentity();
+    }
   }
 
   private withAccessTokenExpiresAt(
