@@ -19,6 +19,7 @@ import { createTenantFinanceApi } from "./finance";
 import { createTenantHardwareApi } from "./hardware";
 import { createTenantNotificationsApi } from "./notifications";
 import { createTenantPosChannelApi } from "./pos-channel";
+import { createTenantProfileApi } from "./profile";
 import { createTenantSettingsApi } from "./settings";
 
 export * from "./insights";
@@ -30,6 +31,7 @@ export * from "./finance";
 export * from "./hardware";
 export * from "./notifications";
 export * from "./pos-channel";
+export * from "./profile";
 // NOTE: settings types are exported explicitly below (not via `export *`),
 // because `TenantSettings` / `UpdateTenantSettingsRequest` collide with the
 // SaaS-domain types of the same name (see ../saas/tenants). They are re-exported
@@ -56,6 +58,7 @@ export function createTenantApi(client: ApiClient) {
   const hardware = createTenantHardwareApi(client);
   const notifications = createTenantNotificationsApi(client);
   const posChannel = createTenantPosChannelApi(client);
+  const profile = createTenantProfileApi(client);
   const reports = createTenantReportsApi(client);
 
   return {
@@ -72,6 +75,7 @@ export function createTenantApi(client: ApiClient) {
     hardware,
     notifications,
     posChannel,
+    profile,
     reports,
   };
 }
