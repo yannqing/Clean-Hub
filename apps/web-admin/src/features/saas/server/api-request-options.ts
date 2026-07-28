@@ -12,5 +12,6 @@ export async function getSaasServerApiRequestOptions(): Promise<
   return {
     cache: "no-store",
     headers: cookie ? { cookie } : undefined,
+    skipAuthRefresh: true,
   };
 }
