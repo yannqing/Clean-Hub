@@ -3,8 +3,11 @@
 import {
   Badge,
   Button,
+  Icon,
   Input,
-  Label,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
@@ -16,21 +19,26 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  cn,
 } from "@cleanhub/ui";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pagination } from "@/components/pagination";
-import { useTenantI18n } from "@/i18n";
 import {
-  getAuditEventDescription,
-  getAuditEventTypesByCategory,
-} from "@/features/audit/event-description";
+  ListFilter,
+  RefreshCw,
+  ScrollText,
+  SlidersHorizontal,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import { Pagination } from "@/components/pagination";
+import { webAdminRoutes } from "@/config/routes";
+import { getAuditEventDescription, getAuditEventTypesByCategory } from "@/features/audit/event-description";
+import { useTenantI18n } from "@/i18n";
 
 import {
-  getTenantAuditLogDetailQuery,
   getTenantAuditLogListQuery,
 } from "../queries";
 import type {
-  TenantAuditLogDetail,
   TenantAuditLogListFilters,
   TenantAuditLogSummary,
 } from "../types";
@@ -45,7 +53,6 @@ type CategoryFilter =
   | "tenant_notification"
   | "tenant_settings"
   | "tenant_backup";
-
 type SuccessFilter = "all" | "true" | "false";
 
 const categoryEntries = [
@@ -57,18 +64,9 @@ const categoryEntries = [
   { key: "notifications", value: "tenant_notification" },
   { key: "settings", value: "tenant_settings" },
   { key: "backups", value: "tenant_backup" },
-] as const satisfies {
-  key:
-    | "branches"
-    | "users"
-    | "services"
-    | "prices"
-    | "hardware"
-    | "notifications"
-    | "settings"
-    | "backups";
-  value: Exclude<CategoryFilter, "all">;
-}[];
+] as const;
+
+const TENANT_AUDIT_LOG_PAGE_SIZE = 10;
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -82,18 +80,19 @@ function toIsoEnd(value: string): string | undefined {
   return value ? new Date(`${value}T23:59:59.999`).toISOString() : undefined;
 }
 
-function formatJson(value: Record<string, unknown> | null, fallback: string): string {
-  return value ? JSON.stringify(value, null, 2) : fallback;
-}
-
-const TENANT_AUDIT_LOG_PAGE_SIZE = 50;
-
 function getStatusVariant(success: boolean): "default" | "destructive" {
   return success ? "default" : "destructive";
 }
 
-export function TenantAuditLogView() {
+export type TenantAuditLogViewProps = {
+  embedded?: boolean;
+};
+
+export function TenantAuditLogView({
+  embedded = false,
+}: TenantAuditLogViewProps = {}) {
   const { m, formatDateTime } = useTenantI18n();
+  const router = useRouter();
   const [logs, setLogs] = useState<TenantAuditLogSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -103,18 +102,9 @@ export function TenantAuditLogView() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [success, setSuccess] = useState<SuccessFilter>("all");
-  const [selectedLog, setSelectedLog] = useState<TenantAuditLogDetail | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [detailLoading, setDetailLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [detailError, setDetailError] = useState<string | null>(null);
-
-  // Resetting to page 1 whenever a filter changes; otherwise the offset would
-  // point past the filtered result set.
-  const resetFiltersAndOffset = useCallback(() => {
-    setOffset(0);
-    setLoading(true);
-  }, []);
 
   const filters = useMemo<TenantAuditLogListFilters>(
     () => ({
@@ -150,13 +140,9 @@ export function TenantAuditLogView() {
 
     getTenantAuditLogListQuery(filters)
       .then((result) => {
-        if (!isCurrent) {
-          return;
-        }
-
+        if (!isCurrent) return;
         setLogs(result.items);
         setTotal(result.total);
-        setError(null);
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
@@ -164,9 +150,7 @@ export function TenantAuditLogView() {
         }
       })
       .finally(() => {
-        if (isCurrent) {
-          setLoading(false);
-        }
+        if (isCurrent) setLoading(false);
       });
 
     return () => {
@@ -174,69 +158,73 @@ export function TenantAuditLogView() {
     };
   }, [filters, m.auditLogs.requestFailed]);
 
-  async function handleSelectLog(logId: string) {
-    setDetailLoading(true);
-    setDetailError(null);
-
-    try {
-      setSelectedLog(await getTenantAuditLogDetailQuery(logId));
-    } catch (selectError) {
-      setDetailError(getErrorMessage(selectError, m.auditLogs.requestFailed));
-    } finally {
-      setDetailLoading(false);
-    }
-  }
-
   const getCategoryLabel = useCallback(
     (value: string): string => {
       const entry = categoryEntries.find((option) => option.value === value);
-      return entry ? m.auditLogs.categoryLabels[entry.key] : value;
+      return entry
+        ? m.auditLogs.categoryLabels[entry.key]
+        : value;
     },
     [m.auditLogs.categoryLabels],
   );
 
-  // Cascading eventType options: when a category is picked, only its event
-  // types are offered. With "all" selected, every known event type is listed so
-  // operators can still pick a specific one without narrowing by category.
   const eventTypeOptions = useMemo(
-    () =>
-      getAuditEventTypesByCategory(
-        category === "all" ? undefined : category,
-      ),
+    () => getAuditEventTypesByCategory(category === "all" ? undefined : category),
     [category],
   );
 
-  const handleCategoryChange = useCallback((value: string) => {
-    setCategory(value as CategoryFilter);
+  function resetToFirstPage() {
+    setOffset(0);
+    setLoading(true);
+    setError(null);
+  }
+
+  function updateCategory(value: CategoryFilter) {
+    setCategory(value);
     setEventType("");
-    resetFiltersAndOffset();
-  }, [resetFiltersAndOffset]);
+    resetToFirstPage();
+  }
 
   return (
-    <section className="min-h-[560px]">
-      <div className="flex flex-col gap-4 border-b p-5 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <Badge variant="secondary">{m.auditLogs.eyebrow}</Badge>
-          <h1 className="mt-3 text-2xl font-semibold tracking-normal">
-            {m.auditLogs.title}
+    <section
+      className={cn("space-y-7 pb-8", embedded && "space-y-4 pb-0")}
+      data-testid="tenant-audit-log-view"
+    >
+      <header className="flex items-center justify-between gap-3">
+        {!embedded ? (
+          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+            <Icon aria-hidden icon={ScrollText} size={19} />
+            <span>{m.auditLogs.title}</span>
           </h1>
-        </div>
-
-        <Button onClick={loadLogs} type="button" variant="outline">
-          {m.common.refresh}
+        ) : null}
+        <Button
+          aria-label={m.common.refresh}
+          className="h-8 gap-1.5 px-2.5 text-xs"
+          disabled={loading}
+          onClick={() => void loadLogs()}
+          size="sm"
+          title={m.common.refresh}
+          type="button"
+          variant="outline"
+        >
+          <Icon aria-hidden icon={RefreshCw} size={14} />
+          <span>{m.common.refresh}</span>
         </Button>
-      </div>
+      </header>
 
-      <div className="grid gap-3 border-b p-5 lg:grid-cols-[180px_1fr_1fr_160px_160px_160px]">
-        <div className="grid gap-2">
-          <Label htmlFor="audit-category">{m.auditLogs.formLabels.category}</Label>
+      {error ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      ) : null}
+
+      <section className="min-w-0 border-y bg-background">
+        <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2.5">
           <Select
-            onValueChange={(value) => {
-              handleCategoryChange(value);
-            }}
+            onValueChange={(value) => updateCategory(value as CategoryFilter)}
             value={category}
           >
-            <SelectTrigger id="audit-category">
+            <SelectTrigger className="h-8 w-36 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -248,20 +236,15 @@ export function TenantAuditLogView() {
               ))}
             </SelectContent>
           </Select>
-        </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="audit-event-type">
-            {m.auditLogs.formLabels.eventType}
-          </Label>
           <Select
             onValueChange={(value) => {
-              resetFiltersAndOffset();
+              resetToFirstPage();
               setEventType(value === "all" ? "" : value);
             }}
             value={eventType || "all"}
           >
-            <SelectTrigger id="audit-event-type">
+            <SelectTrigger className="h-8 w-44 text-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -273,213 +256,197 @@ export function TenantAuditLogView() {
               ))}
             </SelectContent>
           </Select>
+
+          <Popover onOpenChange={setFiltersOpen} open={filtersOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                aria-label={m.auditLogs.formLabels.result}
+                className={cn(
+                  "h-8 gap-1.5 px-2.5 text-xs",
+                  (branchId || dateFrom || dateTo || success !== "all") &&
+                    "bg-accent",
+                )}
+                size="sm"
+                title={m.auditLogs.formLabels.result}
+                type="button"
+                variant="outline"
+              >
+                <Icon aria-hidden icon={SlidersHorizontal} size={14} />
+                <span>{m.auditLogs.formLabels.result}</span>
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-80 p-3">
+              <div className="grid gap-3">
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-medium" htmlFor="audit-branch-id">
+                    {m.auditLogs.formLabels.branchId}
+                  </label>
+                  <Input
+                    className="h-8 text-xs"
+                    id="audit-branch-id"
+                    onChange={(event) => {
+                      setBranchId(event.target.value);
+                      resetToFirstPage();
+                    }}
+                    value={branchId}
+                  />
+                </div>
+                <div className="grid gap-1.5">
+                  <label className="text-xs font-medium" htmlFor="audit-success">
+                    {m.auditLogs.formLabels.result}
+                  </label>
+                  <Select
+                    onValueChange={(value) => {
+                      setSuccess(value as SuccessFilter);
+                      resetToFirstPage();
+                    }}
+                    value={success}
+                  >
+                    <SelectTrigger className="h-8 text-xs" id="audit-success">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{m.auditLogs.allResults}</SelectItem>
+                      <SelectItem value="true">{m.auditLogs.successLabel}</SelectItem>
+                      <SelectItem value="false">{m.auditLogs.failedLabel}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="grid gap-1.5">
+                    <label className="text-xs font-medium" htmlFor="audit-date-from">
+                      {m.auditLogs.formLabels.from}
+                    </label>
+                    <Input
+                      className="h-8 text-xs"
+                      id="audit-date-from"
+                      onChange={(event) => {
+                        setDateFrom(event.target.value);
+                        resetToFirstPage();
+                      }}
+                      type="date"
+                      value={dateFrom}
+                    />
+                  </div>
+                  <div className="grid gap-1.5">
+                    <label className="text-xs font-medium" htmlFor="audit-date-to">
+                      {m.auditLogs.formLabels.to}
+                    </label>
+                    <Input
+                      className="h-8 text-xs"
+                      id="audit-date-to"
+                      onChange={(event) => {
+                        setDateTo(event.target.value);
+                        resetToFirstPage();
+                      }}
+                      type="date"
+                      value={dateTo}
+                    />
+                  </div>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <span className="ml-auto text-xs text-muted-foreground">
+            {total.toLocaleString()}
+          </span>
+          <Icon aria-hidden className="text-muted-foreground" icon={ListFilter} size={15} />
         </div>
 
-        <div className="grid gap-2">
-          <Label htmlFor="audit-branch-id">
-            {m.auditLogs.formLabels.branchId}
-          </Label>
-          <Input
-            id="audit-branch-id"
-            onChange={(event) => {
-              resetFiltersAndOffset();
-              setBranchId(event.target.value);
-            }}
-            value={branchId}
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="audit-success">{m.auditLogs.formLabels.result}</Label>
-          <Select
-            onValueChange={(value) => {
-              resetFiltersAndOffset();
-              setSuccess(value as SuccessFilter);
-            }}
-            value={success}
-          >
-            <SelectTrigger id="audit-success">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{m.auditLogs.allResults}</SelectItem>
-              <SelectItem value="true">{m.auditLogs.successLabel}</SelectItem>
-              <SelectItem value="false">{m.auditLogs.failedLabel}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="audit-date-from">{m.auditLogs.formLabels.from}</Label>
-          <Input
-            id="audit-date-from"
-            onChange={(event) => {
-              resetFiltersAndOffset();
-              setDateFrom(event.target.value);
-            }}
-            type="date"
-            value={dateFrom}
-          />
-        </div>
-
-        <div className="grid gap-2">
-          <Label htmlFor="audit-date-to">{m.auditLogs.formLabels.to}</Label>
-          <Input
-            id="audit-date-to"
-            onChange={(event) => {
-              resetFiltersAndOffset();
-              setDateTo(event.target.value);
-            }}
-            type="date"
-            value={dateTo}
-          />
-        </div>
-      </div>
-
-      <Pagination
-        currentPageCount={logs.length}
-        nextLabel={m.common.next}
-        offset={offset}
-        onOffsetChange={setOffset}
-        pageSize={TENANT_AUDIT_LOG_PAGE_SIZE}
-        previousLabel={m.common.previous}
-        total={total}
-      />
-
-      {loading ? (
-        <div className="grid gap-3 p-5">
-          {[0, 1, 2].map((item) => (
-            <div className="h-14 animate-pulse rounded-md bg-muted" key={item} />
-          ))}
-        </div>
-      ) : error ? (
-        <div className="p-5">
-          <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            {error}
+        {loading ? (
+          <div className="grid gap-2 p-3">
+            {[0, 1, 2, 3, 4].map((item) => (
+              <div className="h-10 animate-pulse rounded-md bg-muted" key={item} />
+            ))}
           </div>
-        </div>
-      ) : logs.length === 0 ? (
-        <div className="p-5">
-          <div className="rounded-md border border-dashed p-8 text-center">
-            <h2 className="text-base font-semibold">{m.auditLogs.empty}</h2>
-          </div>
-        </div>
-      ) : (
-        <div className="p-5">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{m.auditLogs.columns.time}</TableHead>
-                <TableHead>{m.auditLogs.columns.category}</TableHead>
-                <TableHead>{m.auditLogs.columns.event}</TableHead>
-                <TableHead>{m.auditLogs.columns.entity}</TableHead>
-                <TableHead>{m.auditLogs.columns.actor}</TableHead>
-                <TableHead>{m.auditLogs.columns.result}</TableHead>
-                <TableHead className="text-right">
-                  {m.auditLogs.columns.actions}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {logs.map((log) => (
-                <TableRow key={log.id}>
-                  <TableCell>{formatDateTime(log.createdAt)}</TableCell>
-                  <TableCell>{getCategoryLabel(log.eventCategory)}</TableCell>
-                  <TableCell>{getAuditEventDescription(log.eventType)}</TableCell>
-                  <TableCell>
-                    <div>
-                      {log.entityType ?? m.auditLogs.placeholders.unknownEntity}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {log.entityId ?? m.auditLogs.placeholders.noEntity}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      {log.actorDisplayName ??
-                        log.actorUserId ??
-                        m.auditLogs.placeholders.systemActor}
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {log.ipAddress ?? m.auditLogs.placeholders.noIp}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusVariant(log.success)}>
-                      {log.success
-                        ? m.auditLogs.successLabel
-                        : m.auditLogs.failedLabel}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      disabled={detailLoading}
-                      onClick={() => void handleSelectLog(log.id)}
-                      size="sm"
-                      type="button"
-                      variant="outline"
-                    >
-                      {m.common.details}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      <div className="border-t p-5">
-        <h2 className="text-base font-semibold">{m.auditLogs.selectedDetail}</h2>
-        {detailError ? (
-          <div className="mt-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
-            {detailError}
-          </div>
-        ) : selectedLog ? (
-          <div className="mt-3 grid gap-4 lg:grid-cols-3">
-            <div className="rounded-md border p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.auditLogs.detailLabels.event}
-              </p>
-              <p className="mt-2 font-medium">
-                {getAuditEventDescription(selectedLog.eventType)}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {selectedLog.eventCategory}
-              </p>
+        ) : logs.length === 0 ? (
+          <div className="p-3">
+            <div className="rounded-md border border-dashed px-4 py-10 text-center">
+              <h2 className="text-sm font-semibold">{m.auditLogs.empty}</h2>
             </div>
-            <div className="rounded-md border p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.auditLogs.detailLabels.branch}
-              </p>
-              <p className="mt-2 font-medium">
-                {selectedLog.branchId ?? m.auditLogs.detailLabels.tenantScope}
-              </p>
-            </div>
-            <div className="rounded-md border p-4">
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {m.auditLogs.detailLabels.userAgent}
-              </p>
-              <p className="mt-2 truncate text-sm">
-                {selectedLog.userAgent ?? m.auditLogs.detailLabels.notCaptured}
-              </p>
-            </div>
-            <pre className="max-h-80 overflow-auto rounded-md border bg-muted/40 p-4 text-xs lg:col-span-1">
-              {formatJson(selectedLog.before, m.auditLogs.detailLabels.noJson)}
-            </pre>
-            <pre className="max-h-80 overflow-auto rounded-md border bg-muted/40 p-4 text-xs lg:col-span-1">
-              {formatJson(selectedLog.after, m.auditLogs.detailLabels.noJson)}
-            </pre>
-            <pre className="max-h-80 overflow-auto rounded-md border bg-muted/40 p-4 text-xs lg:col-span-1">
-              {formatJson(selectedLog.metadata, m.auditLogs.detailLabels.noJson)}
-            </pre>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-muted-foreground">
-            {m.auditLogs.selectLogHint}
-          </p>
+          <div className="overflow-x-auto">
+            <Table className="text-xs [&_td]:px-1.5 [&_td]:py-1.5 [&_th]:h-8 [&_th]:px-1.5">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{m.auditLogs.columns.time}</TableHead>
+                  <TableHead>{m.auditLogs.columns.category}</TableHead>
+                  <TableHead>{m.auditLogs.columns.event}</TableHead>
+                  <TableHead>{m.auditLogs.columns.entity}</TableHead>
+                  <TableHead>{m.auditLogs.columns.actor}</TableHead>
+                  <TableHead>{m.auditLogs.columns.result}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {logs.map((log) => (
+                  <TableRow
+                    className="cursor-pointer hover:bg-muted/40"
+                    key={log.id}
+                    onClick={() =>
+                      router.push(webAdminRoutes.tenant.system.auditLog(log.id))
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        router.push(webAdminRoutes.tenant.system.auditLog(log.id));
+                      }
+                    }}
+                    onMouseEnter={() =>
+                      router.prefetch(webAdminRoutes.tenant.system.auditLog(log.id))
+                    }
+                    role="link"
+                    tabIndex={0}
+                  >
+                    <TableCell>{formatDateTime(log.createdAt)}</TableCell>
+                    <TableCell>{getCategoryLabel(log.eventCategory)}</TableCell>
+                    <TableCell>{getAuditEventDescription(log.eventType)}</TableCell>
+                    <TableCell>
+                      <div>{log.entityType ?? m.auditLogs.placeholders.unknownEntity}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {log.entityId ?? m.auditLogs.placeholders.noEntity}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        {log.actorDisplayName ??
+                          log.actorUserId ??
+                          m.auditLogs.placeholders.systemActor}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {log.ipAddress ?? m.auditLogs.placeholders.noIp}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusVariant(log.success)}>
+                        {log.success
+                          ? m.auditLogs.successLabel
+                        : m.auditLogs.failedLabel}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
-      </div>
+
+        <Pagination
+          currentPageCount={logs.length}
+          nextLabel={m.common.next}
+          offset={offset}
+          onOffsetChange={(nextOffset) => {
+            setLoading(true);
+            setError(null);
+            setOffset(nextOffset);
+          }}
+          pageSize={TENANT_AUDIT_LOG_PAGE_SIZE}
+          previousLabel={m.common.previous}
+          total={total}
+        />
+      </section>
+
     </section>
   );
 }

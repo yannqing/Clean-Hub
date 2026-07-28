@@ -15,7 +15,7 @@ export const listTenantAuditLogsQuerySchema = z.object({
     .optional(),
   dateFrom: z.string().datetime({ offset: true }).optional(),
   dateTo: z.string().datetime({ offset: true }).optional(),
-  limit: z.coerce.number().int().positive().max(100).default(50),
+  limit: z.coerce.number().int().positive().max(100).default(10),
   offset: z.coerce.number().int().min(0).default(0),
 });
 

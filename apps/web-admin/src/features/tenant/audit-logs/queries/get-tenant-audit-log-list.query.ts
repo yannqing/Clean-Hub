@@ -11,7 +11,7 @@ export async function getTenantAuditLogListQuery(
   return apiClient<TenantAuditLogListResult>("/tenant/audit-logs", {
     query: {
       ...filters,
-      limit: filters.limit ?? 50,
+      limit: filters.limit ?? 10,
       offset: filters.offset ?? 0,
     },
   });
