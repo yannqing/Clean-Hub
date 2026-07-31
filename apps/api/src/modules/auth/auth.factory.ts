@@ -2,35 +2,22 @@ import { getDb, type Database } from "@cleanhub/db";
 
 import { AuthError } from "./auth.errors.js";
 import { AuthService } from "./auth.service.js";
+import { resolveAuthCookieSecure } from "./cookie.service.js";
 
 export type CreateAuthServiceFromEnvOptions = {
   db?: Database;
   env?: NodeJS.ProcessEnv;
 };
 
-function readOptionalPositiveInteger(value: string | undefined): number | undefined {
+function readOptionalPositiveInteger(
+  value: string | undefined,
+): number | undefined {
   if (!value) {
     return undefined;
   }
 
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
-}
-
-function readOptionalBoolean(value: string | undefined): boolean | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  if (["1", "true", "yes"].includes(value.toLowerCase())) {
-    return true;
-  }
-
-  if (["0", "false", "no"].includes(value.toLowerCase())) {
-    return false;
-  }
-
-  return undefined;
 }
 
 export function createAuthServiceFromEnv({
@@ -49,7 +36,7 @@ export function createAuthServiceFromEnv({
   return new AuthService({
     db,
     accessTokenSecret,
-    cookieSecure: readOptionalBoolean(env.AUTH_COOKIE_SECURE),
+    cookieSecure: resolveAuthCookieSecure(env),
     accessTokenTtlSeconds: readOptionalPositiveInteger(
       env.AUTH_ACCESS_TOKEN_TTL_SECONDS,
     ),

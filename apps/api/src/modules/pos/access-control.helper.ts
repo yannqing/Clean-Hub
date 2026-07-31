@@ -6,6 +6,14 @@ import { assertPosContext } from "../auth/permission.helper.js";
 
 export type PosRole = Extract<AdminRole, "owner" | "manager" | "cashier">;
 
+export type PosTerminalContext = {
+  tenantId: string;
+  terminalId: string;
+  branchId: string;
+  deviceId: string;
+  credentialVersion: number;
+};
+
 export type PosSensitiveOperation =
   | "cancel"
   | "delete"
@@ -50,6 +58,38 @@ export function requirePosRole(
   if (!allowedRoles.includes(authContext.role as PosRole)) {
     forbidden("User does not have enough permission for this POS operation.");
   }
+}
+
+export function requirePosTerminalContext(
+  authContext: AuthContext,
+): PosTerminalContext {
+  const tenantId = requirePosTenantId(authContext);
+  const terminalId = authContext.terminalId;
+  const branchId = authContext.terminalBranchId;
+  const deviceId = authContext.terminalDeviceId;
+  const credentialVersion = authContext.terminalCredentialVersion;
+
+  if (
+    !terminalId ||
+    !branchId ||
+    !deviceId ||
+    typeof credentialVersion !== "number"
+  ) {
+    throw new AuthError(
+      "POS_TERMINAL_ENROLLMENT_REQUIRED",
+      "An enrolled POS terminal session is required for POS operations.",
+    );
+  }
+
+  requirePosBranchAccess(authContext, branchId);
+
+  return {
+    tenantId,
+    terminalId,
+    branchId,
+    deviceId,
+    credentialVersion,
+  };
 }
 
 /**

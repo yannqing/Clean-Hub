@@ -1,6 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
 import { AuthError } from "./auth.errors.js";
+import { resolveAuthCookieSecure } from "./cookie.service.js";
 import { generateOpaqueToken } from "./token.service.js";
 
 export const POS_TERMINAL_CREDENTIAL_COOKIE_NAME =
@@ -28,9 +29,7 @@ export function terminalCredentialMatches(
   const actual = Buffer.from(hashTerminalCredential(credential));
   const expected = Buffer.from(expectedDigest);
 
-  return (
-    actual.length === expected.length && timingSafeEqual(actual, expected)
-  );
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
 export function assertEnrolledTerminalCredential(
@@ -94,9 +93,18 @@ export function createTerminalCredentialCookieHeader(
     `Max-Age=${options.maxAgeSeconds ?? 365 * 24 * 60 * 60}`,
   ];
 
-  if (options.secure ?? process.env.NODE_ENV === "production") {
+  if (options.secure ?? resolveAuthCookieSecure()) {
     parts.push("Secure");
   }
 
   return parts.join("; ");
+}
+
+export function createClearTerminalCredentialCookieHeader(
+  options: { secure?: boolean } = {},
+): string {
+  return createTerminalCredentialCookieHeader("", {
+    secure: options.secure,
+    maxAgeSeconds: 0,
+  });
 }

@@ -1,5 +1,5 @@
 import { createId } from "@cleanhub/id";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { authLoginLockouts, type Database } from "@cleanhub/db";
 
@@ -47,73 +47,68 @@ export async function recordLoginFailure(
   lockKey: string,
   policy: EffectiveSecurityPolicy,
 ): Promise<void> {
-  const rows = await db
-    .select({
-      id: authLoginLockouts.id,
-      failedAttempts: authLoginLockouts.failedAttempts,
-      lockedUntil: authLoginLockouts.lockedUntil,
-    })
-    .from(authLoginLockouts)
-    .where(eq(authLoginLockouts.lockKey, lockKey))
-    .limit(1);
-
-  const existing = rows[0];
   const now = new Date();
-
-  if (existing?.lockedUntil && existing.lockedUntil.getTime() > now.getTime()) {
-    throw accountLockedError(existing.lockedUntil);
-  }
-
-  const lockExpired =
-    existing?.lockedUntil !== null &&
-    existing?.lockedUntil !== undefined &&
-    existing.lockedUntil.getTime() <= now.getTime();
-  const failedAttempts = (lockExpired ? 0 : (existing?.failedAttempts ?? 0)) + 1;
-
-  if (failedAttempts >= policy.loginMaxAttempts) {
-    const lockedUntil = new Date(
-      now.getTime() + policy.lockoutMinutes * 60 * 1000,
-    );
-
-    if (existing) {
-      await db
-        .update(authLoginLockouts)
-        .set({
-          failedAttempts: 0,
-          lockedUntil,
-          updatedAt: now,
-        })
-        .where(eq(authLoginLockouts.id, existing.id));
-    } else {
-      await db.insert(authLoginLockouts).values({
-        id: createId(),
-        lockKey,
-        failedAttempts: 0,
-        lockedUntil,
-        updatedAt: now,
-      });
-    }
-
-    throw accountLockedError(lockedUntil);
-  }
-
-  if (existing) {
-    await db
-      .update(authLoginLockouts)
-      .set({
-        failedAttempts,
-        lockedUntil: null,
-        updatedAt: now,
-      })
-      .where(eq(authLoginLockouts.id, existing.id));
-  } else {
-    await db.insert(authLoginLockouts).values({
+  const lockedUntil = new Date(
+    now.getTime() + policy.lockoutMinutes * 60 * 1000,
+  );
+  const failureWindowStart = new Date(
+    now.getTime() - policy.lockoutMinutes * 60 * 1000,
+  );
+  const currentlyLocked = sql<boolean>`
+    ${authLoginLockouts.lockedUntil} is not null
+    and ${authLoginLockouts.lockedUntil} > ${now}
+  `;
+  const nextFailureCount = sql<number>`
+    case
+      when ${authLoginLockouts.lockedUntil} is not null
+        or ${authLoginLockouts.updatedAt} <= ${failureWindowStart}
+      then 1
+      else ${authLoginLockouts.failedAttempts} + 1
+    end
+  `;
+  const firstFailureLocks = policy.loginMaxAttempts <= 1;
+  const rows = await db
+    .insert(authLoginLockouts)
+    .values({
       id: createId(),
       lockKey,
-      failedAttempts,
-      lockedUntil: null,
+      failedAttempts: firstFailureLocks ? 0 : 1,
+      lockedUntil: firstFailureLocks ? lockedUntil : null,
       updatedAt: now,
+    })
+    .onConflictDoUpdate({
+      target: authLoginLockouts.lockKey,
+      set: {
+        failedAttempts: sql<number>`
+          case
+            when ${currentlyLocked} then ${authLoginLockouts.failedAttempts}
+            when ${nextFailureCount} >= ${policy.loginMaxAttempts} then 0
+            else ${nextFailureCount}
+          end
+        `,
+        lockedUntil: sql<Date | null>`
+          case
+            when ${currentlyLocked} then ${authLoginLockouts.lockedUntil}
+            when ${nextFailureCount} >= ${policy.loginMaxAttempts}
+              then ${lockedUntil}
+            else null
+          end
+        `,
+        updatedAt: sql<Date>`
+          case
+            when ${currentlyLocked} then ${authLoginLockouts.updatedAt}
+            else ${now}
+          end
+        `,
+      },
+    })
+    .returning({
+      lockedUntil: authLoginLockouts.lockedUntil,
     });
+
+  const effectiveLockedUntil = rows[0]?.lockedUntil;
+  if (effectiveLockedUntil && effectiveLockedUntil.getTime() > now.getTime()) {
+    throw accountLockedError(effectiveLockedUntil);
   }
 }
 

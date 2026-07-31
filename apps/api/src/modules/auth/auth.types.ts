@@ -21,8 +21,49 @@ export type LoginInput = AuthRequestMeta & {
 
 export type PosPinLoginInput = AuthRequestMeta & {
   pin: string;
-  tenantCode: string;
   deviceId: string;
+  terminalCredential?: string;
+};
+
+export type PosBootstrapStatus =
+  | "unconfigured"
+  | "admin_setup_required"
+  | "enrolled"
+  | "disabled"
+  | "credential_lost"
+  | "ready_for_pin";
+
+export type PosBootstrapTerminal = {
+  id: string;
+  label: string | null;
+  status: "active" | "inactive";
+  branchId: string;
+};
+
+export type PosBootstrapTenant = {
+  id: string;
+  name: string;
+  code: string;
+};
+
+export type PosBootstrapBranch = {
+  id: string;
+  name: string;
+};
+
+export type PosBootstrapState = {
+  status: PosBootstrapStatus;
+  deviceId: string;
+  requiresAdminLogin: boolean;
+  canEnroll: boolean;
+  terminal: PosBootstrapTerminal | null;
+  tenant: PosBootstrapTenant | null;
+  branch: PosBootstrapBranch | null;
+};
+
+export type PosBootstrapInput = {
+  deviceId: string;
+  accessToken?: string;
   terminalCredential?: string;
 };
 
@@ -47,6 +88,7 @@ export type AuthContext = {
   terminalId?: string;
   terminalBranchId?: string;
   terminalDeviceId?: string;
+  terminalCredentialVersion?: number;
   accessTokenExpiresAt: string;
 };
 

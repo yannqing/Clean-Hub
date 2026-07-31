@@ -25,6 +25,7 @@ export const updateTerminalSettingsBodySchema = z
     printCopies: z.coerce.number().int().min(1).max(10).optional(),
     lockTimeoutSeconds: z.coerce.number().int().min(30).max(86400).optional(),
   })
+  .strict()
   .refine(
     (value) => Object.keys(value).length > 0,
     "At least one setting field must be provided.",

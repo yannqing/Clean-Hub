@@ -16,6 +16,7 @@ import {
   findActiveBranchCurrency,
   findOpenShift,
   findOpenShiftForUpdate,
+  findPosTerminalForShiftUpdate,
   findStaffForBranch,
   findZReport,
   listZReports,
@@ -149,6 +150,35 @@ export async function clockAction(
 
   return db.transaction(async (tx) => {
     if (input.data.action === "clock_in") {
+      // Serialize shift creation with terminal disable/rebind/revocation.
+      // Without this lock, a request authenticated just before an administrator
+      // disables the terminal could create a new open shift after the lifecycle
+      // check had already completed.
+      const lockedTerminal = await findPosTerminalForShiftUpdate(tx, {
+        tenantId,
+        terminalId: terminal.terminalId,
+      });
+      if (
+        !lockedTerminal ||
+        lockedTerminal.status !== "active" ||
+        !lockedTerminal.credentialDigest ||
+        lockedTerminal.branchId !== terminal.branchId
+      ) {
+        throw new AuthError(
+          "POS_TERMINAL_DISABLED",
+          "The POS terminal session is no longer active.",
+        );
+      }
+      if (
+        lockedTerminal.credentialVersion !==
+        input.authContext.terminalCredentialVersion
+      ) {
+        throw new AuthError(
+          "POS_TERMINAL_CREDENTIAL_INVALID",
+          "The POS terminal credential changed. Sign in with a staff PIN again.",
+        );
+      }
+
       const existing = await findOpenShift(tx, {
         tenantId,
         staffId: input.authContext.userId,

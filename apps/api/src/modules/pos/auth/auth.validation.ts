@@ -27,6 +27,10 @@ export const rotatePosDeviceCredentialBodySchema = z.object({
   reason: reasonSchema,
 });
 
+export const revokePosDeviceBodySchema = z.object({
+  reason: reasonSchema,
+});
+
 export const setTerminalLockBodySchema = z.object({
   lockState: z.enum(["locked", "unlocked"]),
   reason: reasonSchema,

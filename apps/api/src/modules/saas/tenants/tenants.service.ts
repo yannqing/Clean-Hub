@@ -9,6 +9,11 @@ import {
   type SaasRole,
 } from "../../auth/permission.helper.js";
 import {
+  invalidateLockedPosTerminalsForTenantStatusChange,
+  lockPosTerminalsForTenantStatusChange,
+  securityForceClosePosTerminalShifts,
+} from "../../pos/terminal-lifecycle/terminal-lifecycle.repository.js";
+import {
   createTenantOwnerUser,
   TenantOwnerUserHelperError,
 } from "./tenant-owner-user.helper.js";
@@ -498,6 +503,11 @@ export async function updateSaasTenantStatus(
       );
     }
 
+    // POS security transitions use one terminal-first lock order. This
+    // serializes tenant suspension/activation with terminal logins, refresh,
+    // and shift clock-in without permanently disabling enrolled devices.
+    await lockPosTerminalsForTenantStatusChange(tx, input.tenantId);
+
     const tenant = await updateSaasTenantStatusRecord(tx, {
       tenantId: input.tenantId,
       status: input.data.status,
@@ -510,6 +520,36 @@ export async function updateSaasTenantStatus(
         404,
       );
     }
+
+    // The tenant row is now write-locked. Catch a terminal enrollment that
+    // committed after the initial terminal scan but before this status update
+    // acquired the tenant row lock.
+    const finalLockedTerminals =
+      await lockPosTerminalsForTenantStatusChange(tx, input.tenantId);
+
+    if (input.data.status !== "active") {
+      await securityForceClosePosTerminalShifts(tx, {
+        tenantId: input.tenantId,
+        terminalIds: finalLockedTerminals.map((terminal) => terminal.id),
+        actorUserId: input.authContext.userId,
+        reason: input.data.reason,
+        metadata: {
+          securityTrigger: "tenant_status_change",
+          tenantStatus: input.data.status,
+        },
+        requestMeta: input.requestMeta,
+      });
+    }
+
+    await invalidateLockedPosTerminalsForTenantStatusChange(tx, {
+      tenantId: input.tenantId,
+      previousTenantStatus: before.status,
+      tenantStatus: input.data.status,
+      actorUserId: input.authContext.userId,
+      reason: input.data.reason,
+      terminals: finalLockedTerminals,
+      requestMeta: input.requestMeta,
+    });
 
     if (input.data.status !== "active") {
       await revokeTenantRefreshTokens(tx, input.tenantId);

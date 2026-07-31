@@ -9,6 +9,11 @@ import {
   assertActiveTenant,
   requireTenantRole,
 } from "../../auth/permission.helper.js";
+import {
+  invalidateLockedPosTerminalsForBranchStatusChange,
+  lockPosTerminalsForBranchStatusChange,
+  securityForceClosePosTerminalShifts,
+} from "../../pos/terminal-lifecycle/terminal-lifecycle.repository.js";
 import { TenantBranchesError } from "./branches.errors.js";
 import {
   createBranchRecord,
@@ -195,6 +200,19 @@ export async function updateTenantBranchStatus(
       tenantId,
       branchId,
     });
+    const statusChanged = before.status !== input.data.status;
+
+    // Lock terminals before the branch UPDATE. POS clock-in also starts by
+    // locking its terminal, so this preserves one lock order and guarantees
+    // that any shift created by an in-flight request is visible to (and closed
+    // by) the branch-disable lifecycle below.
+    if (statusChanged) {
+      await lockPosTerminalsForBranchStatusChange(tx, {
+        tenantId,
+        branchId,
+      });
+    }
+
     const branch = await updateBranchStatusRecord(tx, {
       tenantId,
       branchId,
@@ -209,6 +227,41 @@ export async function updateTenantBranchStatus(
         "Branch was not found.",
         404,
       );
+    }
+
+    if (statusChanged) {
+      // The branch row is now write-locked. Re-read the terminal set to catch
+      // a new enrollment or inbound rebind that committed after the first
+      // terminal scan but before the branch UPDATE acquired its row lock.
+      const finalLockedTerminals =
+        await lockPosTerminalsForBranchStatusChange(tx, {
+          tenantId,
+          branchId,
+        });
+
+      if (input.data.status === "inactive") {
+        await securityForceClosePosTerminalShifts(tx, {
+          tenantId,
+          terminalIds: finalLockedTerminals.map((terminal) => terminal.id),
+          actorUserId: input.authContext.userId,
+          reason: "The branch was disabled.",
+          metadata: {
+            securityTrigger: "branch_status_change",
+            branchId,
+            branchStatus: input.data.status,
+          },
+          requestMeta: input.requestMeta,
+        });
+      }
+
+      await invalidateLockedPosTerminalsForBranchStatusChange(tx, {
+        tenantId,
+        branchId,
+        branchStatus: input.data.status,
+        actorUserId: input.authContext.userId,
+        terminals: finalLockedTerminals,
+        requestMeta: input.requestMeta,
+      });
     }
 
     await writeBranchStatusChangedAuditLog(tx, {

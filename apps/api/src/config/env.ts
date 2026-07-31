@@ -7,6 +7,7 @@ config({ path: resolve(process.cwd(), "../../.env") });
 export type ApiEnv = {
   port: number;
   corsOrigins: string[];
+  corsEnforceSameOrigin: boolean;
   nodeEnv: string;
 };
 
@@ -30,10 +31,28 @@ function readCorsOrigins(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
+function readBoolean(
+  value: string | undefined,
+  fallback: boolean,
+  name: string,
+): boolean {
+  if (value === undefined || value.trim() === "") return fallback;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  throw new Error(`${name} must be either "true" or "false".`);
+}
+
 export function loadApiEnv(env: NodeJS.ProcessEnv = process.env): ApiEnv {
+  const nodeEnv = env.NODE_ENV ?? "development";
   return {
     port: readPort(env.PORT),
     corsOrigins: readCorsOrigins(env.CORS_ORIGINS),
-    nodeEnv: env.NODE_ENV ?? "development",
+    corsEnforceSameOrigin: readBoolean(
+      env.CORS_ENFORCE_SAME_ORIGIN,
+      nodeEnv === "production",
+      "CORS_ENFORCE_SAME_ORIGIN",
+    ),
+    nodeEnv,
   };
 }

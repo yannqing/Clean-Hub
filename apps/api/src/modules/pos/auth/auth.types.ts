@@ -1,7 +1,4 @@
-import type {
-  AuthContext,
-  AuthRequestMeta,
-} from "../../auth/auth.types.js";
+import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 
 export type PosDeviceStatus = "active" | "inactive";
 
@@ -37,6 +34,10 @@ export type RotatePosDeviceCredentialRequest = {
   reason: string;
 };
 
+export type RevokePosDeviceRequest = {
+  reason: string;
+};
+
 export type PosTerminalLockState = "locked" | "unlocked";
 
 export type PosTerminalState = {
@@ -59,6 +60,7 @@ export type PosDeviceMutationResult = {
 export type PosDeviceMutationInput<TData> = {
   authContext: AuthContext;
   requestMeta?: AuthRequestMeta;
+  cookieSecure?: boolean;
   data: TData;
 };
 
@@ -71,6 +73,11 @@ export type UpdatePosDeviceInput =
 
 export type RotatePosDeviceCredentialInput =
   PosDeviceMutationInput<RotatePosDeviceCredentialRequest> & {
+    deviceId: string;
+  };
+
+export type RevokePosDeviceInput =
+  PosDeviceMutationInput<RevokePosDeviceRequest> & {
     deviceId: string;
   };
 

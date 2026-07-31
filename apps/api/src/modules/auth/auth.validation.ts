@@ -8,9 +8,13 @@ export const loginRequestSchema = z.object({
 
 export const posPinLoginRequestSchema = z.object({
   pin: z.string().regex(/^\d{4,8}$/),
-  tenantCode: z.string().trim().min(1),
   deviceId: z.string().trim().min(1),
+});
+
+export const posBootstrapRequestSchema = z.object({
+  deviceId: z.string().trim().min(1).max(128),
 });
 
 export type LoginRequestBody = z.infer<typeof loginRequestSchema>;
 export type PosPinLoginRequestBody = z.infer<typeof posPinLoginRequestSchema>;
+export type PosBootstrapRequestBody = z.infer<typeof posBootstrapRequestSchema>;

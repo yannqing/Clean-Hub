@@ -6,12 +6,10 @@ import type { AppBindings } from "../../http/types.js";
 import type { AuthService } from "./auth.service.js";
 import {
   loginRequestSchema,
+  posBootstrapRequestSchema,
   posPinLoginRequestSchema,
 } from "./auth.validation.js";
-import {
-  ACCESS_COOKIE_NAME,
-  REFRESH_COOKIE_NAME,
-} from "./cookie.service.js";
+import { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME } from "./cookie.service.js";
 import { POS_TERMINAL_CREDENTIAL_COOKIE_NAME } from "./pos-terminal-credential.js";
 
 export type AuthControllerOptions = {
@@ -35,16 +33,23 @@ export function createAuthController({ authService }: AuthControllerOptions) {
       });
     },
 
+    posBootstrap: async (c: import("hono").Context<AppBindings>) => {
+      const body = posBootstrapRequestSchema.parse(await c.req.json());
+      const state = await authService.getPosBootstrapState({
+        deviceId: body.deviceId,
+        accessToken: getCookie(c, ACCESS_COOKIE_NAME),
+        terminalCredential: getCookie(c, POS_TERMINAL_CREDENTIAL_COOKIE_NAME),
+      });
+
+      return c.json(state);
+    },
+
     posPinLogin: async (c: import("hono").Context<AppBindings>) => {
       const body = posPinLoginRequestSchema.parse(await c.req.json());
       const result = await authService.loginWithPosPin({
         pin: body.pin,
-        tenantCode: body.tenantCode,
         deviceId: body.deviceId,
-        terminalCredential: getCookie(
-          c,
-          POS_TERMINAL_CREDENTIAL_COOKIE_NAME,
-        ),
+        terminalCredential: getCookie(c, POS_TERMINAL_CREDENTIAL_COOKIE_NAME),
         ...getRequestMeta(c, body.deviceId),
       });
 
@@ -60,10 +65,7 @@ export function createAuthController({ authService }: AuthControllerOptions) {
 
       const result = await authService.refresh({
         refreshToken: refreshToken ?? "",
-        terminalCredential: getCookie(
-          c,
-          POS_TERMINAL_CREDENTIAL_COOKIE_NAME,
-        ),
+        terminalCredential: getCookie(c, POS_TERMINAL_CREDENTIAL_COOKIE_NAME),
         ...getRequestMeta(c),
       });
 

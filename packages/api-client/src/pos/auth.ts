@@ -3,6 +3,7 @@ import type {
   BindPosDeviceRequest,
   PosDevice,
   PosTerminalState,
+  RevokePosDeviceRequest,
   RotatePosDeviceCredentialRequest,
   SetTerminalLockRequest,
   UpdatePosDeviceRequest,
@@ -28,6 +29,8 @@ export function createPosTerminalAuthApi(client: ApiClient) {
         `/pos/auth/devices/${deviceId}/credential-rotation`,
         input,
       ),
+    revokeDevice: (deviceId: string, input: RevokePosDeviceRequest) =>
+      client.post<PosDevice>(`/pos/auth/devices/${deviceId}/revocation`, input),
     getTerminalState: (deviceId: string) =>
       client.get<PosTerminalState>(`/pos/auth/terminals/${deviceId}`),
     setTerminalLock: (deviceId: string, input: SetTerminalLockRequest) =>

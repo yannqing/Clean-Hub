@@ -19,6 +19,7 @@ import {
   posPaymentAdjustments,
   posShiftHandovers,
   posStaffShifts,
+  posTerminalSettings,
   posZReports,
   roles,
   serviceTickets,
@@ -284,6 +285,37 @@ export async function findOpenShift(
     )
     .limit(1);
   return rows[0] ? toShift(rows[0]) : null;
+}
+
+export async function findPosTerminalForShiftUpdate(
+  db: Database,
+  input: { tenantId: string; terminalId: string },
+): Promise<{
+  id: string;
+  branchId: string;
+  status: "active" | "inactive";
+  credentialDigest: string | null;
+  credentialVersion: number;
+} | null> {
+  const rows = await db
+    .select({
+      id: posTerminalSettings.id,
+      branchId: posTerminalSettings.branchId,
+      status: posTerminalSettings.status,
+      credentialDigest: posTerminalSettings.credentialDigest,
+      credentialVersion: posTerminalSettings.credentialVersion,
+    })
+    .from(posTerminalSettings)
+    .where(
+      and(
+        eq(posTerminalSettings.id, input.terminalId),
+        eq(posTerminalSettings.tenantId, input.tenantId),
+      ),
+    )
+    .for("update")
+    .limit(1);
+
+  return rows[0] ?? null;
 }
 
 export async function findOpenShiftForUpdate(

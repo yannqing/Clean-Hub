@@ -2,7 +2,6 @@ import { Hono } from "hono";
 
 import type { AppBindings } from "../../../http/types.js";
 import {
-  createTerminalSettingsController,
   getTerminalSettingsController,
   heartbeatTerminalController,
   updateTerminalSettingsController,
@@ -17,7 +16,6 @@ export function createPosTerminalSettingsRoutes() {
   const routes = new Hono<AppBindings>();
 
   routes.get("/", getTerminalSettingsController);
-  routes.post("/", createTerminalSettingsController);
   routes.patch("/", updateTerminalSettingsController);
   routes.post("/heartbeat", heartbeatTerminalController);
 

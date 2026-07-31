@@ -5,20 +5,31 @@ import {
   bindPosDeviceController,
   getPosDeviceController,
   getTerminalStateController,
+  revokePosDeviceController,
   rotatePosDeviceCredentialController,
   setTerminalLockController,
   updatePosDeviceController,
 } from "./auth.controller.js";
 
-export function createPosAuthRoutes() {
+export type CreatePosAuthRoutesOptions = {
+  terminalCredentialCookieSecure?: boolean;
+};
+
+export function createPosAuthRoutes({
+  terminalCredentialCookieSecure,
+}: CreatePosAuthRoutesOptions = {}) {
   const routes = new Hono<AppBindings>();
 
-  routes.post("/devices", bindPosDeviceController);
+  routes.post("/devices", (c) =>
+    bindPosDeviceController(c, terminalCredentialCookieSecure),
+  );
   routes.get("/devices/:deviceId", getPosDeviceController);
   routes.patch("/devices/:deviceId", updatePosDeviceController);
-  routes.post(
-    "/devices/:deviceId/credential-rotation",
-    rotatePosDeviceCredentialController,
+  routes.post("/devices/:deviceId/credential-rotation", (c) =>
+    rotatePosDeviceCredentialController(c, terminalCredentialCookieSecure),
+  );
+  routes.post("/devices/:deviceId/revocation", (c) =>
+    revokePosDeviceController(c, terminalCredentialCookieSecure),
   );
   routes.get("/terminals/:deviceId", getTerminalStateController);
   routes.patch("/terminals/:deviceId/lock", setTerminalLockController);

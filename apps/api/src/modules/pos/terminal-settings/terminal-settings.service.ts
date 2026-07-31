@@ -6,13 +6,15 @@ import {
   requirePosBranchId,
 } from "../../auth/permission.helper.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { requirePosTerminalContext } from "../access-control.helper.js";
 import { PosTerminalSettingsError } from "./terminal-settings.errors.js";
 import {
+  findAuthenticatedTerminalSettings,
   findTerminalSettingsByTenantAndDevice,
   findTenantPosTerminalDefaults,
   insertTerminalSettings,
+  updateAuthenticatedTerminalLastSeen,
   updateTerminalHeartbeat,
-  updateTerminalLastSeen,
   updateTerminalSettingsRecord,
 } from "./terminal-settings.repository.js";
 import type {
@@ -28,35 +30,26 @@ function requirePosTenantId(authContext: AuthContext): string {
 }
 
 // ---------------------------------------------------------------------------
-// GET /pos/terminal-settings?deviceId=...
+// GET /pos/terminal-settings
 // ---------------------------------------------------------------------------
 
 export async function getPosTerminalSettings(
   authContext: AuthContext,
-  deviceId: string,
   db: Database = getDb(),
 ): Promise<PosTerminalSettingsSummary> {
-  const tenantId = requirePosTenantId(authContext);
-
-  const settings = await findTerminalSettingsByTenantAndDevice(
-    db,
-    tenantId,
-    deviceId,
-  );
+  const terminal = requirePosTerminalContext(authContext);
+  const settings = await findAuthenticatedTerminalSettings(db, terminal);
 
   if (!settings) {
     throw new PosTerminalSettingsError(
       "TERMINAL_SETTINGS_NOT_FOUND",
-      "Terminal settings not found for this device.",
+      "Active settings were not found for the authenticated terminal.",
       404,
     );
   }
 
-  // Verify branch access for non-owner roles.
-  await requirePosBranchId(authContext, settings.branchId, db);
-
   // Update lastSeenAt on every read (fire-and-forget).
-  void updateTerminalLastSeen(db, tenantId, deviceId).catch(() => {
+  void updateAuthenticatedTerminalLastSeen(db, terminal).catch(() => {
     /* ignore */
   });
 
@@ -64,7 +57,8 @@ export async function getPosTerminalSettings(
 }
 
 // ---------------------------------------------------------------------------
-// POST /pos/terminal-settings
+// Internal provisioning helper. Public terminal enrollment must use
+// POST /pos/auth/devices so a credential is issued atomically.
 // ---------------------------------------------------------------------------
 
 export async function createPosTerminalSettings(
@@ -142,46 +136,35 @@ export async function heartbeatPosTerminal(
   data: PosTerminalHeartbeatRequest,
   db: Database = getDb(),
 ): Promise<PosTerminalSettingsSummary> {
-  const tenantId = requirePosTenantId(authContext);
-  const terminalId = authContext.terminalId;
+  const terminal = requirePosTerminalContext(authContext);
 
-  if (!terminalId) {
-    throw new PosTerminalSettingsError(
-      "POS_TERMINAL_REQUIRED",
-      "An enrolled POS terminal is required.",
-      403,
-    );
-  }
-
-  const terminal = await updateTerminalHeartbeat(db, {
-    tenantId,
-    terminalId,
+  const settings = await updateTerminalHeartbeat(db, {
+    terminal,
     data,
   });
 
-  if (!terminal) {
+  if (!settings) {
     throw new PosTerminalSettingsError(
       "TERMINAL_SETTINGS_NOT_FOUND",
-      "Active terminal settings were not found.",
+      "Active settings were not found for the authenticated terminal.",
       404,
     );
   }
 
-  return terminal;
+  return settings;
 }
 
 // ---------------------------------------------------------------------------
-// PATCH /pos/terminal-settings?deviceId=...
+// PATCH /pos/terminal-settings
 // ---------------------------------------------------------------------------
 
 export async function updatePosTerminalSettings(
   authContext: AuthContext,
-  deviceId: string,
   data: UpdatePosTerminalSettingsRequest,
   requestMeta?: AuthRequestMeta,
   db: Database = getDb(),
 ): Promise<PosTerminalSettingsSummary> {
-  const tenantId = requirePosTenantId(authContext);
+  const terminal = requirePosTerminalContext(authContext);
 
   // Only owner/manager can update terminal settings.
   if (authContext.role === "cashier") {
@@ -192,30 +175,22 @@ export async function updatePosTerminalSettings(
     );
   }
 
-  const current = await findTerminalSettingsByTenantAndDevice(
-    db,
-    tenantId,
-    deviceId,
-  );
+  const current = await findAuthenticatedTerminalSettings(db, terminal);
 
   if (!current) {
     throw new PosTerminalSettingsError(
       "TERMINAL_SETTINGS_NOT_FOUND",
-      "Terminal settings not found for this device.",
+      "Active settings were not found for the authenticated terminal.",
       404,
     );
   }
-
-  // Verify branch access.
-  await requirePosBranchId(authContext, current.branchId, db);
 
   return db.transaction(async (tx) => {
     const before = { ...current };
 
     const updated = await updateTerminalSettingsRecord(
       tx,
-      tenantId,
-      current.id,
+      terminal,
       authContext.userId,
       data,
       current.version,
@@ -231,8 +206,8 @@ export async function updatePosTerminalSettings(
 
     await writeAuditLog(tx, {
       actorUserId: authContext.userId,
-      tenantId,
-      branchId: current.branchId,
+      tenantId: terminal.tenantId,
+      branchId: terminal.branchId,
       eventCategory: "pos_terminal_settings",
       eventType: "pos_terminal_settings.updated",
       entityType: "pos_terminal_settings",

@@ -14,6 +14,14 @@ import type {
   UpdatePosTerminalSettingsRequest,
 } from "./terminal-settings.types.js";
 
+export type AuthenticatedTerminalIdentity = {
+  tenantId: string;
+  terminalId: string;
+  branchId: string;
+  deviceId: string;
+  credentialVersion: number;
+};
+
 function toSummary(
   row: typeof posTerminalSettings.$inferSelect,
 ): PosTerminalSettingsSummary {
@@ -117,6 +125,28 @@ export async function findTerminalSettingsById(
   return rows[0] ? toSummary(rows[0]) : null;
 }
 
+export async function findAuthenticatedTerminalSettings(
+  db: Database,
+  terminal: AuthenticatedTerminalIdentity,
+): Promise<PosTerminalSettingsSummary | null> {
+  const rows = await db
+    .select()
+    .from(posTerminalSettings)
+    .where(
+      and(
+        eq(posTerminalSettings.id, terminal.terminalId),
+        eq(posTerminalSettings.tenantId, terminal.tenantId),
+        eq(posTerminalSettings.branchId, terminal.branchId),
+        eq(posTerminalSettings.deviceId, terminal.deviceId),
+        eq(posTerminalSettings.credentialVersion, terminal.credentialVersion),
+        eq(posTerminalSettings.status, "active"),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ? toSummary(rows[0]) : null;
+}
+
 export async function insertTerminalSettings(
   db: Database,
   tenantId: string,
@@ -147,8 +177,7 @@ export async function insertTerminalSettings(
 
 export async function updateTerminalSettingsRecord(
   db: Database,
-  tenantId: string,
-  id: string,
+  terminal: AuthenticatedTerminalIdentity,
   actorUserId: string,
   input: UpdatePosTerminalSettingsRequest,
   currentVersion: number,
@@ -176,8 +205,12 @@ export async function updateTerminalSettingsRecord(
     .set(setValues)
     .where(
       and(
-        eq(posTerminalSettings.id, id),
-        eq(posTerminalSettings.tenantId, tenantId),
+        eq(posTerminalSettings.id, terminal.terminalId),
+        eq(posTerminalSettings.tenantId, terminal.tenantId),
+        eq(posTerminalSettings.branchId, terminal.branchId),
+        eq(posTerminalSettings.deviceId, terminal.deviceId),
+        eq(posTerminalSettings.credentialVersion, terminal.credentialVersion),
+        eq(posTerminalSettings.status, "active"),
         eq(posTerminalSettings.version, currentVersion),
       ),
     )
@@ -186,18 +219,21 @@ export async function updateTerminalSettingsRecord(
   return rows[0] ? toSummary(rows[0]) : null;
 }
 
-export async function updateTerminalLastSeen(
+export async function updateAuthenticatedTerminalLastSeen(
   db: Database,
-  tenantId: string,
-  deviceId: string,
+  terminal: AuthenticatedTerminalIdentity,
 ): Promise<void> {
   await db
     .update(posTerminalSettings)
     .set({ lastSeenAt: new Date() })
     .where(
       and(
-        eq(posTerminalSettings.tenantId, tenantId),
-        eq(posTerminalSettings.deviceId, deviceId),
+        eq(posTerminalSettings.id, terminal.terminalId),
+        eq(posTerminalSettings.tenantId, terminal.tenantId),
+        eq(posTerminalSettings.branchId, terminal.branchId),
+        eq(posTerminalSettings.deviceId, terminal.deviceId),
+        eq(posTerminalSettings.credentialVersion, terminal.credentialVersion),
+        eq(posTerminalSettings.status, "active"),
       ),
     );
 }
@@ -205,8 +241,7 @@ export async function updateTerminalLastSeen(
 export async function updateTerminalHeartbeat(
   db: Database,
   input: {
-    tenantId: string;
-    terminalId: string;
+    terminal: AuthenticatedTerminalIdentity;
     data: PosTerminalHeartbeatRequest;
   },
 ): Promise<PosTerminalSettingsSummary | null> {
@@ -243,8 +278,14 @@ export async function updateTerminalHeartbeat(
     .set(setValues)
     .where(
       and(
-        eq(posTerminalSettings.id, input.terminalId),
-        eq(posTerminalSettings.tenantId, input.tenantId),
+        eq(posTerminalSettings.id, input.terminal.terminalId),
+        eq(posTerminalSettings.tenantId, input.terminal.tenantId),
+        eq(posTerminalSettings.branchId, input.terminal.branchId),
+        eq(posTerminalSettings.deviceId, input.terminal.deviceId),
+        eq(
+          posTerminalSettings.credentialVersion,
+          input.terminal.credentialVersion,
+        ),
         eq(posTerminalSettings.status, "active"),
       ),
     )

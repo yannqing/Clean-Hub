@@ -24,10 +24,12 @@ import { createPosWorkspaceRoutes } from "./workspace/workspace.routes.js";
 
 export type CreatePosRoutesOptions = {
   notificationPublisher?: NotificationPublisher;
+  terminalCredentialCookieSecure?: boolean;
 };
 
 export function createPosRoutes({
   notificationPublisher,
+  terminalCredentialCookieSecure,
 }: CreatePosRoutesOptions = {}) {
   const routes = new Hono<AppBindings>();
 
@@ -36,7 +38,10 @@ export function createPosRoutes({
 
   // Scaffold resources — handlers exist, service layer returns 501 until
   // the repository implementations land.
-  routes.route("/auth", createPosAuthRoutes());
+  routes.route(
+    "/auth",
+    createPosAuthRoutes({ terminalCredentialCookieSecure }),
+  );
   routes.route("/customers", createPosCustomersRoutes());
   routes.route("/catalog", createPosCatalogRoutes());
   routes.route("/service-tickets", createPosServiceTicketsRoutes());

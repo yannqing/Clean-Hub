@@ -9,12 +9,14 @@ import {
   bindPosDevice,
   getPosDevice,
   getTerminalState,
+  revokePosDevice,
   rotatePosDeviceCredential,
   setTerminalLock,
   updatePosDevice,
 } from "./auth.service.js";
 import {
   bindPosDeviceBodySchema,
+  revokePosDeviceBodySchema,
   rotatePosDeviceCredentialBodySchema,
   setTerminalLockBodySchema,
   updatePosDeviceBodySchema,
@@ -48,12 +50,16 @@ async function runTerminalAction<T>(
   }
 }
 
-export async function bindPosDeviceController(c: Context<AppBindings>) {
+export async function bindPosDeviceController(
+  c: Context<AppBindings>,
+  cookieSecure?: boolean,
+) {
   const data = bindPosDeviceBodySchema.parse(await c.req.json());
   const result = await runTerminalAction(c, () =>
     bindPosDevice({
       authContext: c.get("authContext"),
       requestMeta: getRequestMeta(c),
+      cookieSecure,
       data,
     }),
   );
@@ -91,6 +97,7 @@ export async function updatePosDeviceController(c: Context<AppBindings>) {
 
 export async function rotatePosDeviceCredentialController(
   c: Context<AppBindings>,
+  cookieSecure?: boolean,
 ) {
   const deviceId = requirePathParam(c, "deviceId");
   if (deviceId instanceof Response) return deviceId;
@@ -100,6 +107,30 @@ export async function rotatePosDeviceCredentialController(
     rotatePosDeviceCredential({
       authContext: c.get("authContext"),
       requestMeta: getRequestMeta(c),
+      cookieSecure,
+      deviceId,
+      data,
+    }),
+  );
+  if (result instanceof Response) return result;
+
+  appendSetCookieHeaders(c, result.setCookieHeaders);
+  return c.json(result.device);
+}
+
+export async function revokePosDeviceController(
+  c: Context<AppBindings>,
+  cookieSecure?: boolean,
+) {
+  const deviceId = requirePathParam(c, "deviceId");
+  if (deviceId instanceof Response) return deviceId;
+  const data = revokePosDeviceBodySchema.parse(await c.req.json());
+
+  const result = await runTerminalAction(c, () =>
+    revokePosDevice({
+      authContext: c.get("authContext"),
+      requestMeta: getRequestMeta(c),
+      cookieSecure,
       deviceId,
       data,
     }),

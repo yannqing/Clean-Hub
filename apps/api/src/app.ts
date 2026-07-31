@@ -5,10 +5,17 @@ import { cors } from "hono/cors";
 import { loadApiEnv } from "./config/env.js";
 import { handleApiError } from "./http/error-handler.js";
 import { createRequireAuthMiddleware } from "./http/auth.middleware.js";
+import {
+  isUnsafeRequestOriginAllowed,
+  resolveCredentialedCorsOrigin,
+} from "./http/cors-origin.js";
+import { createRequirePosTerminalMiddleware } from "./http/pos-terminal.middleware.js";
 import { createRequestContextMiddleware } from "./http/request-context.middleware.js";
 import type { AppBindings } from "./http/types.js";
+import { requireNonTerminalWebSession } from "./http/web-session.middleware.js";
 import { createAuthServiceFromEnv } from "./modules/auth/auth.factory.js";
 import { createAuthRoutes } from "./modules/auth/auth.routes.js";
+import { resolveAuthCookieSecure } from "./modules/auth/cookie.service.js";
 import { createMobileAuthServiceFromEnv } from "./modules/mobile/auth/auth.service.js";
 import { createMobileRoutes } from "./modules/mobile/mobile.routes.js";
 import { NotificationsService } from "./modules/notifications/index.js";
@@ -53,6 +60,7 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
     service: "cleanhub-api",
   });
   const authService = createAuthServiceFromEnv({ env });
+  const authCookieSecure = resolveAuthCookieSecure(env);
   const mobileAuthService = createMobileAuthServiceFromEnv({ env });
   const notificationsService = new NotificationsService({ env });
   const app = new Hono<AppBindings>();
@@ -64,21 +72,50 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
 
   app.use("*", createRequestContextMiddleware());
 
+  app.use("*", async (c, next) => {
+    if (
+      !isUnsafeRequestOriginAllowed({
+        method: c.req.method,
+        origin: c.req.header("origin"),
+        allowedOrigins: apiEnv.corsOrigins,
+        enforceSameOrigin: apiEnv.corsEnforceSameOrigin,
+        requestUrl: c.req.url,
+        forwardedProto: c.req.header("x-forwarded-proto"),
+        forwardedHost: c.req.header("x-forwarded-host"),
+        secFetchSite: c.req.header("sec-fetch-site"),
+      })
+    ) {
+      return c.json(
+        {
+          message: "Cross-origin state-changing request is not allowed.",
+          code: "CROSS_ORIGIN_REQUEST_FORBIDDEN",
+          requestId: c.get("requestId"),
+        },
+        403,
+      );
+    }
+
+    await next();
+  });
+
   app.use(
     "*",
     cors({
-      origin: (origin) => {
-        if (!origin) {
-          return null;
-        }
-
-        return apiEnv.corsOrigins.includes(origin) ? origin : null;
-      },
+      origin: (origin, c) =>
+        resolveCredentialedCorsOrigin({
+          origin,
+          allowedOrigins: apiEnv.corsOrigins,
+          enforceSameOrigin: apiEnv.corsEnforceSameOrigin,
+          requestUrl: c.req.url,
+          forwardedProto: c.req.header("x-forwarded-proto"),
+          forwardedHost: c.req.header("x-forwarded-host"),
+        }),
       allowHeaders: [
         "Content-Type",
         "Authorization",
         "X-Request-Id",
         "X-Device-Id",
+        "Idempotency-Key",
       ],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
       credentials: true,
@@ -102,8 +139,11 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   );
 
   app.use("/saas/*", createRequireAuthMiddleware(authService));
+  app.use("/saas/*", requireNonTerminalWebSession());
   app.use("/tenant/*", createRequireAuthMiddleware(authService));
+  app.use("/tenant/*", requireNonTerminalWebSession());
   app.use("/pos/*", createRequireAuthMiddleware(authService));
+  app.use("/pos/*", createRequirePosTerminalMiddleware());
 
   // SaaS 平台 - 公共模块
   app.route("/saas/overview", createSaasOverviewRoutes());
@@ -144,7 +184,10 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   // POS 终端侧（收银员 / 店长 / 店主）
   app.route(
     "/pos",
-    createPosRoutes({ notificationPublisher: notificationsService }),
+    createPosRoutes({
+      notificationPublisher: notificationsService,
+      terminalCredentialCookieSecure: authCookieSecure,
+    }),
   );
 
   app.notFound((c) =>

@@ -9,6 +9,29 @@ export type AuthCookieOptions = {
 export const ACCESS_COOKIE_NAME = "cleanhub_access_token";
 export const REFRESH_COOKIE_NAME = "cleanhub_refresh_token";
 
+/**
+ * Resolve the single Secure-cookie policy used by every browser credential.
+ *
+ * `AUTH_COOKIE_SECURE` is intentionally authoritative when configured so a
+ * deployment does not silently weaken one cookie type when `NODE_ENV` differs
+ * from the process manager's production label.
+ */
+export function resolveAuthCookieSecure(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  const configured = env.AUTH_COOKIE_SECURE?.trim().toLowerCase();
+
+  if (["1", "true", "yes"].includes(configured ?? "")) {
+    return true;
+  }
+
+  if (["0", "false", "no"].includes(configured ?? "")) {
+    return false;
+  }
+
+  return env.NODE_ENV === "production";
+}
+
 function serializeCookie(
   name: string,
   value: string,

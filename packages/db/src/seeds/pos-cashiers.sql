@@ -1,7 +1,7 @@
 -- POS cashier seed accounts for in-store staff workflows.
 --
 -- Belongs to Demo Tenant 1 (CLEAN-001, id 01KRERJN800000000000000001) so they
--- share the terminal binding configured by POS_TENANT_CODE=CLEAN-001.
+-- belong to tenant CLEAN-001 and sign in only after the current terminal is enrolled.
 --
 -- Idempotent: safe to run repeatedly via ON CONFLICT ... DO UPDATE.
 -- Run after dev-accounts.sql (this file assumes the tenant row exists).

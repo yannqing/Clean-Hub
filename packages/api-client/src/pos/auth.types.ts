@@ -32,6 +32,10 @@ export type RotatePosDeviceCredentialRequest = {
   reason: string;
 };
 
+export type RevokePosDeviceRequest = {
+  reason: string;
+};
+
 export type PosTerminalLockState = "locked" | "unlocked";
 
 export type PosTerminalState = {

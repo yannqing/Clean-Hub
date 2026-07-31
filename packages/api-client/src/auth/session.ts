@@ -4,6 +4,8 @@ import type {
   AuthPosPinLoginRequest,
   LoginRequest,
   LoginResponse,
+  PosBootstrapRequest,
+  PosBootstrapResponse,
   RefreshResponse,
 } from "./types";
 
@@ -18,6 +20,14 @@ export function createAuthSessionApi(client: ApiClient) {
       }),
     posPinLogin: (input: AuthPosPinLoginRequest, options: RequestOptions = {}) =>
       client.post<LoginResponse>("/auth/pos-pin-login", input, {
+        skipAuthRefresh: true,
+        ...options,
+      }),
+    posBootstrap: (
+      input: PosBootstrapRequest,
+      options: RequestOptions = {},
+    ) =>
+      client.post<PosBootstrapResponse>("/auth/pos-bootstrap", input, {
         skipAuthRefresh: true,
         ...options,
       }),

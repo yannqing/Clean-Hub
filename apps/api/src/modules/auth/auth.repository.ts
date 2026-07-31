@@ -1,10 +1,6 @@
-import {
-  and,
-  eq,
-  getTableColumns,
-  inArray,
-  isNull,
-} from "drizzle-orm";
+import { createHash } from "node:crypto";
+
+import { and, eq, getTableColumns, inArray, isNull, sql } from "drizzle-orm";
 
 import {
   authRefreshTokens,
@@ -41,6 +37,24 @@ export type PosTerminalLoginContext = {
   deviceId: string;
   status: "active" | "inactive";
   credentialDigest: string | null;
+  credentialVersion: number;
+};
+
+export type PosBootstrapTerminalRecord = PosTerminalLoginContext & {
+  label: string | null;
+  tenantName: string;
+  tenantCode: string;
+  tenantStatus: "active" | "suspended" | "disabled";
+  tenantDeleted: boolean;
+  branchName: string;
+  branchStatus: "active" | "inactive";
+  branchDeleted: boolean;
+};
+
+export type PosBootstrapTenantRecord = {
+  id: string;
+  name: string;
+  code: string;
 };
 
 export type ValidatedUserAccess = UserAccess & {
@@ -60,13 +74,45 @@ export type StoredRefreshToken = {
   tenantId: string | null;
   deviceId: string | null;
   terminalId: string | null;
+  tokenHash: string;
   familyId: string;
   expiresAt: Date;
   revokedAt: Date | null;
+  replacedByTokenId: string | null;
 };
+
+export function getPosPinAdvisoryLockKeys(
+  terminalId: string,
+): readonly [number, number] {
+  const digest = createHash("sha256")
+    .update("cleanhub-pos-pin-attempt-v1")
+    .update("\0")
+    .update(terminalId)
+    .digest();
+
+  return [digest.readInt32BE(0), digest.readInt32BE(4)] as const;
+}
+
+export async function lockPosPinAttempt(
+  db: Database,
+  terminalId: string,
+): Promise<void> {
+  const [namespaceKey, terminalKey] = getPosPinAdvisoryLockKeys(terminalId);
+  await db.execute(
+    sql`select pg_advisory_xact_lock(${namespaceKey}, ${terminalKey})`,
+  );
+}
 
 export class AuthRepository {
   constructor(private readonly db: Database) {}
+
+  async runInTransaction<T>(
+    operation: (repository: AuthRepository, db: Database) => Promise<T>,
+  ): Promise<T> {
+    return this.db.transaction(async (tx) =>
+      operation(new AuthRepository(tx), tx),
+    );
+  }
 
   async findLoginUser(identifier: string): Promise<AuthenticatedUser | null> {
     const normalizedIdentifier = identifier.trim().toLowerCase();
@@ -210,62 +256,154 @@ export class AuthRepository {
     };
   }
 
-  async findPosTerminalLoginContext({
-    tenantCode,
+  async findPosBootstrapTerminalByCredential({
     deviceId,
+    credentialDigest,
   }: {
-    tenantCode: string;
     deviceId: string;
-  }): Promise<PosTerminalLoginContext | null> {
+    credentialDigest: string;
+  }): Promise<PosBootstrapTerminalRecord | null> {
     const rows = await this.db
       .select({
-        tenantId: tenants.id,
+        id: posTerminalSettings.id,
+        tenantId: posTerminalSettings.tenantId,
+        branchId: posTerminalSettings.branchId,
+        deviceId: posTerminalSettings.deviceId,
+        label: posTerminalSettings.label,
+        status: posTerminalSettings.status,
+        credentialDigest: posTerminalSettings.credentialDigest,
+        credentialVersion: posTerminalSettings.credentialVersion,
+        tenantName: tenants.name,
+        tenantCode: tenants.pressingCode,
         tenantStatus: tenants.status,
-        terminalId: posTerminalSettings.id,
-        terminalBranchId: posTerminalSettings.branchId,
-        terminalDeviceId: posTerminalSettings.deviceId,
-        terminalStatus: posTerminalSettings.status,
-        terminalCredentialDigest: posTerminalSettings.credentialDigest,
+        tenantDeletedAt: tenants.deletedAt,
+        branchName: branches.name,
+        branchStatus: branches.status,
+        branchDeletedAt: branches.deletedAt,
       })
-      .from(tenants)
+      .from(posTerminalSettings)
+      .innerJoin(tenants, eq(posTerminalSettings.tenantId, tenants.id))
       .innerJoin(
-        posTerminalSettings,
+        branches,
         and(
-          eq(posTerminalSettings.tenantId, tenants.id),
-          eq(posTerminalSettings.deviceId, deviceId),
+          eq(posTerminalSettings.branchId, branches.id),
+          eq(posTerminalSettings.tenantId, branches.tenantId),
         ),
       )
       .where(
         and(
-          eq(tenants.pressingCode, tenantCode.trim()),
-          isNull(tenants.deletedAt),
+          eq(posTerminalSettings.deviceId, deviceId),
+          eq(posTerminalSettings.credentialDigest, credentialDigest),
         ),
       )
       .limit(1);
 
     const row = rows[0];
+    return row
+      ? {
+          id: row.id,
+          tenantId: row.tenantId,
+          branchId: row.branchId,
+          deviceId: row.deviceId,
+          label: row.label,
+          status: row.status,
+          credentialDigest: row.credentialDigest,
+          credentialVersion: row.credentialVersion,
+          tenantName: row.tenantName,
+          tenantCode: row.tenantCode,
+          tenantStatus: row.tenantStatus,
+          tenantDeleted: Boolean(row.tenantDeletedAt),
+          branchName: row.branchName,
+          branchStatus: row.branchStatus,
+          branchDeleted: Boolean(row.branchDeletedAt),
+        }
+      : null;
+  }
 
-    if (!row || row.tenantStatus !== "active") {
-      return null;
-    }
+  async findPosBootstrapTerminalByTenantAndDevice({
+    tenantId,
+    deviceId,
+  }: {
+    tenantId: string;
+    deviceId: string;
+  }): Promise<PosBootstrapTerminalRecord | null> {
+    const rows = await this.db
+      .select({
+        id: posTerminalSettings.id,
+        tenantId: posTerminalSettings.tenantId,
+        branchId: posTerminalSettings.branchId,
+        deviceId: posTerminalSettings.deviceId,
+        label: posTerminalSettings.label,
+        status: posTerminalSettings.status,
+        credentialDigest: posTerminalSettings.credentialDigest,
+        credentialVersion: posTerminalSettings.credentialVersion,
+        tenantName: tenants.name,
+        tenantCode: tenants.pressingCode,
+        tenantStatus: tenants.status,
+        tenantDeletedAt: tenants.deletedAt,
+        branchName: branches.name,
+        branchStatus: branches.status,
+        branchDeletedAt: branches.deletedAt,
+      })
+      .from(posTerminalSettings)
+      .innerJoin(tenants, eq(posTerminalSettings.tenantId, tenants.id))
+      .innerJoin(
+        branches,
+        and(
+          eq(posTerminalSettings.branchId, branches.id),
+          eq(posTerminalSettings.tenantId, branches.tenantId),
+        ),
+      )
+      .where(
+        and(
+          eq(posTerminalSettings.tenantId, tenantId),
+          eq(posTerminalSettings.deviceId, deviceId),
+        ),
+      )
+      .limit(1);
 
-    if (
-      !row.terminalId ||
-      !row.terminalBranchId ||
-      !row.terminalDeviceId ||
-      !row.terminalStatus
-    ) {
-      return null;
-    }
+    const row = rows[0];
+    return row
+      ? {
+          id: row.id,
+          tenantId: row.tenantId,
+          branchId: row.branchId,
+          deviceId: row.deviceId,
+          label: row.label,
+          status: row.status,
+          credentialDigest: row.credentialDigest,
+          credentialVersion: row.credentialVersion,
+          tenantName: row.tenantName,
+          tenantCode: row.tenantCode,
+          tenantStatus: row.tenantStatus,
+          tenantDeleted: Boolean(row.tenantDeletedAt),
+          branchName: row.branchName,
+          branchStatus: row.branchStatus,
+          branchDeleted: Boolean(row.branchDeletedAt),
+        }
+      : null;
+  }
 
-    return {
-      id: row.terminalId,
-      tenantId: row.tenantId,
-      branchId: row.terminalBranchId,
-      deviceId: row.terminalDeviceId,
-      status: row.terminalStatus,
-      credentialDigest: row.terminalCredentialDigest,
-    };
+  async findPosBootstrapTenant(
+    tenantId: string,
+  ): Promise<PosBootstrapTenantRecord | null> {
+    const rows = await this.db
+      .select({
+        id: tenants.id,
+        name: tenants.name,
+        code: tenants.pressingCode,
+      })
+      .from(tenants)
+      .where(
+        and(
+          eq(tenants.id, tenantId),
+          eq(tenants.status, "active"),
+          isNull(tenants.deletedAt),
+        ),
+      )
+      .limit(1);
+
+    return rows[0] ?? null;
   }
 
   async findPosTerminalById(
@@ -279,19 +417,40 @@ export class AuthRepository {
         deviceId: posTerminalSettings.deviceId,
         status: posTerminalSettings.status,
         credentialDigest: posTerminalSettings.credentialDigest,
+        credentialVersion: posTerminalSettings.credentialVersion,
       })
       .from(posTerminalSettings)
       .innerJoin(tenants, eq(posTerminalSettings.tenantId, tenants.id))
+      .innerJoin(
+        branches,
+        and(
+          eq(posTerminalSettings.branchId, branches.id),
+          eq(posTerminalSettings.tenantId, branches.tenantId),
+        ),
+      )
       .where(
         and(
           eq(posTerminalSettings.id, terminalId),
           eq(tenants.status, "active"),
           isNull(tenants.deletedAt),
+          eq(branches.status, "active"),
+          isNull(branches.deletedAt),
         ),
       )
       .limit(1);
 
     return rows[0] ?? null;
+  }
+
+  async lockPosTerminalById(terminalId: string): Promise<boolean> {
+    const rows = await this.db
+      .select({ id: posTerminalSettings.id })
+      .from(posTerminalSettings)
+      .where(eq(posTerminalSettings.id, terminalId))
+      .for("update")
+      .limit(1);
+
+    return Boolean(rows[0]);
   }
 
   async markPosTerminalCredentialUsed(terminalId: string): Promise<void> {
@@ -448,12 +607,62 @@ export class AuthRepository {
         tenantId: authRefreshTokens.tenantId,
         deviceId: authRefreshTokens.deviceId,
         terminalId: authRefreshTokens.terminalId,
+        tokenHash: authRefreshTokens.tokenHash,
         familyId: authRefreshTokens.familyId,
         expiresAt: authRefreshTokens.expiresAt,
         revokedAt: authRefreshTokens.revokedAt,
+        replacedByTokenId: authRefreshTokens.replacedByTokenId,
       })
       .from(authRefreshTokens)
       .where(eq(authRefreshTokens.tokenHash, tokenHash))
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+
+  async findRefreshTokenByHashForUpdate(
+    tokenHash: string,
+  ): Promise<StoredRefreshToken | null> {
+    const rows = await this.db
+      .select({
+        id: authRefreshTokens.id,
+        userId: authRefreshTokens.userId,
+        tenantId: authRefreshTokens.tenantId,
+        deviceId: authRefreshTokens.deviceId,
+        terminalId: authRefreshTokens.terminalId,
+        tokenHash: authRefreshTokens.tokenHash,
+        familyId: authRefreshTokens.familyId,
+        expiresAt: authRefreshTokens.expiresAt,
+        revokedAt: authRefreshTokens.revokedAt,
+        replacedByTokenId: authRefreshTokens.replacedByTokenId,
+      })
+      .from(authRefreshTokens)
+      .where(eq(authRefreshTokens.tokenHash, tokenHash))
+      .for("update")
+      .limit(1);
+
+    return rows[0] ?? null;
+  }
+
+  async findRefreshTokenByIdForUpdate(
+    tokenId: string,
+  ): Promise<StoredRefreshToken | null> {
+    const rows = await this.db
+      .select({
+        id: authRefreshTokens.id,
+        userId: authRefreshTokens.userId,
+        tenantId: authRefreshTokens.tenantId,
+        deviceId: authRefreshTokens.deviceId,
+        terminalId: authRefreshTokens.terminalId,
+        tokenHash: authRefreshTokens.tokenHash,
+        familyId: authRefreshTokens.familyId,
+        expiresAt: authRefreshTokens.expiresAt,
+        revokedAt: authRefreshTokens.revokedAt,
+        replacedByTokenId: authRefreshTokens.replacedByTokenId,
+      })
+      .from(authRefreshTokens)
+      .where(eq(authRefreshTokens.id, tokenId))
+      .for("update")
       .limit(1);
 
     return rows[0] ?? null;

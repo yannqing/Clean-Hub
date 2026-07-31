@@ -17,6 +17,7 @@ export type AccessTokenClaims = {
   terminalId?: string;
   terminalBranchId?: string;
   terminalDeviceId?: string;
+  terminalCredentialVersion?: number;
   expiresAt: Date;
 };
 
@@ -31,6 +32,7 @@ export type TokenIssueContext = {
   terminalId?: string;
   terminalBranchId?: string;
   terminalDeviceId?: string;
+  terminalCredentialVersion?: number;
 };
 
 export type TokenServiceOptions = {
@@ -108,6 +110,7 @@ export class TokenService {
       terminalId: context.terminalId,
       terminalBranchId: context.terminalBranchId,
       terminalDeviceId: context.terminalDeviceId,
+      terminalCredentialVersion: context.terminalCredentialVersion,
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setSubject(context.userId)
@@ -165,6 +168,10 @@ export class TokenService {
         terminalDeviceId:
           typeof result.payload.terminalDeviceId === "string"
             ? result.payload.terminalDeviceId
+            : undefined,
+        terminalCredentialVersion:
+          typeof result.payload.terminalCredentialVersion === "number"
+            ? result.payload.terminalCredentialVersion
             : undefined,
         expiresAt: new Date(Number(result.payload.exp ?? 0) * 1000),
       };

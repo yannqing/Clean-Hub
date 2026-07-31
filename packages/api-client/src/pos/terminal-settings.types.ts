@@ -37,17 +37,6 @@ export type PosTerminalSettings = {
   version: number;
 };
 
-export type CreatePosTerminalSettingsRequest = {
-  branchId: string;
-  deviceId: string;
-  label?: string;
-  defaultPaymentMethod?: PosPaymentMethod;
-  roundingRule?: PosRoundingRule;
-  autoPrintReceipt?: boolean;
-  printCopies?: number;
-  lockTimeoutSeconds?: number;
-};
-
 export type UpdatePosTerminalSettingsRequest = {
   label?: string;
   defaultPaymentMethod?: PosPaymentMethod;

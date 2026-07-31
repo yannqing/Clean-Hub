@@ -23,6 +23,7 @@ export type AuthContext = {
   terminalId?: string;
   terminalBranchId?: string;
   terminalDeviceId?: string;
+  terminalCredentialVersion?: number;
   accessTokenExpiresAt: string;
 };
 
@@ -34,8 +35,41 @@ export type LoginRequest = {
 
 export type AuthPosPinLoginRequest = {
   pin: string;
-  tenantCode: string;
   deviceId: string;
+};
+
+export type PosBootstrapStatus =
+  | "unconfigured"
+  | "admin_setup_required"
+  | "enrolled"
+  | "disabled"
+  | "credential_lost"
+  | "ready_for_pin";
+
+export type PosBootstrapRequest = {
+  deviceId: string;
+};
+
+export type PosBootstrapResponse = {
+  status: PosBootstrapStatus;
+  deviceId: string;
+  requiresAdminLogin: boolean;
+  canEnroll: boolean;
+  terminal: {
+    id: string;
+    label: string | null;
+    status: "active" | "inactive";
+    branchId: string;
+  } | null;
+  tenant: {
+    id: string;
+    name: string;
+    code: string;
+  } | null;
+  branch: {
+    id: string;
+    name: string;
+  } | null;
 };
 
 export type LoginResponse = {
