@@ -19,6 +19,7 @@ export const desktopIpcChannels = {
   offlineGet: "cleanhub:offline:get",
   offlineSet: "cleanhub:offline:set",
   offlineRemove: "cleanhub:offline:remove",
+  offlineKeys: "cleanhub:offline:keys",
 } as const;
 
 export type CleanHubDesktopBridge = {
@@ -38,5 +39,6 @@ export type CleanHubDesktopBridge = {
     getItem(key: string): Promise<string | null>;
     setItem(key: string, value: string): Promise<void>;
     removeItem(key: string): Promise<void>;
+    keys(): Promise<string[]>;
   };
 };

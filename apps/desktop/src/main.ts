@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,6 +7,7 @@ import {
   BrowserWindow,
   ipcMain,
   safeStorage,
+  type IpcMainInvokeEvent,
   type WebContentsPrintOptions,
 } from "electron";
 
@@ -23,14 +23,28 @@ import {
 } from "@cleanhub/hardware";
 
 import { desktopIpcChannels } from "./bridge.js";
+import {
+  createDesktopOfflineStorage,
+  type DesktopOfflineStorage,
+} from "./offline-storage.js";
+import { isUrlFromPosOrigin, resolvePosOrigin } from "./pos-origin.js";
+import { acquireDesktopSingleInstance } from "./single-instance.js";
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
-const posUrl = process.env.CLEANHUB_POS_URL ?? "http://localhost:3001";
+const posOriginConfig = resolvePosOrigin(process.env.CLEANHUB_POS_URL, {
+  isProduction: app.isPackaged || process.env.NODE_ENV === "production",
+});
 const credentialFileName = "terminal-credential.bin";
 const offlineStorageDirectoryName = "offline-queue";
-const maxOfflineValueBytes = 5 * 1024 * 1024;
 
 let mainWindow: BrowserWindow | null = null;
+let offlineStorage: DesktopOfflineStorage | null = null;
+const ownsSingleInstance = acquireDesktopSingleInstance({
+  requestLock: () => app.requestSingleInstanceLock(),
+  quit: () => app.quit(),
+  onSecondInstance: (listener) => app.on("second-instance", listener),
+  getMainWindow: () => mainWindow,
+});
 
 function getCredentialPath(): string {
   return path.join(app.getPath("userData"), credentialFileName);
@@ -72,40 +86,11 @@ async function clearTerminalCredential(): Promise<void> {
   await rm(getCredentialPath(), { force: true });
 }
 
-function getOfflineStoragePath(key: string): string {
-  if (!key.startsWith("cleanhub.pos.offline.")) {
-    throw new Error("Invalid offline storage key.");
+function getOfflineStorage(): DesktopOfflineStorage {
+  if (!offlineStorage) {
+    throw new Error("Desktop offline storage is not initialized.");
   }
-  const digest = createHash("sha256").update(key).digest("hex");
-  return path.join(
-    app.getPath("userData"),
-    offlineStorageDirectoryName,
-    `${digest}.json`,
-  );
-}
-
-async function readOfflineValue(key: string): Promise<string | null> {
-  try {
-    return await readFile(getOfflineStoragePath(key), "utf8");
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return null;
-    }
-    throw error;
-  }
-}
-
-async function writeOfflineValue(key: string, value: string): Promise<void> {
-  if (Buffer.byteLength(value, "utf8") > maxOfflineValueBytes) {
-    throw new Error("Offline queue storage limit exceeded.");
-  }
-  const storagePath = getOfflineStoragePath(key);
-  await mkdir(path.dirname(storagePath), { recursive: true });
-  await writeFile(storagePath, value, { encoding: "utf8", mode: 0o600 });
-}
-
-async function removeOfflineValue(key: string): Promise<void> {
-  await rm(getOfflineStoragePath(key), { force: true });
+  return offlineStorage;
 }
 
 async function listPrinters() {
@@ -195,42 +180,83 @@ const hardwareRuntime = createPosHardwareRuntime({
   secureTerminalCredential: () => safeStorage.isEncryptionAvailable(),
 });
 
+function assertTrustedIpcSender(event: IpcMainInvokeEvent): void {
+  const trustedWindow = mainWindow;
+  const senderFrame = event.senderFrame;
+
+  if (
+    !trustedWindow ||
+    trustedWindow.isDestroyed() ||
+    event.sender !== trustedWindow.webContents ||
+    !senderFrame ||
+    senderFrame !== event.sender.mainFrame ||
+    !isUrlFromPosOrigin(event.sender.getURL(), posOriginConfig.origin) ||
+    !isUrlFromPosOrigin(senderFrame.url, posOriginConfig.origin)
+  ) {
+    throw new Error("IPC request rejected from an untrusted POS renderer.");
+  }
+}
+
 function registerIpcHandlers(): void {
   ipcMain.handle(
     desktopIpcChannels.capabilities,
-    async (): Promise<PosHardwareCapabilities> =>
-      hardwareRuntime.getCapabilities(),
+    async (event): Promise<PosHardwareCapabilities> => {
+      assertTrustedIpcSender(event);
+      return hardwareRuntime.getCapabilities();
+    },
   );
-  ipcMain.handle(desktopIpcChannels.printers, () =>
-    hardwareRuntime.listPrinters(),
-  );
+  ipcMain.handle(desktopIpcChannels.printers, (event) => {
+    assertTrustedIpcSender(event);
+    return hardwareRuntime.listPrinters();
+  });
   ipcMain.handle(
     desktopIpcChannels.print,
-    (_event, request: PosPrintRequest) => hardwareRuntime.print(request),
+    (event, request: PosPrintRequest) => {
+      assertTrustedIpcSender(event);
+      return hardwareRuntime.print(request);
+    },
   );
   ipcMain.handle(
     desktopIpcChannels.drawerOpen,
-    (_event, request: PosDrawerOpenRequest) =>
-      hardwareRuntime.openCashDrawer(request),
+    (event, request: PosDrawerOpenRequest) => {
+      assertTrustedIpcSender(event);
+      return hardwareRuntime.openCashDrawer(request);
+    },
   );
-  ipcMain.handle(desktopIpcChannels.credentialGet, readTerminalCredential);
+  ipcMain.handle(desktopIpcChannels.credentialGet, (event) => {
+    assertTrustedIpcSender(event);
+    return readTerminalCredential();
+  });
   ipcMain.handle(
     desktopIpcChannels.credentialSet,
-    (_event, credential: string) => writeTerminalCredential(credential),
+    (event, credential: string) => {
+      assertTrustedIpcSender(event);
+      return writeTerminalCredential(credential);
+    },
   );
-  ipcMain.handle(desktopIpcChannels.credentialClear, clearTerminalCredential);
-  ipcMain.handle(
-    desktopIpcChannels.offlineGet,
-    (_event, key: string) => readOfflineValue(key),
-  );
+  ipcMain.handle(desktopIpcChannels.credentialClear, (event) => {
+    assertTrustedIpcSender(event);
+    return clearTerminalCredential();
+  });
+  ipcMain.handle(desktopIpcChannels.offlineGet, (event, key: string) => {
+    assertTrustedIpcSender(event);
+    return getOfflineStorage().getItem(key);
+  });
   ipcMain.handle(
     desktopIpcChannels.offlineSet,
-    (_event, key: string, value: string) => writeOfflineValue(key, value),
+    (event, key: string, value: string) => {
+      assertTrustedIpcSender(event);
+      return getOfflineStorage().setItem(key, value);
+    },
   );
-  ipcMain.handle(
-    desktopIpcChannels.offlineRemove,
-    (_event, key: string) => removeOfflineValue(key),
-  );
+  ipcMain.handle(desktopIpcChannels.offlineRemove, (event, key: string) => {
+    assertTrustedIpcSender(event);
+    return getOfflineStorage().removeItem(key);
+  });
+  ipcMain.handle(desktopIpcChannels.offlineKeys, (event) => {
+    assertTrustedIpcSender(event);
+    return getOfflineStorage().keys();
+  });
 }
 
 function createMainWindow(): BrowserWindow {
@@ -249,23 +275,40 @@ function createMainWindow(): BrowserWindow {
     },
   });
 
+  const allowConfiguredPosNavigation = (
+    event: Electron.Event,
+    navigationUrl: string,
+  ) => {
+    if (!isUrlFromPosOrigin(navigationUrl, posOriginConfig.origin)) {
+      event.preventDefault();
+    }
+  };
+
+  window.webContents.on("will-navigate", allowConfiguredPosNavigation);
+  window.webContents.on("will-redirect", allowConfiguredPosNavigation);
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
   window.once("ready-to-show", () => window.show());
-  void window.loadURL(posUrl);
+  void window.loadURL(posOriginConfig.url);
   return window;
 }
 
-await app.whenReady();
-registerIpcHandlers();
-mainWindow = createMainWindow();
+if (ownsSingleInstance) {
+  await app.whenReady();
+  offlineStorage = createDesktopOfflineStorage(
+    path.join(app.getPath("userData"), offlineStorageDirectoryName),
+  );
+  registerIpcHandlers();
+  mainWindow = createMainWindow();
 
-app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    mainWindow = createMainWindow();
-  }
-});
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      mainWindow = createMainWindow();
+    }
+  });
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+      app.quit();
+    }
+  });
+}

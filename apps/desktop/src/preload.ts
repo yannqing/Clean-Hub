@@ -2,10 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 
 import type { PosScanEvent } from "@cleanhub/hardware";
 
-import {
-  desktopIpcChannels,
-  type CleanHubDesktopBridge,
-} from "./bridge.js";
+import { desktopIpcChannels, type CleanHubDesktopBridge } from "./bridge.js";
 
 const bridge: CleanHubDesktopBridge = {
   hardware: {
@@ -15,7 +12,10 @@ const bridge: CleanHubDesktopBridge = {
     openCashDrawer: (request) =>
       ipcRenderer.invoke(desktopIpcChannels.drawerOpen, request),
     onScan(listener) {
-      const handler = (_event: Electron.IpcRendererEvent, scan: PosScanEvent) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        scan: PosScanEvent,
+      ) => {
         listener(scan);
       };
       ipcRenderer.on(desktopIpcChannels.scan, handler);
@@ -36,6 +36,7 @@ const bridge: CleanHubDesktopBridge = {
       ipcRenderer.invoke(desktopIpcChannels.offlineSet, key, value),
     removeItem: (key) =>
       ipcRenderer.invoke(desktopIpcChannels.offlineRemove, key),
+    keys: () => ipcRenderer.invoke(desktopIpcChannels.offlineKeys),
   },
 };
 
