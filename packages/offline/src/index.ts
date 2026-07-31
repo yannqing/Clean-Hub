@@ -7,12 +7,14 @@ export type AsyncKeyValueStorage = {
   getItem(key: string): Promise<string | null>;
   setItem(key: string, value: string): Promise<void>;
   removeItem?(key: string): Promise<void>;
+  keys?(): Promise<string[]>;
 };
 
 export type PreferencesLikeStorage = {
   get(options: { key: string }): Promise<{ value: string | null }>;
   set(options: { key: string; value: string }): Promise<void>;
   remove?(options: { key: string }): Promise<void>;
+  keys?(): Promise<{ keys: string[] }>;
 };
 
 export type OfflineQueueItem<TPayload = unknown> = {
@@ -96,6 +98,57 @@ export type OfflineQueueScope = {
   tenantId: string;
   branchId: string;
   terminalId: string;
+  userId: string;
+  terminalCredentialVersion: number;
+};
+
+/**
+ * The physical print spool belongs to a terminal, not to one staff session.
+ * Keeping this key stable across PIN users and credential epoch changes
+ * preserves exactly-once/reprint history after logout, rotation, or unlock.
+ */
+export type PersistentPrintJobQueueScope = Pick<
+  OfflineQueueScope,
+  "tenantId" | "branchId" | "terminalId"
+>;
+
+export type ParsedScopedOfflineQueueKey = {
+  queueKey: string;
+  namespace: string;
+  tenantId: string;
+  branchId: string;
+  terminalId: string;
+  userId: string | null;
+  terminalCredentialVersion: number;
+};
+
+export type ScopedOfflineQueueQuarantineReason =
+  | "branch_mismatch"
+  | "user_mismatch"
+  | "credential_epoch_mismatch"
+  | "legacy_scope_unattributed"
+  | "future_epoch"
+  | "non_previous_epoch";
+
+export type ScopedOfflineQueueQuarantine = {
+  queueKey: string;
+  scope: {
+    tenantId: string;
+    branchId: string;
+    terminalId: string;
+    userId: string | null;
+    terminalCredentialVersion: number | null;
+  };
+  pendingCount: number;
+  reasons: ScopedOfflineQueueQuarantineReason[];
+};
+
+export type ScopedOfflineQueueRecoveryResult = {
+  storageEnumerationSupported: boolean;
+  migratedItemCount: number;
+  migratedQueueKeys: string[];
+  quarantinedItemCount: number;
+  quarantined: ScopedOfflineQueueQuarantine[];
 };
 
 export type PersistentPrintJobStatus =
@@ -139,11 +192,160 @@ export type DeliveryTaskCacheOptions = {
 const DEFAULT_QUEUE_KEY = "cleanhub.offline.queue.v1";
 const DEFAULT_PRINT_QUEUE_KEY = "cleanhub.pos.offline.print.queue.v1";
 const DEFAULT_DELIVERY_TASK_CACHE_KEY = "cleanhub.offline.deliveryTasks.v1";
+const DEFAULT_SCOPED_OFFLINE_QUEUE_NAMESPACE = "cleanhub.pos.offline.queue.v2";
+const LEGACY_SCOPED_OFFLINE_QUEUE_NAMESPACE = "cleanhub.pos.offline.queue.v1";
+
+class KeyedAsyncMutex {
+  private readonly tails = new Map<string, Promise<void>>();
+
+  async runExclusive<TResult>(
+    key: string,
+    operation: () => Promise<TResult>,
+  ): Promise<TResult> {
+    const previous = this.tails.get(key) ?? Promise.resolve();
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const tail = previous.then(
+      () => gate,
+      () => gate,
+    );
+
+    this.tails.set(key, tail);
+    await previous.catch(() => undefined);
+
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.tails.get(key) === tail) {
+        this.tails.delete(key);
+      }
+    }
+  }
+
+  async runExclusiveMany<TResult>(
+    keys: string[],
+    operation: () => Promise<TResult>,
+  ): Promise<TResult> {
+    const uniqueKeys = [...new Set(keys)].sort();
+
+    const acquire = (index: number): Promise<TResult> => {
+      const key = uniqueKeys[index];
+      if (!key) {
+        return operation();
+      }
+
+      return this.runExclusive(key, () => acquire(index + 1));
+    };
+
+    return acquire(0);
+  }
+}
+
+// Queue instances are frequently recreated by React. These module-level locks
+// keep read-modify-write operations and replay execution mutually exclusive for
+// every instance that targets the same persisted key in this JavaScript realm.
+const queueStateMutex = new KeyedAsyncMutex();
+const queueReplayMutex = new KeyedAsyncMutex();
+
+type QueueLockKind = "replay" | "state";
+
+function hashQueueLockKey(value: string): string {
+  // Two differently-seeded 32-bit FNV-style lanes keep Web Lock names short
+  // without exposing tenant/user identifiers. A collision only serializes two
+  // unrelated queues; it cannot weaken isolation or corrupt their contents.
+  let first = 0x811c9dc5;
+  let second = 0x9e3779b9;
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    first = Math.imul(first ^ code, 0x01000193);
+    second = Math.imul(second ^ code, 0x85ebca6b);
+  }
+
+  return `${(first >>> 0).toString(16).padStart(8, "0")}${(second >>> 0)
+    .toString(16)
+    .padStart(8, "0")}`;
+}
+
+function browserQueueLockName(kind: QueueLockKind, key: string): string {
+  return `cleanhub-pos-offline-${kind}-${hashQueueLockKey(key)}`;
+}
+
+async function runWithBrowserLock<TResult>(
+  kind: QueueLockKind,
+  key: string,
+  operation: () => Promise<TResult>,
+): Promise<TResult> {
+  const lockManager =
+    typeof navigator === "undefined" ? undefined : navigator.locks;
+  if (!lockManager) {
+    return operation();
+  }
+
+  return lockManager.request(browserQueueLockName(kind, key), operation);
+}
+
+async function runWithBrowserLocks<TResult>(
+  kind: QueueLockKind,
+  keys: string[],
+  operation: () => Promise<TResult>,
+): Promise<TResult> {
+  const uniqueKeys = [...new Set(keys)].sort();
+
+  const acquire = (index: number): Promise<TResult> => {
+    const key = uniqueKeys[index];
+    if (!key) {
+      return operation();
+    }
+
+    return runWithBrowserLock(kind, key, () => acquire(index + 1));
+  };
+
+  return acquire(0);
+}
+
+function runQueueStateExclusive<TResult>(
+  key: string,
+  operation: () => Promise<TResult>,
+): Promise<TResult> {
+  return queueStateMutex.runExclusive(key, () =>
+    runWithBrowserLock("state", key, operation),
+  );
+}
+
+function runQueueStateExclusiveMany<TResult>(
+  keys: string[],
+  operation: () => Promise<TResult>,
+): Promise<TResult> {
+  return queueStateMutex.runExclusiveMany(keys, () =>
+    runWithBrowserLocks("state", keys, operation),
+  );
+}
+
+function runQueueReplayExclusive<TResult>(
+  key: string,
+  operation: () => Promise<TResult>,
+): Promise<TResult> {
+  return queueReplayMutex.runExclusive(key, () =>
+    runWithBrowserLock("replay", key, operation),
+  );
+}
+
+function runQueueReplayExclusiveMany<TResult>(
+  keys: string[],
+  operation: () => Promise<TResult>,
+): Promise<TResult> {
+  return queueReplayMutex.runExclusiveMany(keys, () =>
+    runWithBrowserLocks("replay", keys, operation),
+  );
+}
 
 export function createPreferencesStorageAdapter(
   preferences: PreferencesLikeStorage,
 ): AsyncKeyValueStorage {
-  return {
+  const adapter: AsyncKeyValueStorage = {
     async getItem(key) {
       const result = await preferences.get({ key });
       return result.value;
@@ -151,10 +353,21 @@ export function createPreferencesStorageAdapter(
     async setItem(key, value) {
       await preferences.set({ key, value });
     },
-    async removeItem(key) {
-      await preferences.remove?.({ key });
-    },
   };
+
+  if (preferences.remove) {
+    adapter.removeItem = async (key) => {
+      await preferences.remove?.({ key });
+    };
+  }
+  if (preferences.keys) {
+    adapter.keys = async () => {
+      const result = await preferences.keys?.();
+      return result?.keys ?? [];
+    };
+  }
+
+  return adapter;
 }
 
 export function createMemoryStorage(
@@ -172,10 +385,15 @@ export function createMemoryStorage(
     async removeItem(key) {
       values.delete(key);
     },
+    async keys() {
+      return [...values.keys()];
+    },
   };
 }
 
-export function createWebStorageAdapter(storage: Storage): AsyncKeyValueStorage {
+export function createWebStorageAdapter(
+  storage: Storage,
+): AsyncKeyValueStorage {
   return {
     async getItem(key) {
       return storage.getItem(key);
@@ -186,24 +404,115 @@ export function createWebStorageAdapter(storage: Storage): AsyncKeyValueStorage 
     async removeItem(key) {
       storage.removeItem(key);
     },
+    async keys() {
+      const keys: string[] = [];
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (key !== null) {
+          keys.push(key);
+        }
+      }
+      return keys;
+    },
   };
 }
 
 export function buildScopedOfflineQueueKey(
   scope: OfflineQueueScope,
-  namespace = "cleanhub.pos.offline.queue.v1",
+  namespace = DEFAULT_SCOPED_OFFLINE_QUEUE_NAMESPACE,
+): string {
+  const segments = [
+    scope.tenantId,
+    scope.branchId,
+    scope.terminalId,
+    scope.userId,
+  ].map((segment) => segment.trim());
+
+  if (
+    segments.some((segment) => segment.length === 0) ||
+    !Number.isInteger(scope.terminalCredentialVersion) ||
+    scope.terminalCredentialVersion < 1
+  ) {
+    throw new Error(
+      "Offline queue scope requires tenant, branch, terminal, user, and credential epoch identifiers.",
+    );
+  }
+
+  return [
+    namespace,
+    ...segments.map(encodeURIComponent),
+    `epoch-${scope.terminalCredentialVersion}`,
+  ].join(":");
+}
+
+function buildLegacyScopedOfflineQueueKey(
+  scope: Pick<OfflineQueueScope, "tenantId" | "branchId" | "terminalId">,
 ): string {
   const segments = [scope.tenantId, scope.branchId, scope.terminalId].map(
     (segment) => segment.trim(),
   );
-
   if (segments.some((segment) => segment.length === 0)) {
     throw new Error(
-      "Offline queue scope requires tenant, branch, and terminal identifiers.",
+      "Legacy offline queue scope requires tenant, branch, and terminal identifiers.",
     );
   }
 
-  return [namespace, ...segments.map(encodeURIComponent)].join(":");
+  return [
+    LEGACY_SCOPED_OFFLINE_QUEUE_NAMESPACE,
+    ...segments.map(encodeURIComponent),
+  ].join(":");
+}
+
+export function parseScopedOfflineQueueKey(
+  queueKey: string,
+  namespace = DEFAULT_SCOPED_OFFLINE_QUEUE_NAMESPACE,
+): ParsedScopedOfflineQueueKey | null {
+  const prefix = `${namespace}:`;
+  if (!queueKey.startsWith(prefix)) {
+    return null;
+  }
+
+  const segments = queueKey.slice(prefix.length).split(":");
+  if (segments.length !== 4 && segments.length !== 5) {
+    return null;
+  }
+
+  const epochSegment = segments.at(-1);
+  const epochMatch = /^epoch-([1-9]\d*)$/.exec(epochSegment ?? "");
+  if (!epochMatch) {
+    return null;
+  }
+
+  try {
+    const tenantId = decodeURIComponent(segments[0] ?? "");
+    const branchId = decodeURIComponent(segments[1] ?? "");
+    const terminalId = decodeURIComponent(segments[2] ?? "");
+    const userId =
+      segments.length === 5 ? decodeURIComponent(segments[3] ?? "") : null;
+    const terminalCredentialVersion = Number(epochMatch[1]);
+
+    if (
+      !tenantId ||
+      !branchId ||
+      !terminalId ||
+      userId === "" ||
+      !Number.isSafeInteger(terminalCredentialVersion)
+    ) {
+      return null;
+    }
+
+    return {
+      queueKey,
+      namespace,
+      tenantId,
+      branchId,
+      terminalId,
+      userId,
+      terminalCredentialVersion,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function createScopedOfflineQueue(input: {
@@ -217,14 +526,163 @@ export function createScopedOfflineQueue(input: {
   });
 }
 
-export function createScopedPrintJobQueue<TPayload>(input: {
+export function buildScopedPrintJobQueueKey(
+  scope: PersistentPrintJobQueueScope,
+  namespace = DEFAULT_PRINT_QUEUE_KEY,
+): string {
+  const segments = [scope.tenantId, scope.branchId, scope.terminalId].map(
+    (segment) => segment.trim(),
+  );
+
+  if (segments.some((segment) => segment.length === 0)) {
+    throw new Error(
+      "Print job queue scope requires tenant, branch, and terminal identifiers.",
+    );
+  }
+
+  return [namespace, ...segments.map(encodeURIComponent)].join(":");
+}
+
+export async function recoverScopedOfflineQueue(input: {
   storage: AsyncKeyValueStorage;
   scope: OfflineQueueScope;
+  namespace?: string;
+}): Promise<ScopedOfflineQueueRecoveryResult> {
+  const { storage, scope } = input;
+  const namespace = input.namespace ?? DEFAULT_SCOPED_OFFLINE_QUEUE_NAMESPACE;
+  const currentScope: OfflineQueueScope = {
+    tenantId: scope.tenantId.trim(),
+    branchId: scope.branchId.trim(),
+    terminalId: scope.terminalId.trim(),
+    userId: scope.userId.trim(),
+    terminalCredentialVersion: scope.terminalCredentialVersion,
+  };
+  const currentQueueKey = buildScopedOfflineQueueKey(currentScope, namespace);
+  const legacyQueueKey = buildLegacyScopedOfflineQueueKey(currentScope);
+  const storageKeys = storage.keys ? await storage.keys() : [];
+  const relatedQueues = [...new Set(storageKeys)]
+    .map((queueKey) => parseScopedOfflineQueueKey(queueKey, namespace))
+    .filter(
+      (parsed): parsed is ParsedScopedOfflineQueueKey =>
+        parsed !== null &&
+        parsed.queueKey !== currentQueueKey &&
+        parsed.tenantId === currentScope.tenantId &&
+        parsed.terminalId === currentScope.terminalId,
+    );
+
+  const lockKeys = [
+    currentQueueKey,
+    legacyQueueKey,
+    ...relatedQueues.map((candidate) => candidate.queueKey),
+  ];
+
+  return runQueueReplayExclusiveMany(lockKeys, () =>
+    runQueueStateExclusiveMany(lockKeys, async () => {
+      const quarantined: ScopedOfflineQueueQuarantine[] = [];
+
+      const candidates = await Promise.all(
+        relatedQueues.map(async (parsed) => ({
+          parsed,
+          items: await readOfflineQueueFromStorage(storage, parsed.queueKey),
+        })),
+      );
+      const legacyItems = await readOfflineQueueFromStorage(
+        storage,
+        legacyQueueKey,
+      );
+
+      for (const { parsed, items } of candidates) {
+        const pendingCount = items.filter(
+          (item) => item.status === "pending",
+        ).length;
+        if (pendingCount === 0) {
+          continue;
+        }
+
+        const reasons: ScopedOfflineQueueQuarantineReason[] = [];
+        if (parsed.branchId !== currentScope.branchId) {
+          reasons.push("branch_mismatch");
+        }
+        if (parsed.userId !== currentScope.userId) {
+          reasons.push("user_mismatch");
+        }
+        if (
+          parsed.terminalCredentialVersion !==
+          currentScope.terminalCredentialVersion
+        ) {
+          // A credential epoch changes only for a terminal, branch, or tenant
+          // security lifecycle event. The client cannot prove whether an old
+          // offline command was created before or after revocation while the
+          // device was disconnected, so no old epoch may be re-signed and
+          // replayed automatically by a new authenticated session.
+          reasons.push("credential_epoch_mismatch");
+        }
+        if (
+          parsed.terminalCredentialVersion >
+          currentScope.terminalCredentialVersion
+        ) {
+          reasons.push("future_epoch");
+        } else if (
+          parsed.terminalCredentialVersion ===
+          currentScope.terminalCredentialVersion
+        ) {
+          reasons.push("non_previous_epoch");
+        }
+
+        quarantined.push({
+          queueKey: parsed.queueKey,
+          scope: {
+            tenantId: parsed.tenantId,
+            branchId: parsed.branchId,
+            terminalId: parsed.terminalId,
+            userId: parsed.userId,
+            terminalCredentialVersion: parsed.terminalCredentialVersion,
+          },
+          pendingCount,
+          reasons,
+        });
+      }
+
+      const legacyPendingCount = legacyItems.filter(
+        (item) => item.status === "pending",
+      ).length;
+      if (legacyPendingCount > 0) {
+        quarantined.push({
+          queueKey: legacyQueueKey,
+          scope: {
+            tenantId: currentScope.tenantId,
+            branchId: currentScope.branchId,
+            terminalId: currentScope.terminalId,
+            userId: null,
+            terminalCredentialVersion: null,
+          },
+          pendingCount: legacyPendingCount,
+          reasons: ["legacy_scope_unattributed"],
+        });
+      }
+
+      return {
+        storageEnumerationSupported: Boolean(storage.keys),
+        migratedItemCount: 0,
+        migratedQueueKeys: [],
+        quarantinedItemCount: quarantined.reduce(
+          (total, entry) => total + entry.pendingCount,
+          0,
+        ),
+        quarantined,
+      };
+    }),
+  );
+}
+
+export function createScopedPrintJobQueue<TPayload>(input: {
+  storage: AsyncKeyValueStorage;
+  scope: PersistentPrintJobQueueScope;
   namespace?: string;
 }): PersistentPrintJobQueue<TPayload> {
   return new PersistentPrintJobQueue<TPayload>({
     storage: input.storage,
-    queueKey: buildScopedOfflineQueueKey(
+    queueKey: buildScopedPrintJobQueueKey(
       input.scope,
       input.namespace ?? DEFAULT_PRINT_QUEUE_KEY,
     ),
@@ -243,151 +701,165 @@ export class OfflineQueue {
   async enqueue<TPayload = unknown>(
     input: EnqueueInput<TPayload>,
   ): Promise<OfflineQueueItem<TPayload>> {
-    const queue = await this.readQueue<TPayload>();
-    const existing = queue.find(
-      (item) =>
-        (input.id !== undefined && item.id === input.id) ||
-        (input.idempotencyKey !== undefined &&
-          item.idempotencyKey === input.idempotencyKey),
-    );
-    if (existing) {
-      return existing;
-    }
+    return runQueueStateExclusive(this.queueKey, async () => {
+      const queue = await this.readQueue<TPayload>();
+      const existing = queue.find(
+        (item) =>
+          (input.id !== undefined && item.id === input.id) ||
+          (input.idempotencyKey !== undefined &&
+            item.idempotencyKey === input.idempotencyKey),
+      );
+      if (existing) {
+        return existing;
+      }
 
-    const now = new Date().toISOString();
-    const item: OfflineQueueItem<TPayload> = {
-      id: input.id ?? createId(),
-      entity: input.entity,
-      operation: input.operation,
-      payload: input.payload,
-      idempotencyKey: input.idempotencyKey ?? createId(),
-      status: "pending",
-      attempt: 0,
-      createdAt: now,
-      updatedAt: now,
-      metadata: input.metadata,
-    };
+      const now = new Date().toISOString();
+      const item: OfflineQueueItem<TPayload> = {
+        id: input.id ?? createId(),
+        entity: input.entity,
+        operation: input.operation,
+        payload: input.payload,
+        idempotencyKey: input.idempotencyKey ?? createId(),
+        status: "pending",
+        attempt: 0,
+        createdAt: now,
+        updatedAt: now,
+        metadata: input.metadata,
+      };
 
-    queue.push(item);
-    await this.writeQueue(queue);
-    return item;
+      queue.push(item);
+      await this.writeQueue(queue);
+      return item;
+    });
   }
 
   async peek<TPayload = unknown>(): Promise<
     OfflineQueueItem<TPayload> | undefined
   > {
-    const queue = await this.readQueue<TPayload>();
-    return queue.find((item) => item.status === "pending");
+    return runQueueStateExclusive(this.queueKey, async () => {
+      const queue = await this.readQueue<TPayload>();
+      return queue.find((item) => item.status === "pending");
+    });
   }
 
   async list<TPayload = unknown>(): Promise<OfflineQueueItem<TPayload>[]> {
-    return this.readQueue<TPayload>();
+    return runQueueStateExclusive(this.queueKey, () =>
+      this.readQueue<TPayload>(),
+    );
   }
 
   async markSynced(id: string): Promise<void> {
-    const queue = await this.readQueue();
-    const nextQueue = queue.filter((item) => item.id !== id);
+    await runQueueStateExclusive(this.queueKey, async () => {
+      const queue = await this.readQueue();
+      const nextQueue = queue.filter((item) => item.id !== id);
 
-    if (nextQueue.length !== queue.length) {
-      await this.writeQueue(nextQueue);
-      return;
-    }
+      if (nextQueue.length !== queue.length) {
+        await this.writeQueue(nextQueue);
+        return;
+      }
 
-    await this.writeQueue(
-      queue.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: "synced",
-              syncedAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-              lastError: undefined,
-            }
-          : item,
-      ),
-    );
+      await this.writeQueue(
+        queue.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status: "synced",
+                syncedAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                lastError: undefined,
+              }
+            : item,
+        ),
+      );
+    });
   }
 
   async updatePayload<TPayload = unknown>(
     id: string,
     updater: OfflineQueuePayloadUpdater<TPayload>,
   ): Promise<OfflineQueueItem<TPayload> | undefined> {
-    const queue = await this.readQueue<TPayload>();
-    const now = new Date().toISOString();
-    let updated: OfflineQueueItem<TPayload> | undefined;
+    return runQueueStateExclusive(this.queueKey, async () => {
+      const queue = await this.readQueue<TPayload>();
+      const now = new Date().toISOString();
+      let updated: OfflineQueueItem<TPayload> | undefined;
 
-    const nextQueue = queue.map((item) => {
-      if (item.id !== id) {
-        return item;
-      }
+      const nextQueue = queue.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
 
-      updated = {
-        ...item,
-        payload: updater(item.payload),
-        updatedAt: now,
-        lastError: undefined,
-      };
+        updated = {
+          ...item,
+          payload: updater(item.payload),
+          updatedAt: now,
+          lastError: undefined,
+        };
+        return updated;
+      });
+
+      await this.writeQueue(nextQueue);
       return updated;
     });
-
-    await this.writeQueue(nextQueue);
-    return updated;
   }
 
   async replay<TPayload = unknown>(
     handler: ReplayHandler<TPayload>,
   ): Promise<ReplayResult<TPayload>> {
-    const replayed: OfflineQueueItem<TPayload>[] = [];
+    return runQueueReplayExclusive(this.queueKey, async () => {
+      const replayed: OfflineQueueItem<TPayload>[] = [];
 
-    while (true) {
-      const item = await this.peek<TPayload>();
+      while (true) {
+        const item = await this.peek<TPayload>();
 
-      if (!item) {
-        return { replayed };
+        if (!item) {
+          return { replayed };
+        }
+
+        try {
+          await handler(item);
+          replayed.push(item);
+          await this.markSynced(item.id);
+        } catch (error) {
+          const failed = await this.recordFailure<TPayload>(item.id, error);
+          return { replayed, failed };
+        }
       }
-
-      try {
-        await handler(item);
-        replayed.push(item);
-        await this.markSynced(item.id);
-      } catch (error) {
-        const failed = await this.recordFailure<TPayload>(item.id, error);
-        return { replayed, failed };
-      }
-    }
+    });
   }
 
   private async recordFailure<TPayload = unknown>(
     id: string,
     error: unknown,
   ): Promise<OfflineQueueItem<TPayload>> {
-    const queue = await this.readQueue<TPayload>();
-    const now = new Date().toISOString();
-    const message = getErrorMessage(error);
-    let failed: OfflineQueueItem<TPayload> | undefined;
+    return runQueueStateExclusive(this.queueKey, async () => {
+      const queue = await this.readQueue<TPayload>();
+      const now = new Date().toISOString();
+      const message = getErrorMessage(error);
+      let failed: OfflineQueueItem<TPayload> | undefined;
 
-    const nextQueue = queue.map((item) => {
-      if (item.id !== id) {
-        return item;
+      const nextQueue = queue.map((item) => {
+        if (item.id !== id) {
+          return item;
+        }
+
+        failed = {
+          ...item,
+          status: "pending",
+          attempt: item.attempt + 1,
+          lastError: message,
+          updatedAt: now,
+        };
+        return failed;
+      });
+
+      await this.writeQueue(nextQueue);
+
+      if (!failed) {
+        throw new Error(`Offline queue item not found: ${id}`);
       }
 
-      failed = {
-        ...item,
-        status: "pending",
-        attempt: item.attempt + 1,
-        lastError: message,
-        updatedAt: now,
-      };
       return failed;
     });
-
-    await this.writeQueue(nextQueue);
-
-    if (!failed) {
-      throw new Error(`Offline queue item not found: ${id}`);
-    }
-
-    return failed;
   }
 
   private async readQueue<TPayload = unknown>(): Promise<
@@ -425,82 +897,104 @@ export class PersistentPrintJobQueue<TPayload = unknown> {
   async enqueue(
     input: EnqueuePrintJobInput<TPayload>,
   ): Promise<PersistentPrintJob<TPayload>> {
-    const jobs = await this.readJobs();
-    const idempotencyKey = input.idempotencyKey ?? createId();
-    const existing = jobs.find(
-      (job) => job.idempotencyKey === idempotencyKey,
-    );
-    if (existing) return existing;
+    return runQueueStateExclusive(this.queueKey, async () => {
+      const jobs = await this.readJobs();
+      const idempotencyKey = input.idempotencyKey ?? createId();
+      const existing = jobs.find(
+        (job) => job.idempotencyKey === idempotencyKey,
+      );
+      if (existing) return existing;
 
-    const now = new Date().toISOString();
-    const job: PersistentPrintJob<TPayload> = {
-      id: input.id ?? createId(),
-      idempotencyKey,
-      payload: input.payload,
-      status: "pending",
-      attempt: 0,
-      createdAt: now,
-      updatedAt: now,
-    };
-    jobs.push(job);
-    await this.writeJobs(jobs);
-    return job;
+      const now = new Date().toISOString();
+      const job: PersistentPrintJob<TPayload> = {
+        id: input.id ?? createId(),
+        idempotencyKey,
+        payload: input.payload,
+        status: "pending",
+        attempt: 0,
+        createdAt: now,
+        updatedAt: now,
+      };
+      jobs.push(job);
+      await this.writeJobs(jobs);
+      return job;
+    });
   }
 
   async list(): Promise<PersistentPrintJob<TPayload>[]> {
-    return this.readJobs();
+    return runQueueStateExclusive(this.queueKey, () => this.readJobs());
   }
 
   async replay(
     handler: PrintJobHandler<TPayload>,
   ): Promise<PrintJobReplayResult<TPayload>> {
-    const printed: PersistentPrintJob<TPayload>[] = [];
+    return runQueueReplayExclusive(this.queueKey, async () => {
+      const printed: PersistentPrintJob<TPayload>[] = [];
 
-    while (true) {
-      const jobs = await this.readJobs();
-      const next = jobs.find((job) => job.status !== "printed");
-      if (!next) return { printed };
+      while (true) {
+        const jobs = await this.list();
+        const next = jobs.find(
+          (job) => job.status === "pending" || job.status === "failed",
+        );
+        if (!next) {
+          const uncertain = jobs.find((job) => job.status === "printing");
+          return uncertain ? { printed, failed: uncertain } : { printed };
+        }
 
-      const result = await this.execute(next.id, handler);
-      if (result.status === "failed") return { printed, failed: result };
-      printed.push(result);
-    }
+        const result = await this.execute(next.id, handler);
+        if (result.status === "failed") return { printed, failed: result };
+        printed.push(result);
+      }
+    });
   }
 
   async retry(
     jobId: string,
     handler: PrintJobHandler<TPayload>,
   ): Promise<PersistentPrintJob<TPayload>> {
-    const jobs = await this.readJobs();
-    const job = jobs.find((candidate) => candidate.id === jobId);
-    if (!job) throw new Error(`Print job not found: ${jobId}`);
-    if (job.status === "printed") return job;
-    return this.execute(jobId, handler);
+    return runQueueReplayExclusive(this.queueKey, async () => {
+      const jobs = await this.list();
+      const job = jobs.find((candidate) => candidate.id === jobId);
+      if (!job) throw new Error(`Print job not found: ${jobId}`);
+      if (job.status === "printed") return job;
+      if (job.status === "printing") {
+        throw new Error(
+          "Print job outcome is uncertain. Verify the physical output and use an authorized reprint instead.",
+        );
+      }
+      return this.execute(jobId, handler);
+    });
   }
 
   async clearPrinted(): Promise<void> {
-    const jobs = await this.readJobs();
-    await this.writeJobs(jobs.filter((job) => job.status !== "printed"));
+    await runQueueStateExclusive(this.queueKey, async () => {
+      const jobs = await this.readJobs();
+      await this.writeJobs(jobs.filter((job) => job.status !== "printed"));
+    });
   }
 
   private async execute(
     jobId: string,
     handler: PrintJobHandler<TPayload>,
   ): Promise<PersistentPrintJob<TPayload>> {
-    let jobs = await this.readJobs();
-    const current = jobs.find((job) => job.id === jobId);
-    if (!current) throw new Error(`Print job not found: ${jobId}`);
-    if (current.status === "printed") return current;
+    const printing = await runQueueStateExclusive(this.queueKey, async () => {
+      let jobs = await this.readJobs();
+      const current = jobs.find((job) => job.id === jobId);
+      if (!current) throw new Error(`Print job not found: ${jobId}`);
+      if (current.status === "printed") return current;
 
-    const printing: PersistentPrintJob<TPayload> = {
-      ...current,
-      status: "printing",
-      attempt: current.attempt + 1,
-      updatedAt: new Date().toISOString(),
-      lastError: undefined,
-    };
-    jobs = jobs.map((job) => (job.id === jobId ? printing : job));
-    await this.writeJobs(jobs);
+      const next: PersistentPrintJob<TPayload> = {
+        ...current,
+        status: "printing",
+        attempt: current.attempt + 1,
+        updatedAt: new Date().toISOString(),
+        lastError: undefined,
+      };
+      jobs = jobs.map((job) => (job.id === jobId ? next : job));
+      await this.writeJobs(jobs);
+      return next;
+    });
+    if (printing.status === "printed") return printing;
 
     try {
       await handler(printing);
@@ -525,10 +1019,12 @@ export class PersistentPrintJobQueue<TPayload = unknown> {
   }
 
   private async replaceJob(next: PersistentPrintJob<TPayload>): Promise<void> {
-    const jobs = await this.readJobs();
-    await this.writeJobs(
-      jobs.map((job) => (job.id === next.id ? next : job)),
-    );
+    await runQueueStateExclusive(this.queueKey, async () => {
+      const jobs = await this.readJobs();
+      await this.writeJobs(
+        jobs.map((job) => (job.id === next.id ? next : job)),
+      );
+    });
   }
 
   private async readJobs(): Promise<PersistentPrintJob<TPayload>[]> {
@@ -559,7 +1055,9 @@ export class DeliveryTaskCache<
     this.cacheKey = options.cacheKey ?? DEFAULT_DELIVERY_TASK_CACHE_KEY;
   }
 
-  async saveTasks(tasks: TTask[]): Promise<DeliveryTaskCacheSnapshot<TTask, TDetail>> {
+  async saveTasks(
+    tasks: TTask[],
+  ): Promise<DeliveryTaskCacheSnapshot<TTask, TDetail>> {
     const snapshot = await this.readSnapshot();
     const nextSnapshot: DeliveryTaskCacheSnapshot<TTask, TDetail> = {
       ...snapshot,
@@ -576,7 +1074,9 @@ export class DeliveryTaskCache<
     return snapshot.tasks;
   }
 
-  async saveTaskDetail(detail: TDetail): Promise<DeliveryTaskCacheSnapshot<TTask, TDetail>> {
+  async saveTaskDetail(
+    detail: TDetail,
+  ): Promise<DeliveryTaskCacheSnapshot<TTask, TDetail>> {
     const snapshot = await this.readSnapshot();
     const nextSnapshot: DeliveryTaskCacheSnapshot<TTask, TDetail> = {
       ...snapshot,
@@ -675,6 +1175,19 @@ export async function replay<TPayload = unknown>(
   handler: ReplayHandler<TPayload>,
 ): Promise<ReplayResult<TPayload>> {
   return queue.replay(handler);
+}
+
+async function readOfflineQueueFromStorage(
+  storage: AsyncKeyValueStorage,
+  queueKey: string,
+): Promise<OfflineQueueItem[]> {
+  const rawValue = await storage.getItem(queueKey);
+  if (!rawValue) {
+    return [];
+  }
+
+  const parsed = JSON.parse(rawValue) as OfflineQueueItem[];
+  return Array.isArray(parsed) ? parsed : [];
 }
 
 function createEmptyDeliveryTaskSnapshot<
