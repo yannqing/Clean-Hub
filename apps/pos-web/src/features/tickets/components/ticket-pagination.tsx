@@ -1,44 +1,38 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useTransition } from "react";
+import { useTransition, type ReactNode } from "react";
+import { useTranslation } from "@cleanhub/i18n/react";
+import { cn } from "@cleanhub/ui";
 
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { buildPaginationWindow } from "@/lib/pagination";
 
 import {
   DEFAULT_TICKET_PAGE_SIZE,
   TICKET_FILTER_KEYS,
-  TICKET_PAGE_SIZE_OPTIONS,
   parsePageParam,
-  parsePageSizeParam,
 } from "./ticket-filter-params";
 
 type TicketPaginationProps = {
   total: number;
 };
 
-/**
- * Pagination bar for the tickets list. Page and page size live in the URL
- * (`page`, `pageSize`) so the server component re-fetches on change — the
- * controls here only push URL state, they never hold data.
- *
- * Computes a compact page-number window around the current page so very wide
- * result sets don't render dozens of buttons.
- */
 export function TicketPagination({ total }: TicketPaginationProps) {
+  const { locale } = useTranslation();
   const router = useRouter();
   const params = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  const pageSize = parsePageSizeParam(params.get(TICKET_FILTER_KEYS.pageSize));
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const pageCount = Math.max(1, Math.ceil(total / DEFAULT_TICKET_PAGE_SIZE));
   const page = Math.min(
     parsePageParam(params.get(TICKET_FILTER_KEYS.page)),
     pageCount,
   );
-
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = Math.min(page * pageSize, total);
+  const from = total === 0 ? 0 : (page - 1) * DEFAULT_TICKET_PAGE_SIZE + 1;
+  const to = Math.min(page * DEFAULT_TICKET_PAGE_SIZE, total);
+  const pages = buildPaginationWindow(page, pageCount);
+  const text = (value: string) => translatePosText(value, locale);
 
   function goTo(nextPage: number) {
     const clamped = Math.min(Math.max(1, nextPage), pageCount);
@@ -47,59 +41,28 @@ export function TicketPagination({ total }: TicketPaginationProps) {
     }
     const search = new URLSearchParams(params.toString());
     search.set(TICKET_FILTER_KEYS.page, String(clamped));
+    search.delete(TICKET_FILTER_KEYS.pageSize);
     startTransition(() => {
       router.replace(`/tickets?${search.toString()}`, { scroll: false });
     });
   }
-
-  function changeSize(nextSize: number) {
-    const search = new URLSearchParams(params.toString());
-    search.set(TICKET_FILTER_KEYS.pageSize, String(nextSize));
-    // Reset to first page so the offset stays valid for the new size.
-    search.set(TICKET_FILTER_KEYS.page, "1");
-    startTransition(() => {
-      router.replace(`/tickets?${search.toString()}`, { scroll: false });
-    });
-  }
-
-  const pages = buildPaginationWindow(page, pageCount);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3 text-sm">
-      <div className="flex items-center gap-3">
-        <span className="text-slate-500">
-          第 <span className="font-semibold text-slate-700">{from}</span>–
-          <span className="font-semibold text-slate-700">{to}</span> 条 / 共{" "}
-          <span className="font-semibold text-slate-700">{total}</span> 条
-        </span>
-        <label className="flex items-center gap-2 text-slate-500">
-          每页
-          <select
-            className="h-10 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none disabled:opacity-60"
-            disabled={isPending}
-            onChange={(event) => changeSize(Number(event.target.value))}
-            value={pageSize}
-          >
-            {TICKET_PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-          条
-        </label>
-      </div>
+    <div className="flex flex-col gap-2 border-t px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+      <span className="text-muted-foreground">
+        {formatTicketRange(from, to, total, locale)}
+      </span>
 
       <div className="flex items-center gap-1">
         <PagerButton
           disabled={isPending || page <= 1}
           onClick={() => goTo(page - 1)}
         >
-          上一页
+          {text("上一页")}
         </PagerButton>
         {pages.map((entry, index) =>
           entry === "..." ? (
-            <span className="px-2 text-slate-400" key={`gap-${index}`}>
+            <span className="px-1.5 text-muted-foreground" key={`gap-${index}`}>
               …
             </span>
           ) : (
@@ -117,11 +80,26 @@ export function TicketPagination({ total }: TicketPaginationProps) {
           disabled={isPending || page >= pageCount}
           onClick={() => goTo(page + 1)}
         >
-          下一页
+          {text("下一页")}
         </PagerButton>
       </div>
     </div>
   );
+}
+
+function formatTicketRange(
+  from: number,
+  to: number,
+  total: number,
+  locale: string,
+): string {
+  if (locale === "en") {
+    return `${from}–${to} of ${total}`;
+  }
+  if (locale === "fr") {
+    return `${from}–${to} sur ${total}`;
+  }
+  return `第 ${from}–${to} 条 / 共 ${total} 条`;
 }
 
 function PagerButton({
@@ -133,15 +111,16 @@ function PagerButton({
   active?: boolean;
   disabled?: boolean;
   onClick: () => void;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <button
-      className={`flex h-11 min-w-11 items-center justify-center rounded-md px-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={cn(
+        "flex h-10 min-w-10 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 sm:h-7 sm:min-w-7",
         active
-          ? "bg-slate-950 text-white"
-          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
-      }`}
+          ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+          : "bg-background text-foreground",
+      )}
       disabled={disabled}
       onClick={onClick}
       type="button"
@@ -150,5 +129,3 @@ function PagerButton({
     </button>
   );
 }
-
-void DEFAULT_TICKET_PAGE_SIZE;

@@ -30,9 +30,9 @@ export type BadgeTone =
   | "red";
 
 export const BADGE_TONE_CLASSES: Record<BadgeTone, string> = {
-  slate: "bg-slate-100 text-slate-600",
-  blue: "bg-blue-50 text-blue-700",
-  violet: "bg-violet-50 text-violet-700",
+  slate: "bg-muted text-muted-foreground",
+  blue: "bg-accent text-accent-foreground",
+  violet: "bg-secondary text-secondary-foreground",
   emerald: "bg-emerald-50 text-emerald-700",
   amber: "bg-amber-50 text-amber-700",
   red: "bg-red-50 text-red-700",

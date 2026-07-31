@@ -56,29 +56,29 @@ export function TicketDeleteDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-4"
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
         }
       }}
     >
-      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl bg-white shadow-2xl">
-        <div className="border-b border-slate-200 p-5">
-          <h2 className="text-lg font-semibold text-slate-950">删除工单</h2>
-          <p className="mt-1 text-sm text-slate-500">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border bg-background text-foreground shadow-2xl">
+        <div className="border-b p-5">
+          <h2 className="text-lg font-semibold text-foreground">删除工单</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             确定要删除工单
-            <span className="mx-1 font-mono font-semibold text-slate-700">
+            <span className="mx-1 font-mono font-semibold text-foreground">
               {ticketNo ?? ticketId.slice(-8).toUpperCase()}
             </span>
             吗？此操作为软删除，将级联删除该工单下的所有项目。
           </p>
         </div>
         <div className="p-5">
-          <label className="grid gap-2 text-sm font-semibold text-slate-700">
+          <label className="grid gap-2 text-sm font-semibold text-foreground">
             删除原因（必填）
             <textarea
-              className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-400"
+              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
               disabled={isPending}
               maxLength={500}
               onChange={(event) => setReason(event.target.value)}
@@ -86,9 +86,9 @@ export function TicketDeleteDialog({
             />
           </label>
         </div>
-        <div className="flex justify-end gap-2 border-t border-slate-200 p-4">
+        <div className="flex justify-end gap-2 border-t p-4">
           <button
-            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
             disabled={isPending || !reason.trim()}
             onClick={onClose}
             type="button"
@@ -96,7 +96,7 @@ export function TicketDeleteDialog({
             取消
           </button>
           <button
-            className="h-11 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+            className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
             disabled={isPending}
             onClick={confirm}
             type="button"

@@ -124,17 +124,17 @@ export function TicketItemEditor({
   const formOpen = creating || editingId !== null;
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="flex items-center justify-between border-b border-slate-200 p-5">
+    <section className="overflow-hidden border-y bg-background">
+      <div className="flex items-center justify-between border-b p-5">
         <div>
-          <h2 className="font-semibold text-slate-950">工单项目</h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <h2 className="font-semibold text-foreground">工单项目</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
             {items.length} 个项目 · 数量{" "}
             {items.reduce((n, x) => n + x.quantity, 0)}
           </p>
         </div>
         <button
-          className="flex h-11 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700 hover:bg-blue-100"
+          className="flex h-11 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90"
           onClick={startCreate}
           type="button"
         >
@@ -143,9 +143,9 @@ export function TicketItemEditor({
         </button>
       </div>
 
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y">
         {items.length === 0 ? (
-          <div className="px-5 py-10 text-center text-sm text-slate-400">
+          <div className="px-5 py-10 text-center text-sm text-muted-foreground">
             该工单暂无项目，点击「添加项目」开始录入。
           </div>
         ) : null}
@@ -254,12 +254,14 @@ function ItemRow({
     <article className="p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-base font-semibold text-slate-950">
+          <div className="text-base font-semibold text-foreground">
             {item.itemName}
           </div>
-          <div className="mt-1 text-xs text-slate-500">{details || "—"}</div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {details || "—"}
+          </div>
           {item.labelCode ? (
-            <div className="mt-1 font-mono text-[11px] text-blue-600">
+            <div className="mt-1 font-mono text-[11px] text-foreground">
               标签 {item.labelCode}
             </div>
           ) : null}
@@ -267,7 +269,7 @@ function ItemRow({
         <div className="flex shrink-0 gap-2">
           <button
             aria-label="修改项目"
-            className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700"
+            className="flex h-11 w-11 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             disabled={isPending}
             onClick={onEdit}
             title="修改项目"
@@ -278,7 +280,7 @@ function ItemRow({
           {canManage ? (
             <button
               aria-label="删除项目"
-              className="flex h-11 w-11 items-center justify-center rounded-lg border border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+              className="flex h-11 w-11 items-center justify-center rounded-md border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10"
               disabled={isPending}
               onClick={() => setDeleteOpen(true)}
               title="删除项目"
@@ -291,31 +293,31 @@ function ItemRow({
       </div>
 
       {item.defectNotes || item.specialRequest ? (
-        <div className="mt-3 space-y-1 rounded-lg border border-amber-100 bg-amber-50/60 p-3">
+        <div className="mt-3 space-y-1 rounded-md border border-amber-200/70 bg-amber-50/60 p-3 dark:border-amber-900/60 dark:bg-amber-950/20">
           {item.defectNotes ? (
-            <div className="text-xs text-slate-600">
-              <span className="font-semibold text-slate-700">瑕疵：</span>
+            <div className="text-xs text-foreground">
+              <span className="font-semibold">瑕疵：</span>
               {item.defectNotes}
             </div>
           ) : null}
           {item.specialRequest ? (
-            <div className="text-xs text-slate-600">
-              <span className="font-semibold text-slate-700">要求：</span>
+            <div className="text-xs text-foreground">
+              <span className="font-semibold">要求：</span>
               {item.specialRequest}
             </div>
           ) : null}
         </div>
       ) : null}
 
-      <div className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 rounded-md bg-muted/40 p-3 sm:grid-cols-3">
         <div>
-          <div className="text-xs text-slate-400">项目状态</div>
+          <div className="text-xs text-muted-foreground">项目状态</div>
           <div className="mt-1">
             <TicketItemStatusBadge status={item.itemStatus} />
           </div>
           {reachable.length > 0 ? (
             <select
-              className="mt-2 h-10 w-full rounded-md border border-slate-200 bg-white px-2 text-xs text-slate-700 outline-none"
+              className="mt-2 h-11 w-full rounded-md border bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
               disabled={isPending}
               onChange={(event) =>
                 changeStatus(event.target.value as ServiceTicketItemStatus)
@@ -332,10 +334,10 @@ function ItemRow({
           ) : null}
         </div>
         <div>
-          <div className="text-xs text-slate-400">
+          <div className="text-xs text-muted-foreground">
             {item.pricingUnit === "per_kg" ? "重量 / 单价" : "数量 / 单价"}
           </div>
-          <div className="mt-1 text-sm font-medium text-slate-700">
+          <div className="mt-1 text-sm font-medium text-foreground">
             {item.pricingUnit === "per_kg"
               ? `${item.weight ?? "0"} kg${item.bagCount ? ` · ${item.bagCount} 袋` : ""}`
               : `${item.quantity} 件`}{" "}
@@ -348,8 +350,8 @@ function ItemRow({
           ) : null}
         </div>
         <div>
-          <div className="text-xs text-slate-400">项目金额</div>
-          <div className="mt-1 font-semibold text-slate-950">
+          <div className="text-xs text-muted-foreground">项目金额</div>
+          <div className="mt-1 font-semibold text-foreground">
             {formatTicketMoney(item.lineAmount, currency)}
           </div>
         </div>
@@ -368,7 +370,7 @@ function ItemRow({
             <DialogTitle>删除项目</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-muted-foreground">
               删除「{item.itemName}」会写入审计记录。
             </p>
             <Field label="删除原因（必填）" wide>
@@ -382,7 +384,7 @@ function ItemRow({
             </Field>
             <div className="flex justify-end gap-2">
               <button
-                className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600"
+                className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
                 disabled={isPending}
                 onClick={() => setDeleteOpen(false)}
                 type="button"
@@ -390,7 +392,7 @@ function ItemRow({
                 取消
               </button>
               <button
-                className="h-10 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+                className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-60"
                 disabled={isPending || !deleteReason.trim()}
                 onClick={remove}
                 type="button"
@@ -700,9 +702,9 @@ function ItemForm({
           />
         </Field>
       </div>
-      <div className="mt-5 flex justify-end gap-2 border-t border-slate-100 pt-4">
+      <div className="mt-5 flex justify-end gap-2 border-t pt-4">
         <button
-          className="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          className="h-11 rounded-md border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
           disabled={isPending}
           onClick={onCancel}
           type="button"
@@ -710,7 +712,7 @@ function ItemForm({
           取消
         </button>
         <button
-          className="flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          className="flex h-11 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-60"
           disabled={isPending}
           type="submit"
         >
@@ -723,7 +725,7 @@ function ItemForm({
 }
 
 const inputClass =
-  "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400 disabled:bg-slate-100";
+  "h-9 w-full rounded-md border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted disabled:text-muted-foreground";
 
 function Field({
   label,
@@ -736,7 +738,7 @@ function Field({
 }) {
   return (
     <label className={wide ? "col-span-2 lg:col-span-3" : ""}>
-      <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>
       {children}

@@ -3,6 +3,15 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 import { useTranslation } from "@cleanhub/i18n/react";
+import {
+  Button,
+  Checkbox,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  cn,
+} from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
@@ -12,18 +21,13 @@ import {
   TICKET_STATUS_OPTIONS,
   TICKET_TYPE_OPTIONS,
 } from "../constants";
-import { TICKET_FILTER_KEYS } from "./ticket-filter-params";
-import type { TicketListDateFilter, TicketListScope } from "../types";
-
-const DATE_OPTIONS: ReadonlyArray<{
-  value: TicketListDateFilter;
-  label: string;
-}> = [
-  { value: "all", label: "全部日期" },
-  { value: "pickup_today", label: "今日取件" },
-  { value: "overdue", label: "已逾期" },
-  { value: "last_7d", label: "近 7 天" },
-];
+import type { TicketListScope } from "../types";
+import {
+  TICKET_COLUMN_KEYS,
+  TICKET_COLUMN_LABELS,
+  TICKET_FILTER_KEYS,
+  type TicketColumnKey,
+} from "./ticket-filter-params";
 
 const SCOPE_OPTIONS: ReadonlyArray<{ value: TicketListScope; label: string }> =
   [
@@ -32,24 +36,11 @@ const SCOPE_OPTIONS: ReadonlyArray<{ value: TicketListScope; label: string }> =
   ];
 
 type TicketsToolbarProps = {
-  /** Total visible under the currently selected scope and filters. */
-  currentCount: number;
-  /** Count under the "mine" scope using the same filters, ignoring pagination. */
   mineCount: number;
-  /** Count under the "all" scope using the same filters, ignoring pagination. */
   allCount: number;
 };
 
-/**
- * Toolbar with scope toggle + filters. Mutations push to the URL so the server
- * component re-fetches; we never keep filter state locally beyond the input.
- * This keeps filters shareable/deep-linkable and avoids RSC/client drift.
- */
-export function TicketsToolbar({
-  allCount,
-  currentCount,
-  mineCount,
-}: TicketsToolbarProps) {
+export function TicketsToolbar({ allCount, mineCount }: TicketsToolbarProps) {
   const { locale } = useTranslation();
   const router = useRouter();
   const params = useSearchParams();
@@ -57,14 +48,17 @@ export function TicketsToolbar({
   const [draft, setDraft] = useState(params.get(TICKET_FILTER_KEYS.q) ?? "");
 
   const scope: TicketListScope =
-    (params.get(TICKET_FILTER_KEYS.scope) as TicketListScope) === "all"
-      ? "all"
-      : "mine";
+    params.get(TICKET_FILTER_KEYS.scope) === "all" ? "all" : "mine";
   const status = params.get(TICKET_FILTER_KEYS.status) ?? "";
   const type = params.get(TICKET_FILTER_KEYS.type) ?? "";
   const priority = params.get(TICKET_FILTER_KEYS.priority) ?? "";
-  const date =
-    (params.get(TICKET_FILTER_KEYS.date) as TicketListDateFilter) ?? "all";
+  const visibleColumns = parseVisibleColumns(
+    params.get(TICKET_FILTER_KEYS.columns),
+  );
+  const visibleColumnCount = TICKET_COLUMN_KEYS.filter((column) =>
+    visibleColumns.has(column),
+  ).length;
+  const text = (value: string) => translatePosText(value, locale);
 
   const apply = useCallback(
     (next: Record<string, string | undefined>, resetPage = true) => {
@@ -76,8 +70,6 @@ export function TicketsToolbar({
           search.set(key, value);
         }
       }
-      // Any filter/scope change invalidates the current page offset, so drop
-      // back to page 1 unless the caller explicitly opts out.
       if (resetPage) {
         search.delete(TICKET_FILTER_KEYS.page);
       }
@@ -93,175 +85,296 @@ export function TicketsToolbar({
       SCOPE_OPTIONS.map((option) => ({
         ...option,
         label: translatePosText(option.label, locale),
-        // Only show a count badge when we have one for that scope.
         count: option.value === "mine" ? mineCount : allCount,
-        active: scope === option.value,
       })),
-    [allCount, locale, mineCount, scope],
+    [allCount, locale, mineCount],
   );
 
-  const text = (value: string) => translatePosText(value, locale);
+  function setColumnVisible(column: TicketColumnKey, checked: boolean) {
+    if (!checked && visibleColumnCount === 1 && visibleColumns.has(column)) {
+      return;
+    }
+
+    const next = new Set(visibleColumns);
+    if (checked) {
+      next.add(column);
+    } else {
+      next.delete(column);
+    }
+    const isDefault = TICKET_COLUMN_KEYS.every((key) => next.has(key));
+    apply(
+      {
+        [TICKET_FILTER_KEYS.columns]: isDefault
+          ? undefined
+          : TICKET_COLUMN_KEYS.filter((key) => next.has(key)).join(","),
+      },
+      false,
+    );
+  }
 
   return (
-    <section className="mt-3 border-y border-slate-200 bg-white py-3">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div
-          aria-label={text("工单范围")}
-          className="flex rounded-lg bg-slate-100 p-1"
-          role="group"
-        >
-          {scopeOptions.map((option) => (
-            <button
-              aria-pressed={option.active}
-              className={`flex h-8 items-center gap-2 rounded-md px-3 text-sm font-semibold transition ${
-                option.active
-                  ? "bg-white text-slate-950 shadow-sm"
-                  : "text-slate-500 hover:text-slate-800"
-              }`}
-              disabled={isPending}
-              key={option.value}
-              onClick={() =>
-                apply({ [TICKET_FILTER_KEYS.scope]: option.value })
-              }
-              type="button"
-            >
-              {option.label}
-              {option.count !== null ? (
-                <span
-                  className={`rounded bg-slate-100 px-1.5 py-0.5 text-[11px] ${
-                    option.active ? "text-slate-700" : "text-slate-400"
-                  }`}
-                >
+    <section className="min-w-0 border-y bg-background">
+      <div className="flex items-center gap-2 border-b px-3 py-2.5">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <div
+            aria-label={text("工单范围")}
+            className="flex rounded-md bg-muted p-0.5"
+            role="group"
+          >
+            {scopeOptions.map((option) => (
+              <button
+                aria-pressed={scope === option.value}
+                className={cn(
+                  "flex h-7 items-center gap-1.5 rounded px-2 text-xs font-medium transition-colors",
+                  scope === option.value
+                    ? "bg-background text-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+                disabled={isPending}
+                key={option.value}
+                onClick={() =>
+                  apply({
+                    [TICKET_FILTER_KEYS.scope]:
+                      option.value === "mine" ? undefined : option.value,
+                  })
+                }
+                type="button"
+              >
+                {option.label}
+                <span className="text-[10px] text-muted-foreground">
                   {option.count}
                 </span>
-              ) : null}
-            </button>
-          ))}
-        </div>
-        <div className="text-xs text-slate-500">
-          {text("当前范围 · 共")} {currentCount} {text("条")}
-        </div>
-      </div>
+              </button>
+            ))}
+          </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex h-10 min-w-[250px] flex-1 items-center rounded-lg border border-slate-200 bg-white px-3 focus-within:border-slate-400">
-          <Icon className="mr-2 h-4 w-4 text-slate-400" name="search" />
-          <input
-            className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
-            onBlur={(event) => {
-              const value = event.target.value.trim();
-              if (value !== (params.get(TICKET_FILTER_KEYS.q) ?? "")) {
-                apply({ [TICKET_FILTER_KEYS.q]: value || undefined });
-              }
-            }}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                apply({ [TICKET_FILTER_KEYS.q]: draft.trim() || undefined });
-              }
-            }}
-            placeholder={text("工单号、客户名")}
-            value={draft}
-          />
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                aria-label={text("按状态筛选")}
+                className={cn((status || type || priority) && "bg-accent")}
+                disabled={isPending}
+                size="icon-sm"
+                title={text("按状态筛选")}
+                type="button"
+                variant="outline"
+              >
+                <ListFilterGlyph />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-72 p-3">
+              <FilterGroup
+                label={text("工单状态")}
+                onChange={(value) =>
+                  apply({
+                    [TICKET_FILTER_KEYS.status]: value || undefined,
+                  })
+                }
+                options={[
+                  { value: "", label: text("全部") },
+                  ...TICKET_STATUS_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: text(option.label),
+                  })),
+                ]}
+                value={status}
+              />
+              <FilterGroup
+                className="mt-3 border-t pt-3"
+                label={text("工单类型")}
+                onChange={(value) =>
+                  apply({
+                    [TICKET_FILTER_KEYS.type]: value || undefined,
+                  })
+                }
+                options={[
+                  { value: "", label: text("全部") },
+                  ...TICKET_TYPE_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: text(option.label),
+                  })),
+                ]}
+                value={type}
+              />
+              <FilterGroup
+                className="mt-3 border-t pt-3"
+                label={text("优先级")}
+                onChange={(value) =>
+                  apply({
+                    [TICKET_FILTER_KEYS.priority]: value || undefined,
+                  })
+                }
+                options={[
+                  { value: "", label: text("全部") },
+                  ...TICKET_PRIORITY_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: text(option.label),
+                  })),
+                ]}
+                value={priority}
+              />
+            </PopoverContent>
+          </Popover>
+
+          <div className="relative min-w-48 flex-1 sm:max-w-sm">
+            <label className="sr-only" htmlFor="pos-ticket-search">
+              {text("搜索工单")}
+            </label>
+            <Icon
+              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              name="search"
+            />
+            <Input
+              className="h-8 pl-8 text-xs"
+              id="pos-ticket-search"
+              inputMode="search"
+              onBlur={(event) => {
+                const value = event.target.value.trim();
+                if (value !== (params.get(TICKET_FILTER_KEYS.q) ?? "")) {
+                  apply({ [TICKET_FILTER_KEYS.q]: value || undefined });
+                }
+              }}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  apply({
+                    [TICKET_FILTER_KEYS.q]: draft.trim() || undefined,
+                  });
+                }
+              }}
+              placeholder={text("搜索工单号、客户名")}
+              type="search"
+              value={draft}
+            />
+          </div>
         </div>
 
-        <FilterSelect
-          label={text("状态")}
-          onChange={(value) =>
-            apply({ [TICKET_FILTER_KEYS.status]: value || undefined })
-          }
-          options={TICKET_STATUS_OPTIONS.map((option) => ({
-            value: option.value,
-            label: text(option.label),
-          }))}
-          placeholder={text("全部状态")}
-          value={status}
-        />
-        <FilterSelect
-          label={text("类型")}
-          onChange={(value) =>
-            apply({ [TICKET_FILTER_KEYS.type]: value || undefined })
-          }
-          options={TICKET_TYPE_OPTIONS.map((option) => ({
-            value: option.value,
-            label: text(option.label),
-          }))}
-          placeholder={text("全部类型")}
-          value={type}
-        />
-        <FilterSelect
-          label={text("优先级")}
-          onChange={(value) =>
-            apply({ [TICKET_FILTER_KEYS.priority]: value || undefined })
-          }
-          options={TICKET_PRIORITY_OPTIONS.map((option) => ({
-            value: option.value,
-            label: text(option.label),
-          }))}
-          placeholder={text("全部优先级")}
-          value={priority}
-        />
-        <FilterSelect
-          label={text("日期")}
-          onChange={(value) =>
-            apply({
-              [TICKET_FILTER_KEYS.date]:
-                value === "all" ? undefined : (value as TicketListDateFilter),
-            })
-          }
-          options={DATE_OPTIONS.map((option) => ({
-            value: option.value,
-            label: text(option.label),
-          }))}
-          placeholder={text("全部日期")}
-          value={date}
-        />
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              aria-label={text("排序与显示列")}
+              disabled={isPending}
+              size="icon-sm"
+              title={text("排序与显示列")}
+              type="button"
+              variant="outline"
+            >
+              <Icon className="size-[15px]" name="settings" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-72 p-3">
+            <div>
+              <p className="px-1 text-xs font-semibold">{text("排序方式")}</p>
+              <div className="mt-2 flex h-8 items-center gap-2 rounded-md bg-accent px-2 text-xs">
+                <span aria-hidden className="w-3 text-center">
+                  ✓
+                </span>
+                {text("默认：最新创建")}
+              </div>
+            </div>
 
-        <button
-          className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          disabled={isPending}
-          onClick={() => router.replace("/tickets", { scroll: false })}
-          type="button"
-        >
-          <Icon className="h-4 w-4" name="rotate-ccw" />
-          {text("重置")}
-        </button>
+            <div className="mt-3 border-t pt-3">
+              <p className="px-1 text-xs font-semibold">{text("显示列")}</p>
+              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                {TICKET_COLUMN_KEYS.map((column) => {
+                  const checked = visibleColumns.has(column);
+                  return (
+                    <label
+                      className="flex min-w-0 cursor-pointer items-center gap-2 text-xs"
+                      htmlFor={`pos-ticket-column-${column}`}
+                      key={column}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        disabled={checked && visibleColumnCount === 1}
+                        id={`pos-ticket-column-${column}`}
+                        onCheckedChange={(nextChecked) =>
+                          setColumnVisible(column, nextChecked === true)
+                        }
+                      />
+                      <span className="truncate">
+                        {text(TICKET_COLUMN_LABELS[column])}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </section>
   );
 }
 
-type FilterSelectProps = {
-  label: string;
-  value: string;
-  placeholder: string;
-  options: ReadonlyArray<{ value: string; label: string }>;
-  onChange: (value: string) => void;
-};
-
-/** Native select keeps the toolbar light and keyboard-friendly. */
-function FilterSelect({
+function FilterGroup({
+  className,
   label,
   value,
-  placeholder,
   options,
   onChange,
-}: FilterSelectProps) {
+}: {
+  className?: string;
+  label: string;
+  value: string;
+  options: ReadonlyArray<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+}) {
   return (
-    <label className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm">
-      <span className="font-medium text-slate-500">{label}</span>
-      <select
-        className="bg-transparent text-sm text-slate-700 outline-none"
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      >
-        <option value="">{placeholder}</option>
+    <div className={className}>
+      <p className="px-1 text-xs font-semibold">{label}</p>
+      <div className="mt-2 grid gap-1">
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <button
+            aria-pressed={value === option.value}
+            className={cn(
+              "flex min-h-8 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs transition-colors hover:bg-accent",
+              value === option.value && "bg-accent",
+            )}
+            key={option.value || "all"}
+            onClick={() => onChange(option.value)}
+            type="button"
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "w-3 text-center",
+                value === option.value ? "opacity-100" : "opacity-0",
+              )}
+            >
+              ✓
+            </span>
             {option.label}
-          </option>
+          </button>
         ))}
-      </select>
-    </label>
+      </div>
+    </div>
+  );
+}
+
+function parseVisibleColumns(value: string | null): Set<TicketColumnKey> {
+  if (!value) {
+    return new Set(TICKET_COLUMN_KEYS);
+  }
+
+  const requested = new Set(value.split(","));
+  const visible = TICKET_COLUMN_KEYS.filter((column) => requested.has(column));
+  return new Set(visible.length > 0 ? visible : TICKET_COLUMN_KEYS);
+}
+
+function ListFilterGlyph() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-[15px]"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <path d="M3 6h18M7 12h10M10 18h4" />
+    </svg>
   );
 }

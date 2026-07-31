@@ -23,6 +23,7 @@ export const TICKET_FILTER_KEYS = {
   type: "type",
   priority: "priority",
   date: "date",
+  columns: "columns",
   page: "page",
   pageSize: "pageSize",
 } as const;
@@ -34,6 +35,26 @@ export const DEFAULT_TICKET_PAGE_SIZE = 10;
 export const TICKET_PAGE_SIZE_OPTIONS: readonly number[] = [10, 20, 50];
 
 export const TICKET_MAX_PAGE_SIZE = 100;
+
+export const TICKET_COLUMN_KEYS = [
+  "ticket",
+  "customer",
+  "type",
+  "status",
+  "priority",
+  "pickup",
+] as const;
+
+export type TicketColumnKey = (typeof TICKET_COLUMN_KEYS)[number];
+
+export const TICKET_COLUMN_LABELS: Record<TicketColumnKey, string> = {
+  ticket: "工单",
+  customer: "客户",
+  type: "类型",
+  status: "状态",
+  priority: "优先级",
+  pickup: "预计取件",
+};
 
 /**
  * Parse a raw query-string value into a valid ticket status enum, or undefined.

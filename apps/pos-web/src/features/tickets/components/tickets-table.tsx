@@ -1,9 +1,22 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { KeyboardEvent } from "react";
+import type { ServiceTicketSummary } from "@cleanhub/api-client";
+import type { SupportedLocale } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";
+import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { posRoutes } from "@/config";
 
 import {
@@ -13,65 +26,151 @@ import {
   TICKET_SOURCE_LABELS,
   TICKET_TYPE_LABELS,
 } from "../constants";
-import type { ServiceTicketSummary } from "@cleanhub/api-client";
+import {
+  TICKET_COLUMN_KEYS,
+  TICKET_COLUMN_LABELS,
+  TICKET_FILTER_KEYS,
+  type TicketColumnKey,
+} from "./ticket-filter-params";
 import { TicketPriorityBadge, TicketStatusBadge } from "./ticket-badges";
 import { TicketPagination } from "./ticket-pagination";
 
 type TicketsTableProps = {
   tickets: ServiceTicketSummary[];
-  /** Total matching rows across all pages (for the header count + paginator). */
   total: number;
 };
 
-/**
- * Read-only ticket table. Rows link to the detail page; row-level edit is
- * intentionally on the detail page to keep the list lightweight (the list-page
- * quick view is the prototype's drawer — implemented separately).
- *
- * The pagination footer is rendered only when there are more rows than the
- * current page (i.e. `total` exceeds the page size). It reads/writes the
- * `page` and `pageSize` URL params, so the server component re-fetches.
- */
 export function TicketsTable({ tickets, total }: TicketsTableProps) {
   const { locale } = useTranslation();
+  const router = useRouter();
+  const params = useSearchParams();
+  const visibleColumns = parseVisibleColumns(
+    params.get(TICKET_FILTER_KEYS.columns),
+  );
+  const visibleColumnCount = TICKET_COLUMN_KEYS.filter((column) =>
+    visibleColumns.has(column),
+  ).length;
+  const text = (value: string) => translatePosText(value, locale);
 
   if (tickets.length === 0) {
     return <TicketsEmptyState />;
   }
 
-  return (
-    <section className="mt-3 overflow-hidden border-y border-slate-200 bg-white">
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-        <div>
-          <h2 className="font-semibold text-slate-950">工单列表</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            共 {total} 条结果 · 点击工单号或查看按钮打开详情
-          </p>
-        </div>
-      </div>
+  function openTicket(ticketId: string) {
+    router.push(posRoutes.ticketDetail(ticketId));
+  }
 
-      <div className="divide-y divide-slate-100 min-[1180px]:hidden">
+  function handleRowKeyDown(
+    event: KeyboardEvent<HTMLTableRowElement>,
+    ticketId: string,
+  ) {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    event.preventDefault();
+    openTicket(ticketId);
+  }
+
+  return (
+    <section className="min-w-0 overflow-hidden border-y bg-background">
+      <div className="divide-y min-[900px]:hidden">
         {tickets.map((ticket) => (
           <TicketCard key={ticket.id} locale={locale} ticket={ticket} />
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto min-[1180px]:block">
-        <div className="min-w-[1080px]">
-          <div className="grid grid-cols-[130px_minmax(190px,1.2fr)_100px_110px_110px_150px_90px] bg-slate-50 px-5 py-3 text-[11px] font-semibold tracking-[0.1em] text-slate-400 uppercase">
-            <div>工单 / 来源</div>
-            <div>客户 / 项目</div>
-            <div>类型</div>
-            <div>状态</div>
-            <div>优先级</div>
-            <div>预计取件</div>
-            <div className="text-right">操作</div>
-          </div>
-          {tickets.map((ticket) => (
-            <TicketRow key={ticket.id} locale={locale} ticket={ticket} />
-          ))}
-        </div>
+      <div className="hidden min-[900px]:block">
+        <Table
+          className="text-xs [&_td]:px-2 [&_td]:py-2 [&_th]:h-8 [&_th]:px-2"
+          style={{
+            minWidth: `${Math.max(620, visibleColumnCount * 118)}px`,
+          }}
+        >
+          <TableHeader>
+            <TableRow>
+              {TICKET_COLUMN_KEYS.map((column) =>
+                visibleColumns.has(column) ? (
+                  <TableHead key={column}>
+                    {text(TICKET_COLUMN_LABELS[column])}
+                  </TableHead>
+                ) : null,
+              )}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tickets.map((ticket) => {
+              const overdue = isOverdue(ticket);
+              const detailHref = posRoutes.ticketDetail(ticket.id);
+              return (
+                <TableRow
+                  className="cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none"
+                  key={ticket.id}
+                  onClick={() => openTicket(ticket.id)}
+                  onKeyDown={(event) => handleRowKeyDown(event, ticket.id)}
+                  onMouseEnter={() => router.prefetch(detailHref)}
+                  tabIndex={0}
+                >
+                  {visibleColumns.has("ticket") ? (
+                    <TableCell>
+                      <span className="block font-mono font-semibold text-foreground">
+                        {displayTicketCode(ticket)}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                        {text(TICKET_SOURCE_LABELS[ticket.sourceChannel])}
+                      </span>
+                    </TableCell>
+                  ) : null}
+                  {visibleColumns.has("customer") ? (
+                    <TableCell className="max-w-56">
+                      <span className="block truncate font-medium text-foreground">
+                        {ticket.customerName}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                        {ticket.itemCount} {text("个项目")} ·{" "}
+                        {formatTicketMoney(ticket.totalAmount, ticket.currency)}
+                      </span>
+                    </TableCell>
+                  ) : null}
+                  {visibleColumns.has("type") ? (
+                    <TableCell>
+                      {text(TICKET_TYPE_LABELS[ticket.ticketType])}
+                    </TableCell>
+                  ) : null}
+                  {visibleColumns.has("status") ? (
+                    <TableCell>
+                      <TicketStatusBadge status={ticket.ticketStatus} />
+                    </TableCell>
+                  ) : null}
+                  {visibleColumns.has("priority") ? (
+                    <TableCell>
+                      <TicketPriorityBadge priority={ticket.priority} />
+                    </TableCell>
+                  ) : null}
+                  {visibleColumns.has("pickup") ? (
+                    <TableCell
+                      className={
+                        overdue
+                          ? "font-medium text-destructive"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      <span className="block">
+                        {formatTicketDateTime(ticket.expectedPickupAt, locale)}
+                      </span>
+                      {overdue ? (
+                        <span className="mt-0.5 block text-[10px]">
+                          {text("已逾期")}
+                        </span>
+                      ) : null}
+                    </TableCell>
+                  ) : null}
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
+
       <TicketPagination total={total} />
     </section>
   );
@@ -81,182 +180,94 @@ function TicketCard({
   locale,
   ticket,
 }: {
-  locale: string;
+  locale: SupportedLocale;
   ticket: ServiceTicketSummary;
 }) {
   const overdue = isOverdue(ticket);
   const detailHref = posRoutes.ticketDetail(ticket.id);
+  const text = (value: string) => translatePosText(value, locale);
 
   return (
-    <article className="p-4 sm:p-5">
+    <Link
+      className="block min-h-24 px-3 py-3 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+      href={detailHref}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link
-            className="inline-flex min-h-11 items-center font-mono text-sm font-semibold text-blue-700"
-            href={detailHref}
-          >
-            {ticket.ticketNo ?? ticket.id.slice(-8).toUpperCase()}
-          </Link>
-          <div className="truncate text-base font-semibold text-slate-900">
+          <div className="font-mono text-xs font-semibold text-foreground">
+            {displayTicketCode(ticket)}
+          </div>
+          <div className="mt-1 truncate text-sm font-medium text-foreground">
             {ticket.customerName}
           </div>
-          <div className="mt-1 text-xs text-slate-500">
-            {TICKET_SOURCE_LABELS[ticket.sourceChannel]} · {ticket.itemCount}{" "}
-            个项目
+          <div className="mt-1 text-xs text-muted-foreground">
+            {text(TICKET_TYPE_LABELS[ticket.ticketType])} · {ticket.itemCount}{" "}
+            {text("个项目")}
           </div>
         </div>
         <TicketStatusBadge status={ticket.ticketStatus} />
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3">
-        <CardDetail
-          label="工单类型"
-          value={TICKET_TYPE_LABELS[ticket.ticketType]}
-        />
-        <div>
-          <dt className="text-xs text-slate-400">优先级</dt>
-          <dd className="mt-1">
-            <TicketPriorityBadge priority={ticket.priority} />
-          </dd>
-        </div>
-        <CardDetail
-          danger={overdue}
-          label="预计取件"
-          value={formatTicketDateTime(ticket.expectedPickupAt, locale)}
-        />
-      </dl>
-
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div>
-          <div className="text-xs text-slate-400">工单金额</div>
-          <div className="mt-0.5 font-semibold text-slate-950">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-foreground">
             {formatTicketMoney(ticket.totalAmount, ticket.currency)}
-          </div>
+          </span>
+          <TicketPriorityBadge priority={ticket.priority} />
         </div>
-        <Link
-          className="flex h-11 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700"
-          href={detailHref}
+        <span
+          className={
+            overdue
+              ? "flex items-center gap-1 font-medium text-destructive"
+              : "flex items-center gap-1 text-muted-foreground"
+          }
         >
-          <Icon className="h-4 w-4" name="eye" />
-          查看详情
-        </Link>
+          {ticket.expectedPickupAt
+            ? formatTicketDateTime(ticket.expectedPickupAt, locale)
+            : TICKET_EMPTY_PLACEHOLDER}
+          <Icon className="size-3.5" name="chevron-right" />
+        </span>
       </div>
-    </article>
-  );
-}
-
-function CardDetail({
-  danger,
-  label,
-  value,
-}: {
-  danger?: boolean;
-  label: string;
-  value: string;
-}) {
-  return (
-    <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
-      <dd
-        className={`mt-1 text-sm font-medium ${danger ? "text-red-700" : "text-slate-700"}`}
-      >
-        {value}
-      </dd>
-    </div>
-  );
-}
-
-function TicketRow({
-  locale,
-  ticket,
-}: {
-  locale: string;
-  ticket: ServiceTicketSummary;
-}) {
-  const overdue = isOverdue(ticket);
-  const detailHref = posRoutes.ticketDetail(ticket.id);
-  const sourceLabel = TICKET_SOURCE_LABELS[ticket.sourceChannel];
-  const typeLabel = TICKET_TYPE_LABELS[ticket.ticketType];
-
-  return (
-    <div className="grid grid-cols-[130px_minmax(190px,1.2fr)_100px_110px_110px_150px_90px] items-center border-t border-slate-100 px-5 py-3 text-sm hover:bg-slate-50/70">
-      <div className="min-w-0">
-        <Link
-          className="font-mono text-xs font-semibold text-blue-700 hover:underline"
-          href={detailHref}
-        >
-          {ticket.ticketNo ?? ticket.id.slice(-8).toUpperCase()}
-        </Link>
-        <div className="mt-1 text-[11px] text-slate-400">{sourceLabel}</div>
-      </div>
-      <div className="min-w-0">
-        <div className="truncate font-semibold text-slate-800">
-          {ticket.customerName}
-        </div>
-        <div className="mt-1 truncate text-xs text-slate-500">
-          {ticket.itemCount} 个项目 · 合计{" "}
-          {formatTicketMoney(ticket.totalAmount, ticket.currency)}
-        </div>
-      </div>
-      <div className="text-xs font-medium text-slate-600">{typeLabel}</div>
-      <div>
-        <TicketStatusBadge status={ticket.ticketStatus} />
-      </div>
-      <div>
-        <TicketPriorityBadge priority={ticket.priority} />
-      </div>
-      <div>
-        <div
-          className={`text-xs font-medium ${
-            overdue ? "text-red-700" : "text-slate-700"
-          }`}
-        >
-          {formatTicketDateTime(ticket.expectedPickupAt, locale)}
-        </div>
-        {overdue ? (
-          <div className="mt-1 text-[11px] font-semibold text-red-600">
-            已逾期
-          </div>
-        ) : (
-          <div className="mt-1 text-[11px] text-slate-400">
-            {ticket.expectedPickupAt ? "预计完成" : TICKET_EMPTY_PLACEHOLDER}
-          </div>
-        )}
-      </div>
-      <div className="flex justify-end gap-1">
-        <Link
-          aria-label="查看详情"
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-blue-50 hover:text-blue-700"
-          href={detailHref}
-          title="查看详情"
-        >
-          <Icon className="h-4 w-4" name="eye" />
-        </Link>
-      </div>
-    </div>
+    </Link>
   );
 }
 
 function TicketsEmptyState() {
+  const { locale } = useTranslation();
+  const text = (value: string) => translatePosText(value, locale);
+
   return (
-    <section className="mt-3 border-y border-slate-200 bg-white">
-      <div className="px-5 py-14 text-center">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
-          <Icon className="h-5 w-5" name="search-x" />
-        </span>
-        <div className="mt-3 font-semibold text-slate-700">没有匹配的工单</div>
-        <div className="mt-1 text-sm text-slate-400">
-          请调整关键词或筛选条件后重试。
-        </div>
+    <section className="border-y bg-background p-4">
+      <div className="border-y border-dashed px-4 py-14 text-center">
+        <Icon
+          className="mx-auto size-5 text-muted-foreground"
+          name="search-x"
+        />
+        <h2 className="mt-3 text-base font-semibold text-foreground">
+          {text("没有匹配的工单")}
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {text("请调整关键词或筛选条件后重试。")}
+        </p>
       </div>
     </section>
   );
 }
 
-/**
- * A ticket is "overdue" when it is still in an active state and its expected
- * pickup time has passed. Mirrors the backend overview overdue definition.
- */
+function displayTicketCode(ticket: ServiceTicketSummary): string {
+  return ticket.ticketNo ?? ticket.id.slice(-8).toUpperCase();
+}
+
+function parseVisibleColumns(value: string | null): Set<TicketColumnKey> {
+  if (!value) {
+    return new Set(TICKET_COLUMN_KEYS);
+  }
+
+  const requested = new Set(value.split(","));
+  const visible = TICKET_COLUMN_KEYS.filter((column) => requested.has(column));
+  return new Set(visible.length > 0 ? visible : TICKET_COLUMN_KEYS);
+}
+
 function isOverdue(ticket: ServiceTicketSummary): boolean {
   if (!ticket.expectedPickupAt) {
     return false;

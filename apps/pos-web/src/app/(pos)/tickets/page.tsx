@@ -8,7 +8,6 @@ import {
   DEFAULT_TICKET_PAGE_SIZE,
   TICKET_FILTER_KEYS,
   parsePageParam,
-  parsePageSizeParam,
   parsePriorityParam,
   parseStatusParam,
   parseTypeParam,
@@ -58,10 +57,6 @@ async function buildTicketListQuery(
   const q = get(TICKET_FILTER_KEYS.q)?.trim() || undefined;
   const date = (get(TICKET_FILTER_KEYS.date) as TicketListDateFilter) ?? "all";
 
-  const pageSize = parsePageSizeParam(
-    get(TICKET_FILTER_KEYS.pageSize),
-    DEFAULT_TICKET_PAGE_SIZE,
-  );
   const page = parsePageParam(get(TICKET_FILTER_KEYS.page), 1);
 
   const now = new Date();
@@ -103,8 +98,8 @@ async function buildTicketListQuery(
     current: {
       ...sharedFilters,
       assistantId: scope === "mine" ? currentUserId : undefined,
-      limit: pageSize,
-      offset: (page - 1) * pageSize,
+      limit: DEFAULT_TICKET_PAGE_SIZE,
+      offset: (page - 1) * DEFAULT_TICKET_PAGE_SIZE,
     },
     counts: {
       mine: {
@@ -139,7 +134,7 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
   const total = list.total;
 
   return (
-    <section>
+    <section className="space-y-7 pb-8">
       <TicketsPageHeader />
 
       <TicketMetrics overview={overview} />
@@ -147,7 +142,6 @@ export default async function TicketsPage({ searchParams }: TicketsPageProps) {
       <Suspense fallback={null}>
         <TicketsToolbar
           allCount={allCountResult.total}
-          currentCount={total}
           mineCount={mineCountResult.total}
         />
       </Suspense>

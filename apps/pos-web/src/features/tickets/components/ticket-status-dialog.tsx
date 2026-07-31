@@ -79,25 +79,25 @@ export function TicketStatusDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-4"
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
         }
       }}
     >
-      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-xl bg-white shadow-2xl">
-        <div className="flex items-start justify-between border-b border-slate-200 p-5">
+      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-xl border bg-background text-foreground shadow-2xl">
+        <div className="flex items-start justify-between border-b p-5">
           <div>
-            <h2 className="text-lg font-semibold text-slate-950">
+            <h2 className="text-lg font-semibold text-foreground">
               更新工单状态
             </h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               状态更新会记录操作人员与时间。
             </p>
           </div>
           <button
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
+            className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             onClick={onClose}
             type="button"
           >
@@ -106,7 +106,7 @@ export function TicketStatusDialog({
         </div>
         <div className="grid grid-cols-2 gap-3 p-5">
           {reachable.length === 0 ? (
-            <p className="col-span-2 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
+            <p className="col-span-2 rounded-md bg-muted/50 p-4 text-sm text-muted-foreground">
               当前状态「{TICKET_STATUS_LABELS[current]}」为终态，无法继续流转。
             </p>
           ) : (
@@ -114,10 +114,10 @@ export function TicketStatusDialog({
               const isPickup = isPickupTransition(next);
               return (
                 <button
-                  className={`flex h-12 items-center justify-between rounded-lg border px-4 text-sm font-semibold transition ${
+                  className={`flex h-12 items-center justify-between rounded-md border px-4 text-sm font-semibold transition ${
                     isPending
-                      ? "cursor-wait border-slate-200 text-slate-400"
-                      : "border-slate-200 text-slate-700 hover:bg-slate-50"
+                      ? "cursor-wait text-muted-foreground opacity-60"
+                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
                   }`}
                   disabled={isPending}
                   key={next}
@@ -141,10 +141,10 @@ export function TicketStatusDialog({
           )}
         </div>
         {reachable.includes("cancelled") ? (
-          <label className="mx-5 mb-5 grid gap-2 text-sm font-semibold text-slate-700">
+          <label className="mx-5 mb-5 grid gap-2 text-sm font-semibold text-foreground">
             取消原因（选择取消时必填）
             <textarea
-              className="min-h-20 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-400"
+              className="min-h-20 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
               disabled={isPending}
               maxLength={500}
               onChange={(event) => setCancelReason(event.target.value)}
@@ -152,9 +152,9 @@ export function TicketStatusDialog({
             />
           </label>
         ) : null}
-        <div className="flex justify-end border-t border-slate-200 p-4">
+        <div className="flex justify-end border-t p-4">
           <button
-            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
             onClick={onClose}
             type="button"
           >

@@ -6,36 +6,26 @@ import type { ServiceTicketOverview } from "@cleanhub/api-client";
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 
-type MetricTone = "blue" | "violet" | "amber" | "red";
-
-const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
-  blue: "text-blue-700 bg-blue-50",
-  violet: "text-violet-700 bg-violet-50",
-  amber: "text-amber-700 bg-amber-50",
-  red: "text-red-700 bg-red-50",
-};
-
 type MetricCardProps = {
   label: string;
-  value: number;
-  note: string;
+  value: number | string;
   icon: Parameters<typeof Icon>[0]["name"];
-  tone: MetricTone;
 };
 
-function MetricCard({ label, value, note, icon, tone }: MetricCardProps) {
+function MetricCard({ label, value, icon }: MetricCardProps) {
   return (
-    <section className="border-y border-slate-200 bg-white px-3 py-3">
-      <div className="flex items-center justify-between">
-        <div className="text-xs font-medium text-slate-500">{label}</div>
-        <span
-          className={`flex h-8 w-8 items-center justify-center rounded-md ${METRIC_TONE_CLASSES[tone]}`}
-        >
-          <Icon className="h-4 w-4" name={icon} />
+    <section className="flex min-h-20 items-center gap-2.5 rounded-md border bg-background px-3 py-2.5">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <Icon className="size-[15px]" name={icon} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[11px] font-medium text-muted-foreground">
+          {label}
         </span>
-      </div>
-      <div className="mt-1 text-xl font-semibold text-slate-950">{value}</div>
-      <div className="mt-1 text-xs text-slate-400">{note}</div>
+        <span className="mt-0.5 block truncate text-lg font-semibold text-foreground">
+          {value}
+        </span>
+      </span>
     </section>
   );
 }
@@ -50,47 +40,31 @@ export function TicketMetrics({
   overview: ServiceTicketOverview | null;
 }) {
   const { locale } = useTranslation();
-
-  if (!overview) {
-    return null;
-  }
-
   const text = (value: string) => translatePosText(value, locale);
 
-  const openCount =
-    (overview.byStatus.pending ?? 0) + (overview.byStatus.in_progress ?? 0);
-  const readyCount = overview.byStatus.ready_to_pick ?? 0;
-  const overdueCount = overview.overdueCount ?? 0;
-  const todayCreatedCount = overview.todayCreatedCount ?? 0;
+  const openCount = overview
+    ? (overview.byStatus.pending ?? 0) + (overview.byStatus.in_progress ?? 0)
+    : "—";
+  const readyCount = overview?.byStatus.ready_to_pick ?? (overview ? 0 : "—");
+  const overdueCount = overview?.overdueCount ?? "—";
+  const todayCreatedCount = overview?.todayCreatedCount ?? "—";
 
   return (
-    <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
       <MetricCard
         icon="clipboard-list"
         label={text("进行中工单")}
-        note={text("待处理 + 处理中")}
-        tone="blue"
         value={openCount}
       />
       <MetricCard
         icon="package-check"
         label={text("待取件")}
-        note={text("等待客户到店")}
-        tone="violet"
         value={readyCount}
       />
-      <MetricCard
-        icon="clock"
-        label={text("已逾期")}
-        note={text("超过预计取件时间")}
-        tone="red"
-        value={overdueCount}
-      />
+      <MetricCard icon="clock" label={text("已逾期")} value={overdueCount} />
       <MetricCard
         icon="clipboard-list"
         label={text("今日新增")}
-        note={text("今日创建的工单")}
-        tone="amber"
         value={todayCreatedCount}
       />
     </div>

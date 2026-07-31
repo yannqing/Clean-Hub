@@ -77,11 +77,8 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
   }
 
   return (
-    <form
-      className="rounded-lg border border-slate-200 bg-white p-5"
-      onSubmit={submit}
-    >
-      <h3 className="font-semibold text-slate-950">基本信息</h3>
+    <form className="border-y bg-background p-5" onSubmit={submit}>
+      <h3 className="font-semibold text-foreground">基本信息</h3>
       <div className="mt-4 grid grid-cols-2 gap-4">
         <Field label="工单类型">
           <select
@@ -156,7 +153,7 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <button
-          className="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          className="h-9 rounded-md border bg-background px-4 text-sm font-semibold text-foreground hover:bg-accent"
           disabled={isPending}
           onClick={onCancel}
           type="button"
@@ -164,7 +161,7 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
           取消
         </button>
         <button
-          className="flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+          className="flex h-9 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:bg-foreground/90 disabled:opacity-60"
           disabled={isPending}
           type="submit"
         >
@@ -195,7 +192,7 @@ function toLocalDateTimeInput(iso: string | null | undefined): string {
 }
 
 const inputClass =
-  "h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-blue-400";
+  "h-9 w-full rounded-md border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring";
 
 function Field({
   label,
@@ -208,7 +205,7 @@ function Field({
 }) {
   return (
     <label className={wide ? "col-span-2" : ""}>
-      <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>
       {children}
