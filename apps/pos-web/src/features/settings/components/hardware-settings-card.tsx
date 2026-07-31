@@ -99,42 +99,46 @@ export function HardwareSettingsCard({
   }
 
   return (
-    <section className="overflow-hidden border-y border-slate-200 bg-white">
-      <header className="border-b border-slate-200 px-4 py-3">
+    <section className="overflow-hidden border-y bg-background">
+      <header className="border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-slate-500" name="printer" />
-          <h2 className="text-sm font-semibold text-slate-950">硬件设备</h2>
+          <Icon className="h-4 w-4 text-muted-foreground" name="printer" />
+          <h2 className="text-sm font-semibold text-foreground">硬件设备</h2>
         </div>
-        <p className="mt-1 text-xs leading-5 text-slate-500">
-          当前门店已配置的硬件设备。如需添加或修改，请联系管理员在后台操作。
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+          当前收银终端已配置的硬件设备。如需添加或修改，请联系管理员在后台操作。
         </p>
       </header>
       <div className="p-4">
         {loading ? (
           <div className="flex h-24 items-center justify-center">
-            <div className="text-sm text-slate-400">正在加载设备列表…</div>
+            <div className="text-sm text-muted-foreground">
+              正在加载设备列表…
+            </div>
           </div>
         ) : devices.length === 0 ? (
-          <div className="flex h-24 items-center justify-center rounded-lg border border-dashed border-slate-200">
-            <p className="text-sm text-slate-400">暂无已配置的硬件设备</p>
+          <div className="flex h-24 items-center justify-center rounded-md border border-dashed">
+            <p className="text-sm text-muted-foreground">
+              暂无已配置的硬件设备
+            </p>
           </div>
         ) : (
           <div className="space-y-2">
             {devices.map((device) => (
               <div
-                className="flex items-center justify-between gap-3 border-b border-slate-100 py-3 last:border-b-0"
+                className="flex items-center justify-between gap-3 border-b py-3 last:border-b-0"
                 key={device.id}
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <Icon
-                    className="h-5 w-5 shrink-0 text-slate-500"
+                    className="h-5 w-5 shrink-0 text-muted-foreground"
                     name={DEVICE_ICONS[device.deviceType] ?? "settings"}
                   />
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-slate-800">
+                    <p className="truncate text-sm font-medium text-foreground">
                       {device.name}
                     </p>
-                    <p className="text-xs text-slate-400">
+                    <p className="text-xs text-muted-foreground">
                       {DEVICE_TYPE_LABELS[device.deviceType] ??
                         device.deviceType}
                       {" · "}
@@ -147,7 +151,7 @@ export function HardwareSettingsCard({
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     device.status === "active"
                       ? "bg-emerald-50 text-emerald-700"
-                      : "bg-slate-100 text-slate-500"
+                      : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {device.status === "active" ? "已配置" : "已停用"}
@@ -159,17 +163,17 @@ export function HardwareSettingsCard({
       </div>
 
       {canManageSensitiveHardware ? (
-        <footer className="flex items-center justify-between gap-4 border-t border-slate-200 px-4 py-3">
+        <footer className="flex items-center justify-between gap-4 border-t px-4 py-3">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-slate-800">钱箱控制</p>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="text-sm font-medium text-foreground">钱箱控制</p>
+            <p className="mt-1 text-xs text-muted-foreground">
               {configuredDrawer
                 ? configuredDrawer.name
-                : "当前门店未配置可用钱箱"}
+                : "当前收银终端未配置可用钱箱"}
             </p>
           </div>
           <button
-            className="flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
             disabled={!configuredDrawer || loading}
             onClick={() => setDrawerDialogOpen(true)}
             type="button"
@@ -196,10 +200,10 @@ export function HardwareSettingsCard({
               仅 Owner 或 Manager 可执行，授权原因和当前终端会写入审计记录。
             </DialogDescription>
           </DialogHeader>
-          <label className="grid gap-2 text-sm font-medium text-slate-700">
+          <label className="grid gap-2 text-sm font-medium text-foreground">
             操作原因
             <textarea
-              className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-300"
+              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
               disabled={openingDrawer}
               maxLength={500}
               onChange={(event) => setDrawerReason(event.target.value)}
@@ -209,7 +213,7 @@ export function HardwareSettingsCard({
           </label>
           <DialogFooter>
             <button
-              className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+              className="h-9 rounded-md border px-4 text-sm font-semibold text-foreground hover:bg-accent"
               disabled={openingDrawer}
               onClick={() => setDrawerDialogOpen(false)}
               type="button"
@@ -217,7 +221,7 @@ export function HardwareSettingsCard({
               返回
             </button>
             <button
-              className="flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-11 items-center justify-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={openingDrawer || !drawerReason.trim()}
               onClick={() => void openDrawer()}
               type="button"

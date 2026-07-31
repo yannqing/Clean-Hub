@@ -103,11 +103,11 @@ function KpiCard({
   color: string;
 }) {
   return (
-    <article className="border-y border-slate-200 bg-white px-3 py-3">
+    <article className="rounded-md border border-border bg-background px-3 py-2.5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-medium text-slate-500">{label}</p>
-          <p className="mt-1 truncate text-xl font-semibold text-slate-950">
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          <p className="mt-0.5 truncate text-lg font-semibold text-foreground">
             {value}
           </p>
         </div>
@@ -118,7 +118,7 @@ function KpiCard({
           <Icon className="h-4 w-4" name={icon} />
         </span>
       </div>
-      <p className="mt-2 truncate text-xs font-medium text-slate-500">
+      <p className="mt-2 truncate text-xs font-medium text-muted-foreground">
         {helper}
       </p>
     </article>
@@ -136,7 +136,7 @@ function LegendRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="flex min-w-0 items-center gap-2 text-slate-600">
+      <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
         <span
           aria-hidden
           className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -144,7 +144,7 @@ function LegendRow({
         />
         <span className="truncate">{label}</span>
       </span>
-      <span className="shrink-0 font-semibold text-slate-900">{value}</span>
+      <span className="shrink-0 font-semibold text-foreground">{value}</span>
     </div>
   );
 }
@@ -196,13 +196,15 @@ function PaymentChart({
         ];
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
+    <section className="rounded-lg border border-border bg-background p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">订单收款</h3>
-          <p className="mt-1 text-xs text-slate-500">销售额与实收金额对比</p>
+          <h3 className="text-sm font-semibold text-foreground">订单收款</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            销售额与实收金额对比
+          </p>
         </div>
-        <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+        <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
           {formatOrderUnitCount(orderCount, locale)}
         </span>
       </div>
@@ -237,10 +239,10 @@ function PaymentChart({
             </PieChart>
           </PosChartContainer>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-2xl font-bold text-slate-950">
+            <span className="text-2xl font-bold text-foreground">
               {percentLabel}
             </span>
-            <span className="mt-0.5 text-xs font-medium text-slate-500">
+            <span className="mt-0.5 text-xs font-medium text-muted-foreground">
               实收占比
             </span>
           </div>
@@ -257,7 +259,7 @@ function PaymentChart({
             label="待收款"
             value={formatCurrency(unpaidAmount, locale, currency)}
           />
-          <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-medium text-slate-500">
+          <div className="rounded-lg bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
             未付款订单 {formatOrderUnitCount(unpaidCount, locale)}
           </div>
         </div>
@@ -312,15 +314,15 @@ function TicketBars({
   const maxValue = Math.max(...bars.map((item) => item.value), 1);
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
+    <section className="rounded-lg border border-border bg-background p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">工单动态</h3>
-          <p className="mt-1 text-xs text-slate-500">
+          <h3 className="text-sm font-semibold text-foreground">工单动态</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
             今日创建、取件与逾期情况
           </p>
         </div>
-        <span className="rounded-md bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
+        <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
           共 {formatNumber(total, locale)}
         </span>
       </div>
@@ -412,11 +414,13 @@ function CustomerGrowth({
         ];
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
+    <section className="rounded-lg border border-border bg-background p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">客户增长</h3>
-          <p className="mt-1 text-xs text-slate-500">客户存量与今日新增</p>
+          <h3 className="text-sm font-semibold text-foreground">客户增长</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            客户存量与今日新增
+          </p>
         </div>
         <span
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border"
@@ -427,22 +431,22 @@ function CustomerGrowth({
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3">
-        <div className="rounded-lg bg-slate-50 p-3">
-          <p className="text-xs font-medium text-slate-500">总客户</p>
-          <p className="mt-1 text-xl font-bold text-slate-950">
+        <div className="rounded-lg bg-muted/50 p-3">
+          <p className="text-xs font-medium text-muted-foreground">总客户</p>
+          <p className="mt-1 text-xl font-bold text-foreground">
             {formatNumber(totalCount, locale)}
           </p>
         </div>
-        <div className="rounded-lg bg-slate-50 p-3">
-          <p className="text-xs font-medium text-slate-500">今日新增</p>
-          <p className="mt-1 text-xl font-bold text-slate-950">
+        <div className="rounded-lg bg-muted/50 p-3">
+          <p className="text-xs font-medium text-muted-foreground">今日新增</p>
+          <p className="mt-1 text-xl font-bold text-foreground">
             {formatNumber(todayNewCount, locale)}
           </p>
         </div>
       </div>
 
       <div className="mt-4">
-        <div className="flex items-center justify-between gap-3 text-xs font-medium text-slate-500">
+        <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
           <span>新增占比</span>
           <span>{formatPercent(newCustomerPercent, locale)}</span>
         </div>
@@ -475,10 +479,10 @@ function CustomerGrowth({
             </PieChart>
           </PosChartContainer>
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-lg font-bold text-slate-950">
+            <span className="text-lg font-bold text-foreground">
               {formatPercent(newCustomerPercent, locale)}
             </span>
-            <span className="text-[11px] font-medium text-slate-500">
+            <span className="text-[11px] font-medium text-muted-foreground">
               新增占比
             </span>
           </div>
@@ -514,17 +518,15 @@ export function WorkspaceStatistics({ statistics }: WorkspaceStatisticsProps) {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-white">
-            <Icon className="h-4 w-4" name="chart" />
-          </span>
+          <Icon className="h-4 w-4" name="chart" />
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">今日概况</h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <h2 className="text-sm font-semibold text-foreground">今日概况</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
               订单、收款、工单与客户的实时概览
             </p>
           </div>
         </div>
-        <span className="inline-flex h-8 items-center gap-2 rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-600">
+        <span className="inline-flex h-8 items-center gap-2 rounded-md bg-muted px-3 text-xs font-semibold text-muted-foreground">
           <span
             aria-hidden
             className="h-2 w-2 rounded-full"

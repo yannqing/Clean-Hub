@@ -29,21 +29,18 @@ export function PosPagePlaceholder({
     <section>
       <PosBreadcrumb className="mb-5" items={[{ label: text(breadcrumb) }]} />
 
-      <div className="flex min-h-[420px] flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white px-6 py-16 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-700">
-          <Icon className="h-6 w-6" name={icon} />
+      <div className="flex min-h-64 flex-col items-center justify-center border-y border-border bg-background px-6 py-12 text-center">
+        <span className="flex size-11 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          <Icon className="h-5 w-5" name={icon} />
         </span>
-        <h1 className="mt-5 text-2xl font-semibold tracking-tight text-slate-950">
+        <h1 className="mt-4 text-base font-semibold text-foreground">
           {text(title)}
         </h1>
         {description ? (
-          <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+          <p className="mt-1.5 max-w-md text-sm leading-6 text-muted-foreground">
             {text(description)}
           </p>
         ) : null}
-        <span className="mt-6 rounded-md bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          {text("占位")}
-        </span>
       </div>
     </section>
   );

@@ -23,11 +23,11 @@ export function PosBreadcrumb({ className, items }: PosBreadcrumbProps) {
       aria-label="POS breadcrumb / POS 面包屑"
       className={cn("min-w-0", className)}
     >
-      <ol className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-slate-400">
+      <ol className="flex min-w-0 items-center gap-1.5 text-xs font-semibold text-muted-foreground">
         <li className="shrink-0">
           <Link
             aria-label="POS 首页 / POS home"
-            className="flex h-8 w-8 items-center justify-center rounded-md text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
+            className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             href="/"
             title="POS 首页"
           >
@@ -38,12 +38,15 @@ export function PosBreadcrumb({ className, items }: PosBreadcrumbProps) {
         {items.map((item, index) => {
           const current = index === items.length - 1;
           const contentClassName = current
-            ? "max-w-72 truncate text-slate-700"
-            : "max-w-56 truncate text-slate-500 transition-colors hover:text-slate-950";
+            ? "max-w-72 truncate text-foreground"
+            : "max-w-56 truncate text-muted-foreground transition-colors hover:text-foreground";
 
           return (
             <li
-              className={cn("flex min-w-0 items-center gap-1.5", current && "flex-1")}
+              className={cn(
+                "flex min-w-0 items-center gap-1.5",
+                current && "flex-1",
+              )}
               key={index}
             >
               <Icon className="h-3.5 w-3.5 shrink-0" name="chevron-right" />

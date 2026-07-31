@@ -31,16 +31,21 @@ export function OfflineSyncBadge({
             : t("pos.shell.syncPending", { count: pendingCount });
 
   const badgeClassName = cn(
-    "items-center justify-center gap-2 rounded-lg text-sm font-semibold transition",
+    "items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2",
     variant === "dark"
-      ? "flex h-10 w-10 border border-white/15 bg-white/10 px-0 text-white/80 hover:bg-white/15 2xl:w-auto 2xl:px-3"
+      ? "flex size-9 px-0 text-white/75 hover:bg-white/10 hover:text-white focus-visible:ring-white/60"
       : "hidden h-9 px-3 2xl:flex",
-    variant === "default" && status === "synced" && "bg-emerald-50 text-emerald-700",
-    variant === "default" && status === "offline" && "bg-slate-100 text-slate-600",
+    variant === "default" &&
+      status === "synced" &&
+      "bg-emerald-50 text-emerald-700",
+    variant === "default" &&
+      status === "offline" &&
+      "bg-muted text-muted-foreground",
     variant === "default" &&
       (status === "pending" || status === "replaying") &&
       "bg-amber-50 text-amber-700",
     variant === "default" && status === "error" && "bg-red-50 text-red-700",
+    variant === "default" && "focus-visible:ring-ring",
     className,
   );
 
@@ -57,9 +62,7 @@ export function OfflineSyncBadge({
           className="h-4 w-4"
           name={status === "error" ? "alert" : "rotate-ccw"}
         />
-        <span className={cn(variant === "dark" && "hidden 2xl:inline")}>
-          {label}
-        </span>
+        {variant === "default" ? <span>{label}</span> : null}
       </button>
     );
   }
@@ -77,13 +80,11 @@ export function OfflineSyncBadge({
         <span
           className={cn(
             "h-2 w-2 rounded-full",
-            status === "synced" ? "bg-emerald-500" : "bg-slate-400",
+            status === "synced" ? "bg-emerald-500" : "bg-muted-foreground",
           )}
         />
       )}
-      <span className={cn(variant === "dark" && "hidden 2xl:inline")}>
-        {label}
-      </span>
+      {variant === "default" ? <span>{label}</span> : null}
     </div>
   );
 }

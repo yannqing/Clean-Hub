@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
@@ -44,7 +44,7 @@ const CHART_COLORS = {
   tickets: "var(--chart-3)",
   customers: "var(--chart-4)",
   risk: "var(--chart-5)",
-  muted: "#cbd5e1",
+  muted: "var(--muted-foreground)",
 } as const;
 
 const TICKET_STATUS_META: Record<string, { label: string; color: string }> = {
@@ -149,42 +149,31 @@ function formatCountUnit(
   return `${count} ${zhUnit}`;
 }
 
-function iconAccentStyle(color: string): CSSProperties {
-  return {
-    backgroundColor: `color-mix(in oklch, ${color} 12%, white)`,
-    borderColor: `color-mix(in oklch, ${color} 22%, white)`,
-    color,
-  };
-}
-
 function MetricCard({
-  color,
   helper,
   icon,
   label,
   value,
 }: {
-  color: string;
   helper: string;
   icon: PosIconName;
   label: string;
   value: string;
 }) {
   return (
-    <article className="flex min-h-20 items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2.5">
-      <span
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
-        style={iconAccentStyle(color)}
-      >
+    <article className="flex min-h-20 items-center gap-3 rounded-md border bg-background px-3 py-2.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
         <Icon className="h-4 w-4" name={icon} />
       </span>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-medium text-slate-500">{label}</p>
-          <p className="mt-0.5 truncate text-lg font-semibold text-slate-950">
+          <p className="text-[11px] font-medium text-muted-foreground">
+            {label}
+          </p>
+          <p className="mt-0.5 truncate text-lg font-semibold text-foreground">
             {value}
           </p>
-          <p className="mt-0.5 truncate text-[11px] text-slate-400">
+          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
             {helper}
           </p>
         </div>
@@ -195,13 +184,11 @@ function MetricCard({
 
 function SectionHeader({
   action,
-  color,
   description,
   icon,
   title,
 }: {
   action?: ReactNode;
-  color: string;
   description: string;
   icon: PosIconName;
   title: string;
@@ -209,15 +196,10 @@ function SectionHeader({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2">
-        <span
-          className="flex h-9 w-9 items-center justify-center rounded-lg border"
-          style={iconAccentStyle(color)}
-        >
-          <Icon className="h-4 w-4" name={icon} />
-        </span>
+        <Icon className="h-4 w-4 text-muted-foreground" name={icon} />
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-          <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
         </div>
       </div>
       {action}
@@ -238,7 +220,7 @@ function LegendRow({
 }) {
   return (
     <div className="flex items-center justify-between gap-3 text-sm">
-      <span className="flex min-w-0 items-center gap-2 text-slate-600">
+      <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
         <span
           aria-hidden
           className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -247,13 +229,13 @@ function LegendRow({
         <span className="min-w-0">
           <span className="block truncate">{label}</span>
           {helper ? (
-            <span className="block truncate text-xs text-slate-400">
+            <span className="block truncate text-xs text-muted-foreground">
               {helper}
             </span>
           ) : null}
         </span>
       </span>
-      <span className="shrink-0 font-semibold text-slate-900">{value}</span>
+      <span className="shrink-0 font-semibold text-foreground">{value}</span>
     </div>
   );
 }
@@ -281,10 +263,10 @@ function ChartCard({
   title: string;
 }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
+    <section className="border-y bg-background p-5">
       <div>
-        <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-        <p className="mt-1 text-xs text-slate-500">{description}</p>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
       </div>
       {children}
     </section>
@@ -324,36 +306,44 @@ function VerticalBarChart({
         margin={{ bottom: 8, left: 0, right: 12, top: 20 }}
       >
         <CartesianGrid
-          stroke="#e2e8f0"
+          stroke="var(--border)"
           strokeDasharray="4 4"
           vertical={false}
         />
         <XAxis
           axisLine={false}
           dataKey="shortLabel"
-          tick={{ fill: "#64748b", fontSize: 11, fontWeight: 500 }}
+          tick={{
+            fill: "var(--muted-foreground)",
+            fontSize: 11,
+            fontWeight: 500,
+          }}
           tickLine={false}
         />
         <YAxis
           axisLine={false}
           domain={[0, chartMax]}
-          tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 500 }}
+          tick={{
+            fill: "var(--muted-foreground)",
+            fontSize: 10,
+            fontWeight: 500,
+          }}
           tickFormatter={(value) => valueFormatter(Number(value), locale)}
           tickLine={false}
           width={48}
         />
         <Tooltip
           content={<PosChartTooltip hideLabel />}
-          cursor={{ fill: "rgba(148, 163, 184, 0.12)" }}
+          cursor={{ fill: "var(--muted)" }}
           isAnimationActive={false}
         />
         <Bar
           activeBar={{
             fillOpacity: 0.86,
-            stroke: "#0f172a",
+            stroke: "var(--foreground)",
             strokeOpacity: 0.12,
           }}
-          background={{ fill: "#f1f5f9", radius: 8 }}
+          background={{ fill: "var(--muted)", radius: 8 }}
           dataKey="value"
           maxBarSize={46}
           minPointSize={4}
@@ -392,41 +382,49 @@ function CustomerTrendChart({
         margin={{ bottom: 8, left: 0, right: 18, top: 12 }}
       >
         <CartesianGrid
-          stroke="#e2e8f0"
+          stroke="var(--border)"
           strokeDasharray="4 4"
           vertical={false}
         />
         <XAxis
           axisLine={false}
           dataKey="shortLabel"
-          tick={{ fill: "#64748b", fontSize: 10, fontWeight: 500 }}
+          tick={{
+            fill: "var(--muted-foreground)",
+            fontSize: 10,
+            fontWeight: 500,
+          }}
           tickLine={false}
         />
         <YAxis
           axisLine={false}
           domain={[0, Math.ceil(maxValue)]}
-          tick={{ fill: "#94a3b8", fontSize: 10, fontWeight: 500 }}
+          tick={{
+            fill: "var(--muted-foreground)",
+            fontSize: 10,
+            fontWeight: 500,
+          }}
           tickFormatter={(value) => formatNumber(Number(value), locale)}
           tickLine={false}
           width={36}
         />
         <Tooltip
           content={<PosChartTooltip hideLabel />}
-          cursor={{ stroke: "#cbd5e1", strokeDasharray: "4 4" }}
+          cursor={{ stroke: "var(--border)", strokeDasharray: "4 4" }}
           isAnimationActive={false}
         />
         <Line
           activeDot={{
             fill: "var(--chart-4)",
             r: 6,
-            stroke: "#fff",
+            stroke: "var(--background)",
             strokeWidth: 3,
           }}
           dataKey="value"
           dot={{
             fill: "var(--chart-4)",
             r: 3,
-            stroke: "#fff",
+            stroke: "var(--background)",
             strokeWidth: 2,
           }}
           isAnimationActive={false}
@@ -490,9 +488,11 @@ function RevenueComparisonChart({
         />
 
         <div className="flex flex-col justify-center gap-3">
-          <div className="rounded-lg bg-slate-50 p-4">
-            <p className="text-xs font-medium text-slate-500">收款完成率</p>
-            <p className="mt-1 text-3xl font-bold text-slate-950">
+          <div className="rounded-md bg-muted/40 p-4">
+            <p className="text-xs font-medium text-muted-foreground">
+              收款完成率
+            </p>
+            <p className="mt-1 text-3xl font-bold text-foreground">
               {formatPercent(paidPercent, locale)}
             </p>
           </div>
@@ -613,7 +613,7 @@ function DonutSectorShape(props: PieSectorShapeProps) {
     innerRadius: adjustedInnerRadius,
     outerRadius: adjustedOuterRadius,
     startAngle,
-    stroke: "#fff",
+    stroke: "var(--background)",
     strokeWidth: isActive ? 4 : 3,
     style: {
       transition: "fill-opacity 150ms ease, filter 150ms ease",
@@ -621,7 +621,7 @@ function DonutSectorShape(props: PieSectorShapeProps) {
   };
 
   return (
-    <g className={isActive ? "drop-shadow-md" : undefined}>
+    <g>
       <Sector {...sectorProps} />
       {isActive ? (
         <Sector
@@ -672,7 +672,7 @@ function DonutChart({
         }))
       : [
           {
-            color: "#e2e8f0",
+            color: "var(--muted)",
             displayValue: valueFormatter(0),
             helper: undefined,
             label: "暂无数据",
@@ -716,7 +716,7 @@ function DonutChart({
             paddingAngle={total > 0 ? 3 : 0}
             shape={DonutSectorShape}
             startAngle={90}
-            stroke="#fff"
+            stroke="var(--background)"
             strokeWidth={3}
           >
             {chartData.map((item, index) => (
@@ -734,17 +734,14 @@ function DonutChart({
         </PieChart>
       </PosChartContainer>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-        <span
-          className="text-2xl font-bold text-slate-950 transition-colors duration-150"
-          style={activeItem ? { color: activeItem.color } : undefined}
-        >
+        <span className="text-2xl font-bold text-foreground transition-colors duration-150">
           {displayCenterValue}
         </span>
-        <span className="mt-1 text-xs font-medium text-slate-500">
+        <span className="mt-1 text-xs font-medium text-muted-foreground">
           {displayCenterLabel}
         </span>
         {activeItem?.helper ? (
-          <span className="mt-0.5 text-[11px] font-semibold text-slate-400">
+          <span className="mt-0.5 text-[11px] font-semibold text-muted-foreground">
             {activeItem.helper}
           </span>
         ) : null}
@@ -807,8 +804,12 @@ function BusinessStructureChart({
       <div className="mt-5 grid gap-8 xl:grid-cols-2">
         <div className="min-w-0">
           <div>
-            <h4 className="text-xs font-semibold text-slate-900">工单状态图</h4>
-            <p className="mt-1 text-xs text-slate-500">当前工单池按状态拆分</p>
+            <h4 className="text-xs font-semibold text-foreground">
+              工单状态图
+            </h4>
+            <p className="mt-1 text-xs text-muted-foreground">
+              当前工单池按状态拆分
+            </p>
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-1 2xl:grid-cols-[220px_minmax(0,1fr)]">
             <DonutChart
@@ -839,16 +840,20 @@ function BusinessStructureChart({
                   );
                 })
               ) : (
-                <p className="text-sm text-slate-500">暂无工单数据</p>
+                <p className="text-sm text-muted-foreground">暂无工单数据</p>
               )}
             </div>
           </div>
         </div>
 
-        <div className="min-w-0 xl:border-l xl:border-slate-200 xl:pl-8">
+        <div className="min-w-0 xl:border-l xl:pl-8">
           <div>
-            <h4 className="text-xs font-semibold text-slate-900">客户增长图</h4>
-            <p className="mt-1 text-xs text-slate-500">客户存量与今日新增</p>
+            <h4 className="text-xs font-semibold text-foreground">
+              客户增长图
+            </h4>
+            <p className="mt-1 text-xs text-muted-foreground">
+              客户存量与今日新增
+            </p>
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-1 2xl:grid-cols-[220px_minmax(0,1fr)]">
             <DonutChart
@@ -863,14 +868,14 @@ function BusinessStructureChart({
             <div className="flex flex-col justify-center gap-3">
               <div>
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs font-medium text-slate-500">
+                  <p className="text-xs font-medium text-muted-foreground">
                     新增客户占比
                   </p>
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-sm font-semibold text-foreground">
                     {formatPercent(newCustomerPercent, locale)}
                   </p>
                 </div>
-                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200">
+                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted">
                   <div
                     className="h-full rounded-full"
                     style={{
@@ -938,41 +943,40 @@ function CustomerPanel({
   }));
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5">
+    <section className="border-y bg-background p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold text-slate-900">客户运营概览</h3>
-          <p className="mt-1 text-xs text-slate-500">
+          <h3 className="text-sm font-semibold text-foreground">
+            客户运营概览
+          </h3>
+          <p className="mt-1 text-xs text-muted-foreground">
             账户、档案、服务参与度与新增趋势
           </p>
         </div>
-        <span
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border"
-          style={iconAccentStyle(CHART_COLORS.customers)}
-        >
-          <Icon className="h-4 w-4" name="users" />
-        </span>
+        <Icon className="h-4 w-4 text-muted-foreground" name="users" />
       </div>
 
       <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        <div className="rounded-lg bg-slate-50 p-4">
+        <div className="rounded-md border bg-muted/30 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-medium text-slate-500">客户账户</p>
-              <p className="mt-1 text-2xl font-bold text-slate-950">
+              <p className="text-xs font-medium text-muted-foreground">
+                客户账户
+              </p>
+              <p className="mt-1 text-2xl font-bold text-foreground">
                 {formatNumber(totalCount, locale)}
               </p>
             </div>
-            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+            <span className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground">
               今日 +{formatNumber(todayNewCount, locale)}
             </span>
           </div>
           <div className="mt-4">
-            <div className="flex items-center justify-between gap-3 text-xs font-medium text-slate-500">
+            <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
               <span>启用账户</span>
               <span>{formatPercent(activeAccountPercent, locale)}</span>
             </div>
-            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-200">
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -984,38 +988,40 @@ function CustomerPanel({
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
             <div>
-              <p className="text-slate-400">启用</p>
-              <p className="mt-1 font-semibold text-slate-900">
+              <p className="text-muted-foreground">启用</p>
+              <p className="mt-1 font-semibold text-foreground">
                 {formatNumber(activeCount, locale)}
               </p>
             </div>
             <div>
-              <p className="text-slate-400">停用</p>
-              <p className="mt-1 font-semibold text-slate-900">
+              <p className="text-muted-foreground">停用</p>
+              <p className="mt-1 font-semibold text-foreground">
                 {formatNumber(disabledCount, locale)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg bg-slate-50 p-4">
+        <div className="rounded-md border bg-muted/30 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-medium text-slate-500">客户档案</p>
-              <p className="mt-1 text-2xl font-bold text-slate-950">
+              <p className="text-xs font-medium text-muted-foreground">
+                客户档案
+              </p>
+              <p className="mt-1 text-2xl font-bold text-foreground">
                 {formatNumber(profileCount, locale)}
               </p>
             </div>
-            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+            <span className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground">
               今日 +{formatNumber(todayNewProfileCount, locale)}
             </span>
           </div>
           <div className="mt-4">
-            <div className="flex items-center justify-between gap-3 text-xs font-medium text-slate-500">
+            <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
               <span>可服务档案</span>
               <span>{formatPercent(activeProfilePercent, locale)}</span>
             </div>
-            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-200">
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -1027,64 +1033,66 @@ function CustomerPanel({
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
             <div>
-              <p className="text-slate-400">启用档案</p>
-              <p className="mt-1 font-semibold text-slate-900">
+              <p className="text-muted-foreground">启用档案</p>
+              <p className="mt-1 font-semibold text-foreground">
                 {formatNumber(activeProfileCount, locale)}
               </p>
             </div>
             <div>
-              <p className="text-slate-400">停用档案</p>
-              <p className="mt-1 font-semibold text-slate-900">
+              <p className="text-muted-foreground">停用档案</p>
+              <p className="mt-1 font-semibold text-foreground">
                 {formatNumber(disabledProfileCount, locale)}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="rounded-lg bg-slate-50 p-4">
+        <div className="rounded-md border bg-muted/30 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-medium text-slate-500">服务参与客户</p>
-              <p className="mt-1 text-2xl font-bold text-slate-950">
+              <p className="text-xs font-medium text-muted-foreground">
+                服务参与客户
+              </p>
+              <p className="mt-1 text-2xl font-bold text-foreground">
                 {formatNumber(engagedCustomerCount, locale)}
               </p>
             </div>
-            <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+            <span className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground">
               {formatPercent(engagementPercent, locale)}
             </span>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
             <div>
-              <p className="text-slate-400">有订单</p>
-              <p className="mt-1 font-semibold text-slate-900">
+              <p className="text-muted-foreground">有订单</p>
+              <p className="mt-1 font-semibold text-foreground">
                 {formatNumber(orderedCustomerCount, locale)}
               </p>
             </div>
             <div>
-              <p className="text-slate-400">有工单</p>
-              <p className="mt-1 font-semibold text-slate-900">
+              <p className="text-muted-foreground">有工单</p>
+              <p className="mt-1 font-semibold text-foreground">
                 {formatNumber(ticketedCustomerCount, locale)}
               </p>
             </div>
             <div>
-              <p className="text-slate-400">复购客户</p>
-              <p className="mt-1 font-semibold text-slate-900">
+              <p className="text-muted-foreground">复购客户</p>
+              <p className="mt-1 font-semibold text-foreground">
                 {formatNumber(repeatOrderCustomerCount, locale)}
               </p>
             </div>
             <div>
-              <p className="text-slate-400">多次工单</p>
-              <p className="mt-1 font-semibold text-slate-900">
+              <p className="text-muted-foreground">多次工单</p>
+              <p className="mt-1 font-semibold text-foreground">
                 {formatNumber(repeatTicketCustomerCount, locale)}
               </p>
             </div>
           </div>
           <div className="mt-4">
-            <div className="flex items-center justify-between gap-3 text-xs font-medium text-slate-500">
+            <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
               <span>订单复购率</span>
               <span>{formatPercent(repeatOrderPercent, locale)}</span>
             </div>
-            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-slate-200">
+            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full"
                 style={{
@@ -1097,17 +1105,17 @@ function CustomerPanel({
         </div>
       </div>
 
-      <div className="mt-4 rounded-lg bg-slate-50 p-4">
+      <div className="mt-4 rounded-md border bg-muted/30 p-4">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h4 className="text-xs font-semibold text-slate-900">
+            <h4 className="text-xs font-semibold text-foreground">
               近 7 天新增客户
             </h4>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               按客户账户创建日期统计
             </p>
           </div>
-          <span className="rounded-md bg-white px-2 py-1 text-xs font-semibold text-slate-600">
+          <span className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground">
             {formatCountUnit(
               trendData.reduce((sum, item) => sum + item.count, 0),
               locale,
@@ -1125,24 +1133,21 @@ function CustomerPanel({
 
 function EmptyState() {
   return (
-    <div className="space-y-5">
+    <div className="space-y-7 pb-8">
       <PosBreadcrumb items={[{ label: "统计数据" }]} />
       <PosPageHeader
         description="查看门店经营数据：订单、工单和客户统计。"
         icon="chart"
         title="统计数据"
       />
-      <div className="border-y border-dashed border-slate-300 bg-white p-12 text-center">
-        <div
-          className="mx-auto flex h-14 w-14 items-center justify-center rounded-lg border"
-          style={iconAccentStyle(CHART_COLORS.tickets)}
-        >
+      <div className="border-y border-dashed bg-background p-12 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-md bg-muted text-muted-foreground">
           <Icon className="h-6 w-6" name="chart" />
         </div>
-        <p className="mt-3 text-sm font-medium text-slate-600">
+        <p className="mt-3 text-sm font-medium text-foreground">
           还没有可展示的统计信息
         </p>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs text-muted-foreground">
           产生订单或工单后，这里会显示经营概况。
         </p>
       </div>
@@ -1187,15 +1192,19 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
       <PosPageHeader
         actions={
           <div className="grid min-w-[260px] grid-cols-2 gap-3">
-            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-right">
-              <p className="text-xs font-medium text-slate-500">今日销售额</p>
-              <p className="mt-0.5 truncate text-base font-semibold text-slate-950">
+            <div className="rounded-md border bg-background px-3 py-2 text-right">
+              <p className="text-xs font-medium text-muted-foreground">
+                今日销售额
+              </p>
+              <p className="mt-0.5 truncate text-base font-semibold text-foreground">
                 {formatCurrency(totalAmount, locale, currency)}
               </p>
             </div>
-            <div className="rounded-md border border-slate-200 bg-white px-3 py-2 text-right">
-              <p className="text-xs font-medium text-slate-500">收款完成率</p>
-              <p className="mt-0.5 text-base font-semibold text-slate-950">
+            <div className="rounded-md border bg-background px-3 py-2 text-right">
+              <p className="text-xs font-medium text-muted-foreground">
+                收款完成率
+              </p>
+              <p className="mt-0.5 text-base font-semibold text-foreground">
                 {formatPercent(paidPercent, locale)}
               </p>
             </div>
@@ -1208,12 +1217,11 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
 
       <section className="space-y-4">
         <SectionHeader
-          color={CHART_COLORS.orders}
           description="今日订单与收款概况"
           icon="receipt"
           title="订单统计"
           action={
-            <span className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600">
+            <span className="inline-flex h-8 items-center rounded-md border bg-background px-3 text-xs font-semibold text-muted-foreground">
               {formatCountUnit(orderCount, locale, "单", "orders", "commandes")}
             </span>
           }
@@ -1221,28 +1229,24 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
-            color={CHART_COLORS.orders}
             helper="今日全部订单"
             icon="receipt"
             label="今日订单数"
             value={formatNumber(orderCount, locale)}
           />
           <MetricCard
-            color={CHART_COLORS.paid}
             helper={`已收金额 ${formatCurrency(paidAmount, locale, currency)}`}
             icon="wallet-cards"
             label="今日销售额"
             value={formatCurrency(totalAmount, locale, currency)}
           />
           <MetricCard
-            color={CHART_COLORS.risk}
             helper="未支付与部分支付"
             icon="clock"
             label="待收款订单"
             value={formatNumber(unpaidCount, locale)}
           />
           <MetricCard
-            color={CHART_COLORS.tickets}
             helper="已交付给客户"
             icon="package-check"
             label="已完成订单"
@@ -1269,12 +1273,11 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
 
       <section className="space-y-4">
         <SectionHeader
-          color={CHART_COLORS.tickets}
           description="当前工单池与今日流转概况"
           icon="clipboard-list"
           title="工单统计"
           action={
-            <span className="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600">
+            <span className="inline-flex h-8 items-center rounded-md border bg-background px-3 text-xs font-semibold text-muted-foreground">
               {formatCountUnit(
                 totalTicketCount,
                 locale,
@@ -1288,28 +1291,24 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
 
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <MetricCard
-            color={CHART_COLORS.tickets}
             helper="当前全部工单"
             icon="clipboard-list"
             label="工单总数"
             value={formatNumber(totalTicketCount, locale)}
           />
           <MetricCard
-            color={CHART_COLORS.risk}
             helper="超过预计取件时间"
             icon="alert"
             label="已逾期"
             value={formatNumber(overdueCount, locale)}
           />
           <MetricCard
-            color={CHART_COLORS.orders}
             helper="今日创建的工单"
             icon="plus"
             label="今日新增"
             value={formatNumber(todayCreatedCount, locale)}
           />
           <MetricCard
-            color={CHART_COLORS.paid}
             helper="今日已取件"
             icon="package-check"
             label="今日取件"
@@ -1328,7 +1327,6 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
 
       <section className="space-y-4">
         <SectionHeader
-          color={CHART_COLORS.customers}
           description="客户存量与新增"
           icon="users"
           title="客户统计"

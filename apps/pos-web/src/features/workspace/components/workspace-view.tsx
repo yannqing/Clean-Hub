@@ -43,31 +43,32 @@ export function WorkspaceView({
   });
 
   return (
-    <div className="space-y-6">
-      <section className="flex flex-wrap items-end justify-between gap-4 border-b border-slate-200 pb-5">
-        <div className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white">
-            <Icon name="layout-dashboard" className="h-[18px] w-[18px]" />
-          </span>
+    <div className="space-y-7 pb-8">
+      <section className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex min-w-0 items-start gap-2">
+          <Icon
+            aria-hidden
+            className="mt-0.5 h-[19px] w-[19px] shrink-0"
+            name="layout-dashboard"
+          />
           <div className="min-w-0">
-            <p className="text-xs font-medium text-slate-500">门店工作台</p>
-            <h1 className="mt-0.5 truncate text-lg font-semibold text-slate-950">
+            <h1 className="truncate text-xl font-semibold tracking-tight">
               {user ? `欢迎回来，${user.displayName}` : "工作台"}
             </h1>
-            <p className="mt-1 text-sm text-slate-500">
+            <p className="mt-1 text-sm text-muted-foreground">
               今日事，今日毕。按轻重缓急，稳妥完成每一次接待与交付。
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {roleLabel ? (
-            <span className="inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-100 px-3 font-medium">
+            <span className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 font-medium">
               <Icon name="users" className="h-3.5 w-3.5" />
               {roleLabel}
             </span>
           ) : null}
-          <span className="inline-flex h-8 items-center gap-1.5 rounded-md bg-slate-100 px-3 font-medium">
+          <span className="inline-flex h-8 items-center gap-1.5 rounded-md border bg-background px-3 font-medium">
             <Icon name="clock" className="h-3.5 w-3.5" />
             {today}
           </span>

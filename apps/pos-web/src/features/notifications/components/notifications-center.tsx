@@ -54,21 +54,21 @@ const GROUP_LABELS: Record<NotificationGroupKey, string> = {
 };
 
 const PRIORITY_BADGE_CLASSES = {
-  critical: "bg-red-50 text-red-700",
-  high: "bg-amber-50 text-amber-700",
-  normal: "bg-slate-100 text-slate-600",
-  low: "bg-slate-100 text-slate-500",
+  critical: "bg-destructive/10 text-destructive",
+  high: "bg-amber-50 text-amber-700 dark:bg-amber-950/35 dark:text-amber-300",
+  normal: "bg-muted text-muted-foreground",
+  low: "bg-muted text-muted-foreground",
 } as const;
 
 const READ_STATUS_BADGE_CLASSES = {
-  unread: "bg-blue-50 text-blue-700",
-  read: "bg-emerald-50 text-emerald-700",
-  archived: "bg-slate-100 text-slate-500",
+  unread: "bg-accent text-accent-foreground",
+  read: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-300",
+  archived: "bg-muted text-muted-foreground",
 } as const;
 
 const NOTICE_TYPE_BADGE_CLASSES = {
-  business: "bg-violet-50 text-violet-700",
-  system: "bg-slate-100 text-slate-600",
+  business: "bg-accent text-accent-foreground",
+  system: "bg-muted text-muted-foreground",
 } as const;
 
 export function NotificationsCenter({
@@ -147,13 +147,13 @@ export function NotificationsCenter({
   );
 
   return (
-    <section className="space-y-5 pb-8">
+    <section className="space-y-7 pb-8">
       <PosBreadcrumb items={[{ label: "通知中心" }]} />
 
       <PosPageHeader
         actions={
           <button
-            className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-9 items-center gap-2 rounded-md border bg-background px-3 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isPending || overview.unreadCount === 0}
             onClick={() => runAction(markAllNotificationsReadAction)}
             type="button"
@@ -170,18 +170,23 @@ export function NotificationsCenter({
       <NotificationMetrics overview={overview} />
 
       <PosTableSurface>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-3 py-2.5">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-            <Icon className="h-4 w-4 text-slate-500" name="search" />
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-3 py-2.5">
+          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Icon className="h-4 w-4 text-muted-foreground" name="search" />
             通知筛选
           </div>
-          <div className="text-xs text-slate-500">当前结果 · 共 {total} 条</div>
+          <div className="text-xs text-muted-foreground">
+            当前结果 · 共 {total} 条
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 px-3 py-2.5">
-          <div className="flex h-10 min-w-[240px] flex-1 items-center rounded-md border border-slate-200 bg-slate-50 px-3 focus-within:border-slate-400 focus-within:bg-white">
-            <Icon className="mr-2 h-4 w-4 text-slate-400" name="search" />
+          <div className="flex h-8 min-w-[240px] flex-1 items-center rounded-md border bg-background px-2.5 focus-within:ring-2 focus-within:ring-ring">
+            <Icon
+              className="mr-2 h-4 w-4 text-muted-foreground"
+              name="search"
+            />
             <input
-              className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
+              className="h-full min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
               onBlur={(event) => {
                 const value = event.target.value.trim();
                 if (value !== (params.get(NOTIFICATION_FILTER_KEYS.q) ?? "")) {
@@ -247,7 +252,7 @@ export function NotificationsCenter({
             value={params.get(NOTIFICATION_FILTER_KEYS.relatedType) ?? ""}
           />
           <button
-            className="flex h-10 items-center gap-2 rounded-md border border-slate-200 px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            className="flex h-8 items-center gap-2 rounded-md border px-2.5 text-xs font-semibold text-foreground hover:bg-accent"
             disabled={isPending}
             onClick={() => router.replace("/notifications", { scroll: false })}
             type="button"
@@ -259,16 +264,16 @@ export function NotificationsCenter({
       </PosTableSurface>
 
       {actionMessage ? (
-        <div className="border-y border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+        <div className="border-y bg-background px-4 py-3 text-sm text-muted-foreground">
           {actionMessage}
         </div>
       ) : null}
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.5fr)_380px]">
         <PosTableSurface className="overflow-hidden">
-          <div className="border-b border-slate-200 px-3 py-3">
-            <h2 className="text-sm font-semibold text-slate-950">通知列表</h2>
-            <p className="mt-1 text-xs text-slate-500">
+          <div className="border-b px-3 py-3">
+            <h2 className="text-sm font-semibold text-foreground">通知列表</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
               默认显示未归档通知，按送达时间倒序排列。
             </p>
           </div>
@@ -370,7 +375,7 @@ function NotificationGroup({
 }) {
   return (
     <div>
-      <div className="border-b border-slate-100 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+      <div className="border-b bg-muted/50 px-3 py-2 text-xs font-semibold text-muted-foreground">
         {label}
       </div>
       {notifications.map((notification) => (
@@ -407,8 +412,8 @@ function NotificationRow({
 
   return (
     <div
-      className={`border-b border-slate-100 px-3 py-3 ${
-        isSelected ? "bg-slate-100" : "hover:bg-slate-50/70"
+      className={`border-b px-3 py-3 ${
+        isSelected ? "bg-accent" : "hover:bg-muted/40"
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -418,17 +423,17 @@ function NotificationRow({
           type="button"
         >
           <div className="flex flex-wrap items-center gap-2">
-            <span className="truncate text-sm font-semibold text-slate-950">
+            <span className="truncate text-sm font-semibold text-foreground">
               {notification.title}
             </span>
             {notification.readStatus === "unread" ? (
-              <span className="h-2 w-2 rounded-full bg-blue-600" />
+              <span className="h-2 w-2 rounded-full bg-foreground" />
             ) : null}
           </div>
-          <p className="mt-1 max-h-10 overflow-hidden text-sm text-slate-500">
+          <p className="mt-1 max-h-10 overflow-hidden text-sm text-muted-foreground">
             {notification.content}
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>
               {formatNotificationDateTime(notification.sentAt, locale)}
             </span>
@@ -457,7 +462,7 @@ function NotificationRow({
           </div>
           <div className="flex justify-end gap-1">
             <button
-              className="flex h-11 items-center rounded-lg px-3 text-xs font-semibold text-slate-500 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-8 items-center rounded-md px-2.5 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
               disabled={disabled || notification.readStatus !== "unread"}
               onClick={() => onMarkRead(notification.id)}
               type="button"
@@ -465,7 +470,7 @@ function NotificationRow({
               已读
             </button>
             <button
-              className="flex h-11 items-center rounded-lg px-3 text-xs font-semibold text-slate-500 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-8 items-center rounded-md px-2.5 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
               disabled={disabled || notification.readStatus === "archived"}
               onClick={() => onArchive(notification.id)}
               type="button"
@@ -494,7 +499,7 @@ function NotificationDetailPanel({
 
   if (!notification) {
     return (
-      <aside className="border-y border-slate-200 bg-white p-5 text-sm text-slate-500">
+      <aside className="border-y bg-background p-5 text-sm text-muted-foreground">
         选择一条通知查看详情。
       </aside>
     );
@@ -503,12 +508,12 @@ function NotificationDetailPanel({
   const relatedHref = getRelatedHref(notification);
 
   return (
-    <aside className="border-y border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-4 py-3">
+    <aside className="border-y bg-background">
+      <div className="border-b px-4 py-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-semibold text-slate-950">通知详情</h2>
-            <p className="mt-1 text-xs text-slate-500">
+            <h2 className="font-semibold text-foreground">通知详情</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
               {formatNotificationDateTime(notification.sentAt, locale)}
             </p>
           </div>
@@ -530,24 +535,26 @@ function NotificationDetailPanel({
               label={NOTICE_PRIORITY_LABELS[notification.priority]}
             />
           </div>
-          <h3 className="mt-3 text-lg font-semibold text-slate-950">
+          <h3 className="mt-3 text-lg font-semibold text-foreground">
             {notification.title}
           </h3>
-          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">
+          <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
             {notification.content}
           </p>
         </div>
 
         {notification.relatedType && notification.relatedId ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <div className="text-xs font-medium text-slate-400">关联对象</div>
-            <div className="mt-1 font-mono text-xs font-semibold text-slate-700">
+          <div className="rounded-md border bg-muted/30 p-4">
+            <div className="text-xs font-medium text-muted-foreground">
+              关联对象
+            </div>
+            <div className="mt-1 font-mono text-xs font-semibold text-foreground">
               {NOTICE_RELATED_TYPE_LABELS[notification.relatedType]} ·{" "}
               {notification.relatedId}
             </div>
             {relatedHref ? (
               <Link
-                className="mt-3 inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+                className="mt-3 inline-flex h-9 items-center gap-2 rounded-md bg-foreground px-3 text-sm font-semibold text-background hover:bg-foreground/90"
                 href={relatedHref}
               >
                 <Icon className="h-4 w-4" name="chevron-right" />
@@ -557,9 +564,9 @@ function NotificationDetailPanel({
           </div>
         ) : null}
 
-        <div className="flex flex-wrap gap-2 border-t border-slate-100 pt-4">
+        <div className="flex flex-wrap gap-2 border-t pt-4">
           <button
-            className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-semibold text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
             disabled={disabled || notification.readStatus !== "unread"}
             onClick={() => onMarkRead(notification.id)}
             type="button"
@@ -568,7 +575,7 @@ function NotificationDetailPanel({
             标记已读
           </button>
           <button
-            className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-semibold text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
             disabled={disabled || notification.readStatus === "archived"}
             onClick={() => onArchive(notification.id)}
             type="button"
@@ -612,10 +619,10 @@ function FilterSelect({
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm">
-      <span className="font-medium text-slate-500">{label}</span>
+    <label className="flex h-8 items-center gap-2 rounded-md border bg-background px-2.5 text-xs">
+      <span className="font-medium text-muted-foreground">{label}</span>
       <select
-        className="bg-transparent text-sm text-slate-700 outline-none"
+        className="bg-transparent text-xs text-foreground outline-none"
         onChange={(event) => onChange(event.target.value)}
         value={value}
       >
@@ -633,11 +640,11 @@ function FilterSelect({
 function NotificationsEmptyState() {
   return (
     <div className="px-5 py-14 text-center">
-      <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-md bg-slate-100 text-slate-400">
+      <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-md bg-muted text-muted-foreground">
         <Icon className="h-5 w-5" name="bell" />
       </span>
-      <div className="mt-3 font-semibold text-slate-700">暂无匹配通知</div>
-      <div className="mt-1 text-sm text-slate-400">
+      <div className="mt-3 font-semibold text-foreground">暂无匹配通知</div>
+      <div className="mt-1 text-sm text-muted-foreground">
         调整筛选条件后重试，或查看已归档通知。
       </div>
     </div>

@@ -278,7 +278,7 @@ export function PrintJobControl({
         : initialLabel;
   const statusTone =
     latestJob?.status === "failed"
-      ? "text-red-600"
+      ? "text-destructive"
       : latestJob?.status === "printed"
         ? "text-emerald-700"
         : "text-amber-700";
@@ -286,7 +286,7 @@ export function PrintJobControl({
   return (
     <div className="min-w-0">
       <button
-        className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex h-11 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         disabled={
           busy || !queue || (latestJob?.status === "printed" && !canReprint)
         }
@@ -334,10 +334,10 @@ export function PrintJobControl({
               授权，原因和终端会写入审计记录。
             </DialogDescription>
           </DialogHeader>
-          <label className="grid gap-2 text-sm font-medium text-slate-700">
+          <label className="grid gap-2 text-sm font-medium text-foreground">
             重打原因
             <textarea
-              className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-300"
+              className="min-h-24 rounded-lg border border-border bg-background px-3 py-2 font-normal text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
               disabled={busy}
               maxLength={500}
               onChange={(event) => setReprintReason(event.target.value)}
@@ -347,7 +347,7 @@ export function PrintJobControl({
           </label>
           <DialogFooter>
             <button
-              className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+              className="h-10 rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
               disabled={busy}
               onClick={() => setReprintOpen(false)}
               type="button"
@@ -355,7 +355,7 @@ export function PrintJobControl({
               返回
             </button>
             <button
-              className="flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
               disabled={busy || !reprintReason.trim()}
               onClick={() => void authorizeAndReprint()}
               type="button"

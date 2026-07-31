@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "CleanHub POS",
   },
 };
@@ -27,7 +27,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#F7F9FC",
+  themeColor: "#000000",
 };
 
 const POS_LOCALE_COOKIE_NAME = "cleanhub.pos.locale";

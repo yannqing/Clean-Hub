@@ -434,32 +434,23 @@ function writeDraft(draft: ShiftHandoverDraft) {
 function MetricCard({
   icon,
   label,
-  tone,
   value,
 }: {
   icon: PosIconName;
   label: string;
-  tone: "blue" | "green" | "orange" | "red";
   value: string;
 }) {
-  const toneClass = {
-    blue: "bg-blue-50 text-blue-700",
-    green: "bg-emerald-50 text-emerald-700",
-    orange: "bg-amber-50 text-amber-700",
-    red: "bg-red-50 text-red-700",
-  }[tone];
-
   return (
-    <article className="flex min-h-20 items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2.5">
-      <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${toneClass}`}
-      >
+    <article className="flex min-h-20 items-center gap-3 rounded-md border bg-background px-3 py-2.5">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
         <Icon className="h-4 w-4" name={icon} />
       </span>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[11px] font-medium text-slate-500">{label}</p>
-          <p className="mt-0.5 truncate text-lg font-semibold text-slate-950">
+          <p className="text-[11px] font-medium text-muted-foreground">
+            {label}
+          </p>
+          <p className="mt-0.5 truncate text-lg font-semibold text-foreground">
             {value}
           </p>
         </div>
@@ -470,7 +461,7 @@ function MetricCard({
 
 function EmptyList({ label }: { label: string }) {
   return (
-    <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm font-medium text-slate-400">
+    <div className="rounded-md border border-dashed bg-muted/20 px-4 py-6 text-center text-sm font-medium text-muted-foreground">
       {label}
     </div>
   );
@@ -487,23 +478,23 @@ function OrderRow({
 }) {
   return (
     <Link
-      className="block rounded-lg border border-slate-200 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
+      className="block border-b px-1 py-3 transition-colors hover:bg-accent"
       href={posRoutes.orderDetail(order.id)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-xs font-semibold text-blue-700">
+          <p className="font-mono text-xs font-semibold text-foreground">
             {displayOrderCode(order.id)}
           </p>
-          <p className="mt-1 truncate text-sm font-semibold text-slate-900">
+          <p className="mt-1 truncate text-sm font-semibold text-foreground">
             {order.customerName}
           </p>
         </div>
-        <p className="shrink-0 text-right text-sm font-bold text-slate-950">
+        <p className="shrink-0 text-right text-sm font-bold text-foreground">
           {formatMoney(toNumber(order.totalAmount), currency, locale)}
         </p>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
         <span>{formatDateTime(order.createdAt, locale)}</span>
         <span>{formatMoney(toNumber(order.paidAmount), currency, locale)}</span>
       </div>
@@ -524,23 +515,23 @@ function TicketRow({
 }) {
   return (
     <Link
-      className="block rounded-lg border border-slate-200 bg-white p-3 transition hover:border-blue-200 hover:bg-blue-50/40"
+      className="block border-b px-1 py-3 transition-colors hover:bg-accent"
       href={posRoutes.ticketDetail(ticket.id)}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-mono text-xs font-semibold text-blue-700">
+          <p className="font-mono text-xs font-semibold text-foreground">
             {displayTicketCode(ticket)}
           </p>
-          <p className="mt-1 truncate text-sm font-semibold text-slate-900">
+          <p className="mt-1 truncate text-sm font-semibold text-foreground">
             {ticket.customerName}
           </p>
         </div>
-        <p className="shrink-0 text-right text-sm font-bold text-slate-950">
+        <p className="shrink-0 text-right text-sm font-bold text-foreground">
           {formatMoney(toNumber(ticket.totalAmount), currency, locale)}
         </p>
       </div>
-      <div className="mt-2 flex items-center justify-between gap-3 text-xs text-slate-500">
+      <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
         <span>{formatDateTime(ticket.updatedAt, locale)}</span>
         <span>
           {ticket.itemCount} {unitLabel}
@@ -753,13 +744,13 @@ export function ShiftHandoverView({
 
   const varianceTone =
     variance === 0
-      ? "text-slate-950"
+      ? "text-foreground"
       : variance > 0
         ? "text-emerald-700"
-        : "text-red-700";
+        : "text-destructive";
 
   return (
-    <section className="space-y-5">
+    <section className="space-y-7 pb-8">
       <PosBreadcrumb items={[{ label: copy.breadcrumb }]} />
 
       <PosPageHeader
@@ -770,7 +761,7 @@ export function ShiftHandoverView({
                 ? "bg-emerald-50 text-emerald-700"
                 : currentShift?.status === "on_break"
                   ? "bg-amber-50 text-amber-700"
-                  : "bg-slate-100 text-slate-600"
+                  : "bg-muted text-muted-foreground"
             }`}
           >
             <span
@@ -779,14 +770,14 @@ export function ShiftHandoverView({
                   ? "bg-emerald-500"
                   : currentShift?.status === "on_break"
                     ? "bg-amber-500"
-                    : "bg-slate-400"
+                    : "bg-muted-foreground"
               }`}
             />
             {currentShift?.status === "open"
               ? copy.active
               : currentShift?.status === "on_break"
                 ? copy.onBreak
-              : copy.noOpenShift}
+                : copy.noOpenShift}
           </span>
         }
         description={copy.description}
@@ -794,38 +785,42 @@ export function ShiftHandoverView({
         title={copy.title}
       />
 
-      <div className="border-y border-slate-200 bg-white py-4">
+      <div className="border-y bg-background py-4">
         <div className="grid gap-3 lg:grid-cols-3">
-          <div className="rounded-md bg-slate-50 p-3">
-            <p className="text-xs font-medium text-slate-500">{copy.cashier}</p>
-            <p className="mt-1 truncate text-sm font-semibold text-slate-950">
+          <div className="rounded-md bg-muted/40 p-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              {copy.cashier}
+            </p>
+            <p className="mt-1 truncate text-sm font-semibold text-foreground">
               {cashierName}
             </p>
           </div>
-          <div className="rounded-md bg-slate-50 p-3">
-            <p className="text-xs font-medium text-slate-500">{copy.branch}</p>
-            <p className="mt-1 truncate text-sm font-semibold text-slate-950">
+          <div className="rounded-md bg-muted/40 p-3">
+            <p className="text-xs font-medium text-muted-foreground">
+              {copy.branch}
+            </p>
+            <p className="mt-1 truncate text-sm font-semibold text-foreground">
               {branchName}
             </p>
           </div>
-          <div className="rounded-md bg-slate-50 p-3">
-            <p className="text-xs font-medium text-slate-500">
+          <div className="rounded-md bg-muted/40 p-3">
+            <p className="text-xs font-medium text-muted-foreground">
               {copy.generatedAt}
             </p>
-            <p className="mt-1 text-sm font-semibold text-slate-950">
+            <p className="mt-1 text-sm font-semibold text-foreground">
               {formatDateTime(summary.generatedAt, locale)}
             </p>
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end gap-3 border-t border-slate-100 pt-4">
+        <div className="mt-4 flex flex-wrap items-end gap-3 border-t pt-4">
           {!currentShift ? (
             <label className="block min-w-52">
-              <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+              <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
                 {copy.openingFloat}
               </span>
               <input
-                className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-300 focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
+                className="h-11 w-full rounded-md border bg-background px-3 text-sm font-semibold text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 inputMode="decimal"
                 onChange={(event) =>
                   setOpeningFloat(normalizeMoneyInput(event.target.value))
@@ -837,7 +832,7 @@ export function ShiftHandoverView({
           ) : null}
           {!currentShift ? (
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="inline-flex h-11 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               disabled={isSubmitting || openingFloat.trim().length === 0}
               onClick={() => void performClockAction("clock_in")}
               type="button"
@@ -847,7 +842,7 @@ export function ShiftHandoverView({
             </button>
           ) : currentShift.status === "on_break" ? (
             <button
-              className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="inline-flex h-11 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               disabled={isSubmitting}
               onClick={() => void performClockAction("break_end")}
               type="button"
@@ -858,7 +853,7 @@ export function ShiftHandoverView({
           ) : (
             <>
               <button
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                className="inline-flex h-11 items-center gap-2 rounded-md border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:text-muted-foreground"
                 disabled={isSubmitting}
                 onClick={() => void performClockAction("break_start")}
                 type="button"
@@ -867,7 +862,7 @@ export function ShiftHandoverView({
                 {copy.breakStart}
               </button>
               <button
-                className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-200 bg-white px-4 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                className="inline-flex h-11 items-center gap-2 rounded-md border border-destructive/30 bg-background px-4 text-sm font-semibold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:text-muted-foreground"
                 disabled={isSubmitting || countedCash.trim().length === 0}
                 onClick={() => void performClockAction("clock_out")}
                 type="button"
@@ -884,43 +879,39 @@ export function ShiftHandoverView({
         <MetricCard
           icon="wallet-cards"
           label={copy.expectedCash}
-          tone="green"
           value={formatMoney(expectedCash, currency, locale)}
         />
         <MetricCard
           icon="receipt"
           label={copy.paidToday}
-          tone="blue"
           value={formatMoney(paidToday, currency, locale)}
         />
         <MetricCard
           icon="clock"
           label={copy.pendingPayment}
-          tone={pendingOrderCount > 0 ? "orange" : "green"}
           value={formatNumber(pendingOrderCount, locale)}
         />
         <MetricCard
           icon="package-check"
           label={copy.readyPickup}
-          tone="blue"
           value={formatNumber(readyTicketCount, locale)}
         />
       </div>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <section className="border-y bg-background p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <h2 className="text-sm font-semibold text-slate-950">
+              <h2 className="text-sm font-semibold text-foreground">
                 {copy.cashCardTitle}
               </h2>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {copy.cashCardDescription}
               </p>
             </div>
             <div className={`text-right text-2xl font-bold ${varianceTone}`}>
               {formatMoney(variance, currency, locale)}
-              <p className="mt-0.5 text-xs font-medium text-slate-500">
+              <p className="mt-0.5 text-xs font-medium text-muted-foreground">
                 {copy.variance}
               </p>
             </div>
@@ -928,11 +919,11 @@ export function ShiftHandoverView({
 
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+              <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
                 {copy.cashInputLabel}
               </span>
               <input
-                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-blue-300 focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
+                className="h-11 w-full rounded-md border bg-background px-3 text-sm font-semibold text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 disabled={!currentShift}
                 inputMode="decimal"
                 onChange={(event) =>
@@ -943,11 +934,11 @@ export function ShiftHandoverView({
               />
             </label>
             <label className="block">
-              <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+              <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
                 {copy.incomingStaffLabel}
               </span>
               <select
-                className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
+                className="h-11 w-full rounded-md border bg-background px-3 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                 disabled={!currentShift || availableStaff.length === 0}
                 onChange={(event) => setIncomingStaffId(event.target.value)}
                 value={incomingStaffId}
@@ -967,11 +958,11 @@ export function ShiftHandoverView({
           </div>
 
           <label className="mt-4 block">
-            <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+            <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
               {copy.notesLabel}
             </span>
             <textarea
-              className="min-h-24 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-blue-300 focus:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]"
+              className="min-h-24 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
               disabled={!currentShift}
               onChange={(event) => setNotes(event.target.value)}
               placeholder={copy.notesPlaceholder}
@@ -979,19 +970,19 @@ export function ShiftHandoverView({
             />
           </label>
 
-          <div className="mt-5 rounded-lg bg-slate-50 p-4">
-            <h3 className="text-xs font-semibold text-slate-900">
+          <div className="mt-5 rounded-md border bg-muted/30 p-4">
+            <h3 className="text-xs font-semibold text-foreground">
               {copy.checklistTitle}
             </h3>
             <div className="mt-3 grid gap-2">
               {copy.checklist.map((item, index) => (
                 <label
-                  className="flex min-h-11 items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm font-medium text-slate-700"
+                  className="flex min-h-11 items-center gap-3 rounded-md bg-background px-3 py-2 text-sm font-medium text-foreground"
                   key={item}
                 >
                   <input
                     checked={checks[index] ?? false}
-                    className="h-4 w-4 rounded border-slate-300 text-blue-600"
+                    className="h-4 w-4 rounded border-border text-foreground"
                     disabled={!currentShift}
                     onChange={(event) =>
                       updateCheck(index, event.target.checked)
@@ -1006,7 +997,7 @@ export function ShiftHandoverView({
 
           <div className="mt-5 flex flex-wrap items-center gap-2">
             <button
-              className="inline-flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="inline-flex h-11 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition hover:bg-foreground/90 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               disabled={!canComplete}
               onClick={() => void completeHandover()}
               type="button"
@@ -1015,7 +1006,7 @@ export function ShiftHandoverView({
               {copy.complete}
             </button>
             <button
-              className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex h-11 items-center gap-2 rounded-md border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-accent"
               onClick={() => window.print()}
               type="button"
             >
@@ -1023,7 +1014,7 @@ export function ShiftHandoverView({
               {copy.print}
             </button>
             <button
-              className="inline-flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="inline-flex h-11 items-center gap-2 rounded-md border bg-background px-4 text-sm font-semibold text-foreground transition hover:bg-accent"
               onClick={() => void copySummary()}
               type="button"
             >
@@ -1032,15 +1023,15 @@ export function ShiftHandoverView({
             </button>
           </div>
           {!canComplete ? (
-            <p className="mt-2 text-xs font-medium text-slate-400">
+            <p className="mt-2 text-xs font-medium text-muted-foreground">
               {copy.completeDisabled}
             </p>
           ) : null}
         </section>
 
         <aside className="space-y-5">
-          <section className="rounded-lg border border-slate-200 bg-white p-5">
-            <h2 className="text-sm font-semibold text-slate-950">
+          <section className="border-y bg-background p-5">
+            <h2 className="text-sm font-semibold text-foreground">
               {copy.paymentBreakdown}
             </h2>
             <div className="mt-4 space-y-3">
@@ -1050,14 +1041,14 @@ export function ShiftHandoverView({
                     className="flex items-center justify-between gap-3 text-sm"
                     key={`${item.method}:${item.provider ?? "default"}`}
                   >
-                    <span className="font-medium text-slate-600">
+                    <span className="font-medium text-muted-foreground">
                       {PAYMENT_METHOD_LABELS[item.provider ?? item.method]?.[
                         resolvedLocale
                       ] ??
                         item.provider ??
                         item.method}
                     </span>
-                    <span className="font-semibold text-slate-950">
+                    <span className="font-semibold text-foreground">
                       {formatMoney(toNumber(item.amount), currency, locale)}
                     </span>
                   </div>
@@ -1066,70 +1057,77 @@ export function ShiftHandoverView({
                 <EmptyList label={copy.noPayments} />
               )}
             </div>
-            <div className="mt-4 flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm font-semibold">
-              <span className="text-slate-600">{copy.orderCount}</span>
-              <span className="text-slate-950">
+            <div className="mt-4 flex items-center justify-between rounded-md bg-muted/40 px-3 py-2 text-sm font-semibold">
+              <span className="text-muted-foreground">{copy.orderCount}</span>
+              <span className="text-foreground">
                 {formatNumber(orderCount, locale)}
               </span>
             </div>
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-5">
+          <section className="border-y bg-background p-5">
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold text-slate-950">
+              <h2 className="text-sm font-semibold text-foreground">
                 {copy.recentRecords}
               </h2>
             </div>
             <div className="mt-4 space-y-3">
               {recentReports.length > 0 ? (
                 recentReports.map((report) => (
-                  <div
-                    className="rounded-lg border border-slate-200 bg-slate-50 p-3"
-                    key={report.id}
-                  >
+                  <div className="border-b py-3" key={report.id}>
                     <div className="flex items-center justify-between gap-3">
-                      <p className="font-mono text-xs font-semibold text-blue-700">
+                      <p className="font-mono text-xs font-semibold text-foreground">
                         Z-{report.id.slice(-8).toUpperCase()}
                       </p>
-                      <span className="text-xs font-medium text-slate-500">
+                      <span className="text-xs font-medium text-muted-foreground">
                         {formatDateTime(report.cutoffAt, locale)}
                       </span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-                      <span className="text-slate-500">{copy.grossSales}</span>
-                      <span className="text-right font-semibold text-slate-900">
+                      <span className="text-muted-foreground">
+                        {copy.grossSales}
+                      </span>
+                      <span className="text-right font-semibold text-foreground">
                         {formatMoney(
                           toNumber(report.grossSales),
                           report.currency,
                           locale,
                         )}
                       </span>
-                      <span className="text-slate-500">{copy.discounts}</span>
-                      <span className="text-right font-semibold text-slate-900">
+                      <span className="text-muted-foreground">
+                        {copy.discounts}
+                      </span>
+                      <span className="text-right font-semibold text-foreground">
                         {formatMoney(
                           toNumber(report.discountAmount),
                           report.currency,
                           locale,
                         )}
                       </span>
-                      <span className="text-slate-500">{copy.refunds}</span>
-                      <span className="text-right font-semibold text-red-700">
+                      <span className="text-muted-foreground">
+                        {copy.refunds}
+                      </span>
+                      <span className="text-right font-semibold text-destructive">
                         {formatMoney(
                           toNumber(report.refundAmount),
                           report.currency,
                           locale,
                         )}
                       </span>
-                      <span className="text-slate-500">{copy.corrections}</span>
-                      <span className="text-right font-semibold text-slate-900">
+                      <span className="text-muted-foreground">
+                        {copy.corrections}
+                      </span>
+                      <span className="text-right font-semibold text-foreground">
                         {formatMoney(
                           toNumber(report.correctionAmount),
                           report.currency,
                           locale,
                         )}
                       </span>
-                      <span className="text-slate-500">{copy.netSales}</span>
-                      <span className="text-right font-semibold text-slate-900">
+                      <span className="text-muted-foreground">
+                        {copy.netSales}
+                      </span>
+                      <span className="text-right font-semibold text-foreground">
                         {formatMoney(
                           toNumber(report.netSales),
                           report.currency,
@@ -1137,10 +1135,12 @@ export function ShiftHandoverView({
                         )}
                       </span>
                     </div>
-                    <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-200 pt-3 text-center text-xs">
+                    <div className="mt-3 grid grid-cols-3 gap-2 border-t pt-3 text-center text-xs">
                       <div>
-                        <p className="text-slate-500">{copy.expectedCash}</p>
-                        <p className="mt-1 font-semibold text-slate-900">
+                        <p className="text-muted-foreground">
+                          {copy.expectedCash}
+                        </p>
+                        <p className="mt-1 font-semibold text-foreground">
                           {formatMoney(
                             toNumber(report.expectedCash),
                             report.currency,
@@ -1149,8 +1149,10 @@ export function ShiftHandoverView({
                         </p>
                       </div>
                       <div>
-                        <p className="text-slate-500">{copy.cashCounted}</p>
-                        <p className="mt-1 font-semibold text-slate-900">
+                        <p className="text-muted-foreground">
+                          {copy.cashCounted}
+                        </p>
+                        <p className="mt-1 font-semibold text-foreground">
                           {formatMoney(
                             toNumber(report.countedCash),
                             report.currency,
@@ -1159,8 +1161,8 @@ export function ShiftHandoverView({
                         </p>
                       </div>
                       <div>
-                        <p className="text-slate-500">{copy.variance}</p>
-                        <p className="mt-1 font-semibold text-slate-900">
+                        <p className="text-muted-foreground">{copy.variance}</p>
+                        <p className="mt-1 font-semibold text-foreground">
                           {formatMoney(
                             toNumber(report.variance),
                             report.currency,
@@ -1170,20 +1172,20 @@ export function ShiftHandoverView({
                       </div>
                     </div>
                     {report.paymentBreakdown.length > 0 ? (
-                      <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-3 text-xs">
+                      <div className="mt-3 space-y-1.5 border-t pt-3 text-xs">
                         {report.paymentBreakdown.map((payment) => (
                           <div
                             className="flex items-center justify-between gap-3"
                             key={`${payment.method}:${payment.provider ?? "default"}`}
                           >
-                            <span className="truncate text-slate-500">
+                            <span className="truncate text-muted-foreground">
                               {PAYMENT_METHOD_LABELS[
                                 payment.provider ?? payment.method
                               ]?.[resolvedLocale] ??
                                 payment.provider ??
                                 payment.method}
                             </span>
-                            <span className="font-semibold text-slate-900">
+                            <span className="font-semibold text-foreground">
                               {formatMoney(
                                 toNumber(payment.netAmount),
                                 report.currency,
@@ -1205,13 +1207,13 @@ export function ShiftHandoverView({
       </div>
 
       <div className="grid gap-5 xl:grid-cols-3">
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <section className="border-y bg-background p-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-slate-950">
+            <h2 className="text-sm font-semibold text-foreground">
               {copy.pendingOrders}
             </h2>
             <Link
-              className="text-xs font-semibold text-blue-700 hover:underline"
+              className="text-xs font-semibold text-foreground underline-offset-4 hover:underline"
               href={`${posRoutes.orders}?paymentStatus=unpaid`}
             >
               {copy.viewOrders}
@@ -1233,13 +1235,13 @@ export function ShiftHandoverView({
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <section className="border-y bg-background p-5">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-slate-950">
+            <h2 className="text-sm font-semibold text-foreground">
               {copy.readyTickets}
             </h2>
             <Link
-              className="text-xs font-semibold text-blue-700 hover:underline"
+              className="text-xs font-semibold text-foreground underline-offset-4 hover:underline"
               href={`${posRoutes.tickets}?scope=all&status=ready_to_pick`}
             >
               {copy.viewTickets}
@@ -1262,21 +1264,21 @@ export function ShiftHandoverView({
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-5">
+        <section className="border-y bg-background p-5">
           <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-amber-50 p-4">
-              <p className="text-xs font-medium text-amber-700">
+            <div className="rounded-md bg-amber-50 p-4 dark:bg-amber-950/35">
+              <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
                 {copy.overdueTickets}
               </p>
-              <p className="mt-2 text-2xl font-bold text-amber-900">
+              <p className="mt-2 text-2xl font-bold text-amber-900 dark:text-amber-100">
                 {formatNumber(overdueTicketCount, locale)}
               </p>
             </div>
-            <div className="rounded-lg bg-red-50 p-4">
-              <p className="text-xs font-medium text-red-700">
+            <div className="rounded-md bg-destructive/10 p-4">
+              <p className="text-xs font-medium text-destructive">
                 {copy.exceptionTickets}
               </p>
-              <p className="mt-2 text-2xl font-bold text-red-900">
+              <p className="mt-2 text-2xl font-bold text-destructive">
                 {formatNumber(exceptionTicketCount, locale)}
               </p>
             </div>

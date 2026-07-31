@@ -7,35 +7,30 @@ import {
 
 const STATUS_CONFIG: Record<
   ServiceTicketStatus,
-  { label: string; color: string; bgColor: string }
+  { label: string; barClassName: string }
 > = {
-  draft: { label: "草稿", color: "text-slate-600", bgColor: "bg-slate-100" },
+  draft: { label: "草稿", barClassName: "bg-muted-foreground" },
   pending: {
     label: "待处理",
-    color: "text-yellow-600",
-    bgColor: "bg-yellow-100",
+    barClassName: "bg-amber-500",
   },
   in_progress: {
     label: "处理中",
-    color: "text-blue-600",
-    bgColor: "bg-blue-100",
+    barClassName: "bg-foreground",
   },
   ready_to_pick: {
     label: "待取件",
-    color: "text-purple-600",
-    bgColor: "bg-purple-100",
+    barClassName: "bg-accent-foreground",
   },
   picked_up: {
     label: "已取件",
-    color: "text-green-600",
-    bgColor: "bg-green-100",
+    barClassName: "bg-emerald-500",
   },
   cancelled: {
     label: "已取消",
-    color: "text-gray-600",
-    bgColor: "bg-gray-100",
+    barClassName: "bg-muted-foreground",
   },
-  exception: { label: "异常", color: "text-red-600", bgColor: "bg-red-100" },
+  exception: { label: "异常", barClassName: "bg-destructive" },
 };
 
 function StatusRow({
@@ -52,21 +47,21 @@ function StatusRow({
 
   return (
     <div className="flex items-center gap-3">
-      <div className="w-20 text-xs font-medium text-slate-600">
+      <div className="w-20 text-xs font-medium text-muted-foreground">
         {config.label}
       </div>
       <div className="flex-1">
-        <div className="h-2 rounded-full bg-slate-100">
+        <div className="h-2 rounded-full bg-muted">
           <div
-            className={`h-full rounded-full ${config.bgColor.replace("100", "400")}`}
+            className={`h-full rounded-full ${config.barClassName}`}
             style={{ width: `${percentage}%` }}
           />
         </div>
       </div>
-      <div className="w-12 text-right text-sm font-semibold text-slate-900">
+      <div className="w-12 text-right text-sm font-semibold text-foreground">
         {count}
       </div>
-      <div className="w-12 text-right text-xs text-slate-500">
+      <div className="w-12 text-right text-xs text-muted-foreground">
         {percentage}%
       </div>
     </div>
@@ -95,15 +90,15 @@ export function TicketStatusChart({
 
   if (total === 0) {
     return (
-      <div className="rounded-md border border-dashed border-slate-300 bg-white p-6 text-center">
-        <p className="text-sm text-slate-500">暂无工单数据</p>
+      <div className="border-y border-dashed bg-background p-6 text-center">
+        <p className="text-sm text-muted-foreground">暂无工单数据</p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4">
-      <h3 className="mb-4 text-sm font-semibold text-slate-700">
+    <div className="border-y bg-background p-4">
+      <h3 className="mb-4 text-sm font-semibold text-foreground">
         工单状态分布
       </h3>
       <div className="space-y-3">
@@ -111,10 +106,10 @@ export function TicketStatusChart({
           <StatusRow key={status} status={status} count={count} total={total} />
         ))}
       </div>
-      <div className="mt-4 border-t border-slate-100 pt-3">
-        <div className="flex items-center justify-between text-xs text-slate-500">
+      <div className="mt-4 border-t pt-3">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>总计</span>
-          <span className="font-semibold text-slate-700">{total} 个工单</span>
+          <span className="font-semibold text-foreground">{total} 个工单</span>
         </div>
       </div>
     </div>

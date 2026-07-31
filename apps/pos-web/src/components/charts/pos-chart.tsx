@@ -87,9 +87,9 @@ export function PosChartTooltip({
     : (firstPayload.label ?? firstPayload.name ?? label);
 
   return (
-    <div className="min-w-36 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-xl">
+    <div className="min-w-36 rounded-lg border border-border bg-popover px-3 py-2 text-xs text-popover-foreground shadow-md">
       {!hideLabel && title ? (
-        <p className="mb-1.5 font-semibold text-slate-900">{title}</p>
+        <p className="mb-1.5 font-semibold text-popover-foreground">{title}</p>
       ) : null}
       <div className="space-y-1.5">
         {payload.map((entry, index) => {
@@ -104,7 +104,7 @@ export function PosChartTooltip({
           return (
             <div className="space-y-0.5" key={`${String(entry.name)}-${index}`}>
               <div className="flex min-w-0 items-center justify-between gap-4">
-                <span className="flex min-w-0 items-center gap-2 text-slate-600">
+                <span className="flex min-w-0 items-center gap-2 text-muted-foreground">
                   <span
                     aria-hidden
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
@@ -112,12 +112,14 @@ export function PosChartTooltip({
                   />
                   <span className="truncate">{name}</span>
                 </span>
-                <span className="shrink-0 font-semibold text-slate-950">
+                <span className="shrink-0 font-semibold text-popover-foreground">
                   {value}
                 </span>
               </div>
               {entryPayload.helper ? (
-                <p className="pl-4 text-slate-400">{entryPayload.helper}</p>
+                <p className="pl-4 text-muted-foreground">
+                  {entryPayload.helper}
+                </p>
               ) : null}
             </div>
           );

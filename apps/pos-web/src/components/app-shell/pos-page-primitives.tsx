@@ -26,16 +26,16 @@ export function PosPageHeader({
       )}
     >
       <div className="min-w-0">
-        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-slate-950">
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
           <Icon
             aria-hidden
-            className="h-[18px] w-[18px] shrink-0 text-slate-600"
+            className="h-[19px] w-[19px] shrink-0"
             name={icon}
           />
           <span className="min-w-0 truncate">{title}</span>
         </h1>
         {description ? (
-          <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-500">
+          <p className="mt-1.5 max-w-3xl text-sm leading-6 text-muted-foreground">
             {description}
           </p>
         ) : null}
@@ -72,32 +72,29 @@ export function PosMetricStrip({
   return (
     <section
       aria-label={ariaLabel}
-      className={cn(
-        "grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4",
-        className,
-      )}
+      className={cn("grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4", className)}
     >
       {metrics.map((metric) => (
         <div
-          className="flex min-h-20 items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2.5"
+          className="flex min-h-20 items-center gap-2.5 rounded-md border bg-background px-3 py-2.5"
           key={metric.label}
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
             <Icon aria-hidden className="h-4 w-4" name={metric.icon} />
           </span>
           <span className="min-w-0">
-            <span className="block truncate text-[11px] font-medium text-slate-500">
+            <span className="block truncate text-[11px] font-medium text-muted-foreground">
               {metric.label}
             </span>
             {loading ? (
-              <span className="mt-1.5 block h-5 w-20 animate-pulse rounded bg-slate-200" />
+              <span className="mt-1.5 block h-5 w-20 animate-pulse rounded bg-muted" />
             ) : (
-              <span className="mt-0.5 block truncate text-lg font-semibold text-slate-950">
+              <span className="mt-0.5 block truncate text-lg font-semibold">
                 {metric.value}
               </span>
             )}
             {metric.note ? (
-              <span className="mt-0.5 block truncate text-[11px] text-slate-400">
+              <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                 {metric.note}
               </span>
             ) : null}
@@ -113,17 +110,9 @@ type PosTableSurfaceProps = {
   className?: string;
 };
 
-export function PosTableSurface({
-  children,
-  className,
-}: PosTableSurfaceProps) {
+export function PosTableSurface({ children, className }: PosTableSurfaceProps) {
   return (
-    <section
-      className={cn(
-        "min-w-0 border-y border-slate-200 bg-white",
-        className,
-      )}
-    >
+    <section className={cn("min-w-0 border-y bg-background", className)}>
       {children}
     </section>
   );
@@ -144,10 +133,7 @@ export function PosFormLayout({
 }: PosFormLayoutProps) {
   return (
     <section
-      className={cn(
-        "mx-auto w-full max-w-[960px] space-y-3 pb-20",
-        className,
-      )}
+      className={cn("mx-auto w-full max-w-[960px] space-y-3 pb-20", className)}
     >
       <div
         className={cn(
@@ -181,16 +167,16 @@ export function PosEmptyState({
   return (
     <section
       className={cn(
-        "flex min-h-64 flex-col items-center justify-center border-y border-slate-200 bg-white px-6 py-12 text-center",
+        "flex min-h-64 flex-col items-center justify-center border-y bg-background px-6 py-12 text-center",
         className,
       )}
     >
-      <span className="flex h-11 w-11 items-center justify-center rounded-md bg-slate-100 text-slate-500">
+      <span className="flex h-11 w-11 items-center justify-center rounded-md bg-muted text-muted-foreground">
         <Icon aria-hidden className="h-5 w-5" name={icon} />
       </span>
-      <h1 className="mt-4 text-base font-semibold text-slate-900">{title}</h1>
+      <h1 className="mt-4 text-base font-semibold text-foreground">{title}</h1>
       {description ? (
-        <p className="mt-1.5 max-w-md text-sm leading-6 text-slate-500">
+        <p className="mt-1.5 max-w-md text-sm leading-6 text-muted-foreground">
           {description}
         </p>
       ) : null}
@@ -200,4 +186,4 @@ export function PosEmptyState({
 }
 
 export const posCompactTableClassName =
-  "text-xs [&_td]:px-2.5 [&_td]:py-2.5 [&_th]:h-10 [&_th]:px-2.5";
+  "text-xs [&_td]:px-1.5 [&_td]:py-1.5 [&_th]:h-8 [&_th]:px-1.5";

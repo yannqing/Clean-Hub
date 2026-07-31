@@ -54,21 +54,20 @@ export function TerminalSettingsCard({
     return (
       <section
         aria-busy="true"
-        className="overflow-hidden border-y border-slate-200 bg-white"
+        className="overflow-hidden border-y bg-background"
       >
-        <header className="border-b border-slate-200 px-4 py-3">
+        <header className="border-b px-4 py-3">
           <div className="flex items-center gap-2">
-            <Icon className="h-4 w-4 text-slate-500" name="settings" />
-            <h2 className="text-sm font-semibold text-slate-950">终端设置</h2>
+            <Icon className="h-4 w-4 text-muted-foreground" name="settings" />
+            <h2 className="text-sm font-semibold text-foreground">终端设置</h2>
           </div>
-          <p className="mt-1 text-xs text-slate-500">正在加载终端设置…</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            正在加载终端设置…
+          </p>
         </header>
         <div className="grid gap-3 p-4">
           {[0, 1, 2, 3].map((item) => (
-            <div
-              className="h-11 animate-pulse rounded-md bg-slate-100"
-              key={item}
-            />
+            <div className="h-9 animate-pulse rounded-md bg-muted" key={item} />
           ))}
         </div>
       </section>
@@ -76,13 +75,13 @@ export function TerminalSettingsCard({
   }
 
   return (
-    <section className="overflow-hidden border-y border-slate-200 bg-white">
-      <header className="border-b border-slate-200 px-4 py-3">
+    <section className="overflow-hidden border-y bg-background">
+      <header className="border-b px-4 py-3">
         <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-slate-500" name="settings" />
-          <h2 className="text-sm font-semibold text-slate-950">终端设置</h2>
+          <Icon className="h-4 w-4 text-muted-foreground" name="settings" />
+          <h2 className="text-sm font-semibold text-foreground">终端设置</h2>
         </div>
-        <p className="mt-1 text-xs leading-5 text-slate-500">
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">
           配置当前终端的收银偏好、打印和锁屏策略。
         </p>
       </header>
@@ -92,14 +91,14 @@ export function TerminalSettingsCard({
           <div className="space-y-1.5">
             <Label htmlFor="terminal-label">设备标签</Label>
             <Input
-              className="h-11"
+              className="h-9"
               id="terminal-label"
               maxLength={64}
               onChange={(e) => updateField("label", e.target.value)}
               placeholder="如：前台收银机1"
               value={form.label}
             />
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               给终端起一个可读的名称，方便管理多台设备。
             </p>
           </div>
@@ -116,7 +115,7 @@ export function TerminalSettingsCard({
               }
               value={form.defaultPaymentMethod}
             >
-              <SelectTrigger className="h-11 w-full">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -141,7 +140,7 @@ export function TerminalSettingsCard({
               }
               value={form.roundingRule}
             >
-              <SelectTrigger className="h-11 w-full">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -177,7 +176,7 @@ export function TerminalSettingsCard({
               }
               value={String(form.printCopies)}
             >
-              <SelectTrigger className="h-11 w-full">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -199,7 +198,7 @@ export function TerminalSettingsCard({
               }
               value={String(form.lockTimeoutSeconds)}
             >
-              <SelectTrigger className="h-11 w-full">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -210,14 +209,14 @@ export function TerminalSettingsCard({
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-muted-foreground">
               无操作后自动锁定终端，需输入 PIN 解锁。
             </p>
           </div>
         </div>
-        <footer className="flex justify-end border-t border-slate-200 px-4 py-3">
+        <footer className="flex justify-end border-t px-4 py-3">
           <button
-            className="h-11 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:opacity-50"
+            className="h-9 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
             disabled={saving}
             type="submit"
           >

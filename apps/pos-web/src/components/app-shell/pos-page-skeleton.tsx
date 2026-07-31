@@ -4,7 +4,7 @@ function SkeletonBlock({ className }: { className: string }) {
   return (
     <div
       aria-hidden
-      className={`animate-pulse rounded-md bg-slate-200 ${className}`}
+      className={`animate-pulse rounded-md bg-muted ${className}`}
     />
   );
 }
@@ -17,10 +17,7 @@ function SkeletonSurface({
   className?: string;
 }) {
   return (
-    <section
-      aria-hidden
-      className={`border-y border-slate-200 bg-white ${className}`}
-    >
+    <section aria-hidden className={`border-y bg-background ${className}`}>
       {children}
     </section>
   );
@@ -43,7 +40,7 @@ function HeaderSkeleton({ action = true }: { action?: boolean }) {
         <SkeletonBlock className="h-6 w-40" />
         <SkeletonBlock className="h-4 w-72 max-w-[65vw]" />
       </div>
-      {action ? <SkeletonBlock className="h-10 w-28" /> : null}
+      {action ? <SkeletonBlock className="h-8 w-28" /> : null}
     </header>
   );
 }
@@ -54,7 +51,7 @@ function MetricSkeletons() {
       {[0, 1, 2, 3].map((item) => (
         <div
           aria-hidden
-          className="flex min-h-20 items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2.5"
+          className="flex min-h-20 items-center gap-2.5 rounded-md border bg-background px-3 py-2.5"
           key={item}
         >
           <SkeletonBlock className="h-8 w-8 shrink-0" />
@@ -73,7 +70,7 @@ export function PosHomePageSkeleton() {
     <section
       aria-busy="true"
       aria-label="正在加载工作台 / Loading workspace"
-      className="space-y-6 pb-8"
+      className="space-y-7 pb-8"
     >
       <HeaderSkeleton action={false} />
       <SkeletonSurface className="p-4">
@@ -107,21 +104,21 @@ export function PosListPageSkeleton() {
     <section
       aria-busy="true"
       aria-label="正在加载列表 / Loading list"
-      className="space-y-6 pb-8"
+      className="space-y-7 pb-8"
     >
       <BreadcrumbSkeleton />
       <HeaderSkeleton />
       <MetricSkeletons />
       <SkeletonSurface>
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-3 py-2.5">
-          <SkeletonBlock className="h-10 w-10" />
-          <SkeletonBlock className="h-10 min-w-52 flex-1" />
-          <SkeletonBlock className="h-10 w-28" />
-          <SkeletonBlock className="h-10 w-10" />
+        <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2.5">
+          <SkeletonBlock className="h-8 w-8" />
+          <SkeletonBlock className="h-8 min-w-52 flex-1" />
+          <SkeletonBlock className="h-8 w-28" />
+          <SkeletonBlock className="h-8 w-8" />
         </div>
         <div className="grid gap-1 p-2">
           {[0, 1, 2, 3, 4, 5, 6, 7].map((row) => (
-            <SkeletonBlock className="h-11 w-full" key={row} />
+            <SkeletonBlock className="h-9 w-full" key={row} />
           ))}
         </div>
       </SkeletonSurface>
@@ -137,7 +134,7 @@ export function PosDetailPageSkeleton() {
       className="mx-auto w-full max-w-[1080px] space-y-4 pb-12"
     >
       <BreadcrumbSkeleton />
-      <div className="flex flex-wrap items-center justify-between gap-3 border-y border-slate-200 bg-white px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-y bg-background px-4 py-3">
         <div className="space-y-2">
           <SkeletonBlock className="h-6 w-44" />
           <SkeletonBlock className="h-4 w-64 max-w-[60vw]" />
@@ -211,7 +208,7 @@ export function PosWorkflowPageSkeleton() {
     <section
       aria-busy="true"
       aria-label="正在加载操作页面 / Loading workflow"
-      className="space-y-5 pb-12"
+      className="space-y-7 pb-12"
     >
       <BreadcrumbSkeleton />
       <HeaderSkeleton />

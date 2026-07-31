@@ -85,12 +85,10 @@ function SectionHeader({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-white">
-          <Icon className="h-4 w-4" name={icon} />
-        </span>
+        <Icon className="h-4 w-4" name={icon} />
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
-          <p className="mt-0.5 text-xs text-slate-500">{description}</p>
+          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
         </div>
       </div>
       {action}
@@ -100,15 +98,15 @@ function SectionHeader({
 
 function EmptyTasks() {
   return (
-    <div className="border-y border-dashed border-slate-300 bg-white p-8 text-center">
+    <div className="border-y border-dashed border-border bg-background p-8 text-center">
       <div
         className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg border"
         style={iconAccentStyle(CHART_COLORS.low)}
       >
         <Icon className="h-6 w-6" name="package-check" />
       </div>
-      <p className="mt-3 text-sm font-semibold text-slate-700">暂无待办任务</p>
-      <p className="mt-1 text-xs text-slate-500">所有任务都已处理完毕</p>
+      <p className="mt-3 text-sm font-semibold text-foreground">暂无待办任务</p>
+      <p className="mt-1 text-xs text-muted-foreground">所有任务都已处理完毕</p>
     </div>
   );
 }
@@ -133,7 +131,7 @@ function TaskCard({
 
   return (
     <Link
-      className="group block border-y border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+      className="group block border-y border-border bg-background p-4 transition hover:border-border hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       href={task.actionRoute}
     >
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4">
@@ -146,14 +144,14 @@ function TaskCard({
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-sm font-semibold text-slate-950">
+              <h3 className="truncate text-sm font-semibold text-foreground">
                 {task.title}
               </h3>
-              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+              <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
                 {meta.label}
               </span>
             </div>
-            <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
               {task.description}
             </p>
           </div>
@@ -166,7 +164,7 @@ function TaskCard({
           >
             {formatNumber(task.count, locale)}
           </span>
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 group-hover:text-slate-800">
+          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground group-hover:text-foreground">
             处理
             <Icon className="h-3.5 w-3.5" name="chevron-right" />
           </span>
@@ -174,11 +172,11 @@ function TaskCard({
       </div>
 
       <div className="mt-4">
-        <div className="mb-2 flex items-center justify-between gap-3 text-[11px] font-semibold text-slate-500">
+        <div className="mb-2 flex items-center justify-between gap-3 text-[11px] font-semibold text-muted-foreground">
           <span>{PRIORITY_LABELS[priority]}</span>
           <span>待处理事项</span>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
           <div
             className="h-full rounded-full transition-[width] duration-500"
             style={{ backgroundColor: color, width: `${width}%` }}
@@ -199,7 +197,7 @@ export function PendingTasks({ tasks }: { tasks: PosPendingTask[] }) {
       <SectionHeader
         action={
           tasks.length > 0 ? (
-            <span className="inline-flex h-8 items-center rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-600">
+            <span className="inline-flex h-8 items-center rounded-md bg-muted px-3 text-xs font-semibold text-muted-foreground">
               {formatPendingSummary(totalPending, locale)}
             </span>
           ) : null

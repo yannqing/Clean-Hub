@@ -87,26 +87,26 @@ function QuickActionCard({ action }: { action: PosQuickAction }) {
 
   return (
     <Link
-      className="group flex min-h-[108px] flex-col justify-between border-y border-slate-200 bg-white px-3 py-4 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+      className="group flex min-h-36 flex-col justify-between rounded-2xl border bg-background p-5 shadow-sm transition-[transform,box-shadow,border-color] duration-200 ease-out hover:-translate-y-1 hover:border-foreground/20 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none"
       href={action.route}
     >
       <div className="flex items-start justify-between gap-3">
         <span
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-transform duration-200 group-hover:scale-105"
           style={iconAccentStyle(color)}
         >
           <Icon className="h-5 w-5" name={icon} />
         </span>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition group-hover:bg-white group-hover:text-slate-700">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground">
           <Icon className="h-4 w-4" name="chevron-right" />
         </span>
       </div>
 
-      <div className="mt-3 min-w-0">
-        <h3 className="truncate text-sm font-semibold text-slate-950">
+      <div className="mt-5 min-w-0">
+        <h3 className="truncate text-lg font-semibold text-foreground">
           {action.label}
         </h3>
-        <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+        <p className="mt-1.5 line-clamp-2 text-sm leading-6 text-muted-foreground">
           {description}
         </p>
       </div>
@@ -125,20 +125,20 @@ export function WorkspaceQuickActions({ actions }: WorkspaceQuickActionsProps) {
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-white">
-            <Icon className="h-4 w-4" name="plus" />
-          </span>
+          <Icon className="h-4 w-4" name="plus" />
           <div>
-            <h2 className="text-sm font-semibold text-slate-900">快速操作</h2>
-            <p className="mt-0.5 text-xs text-slate-500">门店常用业务入口</p>
+            <h2 className="text-sm font-semibold text-foreground">快速操作</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              门店常用业务入口
+            </p>
           </div>
         </div>
-        <span className="inline-flex h-8 items-center rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-600">
+        <span className="inline-flex h-8 items-center rounded-md bg-muted px-3 text-xs font-semibold text-muted-foreground">
           {formatActionCount(actions.length, locale)}
         </span>
       </div>
 
-      <div className="grid gap-x-3 gap-y-2 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {actions.map((action) => (
           <QuickActionCard action={action} key={action.id} />
         ))}

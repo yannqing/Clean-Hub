@@ -140,18 +140,16 @@ function SectionHeader({
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2">
-        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-950 text-white">
-          <Icon className="h-4 w-4" name="chart" />
-        </span>
+        <Icon className="h-4 w-4" name="chart" />
         <div>
-          <h2 className="text-sm font-semibold text-slate-900">最近活动</h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <h2 className="text-sm font-semibold text-foreground">最近活动</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">
             按时间倒序展示最近业务变化
           </p>
         </div>
       </div>
       {activityCount > 0 ? (
-        <span className="inline-flex h-8 items-center rounded-md bg-slate-100 px-3 text-xs font-semibold text-slate-600">
+        <span className="inline-flex h-8 items-center rounded-md bg-muted px-3 text-xs font-semibold text-muted-foreground">
           {formatActivityCount(activityCount, locale)}
         </span>
       ) : null}
@@ -161,15 +159,17 @@ function SectionHeader({
 
 function EmptyActivities() {
   return (
-    <div className="border-y border-dashed border-slate-300 bg-white p-8 text-center">
+    <div className="border-y border-dashed border-border bg-background p-8 text-center">
       <div
         className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg border"
         style={iconAccentStyle("var(--chart-3)")}
       >
         <Icon className="h-6 w-6" name="clock" />
       </div>
-      <p className="mt-3 text-sm font-semibold text-slate-700">暂无最近活动</p>
-      <p className="mt-1 text-xs text-slate-500">最近的操作记录会显示在这里</p>
+      <p className="mt-3 text-sm font-semibold text-foreground">暂无最近活动</p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        最近的操作记录会显示在这里
+      </p>
     </div>
   );
 }
@@ -198,19 +198,19 @@ function ActivityContent({
 
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+          <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
             {meta.label}
           </span>
-          <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-400">
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
             <Icon className="h-3.5 w-3.5" name="clock" />
             {formattedTime}
           </span>
         </div>
-        <h3 className="mt-1 truncate text-sm font-semibold text-slate-950">
+        <h3 className="mt-1 truncate text-sm font-semibold text-foreground">
           {activity.title}
         </h3>
         {activity.description ? (
-          <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-500">
+          <p className="mt-0.5 line-clamp-2 text-xs leading-5 text-muted-foreground">
             {activity.description}
           </p>
         ) : null}
@@ -228,7 +228,7 @@ function ActivityItem({
 }) {
   const href = getActivityHref(activity);
   const className =
-    "group block border-b border-slate-100 p-4 transition last:border-b-0 hover:bg-slate-50/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-slate-300";
+    "group block border-b border-border/60 p-4 transition last:border-b-0 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring";
 
   if (!href) {
     return (
@@ -242,7 +242,7 @@ function ActivityItem({
     <Link className={className} href={href}>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
         <ActivityContent activity={activity} formattedTime={formattedTime} />
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition group-hover:bg-white group-hover:text-slate-700">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition group-hover:bg-background group-hover:text-foreground">
           <Icon className="h-4 w-4" name="chevron-right" />
         </span>
       </div>
@@ -280,7 +280,7 @@ export function RecentActivities({
       {activities.length === 0 ? (
         <EmptyActivities />
       ) : (
-        <div className="overflow-hidden border-y border-slate-200 bg-white">
+        <div className="overflow-hidden border-y border-border bg-background">
           {activities.map((activity) => (
             <ActivityItem
               activity={activity}

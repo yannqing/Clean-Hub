@@ -19,11 +19,13 @@ export function BranchCard({ branch }: BranchCardProps) {
   ];
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    <section className="border-y border-border bg-background px-4 py-4">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="text-lg font-bold text-slate-950">{branch.name}</h2>
-          <p className="mt-1 text-xs text-slate-400">
+          <h2 className="text-base font-semibold text-foreground">
+            {branch.name}
+          </h2>
+          <p className="mt-1 text-xs text-muted-foreground">
             门店编码 · {branch.id.slice(-8).toUpperCase()}
           </p>
         </div>
@@ -31,18 +33,20 @@ export function BranchCard({ branch }: BranchCardProps) {
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
             branch.status === "active"
               ? "bg-emerald-50 text-emerald-700"
-              : "bg-slate-100 text-slate-500"
+              : "bg-muted text-muted-foreground"
           }`}
         >
           {statusLabel}
         </span>
       </div>
 
-      <dl className="mt-5 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
+      <dl className="mt-4 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
         {rows.map((row) => (
           <div key={row.label} className="flex flex-col">
-            <dt className="text-xs font-medium text-slate-400">{row.label}</dt>
-            <dd className="mt-0.5 text-sm font-medium text-slate-700">
+            <dt className="text-xs font-medium text-muted-foreground">
+              {row.label}
+            </dt>
+            <dd className="mt-0.5 text-sm font-medium text-foreground">
               {row.value ?? "—"}
             </dd>
           </div>

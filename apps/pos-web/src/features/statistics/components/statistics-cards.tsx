@@ -5,7 +5,6 @@ import { type ServiceTicketOverview } from "@cleanhub/api-client";
 type StatCard = {
   label: string;
   value: number;
-  color: "blue" | "orange" | "red" | "green";
 };
 
 function deriveStatCards(overview: ServiceTicketOverview): StatCard[] {
@@ -16,65 +15,29 @@ function deriveStatCards(overview: ServiceTicketOverview): StatCard[] {
     {
       label: "进行中工单",
       value: inProgress,
-      color: "blue",
     },
     {
       label: "待取件",
       value: overview.byStatus.ready_to_pick ?? 0,
-      color: "orange",
     },
     {
       label: "已逾期",
       value: overview.overdueCount,
-      color: "red",
     },
     {
       label: "今日新增",
       value: overview.todayCreatedCount,
-      color: "green",
     },
   ];
 }
 
-const COLOR_MAP = {
-  blue: {
-    bg: "bg-blue-50",
-    text: "text-blue-600",
-    badge: "bg-blue-100 text-blue-700",
-  },
-  orange: {
-    bg: "bg-orange-50",
-    text: "text-orange-600",
-    badge: "bg-orange-100 text-orange-700",
-  },
-  red: {
-    bg: "bg-red-50",
-    text: "text-red-600",
-    badge: "bg-red-100 text-red-700",
-  },
-  green: {
-    bg: "bg-green-50",
-    text: "text-green-600",
-    badge: "bg-green-100 text-green-700",
-  },
-} as const;
-
 function StatCardItem({ card }: { card: StatCard }) {
-  const colors = COLOR_MAP[card.color];
-
   return (
-    <div className={`rounded-md border border-slate-200 ${colors.bg} p-3`}>
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-slate-500">{card.label}</span>
-        <span
-          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${colors.badge}`}
-        >
-          {card.value}
-        </span>
-      </div>
-      <p className={`mt-1 text-lg font-semibold ${colors.text}`}>
-        {card.value}
-      </p>
+    <div className="rounded-md border bg-background px-3 py-2.5">
+      <span className="text-xs font-medium text-muted-foreground">
+        {card.label}
+      </span>
+      <p className="mt-1 text-lg font-semibold text-foreground">{card.value}</p>
     </div>
   );
 }

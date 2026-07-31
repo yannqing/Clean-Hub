@@ -121,6 +121,10 @@ export const POS_TEXT_TRANSLATIONS: Record<
     en: "The hardware equipment currently configured in the store. If you need to add or modify, please contact the administrator to operate in the background.",
     fr: "L'équipement matériel actuellement configuré dans le magasin. Si vous devez ajouter ou modifier, veuillez contacter l'administrateur pour fonctionner en arrière-plan.",
   },
+  "当前收银终端已配置的硬件设备。如需添加或修改，请联系管理员在后台操作。": {
+    en: "Hardware configured for this POS terminal. Contact an administrator in the back office to add or modify devices.",
+    fr: "Matériel configuré pour ce terminal POS. Contactez un administrateur dans le back-office pour ajouter ou modifier des appareils.",
+  },
   "优先查询客户账户联系方式，并自动使用档案手机号或邮箱进行兜底查询。": {
     en: "Prioritize customer account contact information and automatically use the mobile phone number or email on file to conduct detailed inquiries.",
     fr: "Donnez la priorité aux informations de contact du compte client et utilisez automatiquement le numéro de téléphone mobile ou l’adresse e-mail enregistrée pour mener des enquêtes détaillées.",

@@ -4,7 +4,8 @@ html,
 body {
   min-height: 100%;
   overscroll-behavior: none;
-  background: #f7f9fc;
+  background: var(--background);
+  color: var(--foreground);
 }
 
 button,
@@ -17,7 +18,7 @@ a,
 /* POS workspace scrollbar — mirrors the design prototype (.scrollbar). */
 .pos-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-color: var(--border) transparent;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
@@ -31,6 +32,6 @@ a,
 }
 
 .pos-scrollbar::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--border);
   border-radius: 999px;
 }

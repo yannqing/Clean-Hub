@@ -8,7 +8,7 @@ import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { cn } from "@cleanhub/ui";
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/app-shell";
 import { posRoutes } from "@/config";
@@ -16,9 +16,10 @@ import { posApi } from "@/lib/api-client";
 
 type HeaderNotificationsMenuProps = {
   className?: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   unreadCount: number;
   onUnreadCountChange?: (count: number) => void;
-  variant?: "default" | "dark";
 };
 
 type LoadState = "idle" | "loading" | "success" | "error";
@@ -69,23 +70,29 @@ function getNoticeTypeLabel(
 
 export function HeaderNotificationsMenu({
   className,
+  open,
+  onOpenChange,
   unreadCount,
   onUnreadCountChange,
-  variant = "default",
 }: HeaderNotificationsMenuProps) {
   const { locale, t } = useTranslation();
-  const rootRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const [open, setOpen] = useState(false);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [items, setItems] = useState<PosNotificationInboxItem[]>([]);
   const [actionId, setActionId] = useState<string | null>(null);
 
   function closeMenu() {
-    setOpen(false);
+    onOpenChange(false);
     abortRef.current?.abort();
     abortRef.current = null;
   }
+
+  useEffect(() => {
+    if (!open) {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    }
+  }, [open]);
 
   async function loadNotifications() {
     abortRef.current?.abort();
@@ -119,7 +126,7 @@ export function HeaderNotificationsMenu({
       return;
     }
 
-    setOpen(true);
+    onOpenChange(true);
     await loadNotifications();
   }
 
@@ -168,7 +175,6 @@ export function HeaderNotificationsMenu({
 
   return (
     <div
-      ref={rootRef}
       className={cn("relative", className)}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
@@ -193,10 +199,9 @@ export function HeaderNotificationsMenu({
             : t("pos.shell.messageCenter")
         }
         className={cn(
-          "relative z-50 flex items-center justify-center rounded-lg border transition",
-          variant === "dark"
-            ? "h-10 w-10 border-white/15 bg-white/10 text-white/80 hover:bg-white/15 hover:text-white"
-            : "h-11 w-11 border-slate-200 bg-white text-slate-700 hover:bg-slate-50",
+          "relative z-50 flex size-9 items-center justify-center rounded-xl text-white/75 transition-colors",
+          "hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+          open && "bg-white/15 text-white",
         )}
         onClick={() => {
           void toggleMenu();
@@ -205,18 +210,20 @@ export function HeaderNotificationsMenu({
       >
         <Icon className="h-[18px] w-[18px]" name="bell" />
         {unreadCount > 0 ? (
-          <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
+          <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-4 text-white ring-2 ring-black">
+            {unreadCount > 99 ? "99+" : unreadCount}
+          </span>
         ) : null}
       </button>
 
       {open ? (
-        <section className="absolute right-0 top-[calc(100%+8px)] z-50 w-[min(380px,calc(100vw-2rem))] overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-[0_18px_45px_rgba(15,23,42,0.18)]">
-          <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+        <section className="absolute right-0 top-[calc(100%+10px)] z-50 w-[min(390px,calc(100vw-1rem))] overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-xl">
+          <div className="flex items-start justify-between gap-3 border-b px-4 py-3.5">
             <div>
-              <div className="text-sm font-bold text-slate-950">
+              <div className="text-sm font-semibold text-foreground">
                 {t("pos.notificationsMenu.title")}
               </div>
-              <div className="mt-0.5 text-xs font-medium text-slate-500">
+              <div className="mt-0.5 text-xs text-muted-foreground">
                 {unreadCount > 0
                   ? t("pos.notificationsMenu.unreadCount", {
                       count: unreadCount,
@@ -225,7 +232,7 @@ export function HeaderNotificationsMenu({
               </div>
             </div>
             <button
-              className="rounded-md px-2.5 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:text-slate-400"
+              className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:text-muted-foreground"
               disabled={unreadCount === 0 || actionId === "all"}
               onClick={() => {
                 void markAllRead();
@@ -238,37 +245,51 @@ export function HeaderNotificationsMenu({
             </button>
           </div>
 
-          <div className="pos-scrollbar max-h-[390px] overflow-y-auto">
-            {loadState === "loading" ? (
-              <div className="px-4 py-6 text-sm font-medium text-slate-500">
+          <div className="pos-scrollbar max-h-[420px] overflow-y-auto">
+            {loadState === "loading" || loadState === "idle" ? (
+              <div className="flex items-center gap-2 px-4 py-8 text-sm text-muted-foreground">
+                <Icon className="h-4 w-4 animate-spin" name="rotate-ccw" />
                 {t("pos.notificationsMenu.loading")}
               </div>
             ) : null}
 
             {loadState === "error" ? (
-              <div className="px-4 py-6">
-                <div className="text-sm font-semibold text-slate-900">
+              <div className="px-5 py-8 text-center">
+                <div className="text-sm font-semibold text-foreground">
                   {t("pos.notificationsMenu.errorTitle")}
                 </div>
-                <div className="mt-1 text-xs font-medium text-slate-500">
+                <div className="mt-1 text-xs leading-5 text-muted-foreground">
                   {t("pos.notificationsMenu.errorHint")}
                 </div>
+                <button
+                  className="mt-4 inline-flex h-8 items-center gap-2 rounded-lg border border-border px-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  onClick={() => {
+                    void loadNotifications();
+                  }}
+                  type="button"
+                >
+                  <Icon className="h-3.5 w-3.5" name="rotate-ccw" />
+                  {t("common.retry")}
+                </button>
               </div>
             ) : null}
 
             {loadState === "success" && items.length === 0 ? (
-              <div className="px-4 py-6">
-                <div className="text-sm font-semibold text-slate-900">
+              <div className="px-5 py-10 text-center">
+                <span className="mx-auto flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <Icon className="h-[18px] w-[18px]" name="bell" />
+                </span>
+                <div className="mt-3 text-sm font-semibold text-foreground">
                   {t("pos.notificationsMenu.emptyTitle")}
                 </div>
-                <div className="mt-1 text-xs font-medium text-slate-500">
+                <div className="mt-1 text-xs leading-5 text-muted-foreground">
                   {t("pos.notificationsMenu.emptyHint")}
                 </div>
               </div>
             ) : null}
 
             {loadState === "success" && items.length > 0 ? (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-border">
                 {items.map((notification) => {
                   const unread = notification.readStatus === "unread";
                   const statusLabel = t(
@@ -282,8 +303,8 @@ export function HeaderNotificationsMenu({
                   return (
                     <article
                       className={cn(
-                        "px-4 py-3 transition",
-                        unread ? "bg-blue-50/45" : "bg-white",
+                        "px-4 py-3.5 transition-colors",
+                        unread ? "bg-muted/45" : "bg-background",
                       )}
                       key={notification.id}
                     >
@@ -291,30 +312,30 @@ export function HeaderNotificationsMenu({
                         <span
                           className={cn(
                             "mt-1 h-2 w-2 shrink-0 rounded-full",
-                            unread ? "bg-red-500" : "bg-slate-300",
+                            unread ? "bg-red-500" : "bg-muted-foreground/30",
                           )}
                         />
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="truncate text-sm font-semibold text-slate-950">
+                          <div className="flex items-start justify-between gap-2">
+                            <span className="min-w-0 truncate text-sm font-semibold text-foreground">
                               {notification.title}
                             </span>
-                            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500">
+                            <span className="shrink-0 rounded-full bg-background px-2 py-0.5 text-[10px] font-semibold text-muted-foreground ring-1 ring-border">
                               {getNoticeTypeLabel(notification.noticeType, t)}
                             </span>
                           </div>
-                          <p className="mt-1 max-h-10 overflow-hidden text-xs leading-5 text-slate-500">
+                          <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
                             {notification.content}
                           </p>
                           <div className="mt-2 flex items-center justify-between gap-3">
-                            <span className="min-w-0 truncate text-[11px] font-medium text-slate-400">
+                            <span className="min-w-0 truncate text-[11px] text-muted-foreground">
                               {[statusLabel, sentAt]
                                 .filter(Boolean)
                                 .join(" · ")}
                             </span>
                             {unread ? (
                               <button
-                                className="shrink-0 rounded-md px-2 py-1 text-[11px] font-bold text-blue-700 hover:bg-white disabled:cursor-not-allowed disabled:text-slate-400"
+                                className="shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-foreground transition-colors hover:bg-background disabled:cursor-not-allowed disabled:text-muted-foreground"
                                 disabled={actionId === notification.id}
                                 onClick={() => {
                                   void markRead(notification);
@@ -336,9 +357,9 @@ export function HeaderNotificationsMenu({
             ) : null}
           </div>
 
-          <div className="border-t border-slate-100 p-3">
+          <div className="border-t px-4 py-2.5">
             <Link
-              className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-slate-900 text-sm font-bold text-white transition hover:bg-slate-800"
+              className="flex items-center justify-center rounded-lg px-3 py-2 text-xs font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               href={posRoutes.notifications}
               onClick={closeMenu}
             >

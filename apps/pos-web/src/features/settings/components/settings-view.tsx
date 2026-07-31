@@ -198,7 +198,7 @@ export function SettingsView() {
   const isLoading = pageState === "loading";
 
   return (
-    <div className="mx-auto w-full max-w-[960px] space-y-4">
+    <section className="mx-auto w-full max-w-[960px] space-y-7 pb-8">
       <PosBreadcrumb items={[{ label: SETTINGS_PAGE_TITLE }]} />
       <PosPageHeader
         description={SETTINGS_PAGE_DESCRIPTION}
@@ -207,6 +207,7 @@ export function SettingsView() {
       />
 
       <PosFormLayout
+        className="pb-0"
         aside={
           <div className="grid gap-5">
             <GeneralSettingsCard
@@ -234,6 +235,6 @@ export function SettingsView() {
           onSave={handleSave}
         />
       </PosFormLayout>
-    </div>
+    </section>
   );
 }

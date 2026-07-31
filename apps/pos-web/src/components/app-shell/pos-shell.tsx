@@ -124,15 +124,17 @@ export function PosShell({
   const settingsActive = isActivePath(pathname, posRoutes.settings);
 
   return (
-    <div className="flex h-screen h-dvh min-h-0 flex-col overflow-hidden bg-[#f6f6f6] pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-slate-900">
-      <PosGlobalHeader
-        displayInitials={displayInitials}
-        notificationUnreadCount={currentUnreadCount}
-        onOpenNavigation={() => setMobileNavigationOpen(true)}
-        onUnreadCountChange={setCurrentUnreadCount}
-        profileName={profileName}
-        roleLabel={roleLabel}
-      />
+    <div className="flex h-screen h-dvh min-h-0 flex-col overflow-hidden bg-muted/30 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-foreground">
+      <div className="relative z-50 shrink-0 bg-black pt-[env(safe-area-inset-top)]">
+        <PosGlobalHeader
+          displayInitials={displayInitials}
+          notificationUnreadCount={currentUnreadCount}
+          onOpenNavigation={() => setMobileNavigationOpen(true)}
+          onUnreadCountChange={setCurrentUnreadCount}
+          profileName={profileName}
+          roleLabel={roleLabel}
+        />
+      </div>
 
       <div className="relative flex min-h-0 flex-1">
         {mobileNavigationOpen ? (
@@ -146,18 +148,18 @@ export function PosShell({
 
         <aside
           className={cn(
-            "absolute inset-y-0 left-0 z-40 flex w-56 shrink-0 flex-col border-r border-slate-200 bg-white px-3 py-4 text-slate-900 shadow-xl transition-transform duration-200 lg:static lg:translate-x-0 lg:shadow-none",
+            "absolute inset-y-0 left-0 z-40 flex w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-3 py-4 text-sidebar-foreground shadow-xl transition-transform duration-200 lg:static lg:translate-x-0 lg:shadow-none",
             mobileNavigationOpen ? "translate-x-0" : "-translate-x-full",
           )}
           data-testid="pos-sidebar"
         >
           <div className="mb-3 flex items-center justify-between px-2 lg:hidden">
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
               CleanHub POS
             </span>
             <button
               aria-label={t("pos.shell.closeNavigation")}
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
+              className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => setMobileNavigationOpen(false)}
               type="button"
             >
@@ -173,8 +175,7 @@ export function PosShell({
               const active = isActivePath(activePathname, item.href);
               const label = t(item.labelKey);
               const showUnreadIndicator =
-                currentUnreadCount > 0 &&
-                item.href === posRoutes.notifications;
+                currentUnreadCount > 0 && item.href === posRoutes.notifications;
 
               return (
                 <Link
@@ -187,11 +188,12 @@ export function PosShell({
                       : label
                   }
                   className={cn(
-                    "group relative flex h-10 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+                    "group relative flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                    "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     active
-                      ? "bg-slate-100 text-slate-950"
-                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm"
+                      : "text-muted-foreground",
                   )}
                   href={item.href}
                   key={item.href}
@@ -199,14 +201,14 @@ export function PosShell({
                 >
                   <span
                     className={cn(
-                      "absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-black opacity-0 transition-opacity",
+                      "absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity",
                       active && "opacity-100",
                     )}
                   />
                   <Icon
                     className={cn(
-                      "h-4 w-4 text-slate-400 transition-colors",
-                      active && "text-slate-950",
+                      "h-4 w-4 text-muted-foreground transition-colors",
+                      active && "text-sidebar-accent-foreground",
                     )}
                     name={item.icon}
                   />
@@ -219,29 +221,30 @@ export function PosShell({
             })}
           </nav>
 
-          <div className="border-t border-slate-200 pt-3">
+          <div className="border-t border-sidebar-border pt-3">
             <Link
               aria-current={settingsActive ? "page" : undefined}
               className={cn(
-                "relative flex h-10 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400",
+                "relative flex h-9 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 settingsActive
-                  ? "bg-slate-100 text-slate-950"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-950",
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-muted-foreground",
               )}
               href={posRoutes.settings}
               onClick={() => setMobileNavigationOpen(false)}
             >
               <span
                 className={cn(
-                  "absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-black opacity-0 transition-opacity",
+                  "absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity",
                   settingsActive && "opacity-100",
                 )}
               />
               <Icon
                 className={cn(
-                  "h-4 w-4 text-slate-400",
-                  settingsActive && "text-slate-950",
+                  "h-4 w-4 text-muted-foreground",
+                  settingsActive && "text-sidebar-accent-foreground",
                 )}
                 name="settings"
               />
@@ -251,7 +254,7 @@ export function PosShell({
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col">
-          <div className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 sm:px-5 lg:px-7">
+          <div className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 py-6 lg:px-8">
             {children}
           </div>
         </main>

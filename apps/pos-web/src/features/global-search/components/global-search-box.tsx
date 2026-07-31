@@ -270,7 +270,7 @@ export function GlobalSearchBox({
   function renderPanelContent() {
     if (status === "loading") {
       return (
-        <div className="px-4 py-5 text-sm font-medium text-slate-500">
+        <div className="px-4 py-5 text-sm font-medium text-muted-foreground">
           {t("pos.globalSearch.loading")}
         </div>
       );
@@ -279,10 +279,10 @@ export function GlobalSearchBox({
     if (status === "error") {
       return (
         <div className="px-4 py-5">
-          <div className="text-sm font-semibold text-slate-900">
+          <div className="text-sm font-semibold text-foreground">
             {t("pos.globalSearch.errorTitle")}
           </div>
-          <div className="mt-1 text-xs font-medium text-slate-500">
+          <div className="mt-1 text-xs font-medium text-muted-foreground">
             {t("pos.globalSearch.errorHint")}
           </div>
         </div>
@@ -292,12 +292,12 @@ export function GlobalSearchBox({
     if (!hasResults) {
       return (
         <div className="px-4 py-5">
-          <div className="text-sm font-semibold text-slate-900">
+          <div className="text-sm font-semibold text-foreground">
             {canSearch
               ? t("pos.globalSearch.emptyTitle")
               : t("pos.globalSearch.minLengthTitle")}
           </div>
-          <div className="mt-1 text-xs font-medium text-slate-500">
+          <div className="mt-1 text-xs font-medium text-muted-foreground">
             {canSearch
               ? t("pos.globalSearch.emptyHint")
               : t("pos.globalSearch.minLengthHint")}
@@ -310,7 +310,7 @@ export function GlobalSearchBox({
 
     return groups.map((group) => (
       <div key={group.key} className="py-2">
-        <div className="px-3 pb-1 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
+        <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           {group.label}
         </div>
         <div className="space-y-1 px-2">
@@ -324,10 +324,10 @@ export function GlobalSearchBox({
               <button
                 aria-selected={active}
                 className={cn(
-                  "flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition",
+                  "flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                   active
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-slate-700 hover:bg-slate-50",
+                    ? "bg-muted text-foreground"
+                    : "text-foreground hover:bg-muted/60",
                 )}
                 id={`${listboxId}-option-${optionIndex}`}
                 key={`${item.type}:${item.id}`}
@@ -340,8 +340,8 @@ export function GlobalSearchBox({
                   className={cn(
                     "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
                     active
-                      ? "bg-white text-blue-700"
-                      : "bg-slate-100 text-slate-500",
+                      ? "bg-background text-foreground"
+                      : "bg-muted text-muted-foreground",
                   )}
                 >
                   <Icon className="h-4 w-4" name={ENTITY_ICON[item.type]} />
@@ -350,12 +350,12 @@ export function GlobalSearchBox({
                   <span className="block truncate text-sm font-semibold">
                     {item.title}
                   </span>
-                  <span className="mt-0.5 block truncate text-xs font-medium text-slate-500">
+                  <span className="mt-0.5 block truncate text-xs font-medium text-muted-foreground">
                     {[item.subtitle, metadataLabel].filter(Boolean).join(" · ")}
                   </span>
                 </span>
                 {badgeLabel ? (
-                  <span className="max-w-24 shrink-0 truncate rounded-full bg-white px-2 py-1 text-[11px] font-bold text-slate-500 shadow-sm">
+                  <span className="max-w-24 shrink-0 truncate rounded-full bg-background px-2 py-1 text-[11px] font-semibold text-muted-foreground ring-1 ring-border">
                     {badgeLabel}
                   </span>
                 ) : null}
@@ -370,20 +370,20 @@ export function GlobalSearchBox({
   return (
     <div
       ref={rootRef}
-      className={cn("relative w-full min-w-0 max-w-[620px]", className)}
+      className={cn("relative w-full min-w-0 max-w-xl", className)}
     >
       <div
         className={cn(
           "flex w-full items-center rounded-lg border px-3 transition",
           variant === "dark"
             ? "h-10 border-white/15 bg-white/10 focus-within:border-white/30 focus-within:bg-white/[0.14] focus-within:ring-2 focus-within:ring-white/10"
-            : "h-12 border-slate-200 bg-slate-50 focus-within:border-blue-300 focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(37,99,235,0.10)]",
+            : "h-12 border-border bg-muted/50 focus-within:border-ring focus-within:bg-background focus-within:ring-2 focus-within:ring-ring/20",
         )}
       >
         <Icon
           className={cn(
             "mr-2.5 h-[18px] w-[18px]",
-            variant === "dark" ? "text-white/55" : "text-slate-400",
+            variant === "dark" ? "text-white/55" : "text-muted-foreground",
           )}
           name="search"
         />
@@ -397,7 +397,7 @@ export function GlobalSearchBox({
             "h-full min-w-0 flex-1 bg-transparent text-sm font-medium outline-none",
             variant === "dark"
               ? "text-white placeholder:text-white/45"
-              : "text-slate-900 placeholder:text-slate-400",
+              : "text-foreground placeholder:text-muted-foreground",
           )}
           id={inputId}
           onChange={(event) => {
@@ -423,7 +423,8 @@ export function GlobalSearchBox({
             "ml-2 flex shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition",
             variant === "dark"
               ? "h-8 bg-white/10 text-white/75 hover:bg-white/15 hover:text-white"
-              : "h-11 bg-white text-slate-500 shadow-sm hover:text-slate-800",
+              : "h-10 bg-background text-muted-foreground ring-1 ring-border hover:bg-muted hover:text-foreground",
+            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           )}
           onClick={() => router.push(posRoutes.scan)}
           type="button"
@@ -435,7 +436,7 @@ export function GlobalSearchBox({
 
       {showPanel ? (
         <div
-          className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-[430px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]"
+          className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-[430px] overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-xl"
           id={listboxId}
           role="listbox"
         >
