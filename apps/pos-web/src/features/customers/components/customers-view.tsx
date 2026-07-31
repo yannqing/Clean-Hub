@@ -9,7 +9,11 @@ import { posToast as toast } from "@/lib/pos-toast";
 
 import { customerDetailPath } from "@/config";
 
-import { CUSTOMER_DEFAULT_FILTERS } from "../constants";
+import {
+  CUSTOMER_COLUMN_KEYS,
+  CUSTOMER_DEFAULT_FILTERS,
+  type CustomerColumnKey,
+} from "../constants";
 import {
   changeAccountStatus,
   changeProfileStatus,
@@ -21,6 +25,7 @@ import type {
   CustomerDialogState,
   CustomerFilterState,
   CustomerListRow,
+  CustomerStatusFilter,
   CustomerViewMode,
   PosCustomerAccountSummary,
 } from "../types";
@@ -67,6 +72,9 @@ export function CustomersView({
   const [totalProfiles, setTotalProfiles] = useState(0);
   const [loading, setLoading] = useState(false);
   const reloadRequestIdRef = useRef(0);
+  const [visibleColumns, setVisibleColumns] = useState<Set<CustomerColumnKey>>(
+    () => new Set(CUSTOMER_COLUMN_KEYS),
+  );
 
   const [accounts, setAccounts] = useState<PosCustomerAccountSummary[]>([]);
   const [dialog, setDialog] = useState<CustomerDialogState>({ type: "none" });
@@ -140,6 +148,9 @@ export function CustomersView({
 
   function handleSearch() {
     const query = draftQuery.trim();
+    if (query === filters.query) {
+      return;
+    }
     setFilters((current) => ({ ...current, query, page: 1 }));
     if (viewMode === "list") {
       replaceCustomerQueryParam(query || undefined);
@@ -161,12 +172,30 @@ export function CustomersView({
     setFilters((current) => ({ ...current, resultType: value, page: 1 }));
   }
 
+  function handleStatusChange(value: CustomerStatusFilter) {
+    setFilters((current) => ({ ...current, status: value, page: 1 }));
+  }
+
   function handlePageChange(page: number) {
     setFilters((current) => ({ ...current, page }));
   }
 
-  function handlePageSizeChange(pageSize: number) {
-    setFilters((current) => ({ ...current, pageSize, page: 1 }));
+  function handleColumnVisibleChange(
+    column: CustomerColumnKey,
+    checked: boolean,
+  ) {
+    setVisibleColumns((current) => {
+      if (!checked && current.has(column) && current.size === 1) {
+        return current;
+      }
+      const next = new Set(current);
+      if (checked) {
+        next.add(column);
+      } else {
+        next.delete(column);
+      }
+      return next;
+    });
   }
 
   // ---- view mode handlers --------------------------------------------------
@@ -251,49 +280,39 @@ export function CustomersView({
   const currentAccount = viewMode === "account" ? accountContext : null;
 
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
+    <div className="space-y-7 pb-8">
+      <header className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           {currentAccount ? (
             <PosBreadcrumb
+              className="mb-2"
               items={[
                 { label: "客户管理", onClick: handleBackToList },
                 { label: currentAccount.accountName },
               ]}
             />
-          ) : (
-            <PosBreadcrumb items={[{ label: "客户管理" }]} />
-          )}
-          <div className="mt-3 flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white">
-              <Icon className="h-[18px] w-[18px]" name="users" />
+          ) : null}
+          <h1 className="flex min-w-0 items-center gap-2 text-xl font-semibold tracking-tight text-foreground">
+            <Icon className="size-[19px]" name="users" />
+            <span className="truncate">
+              {currentAccount
+                ? `${currentAccount.accountName}的客户档案`
+                : "客户"}
             </span>
-            <div className="min-w-0">
-              <h1 className="truncate text-lg font-semibold text-slate-950">
-                {currentAccount
-                  ? `${currentAccount.accountName}的客户档案`
-                  : "客户管理"}
-              </h1>
-              <p className="mt-0.5 text-sm text-slate-500">
-                {currentAccount
-                  ? "查看该账户下的全部客户档案。"
-                  : "统一查询客户账户与档案，快速进入接待与历史记录。"}
-              </p>
-            </div>
-          </div>
+          </h1>
         </div>
         <div className="flex gap-2">
           {currentAccount ? (
             <>
               <button
-                className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
+                className="flex h-8 items-center gap-2 rounded-md border bg-background px-3 text-xs font-medium transition-colors hover:bg-accent"
                 type="button"
                 onClick={handleBackToList}
               >
                 返回客户列表
               </button>
               <button
-                className="h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                className="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 type="button"
                 onClick={openCreateProfile}
               >
@@ -303,14 +322,14 @@ export function CustomersView({
           ) : (
             <>
               <button
-                className="h-10 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
+                className="h-8 rounded-md border bg-background px-3 text-xs font-medium transition-colors hover:bg-accent"
                 type="button"
                 onClick={openCreateProfile}
               >
                 新增档案
               </button>
               <button
-                className="h-10 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white hover:bg-slate-800"
+                className="h-8 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
                 type="button"
                 onClick={openCreateAccount}
               >
@@ -319,24 +338,35 @@ export function CustomersView({
             </>
           )}
         </div>
-      </div>
+      </header>
 
-      <section className="overflow-hidden border-y border-slate-200 bg-white">
+      <CustomerMetrics
+        accountContext={viewMode === "account"}
+        activeOnPage={rows.filter((row) => row.status === "active").length}
+        loading={loading}
+        total={total}
+        totalAccounts={totalAccounts}
+        totalProfiles={totalProfiles}
+      />
+
+      <section className="min-w-0 overflow-hidden border-y bg-background">
         <CustomerSearchBar
           accountContext={viewMode === "account"}
           draftQuery={draftQuery}
           filters={filters}
+          onColumnVisibleChange={handleColumnVisibleChange}
           onDraftQueryChange={setDraftQuery}
           onReset={handleReset}
           onResultTypeChange={handleResultTypeChange}
           onSearch={handleSearch}
+          onStatusChange={handleStatusChange}
+          visibleColumns={visibleColumns}
         />
         <CustomerTable
           accountContext={viewMode === "account"}
           loading={loading}
           rows={rows}
-          totalAccounts={totalAccounts}
-          totalProfiles={totalProfiles}
+          visibleColumns={visibleColumns}
           onDelete={canDelete ? openDelete : undefined}
           onEdit={openEdit}
           onService={(row) => router.push(customerDetailPath(row.id))}
@@ -345,7 +375,6 @@ export function CustomersView({
         />
         <CustomerPagination
           onPageChange={handlePageChange}
-          onPageSizeChange={handlePageSizeChange}
           page={filters.page}
           pageSize={filters.pageSize}
           total={total}
@@ -468,5 +497,70 @@ export function CustomersView({
         }
       />
     </div>
+  );
+}
+
+function CustomerMetrics({
+  accountContext,
+  activeOnPage,
+  loading,
+  total,
+  totalAccounts,
+  totalProfiles,
+}: {
+  accountContext: boolean;
+  activeOnPage: number;
+  loading: boolean;
+  total: number;
+  totalAccounts: number;
+  totalProfiles: number;
+}) {
+  const metrics: Array<{
+    label: string;
+    value: number;
+    icon: Parameters<typeof Icon>[0]["name"];
+  }> = [
+    { label: "匹配结果", value: total, icon: "users" },
+    {
+      label: "客户账户",
+      value: accountContext ? 1 : totalAccounts,
+      icon: "user-circle",
+    },
+    {
+      label: "客户档案",
+      value: accountContext ? total : totalProfiles,
+      icon: "user-plus",
+    },
+    { label: "本页正常", value: activeOnPage, icon: "package-check" },
+  ];
+
+  return (
+    <section
+      aria-label="客户统计"
+      className="grid grid-cols-2 gap-2.5 xl:grid-cols-4"
+    >
+      {metrics.map((metric) => (
+        <div
+          className="flex min-h-20 items-center gap-2.5 rounded-md border bg-background px-3 py-2.5"
+          key={metric.label}
+        >
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+            <Icon className="size-[15px]" name={metric.icon} />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[11px] font-medium text-muted-foreground">
+              {metric.label}
+            </span>
+            {loading ? (
+              <span className="mt-1.5 block h-5 w-16 animate-pulse rounded bg-muted" />
+            ) : (
+              <span className="mt-0.5 block truncate text-lg font-semibold text-foreground">
+                {metric.value}
+              </span>
+            )}
+          </span>
+        </div>
+      ))}
+    </section>
   );
 }

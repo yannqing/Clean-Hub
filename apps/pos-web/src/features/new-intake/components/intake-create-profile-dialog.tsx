@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "@cleanhub/i18n/react";
 
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
+import { Icon } from "@/components/app-shell";
 
 import {
   Dialog,
@@ -134,11 +135,14 @@ export function IntakeCreateProfileDialog({
 
         {/* Account selector */}
         <section>
-          <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+          <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
             {text("所属账户")}
           </span>
-          <div className="flex h-11 items-center rounded-lg border border-slate-200 bg-white px-3">
-            <span className="mr-2 text-slate-400">🔍</span>
+          <div className="flex h-11 items-center rounded-lg border border-border bg-background px-3 focus-within:border-foreground/40 focus-within:ring-2 focus-within:ring-ring/20">
+            <Icon
+              className="mr-2 h-4 w-4 text-muted-foreground"
+              name="search"
+            />
             <input
               className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
               onChange={(event) => refreshAccounts(event.target.value)}
@@ -147,13 +151,13 @@ export function IntakeCreateProfileDialog({
             />
           </div>
 
-          <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-slate-200">
+          <div className="mt-2 max-h-44 overflow-y-auto rounded-lg border border-border">
             {accountsLoading ? (
-              <div className="px-3 py-4 text-center text-xs text-slate-500">
+              <div className="px-3 py-4 text-center text-xs text-muted-foreground">
                 {text("加载中…")}
               </div>
             ) : accounts.length === 0 ? (
-              <div className="px-3 py-4 text-center text-xs text-slate-500">
+              <div className="px-3 py-4 text-center text-xs text-muted-foreground">
                 {text("没有匹配的账户，请先创建客户账户。")}
               </div>
             ) : (
@@ -162,7 +166,7 @@ export function IntakeCreateProfileDialog({
                 return (
                   <button
                     className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition ${
-                      active ? "bg-blue-50 text-blue-700" : "hover:bg-slate-50"
+                      active ? "bg-muted text-foreground" : "hover:bg-muted/50"
                     }`}
                     key={account.id}
                     type="button"
@@ -172,7 +176,7 @@ export function IntakeCreateProfileDialog({
                       <div className="truncate font-semibold">
                         <RawText value={account.accountName} />
                       </div>
-                      <div className="truncate text-xs text-slate-500">
+                      <div className="truncate text-xs text-muted-foreground">
                         <RawText
                           value={
                             [account.phone, account.email]
@@ -193,7 +197,7 @@ export function IntakeCreateProfileDialog({
             )}
           </div>
           {selectedAccount && (
-            <p className="mt-1.5 text-xs text-slate-500">
+            <p className="mt-1.5 text-xs text-muted-foreground">
               <RawText
                 value={formatProfileAccountNote(
                   selectedAccount.accountName,
@@ -229,11 +233,11 @@ export function IntakeCreateProfileDialog({
             value={form.profileEmail}
           />
           <label className="block">
-            <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+            <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
               {text("账户关系")}
             </span>
             <select
-              className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+              className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-foreground/40 focus:ring-2 focus:ring-ring/20"
               onChange={(event) => update("relationship", event.target.value)}
               value={form.relationship}
             >
@@ -248,7 +252,7 @@ export function IntakeCreateProfileDialog({
 
         <DialogFooter>
           <button
-            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold"
+            className="h-10 rounded-lg border border-border px-4 text-sm font-semibold"
             disabled={submitting}
             type="button"
             onClick={() => onOpenChange(false)}
@@ -256,7 +260,7 @@ export function IntakeCreateProfileDialog({
             {text("取消")}
           </button>
           <button
-            className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+            className="h-10 rounded-lg bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-60"
             disabled={submitting}
             type="button"
             onClick={handleSubmit}
@@ -300,11 +304,11 @@ function FormField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>
       <input
-        className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+        className="h-11 w-full rounded-lg border border-border px-3 text-sm outline-none focus:border-foreground/40 focus:ring-2 focus:ring-ring/20"
         id={id}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}

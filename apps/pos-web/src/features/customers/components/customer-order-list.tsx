@@ -85,18 +85,18 @@ export function CustomerOrderList({
   const to = Math.min(total, (page - 1) * currentPageSize + rows.length);
 
   return (
-    <section className="mt-5 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 p-5">
+    <section className="mt-5 overflow-hidden border-y bg-background">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-3 py-2.5">
         <div>
-          <h2 className="font-semibold text-slate-950">订单记录</h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <h2 className="font-semibold text-foreground">订单记录</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
             仅展示该客户档案名下的订单记录。
           </p>
         </div>
-        <div className="flex h-10 w-full items-center rounded-lg border border-slate-200 bg-slate-50 px-3 sm:w-[300px]">
-          <span className="mr-2 text-slate-400">🔍</span>
+        <div className="flex h-8 w-full items-center rounded-md border bg-background px-2.5 focus-within:ring-2 focus-within:ring-ring sm:w-[300px]">
+          <span className="mr-2 text-muted-foreground">⌕</span>
           <input
-            className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
+            className="h-full min-w-0 flex-1 bg-transparent text-xs text-foreground outline-none placeholder:text-muted-foreground"
             onChange={(event) => {
               setQuery(event.target.value);
               setPage(1);
@@ -107,9 +107,9 @@ export function CustomerOrderList({
         </div>
       </div>
 
-      <div className="divide-y divide-slate-100 min-[1400px]:hidden">
+      <div className="divide-y min-[1400px]:hidden">
         {rows.length === 0 ? (
-          <div className="px-5 py-10 text-center text-sm text-slate-500">
+          <div className="px-5 py-10 text-center text-sm text-muted-foreground">
             {loading ? "加载中…" : "没有符合当前条件的订单。"}
           </div>
         ) : (
@@ -126,7 +126,7 @@ export function CustomerOrderList({
 
       <div className="hidden overflow-x-auto min-[1400px]:block">
         <div className="min-w-[760px]">
-          <div className="grid grid-cols-[130px_1.3fr_140px_140px_130px] bg-slate-50 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+          <div className="grid grid-cols-[130px_1.3fr_140px_140px_130px] bg-muted/50 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
             <div>订单</div>
             <div>来源</div>
             <div>支付</div>
@@ -135,33 +135,33 @@ export function CustomerOrderList({
           </div>
 
           {rows.length === 0 ? (
-            <div className="border-t border-slate-100 px-5 py-10 text-center text-sm text-slate-500">
+            <div className="border-t px-5 py-10 text-center text-sm text-muted-foreground">
               {loading ? "加载中…" : "没有符合当前条件的订单。"}
             </div>
           ) : (
             rows.map((order) => {
               const statusTone =
                 CUSTOMER_ORDER_STATUS_TONES[order.status] ??
-                "bg-slate-100 text-slate-600";
+                "bg-muted text-muted-foreground";
               const payTone =
                 CUSTOMER_ORDER_PAYMENT_TONES[order.paymentStatus] ??
-                "bg-slate-100 text-slate-600";
+                "bg-muted text-muted-foreground";
               return (
                 <button
-                  className="grid w-full grid-cols-[130px_1.3fr_140px_140px_130px] items-center border-t border-slate-100 px-5 py-4 text-left text-sm transition hover:bg-blue-50/40"
+                  className="grid w-full grid-cols-[130px_1.3fr_140px_140px_130px] items-center border-t px-5 py-4 text-left text-sm transition-colors hover:bg-accent"
                   key={order.id}
                   type="button"
                   onClick={() => router.push(`/orders/${order.id}`)}
                 >
                   <div>
-                    <div className="font-semibold text-blue-700">
+                    <div className="font-semibold text-foreground">
                       {order.id.slice(-8).toUpperCase()}
                     </div>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-muted-foreground">
                       {formatDate(order.createdAt, locale)}
                     </div>
                   </div>
-                  <div className="text-slate-700">
+                  <div className="text-foreground">
                     {CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ??
                       order.orderType}
                   </div>
@@ -181,7 +181,7 @@ export function CustomerOrderList({
                         order.status}
                     </span>
                   </div>
-                  <div className="text-right font-semibold text-slate-950">
+                  <div className="text-right font-semibold text-foreground">
                     {formatPosMoney(order.totalAmount, order.currency, locale)}
                   </div>
                 </button>
@@ -191,15 +191,15 @@ export function CustomerOrderList({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-4">
-        <div className="flex items-center gap-2 text-xs text-slate-500">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t px-3 py-2.5">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span>
             第 {from}-{to} 条 / 共 {total} 条
           </span>
           <label className="flex items-center gap-1">
             每页
             <select
-              className="h-10 rounded-md border border-slate-200 bg-white px-2 text-xs outline-none"
+              className="h-8 rounded-md border bg-background px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
               value={currentPageSize}
               onChange={(event) => {
                 setCurrentPageSize(Number(event.target.value));
@@ -217,18 +217,18 @@ export function CustomerOrderList({
         </div>
         <div className="flex items-center gap-1">
           <button
-            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
+            className="h-9 rounded-md border px-3 text-sm font-semibold text-foreground hover:bg-accent disabled:opacity-40"
             disabled={loading || page === 1}
             type="button"
             onClick={() => setPage((p) => p - 1)}
           >
             上一页
           </button>
-          <span className="px-2 text-xs text-slate-500">
+          <span className="px-2 text-xs text-muted-foreground">
             {page} / {pageCount}
           </span>
           <button
-            className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
+            className="h-9 rounded-md border px-3 text-sm font-semibold text-foreground hover:bg-accent disabled:opacity-40"
             disabled={loading || page === pageCount}
             type="button"
             onClick={() => setPage((p) => p + 1)}
@@ -251,26 +251,27 @@ function CustomerOrderCard({
   onOpen: () => void;
 }) {
   const statusTone =
-    CUSTOMER_ORDER_STATUS_TONES[order.status] ?? "bg-slate-100 text-slate-600";
+    CUSTOMER_ORDER_STATUS_TONES[order.status] ??
+    "bg-muted text-muted-foreground";
   const payTone =
     CUSTOMER_ORDER_PAYMENT_TONES[order.paymentStatus] ??
-    "bg-slate-100 text-slate-600";
+    "bg-muted text-muted-foreground";
 
   return (
     <button
-      className="w-full p-4 text-left transition hover:bg-blue-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 sm:p-5"
+      className="w-full p-4 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:p-5"
       onClick={onOpen}
       type="button"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="font-mono text-sm font-semibold text-blue-700">
+          <div className="font-mono text-sm font-semibold text-foreground">
             {order.id.slice(-8).toUpperCase()}
           </div>
-          <div className="mt-1 text-sm font-medium text-slate-800">
+          <div className="mt-1 text-sm font-medium text-foreground">
             {CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ?? order.orderType}
           </div>
-          <div className="mt-1 text-xs text-slate-500">
+          <div className="mt-1 text-xs text-muted-foreground">
             {formatDate(order.createdAt, locale)}
           </div>
         </div>
@@ -281,9 +282,9 @@ function CustomerOrderCard({
         </span>
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3">
+      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-md bg-muted/40 p-3 sm:grid-cols-3">
         <div>
-          <dt className="text-xs text-slate-400">支付状态</dt>
+          <dt className="text-xs text-muted-foreground">支付状态</dt>
           <dd className="mt-1">
             <span
               className={`rounded-md px-2.5 py-1 text-xs font-semibold ${payTone}`}
@@ -312,8 +313,8 @@ function CustomerOrderCardDetail({
 }) {
   return (
     <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
-      <dd className="mt-1 text-sm font-medium text-slate-700">{value}</dd>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-foreground">{value}</dd>
     </div>
   );
 }

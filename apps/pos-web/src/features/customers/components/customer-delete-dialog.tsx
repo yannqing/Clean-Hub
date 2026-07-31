@@ -84,16 +84,16 @@ export function CustomerDeleteDialog({
         <DialogHeader>
           <DialogTitle>删除{isAccount ? "客户账户" : "客户档案"}</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-slate-700">确认删除“{name}”吗？</p>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm leading-6 text-red-700">
+        <p className="text-sm text-foreground">确认删除“{name}”吗？</p>
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-4 text-sm leading-6 text-destructive">
           {warning}
         </div>
         <label className="block">
-          <span className="mb-1.5 block text-sm font-semibold text-slate-700">
+          <span className="mb-1.5 block text-sm font-semibold text-foreground">
             删除原因
           </span>
           <textarea
-            className="min-h-20 w-full resize-y rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none focus:border-red-400 focus:ring-4 focus:ring-red-100"
+            className="min-h-20 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-destructive/40"
             maxLength={500}
             onChange={(event) => setReason(event.target.value)}
             value={reason}
@@ -101,7 +101,7 @@ export function CustomerDeleteDialog({
         </label>
         <DialogFooter>
           <button
-            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold"
+            className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground hover:bg-accent"
             disabled={deleting || !reason.trim()}
             type="button"
             onClick={() => onOpenChange(false)}
@@ -109,7 +109,7 @@ export function CustomerDeleteDialog({
             取消
           </button>
           <button
-            className="h-10 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+            className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60"
             disabled={deleting}
             type="button"
             onClick={handleConfirm}

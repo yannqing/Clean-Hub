@@ -93,13 +93,13 @@ export function AccountFormDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] gap-5 overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle>
             {mode === "edit" ? "编辑客户账户" : "新增客户账户"}
           </DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField
             id="form-account-name"
             label="账户名称"
@@ -129,12 +129,12 @@ export function AccountFormDialog({
             value={form.email}
           />
         </div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           账户保存共享联系方式，可关联多个客户档案。
         </p>
         <DialogFooter>
           <button
-            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold"
+            className="h-10 rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
             disabled={submitting}
             type="button"
             onClick={() => onOpenChange(false)}
@@ -142,7 +142,7 @@ export function AccountFormDialog({
             取消
           </button>
           <button
-            className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
             disabled={submitting}
             type="button"
             onClick={handleSubmit}
@@ -189,11 +189,11 @@ function FormField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>
       <input
-        className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+        className="h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
         id={id}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}

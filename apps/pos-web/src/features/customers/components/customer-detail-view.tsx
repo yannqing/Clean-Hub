@@ -9,7 +9,7 @@ import type {
   ServiceTicketSummary,
 } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
-import { Icon, PosBreadcrumb } from "@/components/app-shell";
+import { PosBreadcrumb, PosDetailPageSkeleton } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
@@ -203,16 +203,12 @@ export function CustomerDetailView({
   }
 
   if (loading) {
-    return (
-      <div className="px-6 py-10 text-center text-sm text-slate-500">
-        加载中…
-      </div>
-    );
+    return <PosDetailPageSkeleton />;
   }
 
   if (!profile) {
     return (
-      <div className="px-6 py-10 text-center text-sm text-slate-500">
+      <div className="mx-auto w-full max-w-[1080px] border-y bg-background px-6 py-10 text-center text-sm text-muted-foreground">
         未找到该客户档案。
       </div>
     );
@@ -223,55 +219,36 @@ export function CustomerDetailView({
     profile.relationship ?? CUSTOMER_PROFILE_RELATIONSHIPS[0];
 
   return (
-    <div>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <PosBreadcrumb
-          items={[
-            {
-              href: intakeReturnPath,
-              label: fromIntake ? "客户接待" : "客户管理",
-            },
-            { label: profile.fullName },
-          ]}
-        />
-        <button
-          className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          type="button"
-          onClick={() => router.push(intakeReturnPath)}
-        >
-          {fromIntake ? "返回客户接待" : "返回账户档案"}
-        </button>
-      </div>
+    <section className="mx-auto w-full max-w-[1080px] space-y-4 pb-12">
+      <PosBreadcrumb
+        items={[
+          {
+            href: intakeReturnPath,
+            label: fromIntake ? "客户接待" : "客户管理",
+          },
+          { label: profile.fullName },
+        ]}
+      />
 
-      <section className="overflow-hidden border-y border-slate-200 bg-white">
-        <div className="flex flex-wrap items-center gap-4 py-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-950 text-sm font-semibold text-white">
-            <Icon className="h-5 w-5" name="user-circle" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-lg font-semibold text-slate-950">
-                {profile.fullName}
-              </h1>
-            </div>
-            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate-500">
-              <span>{profile.phone || "未填写手机号"}</span>
-              <span>{profile.email || "未填写邮箱"}</span>
-              <span>
-                {accountName} · {relationshipLabel}
-              </span>
-            </div>
+      <section className="overflow-hidden border-y bg-background">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span>{profile.phone || "未填写手机号"}</span>
+            <span>{profile.email || "未填写邮箱"}</span>
+            <span>
+              {accountName} · {relationshipLabel}
+            </span>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2">
             <button
-              className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+              className="h-9 rounded-md border px-3 text-sm font-semibold text-foreground hover:bg-accent"
               type="button"
               onClick={() => setDialog({ type: "edit-profile", customerId })}
             >
               编辑档案
             </button>
             <button
-              className="flex h-11 items-center gap-2 rounded-lg bg-slate-950 px-5 text-sm font-semibold text-white hover:bg-slate-800"
+              className="flex h-11 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:bg-foreground/90"
               type="button"
               onClick={handleCreateServiceTicket}
             >
@@ -281,7 +258,7 @@ export function CustomerDetailView({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 border-t border-slate-200 sm:grid-cols-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4">
           {[
             {
               label: "账户余额",
@@ -301,23 +278,27 @@ export function CustomerDetailView({
             },
           ].map((metric) => (
             <div
-              className="border-r border-slate-100 px-5 py-4 last:border-r-0"
+              className="border-r px-4 py-3 last:border-r-0"
               key={metric.label}
             >
-              <div className="text-xs font-medium text-slate-500">
+              <div className="text-xs font-medium text-muted-foreground">
                 {metric.label}
               </div>
-              <div className="mt-1 text-lg font-semibold text-slate-950">
+              <div className="mt-1 text-lg font-semibold text-foreground">
                 {metric.value}
               </div>
-              <div className="mt-0.5 text-xs text-slate-400">{metric.hint}</div>
+              <div className="mt-0.5 text-xs text-muted-foreground">
+                {metric.hint}
+              </div>
             </div>
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t px-4 py-3">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500">状态：</span>
+            <span className="text-xs font-semibold text-muted-foreground">
+              状态：
+            </span>
             <CustomerStatusSwitch
               kind="profile"
               status={profile.status}
@@ -325,13 +306,13 @@ export function CustomerDetailView({
             />
           </div>
         </div>
-        <div className="pos-scrollbar flex overflow-x-auto border-t border-slate-200 px-5">
+        <div className="pos-scrollbar flex overflow-x-auto border-t px-4">
           {(Object.keys(TAB_LABELS) as DetailTab[]).map((tabKey) => (
             <button
-              className={`relative h-12 shrink-0 px-4 text-sm font-semibold ${
+              className={`relative h-10 shrink-0 px-3 text-sm font-semibold ${
                 tab === tabKey
-                  ? "text-slate-950"
-                  : "text-slate-500 hover:text-slate-800"
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               }`}
               key={tabKey}
               type="button"
@@ -339,7 +320,7 @@ export function CustomerDetailView({
             >
               {TAB_LABELS[tabKey]}
               {tab === tabKey ? (
-                <span className="absolute inset-x-3 bottom-0 h-0.5 bg-slate-950" />
+                <span className="absolute inset-x-3 bottom-0 h-0.5 bg-foreground" />
               ) : null}
             </button>
           ))}
@@ -349,16 +330,16 @@ export function CustomerDetailView({
       {tab === "overview" ? (
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="space-y-5">
-            <section className="rounded-lg border border-slate-200 bg-white p-5">
+            <section className="border-y bg-background p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="font-semibold text-slate-950">当前服务</h2>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <h2 className="font-semibold text-foreground">当前服务</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
                     进行中的工单在全部项目完成并取件前保持开启。
                   </p>
                 </div>
                 <button
-                  className="text-sm font-semibold text-blue-700"
+                  className="text-sm font-semibold text-foreground underline-offset-4 hover:underline"
                   type="button"
                   onClick={() => setTab("tickets")}
                 >
@@ -367,11 +348,11 @@ export function CustomerDetailView({
               </div>
               <CurrentServiceCard locale={locale} ticket={recentTickets[0]} />
             </section>
-            <section className="rounded-lg border border-slate-200 bg-white p-5">
+            <section className="border-y bg-background p-5">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-slate-950">最近动态</h2>
+                <h2 className="font-semibold text-foreground">最近动态</h2>
                 <button
-                  className="text-sm font-semibold text-blue-700"
+                  className="text-sm font-semibold text-foreground underline-offset-4 hover:underline"
                   type="button"
                   onClick={() => setTab("orders")}
                 >
@@ -386,8 +367,8 @@ export function CustomerDetailView({
             </section>
           </div>
           <aside className="space-y-5 lg:col-start-2">
-            <section className="rounded-lg border border-slate-200 bg-white p-5">
-              <h2 className="font-semibold text-slate-950">档案信息</h2>
+            <section className="border-y bg-background p-5">
+              <h2 className="font-semibold text-foreground">档案信息</h2>
               <div className="mt-4 space-y-3">
                 <Detail label="档案编号" value={profile.id} mono />
                 <Detail label="客户账户" value={accountName} />
@@ -399,18 +380,18 @@ export function CustomerDetailView({
                 <Detail label="地址" value={profile.address ?? "未填写"} />
               </div>
             </section>
-            <section className="rounded-lg border border-slate-200 bg-white p-5">
+            <section className="border-y bg-background p-5">
               <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-slate-950">服务偏好</h2>
+                <h2 className="font-semibold text-foreground">服务偏好</h2>
                 <button
-                  className="text-xs font-semibold text-blue-700"
+                  className="text-xs font-semibold text-foreground underline-offset-4 hover:underline"
                   type="button"
                   onClick={() => setTab("notes")}
                 >
                   管理
                 </button>
               </div>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+              <p className="mt-3 text-sm leading-6 text-muted-foreground">
                 {profile.notes || "暂无服务偏好记录。"}
               </p>
             </section>
@@ -420,19 +401,19 @@ export function CustomerDetailView({
 
       {tab === "notes" ? (
         <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="rounded-lg border border-slate-200 bg-white p-5">
-            <h2 className="font-semibold text-slate-950">档案备注</h2>
-            <p className="mt-1 text-sm text-slate-500">
+          <section className="border-y bg-background p-5">
+            <h2 className="font-semibold text-foreground">档案备注</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
               该备注在选中此档案时对店员可见。
             </p>
             <textarea
-              className="mt-4 min-h-[180px] w-full resize-none rounded-lg border border-slate-200 p-3 text-sm leading-6 outline-none focus:border-blue-400"
+              className="mt-4 min-h-[180px] w-full resize-none rounded-md border bg-background p-3 text-sm leading-6 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onChange={(event) => setNotesDraft(event.target.value)}
               value={notesDraft}
             />
             <div className="mt-3 flex justify-end">
               <button
-                className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+                className="h-9 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:bg-foreground/90 disabled:opacity-60"
                 disabled={savingNotes}
                 type="button"
                 onClick={handleSaveNotes}
@@ -511,7 +492,7 @@ export function CustomerDetailView({
         onOpenChange={setTicketDialogOpen}
         open={ticketDialogOpen}
       />
-    </div>
+    </section>
   );
 }
 
@@ -551,9 +532,9 @@ function Detail({
 }) {
   return (
     <div>
-      <div className="text-xs text-slate-400">{label}</div>
+      <div className="text-xs text-muted-foreground">{label}</div>
       <div
-        className={`mt-0.5 text-sm font-medium text-slate-700 ${mono ? "font-mono text-xs" : ""}`}
+        className={`mt-0.5 text-sm font-medium text-foreground ${mono ? "font-mono text-xs" : ""}`}
       >
         {value}
       </div>
@@ -584,19 +565,19 @@ function NotificationPermissionsPanel({
   ];
 
   return (
-    <aside className="rounded-lg border border-slate-200 bg-white p-5">
-      <h2 className="font-semibold text-slate-950">通知权限</h2>
+    <aside className="border-y bg-background p-5">
+      <h2 className="font-semibold text-foreground">通知权限</h2>
       <div className="mt-5 space-y-4">
         {options.map((option) => (
           <label
-            className="flex items-center justify-between gap-4 text-sm text-slate-700"
+            className="flex items-center justify-between gap-4 text-sm text-foreground"
             key={option.key}
           >
             <span>{option.label}</span>
             <button
               aria-pressed={values[option.key]}
               className={`relative h-7 w-12 rounded-full transition ${
-                values[option.key] ? "bg-blue-600" : "bg-slate-200"
+                values[option.key] ? "bg-foreground" : "bg-muted"
               }`}
               type="button"
               onClick={() =>
@@ -607,7 +588,7 @@ function NotificationPermissionsPanel({
               }
             >
               <span
-                className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow-sm transition ${
+                className={`absolute top-1 h-5 w-5 rounded-full bg-background ring-1 ring-border transition ${
                   values[option.key] ? "left-6" : "left-1"
                 }`}
               />
@@ -664,26 +645,26 @@ function CurrentServiceCard({
 }) {
   if (!ticket) {
     return (
-      <div className="mt-4 rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+      <div className="mt-4 rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
         暂无工单记录。
       </div>
     );
   }
   const tone =
     CUSTOMER_TICKET_STATUS_TONES[ticket.ticketStatus] ??
-    "bg-slate-100 text-slate-600";
+    "bg-muted text-muted-foreground";
   return (
-    <div className="mt-4 grid gap-3 rounded-lg border border-slate-200 p-4 sm:grid-cols-[minmax(0,1fr)_130px_120px] sm:items-center">
+    <div className="mt-4 grid gap-3 border-y py-4 sm:grid-cols-[minmax(0,1fr)_130px_120px] sm:items-center">
       <div className="min-w-0">
-        <div className="font-semibold text-slate-950">
+        <div className="font-semibold text-foreground">
           {CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType}
         </div>
-        <div className="mt-1 text-xs text-slate-500">
+        <div className="mt-1 text-xs text-muted-foreground">
           工单 {ticket.ticketNo || "—"} · {ticket.itemCount} 个项目 ·{" "}
           {formatDateShort(ticket.createdAt, locale)}
         </div>
       </div>
-      <span className="text-sm text-slate-500">
+      <span className="text-sm text-muted-foreground">
         {ticket.expectedPickupAt
           ? formatDateShort(ticket.expectedPickupAt, locale)
           : "未设置取件"}
@@ -750,30 +731,30 @@ function RecentActivity({
 
   if (items.length === 0) {
     return (
-      <div className="mt-4 rounded-lg border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
+      <div className="mt-4 rounded-md border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
         暂无动态记录。
       </div>
     );
   }
 
   return (
-    <div className="mt-4 divide-y divide-slate-100">
+    <div className="mt-4 divide-y">
       {items.map((item, index) => (
         <div
           className="flex items-center gap-3 py-3 first:pt-0 last:pb-0"
           key={index}
         >
-          <span className="h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+          <span className="h-2 w-2 shrink-0 rounded-full bg-muted-foreground" />
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold text-slate-800">
+            <div className="text-sm font-semibold text-foreground">
               {item.title}
             </div>
-            <div className="text-xs text-slate-500">{item.detail}</div>
+            <div className="text-xs text-muted-foreground">{item.detail}</div>
           </div>
           <div className="text-right">
-            <div className="text-xs text-slate-400">{item.time}</div>
+            <div className="text-xs text-muted-foreground">{item.time}</div>
             {item.amount ? (
-              <div className="mt-1 text-sm font-semibold text-slate-950">
+              <div className="mt-1 text-sm font-semibold text-foreground">
                 {item.amount}
               </div>
             ) : null}

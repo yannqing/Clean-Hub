@@ -1,81 +1,92 @@
 "use client";
 
-import { buildPaginationWindow } from "@/lib/pagination";
+import type { ReactNode } from "react";
+import { cn } from "@cleanhub/ui";
 
-import { CUSTOMER_PAGE_SIZE_OPTIONS } from "../constants";
+import { buildPaginationWindow } from "@/lib/pagination";
 
 type CustomerPaginationProps = {
   total: number;
   pageSize: number;
   page: number;
-  onPageSizeChange: (size: number) => void;
   onPageChange: (page: number) => void;
 };
 
-/**
- * Pagination footer: page-size select + prev/next + page numbers.
- */
 export function CustomerPagination({
   total,
   pageSize,
   page,
-  onPageSizeChange,
   onPageChange,
 }: CustomerPaginationProps) {
   const pageCount = Math.max(1, Math.ceil(total / pageSize));
-  const pages = buildPaginationWindow(page, pageCount);
+  const currentPage = Math.min(page, pageCount);
+  const pages = buildPaginationWindow(currentPage, pageCount);
+  const from = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const to = Math.min(currentPage * pageSize, total);
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200 px-4 py-4 sm:px-5">
-      <div className="flex flex-wrap items-center justify-end gap-1">
-        <select
-          className="mr-2 h-11 rounded-lg border border-slate-200 bg-white px-3 text-sm"
-          onChange={(event) => onPageSizeChange(Number(event.target.value))}
-          value={pageSize}
-        >
-          {CUSTOMER_PAGE_SIZE_OPTIONS.map((size) => (
-            <option key={size} value={size}>
-              每页 {size} 条
-            </option>
-          ))}
-        </select>
-        <button
-          className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
-          disabled={page === 1}
-          type="button"
-          onClick={() => onPageChange(page - 1)}
+    <div className="flex flex-col gap-2 border-t px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+      <span className="text-muted-foreground">
+        第 {from}–{to} 条 / 共 {total} 条
+      </span>
+
+      <div className="flex items-center gap-1">
+        <PagerButton
+          disabled={currentPage <= 1}
+          onClick={() => onPageChange(currentPage - 1)}
         >
           上一页
-        </button>
+        </PagerButton>
         {pages.map((entry, index) =>
           entry === "..." ? (
-            <span className="px-1.5 text-slate-400" key={`gap-${index}`}>
+            <span className="px-1.5 text-muted-foreground" key={`gap-${index}`}>
               …
             </span>
           ) : (
-            <button
-              className={`h-11 min-w-11 rounded-lg text-sm font-semibold ${
-                entry === page
-                  ? "bg-slate-950 text-white"
-                  : "border border-slate-200 text-slate-600"
-              }`}
+            <PagerButton
+              active={entry === currentPage}
               key={entry}
-              type="button"
               onClick={() => onPageChange(entry)}
             >
               {entry}
-            </button>
+            </PagerButton>
           ),
         )}
-        <button
-          className="h-11 rounded-lg border border-slate-200 px-4 text-sm font-semibold disabled:opacity-40"
-          disabled={page === pageCount}
-          type="button"
-          onClick={() => onPageChange(page + 1)}
+        <PagerButton
+          disabled={currentPage >= pageCount}
+          onClick={() => onPageChange(currentPage + 1)}
         >
           下一页
-        </button>
+        </PagerButton>
       </div>
     </div>
+  );
+}
+
+function PagerButton({
+  active,
+  disabled,
+  onClick,
+  children,
+}: {
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      className={cn(
+        "flex h-10 min-w-10 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 sm:h-7 sm:min-w-7",
+        active
+          ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+          : "bg-background text-foreground",
+      )}
+      disabled={disabled}
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
   );
 }

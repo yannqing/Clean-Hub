@@ -128,12 +128,12 @@ export function IntakeCreateCustomerDialog({
             value={form.accountEmail}
           />
         </div>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           {text("账户保存共享联系方式，可关联多个客户档案。")}
         </p>
         <DialogFooter>
           <button
-            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold"
+            className="h-10 rounded-lg border border-border px-4 text-sm font-semibold"
             disabled={submitting}
             type="button"
             onClick={() => onOpenChange(false)}
@@ -141,7 +141,7 @@ export function IntakeCreateCustomerDialog({
             {text("取消")}
           </button>
           <button
-            className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+            className="h-10 rounded-lg bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-60"
             disabled={submitting}
             type="button"
             onClick={handleSubmit}
@@ -171,11 +171,11 @@ function FormField({
 }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>
       <input
-        className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+        className="h-11 w-full rounded-lg border border-border px-3 text-sm outline-none focus:border-foreground/40 focus:ring-2 focus:ring-ring/20"
         id={id}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}

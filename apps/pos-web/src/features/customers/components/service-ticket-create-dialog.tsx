@@ -149,15 +149,15 @@ export function ServiceTicketCreateDialog({
 
   return (
     <Dialog onOpenChange={onOpenChange} open={open}>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl overflow-y-auto overscroll-contain">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl gap-5 overflow-y-auto overscroll-contain">
         <DialogHeader>
           <DialogTitle>新建服务工单</DialogTitle>
         </DialogHeader>
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-muted-foreground">
           为 {customerName} 创建工单，项目与价格将在下一步添加。
         </p>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField label="工单类型">
             <select
               className={inputClass}
@@ -229,7 +229,7 @@ export function ServiceTicketCreateDialog({
 
         <DialogFooter>
           <button
-            className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold"
+            className="h-10 rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
             disabled={submitting}
             type="button"
             onClick={() => onOpenChange(false)}
@@ -237,7 +237,7 @@ export function ServiceTicketCreateDialog({
             取消
           </button>
           <button
-            className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+            className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
             disabled={submitting || branchLoading || !branchId}
             type="button"
             onClick={handleSubmit}
@@ -251,7 +251,7 @@ export function ServiceTicketCreateDialog({
 }
 
 const inputClass =
-  "h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400";
+  "h-11 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20";
 
 function FormField({
   label,
@@ -263,8 +263,8 @@ function FormField({
   children: React.ReactNode;
 }) {
   return (
-    <label className={wide ? "col-span-2" : ""}>
-      <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+    <label className={wide ? "sm:col-span-2" : ""}>
+      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>
       {children}

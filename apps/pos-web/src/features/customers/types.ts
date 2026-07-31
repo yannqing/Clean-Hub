@@ -52,11 +52,13 @@ export type CustomerListRow =
 
 /** Result-type filter options for the search bar dropdown. */
 export type ResultTypeFilter = "all" | "account" | "profile";
+export type CustomerStatusFilter = "all" | "active" | "disabled";
 
 /** Filter + pagination state shared by the list and account views. */
 export type CustomerFilterState = {
   query: string;
   resultType: ResultTypeFilter;
+  status: CustomerStatusFilter;
   page: number;
   pageSize: number;
 };

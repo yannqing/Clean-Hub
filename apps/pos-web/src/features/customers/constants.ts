@@ -2,6 +2,7 @@
  * 客户管理 — UI constants (labels, status maps, defaults).
  */
 import type {
+  CustomerStatusFilter,
   CustomerFilterState,
   ProfileFormValues,
   ResultTypeFilter,
@@ -11,14 +12,12 @@ export const CUSTOMERS_PAGE_TITLE = "客户管理";
 export const CUSTOMERS_PAGE_DESCRIPTION =
   "一次查询同时匹配客户账户和客户档案，店员无需提前判断手机号属于哪种数据。";
 
-/** Default page size options for the pagination control. */
-export const CUSTOMER_PAGE_SIZE_OPTIONS = [5, 10] as const;
-
 export const CUSTOMER_DEFAULT_FILTERS: CustomerFilterState = {
   query: "",
   resultType: "all",
+  status: "all",
   page: 1,
-  pageSize: 5,
+  pageSize: 10,
 };
 
 export const CUSTOMER_RESULT_TYPE_OPTIONS: {
@@ -30,6 +29,35 @@ export const CUSTOMER_RESULT_TYPE_OPTIONS: {
   { value: "profile", label: "仅客户档案" },
 ];
 
+export const CUSTOMER_STATUS_OPTIONS: {
+  value: CustomerStatusFilter;
+  label: string;
+}[] = [
+  { value: "all", label: "全部状态" },
+  { value: "active", label: "正常" },
+  { value: "disabled", label: "停用" },
+];
+
+export const CUSTOMER_COLUMN_KEYS = [
+  "customer",
+  "contact",
+  "account",
+  "status",
+  "createdAt",
+  "actions",
+] as const;
+
+export type CustomerColumnKey = (typeof CUSTOMER_COLUMN_KEYS)[number];
+
+export const CUSTOMER_COLUMN_LABELS: Record<CustomerColumnKey, string> = {
+  customer: "客户",
+  contact: "联系方式",
+  account: "所属账户",
+  status: "状态",
+  createdAt: "创建时间",
+  actions: "操作",
+};
+
 /** Status -> display label + badge classes. */
 export const CUSTOMER_STATUS_META = {
   active: {
@@ -39,8 +67,8 @@ export const CUSTOMER_STATUS_META = {
   },
   disabled: {
     label: "停用",
-    badgeClassName: "bg-slate-100 text-slate-500",
-    dotClassName: "bg-slate-400",
+    badgeClassName: "bg-muted text-muted-foreground",
+    dotClassName: "bg-muted-foreground",
   },
 } as const;
 
@@ -84,10 +112,10 @@ export const CUSTOMER_TICKET_STATUS_LABELS: Record<string, string> = {
 };
 
 export const CUSTOMER_TICKET_STATUS_TONES: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-600",
-  pending: "bg-blue-50 text-blue-700",
-  in_progress: "bg-blue-50 text-blue-700",
-  ready_to_pick: "bg-violet-50 text-violet-700",
+  draft: "bg-muted text-muted-foreground",
+  pending: "bg-accent text-accent-foreground",
+  in_progress: "bg-accent text-accent-foreground",
+  ready_to_pick: "bg-secondary text-secondary-foreground",
   picked_up: "bg-emerald-50 text-emerald-700",
   cancelled: "bg-red-50 text-red-700",
   exception: "bg-amber-50 text-amber-700",
@@ -117,10 +145,10 @@ export const CUSTOMER_ORDER_STATUS_LABELS: Record<string, string> = {
 };
 
 export const CUSTOMER_ORDER_STATUS_TONES: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-600",
-  received: "bg-blue-50 text-blue-700",
+  draft: "bg-muted text-muted-foreground",
+  received: "bg-accent text-accent-foreground",
   paid: "bg-emerald-50 text-emerald-700",
-  delivered: "bg-violet-50 text-violet-700",
+  delivered: "bg-secondary text-secondary-foreground",
   cancelled: "bg-red-50 text-red-700",
 };
 
@@ -135,7 +163,7 @@ export const CUSTOMER_ORDER_PAYMENT_TONES: Record<string, string> = {
   unpaid: "bg-red-50 text-red-700",
   paid: "bg-emerald-50 text-emerald-700",
   partial: "bg-amber-50 text-amber-700",
-  refunded: "bg-slate-100 text-slate-600",
+  refunded: "bg-muted text-muted-foreground",
 };
 
 export const CUSTOMER_ORDER_TYPE_LABELS: Record<string, string> = {
@@ -155,10 +183,10 @@ export const CUSTOMER_TICKET_ITEM_STATUS_LABELS: Record<string, string> = {
 };
 
 export const CUSTOMER_TICKET_ITEM_STATUS_TONES: Record<string, string> = {
-  pending_wash: "bg-slate-100 text-slate-600",
-  washing: "bg-blue-50 text-blue-700",
+  pending_wash: "bg-muted text-muted-foreground",
+  washing: "bg-accent text-accent-foreground",
   done: "bg-emerald-50 text-emerald-700",
-  ready_to_pick: "bg-violet-50 text-violet-700",
+  ready_to_pick: "bg-secondary text-secondary-foreground",
   exception: "bg-red-50 text-red-700",
 };
 

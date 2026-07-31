@@ -70,9 +70,7 @@ export async function fetchAccountOptions(): Promise<
 }
 
 /** Fetch the hybrid customer list, flattening the wire rows for rendering. */
-export async function fetchCustomerList(
-  filters: CustomerFilterState,
-): Promise<{
+export async function fetchCustomerList(filters: CustomerFilterState): Promise<{
   rows: CustomerListRow[];
   total: number;
   totalAccounts: number;
@@ -81,6 +79,7 @@ export async function fetchCustomerList(
   const result = await posApi.pos.customers.list({
     q: filters.query.trim() || undefined,
     resultType: filters.resultType === "all" ? undefined : filters.resultType,
+    status: filters.status === "all" ? undefined : filters.status,
     limit: filters.pageSize,
     offset: toOffset(filters.page, filters.pageSize),
   });

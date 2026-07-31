@@ -5,7 +5,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 
 import { useRouter } from "next/navigation";
 
-import { Icon, PosBreadcrumb } from "@/components/app-shell";
+import { PosPageHeader } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { posToast as toast } from "@/lib/pos-toast";
 
@@ -298,36 +298,24 @@ export function IntakeCustomerLookup({
   const pageCount = Math.max(1, Math.ceil(total / query.pageSize));
 
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-4">
-        <div className="min-w-0">
-          <PosBreadcrumb items={[{ label: text("客户接待") }]} />
-          <div className="mt-3 flex items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white">
-              <Icon className="h-[18px] w-[18px]" name="user-plus" />
-            </span>
-            <div>
-              <h1 className="text-lg font-semibold text-slate-950">
-                {text("查询客户档案")}
-              </h1>
-              <p className="mt-0.5 text-sm text-slate-500">
-                {text(NEWINTAKE_PAGE_DESCRIPTION)}
-              </p>
-            </div>
-          </div>
-        </div>
+    <div className="space-y-7 pb-8">
+      <PosPageHeader
+        actions={
+          <button
+            className="flex h-10 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition hover:bg-foreground/85"
+            type="button"
+            onClick={handleCreateCustomer}
+          >
+            <span className="text-base leading-none">+</span>
+            {text("新建客户")}
+          </button>
+        }
+        description={text(NEWINTAKE_PAGE_DESCRIPTION)}
+        icon="user-plus"
+        title={text("查询客户档案")}
+      />
 
-        <button
-          className="flex h-10 items-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
-          type="button"
-          onClick={handleCreateCustomer}
-        >
-          <span className="text-base leading-none">+</span>
-          {text("新建客户")}
-        </button>
-      </div>
-
-      <section className="overflow-hidden border-y border-slate-200 bg-white">
+      <section className="overflow-hidden border-y bg-background">
         <IntakeCustomerSearch
           draftQuery={draftQuery}
           onDraftQueryChange={setDraftQuery}
