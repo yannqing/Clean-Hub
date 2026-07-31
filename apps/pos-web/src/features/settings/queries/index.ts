@@ -12,17 +12,14 @@ import type {
 
 import { posApi } from "@/lib/api-client";
 
-/** Fetch terminal settings for the current device. */
-export async function fetchTerminalSettings(
-  deviceId: string,
-): Promise<PosTerminalSettings> {
-  return posApi.pos.terminalSettings.get({ deviceId });
+/** Fetch settings for the terminal resolved from the authenticated session. */
+export async function fetchTerminalSettings(): Promise<PosTerminalSettings> {
+  return posApi.pos.terminalSettings.get();
 }
 
-/** Update terminal settings for the current device. */
+/** Update settings for the terminal resolved from the authenticated session. */
 export async function updateTerminalSettings(
-  deviceId: string,
   input: UpdatePosTerminalSettingsRequest,
 ): Promise<PosTerminalSettings> {
-  return posApi.pos.terminalSettings.update(deviceId, input);
+  return posApi.pos.terminalSettings.update(input);
 }

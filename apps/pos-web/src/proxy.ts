@@ -11,6 +11,7 @@ const API_BASE_URL =
   DEFAULT_API_BASE_URL;
 
 const LOGIN_PATH = "/login";
+const SETUP_PATH = "/setup";
 
 const POS_ALLOWED_ROLES: ReadonlySet<AdminRole> = new Set([
   "owner",
@@ -20,6 +21,19 @@ const POS_ALLOWED_ROLES: ReadonlySet<AdminRole> = new Set([
 
 function isPosAllowedRole(role: AdminRole | string): boolean {
   return POS_ALLOWED_ROLES.has(role as AdminRole);
+}
+
+function isSetupAdministrator(role: AdminRole | string): boolean {
+  return role === "owner" || role === "manager";
+}
+
+function isTerminalSession(authContext: AuthContext): boolean {
+  return Boolean(
+    authContext.terminalId &&
+      authContext.terminalBranchId &&
+      authContext.terminalDeviceId &&
+      typeof authContext.terminalCredentialVersion === "number",
+  );
 }
 
 type AuthResolution = {
@@ -216,13 +230,39 @@ async function resolveAuth(
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const auth = await resolveAuth(request);
+  const authContext = auth?.authContext;
+  const terminalSession = authContext
+    ? isTerminalSession(authContext)
+    : false;
 
   if (pathname === LOGIN_PATH) {
-    if (!auth || !isPosAllowedRole(auth.authContext.role)) {
+    if (!authContext || !isPosAllowedRole(authContext.role)) {
       return createNextResponse(request);
     }
 
-    return createRedirect(request, "/", auth.setCookieHeaders);
+    if (terminalSession) {
+      return createRedirect(request, "/", auth.setCookieHeaders);
+    }
+
+    if (isSetupAdministrator(authContext.role)) {
+      return createRedirect(request, SETUP_PATH, auth.setCookieHeaders);
+    }
+
+    // A password-authenticated cashier must not enter the operating shell.
+    // Keep the login route available so the client bootstrap can direct the
+    // device into administrator setup.
+    return createNextResponse(request, auth.setCookieHeaders);
+  }
+
+  if (pathname === SETUP_PATH || pathname.startsWith(`${SETUP_PATH}/`)) {
+    if (terminalSession && auth) {
+      return createRedirect(request, "/", auth.setCookieHeaders);
+    }
+
+    // Setup is intentionally available before authentication. The setup
+    // wizard narrows full-account authentication to Owner/Manager and only
+    // then enables terminal enrollment.
+    return createNextResponse(request, auth?.setCookieHeaders);
   }
 
   if (!auth) {
@@ -232,6 +272,14 @@ export async function proxy(request: NextRequest) {
   // POS terminals are tenant-scoped; reject SaaS platform roles.
   if (!isPosAllowedRole(auth.authContext.role)) {
     return redirectToLogin(request);
+  }
+
+  if (!terminalSession) {
+    if (isSetupAdministrator(auth.authContext.role)) {
+      return createRedirect(request, SETUP_PATH, auth.setCookieHeaders);
+    }
+
+    return createRedirect(request, LOGIN_PATH, auth.setCookieHeaders);
   }
 
   return createNextResponse(request, auth.setCookieHeaders);

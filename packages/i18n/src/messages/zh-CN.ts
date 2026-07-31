@@ -460,10 +460,12 @@ export const zhCNMessages = {
     },
     device: {
       gpsInitialUnavailable: "初始渲染期间 GPS 不可用。",
-      gpsNativeMissing: "mobile-web 尚未安装原生 GPS 模块。操作可不带位置继续。",
+      gpsNativeMissing:
+        "mobile-web 尚未安装原生 GPS 模块。操作可不带位置继续。",
       gpsPermissionDenied: "位置不可用或权限被拒绝。操作可不带 GPS 继续。",
       cameraInitialUnavailable: "初始渲染期间摄像头不可用。",
-      cameraNativeMissing: "mobile-web 尚未安装原生摄像头模块。请使用系统图片选择器继续。",
+      cameraNativeMissing:
+        "mobile-web 尚未安装原生摄像头模块。请使用系统图片选择器继续。",
       cameraPermissionDenied: "摄像头不可用或权限被拒绝。",
       cameraNoPhoto: "未从摄像头收到照片。",
     },
@@ -482,7 +484,8 @@ export const zhCNMessages = {
       missingInfo: "任务缺少必要信息。",
       missingDocument: "打印前请先关联订单或工单。",
       noDeviceFound: "附近未发现便携打印机。",
-      webUnavailable: "当前 WebView 无法使用蓝牙连接。请在 Capacitor 同步后使用原生应用。",
+      webUnavailable:
+        "当前 WebView 无法使用蓝牙连接。请在 Capacitor 同步后使用原生应用。",
       popupBlocked: "打印窗口被拦截。",
     },
     messages: {
@@ -785,21 +788,19 @@ export const zhCNMessages = {
       password: "密码",
       passwordPlaceholder: "请输入密码",
       pin: "PIN 码",
-      pinPlaceholder: "请输入 6 位 PIN",
+      pinPlaceholder: "请输入 4–8 位 PIN",
       clearPin: "清空",
       deleteDigit: "删除",
       submit: "登录",
       submitting: "登录中...",
       currentStore: "当前门店：",
       loginSuccess: "登录成功",
-      missingTenantCode:
-        "本终端尚未配置门店编码（POS_TENANT_CODE），请联系管理员。",
       loginFailed: "登录失败，请重试。",
       validation: {
         identifierRequired: "请输入手机号或邮箱",
         passwordRequired: "请输入密码",
         pinRequired: "请输入 PIN 码",
-        pinInvalid: "PIN 码必须是 6 位数字",
+        pinInvalid: "PIN 码必须是 4–8 位数字",
       },
     },
     role: {

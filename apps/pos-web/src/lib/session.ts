@@ -16,6 +16,7 @@ export type PosSessionUser = {
   terminalId?: string;
   terminalBranchId?: string;
   terminalDeviceId?: string;
+  terminalCredentialVersion?: number;
   accessTokenExpiresAt: string;
 };
 

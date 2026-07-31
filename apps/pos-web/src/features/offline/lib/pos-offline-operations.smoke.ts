@@ -74,6 +74,8 @@ async function main() {
       tenantId: createId(),
       branchId: createId(),
       terminalId: createId(),
+      userId: createId(),
+      terminalCredentialVersion: 1,
     },
   });
   for (const mutation of [

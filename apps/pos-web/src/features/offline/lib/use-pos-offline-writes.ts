@@ -12,6 +12,7 @@ import type { EnqueueInput } from "@cleanhub/offline";
 import { useCallback } from "react";
 
 import { posApi } from "@/lib/api-client";
+import { isPosTerminalSessionInvalidated } from "@/lib/pos-terminal-session";
 
 import { useOfflineSync } from "../components/offline-sync-provider";
 import {
@@ -38,11 +39,21 @@ export function usePosOfflineWrites() {
       | { queued: false; data: TData }
       | { queued: true; entityId: string; operationId: string }
     > => {
+      if (isPosTerminalSessionInvalidated()) {
+        throw new Error("The enrolled terminal session is no longer active.");
+      }
+
       if (!queue) {
         throw new Error("The enrolled terminal scope is unavailable.");
       }
 
       const enqueue = async () => {
+        if (isPosTerminalSessionInvalidated()) {
+          throw new Error(
+            "The enrolled terminal session is no longer active.",
+          );
+        }
+
         const item = await queue.enqueue(mutation as EnqueueInput<TPayload>);
         await refresh();
         return {

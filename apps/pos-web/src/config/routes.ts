@@ -1,6 +1,7 @@
 export const posRoutes = {
   home: "/",
   login: "/login",
+  setup: "/setup",
   workspace: "/",
   newIntake: "/new-intake",
   scan: "/scan",

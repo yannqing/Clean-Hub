@@ -23,38 +23,16 @@ pos-web 可以通过 `apps/pos-mobile` 封装为 Android APK / iOS IPA。
 
 详细步骤请参考 [pos-mobile/README.md](../pos-mobile/README.md)。
 
-### 静态导出配置
+### 服务端加载与认证
 
-当设置环境变量 `CAPACITOR_BUILD=true` 时，`next.config.ts` 会启用静态导出模式：
+本应用依赖 Next.js Proxy、Server Components 和服务端 Cookie，不能使用
+`CAPACITOR_BUILD=true` 静态导出。Capacitor 壳会加载一个已运行的 POS Web
+地址；生产环境必须使用 HTTPS。
 
-```bash
-CAPACITOR_BUILD=true pnpm build
-```
-
-输出目录：`out/`
-
-### 已知问题：登录认证
-
-**问题**：当前使用 HttpOnly Cookie 存储 token，在 Capacitor WebView 中 Cookie 行为不稳定，可能导致：
-- 登录后 token 丢失
-- 页面刷新后需要重新登录
-- Token 刷新失败
-
-**原因**：Capacitor WebView 的 Cookie 管理与浏览器不同，HttpOnly Cookie 可能无法正确持久化。
-
-**待优化方案**：改为 Token 存储在 Capacitor Preferences 中：
-
-1. 登录成功后，将 accessToken/refreshToken 存入 `@capacitor/preferences`
-2. API 请求时从 Preferences 读取 token，放在 `Authorization` header 中
-3. Token 刷新逻辑改为从 Preferences 读写
-4. 登出时清除 Preferences 中的 token
-
-**影响范围**：
-- `src/lib/api-client.ts` — 请求拦截器需要读取 token
-- `src/lib/session.ts` — session 管理需要适配
-- `src/features/auth/` — 登录/登出逻辑需要适配
-
-**临时解决方案**（开发阶段）：使用 `server.url` 模式连接 dev server，此时 Cookie 行为与浏览器一致。
+部署时应让 POS 页面与浏览器侧 API 使用同一个公开 origin，例如由
+`https://pos.example.com/api/*` 反向代理到 API。认证继续使用服务端设置的
+HttpOnly Cookie，并由 WebView Cookie jar 持久化。不要把 access token 或
+refresh token 写入 JavaScript 可读的 Capacitor Preferences。
 
 ## 技术栈
 

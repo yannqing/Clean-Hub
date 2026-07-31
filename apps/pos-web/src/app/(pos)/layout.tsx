@@ -3,6 +3,7 @@ import { PosRuntimeConfigProvider } from "@/components/runtime/pos-runtime-confi
 import { getMyBranchQuery } from "@/features/branches/queries";
 import { getNotificationsOverviewQuery } from "@/features/notifications/queries";
 import { OfflineSyncProvider } from "@/features/offline/components";
+import { PosTerminalSessionGuard } from "@/features/terminal-setup/components/pos-terminal-session-guard";
 import { getCurrentUser } from "@/lib/auth";
 
 export default async function PosLayout({
@@ -32,12 +33,17 @@ export default async function PosLayout({
       tenantId={user?.tenantId}
       branchId={runtimeBranchId}
       terminalId={user?.terminalId}
+      userId={user?.userId}
+      terminalCredentialVersion={user?.terminalCredentialVersion}
       currency={branch?.defaultCurrency}
     >
+      <PosTerminalSessionGuard />
       <OfflineSyncProvider
         tenantId={user?.tenantId}
         branchId={runtimeBranchId}
         terminalId={user?.terminalId}
+        userId={user?.userId}
+        terminalCredentialVersion={user?.terminalCredentialVersion}
       >
         <PosShell
           notificationUnreadCount={notificationsOverview?.unreadCount ?? 0}

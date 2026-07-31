@@ -6,6 +6,9 @@ export type LoginFormField = keyof LoginFormValues;
 
 export type LoginFormFieldErrors = Partial<Record<LoginFormField, string>>;
 
+export const POS_PIN_MIN_LENGTH = 4;
+export const POS_PIN_MAX_LENGTH = 8;
+
 type LoginFormValidationMessages = {
   pinRequired: string;
   pinInvalid: string;
@@ -19,7 +22,7 @@ export function validateLoginForm(
 
   if (!values.pin) {
     errors.pin = messages.pinRequired;
-  } else if (!/^\d{6}$/.test(values.pin)) {
+  } else if (!/^\d{4,8}$/.test(values.pin)) {
     errors.pin = messages.pinInvalid;
   }
 

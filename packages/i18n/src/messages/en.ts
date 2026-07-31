@@ -242,13 +242,16 @@ export const enMessages = {
     },
     confirm: {
       cancelAppointmentTitle: "Cancel appointment?",
-      cancelAppointmentDescription: "This appointment will be cancelled and removed from the active schedule.",
+      cancelAppointmentDescription:
+        "This appointment will be cancelled and removed from the active schedule.",
       cancelAppointmentConfirm: "Cancel appointment",
       deleteAddressTitle: "Delete address?",
-      deleteAddressDescription: "This saved pickup or delivery address will be removed from your address book.",
+      deleteAddressDescription:
+        "This saved pickup or delivery address will be removed from your address book.",
       deleteAddressConfirm: "Delete address",
       deleteContactTitle: "Delete contact?",
-      deleteContactDescription: "This linked customer contact will be removed from your profile.",
+      deleteContactDescription:
+        "This linked customer contact will be removed from your profile.",
       deleteContactConfirm: "Delete contact",
     },
     profile: {
@@ -324,7 +327,8 @@ export const enMessages = {
       refundReasonRequired: "A reason is required for the request.",
       appointmentAddressRequired: "Address is required for the appointment.",
       invalidAppointmentDate: "Appointment date is invalid.",
-      appointmentInPast: "Schedule the appointment at least 30 minutes from now.",
+      appointmentInPast:
+        "Schedule the appointment at least 30 minutes from now.",
       nameRequired: "Name is required.",
       contactNameRequired: "Contact name is required.",
       contactUpdated: "Contact updated.",
@@ -336,10 +340,13 @@ export const enMessages = {
       addressDeleted: "Address deleted.",
       defaultAddressUpdated: "Default address updated.",
       addressLocationCaptured: "Current location saved.",
-      addressLocationUnavailable: "Current location unavailable. Check location permission.",
-      passwordChangedOtherDevices: "Password updated. Sign in again on other devices.",
+      addressLocationUnavailable:
+        "Current location unavailable. Check location permission.",
+      passwordChangedOtherDevices:
+        "Password updated. Sign in again on other devices.",
       customerSessionRequired: "Customer session required.",
-      detailUnavailable: "This detail was not found or is not available for this account.",
+      detailUnavailable:
+        "This detail was not found or is not available for this account.",
     },
     paymentMock: {
       paidTitle: "Payment confirmed",
@@ -427,7 +434,8 @@ export const enMessages = {
     workflow: {
       title: "Next step",
       signedDone: "This task is signed and complete.",
-      exceptionLocked: "This task is marked as an exception and is waiting for store follow-up.",
+      exceptionLocked:
+        "This task is marked as an exception and is waiting for store follow-up.",
       cancelled: "This task was cancelled.",
     },
     proof: {
@@ -463,8 +471,10 @@ export const enMessages = {
       gpsInitialUnavailable: "GPS is unavailable during initial rendering.",
       gpsNativeMissing:
         "The native GPS module is not installed in mobile-web yet. The action can continue without location.",
-      gpsPermissionDenied: "Location unavailable or permission denied. The action can continue without GPS.",
-      cameraInitialUnavailable: "Camera is unavailable during initial rendering.",
+      gpsPermissionDenied:
+        "Location unavailable or permission denied. The action can continue without GPS.",
+      cameraInitialUnavailable:
+        "Camera is unavailable during initial rendering.",
       cameraNativeMissing:
         "The native camera module is not installed in mobile-web yet. Use the system image picker to continue.",
       cameraPermissionDenied: "Camera unavailable or permission denied.",
@@ -516,7 +526,8 @@ export const enMessages = {
       signatureRequired: "Customer signature is required.",
       signatureMediaRequired: "Signature media is required.",
       signaturePrepareFailed: "Unable to prepare the signature.",
-      detailUnavailable: "This task was not found or is not available for this account.",
+      detailUnavailable:
+        "This task was not found or is not available for this account.",
     },
   },
   owner: {
@@ -702,7 +713,8 @@ export const enMessages = {
       placeholder: "Search phone, customer, ticket, order, or tag",
       loading: "Searching...",
       emptyTitle: "No matching results",
-      emptyHint: "Try another phone, customer name, ticket number, or order ID.",
+      emptyHint:
+        "Try another phone, customer name, ticket number, or order ID.",
       minLengthTitle: "Enter at least 2 characters to search",
       minLengthHint: "Search phone, customer, ticket, order, and tag records.",
       errorTitle: "Search is unavailable",
@@ -789,21 +801,19 @@ export const enMessages = {
       password: "Password",
       passwordPlaceholder: "Enter password",
       pin: "PIN",
-      pinPlaceholder: "Enter 6-digit PIN",
+      pinPlaceholder: "Enter 4–8 digit PIN",
       clearPin: "Clear",
       deleteDigit: "Delete",
       submit: "Sign in",
       submitting: "Signing in...",
       currentStore: "Current store:",
       loginSuccess: "Signed in",
-      missingTenantCode:
-        "This terminal has no store code configured (POS_TENANT_CODE). Contact an administrator.",
       loginFailed: "Sign-in failed. Try again.",
       validation: {
         identifierRequired: "Enter phone or email",
         passwordRequired: "Enter password",
         pinRequired: "Enter PIN",
-        pinInvalid: "PIN must be exactly 6 digits",
+        pinInvalid: "PIN must be 4–8 digits",
       },
     },
     role: {

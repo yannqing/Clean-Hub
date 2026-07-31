@@ -266,16 +266,24 @@ export function PrintJobControl({
   }
 
   const retryable =
-    latestJob && latestJob.status !== "printed" ? latestJob : null;
+    latestJob &&
+    (latestJob.status === "pending" || latestJob.status === "failed")
+      ? latestJob
+      : null;
+  const uncertainPrint = latestJob?.status === "printing" ? latestJob : null;
   const buttonLabel = busy
     ? "正在打印"
     : retryable
       ? "重试原任务"
-      : latestJob?.status === "printed"
+      : uncertainPrint
         ? canReprint
-          ? `重打${documentType === "receipt" ? "小票" : "标签"}`
-          : `${documentType === "receipt" ? "小票" : "标签"}已打印`
-        : initialLabel;
+          ? "确认打印结果"
+          : "打印结果待确认"
+        : latestJob?.status === "printed"
+          ? canReprint
+            ? `重打${documentType === "receipt" ? "小票" : "标签"}`
+            : `${documentType === "receipt" ? "小票" : "标签"}已打印`
+          : initialLabel;
   const statusTone =
     latestJob?.status === "failed"
       ? "text-destructive"
@@ -288,12 +296,19 @@ export function PrintJobControl({
       <button
         className="flex h-11 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
         disabled={
-          busy || !queue || (latestJob?.status === "printed" && !canReprint)
+          busy ||
+          !queue ||
+          ((latestJob?.status === "printed" ||
+            latestJob?.status === "printing") &&
+            !canReprint)
         }
         onClick={() => {
           if (retryable) {
             void runJob(retryable);
-          } else if (latestJob?.status === "printed") {
+          } else if (
+            latestJob?.status === "printed" ||
+            latestJob?.status === "printing"
+          ) {
             setReprintOpen(true);
           } else {
             void startInitialPrint();
@@ -327,11 +342,13 @@ export function PrintJobControl({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              重打{documentType === "receipt" ? "小票" : "标签"}
+              {uncertainPrint ? "确认打印结果" : "重打"}
+              {documentType === "receipt" ? "小票" : "标签"}
             </DialogTitle>
             <DialogDescription>
-              已成功打印的文件再次打印需要 Owner 或 Manager
-              授权，原因和终端会写入审计记录。
+              {uncertainPrint
+                ? "上次任务在打印中断开，系统无法判断是否已经出纸。请先检查打印机；确认需要再次打印后，由 Owner 或 Manager 填写原因授权，操作会写入审计记录。"
+                : "已成功打印的文件再次打印需要 Owner 或 Manager 授权，原因和终端会写入审计记录。"}
             </DialogDescription>
           </DialogHeader>
           <label className="grid gap-2 text-sm font-medium text-foreground">

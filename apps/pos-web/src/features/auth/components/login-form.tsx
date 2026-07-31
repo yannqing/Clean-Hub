@@ -6,12 +6,13 @@ import { posToast as toast } from "@/lib/pos-toast";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import { posTenantCode } from "@/config/tenant";
 import { posApi } from "@/lib/api-client";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 
 import { getOrCreatePosDeviceId } from "../utils/device-id";
 import {
+  POS_PIN_MAX_LENGTH,
+  POS_PIN_MIN_LENGTH,
   validateLoginForm,
   type LoginFormFieldErrors,
   type LoginFormValues,
@@ -21,7 +22,6 @@ const initialState: LoginFormValues = {
   pin: "",
 };
 
-const PIN_LENGTH = 6;
 const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 
 function isSafeInternalPath(path: string | null): path is string {
@@ -54,14 +54,6 @@ export function LoginForm() {
     submittedPinRef.current = pin;
     setErrorMessage(null);
 
-    if (!posTenantCode) {
-      const message = t("pos.auth.missingTenantCode");
-      submittedPinRef.current = null;
-      setErrorMessage(message);
-      toast.error(message);
-      return;
-    }
-
     const validationErrors = validateLoginForm(
       { pin },
       {
@@ -79,10 +71,10 @@ export function LoginForm() {
     setSubmitting(true);
 
     try {
+      const deviceId = await getOrCreatePosDeviceId();
       await posApi.auth.posPinLogin({
         pin,
-        tenantCode: posTenantCode,
-        deviceId: getOrCreatePosDeviceId(),
+        deviceId,
       });
 
       toast.success(t("pos.auth.loginSuccess"));
@@ -108,7 +100,7 @@ export function LoginForm() {
   }
 
   function updatePin(value: string) {
-    const pin = value.replace(/\D/g, "").slice(0, PIN_LENGTH);
+    const pin = value.replace(/\D/g, "").slice(0, POS_PIN_MAX_LENGTH);
 
     setFormState({ pin });
     setErrorMessage(null);
@@ -117,7 +109,7 @@ export function LoginForm() {
       setFieldErrors({});
     }
 
-    if (pin.length < PIN_LENGTH) {
+    if (pin.length < POS_PIN_MAX_LENGTH) {
       submittedPinRef.current = null;
       return;
     }
@@ -150,7 +142,7 @@ export function LoginForm() {
           disabled={submitting}
           id="pin"
           inputMode="numeric"
-          maxLength={PIN_LENGTH}
+          maxLength={POS_PIN_MAX_LENGTH}
           name="pin"
           onChange={(event) => updatePin(event.target.value)}
           pattern="[0-9]*"
@@ -173,7 +165,7 @@ export function LoginForm() {
         {KEYPAD_KEYS.map((digit) => (
           <button
             className="flex h-12 items-center justify-center rounded-xl border border-border bg-background text-lg font-semibold text-foreground transition-colors hover:bg-muted active:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={submitting}
+            disabled={submitting || formState.pin.length >= POS_PIN_MAX_LENGTH}
             key={digit}
             onClick={() => appendDigit(digit)}
             type="button"
@@ -191,7 +183,7 @@ export function LoginForm() {
         </button>
         <button
           className="flex h-12 items-center justify-center rounded-xl border border-border bg-background text-lg font-semibold text-foreground transition-colors hover:bg-muted active:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={submitting}
+          disabled={submitting || formState.pin.length >= POS_PIN_MAX_LENGTH}
           onClick={() => appendDigit("0")}
           type="button"
         >
@@ -207,16 +199,17 @@ export function LoginForm() {
         </button>
       </div>
 
+      <button
+        className="flex h-12 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={submitting || formState.pin.length < POS_PIN_MIN_LENGTH}
+        type="submit"
+      >
+        {submitting ? t("pos.auth.submitting") : t("pos.auth.submit")}
+      </button>
+
       {errorMessage ? (
         <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
           {errorMessage}
-        </p>
-      ) : null}
-
-      {posTenantCode ? (
-        <p className="border-t border-border pt-3 text-center text-xs text-muted-foreground">
-          {t("pos.auth.currentStore")}
-          <span className="font-semibold text-foreground">{posTenantCode}</span>
         </p>
       ) : null}
     </form>

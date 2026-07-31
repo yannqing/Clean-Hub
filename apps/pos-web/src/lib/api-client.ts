@@ -3,7 +3,11 @@ import {
   type ApiRequestOptions,
 } from "@cleanhub/api-client";
 
-import { posRoutes } from "@/config/routes";
+import {
+  invalidatePosTerminalSession,
+  isPosTerminalSessionError,
+  redirectToPosLogin,
+} from "@/lib/pos-terminal-session";
 
 const DEFAULT_API_BASE_URL = "http://localhost:4000";
 let refreshRequest: Promise<unknown> | null = null;
@@ -18,16 +22,6 @@ function getApiBaseUrl(): string {
   }
 
   return process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
-}
-
-function redirectToLogin(): void {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  if (window.location.pathname !== posRoutes.login) {
-    window.location.assign(posRoutes.login);
-  }
 }
 
 export const posApi = createCleanHubApiClient({
@@ -51,8 +45,13 @@ export const posApi = createCleanHubApiClient({
       return "retry";
     } catch {
       await posApi.auth.logout().catch(() => undefined);
-      redirectToLogin();
+      redirectToPosLogin();
       return "logout";
+    }
+  },
+  onError: (error) => {
+    if (isPosTerminalSessionError(error)) {
+      invalidatePosTerminalSession();
     }
   },
 });

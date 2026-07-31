@@ -11,7 +11,7 @@ import {
 import { posToast as toast } from "@/lib/pos-toast";
 
 import { posApi } from "@/lib/api-client";
-import { getPosDeviceIdSync } from "@/features/auth/utils/device-id";
+import { getOrCreatePosDeviceId } from "@/features/auth/utils/device-id";
 
 import {
   SETTINGS_PAGE_DESCRIPTION,
@@ -67,9 +67,18 @@ async function fetchHardwareDevices(): Promise<PosHardwareDeviceSummary[]> {
   }
 }
 
-export function SettingsView() {
-  const deviceId = getPosDeviceIdSync();
+function assertCurrentTerminalDevice(
+  settings: PosTerminalSettings,
+  deviceId: string,
+): void {
+  if (settings.deviceId !== deviceId) {
+    throw new Error(
+      "当前设备标识与已登记终端不一致，请退出并重新完成终端登记。",
+    );
+  }
+}
 
+export function SettingsView() {
   const [pageState, setPageState] = useState<SettingsPageState>("loading");
   const [terminalSettings, setTerminalSettings] =
     useState<PosTerminalSettings | null>(null);
@@ -78,7 +87,7 @@ export function SettingsView() {
   );
   const [saving, setSaving] = useState(false);
 
-  // Branch info (cached to avoid re-fetch on save).
+  // Branch information displayed alongside the terminal settings.
   const [branchInfo, setBranchInfo] = useState<BranchInfo | null>(null);
 
   // Hardware devices
@@ -92,35 +101,33 @@ export function SettingsView() {
   // Load all data on mount.
   const loadData = useCallback(async () => {
     setPageState("loading");
+    setHardwareLoading(true);
 
     try {
-      // Load branch info.
-      const branch = await fetchMyBranch();
+      // Native installations keep the authoritative id in Capacitor
+      // Preferences. Never issue terminal requests with the synchronous
+      // localStorage fallback while that value is still being resolved.
+      const resolvedDeviceId = await getOrCreatePosDeviceId();
+
+      const [branch, settings, devices, authContext] = await Promise.all([
+        fetchMyBranch(),
+        fetchTerminalSettings(),
+        fetchHardwareDevices(),
+        posApi.auth.me(),
+      ]);
+      assertCurrentTerminalDevice(settings, resolvedDeviceId);
+
       setBranchInfo(branch);
-
-      // Load terminal settings (may 404 if not registered yet).
-      try {
-        const settings = await fetchTerminalSettings(deviceId);
-        setTerminalSettings(settings);
-        setFormValues({
-          label: settings.label ?? "",
-          defaultPaymentMethod: settings.defaultPaymentMethod,
-          roundingRule: settings.roundingRule,
-          autoPrintReceipt: settings.autoPrintReceipt,
-          printCopies: settings.printCopies,
-          lockTimeoutSeconds: settings.lockTimeoutSeconds,
-        });
-      } catch {
-        // Terminal not registered yet — use defaults.
-        setTerminalSettings(null);
-        setFormValues(TERMINAL_SETTINGS_DEFAULTS);
-      }
-
-      // Load hardware devices via POS read-only endpoint.
-      const devices = await fetchHardwareDevices();
+      setTerminalSettings(settings);
+      setFormValues({
+        label: settings.label ?? "",
+        defaultPaymentMethod: settings.defaultPaymentMethod,
+        roundingRule: settings.roundingRule,
+        autoPrintReceipt: settings.autoPrintReceipt,
+        printCopies: settings.printCopies,
+        lockTimeoutSeconds: settings.lockTimeoutSeconds,
+      });
       setHardwareDevices(devices);
-
-      const authContext = await posApi.auth.me();
       setCanManageSensitiveHardware(
         authContext.role === "owner" || authContext.role === "manager",
       );
@@ -134,7 +141,7 @@ export function SettingsView() {
     } finally {
       setHardwareLoading(false);
     }
-  }, [deviceId]);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial/dependent data fetch; setState happens in the async continuation, not synchronously in the effect body.
@@ -143,38 +150,27 @@ export function SettingsView() {
 
   // Save terminal settings.
   async function handleSave(values: TerminalSettingsFormValues) {
-    if (!branchInfo?.id) {
-      toast.error("无法获取当前门店信息，请刷新重试。");
+    if (pageState !== "ready" || !terminalSettings) {
+      toast.error("当前终端设置尚未加载完成，请刷新后重试。");
       return;
     }
 
     setSaving(true);
     try {
-      let result: PosTerminalSettings;
+      // Always wait for the native authoritative id again before a mutation.
+      // The resolver is memoized, while avoiding any synchronous fallback.
+      const resolvedDeviceId = await getOrCreatePosDeviceId();
+      assertCurrentTerminalDevice(terminalSettings, resolvedDeviceId);
 
-      if (terminalSettings) {
-        // Update existing.
-        result = await updateTerminalSettings(deviceId, {
-          label: values.label || undefined,
-          defaultPaymentMethod: values.defaultPaymentMethod,
-          roundingRule: values.roundingRule,
-          autoPrintReceipt: values.autoPrintReceipt,
-          printCopies: values.printCopies,
-          lockTimeoutSeconds: values.lockTimeoutSeconds,
-        });
-      } else {
-        // Create new.
-        result = await posApi.pos.terminalSettings.create({
-          branchId: branchInfo.id,
-          deviceId,
-          label: values.label || undefined,
-          defaultPaymentMethod: values.defaultPaymentMethod,
-          roundingRule: values.roundingRule,
-          autoPrintReceipt: values.autoPrintReceipt,
-          printCopies: values.printCopies,
-          lockTimeoutSeconds: values.lockTimeoutSeconds,
-        });
-      }
+      const result = await updateTerminalSettings({
+        label: values.label || undefined,
+        defaultPaymentMethod: values.defaultPaymentMethod,
+        roundingRule: values.roundingRule,
+        autoPrintReceipt: values.autoPrintReceipt,
+        printCopies: values.printCopies,
+        lockTimeoutSeconds: values.lockTimeoutSeconds,
+      });
+      assertCurrentTerminalDevice(result, resolvedDeviceId);
 
       setTerminalSettings(result);
       setFormValues({
@@ -195,7 +191,7 @@ export function SettingsView() {
     }
   }
 
-  const isLoading = pageState === "loading";
+  const isLoading = pageState !== "ready";
 
   return (
     <section className="mx-auto w-full max-w-[960px] space-y-7 pb-8">

@@ -180,11 +180,13 @@ export const frMessages = {
       appointments: "Aucun rendez-vous planifie.",
       addresses: "Aucune adresse enregistree.",
       noTrackingTitle: "Aucun suivi",
-      noTrackingBody: "Les commandes et tickets apparaitront ici apres prise en charge.",
+      noTrackingBody:
+        "Les commandes et tickets apparaitront ici apres prise en charge.",
       noOrdersTitle: "Aucune commande",
       noOrdersBody: "Les commandes et tickets actifs apparaitront ici.",
       noFilteredTrackingTitle: "Aucun suivi correspondant",
-      noFilteredTrackingBody: "Changez de statut pour voir les autres commandes et tickets.",
+      noFilteredTrackingBody:
+        "Changez de statut pour voir les autres commandes et tickets.",
       noAppointmentsTitle: "Aucun rendez-vous",
       noAppointmentsBody: "Les demandes creees apparaitront ici.",
       profileUnavailableTitle: "Profil indisponible",
@@ -242,13 +244,16 @@ export const frMessages = {
     },
     confirm: {
       cancelAppointmentTitle: "Annuler le rendez-vous ?",
-      cancelAppointmentDescription: "Ce rendez-vous sera annule et retire du planning actif.",
+      cancelAppointmentDescription:
+        "Ce rendez-vous sera annule et retire du planning actif.",
       cancelAppointmentConfirm: "Annuler le rendez-vous",
       deleteAddressTitle: "Supprimer l'adresse ?",
-      deleteAddressDescription: "Cette adresse de collecte ou livraison sera retiree du carnet d'adresses.",
+      deleteAddressDescription:
+        "Cette adresse de collecte ou livraison sera retiree du carnet d'adresses.",
       deleteAddressConfirm: "Supprimer l'adresse",
       deleteContactTitle: "Supprimer le contact ?",
-      deleteContactDescription: "Ce contact client lie sera retire de votre profil.",
+      deleteContactDescription:
+        "Ce contact client lie sera retire de votre profil.",
       deleteContactConfirm: "Supprimer le contact",
     },
     profile: {
@@ -324,7 +329,8 @@ export const frMessages = {
       refundReasonRequired: "Motif requis pour la demande.",
       appointmentAddressRequired: "Adresse requise pour le rendez-vous.",
       invalidAppointmentDate: "Date de rendez-vous invalide.",
-      appointmentInPast: "Planifiez le rendez-vous au moins 30 minutes plus tard.",
+      appointmentInPast:
+        "Planifiez le rendez-vous au moins 30 minutes plus tard.",
       nameRequired: "Nom requis.",
       contactNameRequired: "Nom du contact requis.",
       contactUpdated: "Contact mis a jour.",
@@ -336,10 +342,13 @@ export const frMessages = {
       addressDeleted: "Adresse supprimee.",
       defaultAddressUpdated: "Adresse par defaut mise a jour.",
       addressLocationCaptured: "Position actuelle enregistree.",
-      addressLocationUnavailable: "Position actuelle indisponible. Verifiez l'autorisation.",
-      passwordChangedOtherDevices: "Mot de passe mis a jour. Reconnectez-vous sur les autres appareils.",
+      addressLocationUnavailable:
+        "Position actuelle indisponible. Verifiez l'autorisation.",
+      passwordChangedOtherDevices:
+        "Mot de passe mis a jour. Reconnectez-vous sur les autres appareils.",
       customerSessionRequired: "Session client requise.",
-      detailUnavailable: "Ce detail est introuvable ou indisponible pour ce compte.",
+      detailUnavailable:
+        "Ce detail est introuvable ou indisponible pour ce compte.",
     },
     paymentMock: {
       paidTitle: "Paiement confirme",
@@ -464,7 +473,8 @@ export const frMessages = {
       gpsInitialUnavailable: "GPS indisponible pendant le rendu initial.",
       gpsNativeMissing:
         "Le module GPS natif n'est pas encore installé dans mobile-web. L'action peut partir sans position.",
-      gpsPermissionDenied: "Position indisponible ou permission refusée. L'action reste possible sans GPS.",
+      gpsPermissionDenied:
+        "Position indisponible ou permission refusée. L'action reste possible sans GPS.",
       cameraInitialUnavailable: "Caméra indisponible pendant le rendu initial.",
       cameraNativeMissing:
         "Le module caméra natif n'est pas encore installé dans mobile-web. Utilisez le sélecteur d'image système pour continuer.",
@@ -498,11 +508,14 @@ export const frMessages = {
       syncDone: "Synchronisation terminee.",
       syncCount: "{count} action(s) synchronisée(s).",
       syncPartial: "Synchronisation partielle: {count} action(s), puis échec.",
-      offlineQueued: "Action enregistrée hors ligne. Elle sera synchronisée automatiquement.",
+      offlineQueued:
+        "Action enregistrée hors ligne. Elle sera synchronisée automatiquement.",
       onlineSynced: "Action synchronisée.",
       alreadySynced: "Action déjà synchronisée.",
-      networkQueued: "Réseau indisponible. Action placée en attente de synchronisation.",
-      networkUnavailable: "Réseau indisponible. Les actions restent en attente.",
+      networkQueued:
+        "Réseau indisponible. Action placée en attente de synchronisation.",
+      networkUnavailable:
+        "Réseau indisponible. Les actions restent en attente.",
       offlineOperationMissing: "Operation hors ligne introuvable.",
       noNextStatus: "Aucune progression disponible.",
       syncUnavailable: "Synchronisation impossible pour le moment.",
@@ -517,7 +530,8 @@ export const frMessages = {
       signatureRequired: "Signature client requise.",
       signatureMediaRequired: "Le média de signature est requis.",
       signaturePrepareFailed: "Signature impossible à préparer.",
-      detailUnavailable: "Cette tache est introuvable ou indisponible pour ce compte.",
+      detailUnavailable:
+        "Cette tache est introuvable ou indisponible pour ce compte.",
     },
   },
   owner: {
@@ -650,8 +664,10 @@ export const frMessages = {
       loadFailed: "Impossible de charger les données owner pour le moment.",
       actionDone: "Action effectuee.",
       noData: "Aucune donnée disponible.",
-      branchRequiredAppointments: "Sélectionnez une branche pour charger les rendez-vous.",
-      branchRequiredDispatch: "Sélectionnez une branche pour charger le dispatch.",
+      branchRequiredAppointments:
+        "Sélectionnez une branche pour charger les rendez-vous.",
+      branchRequiredDispatch:
+        "Sélectionnez une branche pour charger le dispatch.",
       loadingAppointments: "Chargement des rendez-vous...",
       loadingDispatch: "Chargement du dispatch...",
       loadingRefunds: "Chargement des remboursements...",
@@ -701,7 +717,8 @@ export const frMessages = {
     },
     globalSearch: {
       label: "Recherche globale",
-      placeholder: "Rechercher téléphone, client, ticket, commande ou étiquette",
+      placeholder:
+        "Rechercher téléphone, client, ticket, commande ou étiquette",
       loading: "Recherche...",
       emptyTitle: "Aucun résultat correspondant",
       emptyHint:
@@ -744,8 +761,7 @@ export const frMessages = {
       noUnread: "Aucun message non lu",
       loading: "Chargement des messages...",
       emptyTitle: "Aucun message",
-      emptyHint:
-        "Les nouveaux messages système et métier apparaîtront ici.",
+      emptyHint: "Les nouveaux messages système et métier apparaîtront ici.",
       errorTitle: "Impossible de charger les messages",
       errorHint: "Réessayez plus tard ou ouvrez le centre de messages.",
       markRead: "Marquer lu",
@@ -789,28 +805,25 @@ export const frMessages = {
       heroDescription:
         "Caisse, accueil, scan, commandes et passation dans un seul espace magasin. Saisissez le code PIN employé pour accéder au terminal.",
       loginTitle: "Connexion employé",
-      loginDescription:
-        "Saisissez le code PIN employé pour continuer.",
+      loginDescription: "Saisissez le code PIN employé pour continuer.",
       identifier: "Téléphone / Email",
       identifierPlaceholder: "Saisir le téléphone ou l'email",
       password: "Mot de passe",
       passwordPlaceholder: "Saisir le mot de passe",
       pin: "Code PIN",
-      pinPlaceholder: "Saisir le PIN à 6 chiffres",
+      pinPlaceholder: "Saisir un PIN de 4 à 8 chiffres",
       clearPin: "Effacer",
       deleteDigit: "Supprimer",
       submit: "Se connecter",
       submitting: "Connexion...",
       currentStore: "Magasin actuel :",
       loginSuccess: "Connecté",
-      missingTenantCode:
-        "Aucun code magasin n'est configuré sur ce terminal (POS_TENANT_CODE). Contactez un administrateur.",
       loginFailed: "Échec de connexion. Réessayez.",
       validation: {
         identifierRequired: "Saisissez le téléphone ou l'email",
         passwordRequired: "Saisissez le mot de passe",
         pinRequired: "Saisissez le code PIN",
-        pinInvalid: "Le code PIN doit comporter exactement 6 chiffres",
+        pinInvalid: "Le code PIN doit comporter de 4 à 8 chiffres",
       },
     },
     role: {

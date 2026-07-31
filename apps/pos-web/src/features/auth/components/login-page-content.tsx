@@ -4,6 +4,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import type { CSSProperties } from "react";
 
 import { LanguageSwitcher } from "@/components/i18n";
+import { TerminalPinLoginGate } from "@/features/terminal-setup/components/terminal-pin-login-gate";
 
 import { LoginForm } from "./login-form";
 
@@ -141,8 +142,29 @@ export function LoginPageContent() {
               </p>
             </div>
 
-            <div className="mt-6 rounded-2xl border border-border/80 bg-background/[0.96] p-5 shadow-[0_28px_80px_-34px_rgba(0,0,0,0.58)] backdrop-blur-2xl sm:p-6">
-              <LoginForm />
+            <div className="mt-6">
+              <TerminalPinLoginGate>
+                {(bootstrap) => (
+                  <div className="rounded-2xl border border-border/80 bg-background/[0.96] p-5 shadow-[0_28px_80px_-34px_rgba(0,0,0,0.58)] backdrop-blur-2xl sm:p-6">
+                    {bootstrap.tenant || bootstrap.branch ? (
+                      <div className="mb-4 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-xl bg-muted/65 px-3 py-2 text-xs text-muted-foreground">
+                        {bootstrap.tenant ? (
+                          <span className="font-medium text-foreground">
+                            {bootstrap.tenant.name}
+                          </span>
+                        ) : null}
+                        {bootstrap.tenant && bootstrap.branch ? (
+                          <span aria-hidden="true">·</span>
+                        ) : null}
+                        {bootstrap.branch ? (
+                          <span>{bootstrap.branch.name}</span>
+                        ) : null}
+                      </div>
+                    ) : null}
+                    <LoginForm />
+                  </div>
+                )}
+              </TerminalPinLoginGate>
             </div>
           </div>
         </section>
