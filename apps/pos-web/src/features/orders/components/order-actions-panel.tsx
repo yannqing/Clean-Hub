@@ -182,51 +182,53 @@ export function OrderActionsPanel({
   }
 
   return (
-    <section className="sticky top-4 rounded-lg border border-slate-200 bg-white p-5">
+    <section className="sticky top-4 border-y bg-background p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h2 className="font-semibold text-slate-950">订单操作</h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <h2 className="font-semibold text-foreground">订单操作</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
             支付状态由成功流水自动累加计算。
           </p>
         </div>
-        <Icon className="h-5 w-5 text-slate-300" name="wallet-cards" />
+        <Icon className="h-5 w-5 text-muted-foreground" name="wallet-cards" />
       </div>
 
-      <div className="mt-5 rounded-lg bg-slate-50 p-4">
-        <div className="grid gap-2 border-b border-slate-200 pb-3 text-xs">
-          <div className="flex items-center justify-between gap-3 text-slate-500">
+      <div className="mt-5 rounded-md bg-muted/40 p-4">
+        <div className="grid gap-2 border-b pb-3 text-xs">
+          <div className="flex items-center justify-between gap-3 text-muted-foreground">
             <span>{text("订单小计")}</span>
-            <span className="font-semibold text-slate-700">
+            <span className="font-semibold text-foreground">
               {formatOrderMoney(order.subtotalAmount, order.currency, locale)}
             </span>
           </div>
-          <div className="flex items-center justify-between gap-3 text-slate-500">
+          <div className="flex items-center justify-between gap-3 text-muted-foreground">
             <span>{text("优惠金额")}</span>
             <span className="font-semibold text-emerald-700">
               {Number(order.discountAmount) > 0 ? "−" : ""}
               {formatOrderMoney(order.discountAmount, order.currency, locale)}
             </span>
           </div>
-          <div className="flex items-center justify-between gap-3 text-slate-600">
+          <div className="flex items-center justify-between gap-3 text-foreground">
             <span className="font-semibold">{text("应付总额")}</span>
-            <span className="text-sm font-semibold text-slate-950">
+            <span className="text-sm font-semibold text-foreground">
               {formatOrderMoney(order.totalAmount, order.currency, locale)}
             </span>
           </div>
         </div>
-        <div className="mt-3 text-xs font-medium text-slate-500">待收金额</div>
-        <div className="mt-1 text-xl font-semibold text-slate-950">
+        <div className="mt-3 text-xs font-medium text-muted-foreground">
+          待收金额
+        </div>
+        <div className="mt-1 text-xl font-semibold text-foreground">
           {formatOrderMoney(outstanding, order.currency)}
         </div>
         <div className="mt-3 grid grid-cols-3 gap-2">
           {(["cash", "wave", "orange_money"] satisfies PaymentOption[]).map(
             (option) => (
               <button
-                className={`min-h-11 rounded-lg border px-3 text-sm font-semibold transition ${
+                className={`min-h-11 rounded-md border px-3 text-sm font-semibold transition ${
                   paymentOption === option
-                    ? "border-blue-600 bg-blue-600 text-white"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-blue-200"
+                    ? "border-foreground bg-foreground text-background"
+                    : "bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                 }`}
                 disabled={!canPay || isPending}
                 key={option}
@@ -246,7 +248,7 @@ export function OrderActionsPanel({
         </div>
 
         {pendingManualPayment ? (
-          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
             当前订单已有一笔
             {pendingManualPayment.provider
               ? ` ${MOBILE_MONEY_PROVIDER_LABELS[pendingManualPayment.provider]} `
@@ -254,21 +256,21 @@ export function OrderActionsPanel({
             待确认。处理完成前不能继续收款。
           </div>
         ) : paymentOption !== "cash" ? (
-          <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 p-3 text-xs leading-5 text-blue-800">
+          <div className="mt-3 rounded-md border bg-accent/60 p-3 text-xs leading-5 text-accent-foreground">
             客户需先在外部应用完成转账。这里只记录付款凭证，不会自动扣款；Owner
             或 Manager 核对商户账户后才能确认到账。
           </div>
         ) : null}
 
         {isZeroTotalReadyForConfirmation ? (
-          <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-800">
+          <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
             {text("当前订单应付金额为 0。确认零元订单后即可继续完成交付。")}
           </div>
         ) : null}
 
         <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto]">
           <input
-            className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 outline-none focus:border-blue-300"
+            className="h-11 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
             disabled={!canPay || isPending}
             inputMode="decimal"
             onChange={(event) => {
@@ -279,7 +281,7 @@ export function OrderActionsPanel({
           />
           {paymentOption !== "cash" ? (
             <input
-              className="h-11 min-w-0 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-300"
+              className="h-11 min-w-0 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               disabled={!canPay || isPending}
               maxLength={120}
               onChange={(event) => {
@@ -293,10 +295,10 @@ export function OrderActionsPanel({
             <div className="hidden sm:block" />
           )}
           <button
-            className={`flex h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+            className={`flex h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
               paymentOption === "cash"
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-amber-600 hover:bg-amber-700"
+                ? "bg-foreground text-background hover:bg-foreground/90"
+                : "bg-amber-600 text-white hover:bg-amber-700"
             }`}
             disabled={
               !canPay ||
@@ -317,13 +319,13 @@ export function OrderActionsPanel({
 
       <div className="mt-5 grid gap-2">
         {transitions.length === 0 ? (
-          <div className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-500">
+          <div className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
             当前状态无可用流转。
           </div>
         ) : (
           transitions.map((status) => (
             <button
-              className="flex h-11 items-center justify-between rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-11 items-center justify-between rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isPending}
               key={status}
               onClick={() => {
@@ -340,13 +342,16 @@ export function OrderActionsPanel({
                   ? text("确认零元订单")
                   : `设为 ${ORDER_STATUS_LABELS[status]}`}
               </span>
-              <Icon className="h-4 w-4 text-slate-400" name="chevron-right" />
+              <Icon
+                className="h-4 w-4 text-muted-foreground"
+                name="chevron-right"
+              />
             </button>
           ))
         )}
 
         <button
-          className="mt-2 flex h-11 items-center justify-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-2 flex h-11 items-center justify-center gap-2 rounded-md border border-destructive/30 px-4 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!canDelete || isPending}
           onClick={() => setSensitiveAction("delete")}
           type="button"
@@ -374,10 +379,10 @@ export function OrderActionsPanel({
               此操作仅限 Owner 或 Manager，并会记录操作原因和审计信息。
             </DialogDescription>
           </DialogHeader>
-          <label className="grid gap-2 text-sm font-medium text-slate-700">
+          <label className="grid gap-2 text-sm font-medium text-foreground">
             操作原因
             <textarea
-              className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-300"
+              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
               disabled={isPending}
               maxLength={500}
               onChange={(event) => setSensitiveReason(event.target.value)}
@@ -387,7 +392,7 @@ export function OrderActionsPanel({
           </label>
           <DialogFooter>
             <button
-              className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+              className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
               disabled={isPending}
               onClick={() => {
                 setSensitiveAction(null);
@@ -398,7 +403,7 @@ export function OrderActionsPanel({
               返回
             </button>
             <button
-              className="h-10 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50"
+              className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-50"
               disabled={isPending || !sensitiveReason.trim()}
               onClick={submitSensitiveAction}
               type="button"

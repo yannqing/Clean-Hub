@@ -252,7 +252,7 @@ export function OrderCreateDialog({
       <button
         className={
           triggerClassName ??
-          "flex h-11 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+          "flex h-11 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         }
         onClick={() => setOpen(true)}
         type="button"
@@ -269,13 +269,13 @@ export function OrderCreateDialog({
 
           <div className="grid gap-5">
             {ticketModeLocked ? null : (
-              <div className="inline-grid w-fit grid-cols-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
+              <div className="inline-grid w-fit grid-cols-2 rounded-lg border border-border bg-muted/50 p-1">
                 {(["manual", "ticket"] as const).map((value) => (
                   <button
                     className={`h-11 rounded-md px-4 text-sm font-semibold ${
                       orderType === value
-                        ? "bg-white text-blue-700 shadow-sm"
-                        : "text-slate-500 hover:text-slate-800"
+                        ? "bg-background text-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                     key={value}
                     onClick={() => setOrderType(value)}
@@ -318,7 +318,7 @@ export function OrderCreateDialog({
             <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
               <Field label={text("过期日期")}>
                 <input
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                  className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/20"
                   onChange={(event) => setExpireAt(event.target.value)}
                   type="date"
                   value={expireAt}
@@ -326,7 +326,7 @@ export function OrderCreateDialog({
               </Field>
               <Field label={text("备注")}>
                 <input
-                  className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-blue-400"
+                  className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
                   onChange={(event) => setNotes(event.target.value)}
                   placeholder={text("选填")}
                   value={notes}
@@ -337,7 +337,7 @@ export function OrderCreateDialog({
 
           <DialogFooter>
             <button
-              className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+              className="h-10 rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
               disabled={isPending}
               onClick={() => handleOpenChange(false)}
               type="button"
@@ -345,7 +345,7 @@ export function OrderCreateDialog({
               {text("取消")}
             </button>
             <button
-              className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+              className="h-10 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
               disabled={isPending}
               onClick={submit}
               type="button"
@@ -390,13 +390,13 @@ function ManualOrderFields({
         selectedCustomer={selectedCustomer}
       />
 
-      <div className="rounded-lg border border-slate-200">
-        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-          <div className="text-sm font-semibold text-slate-800">
+      <div className="rounded-lg border border-border">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+          <div className="text-sm font-semibold text-foreground">
             {text("订单条目")}
           </div>
           <button
-            className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+            className="flex h-11 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             onClick={onAddItem}
             type="button"
           >
@@ -407,15 +407,15 @@ function ManualOrderFields({
         <div className="grid gap-3 p-4">
           {items.map((item, index) => (
             <div
-              className="grid min-w-0 gap-3 rounded-lg bg-slate-50 p-3 md:grid-cols-2 lg:grid-cols-3"
+              className="grid min-w-0 gap-3 rounded-lg bg-muted/50 p-3 md:grid-cols-2 lg:grid-cols-3"
               key={item.key}
             >
               <label className="md:col-span-2 lg:col-span-3">
-                <span className="mb-1 block text-xs font-semibold text-slate-500">
+                <span className="mb-1 block text-xs font-semibold text-muted-foreground">
                   {text("服务项目")}
                 </span>
                 <select
-                  className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none"
+                  className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/20"
                   onChange={(event) => {
                     const service = catalog.find(
                       (entry) => entry.id === event.target.value,
@@ -494,11 +494,11 @@ function ManualOrderFields({
                 type="number"
                 value={item.chargedUnitAmount}
               />
-              <div className="rounded-lg bg-blue-50 px-3 py-2">
-                <div className="text-xs font-semibold text-blue-600">
+              <div className="rounded-lg border border-border bg-background px-3 py-2">
+                <div className="text-xs font-semibold text-muted-foreground">
                   {text("小计")}
                 </div>
-                <div className="mt-1 font-semibold text-blue-950">
+                <div className="mt-1 font-semibold text-foreground">
                   {formatOrderMoney(
                     (item.pricingUnit === "per_kg"
                       ? Number(item.weight) || 0
@@ -548,7 +548,7 @@ function ManualOrderFields({
               ) : null}
               <button
                 aria-label={text("删除条目")}
-                className="flex h-11 w-11 items-center justify-center justify-self-end rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 md:col-span-2 lg:col-span-3"
+                className="flex h-11 w-11 items-center justify-center justify-self-end rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-40 md:col-span-2 lg:col-span-3"
                 disabled={items.length === 1}
                 onClick={() => onRemoveItem(index)}
                 title={text("删除条目")}
@@ -582,7 +582,7 @@ function TicketOrderFields({
         onSelect={onSelectTicket}
         selectedTicket={selectedTicket}
       />
-      <div className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">
+      <div className="rounded-lg border border-border bg-muted/50 px-3 py-2 text-xs font-medium text-muted-foreground">
         {translatePosText(
           "选择工单后，系统会自动把该工单中尚未生成订单的项目全部带入订单。",
           locale,
@@ -636,9 +636,9 @@ function CustomerProfilePicker({
 
   return (
     <Field label={text("客户档案")}>
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="rounded-lg border border-border bg-muted/50 p-3">
         <input
-          className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+          className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
           onChange={(event) => setKeyword(event.target.value)}
           placeholder={text("搜索客户姓名、手机号或邮箱")}
           value={keyword}
@@ -715,10 +715,10 @@ function ServiceTicketPicker({
 
   return (
     <Field label={text("服务工单")}>
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="rounded-lg border border-border bg-muted/50 p-3">
         {locked ? null : (
           <input
-            className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
+            className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
             onChange={(event) => setKeyword(event.target.value)}
             placeholder={text("搜索工单号或客户名")}
             value={keyword}
@@ -759,18 +759,18 @@ function SelectedPill({
   const { locale } = useTranslation();
 
   return (
-    <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-blue-50 px-3 py-2">
+    <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-border bg-background px-3 py-2">
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-blue-900">
+        <div className="truncate text-sm font-semibold text-foreground">
           <RawText value={label} />
         </div>
-        <div className="mt-0.5 truncate text-xs font-medium text-blue-600">
+        <div className="mt-0.5 truncate text-xs font-medium text-muted-foreground">
           <RawText value={meta} />
         </div>
       </div>
       {onClear ? (
         <button
-          className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-blue-700 hover:bg-white"
+          className="shrink-0 rounded-md px-2 py-1 text-xs font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onClick={onClear}
           type="button"
         >
@@ -795,23 +795,25 @@ function OptionList({
 }) {
   if (options.length === 0) {
     return (
-      <div className="mt-3 text-xs font-medium text-slate-400">{emptyText}</div>
+      <div className="mt-3 text-xs font-medium text-muted-foreground">
+        {emptyText}
+      </div>
     );
   }
 
   return (
-    <div className="mt-3 max-h-52 overflow-y-auto rounded-lg border border-slate-200 bg-white">
+    <div className="mt-3 max-h-52 overflow-y-auto rounded-lg border border-border bg-background">
       {options.map((option) => (
         <button
-          className="block w-full border-b border-slate-100 px-3 py-2 text-left last:border-b-0 hover:bg-slate-50"
+          className="block w-full border-b border-border px-3 py-2 text-left transition-colors last:border-b-0 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           key={option.id}
           onClick={option.onSelect}
           type="button"
         >
-          <div className="truncate text-sm font-semibold text-slate-800">
+          <div className="truncate text-sm font-semibold text-foreground">
             <RawText value={option.title} />
           </div>
-          <div className="mt-0.5 truncate text-xs text-slate-500">
+          <div className="mt-0.5 truncate text-xs text-muted-foreground">
             <RawText value={option.meta} />
           </div>
         </button>
@@ -823,7 +825,7 @@ function OptionList({
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-semibold text-slate-600">
+      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>
       {children}
@@ -849,7 +851,7 @@ function TextField({
   return (
     <Field label={label}>
       <input
-        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-500"
+        className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20 disabled:bg-muted disabled:text-muted-foreground"
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}

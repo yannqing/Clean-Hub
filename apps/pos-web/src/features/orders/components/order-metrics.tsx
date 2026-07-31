@@ -8,21 +8,10 @@ import { translatePosText } from "@/components/i18n/pos-runtime-text";
 
 import { formatOrderMoney } from "../constants";
 
-type MetricTone = "blue" | "violet" | "emerald" | "amber";
-
-const METRIC_TONE_CLASSES: Record<MetricTone, string> = {
-  blue: "text-blue-700 bg-blue-50",
-  violet: "text-violet-700 bg-violet-50",
-  emerald: "text-emerald-700 bg-emerald-50",
-  amber: "text-amber-700 bg-amber-50",
-};
-
 type MetricCardProps = {
   label: string;
   value: string | number;
-  note: string;
   icon: Parameters<typeof Icon>[0]["name"];
-  tone: MetricTone;
 };
 
 const PERIOD_LABELS: Record<PosOrderOverview["period"], string> = {
@@ -32,26 +21,20 @@ const PERIOD_LABELS: Record<PosOrderOverview["period"], string> = {
   month: "本月订单",
 };
 
-const PERIOD_NOTES: Record<PosOrderOverview["period"], string> = {
-  all: "当前全部记录",
-  today: "今天创建",
-  week: "近 7 天创建",
-  month: "本月创建",
-};
-
-function MetricCard({ label, value, note, icon, tone }: MetricCardProps) {
+function MetricCard({ label, value, icon }: MetricCardProps) {
   return (
-    <section className="border-y border-slate-200 bg-white px-3 py-3">
-      <div className="flex items-center justify-between">
-        <div className="text-xs font-medium text-slate-500">{label}</div>
-        <span
-          className={`flex h-8 w-8 items-center justify-center rounded-md ${METRIC_TONE_CLASSES[tone]}`}
-        >
-          <Icon className="h-4 w-4" name={icon} />
+    <section className="flex min-h-20 items-center gap-2.5 rounded-md border bg-background px-3 py-2.5">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+        <Icon className="size-[15px]" name={icon} />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-[11px] font-medium text-muted-foreground">
+          {label}
         </span>
-      </div>
-      <div className="mt-1 text-xl font-semibold text-slate-950">{value}</div>
-      <div className="mt-1 text-xs text-slate-400">{note}</div>
+        <span className="mt-0.5 block truncate text-lg font-semibold text-foreground">
+          {value}
+        </span>
+      </span>
     </section>
   );
 }
@@ -61,33 +44,25 @@ export function OrderMetrics({ overview }: { overview: PosOrderOverview }) {
   const text = (value: string) => translatePosText(value, locale);
 
   return (
-    <div className="mt-4 grid grid-cols-2 gap-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
       <MetricCard
         icon="receipt"
         label={text(PERIOD_LABELS[overview.period])}
-        note={text(PERIOD_NOTES[overview.period])}
-        tone="blue"
         value={overview.orderCount}
       />
       <MetricCard
         icon="wallet-cards"
         label={text("已收金额")}
-        note={text("成功支付流水")}
-        tone="emerald"
         value={formatOrderMoney(overview.paidAmount, overview.currency, locale)}
       />
       <MetricCard
         icon="clock"
         label={text("待支付")}
-        note={text("未支付 + 部分支付")}
-        tone="amber"
         value={overview.unpaidCount + overview.partialCount}
       />
       <MetricCard
         icon="package-check"
         label={text("已交付")}
-        note={text(PERIOD_NOTES[overview.period])}
-        tone="violet"
         value={overview.deliveredCount}
       />
     </div>

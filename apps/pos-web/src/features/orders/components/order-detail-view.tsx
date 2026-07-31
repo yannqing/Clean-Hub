@@ -19,7 +19,7 @@ import { buildPosReceiptText, type PrintLocale } from "@cleanhub/hardware";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { Icon, PosBreadcrumb } from "@/components/app-shell";
+import { PosBreadcrumb } from "@/components/app-shell";
 import { customerDetailPath, posRoutes } from "@/config";
 import { PrintJobControl } from "@/features/hardware/components";
 
@@ -72,41 +72,33 @@ export function OrderDetailView({
   const receiptContent = buildOrderReceiptContent(order, payments, locale);
 
   return (
-    <section>
-      <PosBreadcrumb className="mb-3" items={breadcrumbItems} />
+    <section className="mx-auto w-full max-w-[1080px] space-y-4 pb-12">
+      <PosBreadcrumb items={breadcrumbItems} />
 
-      <div className="border-y border-slate-200 bg-white py-4">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-950 text-white">
-              <Icon className="h-[18px] w-[18px]" name="receipt" />
-            </span>
-            <div>
-              <h1 className="text-lg font-semibold tracking-tight text-slate-950">
-                {displayOrderCode(order.id)}
-              </h1>
-              <p className="mt-0.5 text-sm text-slate-500">
-                {order.customerName || "未命名客户"} ·{" "}
-                {ORDER_TYPE_LABELS[order.orderType]}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-start gap-2">
-            <PrintJobControl
-              canReprint={canResolveManualPayments}
-              content={receiptContent}
-              documentType="receipt"
-              entityId={order.id}
-              initialLabel="打印小票"
-              title={`RC-${order.id.slice(-8).toUpperCase()}`}
-            />
-            <OrderStatusBadge status={order.status} />
-            <OrderPaymentStatusBadge status={order.paymentStatus} />
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-y bg-background px-4 py-3">
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium text-foreground">
+            {order.customerName || "未命名客户"}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {ORDER_TYPE_LABELS[order.orderType]} · {displayOrderCode(order.id)}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <PrintJobControl
+            canReprint={canResolveManualPayments}
+            content={receiptContent}
+            documentType="receipt"
+            entityId={order.id}
+            initialLabel="打印小票"
+            title={`RC-${order.id.slice(-8).toUpperCase()}`}
+          />
+          <OrderStatusBadge status={order.status} />
+          <OrderPaymentStatusBadge status={order.paymentStatus} />
         </div>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid gap-4">
           <OrderInfoEditor order={order} />
           <OrderItemsManager
@@ -239,7 +231,7 @@ function buildOrderBreadcrumbItems(
   if (!ticketId) {
     return [
       { href: posRoutes.orders, label: "订单管理" },
-      { label: "订单详情" },
+      { label: displayOrderCode(order.id) },
     ];
   }
 
@@ -252,7 +244,7 @@ function buildOrderBreadcrumbItems(
         label: order.customerName || "客户档案",
       },
       { href: ticketHref, label: "工单详情" },
-      { label: "订单详情" },
+      { label: displayOrderCode(order.id) },
     ];
   }
 
@@ -264,14 +256,14 @@ function buildOrderBreadcrumbItems(
         label: order.customerName || "客户档案",
       },
       { href: ticketHref, label: "工单详情" },
-      { label: "订单详情" },
+      { label: displayOrderCode(order.id) },
     ];
   }
 
   return [
     { href: posRoutes.tickets, label: "工单管理" },
     { href: ticketHref, label: "工单详情" },
-    { label: "订单详情" },
+    { label: displayOrderCode(order.id) },
   ];
 }
 
@@ -379,17 +371,19 @@ function OrderPaymentsCard({
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="border-b border-slate-200 px-5 py-4">
-        <h2 className="font-semibold text-slate-950">支付流水</h2>
-        <p className="mt-1 text-xs text-slate-500">
+    <section className="overflow-hidden border-y bg-background">
+      <div className="border-b px-5 py-4">
+        <h2 className="font-semibold text-foreground">支付流水</h2>
+        <p className="mt-1 text-xs text-muted-foreground">
           Wave / Orange Money 需由 Owner 或 Manager 在商户应用核对后确认。
         </p>
       </div>
       {payments.length === 0 ? (
-        <div className="px-5 py-8 text-sm text-slate-400">暂无支付流水。</div>
+        <div className="px-5 py-8 text-sm text-muted-foreground">
+          暂无支付流水。
+        </div>
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y">
           {payments.map((payment) => (
             <div
               className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 text-sm"
@@ -397,7 +391,7 @@ function OrderPaymentsCard({
             >
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="font-semibold text-slate-800">
+                  <div className="font-semibold text-foreground">
                     {getPaymentDisplayName(
                       payment.paymentMethod,
                       payment.provider,
@@ -410,11 +404,11 @@ function OrderPaymentsCard({
                   </span>
                 </div>
                 {payment.externalReference ? (
-                  <div className="mt-1 truncate text-xs text-slate-500">
+                  <div className="mt-1 truncate text-xs text-muted-foreground">
                     流水号：{payment.externalReference}
                   </div>
                 ) : null}
-                <div className="mt-1 text-xs text-slate-400">
+                <div className="mt-1 text-xs text-muted-foreground">
                   {formatOrderDateTime(
                     payment.paidAt ?? payment.createdAt,
                     locale,
@@ -422,14 +416,14 @@ function OrderPaymentsCard({
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="font-semibold text-slate-900">
+                <div className="font-semibold text-foreground">
                   {formatOrderMoney(payment.amount, payment.currency)}
                 </div>
                 {payment.paymentStatus === "pending" ? (
                   canResolveManualPayments ? (
                     <div className="flex gap-2">
                       <button
-                        className="h-9 rounded-lg bg-emerald-600 px-3 text-xs font-semibold text-white hover:bg-emerald-700"
+                        className="h-9 rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
                         onClick={() =>
                           setResolution({ payment, action: "confirm" })
                         }
@@ -438,7 +432,7 @@ function OrderPaymentsCard({
                         确认到账
                       </button>
                       <button
-                        className="h-9 rounded-lg border border-red-200 px-3 text-xs font-semibold text-red-600 hover:bg-red-50"
+                        className="h-9 rounded-md border border-destructive/30 px-3 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10"
                         onClick={() =>
                           setResolution({ payment, action: "fail" })
                         }
@@ -477,8 +471,8 @@ function OrderPaymentsCard({
           </DialogHeader>
           {resolution ? (
             <div className="grid gap-4">
-              <div className="rounded-lg bg-slate-50 p-4 text-sm">
-                <div className="font-semibold text-slate-900">
+              <div className="rounded-md bg-muted/50 p-4 text-sm">
+                <div className="font-semibold text-foreground">
                   {getPaymentDisplayName(
                     resolution.payment.paymentMethod,
                     resolution.payment.provider,
@@ -489,14 +483,14 @@ function OrderPaymentsCard({
                     resolution.payment.currency,
                   )}
                 </div>
-                <div className="mt-1 text-slate-500">
+                <div className="mt-1 text-muted-foreground">
                   流水号：{resolution.payment.externalReference ?? "—"}
                 </div>
               </div>
-              <label className="grid gap-2 text-sm font-medium text-slate-700">
+              <label className="grid gap-2 text-sm font-medium text-foreground">
                 {resolution.action === "fail" ? "失败原因" : "确认备注（可选）"}
                 <textarea
-                  className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-300"
+                  className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   disabled={isPending}
                   maxLength={500}
                   onChange={(event) => setReason(event.target.value)}
@@ -510,7 +504,7 @@ function OrderPaymentsCard({
               </label>
               <div className="flex justify-end gap-2">
                 <button
-                  className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+                  className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
                   disabled={isPending}
                   onClick={closeResolutionDialog}
                   type="button"
@@ -518,10 +512,10 @@ function OrderPaymentsCard({
                   取消
                 </button>
                 <button
-                  className={`h-10 rounded-lg px-4 text-sm font-semibold text-white disabled:opacity-50 ${
+                  className={`h-11 rounded-md px-4 text-sm font-semibold text-white disabled:opacity-50 ${
                     resolution.action === "confirm"
                       ? "bg-emerald-600 hover:bg-emerald-700"
-                      : "bg-red-600 hover:bg-red-700"
+                      : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   }`}
                   disabled={isPending}
                   onClick={submitResolution}

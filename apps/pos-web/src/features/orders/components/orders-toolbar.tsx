@@ -2,29 +2,33 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState, useTransition } from "react";
+import type { PosOrderSort } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
+import {
+  Button,
+  Checkbox,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  cn,
+} from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 
 import {
+  ORDER_COLUMN_KEYS,
+  ORDER_COLUMN_LABELS,
   ORDER_FILTER_KEYS,
   ORDER_PAYMENT_STATUS_OPTIONS,
+  ORDER_SORT_OPTIONS,
   ORDER_STATUS_OPTIONS,
   ORDER_TYPE_OPTIONS,
-  type OrderDateFilter,
+  type OrderColumnKey,
 } from "../constants";
 
-const DATE_OPTIONS: ReadonlyArray<{
-  value: Exclude<OrderDateFilter, "all">;
-  label: string;
-}> = [
-  { value: "today", label: "今天" },
-  { value: "last_7d", label: "近 7 天" },
-  { value: "month", label: "本月" },
-];
-
-export function OrdersToolbar({ totalCount }: { totalCount: number }) {
+export function OrdersToolbar() {
   const { locale } = useTranslation();
   const router = useRouter();
   const params = useSearchParams();
@@ -34,7 +38,15 @@ export function OrdersToolbar({ totalCount }: { totalCount: number }) {
   const status = params.get(ORDER_FILTER_KEYS.status) ?? "";
   const paymentStatus = params.get(ORDER_FILTER_KEYS.paymentStatus) ?? "";
   const orderType = params.get(ORDER_FILTER_KEYS.orderType) ?? "";
-  const date = params.get(ORDER_FILTER_KEYS.date) ?? "";
+  const sort =
+    (params.get(ORDER_FILTER_KEYS.sort) as PosOrderSort | null) ??
+    "created_desc";
+  const visibleColumns = parseVisibleColumns(
+    params.get(ORDER_FILTER_KEYS.columns),
+  );
+  const visibleColumnCount = ORDER_COLUMN_KEYS.filter((column) =>
+    visibleColumns.has(column),
+  ).length;
   const text = (value: string) => translatePosText(value, locale);
 
   const apply = useCallback(
@@ -57,134 +69,265 @@ export function OrdersToolbar({ totalCount }: { totalCount: number }) {
     [params, router],
   );
 
+  function setColumnVisible(column: OrderColumnKey, checked: boolean) {
+    if (!checked && visibleColumnCount === 1 && visibleColumns.has(column)) {
+      return;
+    }
+
+    const next = new Set(visibleColumns);
+    if (checked) {
+      next.add(column);
+    } else {
+      next.delete(column);
+    }
+    const isDefault = ORDER_COLUMN_KEYS.every((key) => next.has(key));
+    apply(
+      {
+        [ORDER_FILTER_KEYS.columns]: isDefault
+          ? undefined
+          : ORDER_COLUMN_KEYS.filter((key) => next.has(key)).join(","),
+      },
+      false,
+    );
+  }
+
   return (
-    <section className="mt-3 border-y border-slate-200 bg-white py-3">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <Icon className="h-4 w-4 text-slate-500" name="receipt" />
-          {text("订单筛选")}
-        </div>
-        <div className="text-xs text-slate-500">
-          {text("当前结果 · 共")} {totalCount} {text("条")}
-        </div>
-      </div>
+    <section className="min-w-0 border-y bg-background">
+      <div className="flex items-center gap-2 border-b px-3 py-2.5">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                aria-label={text("按状态筛选")}
+                className={cn(
+                  (status || paymentStatus || orderType) && "bg-accent",
+                )}
+                disabled={isPending}
+                size="icon-sm"
+                title={text("按状态筛选")}
+                type="button"
+                variant="outline"
+              >
+                <ListFilterGlyph />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-72 p-3">
+              <FilterGroup
+                label={text("订单状态")}
+                onChange={(value) =>
+                  apply({
+                    [ORDER_FILTER_KEYS.status]: value || undefined,
+                  })
+                }
+                options={[
+                  { value: "", label: text("全部") },
+                  ...ORDER_STATUS_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: text(option.label),
+                  })),
+                ]}
+                value={status}
+              />
+              <FilterGroup
+                className="mt-3 border-t pt-3"
+                label={text("支付状态")}
+                onChange={(value) =>
+                  apply({
+                    [ORDER_FILTER_KEYS.paymentStatus]: value || undefined,
+                  })
+                }
+                options={[
+                  { value: "", label: text("全部") },
+                  ...ORDER_PAYMENT_STATUS_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: text(option.label),
+                  })),
+                ]}
+                value={paymentStatus}
+              />
+              <FilterGroup
+                className="mt-3 border-t pt-3"
+                label={text("订单类型")}
+                onChange={(value) =>
+                  apply({
+                    [ORDER_FILTER_KEYS.orderType]: value || undefined,
+                  })
+                }
+                options={[
+                  { value: "", label: text("全部") },
+                  ...ORDER_TYPE_OPTIONS.map((option) => ({
+                    value: option.value,
+                    label: text(option.label),
+                  })),
+                ]}
+                value={orderType}
+              />
+            </PopoverContent>
+          </Popover>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex h-10 min-w-[250px] flex-1 items-center rounded-lg border border-slate-200 bg-white px-3 focus-within:border-slate-400">
-          <Icon className="mr-2 h-4 w-4 text-slate-400" name="search" />
-          <input
-            className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
-            onBlur={(event) => {
-              const value = event.target.value.trim();
-              if (value !== (params.get(ORDER_FILTER_KEYS.q) ?? "")) {
-                apply({ [ORDER_FILTER_KEYS.q]: value || undefined });
+          <div className="relative w-full max-w-sm">
+            <label className="sr-only" htmlFor="pos-order-search">
+              {text("搜索订单")}
+            </label>
+            <Icon
+              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              name="search"
+            />
+            <Input
+              className="h-8 pl-8 text-xs"
+              id="pos-order-search"
+              inputMode="search"
+              onBlur={(event) => {
+                const value = event.target.value.trim();
+                if (value !== (params.get(ORDER_FILTER_KEYS.q) ?? "")) {
+                  apply({ [ORDER_FILTER_KEYS.q]: value || undefined });
+                }
+              }}
+              onChange={(event) => setDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  apply({
+                    [ORDER_FILTER_KEYS.q]: draft.trim() || undefined,
+                  });
+                }
+              }}
+              placeholder={text("搜索订单号、客户名")}
+              type="search"
+              value={draft}
+            />
+          </div>
+        </div>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              aria-label={text("排序与显示列")}
+              disabled={isPending}
+              size="icon-sm"
+              title={text("排序与显示列")}
+              type="button"
+              variant="outline"
+            >
+              <Icon className="size-[15px]" name="settings" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="w-72 p-3">
+            <FilterGroup
+              label={text("排序方式")}
+              onChange={(value) =>
+                apply({
+                  [ORDER_FILTER_KEYS.sort]: value || undefined,
+                })
               }
-            }}
-            onChange={(event) => setDraft(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                apply({ [ORDER_FILTER_KEYS.q]: draft.trim() || undefined });
-              }
-            }}
-            placeholder={text("订单号、客户名")}
-            value={draft}
-          />
-        </div>
+              options={ORDER_SORT_OPTIONS.map((option) => ({
+                value: option.value,
+                label: text(option.label),
+              }))}
+              value={sort}
+            />
 
-        <FilterSelect
-          label={text("状态")}
-          onChange={(value) =>
-            apply({ [ORDER_FILTER_KEYS.status]: value || undefined })
-          }
-          options={ORDER_STATUS_OPTIONS.map((option) => ({
-            ...option,
-            label: text(option.label),
-          }))}
-          placeholder={text("全部状态")}
-          value={status}
-        />
-        <FilterSelect
-          label={text("支付")}
-          onChange={(value) =>
-            apply({ [ORDER_FILTER_KEYS.paymentStatus]: value || undefined })
-          }
-          options={ORDER_PAYMENT_STATUS_OPTIONS.map((option) => ({
-            ...option,
-            label: text(option.label),
-          }))}
-          placeholder={text("全部支付")}
-          value={paymentStatus}
-        />
-        <FilterSelect
-          label={text("类型")}
-          onChange={(value) =>
-            apply({ [ORDER_FILTER_KEYS.orderType]: value || undefined })
-          }
-          options={ORDER_TYPE_OPTIONS.map((option) => ({
-            ...option,
-            label: text(option.label),
-          }))}
-          placeholder={text("全部类型")}
-          value={orderType}
-        />
-        <FilterSelect
-          label={text("日期")}
-          onChange={(value) =>
-            apply({
-              [ORDER_FILTER_KEYS.date]:
-                value === "all" ? undefined : (value as OrderDateFilter),
-            })
-          }
-          options={DATE_OPTIONS.map((option) => ({
-            ...option,
-            label: text(option.label),
-          }))}
-          placeholder={text("全部日期")}
-          value={date}
-        />
-
-        <button
-          className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          disabled={isPending}
-          onClick={() => router.replace("/orders", { scroll: false })}
-          type="button"
-        >
-          <Icon className="h-4 w-4" name="rotate-ccw" />
-          {text("重置")}
-        </button>
+            <div className="mt-3 border-t pt-3">
+              <p className="px-1 text-xs font-semibold">{text("显示列")}</p>
+              <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                {ORDER_COLUMN_KEYS.map((column) => {
+                  const checked = visibleColumns.has(column);
+                  return (
+                    <label
+                      className="flex min-w-0 cursor-pointer items-center gap-2 text-xs"
+                      htmlFor={`pos-order-column-${column}`}
+                      key={column}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        disabled={checked && visibleColumnCount === 1}
+                        id={`pos-order-column-${column}`}
+                        onCheckedChange={(nextChecked) =>
+                          setColumnVisible(column, nextChecked === true)
+                        }
+                      />
+                      <span className="truncate">
+                        {text(ORDER_COLUMN_LABELS[column])}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </section>
   );
 }
 
-function FilterSelect({
+function FilterGroup({
+  className,
   label,
   value,
-  placeholder,
   options,
   onChange,
 }: {
+  className?: string;
   label: string;
   value: string;
-  placeholder: string;
   options: ReadonlyArray<{ value: string; label: string }>;
   onChange: (value: string) => void;
 }) {
   return (
-    <label className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm">
-      <span className="font-medium text-slate-500">{label}</span>
-      <select
-        className="bg-transparent text-sm text-slate-700 outline-none"
-        onChange={(event) => onChange(event.target.value)}
-        value={value}
-      >
-        <option value="">{placeholder}</option>
+    <div className={className}>
+      <p className="px-1 text-xs font-semibold">{label}</p>
+      <div className="mt-2 grid gap-1">
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <button
+            aria-pressed={value === option.value}
+            className={cn(
+              "flex min-h-8 w-full items-center gap-2 rounded-md px-2 py-1 text-left text-xs transition-colors hover:bg-accent",
+              value === option.value && "bg-accent",
+            )}
+            key={option.value || "all"}
+            onClick={() => onChange(option.value)}
+            type="button"
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "w-3 text-center",
+                value === option.value ? "opacity-100" : "opacity-0",
+              )}
+            >
+              ✓
+            </span>
             {option.label}
-          </option>
+          </button>
         ))}
-      </select>
-    </label>
+      </div>
+    </div>
+  );
+}
+
+function parseVisibleColumns(value: string | null): Set<OrderColumnKey> {
+  if (!value) {
+    return new Set(ORDER_COLUMN_KEYS);
+  }
+
+  const requested = new Set(value.split(","));
+  const visible = ORDER_COLUMN_KEYS.filter((column) => requested.has(column));
+  return new Set(visible.length > 0 ? visible : ORDER_COLUMN_KEYS);
+}
+
+function ListFilterGlyph() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="size-[15px]"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2"
+      viewBox="0 0 24 24"
+    >
+      <path d="M3 6h18M7 12h10M10 18h4" />
+    </svg>
   );
 }

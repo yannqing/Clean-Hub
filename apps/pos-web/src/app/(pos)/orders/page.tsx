@@ -3,6 +3,7 @@ import type {
   PosOrderListQuery,
   PosOrderOverviewPeriod,
   PosOrderPaymentStatus,
+  PosOrderSort,
   PosOrderStatus,
   PosOrderType,
 } from "@cleanhub/api-client";
@@ -10,6 +11,7 @@ import type {
 import {
   DEFAULT_ORDER_PAGE_SIZE,
   ORDER_FILTER_KEYS,
+  ORDER_SORT_OPTIONS,
   type OrderDateFilter,
 } from "@/features/orders/constants";
 import {
@@ -83,10 +85,6 @@ function buildDateRange(date: OrderDateFilter | undefined): {
 function buildOrderListQuery(
   params: Record<string, string | string[] | undefined>,
 ): PosOrderListQuery {
-  const pageSize = parsePageParam(
-    getParam(params, ORDER_FILTER_KEYS.pageSize),
-    DEFAULT_ORDER_PAGE_SIZE,
-  );
   const page = parsePageParam(getParam(params, ORDER_FILTER_KEYS.page), 1);
   const q = getParam(params, ORDER_FILTER_KEYS.q)?.trim() || undefined;
   const status = getParam(params, ORDER_FILTER_KEYS.status) as
@@ -101,15 +99,20 @@ function buildOrderListQuery(
   const date = getParam(params, ORDER_FILTER_KEYS.date) as
     | OrderDateFilter
     | undefined;
+  const rawSort = getParam(params, ORDER_FILTER_KEYS.sort);
+  const sort = ORDER_SORT_OPTIONS.some((option) => option.value === rawSort)
+    ? (rawSort as PosOrderSort)
+    : "created_desc";
 
   return {
     q,
     status,
     paymentStatus,
     orderType,
+    sort,
     ...buildDateRange(date),
-    limit: pageSize,
-    offset: (page - 1) * pageSize,
+    limit: DEFAULT_ORDER_PAGE_SIZE,
+    offset: (page - 1) * DEFAULT_ORDER_PAGE_SIZE,
   };
 }
 
@@ -147,7 +150,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   ]);
 
   return (
-    <section>
+    <section className="space-y-7 pb-8">
       <OrdersPageHeader
         canManageSensitiveOperations={
           user?.role === "owner" || user?.role === "manager"
@@ -159,7 +162,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
       <OrderMetrics overview={overview} />
 
       <Suspense fallback={null}>
-        <OrdersToolbar totalCount={list.total} />
+        <OrdersToolbar />
       </Suspense>
 
       <OrdersTable orders={list.data} total={list.total} />

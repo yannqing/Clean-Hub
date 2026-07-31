@@ -96,17 +96,17 @@ export function OrderItemsManager({
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+    <section className="overflow-hidden border-y bg-background">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
         <div>
-          <h2 className="font-semibold text-slate-950">订单条目</h2>
-          <p className="mt-1 text-xs text-slate-500">
+          <h2 className="font-semibold text-foreground">订单条目</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
             条目价格按目录保存快照，称重服务按实际重量计算。
           </p>
         </div>
         {canEdit ? (
           <button
-            className="flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-60"
+            className="flex h-11 items-center justify-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-60"
             disabled={isPending || catalog.length === 0}
             onClick={() => setItemDialog({ type: "create" })}
             type="button"
@@ -115,19 +115,19 @@ export function OrderItemsManager({
             新增条目
           </button>
         ) : (
-          <span className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
+          <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
             当前不可编辑
           </span>
         )}
       </div>
 
       {catalog.length === 0 && canEdit ? (
-        <div className="border-b border-amber-100 bg-amber-50 px-5 py-3 text-sm text-amber-800">
+        <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
           当前门店没有可用的服务及有效价格。
         </div>
       ) : null}
 
-      <div className="divide-y divide-slate-100 min-[1400px]:hidden">
+      <div className="divide-y min-[1400px]:hidden">
         {order.items.map((item) => (
           <ReadOnlyItemCard
             canDelete={canDelete}
@@ -144,7 +144,7 @@ export function OrderItemsManager({
 
       <div className="hidden overflow-x-auto min-[1400px]:block">
         <div className="min-w-[920px]">
-          <div className="grid grid-cols-[minmax(260px,1fr)_150px_150px_120px_110px] bg-slate-50 px-5 py-3 text-[11px] font-semibold uppercase text-slate-400">
+          <div className="grid grid-cols-[minmax(260px,1fr)_150px_150px_120px_110px] bg-muted/50 px-5 py-3 text-[11px] font-semibold uppercase text-muted-foreground">
             <div>项目</div>
             <div>计量</div>
             <div>单价</div>
@@ -202,10 +202,10 @@ export function OrderItemsManager({
               权限，原因会写入审计记录。
             </DialogDescription>
           </DialogHeader>
-          <label className="grid gap-2 text-sm font-medium text-slate-700">
+          <label className="grid gap-2 text-sm font-medium text-foreground">
             操作原因
             <textarea
-              className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-300"
+              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
               disabled={isPending}
               maxLength={500}
               onChange={(event) => setDeleteReason(event.target.value)}
@@ -214,7 +214,7 @@ export function OrderItemsManager({
           </label>
           <DialogFooter>
             <button
-              className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+              className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
               disabled={isPending}
               onClick={() => {
                 setDeleteTarget(null);
@@ -225,7 +225,7 @@ export function OrderItemsManager({
               返回
             </button>
             <button
-              className="h-10 rounded-lg bg-red-600 px-4 text-sm font-semibold text-white disabled:opacity-50"
+              className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-50"
               disabled={isPending || !deleteReason.trim()}
               onClick={() => {
                 if (deleteTarget)
@@ -262,7 +262,7 @@ function ReadOnlyItemCard({
   return (
     <article className="p-4 sm:p-5">
       <ItemHeading item={item} />
-      <dl className="mt-4 grid grid-cols-3 gap-3 rounded-lg bg-slate-50 p-3">
+      <dl className="mt-4 grid grid-cols-3 gap-3 rounded-md bg-muted/40 p-3">
         <OrderItemCardDetail label="计量" value={formatMeasurement(item)} />
         <OrderItemCardDetail
           label="收费单价"
@@ -276,7 +276,7 @@ function ReadOnlyItemCard({
       <IntakeDetails item={item} />
       <div className="mt-4 flex justify-end gap-2">
         <button
-          className="flex h-11 items-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 disabled:opacity-40"
+          className="flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-40"
           disabled={!canEdit || disabled}
           onClick={onEdit}
           type="button"
@@ -286,7 +286,7 @@ function ReadOnlyItemCard({
         </button>
         {canDelete ? (
           <button
-            className="flex h-11 items-center gap-2 rounded-lg border border-red-200 px-4 text-sm font-semibold text-red-600 disabled:opacity-40"
+            className="flex h-11 items-center gap-2 rounded-md border border-destructive/30 px-4 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
             disabled={disabled}
             onClick={onDelete}
             type="button"
@@ -470,7 +470,7 @@ function OrderItemDialog({
           </DialogHeader>
 
           <label className="block">
-            <span className="mb-1 block text-xs font-semibold text-slate-500">
+            <span className="mb-1 block text-xs font-semibold text-muted-foreground">
               服务项目
             </span>
             <select
@@ -532,9 +532,11 @@ function OrderItemDialog({
             />
           </div>
 
-          <div className="rounded-lg bg-blue-50 px-4 py-3">
-            <div className="text-xs font-semibold text-blue-600">计算小计</div>
-            <div className="mt-1 text-lg font-semibold text-blue-950">
+          <div className="rounded-md bg-muted/50 px-4 py-3">
+            <div className="text-xs font-semibold text-muted-foreground">
+              计算小计
+            </div>
+            <div className="mt-1 text-lg font-semibold text-foreground">
               {formatOrderMoney(
                 units * Number(draft.chargedUnitAmount || 0),
                 currency,
@@ -586,7 +588,7 @@ function OrderItemDialog({
 
           <DialogFooter>
             <button
-              className="h-11 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 disabled:opacity-40"
+              className="h-11 rounded-md border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-40"
               disabled={blocked}
               onClick={onClose}
               type="button"
@@ -594,7 +596,7 @@ function OrderItemDialog({
               取消
             </button>
             <button
-              className="flex h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white disabled:opacity-40"
+              className="flex h-11 items-center justify-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-40"
               disabled={blocked}
               type="submit"
             >
@@ -626,15 +628,15 @@ function ReadOnlyItemRow({
   onDelete: () => void;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(260px,1fr)_150px_150px_120px_110px] items-center border-t border-slate-100 px-5 py-4 text-sm">
+    <div className="grid grid-cols-[minmax(260px,1fr)_150px_150px_120px_110px] items-center border-t px-5 py-4 text-sm">
       <div className="min-w-0">
         <ItemHeading item={item} />
         <IntakeDetails item={item} />
       </div>
-      <div className="font-medium text-slate-600">
+      <div className="font-medium text-foreground">
         {formatMeasurement(item)}
       </div>
-      <div className="font-medium text-slate-600">
+      <div className="font-medium text-foreground">
         {formatOrderMoney(item.chargedUnitAmount, currency)}
         {item.chargedUnitAmount !== item.standardUnitAmount ? (
           <div className="text-xs text-amber-700">
@@ -642,13 +644,13 @@ function ReadOnlyItemRow({
           </div>
         ) : null}
       </div>
-      <div className="text-right font-semibold text-slate-800">
+      <div className="text-right font-semibold text-foreground">
         {formatOrderMoney(item.lineAmount, currency)}
       </div>
       <div className="flex justify-end gap-1">
         <button
           aria-label="编辑条目"
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-blue-50 hover:text-blue-700 disabled:opacity-40"
+          className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-40"
           disabled={!canEdit || disabled}
           onClick={onEdit}
           title="编辑条目"
@@ -659,7 +661,7 @@ function ReadOnlyItemRow({
         {canDelete ? (
           <button
             aria-label="删除条目"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
             disabled={disabled}
             onClick={onDelete}
             title="删除条目"
@@ -676,11 +678,11 @@ function ReadOnlyItemRow({
 function ItemHeading({ item }: { item: PosOrderItem }) {
   return (
     <div>
-      <div className="truncate font-semibold text-slate-900">
+      <div className="truncate font-semibold text-foreground">
         {item.itemName}
       </div>
       {item.itemIdentifier ? (
-        <div className="mt-1 font-mono text-[11px] text-blue-600">
+        <div className="mt-1 font-mono text-[11px] text-foreground">
           标识 {item.itemIdentifier}
         </div>
       ) : null}
@@ -695,7 +697,7 @@ function IntakeDetails({ item }: { item: PosOrderItem }) {
     item.specialRequest ? `要求：${item.specialRequest}` : null,
   ].filter(Boolean);
   return details.length > 0 ? (
-    <div className="mt-2 text-xs leading-5 text-slate-500">
+    <div className="mt-2 text-xs leading-5 text-muted-foreground">
       {details.join(" · ")}
     </div>
   ) : null;
@@ -720,14 +722,14 @@ function OrderItemCardDetail({
 }) {
   return (
     <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
-      <dd className="mt-1 text-sm font-semibold text-slate-800">{value}</dd>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm font-semibold text-foreground">{value}</dd>
     </div>
   );
 }
 
 const inputClass =
-  "h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 disabled:bg-slate-50 disabled:text-slate-500";
+  "h-11 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted disabled:text-muted-foreground";
 
 function SmallInput({
   label,
@@ -744,7 +746,7 @@ function SmallInput({
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-xs font-semibold text-slate-500">
+      <span className="mb-1 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>
       <input
@@ -773,10 +775,10 @@ function TextAreaField({
   maxLength?: number;
 }) {
   return (
-    <label className="grid gap-2 text-sm font-medium text-slate-700">
+    <label className="grid gap-2 text-sm font-medium text-foreground">
       {label}
       <textarea
-        className="min-h-20 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-300 disabled:bg-slate-50"
+        className="min-h-20 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted"
         disabled={disabled}
         maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}

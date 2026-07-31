@@ -15,7 +15,7 @@ export default function OrderNotFound() {
       <PosEmptyState
         action={
           <Link
-            className="flex h-11 items-center justify-center rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
+            className="flex h-11 items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             href={posRoutes.orders}
           >
             返回订单列表

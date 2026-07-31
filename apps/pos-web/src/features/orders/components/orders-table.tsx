@@ -1,8 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { KeyboardEvent } from "react";
+import type { PosOrderSummary } from "@cleanhub/api-client";
 import type { SupportedLocale } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
@@ -12,9 +23,12 @@ import {
   displayOrderCode,
   formatOrderDateTime,
   formatOrderMoney,
+  ORDER_COLUMN_KEYS,
+  ORDER_COLUMN_LABELS,
+  ORDER_FILTER_KEYS,
   ORDER_TYPE_LABELS,
+  type OrderColumnKey,
 } from "../constants";
-import type { PosOrderSummary } from "@cleanhub/api-client";
 import { OrderPagination } from "./order-pagination";
 import { OrderPaymentStatusBadge, OrderStatusBadge } from "./order-badges";
 
@@ -25,45 +39,133 @@ type OrdersTableProps = {
 
 export function OrdersTable({ orders, total }: OrdersTableProps) {
   const { locale } = useTranslation();
+  const router = useRouter();
+  const params = useSearchParams();
+  const visibleColumns = parseVisibleColumns(
+    params.get(ORDER_FILTER_KEYS.columns),
+  );
+  const visibleColumnCount = ORDER_COLUMN_KEYS.filter((column) =>
+    visibleColumns.has(column),
+  ).length;
   const text = (value: string) => translatePosText(value, locale);
 
   if (orders.length === 0) {
     return <OrdersEmptyState locale={locale} />;
   }
 
-  return (
-    <section className="mt-3 overflow-hidden border-y border-slate-200 bg-white">
-      <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-        <div>
-          <h2 className="font-semibold text-slate-950">{text("订单列表")}</h2>
-          <p className="mt-1 text-xs text-slate-500">
-            {text("共")} {total} {text("条结果 · 点击订单号或查看按钮打开详情")}
-          </p>
-        </div>
-      </div>
+  function openOrder(orderId: string) {
+    router.push(posRoutes.orderDetail(orderId));
+  }
 
-      <div className="divide-y divide-slate-100 min-[1180px]:hidden">
+  function handleRowKeyDown(
+    event: KeyboardEvent<HTMLTableRowElement>,
+    orderId: string,
+  ) {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    event.preventDefault();
+    openOrder(orderId);
+  }
+
+  return (
+    <section className="min-w-0 overflow-hidden border-y bg-background">
+      <div className="divide-y min-[900px]:hidden">
         {orders.map((order) => (
           <OrderCard key={order.id} locale={locale} order={order} />
         ))}
       </div>
 
-      <div className="hidden overflow-x-auto min-[1180px]:block">
-        <div className="min-w-[1080px]">
-          <div className="grid grid-cols-[150px_minmax(190px,1.2fr)_100px_110px_110px_140px_90px] bg-slate-50 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">
-            <div>{text("订单 / 类型")}</div>
-            <div>{text("客户 / 条目")}</div>
-            <div>{text("金额")}</div>
-            <div>{text("订单状态")}</div>
-            <div>{text("支付状态")}</div>
-            <div>{text("创建时间")}</div>
-            <div className="text-right">{text("操作")}</div>
-          </div>
-          {orders.map((order) => (
-            <OrderRow key={order.id} locale={locale} order={order} />
-          ))}
-        </div>
+      <div className="hidden min-[900px]:block">
+        <Table
+          className="text-xs [&_td]:px-2 [&_td]:py-2 [&_th]:h-8 [&_th]:px-2"
+          style={{
+            minWidth: `${Math.max(620, visibleColumnCount * 118)}px`,
+          }}
+        >
+          <TableHeader>
+            <TableRow>
+              {ORDER_COLUMN_KEYS.map((column) =>
+                visibleColumns.has(column) ? (
+                  <TableHead key={column}>
+                    {text(ORDER_COLUMN_LABELS[column])}
+                  </TableHead>
+                ) : null,
+              )}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {orders.map((order) => (
+              <TableRow
+                className="cursor-pointer focus-visible:bg-muted/50 focus-visible:outline-none"
+                key={order.id}
+                onClick={() => openOrder(order.id)}
+                onKeyDown={(event) => handleRowKeyDown(event, order.id)}
+                onMouseEnter={() =>
+                  router.prefetch(posRoutes.orderDetail(order.id))
+                }
+                tabIndex={0}
+              >
+                {visibleColumns.has("order") ? (
+                  <TableCell>
+                    <span className="block font-mono font-semibold text-foreground">
+                      {displayOrderCode(order.id)}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                      {text(ORDER_TYPE_LABELS[order.orderType])}
+                    </span>
+                  </TableCell>
+                ) : null}
+                {visibleColumns.has("customer") ? (
+                  <TableCell className="max-w-56">
+                    <span className="block truncate font-medium text-foreground">
+                      {order.customerName || text("未命名客户")}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                      {formatOrderItemCount(order.itemCount, locale)}
+                    </span>
+                  </TableCell>
+                ) : null}
+                {visibleColumns.has("amount") ? (
+                  <TableCell>
+                    <span className="block font-medium">
+                      {formatOrderMoney(
+                        order.totalAmount,
+                        order.currency,
+                        locale,
+                      )}
+                    </span>
+                    <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                      {text("已收")}{" "}
+                      {formatOrderMoney(
+                        order.paidAmount,
+                        order.currency,
+                        locale,
+                      )}
+                    </span>
+                  </TableCell>
+                ) : null}
+                {visibleColumns.has("status") ? (
+                  <TableCell>
+                    <OrderStatusBadge status={order.status} />
+                  </TableCell>
+                ) : null}
+                {visibleColumns.has("payment") ? (
+                  <TableCell>
+                    <OrderPaymentStatusBadge status={order.paymentStatus} />
+                  </TableCell>
+                ) : null}
+                {visibleColumns.has("createdAt") ? (
+                  <TableCell className="text-muted-foreground">
+                    {formatOrderDateTime(order.createdAt, locale)}
+                  </TableCell>
+                ) : null}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
+
       <OrderPagination total={total} />
     </section>
   );
@@ -80,23 +182,19 @@ function OrderCard({
   const text = (value: string) => translatePosText(value, locale);
 
   return (
-    <article className="p-4 sm:p-5">
+    <Link
+      className="block min-h-24 px-3 py-3 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
+      href={detailHref}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <Link
-            className="inline-flex min-h-11 items-center font-mono text-sm font-semibold text-blue-700"
-            href={detailHref}
-          >
+          <div className="font-mono text-xs font-semibold text-foreground">
             {displayOrderCode(order.id)}
-          </Link>
-          <div className="truncate text-base font-semibold text-slate-900">
-            {order.customerName ? (
-              <RawText value={order.customerName} />
-            ) : (
-              text("未命名客户")
-            )}
           </div>
-          <div className="mt-1 text-xs text-slate-500">
+          <div className="mt-1 truncate text-sm font-medium text-foreground">
+            {order.customerName || text("未命名客户")}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
             {text(ORDER_TYPE_LABELS[order.orderType])} ·{" "}
             {formatOrderItemCount(order.itemCount, locale)}
           </div>
@@ -104,110 +202,19 @@ function OrderCard({
         <OrderStatusBadge status={order.status} />
       </div>
 
-      <dl className="mt-4 grid grid-cols-2 gap-3 rounded-lg bg-slate-50 p-3 sm:grid-cols-3">
-        <OrderCardDetail
-          label={text("订单金额")}
-          value={formatOrderMoney(order.totalAmount, order.currency)}
-        />
-        <div>
-          <dt className="text-xs text-slate-400">{text("支付状态")}</dt>
-          <dd className="mt-1">
-            <OrderPaymentStatusBadge status={order.paymentStatus} />
-          </dd>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-foreground">
+            {formatOrderMoney(order.totalAmount, order.currency, locale)}
+          </span>
+          <OrderPaymentStatusBadge status={order.paymentStatus} />
         </div>
-        <OrderCardDetail
-          label={text("创建时间")}
-          value={formatOrderDateTime(order.createdAt, locale)}
-        />
-      </dl>
-
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div>
-          <div className="text-xs text-slate-400">{text("已收金额")}</div>
-          <div className="mt-0.5 font-semibold text-slate-950">
-            {formatOrderMoney(order.paidAmount, order.currency)}
-          </div>
-        </div>
-        <Link
-          className="flex h-11 items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 text-sm font-semibold text-blue-700"
-          href={detailHref}
-        >
-          <Icon className="h-4 w-4" name="eye" />
-          {text("查看详情")}
-        </Link>
+        <span className="flex items-center gap-1 text-muted-foreground">
+          {formatOrderDateTime(order.createdAt, locale)}
+          <Icon className="size-3.5" name="chevron-right" />
+        </span>
       </div>
-    </article>
-  );
-}
-
-function OrderCardDetail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-slate-400">{label}</dt>
-      <dd className="mt-1 text-sm font-medium text-slate-700">{value}</dd>
-    </div>
-  );
-}
-
-function OrderRow({
-  locale,
-  order,
-}: {
-  locale: SupportedLocale;
-  order: PosOrderSummary;
-}) {
-  const detailHref = posRoutes.orderDetail(order.id);
-  const text = (value: string) => translatePosText(value, locale);
-
-  return (
-    <div className="grid grid-cols-[150px_minmax(190px,1.2fr)_100px_110px_110px_140px_90px] items-center border-t border-slate-100 px-5 py-3 text-sm hover:bg-slate-50/70">
-      <div className="min-w-0">
-        <Link
-          className="font-mono text-xs font-semibold text-blue-700 hover:underline"
-          href={detailHref}
-        >
-          {displayOrderCode(order.id)}
-        </Link>
-        <div className="mt-1 text-[11px] text-slate-400">
-          {text(ORDER_TYPE_LABELS[order.orderType])}
-        </div>
-      </div>
-      <div className="min-w-0">
-        <div className="truncate font-semibold text-slate-800">
-          {order.customerName ? (
-            <RawText value={order.customerName} />
-          ) : (
-            text("未命名客户")
-          )}
-        </div>
-        <div className="mt-1 truncate text-xs text-slate-500">
-          {formatOrderItemCount(order.itemCount, locale)} · {text("已收")}{" "}
-          {formatOrderMoney(order.paidAmount, order.currency)}
-        </div>
-      </div>
-      <div className="text-xs font-semibold text-slate-700">
-        {formatOrderMoney(order.totalAmount, order.currency)}
-      </div>
-      <div>
-        <OrderStatusBadge status={order.status} />
-      </div>
-      <div>
-        <OrderPaymentStatusBadge status={order.paymentStatus} />
-      </div>
-      <div className="text-xs font-medium text-slate-600">
-        {formatOrderDateTime(order.createdAt, locale)}
-      </div>
-      <div className="flex justify-end gap-1">
-        <Link
-          aria-label={text("查看详情")}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-blue-50 hover:text-blue-700"
-          href={detailHref}
-          title={text("查看详情")}
-        >
-          <Icon className="h-4 w-4" name="eye" />
-        </Link>
-      </div>
-    </div>
+    </Link>
   );
 }
 
@@ -215,24 +222,31 @@ function OrdersEmptyState({ locale }: { locale: SupportedLocale }) {
   const text = (value: string) => translatePosText(value, locale);
 
   return (
-    <section className="mt-3 border-y border-slate-200 bg-white">
-      <div className="px-5 py-14 text-center">
-        <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-400">
-          <Icon className="h-5 w-5" name="search-x" />
-        </span>
-        <div className="mt-3 font-semibold text-slate-700">
+    <section className="border-y bg-background p-4">
+      <div className="border-y border-dashed px-4 py-14 text-center">
+        <Icon
+          className="mx-auto size-5 text-muted-foreground"
+          name="search-x"
+        />
+        <h2 className="mt-3 text-base font-semibold text-foreground">
           {text("没有匹配的订单")}
-        </div>
-        <div className="mt-1 text-sm text-slate-400">
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
           {text("请调整关键词或筛选条件后重试。")}
-        </div>
+        </p>
       </div>
     </section>
   );
 }
 
-function RawText({ value }: { value: string }) {
-  return value;
+function parseVisibleColumns(value: string | null): Set<OrderColumnKey> {
+  if (!value) {
+    return new Set(ORDER_COLUMN_KEYS);
+  }
+
+  const requested = new Set(value.split(","));
+  const visible = ORDER_COLUMN_KEYS.filter((column) => requested.has(column));
+  return new Set(visible.length > 0 ? visible : ORDER_COLUMN_KEYS);
 }
 
 function formatOrderItemCount(count: number, locale: SupportedLocale): string {

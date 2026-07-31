@@ -164,16 +164,18 @@ export function OrderPaymentAdjustments({
   }
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+    <section className="overflow-hidden border-y bg-background">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
         <div>
-          <h2 className="font-semibold text-slate-950">退款与支付修正</h2>
-          <p className="mt-1 text-xs text-slate-500">不可变支付调整记录</p>
+          <h2 className="font-semibold text-foreground">退款与支付修正</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            不可变支付调整记录
+          </p>
         </div>
         {canManage ? (
           <div className="flex gap-2">
             <button
-              className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-9 items-center gap-2 rounded-md border px-3 text-xs font-semibold text-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
               disabled={refundablePayments.length === 0}
               onClick={() => open("refund")}
               type="button"
@@ -182,7 +184,7 @@ export function OrderPaymentAdjustments({
               退款
             </button>
             <button
-              className="flex h-9 items-center gap-2 rounded-lg bg-slate-900 px-3 text-xs font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-9 items-center gap-2 rounded-md bg-foreground px-3 text-xs font-semibold text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={paidPayments.length === 0}
               onClick={() => open("correction")}
               type="button"
@@ -195,26 +197,28 @@ export function OrderPaymentAdjustments({
       </div>
 
       {adjustments.length === 0 ? (
-        <div className="px-5 py-8 text-sm text-slate-400">暂无调整记录。</div>
+        <div className="px-5 py-8 text-sm text-muted-foreground">
+          暂无调整记录。
+        </div>
       ) : (
-        <div className="divide-y divide-slate-100">
+        <div className="divide-y">
           {adjustments.map((adjustment) => (
             <div
               className="flex flex-wrap items-start justify-between gap-4 px-5 py-4 text-sm"
               key={adjustment.id}
             >
               <div className="min-w-0">
-                <div className="font-semibold text-slate-800">
+                <div className="font-semibold text-foreground">
                   {adjustment.adjustmentType === "refund"
                     ? "退款"
                     : adjustment.direction === "debit"
                       ? "减少实收"
                       : "增加实收"}
                 </div>
-                <div className="mt-1 break-words text-xs text-slate-500">
+                <div className="mt-1 break-words text-xs text-muted-foreground">
                   {adjustment.reason}
                 </div>
-                <div className="mt-1 text-xs text-slate-400">
+                <div className="mt-1 text-xs text-muted-foreground">
                   {formatOrderDateTime(adjustment.occurredAt, locale)}
                 </div>
               </div>
@@ -250,10 +254,10 @@ export function OrderPaymentAdjustments({
           </DialogHeader>
 
           {mode === "refund" ? (
-            <label className="grid gap-2 text-sm font-medium text-slate-700">
+            <label className="grid gap-2 text-sm font-medium text-foreground">
               原始支付流水
               <select
-                className="h-11 rounded-lg border border-slate-200 bg-white px-3 font-normal outline-none focus:border-blue-300"
+                className="h-11 rounded-md border bg-background px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 disabled={isPending}
                 onChange={(event) => {
                   const paymentId = event.target.value;
@@ -276,10 +280,10 @@ export function OrderPaymentAdjustments({
             </label>
           ) : (
             <div className="grid gap-4">
-              <label className="grid gap-2 text-sm font-medium text-slate-700">
+              <label className="grid gap-2 text-sm font-medium text-foreground">
                 原始支付流水
                 <select
-                  className="h-11 rounded-lg border border-slate-200 bg-white px-3 font-normal outline-none focus:border-blue-300"
+                  className="h-11 rounded-md border bg-background px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   disabled={isPending}
                   onChange={(event) => {
                     setSelectedPaymentId(event.target.value);
@@ -295,14 +299,16 @@ export function OrderPaymentAdjustments({
                   ))}
                 </select>
               </label>
-              <div className="text-sm font-medium text-slate-700">修正方向</div>
-              <div className="grid grid-cols-2 rounded-lg border border-slate-200 bg-slate-50 p-1">
+              <div className="text-sm font-medium text-foreground">
+                修正方向
+              </div>
+              <div className="grid grid-cols-2 rounded-md border bg-muted/50 p-1">
                 {(["debit", "credit"] as const).map((value) => (
                   <button
-                    className={`h-9 rounded-md text-sm font-semibold transition ${
+                    className={`h-11 rounded-md text-sm font-semibold transition ${
                       direction === value
-                        ? "bg-white text-slate-950 shadow-sm"
-                        : "text-slate-500"
+                        ? "bg-background text-foreground ring-1 ring-border"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                     disabled={isPending}
                     key={value}
@@ -319,10 +325,10 @@ export function OrderPaymentAdjustments({
             </div>
           )}
 
-          <label className="grid gap-2 text-sm font-medium text-slate-700">
+          <label className="grid gap-2 text-sm font-medium text-foreground">
             金额
             <input
-              className="h-11 rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-blue-300"
+              className="h-11 rounded-md border bg-background px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
               disabled={isPending}
               inputMode="decimal"
               onChange={(event) => {
@@ -334,10 +340,10 @@ export function OrderPaymentAdjustments({
             />
           </label>
 
-          <label className="grid gap-2 text-sm font-medium text-slate-700">
+          <label className="grid gap-2 text-sm font-medium text-foreground">
             操作原因
             <textarea
-              className="min-h-24 rounded-lg border border-slate-200 px-3 py-2 font-normal outline-none focus:border-blue-300"
+              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
               disabled={isPending}
               maxLength={500}
               onChange={(event) => {
@@ -351,7 +357,7 @@ export function OrderPaymentAdjustments({
 
           <DialogFooter>
             <button
-              className="h-10 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+              className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
               disabled={isPending}
               onClick={close}
               type="button"
@@ -359,7 +365,7 @@ export function OrderPaymentAdjustments({
               取消
             </button>
             <button
-              className="h-10 rounded-lg bg-slate-900 px-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+              className="h-11 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={isPending || !reason.trim() || Number(amount) <= 0}
               onClick={submit}
               type="button"

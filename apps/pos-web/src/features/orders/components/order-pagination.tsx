@@ -3,12 +3,12 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition, type ReactNode } from "react";
 import { useTranslation } from "@cleanhub/i18n/react";
+import { cn } from "@cleanhub/ui";
 
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
+import { buildPaginationWindow } from "@/lib/pagination";
 
 import { DEFAULT_ORDER_PAGE_SIZE, ORDER_FILTER_KEYS } from "../constants";
-
-const PAGE_SIZE_OPTIONS = [10, 20, 50] as const;
 
 function parsePositiveInt(value: string | null, fallback: number): number {
   const parsed = Number.parseInt(value ?? "", 10);
@@ -21,25 +21,15 @@ export function OrderPagination({ total }: { total: number }) {
   const params = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  const pageSize = parsePositiveInt(
-    params.get(ORDER_FILTER_KEYS.pageSize),
-    DEFAULT_ORDER_PAGE_SIZE,
-  );
-  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const pageCount = Math.max(1, Math.ceil(total / DEFAULT_ORDER_PAGE_SIZE));
   const page = Math.min(
     parsePositiveInt(params.get(ORDER_FILTER_KEYS.page), 1),
     pageCount,
   );
-
-  const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
-  const to = Math.min(page * pageSize, total);
+  const from = total === 0 ? 0 : (page - 1) * DEFAULT_ORDER_PAGE_SIZE + 1;
+  const to = Math.min(page * DEFAULT_ORDER_PAGE_SIZE, total);
+  const pages = buildPaginationWindow(page, pageCount);
   const text = (value: string) => translatePosText(value, locale);
-
-  function replace(search: URLSearchParams) {
-    startTransition(() => {
-      router.replace(`/orders?${search.toString()}`, { scroll: false });
-    });
-  }
 
   function goTo(nextPage: number) {
     const clamped = Math.min(Math.max(1, nextPage), pageCount);
@@ -48,39 +38,17 @@ export function OrderPagination({ total }: { total: number }) {
     }
     const search = new URLSearchParams(params.toString());
     search.set(ORDER_FILTER_KEYS.page, String(clamped));
-    replace(search);
-  }
-
-  function changeSize(nextSize: number) {
-    const search = new URLSearchParams(params.toString());
-    search.set(ORDER_FILTER_KEYS.pageSize, String(nextSize));
-    search.set(ORDER_FILTER_KEYS.page, "1");
-    replace(search);
+    search.delete(ORDER_FILTER_KEYS.pageSize);
+    startTransition(() => {
+      router.replace(`/orders?${search.toString()}`, { scroll: false });
+    });
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-5 py-3 text-sm">
-      <div className="flex items-center gap-3">
-        <span className="text-slate-500">
-          {formatOrderRange(from, to, total, locale)}
-        </span>
-        <label className="flex items-center gap-2 text-slate-500">
-          {text("每页")}
-          <select
-            className="h-10 rounded-md border border-slate-200 bg-white px-2 text-sm text-slate-700 outline-none disabled:opacity-60"
-            disabled={isPending}
-            onChange={(event) => changeSize(Number(event.target.value))}
-            value={pageSize}
-          >
-            {PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-          {text("条")}
-        </label>
-      </div>
+    <div className="flex flex-col gap-2 border-t px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
+      <span className="text-muted-foreground">
+        {formatOrderRange(from, to, total, locale)}
+      </span>
 
       <div className="flex items-center gap-1">
         <PagerButton
@@ -89,9 +57,22 @@ export function OrderPagination({ total }: { total: number }) {
         >
           {text("上一页")}
         </PagerButton>
-        <span className="px-2 text-sm font-semibold text-slate-600">
-          {page} / {pageCount}
-        </span>
+        {pages.map((entry, index) =>
+          entry === "..." ? (
+            <span className="px-1.5 text-muted-foreground" key={`gap-${index}`}>
+              …
+            </span>
+          ) : (
+            <PagerButton
+              active={entry === page}
+              disabled={isPending}
+              key={entry}
+              onClick={() => goTo(entry)}
+            >
+              {entry}
+            </PagerButton>
+          ),
+        )}
         <PagerButton
           disabled={isPending || page >= pageCount}
           onClick={() => goTo(page + 1)}
@@ -119,17 +100,24 @@ function formatOrderRange(
 }
 
 function PagerButton({
+  active,
   disabled,
   onClick,
   children,
 }: {
+  active?: boolean;
   disabled?: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
   return (
     <button
-      className="flex h-11 min-w-11 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+      className={cn(
+        "flex h-10 min-w-10 items-center justify-center rounded-md border px-2 text-xs font-medium transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 sm:h-7 sm:min-w-7",
+        active
+          ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
+          : "bg-background text-foreground",
+      )}
       disabled={disabled}
       onClick={onClick}
       type="button"

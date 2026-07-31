@@ -1,5 +1,6 @@
 import type {
   PosOrderPaymentStatus,
+  PosOrderSort,
   PosOrderStatus,
   PosOrderType,
   PosMobileMoneyProvider,
@@ -12,7 +13,7 @@ import { getPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
 import { DEFAULT_POS_CURRENCY, formatPosMoney } from "@/lib/money";
 
 export const ORDERS_PAGE_TITLE = "订单管理";
-export const DEFAULT_ORDER_PAGE_SIZE = 20;
+export const DEFAULT_ORDER_PAGE_SIZE = 10;
 export const DEFAULT_ORDER_CURRENCY = DEFAULT_POS_CURRENCY;
 export const ORDER_EMPTY_PLACEHOLDER = "—";
 
@@ -25,9 +26,9 @@ export type BadgeTone =
   | "red";
 
 export const BADGE_TONE_CLASSES: Record<BadgeTone, string> = {
-  slate: "bg-slate-100 text-slate-600",
-  blue: "bg-blue-50 text-blue-700",
-  violet: "bg-violet-50 text-violet-700",
+  slate: "bg-muted text-muted-foreground",
+  blue: "bg-accent text-accent-foreground",
+  violet: "bg-secondary text-secondary-foreground",
   emerald: "bg-emerald-50 text-emerald-700",
   amber: "bg-amber-50 text-amber-700",
   red: "bg-red-50 text-red-700",
@@ -104,7 +105,7 @@ export const PAYMENT_TRANSACTION_STATUS_TONES: Record<
 > = {
   pending: "bg-amber-50 text-amber-700",
   paid: "bg-emerald-50 text-emerald-700",
-  refunded: "bg-violet-50 text-violet-700",
+  refunded: "bg-secondary text-secondary-foreground",
   failed: "bg-red-50 text-red-700",
 };
 
@@ -126,11 +127,43 @@ export const ORDER_FILTER_KEYS = {
   paymentStatus: "paymentStatus",
   orderType: "orderType",
   date: "date",
+  sort: "sort",
+  columns: "columns",
   page: "page",
   pageSize: "pageSize",
 } as const;
 
 export type OrderDateFilter = "all" | "today" | "last_7d" | "month";
+
+export const ORDER_SORT_OPTIONS: ReadonlyArray<{
+  value: PosOrderSort;
+  label: string;
+}> = [
+  { value: "created_desc", label: "创建时间：从新到旧" },
+  { value: "created_asc", label: "创建时间：从旧到新" },
+  { value: "amount_desc", label: "订单金额：从高到低" },
+  { value: "amount_asc", label: "订单金额：从低到高" },
+];
+
+export const ORDER_COLUMN_KEYS = [
+  "order",
+  "customer",
+  "amount",
+  "status",
+  "payment",
+  "createdAt",
+] as const;
+
+export type OrderColumnKey = (typeof ORDER_COLUMN_KEYS)[number];
+
+export const ORDER_COLUMN_LABELS: Record<OrderColumnKey, string> = {
+  order: "订单",
+  customer: "客户",
+  amount: "金额",
+  status: "订单状态",
+  payment: "支付状态",
+  createdAt: "创建时间",
+};
 
 export function formatOrderMoney(
   amount: string | number | null | undefined,
