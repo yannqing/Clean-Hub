@@ -1,136 +1,158 @@
 # CleanHub POS Mobile
 
-CleanHub POS 的 Capacitor 移动端壳，用于将 pos-web 封装为 Android APK / iOS IPA。
+这是面向 iPad、iPhone 和 Android 设备的 Capacitor POS 壳。iOS 与 Android
+工程均已纳入仓库，实际业务界面由 `apps/pos-web` 提供。
 
-## 项目结构
+## 运行模型
 
+`pos-web` 使用 Next.js Proxy、Server Components、`cookies()` 和 `headers()`，
+不能静态导出。因此本壳的生产模式不是复制 `out/`，而是加载已部署的 HTTPS
+POS 站点：
+
+```text
+iPad WebView -> https://pos.example.com
+                    ├── Next.js POS 页面
+                    └── /api/* 反向代理到 CleanHub API
 ```
-apps/pos-mobile/
-├── capacitor.config.ts   ← Capacitor 配置
-├── package.json          ← 依赖和脚本
-├── tsconfig.json         ← TypeScript 配置
-├── src/
-│   └── index.ts          ← 原生插件入口（预留）
-├── www/
-│   └── index.html        ← 生产构建入口（由 pos-web out/ 同步）
-└── android/              ← Capacitor 生成（npx cap add android）
-```
 
-## 开发环境搭建
+POS 页面和浏览器侧 API 地址必须是同一个公开 origin。这样 API 设置的
+host-only HttpOnly Cookie 才会同时发送给 Next.js 和 API。不要采用
+`pos.example.com` 页面直连 `api.example.com` 的跨域 Cookie 方案。
 
-### 前置条件
+`www/index.html` 仅是远程服务不可达时的故障提示页，不是生产 POS 页面。
+同步脚本只把经过校验的公开 POS Origin 写入
+`www/pos-runtime-config.js`，不会写入账号、Token、Cookie、查询参数或其他环境
+变量。网络恢复后，故障页会重新导航到该 Origin，而不是反复刷新本地页面。
 
-- Node.js >= 20
-- pnpm >= 10
-- Android Studio（Android 开发）
-- Xcode（iOS 开发，仅 macOS）
+## 本地 iPad 开发
 
-### 首次初始化
+需要 Node.js 22、pnpm 10 和完整 Xcode（仅安装 Command Line Tools 不能构建
+iOS 工程）。真机还需要 Apple 开发者签名与 provisioning profile。
+
+先把示例环境变量复制到本应用目录，并将 IP 改成开发电脑的局域网 IP：
 
 ```bash
-# 1. 安装依赖
-pnpm install
-
-# 2. 添加 Android 平台（只需执行一次）
-cd apps/pos-mobile
-npx cap add android
-
-# 3. 添加 iOS 平台（可选，仅 macOS）
-npx cap add ios
+cp apps/pos-mobile/.env.example apps/pos-mobile/.env
 ```
 
-## 开发流程（实时热更新）
+不要填写 `localhost`，因为 iPad 上的 `localhost` 是 iPad 自身。
 
-开发时，Capacitor WebView 直接连接 pos-web 的 dev server，无需每次构建。
+根目录 `.env` 也必须让浏览器端 API 指向同一台开发电脑，并允许 POS 页面
+origin。服务端自身仍可通过 localhost 调用 API，例如开发电脑 IP 为
+`192.168.1.100` 时：
+
+```dotenv
+CLEANHUB_API_BASE_URL=http://localhost:4000
+NEXT_PUBLIC_API_BASE_URL=http://192.168.1.100:4000
+CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://192.168.1.100:3001
+```
+
+`NEXT_PUBLIC_API_BASE_URL` 会进入前端 bundle，改完后必须重启 API 和 POS
+Web。还应确认系统防火墙允许 iPad 访问 3001 与 4000 端口。
+
+分别启动 API 与可从局域网访问的 POS Web：
 
 ```bash
-# 终端 1：启动 API 服务
 pnpm --filter @cleanhub/api dev
-
-# 终端 2：启动 POS Web（端口 3001）
-pnpm --filter @cleanhub/pos-web dev
-
-# 终端 3：同步并运行到 Android 设备
-cd apps/pos-mobile
-npx cap sync android
-npx cap run android
+pnpm --filter @cleanhub/pos-web dev --hostname 0.0.0.0
 ```
 
-### 真机调试注意事项
+然后同步、运行或打开 Xcode：
 
-如果使用真机（非模拟器），需要将 `capacitor.config.ts` 中的 `localhost` 替换为电脑的局域网 IP：
-
-```typescript
-server: {
-  url: "http://192.168.1.100:3001",  // 替换为你的电脑 IP
-  cleartext: true,
-},
+```bash
+pnpm --filter @cleanhub/pos-mobile cap:sync:ios
+pnpm --filter @cleanhub/pos-mobile cap:run:ios
+pnpm --filter @cleanhub/pos-mobile cap:ios
 ```
 
-确保手机和电脑在同一局域网，且 API 服务（端口 4000）也允许局域网访问。
+Android 对应命令为：
+
+```bash
+pnpm --filter @cleanhub/pos-mobile cap:sync:android
+pnpm --filter @cleanhub/pos-mobile cap:run:android
+pnpm --filter @cleanhub/pos-mobile cap:android
+```
+
+iOS 已声明本地网络用途并仅放开本地网络 ATS。HTTP 只允许开发环境，且必须
+显式设置 `CLEANHUB_POS_ALLOW_CLEARTEXT=true`。
 
 ## 生产构建
 
-### 构建 APK
+生产壳使用独立的 `.env.production`，不要复用开发 `.env`：
 
 ```bash
-# 1. 静态导出 pos-web
-CAPACITOR_BUILD=true pnpm --filter @cleanhub/pos-web build
-
-# 2. 复制到 pos-mobile 的 www/ 目录
-rm -rf apps/pos-mobile/www/*
-cp -r apps/pos-web/out/* apps/pos-mobile/www/
-
-# 3. 同步到 Capacitor
-cd apps/pos-mobile
-npx cap sync android
-
-# 4. 构建 Debug APK
-cd android
-./gradlew assembleDebug
-# 输出：android/app/build/outputs/apk/debug/app-debug.apk
-
-# 5. 构建 Release APK（需要签名配置）
-./gradlew assembleRelease
+cp apps/pos-mobile/.env.production.example apps/pos-mobile/.env.production
 ```
 
-### 构建 iOS（仅 macOS）
+将 `CLEANHUB_POS_SERVER_URL` 改成实际 HTTPS POS Origin。它必须与部署环境的
+`POS_PUBLIC_ORIGIN` 一致，并且只能包含 scheme、host 和可选端口；脚本会拒绝
+账号密码、路径、query、fragment、localhost 和示例域名。
+
+POS Web 的生产环境同时应使用类似配置：
+
+```dotenv
+CLEANHUB_API_BASE_URL=http://cleanhub-api:4000
+NEXT_PUBLIC_API_BASE_URL=https://pos.example.com/api
+AUTH_COOKIE_SECURE=true
+```
+
+其中 `/api/*` 必须由 `pos.example.com` 的反向代理去掉 `/api` 前缀后转发
+到 API，并保留多个 `Set-Cookie` 响应头。
+
+生产发布只能使用下面的专用命令。它们会强制检查：
+
+- runtime 必须明确为 `production`；
+- 服务地址必须存在并使用非示例域名的 HTTPS Origin；
+- cleartext、mixed content、WebView 调试和运行日志必须关闭；
+- 同步后的原生配置与故障恢复页必须使用同一个 Origin。
 
 ```bash
-# 同步到 iOS
-npx cap sync ios
-
-# 在 Xcode 中打开
-npx cap open ios
+pnpm --filter @cleanhub/pos-mobile build:production
+pnpm --filter @cleanhub/pos-mobile release:validate
 ```
 
-## Capacitor 配置说明
+也可只同步一个平台：
 
-`capacitor.config.ts` 中的关键配置：
+```bash
+pnpm --filter @cleanhub/pos-mobile release:sync:ios
+pnpm --filter @cleanhub/pos-mobile release:sync:android
+```
 
-| 配置项 | 开发模式 | 生产模式 |
-|--------|----------|----------|
-| `server.url` | `http://localhost:3001` | 删除此行 |
-| `webDir` | `www`（不使用） | `www`（加载静态文件） |
-| `server.cleartext` | `true` | 不需要 |
+校验通过后，再在 Xcode/Android Studio 中完成签名归档：
 
-**切换到生产模式**：注释掉或删除 `server.url` 行，Capacitor 将从 `www/` 目录加载。
+```bash
+pnpm --filter @cleanhub/pos-mobile cap:ios
+pnpm --filter @cleanhub/pos-mobile cap:android
+```
 
-## 环境变量
+不要在发布前执行开发用的 `cap:sync*`；它会按 `.env` 生成开发配置，并使
+`release:validate` 明确失败。正式归档前再次运行 `release:validate`。
 
-pos-web 在 Capacitor 中运行时使用的环境变量：
+Capacitor 将 `server.url` 定位为 live-reload 能力；当前远程壳是为了兼容
+现有 Next.js 服务端架构。若面向公开 App Store 分发，应在发布前完成审核
+合规评估；如不能接受远程壳，需要另行建设可随安装包发布的离线客户端，
+不能用一次 `CAPACITOR_BUILD` 静态导出来替代。
 
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `NEXT_PUBLIC_API_BASE_URL` | API 服务地址 | `http://localhost:4000` |
-| `NEXT_PUBLIC_POS_TENANT_CODE` | 终端绑定的租户编码 | `CLEAN-001` |
+## 设备身份与 Cookie
 
-## 后续扩展
+- 原生安装 ID 存在 Capacitor Preferences；浏览器回退使用 localStorage。
+- 原生平台 ID 只会先做带应用命名空间的 SHA-256 哈希，不直接发送硬件 ID。
+- Preferences 只保存非机密的 installation device ID。
+- Android 应用备份与设备间自动恢复已关闭，避免把终端安装状态复制到另一台设备。
+- access token、refresh token 和 terminal cookie 始终由服务端设置为 HttpOnly，
+  不会写入 Preferences，也不会由前端 JavaScript读取。
+- `CapacitorCookies` 负责同步原生 Cookie jar 与 WebView，仍会过滤 HttpOnly
+  Cookie，认证请求继续使用普通浏览器 Cookie 行为。
 
-| 功能 | Capacitor 插件 | 状态 |
-|------|---------------|------|
-| 蓝牙打印 | `@niceblue/capacitor-bluetooth-printer` | 待接入 |
-| 二维码扫描 | `@capacitor-community/barcode-scanner` | 待接入 |
-| 震动反馈 | `@capacitor/haptics` | 待接入 |
-| 推送通知 | `@capacitor/push-notifications` | 待接入 |
-| 相机拍照 | `@capacitor/camera` | 待接入 |
+## 真机验收清单
+
+发布前至少在实际 iPad 上验证：
+
+1. 首次安装、强制退出、重启设备和覆盖升级后 installation ID 保持不变。
+2. 登录及 token 刷新后，关闭并重新打开应用仍能恢复会话。
+3. 未初始化、凭据丢失、已停用和已登记终端分别进入正确页面。
+4. 开发 LAN HTTP 可连接；生产 HTTP 会被配置拒绝，HTTPS 可正常启动。
+5. 横竖屏、刘海/状态栏、软键盘和 iPad 分屏下没有内容被遮挡。
+6. 清除站点 Cookie 后，Preferences 中的设备 ID 应保持稳定，但终端凭据会丢失，
+   因而进入“凭据恢复”流程；卸载重装后的平台设备 ID 是否延续由操作系统决定，
+   必须验证最终落入恢复或重新登记流程，不能静默绑定到其他终端。

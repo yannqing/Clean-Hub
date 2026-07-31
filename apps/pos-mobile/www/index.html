@@ -3,31 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+  />
   <title>CleanHub POS</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      background: #f8fafc;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-    }
-    .loading {
-      text-align: center;
-      color: #64748b;
-    }
-    .loading h1 {
-      font-size: 1.5rem;
-      color: #0f172a;
-    }
-  </style>
+  <link rel="stylesheet" href="recovery.css" />
+  <script src="pos-runtime-config.js" defer></script>
+  <script src="recovery.js" defer></script>
 </head>
 <body>
-  <div class="loading">
-    <h1>CleanHub POS</h1>
-    <p>加载中…</p>
-  </div>
+  <main class="message">
+    <div class="mark" aria-hidden="true">CH</div>
+    <h1>暂时无法连接 POS</h1>
+    <p data-status role="status">请检查网络连接，然后重新尝试。</p>
+    <button type="button" data-reconnect>重新连接</button>
+  </main>
 </body>
 </html>

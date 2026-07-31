@@ -243,6 +243,9 @@ importers:
       '@capacitor/core':
         specifier: ^8.4.1
         version: 8.4.1
+      '@capacitor/device':
+        specifier: ^8.0.3
+        version: 8.0.3(@capacitor/core@8.4.1)
       '@capacitor/ios':
         specifier: ^8.4.1
         version: 8.4.1(@capacitor/core@8.4.1)
@@ -262,6 +265,9 @@ importers:
       '@types/node':
         specifier: ^22.0.0
         version: 22.19.18
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
       eslint:
         specifier: ^9.0.0
         version: 9.39.4(jiti@2.7.0)

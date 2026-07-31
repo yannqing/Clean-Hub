@@ -44,6 +44,19 @@ dependencies {
 
 apply from: 'capacitor.build.gradle'
 
+def validatePosProductionConfig = tasks.register('validatePosProductionConfig', Exec) {
+    group = 'verification'
+    description = 'Rejects release builds containing development or offline POS configuration.'
+    workingDir rootProject.projectDir.parentFile
+    commandLine 'node', 'scripts/validate-native-release.mjs', 'android'
+}
+
+afterEvaluate {
+    tasks.named('preReleaseBuild').configure {
+        dependsOn validatePosProductionConfig
+    }
+}
+
 try {
     def servicesJSON = file('google-services.json')
     if (servicesJSON.text) {
