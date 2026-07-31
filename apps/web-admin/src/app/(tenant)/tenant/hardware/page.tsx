@@ -1,5 +1,7 @@
-import { HardwareListView } from "@/features/tenant/hardware";
+import { redirect } from "next/navigation";
 
-export default function HardwarePage() {
-  return <HardwareListView />;
+import { webAdminRoutes } from "@/config/routes";
+
+export default function LegacyHardwarePage() {
+  redirect(webAdminRoutes.tenant.pointOfSale.hardware);
 }

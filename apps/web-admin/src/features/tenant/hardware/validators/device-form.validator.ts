@@ -14,7 +14,7 @@ import type {
  * These mirror the backend zod schemas in
  * `apps/api/src/modules/tenant/hardware/hardware.validation.ts` so device
  * binding/edit forms can fail fast on the client. Error keys match the form
- * field names (`branchId`, `name`, `deviceType`, `connectionType`, `status`).
+ * field names (`terminalId`, `name`, `deviceType`, `connectionType`, `status`).
  */
 
 const DEVICE_TYPES: readonly HardwareDeviceType[] = [
@@ -36,7 +36,7 @@ const DEVICE_STATUSES: readonly HardwareDeviceStatus[] = [
 ];
 
 type DeviceFormField =
-  | "branchId"
+  | "terminalId"
   | "name"
   | "deviceType"
   | "connectionType"
@@ -50,7 +50,7 @@ type ValidationResult<TData> =
   | { ok: false; errors: DeviceFormErrors };
 
 /**
- * Validate the bind-device form. `branchId` must be a valid ULID, `name` is
+ * Validate the bind-device form. `terminalId` must be a valid ULID, `name` is
  * required (≤ 200 chars), and the type/connection enums must be in range.
  */
 export function validateCreateDeviceForm(
@@ -59,8 +59,8 @@ export function validateCreateDeviceForm(
   const errors: DeviceFormErrors = {};
   const name = input.name.trim();
 
-  if (!isUlid(input.branchId)) {
-    errors.branchId = "Select a valid branch.";
+  if (!isUlid(input.terminalId)) {
+    errors.terminalId = "Select a valid POS terminal.";
   }
 
   if (!name) {
@@ -84,7 +84,7 @@ export function validateCreateDeviceForm(
   return {
     ok: true,
     data: {
-      branchId: input.branchId,
+      terminalId: input.terminalId,
       name,
       deviceType: input.deviceType,
       connectionType: input.connectionType,
@@ -118,10 +118,10 @@ export function validateUpdateDeviceForm(
   }
 
   if (
-    input.branchId !== undefined &&
-    !isUlid(input.branchId)
+    input.terminalId !== undefined &&
+    !isUlid(input.terminalId)
   ) {
-    errors.branchId = "Select a valid branch.";
+    errors.terminalId = "Select a valid POS terminal.";
   }
 
   if (
@@ -139,7 +139,7 @@ export function validateUpdateDeviceForm(
   }
 
   const hasField = (
-    ["name", "branchId", "connectionType", "status", "config"] as const
+    ["name", "terminalId", "connectionType", "status", "config"] as const
   ).some((key) => input[key] !== undefined);
 
   if (!hasField && Object.keys(errors).length === 0) {
@@ -159,8 +159,8 @@ export function validateUpdateDeviceForm(
     data.name = input.name.trim();
   }
 
-  if (input.branchId !== undefined) {
-    data.branchId = input.branchId;
+  if (input.terminalId !== undefined) {
+    data.terminalId = input.terminalId;
   }
 
   if (input.connectionType !== undefined) {

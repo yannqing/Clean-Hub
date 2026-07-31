@@ -1,18 +1,7 @@
-import { HardwareFormView } from "@/features/tenant/hardware/components";
-import { getBranchListQuery } from "@/features/tenant/branches/queries";
-import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
+import { redirect } from "next/navigation";
 
-export default async function NewHardwarePage() {
-  const requestOptions = await getTenantServerApiRequestOptions();
-  const branchResult = await getBranchListQuery({}, requestOptions).then(
-    (branches) => ({ branches, branchLoadFailed: false }),
-    () => ({ branches: [], branchLoadFailed: true }),
-  );
+import { webAdminRoutes } from "@/config/routes";
 
-  return (
-    <HardwareFormView
-      branches={branchResult.branches}
-      branchLoadFailed={branchResult.branchLoadFailed}
-    />
-  );
+export default function LegacyNewHardwarePage() {
+  redirect(webAdminRoutes.tenant.pointOfSale.newHardware);
 }

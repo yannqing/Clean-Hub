@@ -771,6 +771,23 @@ export type TenantMessages = {
       updatedLabel: string;
       updated: string;
       versionConflict: string;
+      posTerminals: {
+        title: string;
+        description: string;
+        bind: string;
+        manage: string;
+        empty: string;
+        loading: string;
+        loadError: string;
+        dialogTitle: string;
+        dialogDescription: string;
+        selectLabel: string;
+        selectPlaceholder: string;
+        currentBranch: string;
+        binding: string;
+        bound: string;
+        bindHint: string;
+      };
     };
   };
 
@@ -919,13 +936,13 @@ export type TenantMessages = {
       printers: string;
     };
     noDevices: string;
-    noBranches: string;
+    noTerminals: string;
     typeReadonlyHint: string;
     columns: {
       name: string;
       type: string;
       connection: string;
-      branch: string;
+      terminal: string;
       status: string;
       created: string;
       actions: string;
@@ -934,8 +951,8 @@ export type TenantMessages = {
       title: string;
       description: string;
       labels: {
-        branchId: string;
-        branchPlaceholder: string;
+        terminalId: string;
+        terminalPlaceholder: string;
         deviceName: string;
         deviceType: string;
         connectionType: string;
@@ -948,7 +965,7 @@ export type TenantMessages = {
       title: string;
       labels: {
         deviceName: string;
-        branchId: string;
+        terminalId: string;
         connectionType: string;
         status: string;
       };
@@ -976,6 +993,7 @@ export type TenantMessages = {
     tabs: {
       overview: string;
       devices: string;
+      hardware: string;
       registerSessions: string;
       settings: string;
     };

@@ -234,7 +234,6 @@ export const zhCNMessages: WebAdminMessages = {
         title: "门店与设备",
         items: [
           { label: "门店", href: webAdminRoutes.tenant.config.branches },
-          { label: "周边设备", href: webAdminRoutes.tenant.config.hardware },
           { label: "通知", href: webAdminRoutes.tenant.notifications },
         ],
       },

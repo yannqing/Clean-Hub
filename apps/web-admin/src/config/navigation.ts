@@ -13,7 +13,6 @@ export const webAdminNavigation = {
     { label: "Branches", href: webAdminRoutes.tenant.branches },
     { label: "Services", href: webAdminRoutes.tenant.services },
     { label: "Discounts", href: webAdminRoutes.tenant.discounts },
-    { label: "Peripheral hardware", href: webAdminRoutes.tenant.hardware },
     { label: "Notifications", href: webAdminRoutes.tenant.notifications },
     { label: "Point of sale", href: webAdminRoutes.tenant.pointOfSale.home },
     { label: "Reports", href: webAdminRoutes.tenant.reports },
@@ -100,10 +99,6 @@ export const webAdminSidebarNavigation = {
         {
           label: "Service Catalog",
           href: webAdminRoutes.tenant.config.services,
-        },
-        {
-          label: "Peripheral hardware",
-          href: webAdminRoutes.tenant.config.hardware,
         },
         {
           label: "Notifications",

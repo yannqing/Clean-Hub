@@ -27,14 +27,13 @@ import { Pagination } from "@/components/pagination";
 import { webAdminRoutes } from "@/config/routes";
 import { useTenantI18n } from "@/i18n";
 
-import { getBranchListQuery } from "../../branches/queries";
 import { deleteDeviceAction } from "../actions";
 import {
   hardwareConnectionTypeOptions,
   hardwareDeviceTypeOptions,
 } from "../constants";
 import { getDeviceListQuery } from "../queries";
-import type { BranchSummary, HardwareConfigSummary } from "../types";
+import type { HardwareConfigSummary } from "../types";
 
 const PAGE_SIZE = 20;
 
@@ -57,7 +56,6 @@ export function HardwareListView({
   const router = useRouter();
   const { m, formatDateTime } = useTenantI18n();
   const [devices, setDevices] = useState<HardwareConfigSummary[]>([]);
-  const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [offset, setOffset] = useState(0);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -70,18 +68,6 @@ export function HardwareListView({
     return () => {
       isCurrent.current = false;
     };
-  }, []);
-
-  useEffect(() => {
-    getBranchListQuery()
-      .then((result) => {
-        if (isCurrent.current) {
-          setBranches(result);
-        }
-      })
-      .catch(() => {
-        // Branch names fall back to their IDs when the optional lookup fails.
-      });
   }, []);
 
   const loadDevices = useCallback(() => {
@@ -106,11 +92,6 @@ export function HardwareListView({
     loadDevices();
   }, [loadDevices]);
 
-  const getBranchName = useCallback(
-    (branchId: string) => branches.find((branch) => branch.id === branchId)?.name ?? branchId,
-    [branches],
-  );
-
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const visibleDevices = useMemo(() => {
     if (!normalizedSearchQuery) {
@@ -126,12 +107,18 @@ export function HardwareListView({
           (option) => option.value === device.connectionType,
         )?.label ?? device.connectionType;
 
-      return [device.name, getBranchName(device.branchId), deviceType, connectionType]
+      return [
+        device.name,
+        device.terminalLabel,
+        device.terminalDeviceId,
+        deviceType,
+        connectionType,
+      ]
         .join(" ")
         .toLowerCase()
         .includes(normalizedSearchQuery);
     });
-  }, [devices, getBranchName, normalizedSearchQuery]);
+  }, [devices, normalizedSearchQuery]);
 
   const handleDelete = useCallback(
     async (device: HardwareConfigSummary) => {
@@ -241,7 +228,7 @@ export function HardwareListView({
                   <TableHead>{m.hardware.columns.name}</TableHead>
                   <TableHead>{m.hardware.columns.type}</TableHead>
                   <TableHead>{m.hardware.columns.connection}</TableHead>
-                  <TableHead>{m.hardware.columns.branch}</TableHead>
+                  <TableHead>{m.hardware.columns.terminal}</TableHead>
                   <TableHead>{m.hardware.columns.status}</TableHead>
                   <TableHead>{m.hardware.columns.created}</TableHead>
                   <TableHead />
@@ -280,7 +267,16 @@ export function HardwareListView({
                         (option) => option.value === device.connectionType,
                       )?.label ?? device.connectionType}
                     </TableCell>
-                    <TableCell>{getBranchName(device.branchId)}</TableCell>
+                    <TableCell>
+                      <div className="grid gap-0.5">
+                        <span>{device.terminalLabel || device.terminalDeviceId}</span>
+                        {device.terminalLabel ? (
+                          <span className="font-mono text-[10px] text-muted-foreground">
+                            {device.terminalDeviceId}
+                          </span>
+                        ) : null}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <StatusBadge
                         status={device.status}

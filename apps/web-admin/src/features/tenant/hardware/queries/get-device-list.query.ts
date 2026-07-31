@@ -4,7 +4,7 @@ import type { ApiRequestOptions } from "@cleanhub/api-client";
 import type { HardwareConfigSummary } from "../types";
 
 export type HardwareListQuery = {
-  branchId?: string;
+  terminalId?: string;
   deviceType?: string;
   status?: string;
   limit?: number;

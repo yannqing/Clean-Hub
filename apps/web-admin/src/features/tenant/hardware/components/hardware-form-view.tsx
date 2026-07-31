@@ -14,7 +14,7 @@ import {
   SelectValue,
   toast,
 } from "@cleanhub/ui";
-import { Check, ChevronRight, LoaderCircle, Store, Wrench } from "lucide-react";
+import { Check, ChevronRight, LoaderCircle, SquareTerminal, Wrench } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -33,7 +33,6 @@ import {
 } from "../constants";
 import { validateCreateDeviceForm, validateUpdateDeviceForm } from "../validators";
 import type {
-  BranchSummary,
   CreateHardwareConfigRequest,
   HardwareConfigSummary,
   HardwareConnectionType,
@@ -41,14 +40,15 @@ import type {
   HardwareDeviceType,
   UpdateHardwareConfigRequest,
 } from "../types";
+import type { PointOfSaleDevice } from "../../point-of-sale/types";
 
 type DeviceFormErrors = Partial<
-  Record<"branchId" | "name" | "deviceType" | "connectionType" | "status", string>
+  Record<"terminalId" | "name" | "deviceType" | "connectionType" | "status", string>
 >;
 
 type HardwareFormViewProps = {
-  branches?: BranchSummary[];
-  branchLoadFailed?: boolean;
+  terminals?: PointOfSaleDevice[];
+  terminalLoadFailed?: boolean;
   initialDevice?: HardwareConfigSummary;
   mode?: "create" | "edit";
 };
@@ -61,20 +61,20 @@ function FieldError({ message }: { message?: string }) {
   ) : null;
 }
 
-function BranchSelect({
-  branches,
+function TerminalSelect({
+  terminals,
   disabled,
   emptyLabel,
   onChange,
   selected,
 }: {
-  branches: BranchSummary[];
+  terminals: PointOfSaleDevice[];
   disabled?: boolean;
   emptyLabel: string;
   onChange: (value: string) => void;
   selected: string;
 }) {
-  if (branches.length === 0) {
+  if (terminals.length === 0) {
     return <p className="text-sm text-muted-foreground">{emptyLabel}</p>;
   }
 
@@ -89,9 +89,9 @@ function BranchSelect({
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="__none__">{emptyLabel}</SelectItem>
-        {branches.map((branch) => (
-          <SelectItem key={branch.id} value={branch.id}>
-            {branch.name}
+        {terminals.map((terminal) => (
+          <SelectItem key={terminal.id} value={terminal.id}>
+            {terminal.label || terminal.deviceId} · {terminal.branchName}
           </SelectItem>
         ))}
       </SelectContent>
@@ -100,8 +100,8 @@ function BranchSelect({
 }
 
 export function HardwareFormView({
-  branches = [],
-  branchLoadFailed = false,
+  terminals = [],
+  terminalLoadFailed = false,
   initialDevice,
   mode = "create",
 }: HardwareFormViewProps) {
@@ -109,7 +109,7 @@ export function HardwareFormView({
   const { m } = useTenantI18n();
   const isEditMode = mode === "edit";
   const [name, setName] = useState(initialDevice?.name ?? "");
-  const [branchId, setBranchId] = useState(initialDevice?.branchId ?? "");
+  const [terminalId, setTerminalId] = useState(initialDevice?.terminalId ?? "");
   const [deviceType, setDeviceType] = useState<HardwareDeviceType>(
     initialDevice?.deviceType ?? "printer",
   );
@@ -140,14 +140,14 @@ export function HardwareFormView({
 
     const validation = isEditMode
       ? validateUpdateDeviceForm({
-          branchId,
+          terminalId,
           connectionType,
           name,
           status,
           version: initialDevice?.version ?? 0,
         })
       : validateCreateDeviceForm({
-          branchId,
+          terminalId,
           connectionType,
           deviceType,
           name,
@@ -221,7 +221,7 @@ export function HardwareFormView({
         noValidate
         onSubmit={handleSubmit}
       >
-        {branchLoadFailed ? (
+        {terminalLoadFailed ? (
           <p
             className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
             role="alert"
@@ -230,7 +230,7 @@ export function HardwareFormView({
           </p>
         ) : null}
 
-        <fieldset className="contents" disabled={saving || branchLoadFailed}>
+        <fieldset className="contents" disabled={saving || terminalLoadFailed}>
           <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
             <div className="grid gap-5">
               <Card className="gap-0 rounded-lg py-0 shadow-none">
@@ -313,20 +313,20 @@ export function HardwareFormView({
               <Card className="gap-0 rounded-lg py-0 shadow-none">
                 <CardContent className="grid gap-4 py-5">
                   <div className="grid gap-2">
-                    <Label htmlFor="hardware-branch">
-                      {m.hardware.create.labels.branchId} *
+                    <Label htmlFor="hardware-terminal">
+                      {m.hardware.create.labels.terminalId} *
                     </Label>
-                    <BranchSelect
-                      branches={branches}
+                    <TerminalSelect
+                      terminals={terminals}
                       disabled={saving}
-                      emptyLabel={m.hardware.noBranches}
+                      emptyLabel={m.hardware.noTerminals}
                       onChange={(value) => {
-                        setBranchId(value);
-                        clearError("branchId");
+                        setTerminalId(value);
+                        clearError("terminalId");
                       }}
-                      selected={branchId}
+                      selected={terminalId}
                     />
-                    <FieldError message={errors.branchId} />
+                    <FieldError message={errors.terminalId} />
                   </div>
 
                   {isEditMode ? (
@@ -357,7 +357,7 @@ export function HardwareFormView({
                   ) : null}
 
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Icon aria-hidden icon={Store} size={14} />
+                    <Icon aria-hidden icon={SquareTerminal} size={14} />
                     <span>{m.hardware.create.description}</span>
                   </div>
                 </CardContent>
@@ -381,7 +381,7 @@ export function HardwareFormView({
               <Button
                 aria-busy={saving}
                 className="min-w-28 gap-2 rounded-lg"
-                disabled={saving || branchLoadFailed}
+                disabled={saving || terminalLoadFailed}
                 size="sm"
                 type="submit"
               >

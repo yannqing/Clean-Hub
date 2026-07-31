@@ -62,7 +62,6 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
   const SettingsIcon = getNavIcon(settingsHref);
   const isHomePage = pathname === webAdminRoutes.tenant.home;
   const isBranchesPage = isActivePath(pathname, webAdminRoutes.tenant.branches);
-  const isHardwarePage = isActivePath(pathname, webAdminRoutes.tenant.hardware);
   const isOrdersPage = isActivePath(pathname, webAdminRoutes.tenant.orders);
   const isCustomersPage = isActivePath(
     pathname,
@@ -93,7 +92,6 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
   const usesFlatPageLayout =
     isHomePage ||
     isBranchesPage ||
-    isHardwarePage ||
     isOrdersPage ||
     isCustomersPage ||
     isProductsPage ||
@@ -114,6 +112,10 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
     {
       href: webAdminRoutes.tenant.pointOfSale.devices,
       label: messages.tenant.pointOfSale.tabs.devices,
+    },
+    {
+      href: webAdminRoutes.tenant.pointOfSale.hardware,
+      label: messages.tenant.pointOfSale.tabs.hardware,
     },
     {
       href: webAdminRoutes.tenant.pointOfSale.registerSessions,

@@ -26,6 +26,7 @@ import { useTenantI18n } from "@/i18n";
 import { tenantQueryKeys } from "@/lib/query-keys";
 
 import { updateBranchAction, updateBranchStatusAction } from "../actions";
+import { BranchPosTerminalBindingCard } from "./branch-pos-terminal-binding-card";
 import { branchLanguageValues } from "../constants";
 import { useBranchDetailQuery } from "../queries";
 import type {
@@ -264,6 +265,8 @@ export function BranchDetailView({
                   </div>
                 </CardContent>
               </Card>
+
+              <BranchPosTerminalBindingCard branch={branch} />
 
               <Card className="gap-0 rounded-lg py-0 shadow-none">
                 <CardContent className="grid gap-4 py-5">

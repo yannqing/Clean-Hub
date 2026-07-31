@@ -258,10 +258,6 @@ export const enMessages: WebAdminMessages = {
             href: webAdminRoutes.tenant.config.branches,
           },
           {
-            label: "Peripheral hardware",
-            href: webAdminRoutes.tenant.config.hardware,
-          },
-          {
             label: "Notifications",
             href: webAdminRoutes.tenant.notifications,
           },
