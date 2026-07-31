@@ -15,6 +15,7 @@ export type AppBindings = {
 export type ApiErrorResponse = {
   message: string;
   code?: string;
+  lockedUntil?: string;
   requestId?: string;
   validationErrors?: unknown;
 };

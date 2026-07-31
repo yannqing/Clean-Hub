@@ -50,6 +50,11 @@ export function handleApiError(error: Error, c: import("hono").Context<AppBindin
       {
         message: error.message,
         code: error.code,
+        ...(error.code === "ACCOUNT_LOCKED" &&
+        error.lockedUntil &&
+        Number.isFinite(error.lockedUntil.getTime())
+          ? { lockedUntil: error.lockedUntil.toISOString() }
+          : {}),
         requestId,
       },
       getAuthErrorStatus(error),

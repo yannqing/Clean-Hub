@@ -82,15 +82,61 @@ const POS_API_ERROR_MESSAGES: Record<string, Record<PosErrorLocale, string>> = {
   },
 };
 
+const POS_ACCOUNT_LOCKED_UNTIL_MESSAGES: Record<
+  PosErrorLocale,
+  (lockedUntil: string) => string
+> = {
+  "zh-CN": (lockedUntil) =>
+    `登录失败次数过多，已锁定至 ${lockedUntil}，请在此时间后重试。`,
+  en: (lockedUntil) =>
+    `Too many failed sign-in attempts. Sign-in is locked until ${lockedUntil}.`,
+  fr: (lockedUntil) =>
+    `Trop de tentatives de connexion ont échoué. La connexion est verrouillée jusqu’au ${lockedUntil}.`,
+};
+
+function formatLockedUntil(
+  value: string | undefined,
+  locale: PosErrorLocale,
+): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return undefined;
+  }
+
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZoneName: "short",
+  }).format(date);
+}
+
 export function getPosApiErrorMessage(
   error: unknown,
   fallback = "操作失败，请重试。",
 ): string {
   if (isApiHttpError(error)) {
+    const locale = getPosRuntimeLocale();
+    const lockedUntil =
+      error.code === "ACCOUNT_LOCKED"
+        ? formatLockedUntil(error.lockedUntil, locale)
+        : undefined;
+
+    if (lockedUntil) {
+      return POS_ACCOUNT_LOCKED_UNTIL_MESSAGES[locale](lockedUntil);
+    }
+
     const messages = error.code
       ? POS_API_ERROR_MESSAGES[error.code]
       : undefined;
-    return messages?.[getPosRuntimeLocale()] ?? fallback;
+    return messages?.[locale] ?? fallback;
   }
 
   if (error instanceof Error && error.message) {

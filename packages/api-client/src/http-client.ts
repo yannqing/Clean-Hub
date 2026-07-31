@@ -230,6 +230,26 @@ function getErrorCode(parsedBody: unknown): string | undefined {
   return undefined;
 }
 
+function getErrorLockedUntil(parsedBody: unknown): string | undefined {
+  if (
+    !parsedBody ||
+    typeof parsedBody !== "object" ||
+    !("lockedUntil" in parsedBody)
+  ) {
+    return undefined;
+  }
+
+  const lockedUntil = (parsedBody as ApiErrorDetails).lockedUntil;
+  if (
+    typeof lockedUntil !== "string" ||
+    !Number.isFinite(Date.parse(lockedUntil))
+  ) {
+    return undefined;
+  }
+
+  return lockedUntil;
+}
+
 function isApiFieldError(value: unknown): value is ApiFieldError {
   return (
     value !== null &&
@@ -451,6 +471,7 @@ export function createApiClient(config: ApiClientConfig): ApiClient {
           url,
           requestId,
           code: getErrorCode(parsedError),
+          lockedUntil: getErrorLockedUntil(parsedError),
           responseData: parsedError,
           validationErrors: getValidationErrors(parsedError),
         });

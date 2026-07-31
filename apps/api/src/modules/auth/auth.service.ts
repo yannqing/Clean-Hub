@@ -70,12 +70,40 @@ function assertActiveUser(user: AuthenticatedUser): void {
   }
 }
 
+function laterAccountLockError(
+  current: AuthError | undefined,
+  candidate: AuthError,
+): AuthError {
+  if (!current) {
+    return candidate;
+  }
+
+  const currentTime = current.lockedUntil?.getTime() ?? 0;
+  const candidateTime = candidate.lockedUntil?.getTime() ?? 0;
+
+  return candidateTime > currentTime ? candidate : current;
+}
+
 async function assertLockKeysNotLocked(
   db: Database,
   lockKeys: readonly string[],
 ): Promise<void> {
+  let lockError: AuthError | undefined;
+
   for (const lockKey of lockKeys) {
-    await assertLoginNotLocked(db, lockKey);
+    try {
+      await assertLoginNotLocked(db, lockKey);
+    } catch (error) {
+      if (error instanceof AuthError && error.code === "ACCOUNT_LOCKED") {
+        lockError = laterAccountLockError(lockError, error);
+        continue;
+      }
+      throw error;
+    }
+  }
+
+  if (lockError) {
+    throw lockError;
   }
 }
 
@@ -91,7 +119,7 @@ async function recordFailureForLockKeys(
       await recordLoginFailure(db, lockKey, policy);
     } catch (error) {
       if (error instanceof AuthError && error.code === "ACCOUNT_LOCKED") {
-        lockError = error;
+        lockError = laterAccountLockError(lockError, error);
         continue;
       }
       throw error;

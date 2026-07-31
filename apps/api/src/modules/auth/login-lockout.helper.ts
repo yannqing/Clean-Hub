@@ -15,10 +15,11 @@ export function buildLoginLockKey(
   return `${scope}:${normalizedIdentifier}`;
 }
 
-function accountLockedError(): AuthError {
+function accountLockedError(lockedUntil: Date): AuthError {
   return new AuthError(
     "ACCOUNT_LOCKED",
     "Too many failed login attempts. Try again later.",
+    lockedUntil,
   );
 }
 
@@ -37,7 +38,7 @@ export async function assertLoginNotLocked(
   const lockedUntil = rows[0]?.lockedUntil;
 
   if (lockedUntil && lockedUntil.getTime() > Date.now()) {
-    throw accountLockedError();
+    throw accountLockedError(lockedUntil);
   }
 }
 
@@ -60,7 +61,7 @@ export async function recordLoginFailure(
   const now = new Date();
 
   if (existing?.lockedUntil && existing.lockedUntil.getTime() > now.getTime()) {
-    throw accountLockedError();
+    throw accountLockedError(existing.lockedUntil);
   }
 
   const lockExpired =
@@ -93,7 +94,7 @@ export async function recordLoginFailure(
       });
     }
 
-    throw accountLockedError();
+    throw accountLockedError(lockedUntil);
   }
 
   if (existing) {
