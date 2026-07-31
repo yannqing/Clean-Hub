@@ -1,7 +1,7 @@
 /**
  * POS hardware device — read-only DTOs.
  *
- * POS terminals can list hardware devices configured for their branch
+ * POS terminals can list peripherals configured specifically for themselves
  * but cannot create, update, or delete them (that belongs to web-admin).
  */
 
@@ -18,7 +18,7 @@ export type PosHardwareDeviceStatus = "active" | "inactive";
 export type PosHardwareDeviceSummary = {
   id: string;
   tenantId: string;
-  branchId: string;
+  terminalId: string;
   name: string;
   deviceType: PosHardwareDeviceType;
   connectionType: PosHardwareConnectionType;

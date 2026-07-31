@@ -10,7 +10,7 @@ function toSummary(
   return {
     id: row.id,
     tenantId: row.tenantId,
-    branchId: row.branchId,
+    terminalId: row.terminalId,
     name: row.name,
     deviceType: row.deviceType,
     connectionType: row.connectionType,
@@ -22,13 +22,13 @@ function toSummary(
 }
 
 /**
- * List active hardware devices for a tenant/branch.
+ * List active peripherals for a POS terminal.
  * Only returns non-deleted, active devices.
  */
-export async function findHardwareDevicesByBranch(
+export async function findHardwareDevicesByTerminal(
   db: Database,
   tenantId: string,
-  branchId: string,
+  terminalId: string,
 ): Promise<PosHardwareDeviceSummary[]> {
   const rows = await db
     .select()
@@ -36,7 +36,7 @@ export async function findHardwareDevicesByBranch(
     .where(
       and(
         eq(hardwareConfigs.tenantId, tenantId),
-        eq(hardwareConfigs.branchId, branchId),
+        eq(hardwareConfigs.terminalId, terminalId),
         eq(hardwareConfigs.status, "active"),
         isNull(hardwareConfigs.deletedAt),
       ),

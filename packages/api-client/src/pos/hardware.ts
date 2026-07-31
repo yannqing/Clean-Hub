@@ -11,7 +11,7 @@ import type {
 /**
  * POS hardware device and action authorization API.
  *
- * POS terminals can list hardware devices configured for their branch
+ * POS terminals can list peripherals configured for the current terminal
  * and authorize privileged actions, but cannot modify device configuration.
  */
 export function createPosHardwareApi(client: ApiClient) {

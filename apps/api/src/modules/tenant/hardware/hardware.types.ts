@@ -7,6 +7,11 @@ export type HardwareDeviceStatus = "active" | "inactive";
 export type HardwareConfigSummary = {
   id: string;
   tenantId: string;
+  /** The POS terminal this peripheral belongs to. */
+  terminalId: string;
+  terminalLabel: string | null;
+  terminalDeviceId: string;
+  /** Derived from the terminal and kept for contextual display/audit only. */
   branchId: string;
   name: string;
   deviceType: HardwareDeviceType;
@@ -19,7 +24,7 @@ export type HardwareConfigSummary = {
 };
 
 export type ListHardwareConfigsQuery = {
-  branchId?: string;
+  terminalId?: string;
   deviceType?: HardwareDeviceType;
   status?: HardwareDeviceStatus;
   limit: number;
@@ -27,7 +32,7 @@ export type ListHardwareConfigsQuery = {
 };
 
 export type CreateHardwareConfigData = {
-  branchId: string;
+  terminalId: string;
   name: string;
   deviceType: HardwareDeviceType;
   connectionType: HardwareConnectionType;
@@ -36,8 +41,8 @@ export type CreateHardwareConfigData = {
 
 export type UpdateHardwareConfigData = {
   name?: string;
-  /** Allows relocating a device to another branch (device move scenario). */
-  branchId?: string;
+  /** Allows relocating a peripheral to a different POS terminal. */
+  terminalId?: string;
   connectionType?: HardwareConnectionType;
   config?: Record<string, unknown>;
   status?: HardwareDeviceStatus;

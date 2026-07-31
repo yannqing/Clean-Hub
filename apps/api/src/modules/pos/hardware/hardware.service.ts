@@ -10,9 +10,8 @@ import {
   createPosAuditMetadata,
   requirePosBranchAccess,
   requirePosTenantId,
-  resolvePosBranchScope,
 } from "../access-control.helper.js";
-import { findHardwareDevicesByBranch } from "./hardware.repository.js";
+import { findHardwareDevicesByTerminal } from "./hardware.repository.js";
 import type {
   AuthorizeManualDrawerOpenRequest,
   AuthorizePosHardwareActionInput,
@@ -25,21 +24,15 @@ import type {
 } from "./hardware.types.js";
 
 /**
- * List hardware devices for the current POS user's branch.
+ * List peripherals for the enrolled POS terminal in the current session.
  * Any POS role (owner/manager/cashier) can read the device list.
  */
 export async function listPosHardwareDevices(
   authContext: AuthContext,
   db: Database = getDb(),
 ): Promise<PosHardwareDeviceSummary[]> {
-  const tenantId = requirePosTenantId(authContext);
-
-  const branchId = resolvePosBranchScope(authContext)?.[0];
-  if (!branchId) {
-    return [];
-  }
-
-  return findHardwareDevicesByBranch(db, tenantId, branchId);
+  const terminal = requireHardwareTerminal(authContext);
+  return findHardwareDevicesByTerminal(db, terminal.tenantId, terminal.terminalId);
 }
 
 function requireHardwareTerminal(authContext: AuthContext): {

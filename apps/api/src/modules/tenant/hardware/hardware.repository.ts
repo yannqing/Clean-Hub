@@ -1,7 +1,11 @@
 import { and, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
 
 import { createId } from "@cleanhub/id";
-import { hardwareConfigs, type Database } from "@cleanhub/db";
+import {
+  hardwareConfigs,
+  posTerminalSettings,
+  type Database,
+} from "@cleanhub/db";
 
 import type {
   HardwareConfigSummary,
@@ -15,6 +19,9 @@ import { HardwareError } from "./hardware.errors.js";
 function toHardwareConfigSummary(row: {
   id: string;
   tenantId: string;
+  terminalId: string;
+  terminalLabel: string | null;
+  terminalDeviceId: string;
   branchId: string;
   name: string;
   deviceType: HardwareDeviceType;
@@ -28,6 +35,9 @@ function toHardwareConfigSummary(row: {
   return {
     id: row.id,
     tenantId: row.tenantId,
+    terminalId: row.terminalId,
+    terminalLabel: row.terminalLabel,
+    terminalDeviceId: row.terminalDeviceId,
     branchId: row.branchId,
     name: row.name,
     deviceType: row.deviceType,
@@ -47,7 +57,9 @@ function buildWhereClause(
   const conditions: (SQL | undefined)[] = [
     eq(hardwareConfigs.tenantId, tenantId),
     isNull(hardwareConfigs.deletedAt),
-    query.branchId ? eq(hardwareConfigs.branchId, query.branchId) : undefined,
+    query.terminalId
+      ? eq(hardwareConfigs.terminalId, query.terminalId)
+      : undefined,
     query.deviceType ? eq(hardwareConfigs.deviceType, query.deviceType) : undefined,
     query.status ? eq(hardwareConfigs.status, query.status) : undefined,
   ];
@@ -64,7 +76,10 @@ export async function findHardwareConfigs(
     .select({
       id: hardwareConfigs.id,
       tenantId: hardwareConfigs.tenantId,
-      branchId: hardwareConfigs.branchId,
+      terminalId: hardwareConfigs.terminalId,
+      terminalLabel: posTerminalSettings.label,
+      terminalDeviceId: posTerminalSettings.deviceId,
+      branchId: posTerminalSettings.branchId,
       name: hardwareConfigs.name,
       deviceType: hardwareConfigs.deviceType,
       connectionType: hardwareConfigs.connectionType,
@@ -75,6 +90,13 @@ export async function findHardwareConfigs(
       version: hardwareConfigs.version,
     })
     .from(hardwareConfigs)
+    .innerJoin(
+      posTerminalSettings,
+      and(
+        eq(posTerminalSettings.id, hardwareConfigs.terminalId),
+        eq(posTerminalSettings.tenantId, hardwareConfigs.tenantId),
+      ),
+    )
     .where(buildWhereClause(tenantId, query))
     .orderBy(desc(hardwareConfigs.createdAt))
     .limit(query.limit)
@@ -92,7 +114,10 @@ export async function findHardwareConfigById(
     .select({
       id: hardwareConfigs.id,
       tenantId: hardwareConfigs.tenantId,
-      branchId: hardwareConfigs.branchId,
+      terminalId: hardwareConfigs.terminalId,
+      terminalLabel: posTerminalSettings.label,
+      terminalDeviceId: posTerminalSettings.deviceId,
+      branchId: posTerminalSettings.branchId,
       name: hardwareConfigs.name,
       deviceType: hardwareConfigs.deviceType,
       connectionType: hardwareConfigs.connectionType,
@@ -103,6 +128,13 @@ export async function findHardwareConfigById(
       version: hardwareConfigs.version,
     })
     .from(hardwareConfigs)
+    .innerJoin(
+      posTerminalSettings,
+      and(
+        eq(posTerminalSettings.id, hardwareConfigs.terminalId),
+        eq(posTerminalSettings.tenantId, hardwareConfigs.tenantId),
+      ),
+    )
     .where(
       and(
         eq(hardwareConfigs.id, hardwareId),
@@ -118,9 +150,28 @@ export async function findHardwareConfigById(
   return toHardwareConfigSummary(row);
 }
 
+export async function findHardwareTerminal(
+  db: Database,
+  tenantId: string,
+  terminalId: string,
+): Promise<{ id: string; branchId: string } | null> {
+  const rows = await db
+    .select({ id: posTerminalSettings.id, branchId: posTerminalSettings.branchId })
+    .from(posTerminalSettings)
+    .where(
+      and(
+        eq(posTerminalSettings.id, terminalId),
+        eq(posTerminalSettings.tenantId, tenantId),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
 export type InsertHardwareConfigInput = {
   tenantId: string;
-  branchId: string;
+  terminalId: string;
   name: string;
   deviceType: HardwareDeviceType;
   connectionType: HardwareConnectionType;
@@ -134,41 +185,28 @@ export async function insertHardwareConfig(
 ): Promise<HardwareConfigSummary> {
   const id = createId();
 
-  const rows = await db
+  await db
     .insert(hardwareConfigs)
     .values({
       id,
       tenantId: input.tenantId,
-      branchId: input.branchId,
+      terminalId: input.terminalId,
       name: input.name,
       deviceType: input.deviceType,
       connectionType: input.connectionType,
       config: input.config,
       createdBy: input.actorUserId,
       updatedBy: input.actorUserId,
-    })
-    .returning({
-      id: hardwareConfigs.id,
-      tenantId: hardwareConfigs.tenantId,
-      branchId: hardwareConfigs.branchId,
-      name: hardwareConfigs.name,
-      deviceType: hardwareConfigs.deviceType,
-      connectionType: hardwareConfigs.connectionType,
-      config: hardwareConfigs.config,
-      status: hardwareConfigs.status,
-      createdAt: hardwareConfigs.createdAt,
-      updatedAt: hardwareConfigs.updatedAt,
-      version: hardwareConfigs.version,
     });
 
-  return toHardwareConfigSummary(rows[0]!);
+  return (await findHardwareConfigById(db, input.tenantId, id))!;
 }
 
 export type UpdateHardwareConfigRecordInput = {
   hardwareId: string;
   tenantId: string;
   name?: string;
-  branchId?: string;
+  terminalId?: string;
   connectionType?: HardwareConnectionType;
   config?: Record<string, unknown>;
   status?: HardwareDeviceStatus;
@@ -185,7 +223,7 @@ export async function updateHardwareConfigRecord(
     updatedBy: string | null;
     version: SQL;
     name?: string;
-    branchId?: string;
+    terminalId?: string;
     connectionType?: HardwareConnectionType;
     config?: Record<string, unknown>;
     status?: HardwareDeviceStatus;
@@ -198,7 +236,7 @@ export async function updateHardwareConfigRecord(
   };
 
   if (input.name !== undefined) setValues.name = input.name;
-  if (input.branchId !== undefined) setValues.branchId = input.branchId;
+  if (input.terminalId !== undefined) setValues.terminalId = input.terminalId;
   if (input.connectionType !== undefined) setValues.connectionType = input.connectionType;
   if (input.config !== undefined) setValues.config = input.config;
   if (input.status !== undefined) setValues.status = input.status;

@@ -5,6 +5,9 @@ export type HardwareDeviceStatus = "active" | "inactive";
 export type HardwareConfigSummary = {
   id: string;
   tenantId: string;
+  terminalId: string;
+  terminalLabel: string | null;
+  terminalDeviceId: string;
   branchId: string;
   name: string;
   deviceType: HardwareDeviceType;
@@ -17,7 +20,7 @@ export type HardwareConfigSummary = {
 };
 
 export type CreateHardwareConfigRequest = {
-  branchId: string;
+  terminalId: string;
   name: string;
   deviceType: HardwareDeviceType;
   connectionType: HardwareConnectionType;
@@ -26,8 +29,8 @@ export type CreateHardwareConfigRequest = {
 
 export type UpdateHardwareConfigRequest = {
   name?: string;
-  /** Allows relocating a device to another branch (device move scenario). */
-  branchId?: string;
+  /** Allows relocating a peripheral to a different POS terminal. */
+  terminalId?: string;
   connectionType?: HardwareConnectionType;
   config?: Record<string, unknown>;
   status?: HardwareDeviceStatus;

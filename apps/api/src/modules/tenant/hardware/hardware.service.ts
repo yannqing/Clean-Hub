@@ -6,6 +6,7 @@ import { HardwareError } from "./hardware.errors.js";
 import {
   findHardwareConfigById,
   findHardwareConfigs,
+  findHardwareTerminal,
   insertHardwareConfig,
   softDeleteHardwareConfig,
   updateHardwareConfigRecord,
@@ -36,9 +37,18 @@ export async function createHardwareConfig(
   const tenantId = input.authContext.tenantId!;
 
   return db.transaction(async (tx) => {
+    const terminal = await findHardwareTerminal(tx, tenantId, input.data.terminalId);
+    if (!terminal) {
+      throw new HardwareError(
+        "HARDWARE_TERMINAL_NOT_FOUND",
+        "POS terminal was not found.",
+        404,
+      );
+    }
+
     const hardware = await insertHardwareConfig(tx, {
       tenantId,
-      branchId: input.data.branchId,
+      terminalId: terminal.id,
       name: input.data.name,
       deviceType: input.data.deviceType,
       connectionType: input.data.connectionType,
@@ -57,6 +67,7 @@ export async function createHardwareConfig(
         name: hardware.name,
         deviceType: hardware.deviceType,
         connectionType: hardware.connectionType,
+        terminalId: hardware.terminalId,
         branchId: hardware.branchId,
         status: hardware.status,
       },
@@ -87,11 +98,22 @@ export async function updateHardwareConfig(
       );
     }
 
+    if (input.data.terminalId) {
+      const terminal = await findHardwareTerminal(tx, tenantId, input.data.terminalId);
+      if (!terminal) {
+        throw new HardwareError(
+          "HARDWARE_TERMINAL_NOT_FOUND",
+          "POS terminal was not found.",
+          404,
+        );
+      }
+    }
+
     await updateHardwareConfigRecord(tx, {
       hardwareId: input.hardwareId,
       tenantId,
       name: input.data.name,
-      branchId: input.data.branchId,
+      terminalId: input.data.terminalId,
       connectionType: input.data.connectionType,
       config: input.data.config,
       status: input.data.status,
@@ -108,6 +130,7 @@ export async function updateHardwareConfig(
       entityId: input.hardwareId,
       before: {
         name: existing.name,
+        terminalId: existing.terminalId,
         branchId: existing.branchId,
         connectionType: existing.connectionType,
         config: existing.config,
@@ -161,6 +184,7 @@ export async function deleteHardwareConfig(
         name: existing.name,
         deviceType: existing.deviceType,
         connectionType: existing.connectionType,
+        terminalId: existing.terminalId,
         branchId: existing.branchId,
         status: existing.status,
       },

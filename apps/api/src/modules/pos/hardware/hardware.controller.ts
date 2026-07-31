@@ -17,8 +17,8 @@ import {
 /**
  * GET /pos/hardware-devices
  *
- * Returns the list of active hardware devices for the current POS user's
- * branch. Read-only — POS terminals cannot create/update/delete devices.
+ * Returns the active peripherals bound to the current POS terminal.
+ * Read-only — POS terminals cannot create/update/delete peripherals.
  */
 export async function listHardwareDevicesController(
   c: Context<AppBindings>,

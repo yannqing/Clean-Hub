@@ -9,7 +9,7 @@
 -- IDs use the 01SEED01... prefix convention for business data.
 --
 -- Coverage:
---   hardware_configs (3) — printer, scanner, cash drawer for the demo branch
+--   hardware_configs (3) — printer, scanner, cash drawer bound to the front POS terminal
 --   pos_terminal_settings (2) — two demo POS terminals with different configs
 --     and telemetry states (one recently online, one stale with a sync error)
 
@@ -21,67 +21,7 @@
 -- user_id   : 01KRERJN8F0000000000000031 (cashier1)
 
 -- ───────────────────────────────────────────────
--- 1) Hardware devices for the demo branch
--- ───────────────────────────────────────────────
-INSERT INTO hardware_configs (
-  id, tenant_id, branch_id,
-  device_type, name, connection_type,
-  config, status,
-  created_by, updated_by, version
-) VALUES
-  (
-    '01SEED0100DKV0000000000001',
-    '01KRERJN800000000000000001',
-    '01KRERJN8G0000000000000040',
-    'printer',
-    '前台小票打印机',
-    'network',
-    '{"ip": "192.168.1.100", "port": 9100, "paperWidth": 80}',
-    'active',
-    '01KRERJN8F0000000000000031',
-    '01KRERJN8F0000000000000031',
-    1
-  ),
-  (
-    '01SEED0100DKV0000000000002',
-    '01KRERJN800000000000000001',
-    '01KRERJN8G0000000000000040',
-    'scanner',
-    '前台条码扫描枪',
-    'usb',
-    '{"mode": "continuous"}',
-    'active',
-    '01KRERJN8F0000000000000031',
-    '01KRERJN8F0000000000000031',
-    1
-  ),
-  (
-    '01SEED0100DKV0000000000003',
-    '01KRERJN800000000000000001',
-    '01KRERJN8G0000000000000040',
-    'cash_drawer',
-    '前台收银钱箱',
-    'usb',
-    '{"openCommand": "x1Bx70x00x19xFA"}',
-    'active',
-    '01KRERJN8F0000000000000031',
-    '01KRERJN8F0000000000000031',
-    1
-  )
-ON CONFLICT (id) DO UPDATE SET
-  tenant_id     = EXCLUDED.tenant_id,
-  branch_id     = EXCLUDED.branch_id,
-  device_type   = EXCLUDED.device_type,
-  name          = EXCLUDED.name,
-  connection_type = EXCLUDED.connection_type,
-  config        = EXCLUDED.config,
-  status        = EXCLUDED.status,
-  updated_by    = EXCLUDED.updated_by,
-  updated_at    = now(),
-  version       = hardware_configs.version + 1;
-
--- ───────────────────────────────────────────────
--- 2) POS terminal settings
+-- 1) POS terminal settings
 -- ───────────────────────────────────────────────
 -- Terminal 1: 前台收银机 — default payment = cash, auto-print on, 5min lock
 -- Terminal 2: 后台收银机 — default payment = card, auto-print off, 10min lock
@@ -163,3 +103,63 @@ ON CONFLICT (tenant_id, device_id) DO UPDATE SET
   updated_by            = EXCLUDED.updated_by,
   updated_at            = now(),
   version               = pos_terminal_settings.version + 1;
+
+-- ───────────────────────────────────────────────
+-- 2) POS peripherals for the front terminal
+-- ───────────────────────────────────────────────
+INSERT INTO hardware_configs (
+  id, tenant_id, terminal_id,
+  device_type, name, connection_type,
+  config, status,
+  created_by, updated_by, version
+) VALUES
+  (
+    '01SEED0100DKV0000000000001',
+    '01KRERJN800000000000000001',
+    '01SEED0100PTS0000000000001',
+    'printer',
+    '前台小票打印机',
+    'network',
+    '{"ip": "192.168.1.100", "port": 9100, "paperWidth": 80}',
+    'active',
+    '01KRERJN8F0000000000000031',
+    '01KRERJN8F0000000000000031',
+    1
+  ),
+  (
+    '01SEED0100DKV0000000000002',
+    '01KRERJN800000000000000001',
+    '01SEED0100PTS0000000000001',
+    'scanner',
+    '前台条码扫描枪',
+    'usb',
+    '{"mode": "continuous"}',
+    'active',
+    '01KRERJN8F0000000000000031',
+    '01KRERJN8F0000000000000031',
+    1
+  ),
+  (
+    '01SEED0100DKV0000000000003',
+    '01KRERJN800000000000000001',
+    '01SEED0100PTS0000000000001',
+    'cash_drawer',
+    '前台收银钱箱',
+    'usb',
+    '{"openCommand": "x1Bx70x00x19xFA"}',
+    'active',
+    '01KRERJN8F0000000000000031',
+    '01KRERJN8F0000000000000031',
+    1
+  )
+ON CONFLICT (id) DO UPDATE SET
+  tenant_id       = EXCLUDED.tenant_id,
+  terminal_id     = EXCLUDED.terminal_id,
+  device_type     = EXCLUDED.device_type,
+  name            = EXCLUDED.name,
+  connection_type = EXCLUDED.connection_type,
+  config          = EXCLUDED.config,
+  status          = EXCLUDED.status,
+  updated_by      = EXCLUDED.updated_by,
+  updated_at      = now(),
+  version         = hardware_configs.version + 1;

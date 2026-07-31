@@ -11,7 +11,7 @@ import {
 import { catalogItemStatusEnum } from "../catalog/services.js";
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
-import { branches } from "../tenancy/branches.js";
+import { posTerminalSettings } from "../tenancy/pos-terminal-settings.js";
 import { tenants } from "../tenancy/tenants.js";
 
 export const hardwareDeviceTypeEnum = pgEnum("hardware_device_type", [
@@ -34,9 +34,9 @@ export const hardwareConfigs = pgTable(
     tenantId: ulidColumn("tenant_id")
       .notNull()
       .references(() => tenants.id),
-    branchId: ulidColumn("branch_id")
+    terminalId: ulidColumn("terminal_id")
       .notNull()
-      .references(() => branches.id),
+      .references(() => posTerminalSettings.id),
     deviceType: hardwareDeviceTypeEnum("device_type").notNull(),
     name: varchar("name", { length: 200 }).notNull(),
     connectionType: hardwareConnectionTypeEnum("connection_type").notNull(),
@@ -59,7 +59,7 @@ export const hardwareConfigs = pgTable(
   },
   (table) => [
     index("hardware_configs_tenant_id_idx").on(table.tenantId),
-    index("hardware_configs_branch_id_idx").on(table.branchId),
+    index("hardware_configs_terminal_id_idx").on(table.terminalId),
     index("hardware_configs_status_idx").on(table.status),
     index("hardware_configs_deleted_at_idx").on(table.deletedAt),
   ],
