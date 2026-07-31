@@ -73,7 +73,12 @@ pnpm --filter @cleanhub/api dev
 pnpm --filter @cleanhub/pos-web dev
 ```
 
-POS Web is a single-store terminal: `POS_TENANT_CODE` / `NEXT_PUBLIC_POS_TENANT_CODE` (in the repo-root `.env`) bind the terminal to a tenant so the login form does not ask for a pressing code. Seed cashier accounts (`pos.cashier1..4@cleanhub.local`, password `123456`, tenant `CLEAN-001`) are created by `pnpm db:seed`.
+POS Web is a single-store terminal. A tenant owner or manager initializes each
+installation from the POS setup flow, selects an accessible branch, and enrolls
+the current device. The resulting HttpOnly terminal credential resolves the
+tenant dynamically, so POS login must not depend on a build-time tenant code.
+Seed cashier accounts (`pos.cashier1..4@cleanhub.local`, password `123456`,
+tenant `CLEAN-001`) are created by `pnpm db:seed`.
 
 Build:
 

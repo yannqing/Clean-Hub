@@ -230,8 +230,6 @@ async function writeReleaseCompose() {
       HOSTNAME: 0.0.0.0
       CLEANHUB_API_BASE_URL: \${CLEANHUB_API_BASE_URL:-http://api:4000}
       NEXT_PUBLIC_API_BASE_URL: \${NEXT_PUBLIC_API_BASE_URL:-/api}
-      POS_TENANT_CODE: \${POS_TENANT_CODE:-CLEAN-001}
-      NEXT_PUBLIC_POS_TENANT_CODE: \${NEXT_PUBLIC_POS_TENANT_CODE:-CLEAN-001}
     ports:
       - "127.0.0.1:\${POS_WEB_HOST_PORT:-3011}:3001"
     depends_on:
@@ -664,9 +662,6 @@ async function main() {
   await run("pnpm", ["--filter", "@cleanhub/pos-web", "build"], {
     env: {
       NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api",
-      NEXT_PUBLIC_POS_TENANT_CODE:
-        process.env.NEXT_PUBLIC_POS_TENANT_CODE ?? "CLEAN-001",
-      POS_TENANT_CODE: process.env.POS_TENANT_CODE ?? "CLEAN-001",
     },
   });
 
