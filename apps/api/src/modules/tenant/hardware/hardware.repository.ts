@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, sql, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 
 import { createId } from "@cleanhub/id";
 import {
@@ -53,6 +53,7 @@ function toHardwareConfigSummary(row: {
 function buildWhereClause(
   tenantId: string,
   query: ListHardwareConfigsQuery,
+  allowedBranchIds?: string[],
 ): SQL | undefined {
   const conditions: (SQL | undefined)[] = [
     eq(hardwareConfigs.tenantId, tenantId),
@@ -62,15 +63,31 @@ function buildWhereClause(
       : undefined,
     query.deviceType ? eq(hardwareConfigs.deviceType, query.deviceType) : undefined,
     query.status ? eq(hardwareConfigs.status, query.status) : undefined,
+    buildBranchScopeCondition(allowedBranchIds),
   ];
 
   return and(...conditions);
+}
+
+function buildBranchScopeCondition(
+  allowedBranchIds?: string[],
+): SQL | undefined {
+  if (allowedBranchIds === undefined) {
+    return undefined;
+  }
+
+  if (allowedBranchIds.length === 0) {
+    return sql`false`;
+  }
+
+  return inArray(posTerminalSettings.branchId, allowedBranchIds);
 }
 
 export async function findHardwareConfigs(
   db: Database,
   tenantId: string,
   query: ListHardwareConfigsQuery,
+  allowedBranchIds?: string[],
 ): Promise<HardwareConfigSummary[]> {
   const rows = await db
     .select({
@@ -97,7 +114,7 @@ export async function findHardwareConfigs(
         eq(posTerminalSettings.tenantId, hardwareConfigs.tenantId),
       ),
     )
-    .where(buildWhereClause(tenantId, query))
+    .where(buildWhereClause(tenantId, query, allowedBranchIds))
     .orderBy(desc(hardwareConfigs.createdAt))
     .limit(query.limit)
     .offset(query.offset);
@@ -109,6 +126,7 @@ export async function findHardwareConfigById(
   db: Database,
   tenantId: string,
   hardwareId: string,
+  allowedBranchIds?: string[],
 ): Promise<HardwareConfigSummary | null> {
   const rows = await db
     .select({
@@ -140,6 +158,7 @@ export async function findHardwareConfigById(
         eq(hardwareConfigs.id, hardwareId),
         eq(hardwareConfigs.tenantId, tenantId),
         isNull(hardwareConfigs.deletedAt),
+        buildBranchScopeCondition(allowedBranchIds),
       ),
     )
     .limit(1);

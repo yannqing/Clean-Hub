@@ -9,6 +9,7 @@ import {
 } from "./insights";
 import { createTenantBackupsApi } from "./backups";
 import { createTenantBranchesApi } from "./branches";
+import { createTenantCustomersApi } from "./customers";
 import {
   createTenantProductsApi,
   createTenantServicesApi,
@@ -16,7 +17,9 @@ import {
 import { createTenantDiscountsApi } from "./discounts";
 import { createTenantFinanceApi } from "./finance";
 import { createTenantHardwareApi } from "./hardware";
+import { createTenantUsersApi } from "./identity";
 import { createTenantNotificationsApi } from "./notifications";
+import { createTenantOrdersApi } from "./orders";
 import { createTenantPosChannelApi } from "./pos-channel";
 import { createTenantProfileApi } from "./profile";
 import { createTenantSettingsApi } from "./settings";
@@ -24,11 +27,14 @@ import { createTenantSettingsApi } from "./settings";
 export * from "./insights";
 export * from "./backups";
 export * from "./branches";
+export * from "./customers";
 export * from "./catalog";
 export * from "./discounts";
 export * from "./finance";
 export * from "./hardware";
+export * from "./identity";
 export * from "./notifications";
+export * from "./orders";
 export * from "./pos-channel";
 export * from "./profile";
 // NOTE: settings types are exported explicitly below (not via `export *`),
@@ -47,6 +53,7 @@ export function createTenantApi(client: ApiClient) {
   const auditLogs = createTenantAuditLogsApi(client);
   const backups = createTenantBackupsApi(client);
   const branches = createTenantBranchesApi(client);
+  const customers = createTenantCustomersApi(client);
   const overview = createTenantOverviewApi(client);
   const settings = createTenantSettingsApi(client);
   const services = createTenantServicesApi(client);
@@ -54,7 +61,9 @@ export function createTenantApi(client: ApiClient) {
   const discounts = createTenantDiscountsApi(client);
   const finance = createTenantFinanceApi(client);
   const hardware = createTenantHardwareApi(client);
+  const users = createTenantUsersApi(client);
   const notifications = createTenantNotificationsApi(client);
+  const orders = createTenantOrdersApi(client);
   const posChannel = createTenantPosChannelApi(client);
   const profile = createTenantProfileApi(client);
   const reports = createTenantReportsApi(client);
@@ -63,6 +72,7 @@ export function createTenantApi(client: ApiClient) {
     auditLogs,
     backups,
     branches,
+    customers,
     overview,
     settings,
     services,
@@ -70,7 +80,9 @@ export function createTenantApi(client: ApiClient) {
     discounts,
     finance,
     hardware,
+    users,
     notifications,
+    orders,
     posChannel,
     profile,
     reports,

@@ -1,7 +1,10 @@
 import { getDb, type Database } from "@cleanhub/db";
 
 import { resolveAllowedBranchIds } from "../../auth/branch-scope.helper.js";
-import { requireTenantRole } from "../../auth/permission.helper.js";
+import {
+  assertActiveTenant,
+  requireTenantRole,
+} from "../../auth/permission.helper.js";
 import { TenantAuditError } from "./audit.errors.js";
 import {
   findTenantAuditLogById,
@@ -19,14 +22,10 @@ export async function listTenantAuditLogs(
   db: Database = getDb(),
 ): Promise<TenantAuditLogListResult> {
   requireTenantRole(input.authContext, ["owner", "manager"]);
+  await assertActiveTenant(input.authContext, db);
 
-  let allowedBranchIds: string[] | undefined;
-
-  if (input.authContext.role === "manager") {
-    const scope = await resolveAllowedBranchIds(input.authContext, db);
-
-    allowedBranchIds = scope === "all" ? undefined : scope;
-  }
+  const scope = await resolveAllowedBranchIds(input.authContext, db);
+  const allowedBranchIds = scope === "all" ? undefined : scope;
 
   return findTenantAuditLogs(
     db,
@@ -41,11 +40,16 @@ export async function getTenantAuditLogDetail(
   db: Database = getDb(),
 ): Promise<TenantAuditLogDetail> {
   requireTenantRole(input.authContext, ["owner", "manager"]);
+  await assertActiveTenant(input.authContext, db);
+
+  const scope = await resolveAllowedBranchIds(input.authContext, db);
+  const allowedBranchIds = scope === "all" ? undefined : scope;
 
   const log = await findTenantAuditLogById(
     db,
     input.authContext.tenantId!,
     input.logId,
+    allowedBranchIds,
   );
 
   if (!log) {

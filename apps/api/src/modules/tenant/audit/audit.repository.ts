@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, inArray, isNull, lte, or, type SQL } from "drizzle-orm";
+import { and, count, desc, eq, gte, inArray, lte, sql, type SQL } from "drizzle-orm";
 
 import { auditLogs, type Database, userProfiles } from "@cleanhub/db";
 
@@ -44,17 +44,7 @@ function buildWhereClause(
   query: ListTenantAuditLogsQuery,
   allowedBranchIds?: string[],
 ): SQL | undefined {
-  let branchScopeCondition: SQL | undefined;
-
-  if (allowedBranchIds !== undefined) {
-    branchScopeCondition =
-      allowedBranchIds.length > 0
-        ? or(
-            inArray(auditLogs.branchId, allowedBranchIds),
-            isNull(auditLogs.branchId),
-          )
-        : isNull(auditLogs.branchId);
-  }
+  const branchScopeCondition = buildBranchScopeCondition(allowedBranchIds);
 
   const conditions: (SQL | undefined)[] = [
     eq(auditLogs.tenantId, tenantId),
@@ -71,6 +61,20 @@ function buildWhereClause(
   ];
 
   return and(...conditions);
+}
+
+function buildBranchScopeCondition(
+  allowedBranchIds?: string[],
+): SQL | undefined {
+  if (allowedBranchIds === undefined) {
+    return undefined;
+  }
+
+  if (allowedBranchIds.length === 0) {
+    return sql`false`;
+  }
+
+  return inArray(auditLogs.branchId, allowedBranchIds);
 }
 
 export async function findTenantAuditLogs(
@@ -116,6 +120,7 @@ export async function findTenantAuditLogById(
   db: Database,
   tenantId: string,
   logId: string,
+  allowedBranchIds?: string[],
 ): Promise<TenantAuditLogDetail | null> {
   const rows = await db
     .select({
@@ -139,7 +144,13 @@ export async function findTenantAuditLogById(
     })
     .from(auditLogs)
     .leftJoin(userProfiles, eq(userProfiles.userId, auditLogs.actorUserId))
-    .where(and(eq(auditLogs.id, logId), eq(auditLogs.tenantId, tenantId)))
+    .where(
+      and(
+        eq(auditLogs.id, logId),
+        eq(auditLogs.tenantId, tenantId),
+        buildBranchScopeCondition(allowedBranchIds),
+      ),
+    )
     .limit(1);
 
   const row = rows[0];

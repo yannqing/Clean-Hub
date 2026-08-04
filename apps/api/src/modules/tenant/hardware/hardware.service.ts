@@ -1,7 +1,14 @@
 import { getDb, type Database } from "@cleanhub/db";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
-import { requireTenantRole } from "../../auth/permission.helper.js";
+import {
+  assertBranchIdsSubset,
+  resolveAllowedBranchIds,
+} from "../../auth/branch-scope.helper.js";
+import {
+  assertActiveTenant,
+  requireTenantRole,
+} from "../../auth/permission.helper.js";
 import { HardwareError } from "./hardware.errors.js";
 import {
   findHardwareConfigById,
@@ -19,22 +26,46 @@ import type {
   UpdateHardwareConfigInput,
 } from "./hardware.types.js";
 
+type HardwareAccess = {
+  tenantId: string;
+  allowedBranchIds?: string[];
+};
+
+async function resolveHardwareAccess(
+  authContext: ListHardwareConfigsInput["authContext"],
+  db: Database,
+): Promise<HardwareAccess> {
+  requireTenantRole(authContext, ["owner", "manager"]);
+  await assertActiveTenant(authContext, db);
+
+  const scope = await resolveAllowedBranchIds(authContext, db);
+
+  return {
+    tenantId: authContext.tenantId!,
+    allowedBranchIds: scope === "all" ? undefined : scope,
+  };
+}
+
 export async function listHardwareConfigs(
   input: ListHardwareConfigsInput,
   db: Database = getDb(),
 ): Promise<HardwareConfigSummary[]> {
-  requireTenantRole(input.authContext, ["owner", "manager"]);
+  const access = await resolveHardwareAccess(input.authContext, db);
 
-  return findHardwareConfigs(db, input.authContext.tenantId!, input.query);
+  return findHardwareConfigs(
+    db,
+    access.tenantId,
+    input.query,
+    access.allowedBranchIds,
+  );
 }
 
 export async function createHardwareConfig(
   input: CreateHardwareConfigInput,
   db: Database = getDb(),
 ): Promise<HardwareConfigSummary> {
-  requireTenantRole(input.authContext, ["owner", "manager"]);
-
-  const tenantId = input.authContext.tenantId!;
+  const access = await resolveHardwareAccess(input.authContext, db);
+  const tenantId = access.tenantId;
 
   return db.transaction(async (tx) => {
     const terminal = await findHardwareTerminal(tx, tenantId, input.data.terminalId);
@@ -45,6 +76,7 @@ export async function createHardwareConfig(
         404,
       );
     }
+    await assertBranchIdsSubset(input.authContext, [terminal.branchId], tx);
 
     const hardware = await insertHardwareConfig(tx, {
       tenantId,
@@ -59,6 +91,7 @@ export async function createHardwareConfig(
     await writeAuditLog(tx, {
       actorUserId: input.authContext.userId,
       tenantId,
+      branchId: terminal.branchId,
       eventCategory: "tenant_hardware",
       eventType: "tenant_hardware.created",
       entityType: "hardware_config",
@@ -83,12 +116,16 @@ export async function updateHardwareConfig(
   input: UpdateHardwareConfigInput,
   db: Database = getDb(),
 ): Promise<HardwareConfigSummary> {
-  requireTenantRole(input.authContext, ["owner", "manager"]);
-
-  const tenantId = input.authContext.tenantId!;
+  const access = await resolveHardwareAccess(input.authContext, db);
+  const tenantId = access.tenantId;
 
   return db.transaction(async (tx) => {
-    const existing = await findHardwareConfigById(tx, tenantId, input.hardwareId);
+    const existing = await findHardwareConfigById(
+      tx,
+      tenantId,
+      input.hardwareId,
+      access.allowedBranchIds,
+    );
 
     if (!existing) {
       throw new HardwareError(
@@ -97,6 +134,8 @@ export async function updateHardwareConfig(
         404,
       );
     }
+
+    let targetBranchId = existing.branchId;
 
     if (input.data.terminalId) {
       const terminal = await findHardwareTerminal(tx, tenantId, input.data.terminalId);
@@ -107,6 +146,8 @@ export async function updateHardwareConfig(
           404,
         );
       }
+      await assertBranchIdsSubset(input.authContext, [terminal.branchId], tx);
+      targetBranchId = terminal.branchId;
     }
 
     await updateHardwareConfigRecord(tx, {
@@ -124,6 +165,7 @@ export async function updateHardwareConfig(
     await writeAuditLog(tx, {
       actorUserId: input.authContext.userId,
       tenantId,
+      branchId: targetBranchId,
       eventCategory: "tenant_hardware",
       eventType: "tenant_hardware.updated",
       entityType: "hardware_config",
@@ -141,7 +183,12 @@ export async function updateHardwareConfig(
       userAgent: input.requestMeta?.userAgent,
     });
 
-    const updated = await findHardwareConfigById(tx, tenantId, input.hardwareId);
+    const updated = await findHardwareConfigById(
+      tx,
+      tenantId,
+      input.hardwareId,
+      access.allowedBranchIds,
+    );
 
     return updated!;
   });
@@ -151,12 +198,16 @@ export async function deleteHardwareConfig(
   input: DeleteHardwareConfigInput,
   db: Database = getDb(),
 ): Promise<void> {
-  requireTenantRole(input.authContext, ["owner", "manager"]);
-
-  const tenantId = input.authContext.tenantId!;
+  const access = await resolveHardwareAccess(input.authContext, db);
+  const tenantId = access.tenantId;
 
   await db.transaction(async (tx) => {
-    const existing = await findHardwareConfigById(tx, tenantId, input.hardwareId);
+    const existing = await findHardwareConfigById(
+      tx,
+      tenantId,
+      input.hardwareId,
+      access.allowedBranchIds,
+    );
 
     if (!existing) {
       throw new HardwareError(
@@ -176,6 +227,7 @@ export async function deleteHardwareConfig(
     await writeAuditLog(tx, {
       actorUserId: input.authContext.userId,
       tenantId,
+      branchId: existing.branchId,
       eventCategory: "tenant_hardware",
       eventType: "tenant_hardware.deleted",
       entityType: "hardware_config",

@@ -21,6 +21,8 @@
     "smoke:pos-hardware": "tsx src/modules/pos/hardware/hardware.smoke.ts",
     "smoke:pos-discounts": "tsx src/modules/pos/discounts/pricing-engine.smoke.ts && tsx src/modules/pos/discounts/discount-lifecycle.smoke.ts",
     "smoke:pos-payment-adjustments": "tsx src/modules/pos/payment-adjustments/payment-adjustments.smoke.ts",
+    "smoke:tenant-users": "tsx src/modules/tenant/users/tenant-users.repository.smoke.ts",
+    "smoke:tenant-resource-branch-scope": "tsx src/modules/tenant/tenant-resource-branch-scope.smoke.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "lint": "eslint src",
