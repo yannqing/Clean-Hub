@@ -117,6 +117,7 @@ export type CreatePosAccountRequest = {
 };
 
 export type CreatePosProfileRequest = {
+  id?: string;
   fullName: string;
   phone?: string;
   email?: string;

@@ -219,7 +219,7 @@ export function OfflineSyncProvider({
       setReplaying(true);
       setSyncError(null);
       try {
-        const result = await runtimeQueue.queue.replay(
+        const result = await runtimeQueue.queue.replayAvailable(
           async (item: OfflineQueueItem) => {
             if (
               isPosTerminalSessionInvalidated() ||
@@ -248,10 +248,13 @@ export function OfflineSyncProvider({
           },
         );
         if (
-          result.failed &&
+          result.failed.length > 0 &&
           activeScopeKeyRef.current === runtimeQueue.queueKey
         ) {
-          setSyncError(result.failed.lastError ?? "Replay failed.");
+          setSyncError(
+            result.failed[0]?.lastError ??
+              `${result.failed.length} 条记录同步失败。`,
+          );
         }
       } catch (replayError) {
         if (activeScopeKeyRef.current === runtimeQueue.queueKey) {

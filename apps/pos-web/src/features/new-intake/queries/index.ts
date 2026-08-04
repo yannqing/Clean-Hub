@@ -28,9 +28,11 @@ export type IntakeCreatedAccount = {
 export type IntakeCreatedProfile = {
   profileId: string;
   customerAccountId: string;
+  accountName?: string;
   fullName: string;
   phone: string | null;
   email: string | null;
+  queued?: boolean;
 };
 
 /** Account option for the profile-dialog account selector. */
@@ -39,6 +41,8 @@ export type IntakeAccountOption = {
   accountName: string;
   phone: string | null;
   email: string | null;
+  syncState?: "pending" | "failed";
+  syncError?: string;
 };
 
 type IntakeProfileListResult = {

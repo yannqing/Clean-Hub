@@ -3,6 +3,15 @@ import type { PersistentPrintJob } from "@cleanhub/offline";
 
 import type { CleanHubDesktopBridge } from "./desktop-bridge";
 
+export const POS_PRINT_QUEUE_UPDATED_EVENT =
+  "cleanhub:pos-print-queue-updated";
+
+export function notifyPosPrintQueueUpdated(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(POS_PRINT_QUEUE_UPDATED_EVENT));
+  }
+}
+
 export type PosPrintJobPayload = {
   documentType: "receipt" | "label";
   entityId: string;
@@ -12,6 +21,9 @@ export type PosPrintJobPayload = {
   printerId?: string;
   authorizationId?: string;
   originalPrintJobId?: string;
+  auditReportedAt?: string;
+  auditReportedStatus?: "printed" | "failed";
+  auditReportedAttempt?: number;
 };
 
 type PosHardwarePrintBridge = Pick<

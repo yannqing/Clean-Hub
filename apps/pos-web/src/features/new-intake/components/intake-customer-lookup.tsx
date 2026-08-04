@@ -262,6 +262,27 @@ export function IntakeCustomerLookup({
   }
 
   function handleProfileCreated(profile: IntakeCreatedProfile) {
+    if (profile.queued) {
+      setRows((current) => [
+        {
+          kind: "profile",
+          id: profile.profileId,
+          customerAccountId: profile.customerAccountId,
+          accountName:
+            profile.accountName ?? selectedAccount?.accountName ?? "离线客户",
+          fullName: profile.fullName,
+          phone: profile.phone,
+          email: profile.email,
+          status: "active",
+          createdAt: new Date().toISOString(),
+        },
+        ...current.filter((row) => row.id !== profile.profileId),
+      ]);
+      setTotal((current) => current + 1);
+      setLoading(false);
+      return;
+    }
+
     // Refresh the list so the new profile appears; stay on the lookup page so
     // the clerk can continue searching/selecting.
     if (selectedAccount) {

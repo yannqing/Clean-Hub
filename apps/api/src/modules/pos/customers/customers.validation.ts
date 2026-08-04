@@ -86,6 +86,7 @@ export const createPosAccountBodySchema = z
   );
 
 export const createPosProfileBodySchema = z.object({
+  id: ulidSchema.optional(),
   fullName: z.string().trim().min(1).max(200),
   phone: optionalNonEmpty(32),
   email: optionalEmail(),

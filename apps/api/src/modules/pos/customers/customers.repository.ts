@@ -755,6 +755,7 @@ export async function setPosAccountStatus(
 // ---- writes: profiles -----------------------------------------------------
 
 export type InsertPosProfileInput = {
+  id?: string;
   actorUserId: string;
   tenantId: string;
   customerAccountId: string;
@@ -770,7 +771,7 @@ export async function insertPosProfile(
   db: Database,
   input: InsertPosProfileInput,
 ): Promise<PosCustomerProfileDetail> {
-  const id = createId();
+  const id = input.id ?? createId();
   const phone = normalizeOptional(input.phone);
   const email = input.email ? normalizeEmail(input.email) : undefined;
 

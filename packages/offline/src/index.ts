@@ -32,6 +32,14 @@ export type OfflineQueueItem<TPayload = unknown> = {
   metadata?: Record<string, unknown>;
 };
 
+/**
+ * Optional queue metadata understood by dependency-aware replay. Operation IDs
+ * refer to OfflineQueueItem.id values in the same scoped queue.
+ */
+export type OfflineQueueDependencyMetadata = Record<string, unknown> & {
+  dependsOnOperationIds?: string[];
+};
+
 export type SyncQueueItem<TPayload = unknown> = OfflineQueueItem<TPayload>;
 
 export type EnqueueInput<TPayload = unknown> = {
@@ -50,6 +58,25 @@ export type ReplayHandler<TPayload = unknown> = (
 export type ReplayResult<TPayload = unknown> = {
   replayed: OfflineQueueItem<TPayload>[];
   failed?: OfflineQueueItem<TPayload>;
+};
+
+export type ReplayBlockedReason = "dependency_failed" | "dependency_pending";
+
+export type ReplayBlockedItem<TPayload = unknown> = {
+  item: OfflineQueueItem<TPayload>;
+  reason: ReplayBlockedReason;
+  /** Every valid dependency declared by the blocked operation. */
+  dependencyOperationIds: string[];
+  /** Direct dependencies that are still present in the pending queue. */
+  blockingOperationIds: string[];
+  /** Failed operations found anywhere in the blocked dependency chain. */
+  failedDependencyOperationIds: string[];
+};
+
+export type ReplayAvailableResult<TPayload = unknown> = {
+  replayed: OfflineQueueItem<TPayload>[];
+  failed: OfflineQueueItem<TPayload>[];
+  blocked: ReplayBlockedItem<TPayload>[];
 };
 
 export type OfflineQueuePayloadUpdater<TPayload = unknown> = (
@@ -183,6 +210,10 @@ export type PrintJobReplayResult<TPayload> = {
   printed: PersistentPrintJob<TPayload>[];
   failed?: PersistentPrintJob<TPayload>;
 };
+
+export type PersistentPrintJobPayloadUpdater<TPayload> = (
+  payload: TPayload,
+) => TPayload;
 
 export type DeliveryTaskCacheOptions = {
   storage: AsyncKeyValueStorage;
@@ -827,6 +858,81 @@ export class OfflineQueue {
     });
   }
 
+  /**
+   * Replays every operation whose dependencies are no longer pending.
+   *
+   * Unlike replay(), a failed operation does not stop independent work. It is
+   * attempted at most once during this call, while descendants remain pending
+   * and are returned as blocked. A later call retries the failed operation and
+   * can then continue through its dependency chain.
+   */
+  async replayAvailable<TPayload = unknown>(
+    handler: ReplayHandler<TPayload>,
+  ): Promise<ReplayAvailableResult<TPayload>> {
+    return runQueueReplayExclusive(this.queueKey, async () => {
+      const replayed: OfflineQueueItem<TPayload>[] = [];
+      const failed: OfflineQueueItem<TPayload>[] = [];
+      const attemptedOperationIds = new Set<string>();
+      const failedOperationIds = new Set<string>();
+
+      while (true) {
+        const pending = (await this.list<TPayload>()).filter(
+          (item) => item.status === "pending",
+        );
+        const pendingOperationIds = new Set(pending.map((item) => item.id));
+        const next = pending.find(
+          (item) =>
+            !attemptedOperationIds.has(item.id) &&
+            getDependencyOperationIds(item).every(
+              (dependencyId) => !pendingOperationIds.has(dependencyId),
+            ),
+        );
+
+        if (!next) {
+          const pendingById = new Map(pending.map((item) => [item.id, item]));
+          const blocked = pending
+            .filter((item) => !failedOperationIds.has(item.id))
+            .map((item): ReplayBlockedItem<TPayload> => {
+              const dependencyOperationIds = getDependencyOperationIds(item);
+              const blockingOperationIds = dependencyOperationIds.filter(
+                (dependencyId) => pendingById.has(dependencyId),
+              );
+              const failedDependencyOperationIds =
+                collectFailedDependencyOperationIds(
+                  item,
+                  pendingById,
+                  failedOperationIds,
+                );
+
+              return {
+                item,
+                reason:
+                  failedDependencyOperationIds.length > 0
+                    ? "dependency_failed"
+                    : "dependency_pending",
+                dependencyOperationIds,
+                blockingOperationIds,
+                failedDependencyOperationIds,
+              };
+            });
+
+          return { replayed, failed, blocked };
+        }
+
+        attemptedOperationIds.add(next.id);
+        try {
+          await handler(next);
+          await this.markSynced(next.id);
+          replayed.push(next);
+        } catch (error) {
+          const failedItem = await this.recordFailure<TPayload>(next.id, error);
+          failed.push(failedItem);
+          failedOperationIds.add(failedItem.id);
+        }
+      }
+    });
+  }
+
   private async recordFailure<TPayload = unknown>(
     id: string,
     error: unknown,
@@ -923,6 +1029,27 @@ export class PersistentPrintJobQueue<TPayload = unknown> {
 
   async list(): Promise<PersistentPrintJob<TPayload>[]> {
     return runQueueStateExclusive(this.queueKey, () => this.readJobs());
+  }
+
+  async updatePayload(
+    jobId: string,
+    updater: PersistentPrintJobPayloadUpdater<TPayload>,
+  ): Promise<PersistentPrintJob<TPayload> | undefined> {
+    return runQueueStateExclusive(this.queueKey, async () => {
+      const jobs = await this.readJobs();
+      let updated: PersistentPrintJob<TPayload> | undefined;
+      const nextJobs = jobs.map((job) => {
+        if (job.id !== jobId) return job;
+        updated = {
+          ...job,
+          payload: updater(job.payload),
+          updatedAt: new Date().toISOString(),
+        };
+        return updated;
+      });
+      if (updated) await this.writeJobs(nextJobs);
+      return updated;
+    });
   }
 
   async replay(
@@ -1177,6 +1304,13 @@ export async function replay<TPayload = unknown>(
   return queue.replay(handler);
 }
 
+export async function replayAvailable<TPayload = unknown>(
+  queue: OfflineQueue,
+  handler: ReplayHandler<TPayload>,
+): Promise<ReplayAvailableResult<TPayload>> {
+  return queue.replayAvailable(handler);
+}
+
 async function readOfflineQueueFromStorage(
   storage: AsyncKeyValueStorage,
   queueKey: string,
@@ -1211,4 +1345,58 @@ function getErrorMessage(error: unknown): string {
   }
 
   return "Offline replay failed.";
+}
+
+function getDependencyOperationIds(item: OfflineQueueItem): string[] {
+  const value = item.metadata?.dependsOnOperationIds;
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return [
+    ...new Set(
+      value.filter(
+        (dependencyId): dependencyId is string =>
+          typeof dependencyId === "string" && dependencyId.length > 0,
+      ),
+    ),
+  ];
+}
+
+function collectFailedDependencyOperationIds<TPayload>(
+  item: OfflineQueueItem<TPayload>,
+  pendingById: Map<string, OfflineQueueItem<TPayload>>,
+  failedOperationIds: Set<string>,
+  visited = new Set<string>(),
+): string[] {
+  const failures = new Set<string>();
+
+  for (const dependencyId of getDependencyOperationIds(item)) {
+    if (failedOperationIds.has(dependencyId)) {
+      failures.add(dependencyId);
+      continue;
+    }
+
+    if (visited.has(dependencyId)) {
+      continue;
+    }
+
+    const dependency = pendingById.get(dependencyId);
+    if (!dependency) {
+      continue;
+    }
+
+    const nextVisited = new Set(visited);
+    nextVisited.add(dependencyId);
+    for (const failureId of collectFailedDependencyOperationIds(
+      dependency,
+      pendingById,
+      failedOperationIds,
+      nextVisited,
+    )) {
+      failures.add(failureId);
+    }
+  }
+
+  return [...failures];
 }

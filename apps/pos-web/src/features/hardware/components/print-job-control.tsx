@@ -23,7 +23,7 @@ import {
   useSyncExternalStore,
 } from "react";
 
-import { Icon } from "@/components/app-shell";
+import { Icon } from "@/components/app-shell/icons";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
@@ -32,6 +32,7 @@ import { posToast as toast } from "@/lib/pos-toast";
 import { getDesktopBridge, getPosOfflineStorage } from "../lib/desktop-bridge";
 import {
   executePosPrintJob,
+  notifyPosPrintQueueUpdated,
   type PosPrintJobPayload,
 } from "../lib/pos-print-job";
 
@@ -148,6 +149,8 @@ export function PrintJobControl({
   useEffect(() => {
     if (
       !latestJob ||
+      (latestJob.payload.auditReportedStatus === latestJob.status &&
+        latestJob.payload.auditReportedAttempt === latestJob.attempt) ||
       (latestJob.status !== "printed" && latestJob.status !== "failed")
     ) {
       return;
@@ -169,6 +172,17 @@ export function PrintJobControl({
         authorizationId: latestJob.payload.authorizationId,
         originalPrintJobId: latestJob.payload.originalPrintJobId,
       })
+      .then(async () => {
+        if (!queue) return;
+        await queue.updatePayload(latestJob.id, (payload) => ({
+          ...payload,
+          auditReportedAt: new Date().toISOString(),
+          auditReportedStatus: latestJob.status as "printed" | "failed",
+          auditReportedAttempt: latestJob.attempt,
+        }));
+        await refresh();
+        notifyPosPrintQueueUpdated();
+      })
       .catch((error) => {
         reportingRef.current.delete(reportKey);
         setAuditError(
@@ -178,7 +192,7 @@ export function PrintJobControl({
           ),
         );
       });
-  }, [latestJob]);
+  }, [latestJob, queue, refresh]);
 
   const runJob = useCallback(
     async (job: ScopedPrintJob) => {
@@ -190,6 +204,7 @@ export function PrintJobControl({
           executePosPrintJob(storedJob, getDesktopBridge()?.hardware ?? null),
         );
         await refresh();
+        notifyPosPrintQueueUpdated();
         if (result.status === "printed") {
           toast.success(
             `${documentType === "receipt" ? "小票" : "标签"}已打印。`,
@@ -222,6 +237,7 @@ export function PrintJobControl({
       payload: { documentType, entityId, title, content },
     });
     await refresh();
+    notifyPosPrintQueueUpdated();
     await runJob(job);
   }
 
@@ -256,6 +272,7 @@ export function PrintJobControl({
       setReprintOpen(false);
       setReprintReason("");
       await refresh();
+      notifyPosPrintQueueUpdated();
       setBusy(false);
       await runJob(reprintJob);
     } catch (error) {

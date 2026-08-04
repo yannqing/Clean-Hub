@@ -8,6 +8,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { posRoutes, posSidebarNavigation } from "@/config";
+import { PendingPrintJobs } from "@/features/hardware/components/pending-print-jobs";
+import { OfflineSyncBadge } from "@/features/offline/components";
 
 import { Icon } from "./icons";
 import { PosGlobalHeader } from "./pos-global-header";
@@ -122,6 +124,8 @@ export function PosShell({
   const displayInitials =
     resolvedProfile.initials || buildInitials(profileName);
   const settingsActive = isActivePath(pathname, posRoutes.settings);
+  const canReprint =
+    resolvedProfile.role === "owner" || resolvedProfile.role === "manager";
 
   return (
     <div className="flex h-screen h-dvh min-h-0 flex-col overflow-hidden bg-muted/30 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-foreground">
@@ -222,6 +226,8 @@ export function PosShell({
           </nav>
 
           <div className="border-t border-sidebar-border pt-3">
+            <OfflineSyncBadge className="mb-2 w-full justify-start text-xs" />
+            <PendingPrintJobs canReprint={canReprint} />
             <Link
               aria-current={settingsActive ? "page" : undefined}
               className={cn(

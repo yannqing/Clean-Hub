@@ -5,7 +5,11 @@ import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { SupportedLocale } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
+import { buildPosReceiptText } from "@cleanhub/hardware";
+import { createId } from "@cleanhub/id";
+import { createScopedPrintJobQueue } from "@cleanhub/offline";
 import type {
+  CreateManualOrderRequest,
   CreatePosOrderRequest,
   PosCatalogService,
   PosCustomerProfileWithAccount,
@@ -21,10 +25,18 @@ import {
 
 import { Icon, type PosIconName } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
+import { PrintJobControl } from "@/features/hardware/components/print-job-control";
+import { getPosOfflineStorage } from "@/features/hardware/lib/desktop-bridge";
+import {
+  notifyPosPrintQueueUpdated,
+  type PosPrintJobPayload,
+} from "@/features/hardware/lib/pos-print-job";
 import { usePosOfflineWrites } from "@/features/offline/lib";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
+import { normalizeCurrencyCode } from "@/lib/money";
 
 import { formatOrderMoney } from "../constants";
 
@@ -43,6 +55,12 @@ type ManualItemForm = {
   defectNotes: string;
   specialRequest: string;
   itemIdentifier: string;
+};
+
+type OfflineOrderReceipt = {
+  content: string;
+  entityId: string;
+  title: string;
 };
 
 function emptyItem(): ManualItemForm {
@@ -95,6 +113,12 @@ export function OrderCreateDialog({
   const { locale } = useTranslation();
   const text = (value: string) => translatePosText(value, locale);
   const router = useRouter();
+  const {
+    branchId: runtimeBranchId,
+    currency: runtimeCurrency,
+    tenantId: runtimeTenantId,
+    terminalId: runtimeTerminalId,
+  } = usePosRuntimeConfig();
   const { createOrder } = usePosOfflineWrites();
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -108,6 +132,8 @@ export function OrderCreateDialog({
   const [expireAt, setExpireAt] = useState("");
   const [notes, setNotes] = useState("");
   const [items, setItems] = useState<ManualItemForm[]>([emptyItem()]);
+  const [offlineReceipt, setOfflineReceipt] =
+    useState<OfflineOrderReceipt | null>(null);
   const ticketModeLocked = Boolean(initialTicket);
 
   function resetForm() {
@@ -227,23 +253,56 @@ export function OrderCreateDialog({
     }
 
     startTransition(async () => {
+      let result: Awaited<ReturnType<typeof createOrder>>;
       try {
-        const result = await createOrder(payload);
-        if (result.queued) {
-          toast.success("网络不可用，订单已加入同步队列。");
-          handleOpenChange(false);
-          router.push(posRoutes.orders);
-          return;
-        }
-        toast.success("订单已创建。");
-        handleOpenChange(false);
-        router.push(
-          orderDetailHref?.(result.data.id) ??
-            posRoutes.orderDetail(result.data.id),
-        );
+        result = await createOrder(payload);
       } catch (error) {
         toast.error(getPosApiErrorMessage(error, "订单创建失败，请重试。"));
+        return;
       }
+
+      if (result.queued) {
+        try {
+          const receipt = buildOfflineOrderReceipt({
+            catalog,
+            customer: selectedCustomer,
+            entityId: result.entityId,
+            locale,
+            payload,
+            runtimeCurrency,
+            ticket: selectedTicket,
+          });
+          const receiptPersisted = await persistOfflineReceipt({
+            branchId: runtimeBranchId,
+            receipt,
+            tenantId: runtimeTenantId,
+            terminalId: runtimeTerminalId,
+          });
+          setOfflineReceipt(receipt);
+          toast.success(
+            receiptPersisted
+              ? "网络不可用，订单和待打印小票已本地保存。"
+              : "网络不可用，订单已本地保存，可立即打印小票。",
+          );
+          handleOpenChange(false);
+        } catch (receiptError) {
+          toast.warning(
+            getPosApiErrorMessage(
+              receiptError,
+              "订单已本地保存，但暂存小票生成失败；请勿重复创建订单。",
+            ),
+          );
+          handleOpenChange(false);
+        }
+        return;
+      }
+
+      toast.success("订单已创建。");
+      handleOpenChange(false);
+      router.push(
+        orderDetailHref?.(result.data.id) ??
+          posRoutes.orderDetail(result.data.id),
+      );
     });
   }
 
@@ -355,8 +414,209 @@ export function OrderCreateDialog({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setOfflineReceipt(null);
+        }}
+        open={Boolean(offlineReceipt)}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{text("离线订单已保存")}</DialogTitle>
+          </DialogHeader>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 text-sm leading-6 text-amber-950">
+            {text(
+              "订单已保存在当前终端，恢复网络后会自动同步。现在可以直接打印本地小票。",
+            )}
+          </div>
+          {offlineReceipt ? (
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/40 p-3 text-xs leading-5 text-foreground">
+              {offlineReceipt.content}
+            </pre>
+          ) : null}
+          <DialogFooter>
+            <button
+              className="h-10 rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground hover:bg-muted"
+              onClick={() => setOfflineReceipt(null)}
+              type="button"
+            >
+              {text("稍后处理")}
+            </button>
+            {offlineReceipt ? (
+              <PrintJobControl
+                canReprint={canManageSensitiveOperations}
+                content={offlineReceipt.content}
+                documentType="receipt"
+                entityId={offlineReceipt.entityId}
+                initialLabel={text("打印离线小票")}
+                title={offlineReceipt.title}
+              />
+            ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
+}
+
+function buildOfflineOrderReceipt(input: {
+  catalog: PosCatalogService[];
+  customer: PosCustomerProfileWithAccount | null;
+  entityId: string;
+  locale: SupportedLocale;
+  payload: CreatePosOrderRequest;
+  runtimeCurrency?: string;
+  ticket: ServiceTicketSummary | null;
+}): OfflineOrderReceipt {
+  const manualPayload =
+    input.payload.orderType === "manual" ? input.payload : null;
+  const currency = resolveReceiptCurrency(
+    manualPayload
+      ? input.catalog.find(
+          (service) => service.id === manualPayload.items[0]?.serviceId,
+        )?.currency ??
+        input.runtimeCurrency ??
+        "XOF"
+      : input.runtimeCurrency ?? "XOF",
+  );
+  const receiptItems =
+    manualPayload
+      ? buildOfflineManualReceiptItems(manualPayload, input.catalog, currency)
+      : [
+          {
+            name: input.ticket?.ticketNo
+              ? `Ticket ${input.ticket.ticketNo}`
+              : "Service ticket",
+            quantity: Math.max(1, input.ticket?.itemCount ?? 1),
+            unitAmountMinor: toMinorUnits(
+              Number(input.ticket?.totalAmount ?? 0) /
+                Math.max(1, input.ticket?.itemCount ?? 1),
+              currency,
+            ),
+            totalAmountMinor: toMinorUnits(
+              Number(input.ticket?.totalAmount ?? 0),
+              currency,
+            ),
+          },
+        ];
+  const totalMinor = receiptItems.reduce(
+    (total, item) => total + item.totalAmountMinor,
+    0,
+  );
+  const code = `OFF-${input.entityId.slice(-8).toUpperCase()}`;
+
+  return {
+    entityId: input.entityId,
+    title: code,
+    content: buildPosReceiptText(
+      {
+        receiptNo: code,
+        orderCode: code,
+        issuedAt: new Date(),
+        currency,
+        merchantName: "CleanHub · Offline",
+        customerName:
+          input.customer?.fullName ?? input.ticket?.customerName ?? undefined,
+        items: receiptItems,
+        subtotalMinor: totalMinor,
+        discountMinor: 0,
+        totalMinor,
+        paidMinor: 0,
+        balanceMinor: totalMinor,
+        footer:
+          input.locale === "zh-CN"
+            ? "离线暂存单 · 待同步 · 金额以同步成功后的正式订单为准"
+            : input.locale === "fr"
+              ? "Brouillon hors ligne · Le montant final sera confirmé après synchronisation"
+              : "Offline draft · Final amount is confirmed after sync",
+      },
+      { locale: input.locale },
+    ),
+  };
+}
+
+async function persistOfflineReceipt(input: {
+  branchId: string | null;
+  receipt: OfflineOrderReceipt;
+  tenantId: string | null;
+  terminalId: string | null;
+}): Promise<boolean> {
+  if (!input.tenantId || !input.branchId || !input.terminalId) {
+    return false;
+  }
+
+  const queue = createScopedPrintJobQueue<PosPrintJobPayload>({
+    storage: getPosOfflineStorage(),
+    scope: {
+      tenantId: input.tenantId,
+      branchId: input.branchId,
+      terminalId: input.terminalId,
+    },
+  });
+  await queue.enqueue({
+    id: createId(),
+    idempotencyKey: `pos-print:receipt:${input.receipt.entityId}:initial`,
+    payload: {
+      documentType: "receipt",
+      entityId: input.receipt.entityId,
+      title: input.receipt.title,
+      content: input.receipt.content,
+    },
+  });
+  notifyPosPrintQueueUpdated();
+  return true;
+}
+
+function resolveReceiptCurrency(value: string): string {
+  const normalized = normalizeCurrencyCode(value);
+  try {
+    new Intl.NumberFormat("en", {
+      style: "currency",
+      currency: normalized,
+    }).format(0);
+    return normalized;
+  } catch {
+    return "XOF";
+  }
+}
+
+function buildOfflineManualReceiptItems(
+  payload: CreateManualOrderRequest,
+  catalog: PosCatalogService[],
+  currency: string,
+) {
+  return payload.items.map((item) => {
+    const service = catalog.find((candidate) => candidate.id === item.serviceId);
+    const quantity = item.weight
+      ? Number(item.weight)
+      : Number(item.quantity ?? 1);
+    const unitAmount = Number(item.chargedUnitAmount ?? service?.amount ?? 0);
+    const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+    const safeUnitAmount = Number.isFinite(unitAmount) ? unitAmount : 0;
+
+    return {
+      name: service?.name ?? item.serviceId,
+      quantity: safeQuantity,
+      unitAmountMinor: toMinorUnits(safeUnitAmount, currency),
+      totalAmountMinor: toMinorUnits(
+        safeQuantity * safeUnitAmount,
+        currency,
+      ),
+      note: [item.itemColor, item.defectNotes, item.specialRequest]
+        .filter(Boolean)
+        .join("; ") || undefined,
+    };
+  });
+}
+
+function toMinorUnits(value: number, currency: string): number {
+  const fractionDigits =
+    new Intl.NumberFormat("en", {
+      style: "currency",
+      currency,
+    }).resolvedOptions().maximumFractionDigits ?? 2;
+  return Math.round(value * 10 ** fractionDigits);
 }
 
 function ManualOrderFields({
@@ -604,35 +864,71 @@ function CustomerProfilePicker({
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(false);
   const [options, setOptions] = useState<PosCustomerProfileWithAccount[]>([]);
+  const { listQueuedCustomerProfiles, pendingCount } = usePosOfflineWrites();
 
   useEffect(() => {
     const controller = new AbortController();
+    let active = true;
     const timer = window.setTimeout(() => {
       setLoading(true);
-      void posApi.pos.customers
-        .list({
-          q: keyword.trim() || undefined,
-          resultType: "profile",
-          status: "active",
-          limit: 8,
-          offset: 0,
+      const normalizedKeyword = keyword.trim().toLowerCase();
+      void Promise.allSettled([
+        posApi.pos.customers.list(
+          {
+            q: keyword.trim() || undefined,
+            resultType: "profile",
+            status: "active",
+            limit: 8,
+            offset: 0,
+          },
+          { signal: controller.signal },
+        ),
+        listQueuedCustomerProfiles(),
+      ])
+        .then(([remoteResult, queuedResult]) => {
+          if (!active) return;
+          const remote =
+            remoteResult.status === "fulfilled"
+              ? remoteResult.value.data
+                  .filter((entry) => entry.kind === "profile")
+                  .map((entry) => entry.profile)
+              : [];
+          const queued =
+            queuedResult.status === "fulfilled"
+              ? queuedResult.value.filter((customer) => {
+                  if (!normalizedKeyword) return true;
+                  return [
+                    customer.fullName,
+                    customer.accountName,
+                    customer.phone,
+                    customer.email,
+                  ].some((value) =>
+                    String(value ?? "")
+                      .toLowerCase()
+                      .includes(normalizedKeyword),
+                  );
+                })
+              : [];
+          const merged = new Map<string, PosCustomerProfileWithAccount>();
+          for (const customer of [...queued, ...remote]) {
+            merged.set(customer.id, customer);
+          }
+          setOptions([...merged.values()].slice(0, 8));
         })
-        .then((result) => {
-          setOptions(
-            result.data
-              .filter((entry) => entry.kind === "profile")
-              .map((entry) => entry.profile),
-          );
+        .catch(() => {
+          if (active) setOptions([]);
         })
-        .catch(() => setOptions([]))
-        .finally(() => setLoading(false));
+        .finally(() => {
+          if (active) setLoading(false);
+        });
     }, 250);
 
     return () => {
+      active = false;
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [keyword]);
+  }, [keyword, listQueuedCustomerProfiles, pendingCount]);
 
   return (
     <Field label={text("客户档案")}>

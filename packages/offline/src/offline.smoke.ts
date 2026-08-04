@@ -91,6 +91,103 @@ assert(
   "items should replay in queue order with retry",
 );
 
+const dependencyQueue = createOfflineQueue({
+  storage: createMemoryStorage(),
+  queueKey: "cleanhub.offline.dependency.smoke",
+});
+const dependentChild = await dependencyQueue.enqueue({
+  id: "dependency_child",
+  entity: "customerProfile",
+  operation: "create",
+  payload: { profileId: "profile_1" },
+  metadata: { dependsOnOperationIds: ["dependency_parent"] },
+});
+const dependencyParent = await dependencyQueue.enqueue({
+  id: "dependency_parent",
+  entity: "customerAccount",
+  operation: "create",
+  payload: { accountId: "account_1" },
+});
+const independentOperation = await dependencyQueue.enqueue({
+  id: "dependency_independent",
+  entity: "order",
+  operation: "create",
+  payload: { orderId: "order_independent" },
+});
+const dependentGrandchild = await dependencyQueue.enqueue({
+  id: "dependency_grandchild",
+  entity: "order",
+  operation: "create",
+  payload: { orderId: "order_dependent" },
+  metadata: { dependsOnOperationIds: [dependentChild.id] },
+});
+
+const dependencyAttemptCounts = new Map<string, number>();
+const failedDependencyReplay = await dependencyQueue.replayAvailable(
+  async (item) => {
+    dependencyAttemptCounts.set(
+      item.id,
+      (dependencyAttemptCounts.get(item.id) ?? 0) + 1,
+    );
+    if (item.id === dependencyParent.id) {
+      throw new Error("parent unavailable");
+    }
+  },
+);
+
+assert(
+  failedDependencyReplay.replayed.length === 1 &&
+    failedDependencyReplay.replayed[0]?.id === independentOperation.id,
+  "a failed dependency chain must not stop an unrelated ready operation",
+);
+assert(
+  failedDependencyReplay.failed.length === 1 &&
+    failedDependencyReplay.failed[0]?.id === dependencyParent.id &&
+    failedDependencyReplay.failed[0]?.attempt === 1 &&
+    dependencyAttemptCounts.get(dependencyParent.id) === 1,
+  "a failed operation must be reported and attempted only once per replay",
+);
+assert(
+  failedDependencyReplay.blocked.length === 2 &&
+    failedDependencyReplay.blocked.every(
+      (entry) =>
+        entry.reason === "dependency_failed" &&
+        entry.failedDependencyOperationIds.includes(dependencyParent.id),
+    ) &&
+    failedDependencyReplay.blocked.some(
+      (entry) =>
+        entry.item.id === dependentChild.id &&
+        entry.blockingOperationIds.includes(dependencyParent.id),
+    ) &&
+    failedDependencyReplay.blocked.some(
+      (entry) =>
+        entry.item.id === dependentGrandchild.id &&
+        entry.blockingOperationIds.includes(dependentChild.id),
+    ),
+  "children must stay pending with enough dependency failure detail for the UI",
+);
+
+const recoveredDependencyOrder: string[] = [];
+const recoveredDependencyReplay = await dependencyQueue.replayAvailable(
+  async (item) => {
+    recoveredDependencyOrder.push(item.id);
+  },
+);
+assert(
+  recoveredDependencyReplay.failed.length === 0 &&
+    recoveredDependencyReplay.blocked.length === 0 &&
+    recoveredDependencyReplay.replayed.length === 3 &&
+    recoveredDependencyOrder.join(",") ===
+      [dependencyParent.id, dependentChild.id, dependentGrandchild.id].join(
+        ",",
+      ),
+  "the next replay should retry the parent and recover in dependency order",
+);
+assert(
+  (await dependencyQueue.list()).length === 0,
+  "the dependency queue should be empty after the retry succeeds",
+);
+
 const cache = createDeliveryTaskCache({ storage });
 await cache.saveTasks([
   {
@@ -246,7 +343,8 @@ const printQueueScope = {
   userId: "user_a",
   terminalCredentialVersion: 1,
 };
-const printQueue = createScopedPrintJobQueue<{ content: string }>({
+type SmokePrintPayload = { content: string; auditReported?: boolean };
+const printQueue = createScopedPrintJobQueue<SmokePrintPayload>({
   storage: sharedScopedStorage,
   scope: printQueueScope,
 });
@@ -282,7 +380,7 @@ const rotatedPrintQueueScope = {
   userId: "user_b",
   terminalCredentialVersion: 9,
 };
-const reopenedPrintQueue = createScopedPrintJobQueue<{ content: string }>({
+const reopenedPrintQueue = createScopedPrintJobQueue<SmokePrintPayload>({
   storage: sharedScopedStorage,
   scope: rotatedPrintQueueScope,
 });
@@ -309,6 +407,15 @@ assert(
     retriedPrintJob.attempt === 2 &&
     Boolean(retriedPrintJob.printedAt),
   "retry should print the same job and persist success",
+);
+const auditedPrintJob = await reopenedPrintQueue.updatePayload(
+  printJob.id,
+  (payload) => ({ ...payload, auditReported: true }),
+);
+assert(
+  auditedPrintJob?.payload.auditReported === true &&
+    (await reopenedPrintQueue.list())[0]?.payload.auditReported === true,
+  "print job payload updates should persist audit acknowledgement metadata",
 );
 
 const uncertainPrintStorage = createMemoryStorage();

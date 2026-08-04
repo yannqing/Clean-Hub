@@ -7,6 +7,7 @@ import type {
   UpdatePosAccountRequest,
 } from "./accounts.types";
 import type {
+  CreatePosProfileRequest,
   PosCustomerAccountDetail,
   PosCustomerProfileSummary,
 } from "./customers.types";
@@ -39,18 +40,13 @@ export function createPosAccountsApi(client: ApiClient) {
     /** Create a profile nested under an account. POST /pos/accounts/:accountId/customers */
     createProfile: (
       accountId: string,
-      input: {
-        fullName: string;
-        phone?: string;
-        email?: string;
-        relationship?: string;
-        address?: string;
-        notes?: string;
-      },
+      input: CreatePosProfileRequest,
+      options?: Omit<ApiRequestOptions, "method" | "body" | "query">,
     ) =>
       client.post<PosCustomerProfileSummary>(
         `/pos/accounts/${accountId}/customers`,
         input,
+        options,
       ),
 
     /** Update account basic info. PATCH /pos/accounts/:accountId */

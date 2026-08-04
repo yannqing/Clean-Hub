@@ -7,6 +7,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { Icon } from "@/components/app-shell";
+import { usePosOfflineWrites } from "@/features/offline/lib";
 
 import {
   Dialog,
@@ -17,7 +18,7 @@ import {
 } from "@cleanhub/ui";
 
 import { INTAKE_RELATIONSHIP_OPTIONS } from "../constants";
-import { createIntakeProfile, searchIntakeAccounts } from "../queries";
+import { searchIntakeAccounts } from "../queries";
 import type { IntakeAccountOption, IntakeCreatedProfile } from "../queries";
 import type { IntakeCreateProfileInput } from "../types";
 
@@ -54,6 +55,11 @@ export function IntakeCreateProfileDialog({
   );
   const [accountsLoading, setAccountsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const {
+    createCustomerProfile,
+    listQueuedCustomerAccounts,
+    pendingCount,
+  } = usePosOfflineWrites();
 
   // Load account options for the selector whenever the dialog opens.
   useEffect(() => {
@@ -61,24 +67,49 @@ export function IntakeCreateProfileDialog({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch; loading flag must flip synchronously before the async call.
     setAccountsLoading(true);
     let cancelled = false;
-    searchIntakeAccounts(accountKeyword)
-      .then((result) => {
+    Promise.allSettled([
+      searchIntakeAccounts(accountKeyword),
+      listQueuedCustomerAccounts(),
+    ])
+      .then(([remoteResult, queuedResult]) => {
         if (cancelled) return;
+        const remoteAccounts =
+          remoteResult.status === "fulfilled" ? remoteResult.value : [];
+        const normalizedKeyword = accountKeyword.trim().toLowerCase();
+        const queuedAccounts =
+          queuedResult.status === "fulfilled"
+            ? queuedResult.value
+                .filter((account) => {
+                  if (!normalizedKeyword) return true;
+                  return [
+                    account.accountName,
+                    account.phone,
+                    account.email,
+                  ].some((value) =>
+                    String(value ?? "")
+                      .toLowerCase()
+                      .includes(normalizedKeyword),
+                  );
+                })
+                .map(
+                  (account): IntakeAccountOption => ({
+                    id: account.id,
+                    accountName: account.accountName,
+                    phone: account.phone,
+                    email: account.email,
+                    syncState: account.syncState,
+                    syncError: account.lastError,
+                  }),
+                )
+            : [];
 
-        if (
-          initialAccount &&
-          !result.some((account) => account.id === initialAccount.id)
-        ) {
-          setAccounts([initialAccount, ...result]);
-          return;
-        }
-
-        setAccounts(result);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setAccounts(initialAccount ? [initialAccount] : []);
-        }
+        setAccounts(
+          mergeAccountOptions(
+            queuedAccounts,
+            initialAccount ? [initialAccount] : [],
+            remoteAccounts,
+          ),
+        );
       })
       .finally(() => {
         if (!cancelled) setAccountsLoading(false);
@@ -86,7 +117,13 @@ export function IntakeCreateProfileDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, accountKeyword, initialAccount]);
+  }, [
+    open,
+    accountKeyword,
+    initialAccount,
+    listQueuedCustomerAccounts,
+    pendingCount,
+  ]);
 
   function update<K extends keyof IntakeCreateProfileInput>(
     key: K,
@@ -111,8 +148,53 @@ export function IntakeCreateProfileDialog({
 
     setSubmitting(true);
     try {
-      const profile = await createIntakeProfile(form);
-      toast.success("新增客户档案已保存");
+      const account = selectedAccount;
+      if (!account) {
+        toast.error("请选择所属客户账户");
+        return;
+      }
+      if (account.syncState === "failed") {
+        toast.error("该账户同步失败，请先处理同步问题后再新增档案。");
+        return;
+      }
+      const result = await createCustomerProfile(
+        form.accountId,
+        {
+          fullName: form.fullName.trim(),
+          phone: form.profilePhone.trim() || undefined,
+          email: form.profileEmail.trim() || undefined,
+          relationship: form.relationship.trim() || undefined,
+        },
+        {
+          accountName: account.accountName,
+          phone: account.phone,
+          email: account.email,
+        },
+      );
+      const profile: IntakeCreatedProfile = result.queued
+        ? {
+            profileId: result.entityId,
+            customerAccountId: form.accountId,
+            accountName: account.accountName,
+            fullName: form.fullName.trim(),
+            phone: form.profilePhone.trim() || null,
+            email: form.profileEmail.trim() || null,
+            queued: true,
+          }
+        : {
+            profileId: result.data.id,
+            customerAccountId: result.data.customerAccountId,
+            accountName: account.accountName,
+            fullName: result.data.fullName,
+            phone: result.data.phone,
+            email: result.data.email,
+            queued: false,
+          };
+      toast.success(
+        result.queued
+          ? "客户档案已加入同步队列。"
+          : "新增客户档案已保存",
+      );
       onOpenChange(false);
       onCreated(profile);
     } catch (error) {
@@ -163,11 +245,13 @@ export function IntakeCreateProfileDialog({
             ) : (
               accounts.map((account) => {
                 const active = account.id === form.accountId;
+                const syncFailed = account.syncState === "failed";
                 return (
                   <button
                     className={`flex w-full items-center justify-between px-3 py-2.5 text-left text-sm transition ${
                       active ? "bg-muted text-foreground" : "hover:bg-muted/50"
-                    }`}
+                    } disabled:cursor-not-allowed disabled:opacity-60`}
+                    disabled={syncFailed}
                     key={account.id}
                     type="button"
                     onClick={() => update("accountId", account.id)}
@@ -186,11 +270,15 @@ export function IntakeCreateProfileDialog({
                         />
                       </div>
                     </div>
-                    {active && (
-                      <span className="ml-2 shrink-0 text-xs font-semibold">
-                        ✓ {text("已选择")}
-                      </span>
-                    )}
+                    <span className="ml-2 shrink-0 text-xs font-semibold">
+                      {syncFailed
+                        ? text("同步待处理")
+                        : account.syncState === "pending"
+                          ? text("待同步")
+                          : active
+                            ? `✓ ${text("已选择")}`
+                            : null}
+                    </span>
                   </button>
                 );
               })
@@ -261,7 +349,7 @@ export function IntakeCreateProfileDialog({
           </button>
           <button
             className="h-10 rounded-lg bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-60"
-            disabled={submitting}
+            disabled={submitting || selectedAccount?.syncState === "failed"}
             type="button"
             onClick={handleSubmit}
           >
@@ -271,6 +359,18 @@ export function IntakeCreateProfileDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+function mergeAccountOptions(
+  ...groups: IntakeAccountOption[][]
+): IntakeAccountOption[] {
+  const merged = new Map<string, IntakeAccountOption>();
+  for (const account of groups.flat()) {
+    if (!merged.has(account.id)) {
+      merged.set(account.id, account);
+    }
+  }
+  return [...merged.values()];
 }
 
 function formatProfileAccountNote(accountName: string, locale: string): string {

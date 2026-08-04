@@ -6,7 +6,9 @@ import {
   type ChangePosOrderStatusRequest,
   type ChangeServiceTicketStatusRequest,
   type CreatePosAccountRequest,
+  type CreatePosProfileRequest,
   type CreatePosOrderRequest,
+  type PosCustomerProfileWithAccount,
 } from "@cleanhub/api-client";
 import type { EnqueueInput } from "@cleanhub/offline";
 import { useCallback } from "react";
@@ -17,19 +19,28 @@ import { isPosTerminalSessionInvalidated } from "@/lib/pos-terminal-session";
 import { useOfflineSync } from "../components/offline-sync-provider";
 import {
   createCustomerAccountOfflineMutation,
+  createCustomerProfileOfflineMutation,
   createOrderOfflineMutation,
   createOrderStatusOfflineMutation,
   createTicketStatusOfflineMutation,
+  findQueuedPosCreateDependency,
+  getQueuedPosCustomerAccounts,
+  getQueuedPosCustomerProfiles,
+  POS_OFFLINE_ENTITIES,
+  resolvePosOfflineDependencyState,
+  type PosOfflineCustomerAccountSnapshot,
   type PosOfflineCustomerAccountResult,
+  type PosOfflineCustomerProfileResult,
   type PosOfflineMutation,
   type PosOfflineOrderResult,
   type PosOfflineOrderStatusResult,
   type PosOfflinePayload,
+  type PosQueuedCustomerAccount,
   type PosOfflineTicketStatusResult,
 } from "./pos-offline-operations";
 
 export function usePosOfflineWrites() {
-  const { queue, refresh } = useOfflineSync();
+  const { pendingCount, queue, refresh } = useOfflineSync();
 
   const execute = useCallback(
     async <TData, TPayload extends PosOfflinePayload>(
@@ -62,6 +73,21 @@ export function usePosOfflineWrites() {
           operationId: item.id,
         };
       };
+
+      const dependencyState = resolvePosOfflineDependencyState(
+        await queue.list(),
+        mutation.metadata.dependsOnOperationIds,
+      );
+      if (dependencyState.blockedOperationId) {
+        throw new Error(
+          dependencyState.lastError
+            ? `上游离线数据同步失败：${dependencyState.lastError}`
+            : "上游离线数据尚未正确同步，请先处理同步队列后再继续。",
+        );
+      }
+      if (dependencyState.pendingOperationIds.length > 0) {
+        return enqueue();
+      }
 
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         return enqueue();
@@ -99,7 +125,20 @@ export function usePosOfflineWrites() {
 
   const createOrder = useCallback(
     async (input: CreatePosOrderRequest): Promise<PosOfflineOrderResult> => {
-      const mutation = createOrderOfflineMutation(input);
+      const items = queue ? await queue.list() : [];
+      const customerDependency =
+        input.orderType === "manual"
+          ? findQueuedPosCreateDependency(
+              items,
+              POS_OFFLINE_ENTITIES.customerProfileCreate,
+              input.customerId,
+            )
+          : undefined;
+      assertDependencyUsable(customerDependency);
+      const mutation = createOrderOfflineMutation(
+        input,
+        customerDependency ? [customerDependency.operationId] : [],
+      );
       return execute(mutation, () =>
         posApi.pos.orders.create(mutation.payload.input, {
           idempotencyKey: mutation.idempotencyKey,
@@ -107,8 +146,59 @@ export function usePosOfflineWrites() {
         }),
       );
     },
-    [execute],
+    [execute, queue],
   );
+
+  const createCustomerProfile = useCallback(
+    async (
+      accountId: string,
+      input: CreatePosProfileRequest,
+      account: PosOfflineCustomerAccountSnapshot,
+    ): Promise<PosOfflineCustomerProfileResult> => {
+      const items = queue ? await queue.list() : [];
+      const accountDependency = findQueuedPosCreateDependency(
+        items,
+        POS_OFFLINE_ENTITIES.customerAccountCreate,
+        accountId,
+      );
+      assertDependencyUsable(accountDependency);
+      const mutation = createCustomerProfileOfflineMutation(
+        accountId,
+        input,
+        account,
+        accountDependency ? [accountDependency.operationId] : [],
+      );
+      return execute(mutation, () =>
+        posApi.pos.accounts.createProfile(
+          accountId,
+          mutation.payload.input,
+          {
+            idempotencyKey: mutation.idempotencyKey,
+            requestId: mutation.id,
+          },
+        ),
+      );
+    },
+    [execute, queue],
+  );
+
+  const listQueuedCustomerAccounts = useCallback(async (): Promise<
+    PosQueuedCustomerAccount[]
+  > => {
+    if (!queue) {
+      return [];
+    }
+    return getQueuedPosCustomerAccounts(await queue.list());
+  }, [queue]);
+
+  const listQueuedCustomerProfiles = useCallback(async (): Promise<
+    PosCustomerProfileWithAccount[]
+  > => {
+    if (!queue) {
+      return [];
+    }
+    return getQueuedPosCustomerProfiles(await queue.list());
+  }, [queue]);
 
   const changeOrderStatus = useCallback(
     async (
@@ -144,8 +234,28 @@ export function usePosOfflineWrites() {
 
   return {
     createCustomerAccount,
+    createCustomerProfile,
     createOrder,
+    listQueuedCustomerAccounts,
+    listQueuedCustomerProfiles,
+    pendingCount,
     changeOrderStatus,
     changeTicketStatus,
   };
+}
+
+function assertDependencyUsable(
+  dependency:
+    | { blocked: boolean; lastError?: string }
+    | undefined,
+): void {
+  if (!dependency?.blocked) {
+    return;
+  }
+
+  throw new Error(
+    dependency.lastError
+      ? `上游离线数据同步失败：${dependency.lastError}`
+      : "上游离线数据尚未正确同步，请先处理同步队列后再继续。",
+  );
 }

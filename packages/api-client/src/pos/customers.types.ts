@@ -145,6 +145,8 @@ export type PosCustomerServiceItemListResult = {
 // ---- profile body shapes --------------------------------------------------
 
 export type CreatePosProfileRequest = {
+  /** Stable client-generated ULID used by offline replay. */
+  id?: string;
   fullName: string;
   phone?: string;
   email?: string;

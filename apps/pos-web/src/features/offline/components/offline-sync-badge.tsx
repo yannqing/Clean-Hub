@@ -29,12 +29,14 @@ export function OfflineSyncBadge({
           : status === "error"
             ? t("pos.shell.syncError")
             : t("pos.shell.syncPending", { count: pendingCount });
+  const visibleLabel =
+    status === "error" && error ? `${label}: ${error}` : label;
 
   const badgeClassName = cn(
     "items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2",
     variant === "dark"
       ? "flex size-9 px-0 text-white/75 hover:bg-white/10 hover:text-white focus-visible:ring-white/60"
-      : "hidden h-9 px-3 2xl:flex",
+      : "flex min-h-9 min-w-0 px-3 py-2 text-left",
     variant === "default" &&
       status === "synced" &&
       "bg-emerald-50 text-emerald-700",
@@ -52,7 +54,7 @@ export function OfflineSyncBadge({
   if (retryable) {
     return (
       <button
-        aria-label={`${label}. ${t("pos.shell.syncRetry")}`}
+        aria-label={`${visibleLabel}. ${t("pos.shell.syncRetry")}`}
         className={badgeClassName}
         onClick={() => void retry()}
         title={error ?? t("pos.shell.syncRetry")}
@@ -62,17 +64,19 @@ export function OfflineSyncBadge({
           className="h-4 w-4"
           name={status === "error" ? "alert" : "rotate-ccw"}
         />
-        {variant === "default" ? <span>{label}</span> : null}
+        {variant === "default" ? (
+          <span className="min-w-0 truncate">{visibleLabel}</span>
+        ) : null}
       </button>
     );
   }
 
   return (
     <div
-      aria-label={label}
+      aria-label={visibleLabel}
       aria-live="polite"
       className={badgeClassName}
-      title={error ?? label}
+      title={error ?? visibleLabel}
     >
       {status === "replaying" ? (
         <Icon className="h-4 w-4 animate-spin" name="rotate-ccw" />
@@ -84,7 +88,9 @@ export function OfflineSyncBadge({
           )}
         />
       )}
-      {variant === "default" ? <span>{label}</span> : null}
+      {variant === "default" ? (
+        <span className="min-w-0 truncate">{visibleLabel}</span>
+      ) : null}
     </div>
   );
 }

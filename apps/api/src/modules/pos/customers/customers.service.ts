@@ -552,6 +552,20 @@ export async function createPosProfile(
   requireAnyPosBranchAccess(input.authContext);
   const tenantId = requirePosTenantId(input.authContext);
 
+  if (input.data.id) {
+    const existing = await findPosProfileById(db, tenantId, input.data.id);
+    if (existing) {
+      if (existing.customerAccountId !== input.accountId) {
+        throw new PosCustomerError(
+          "POS_CUSTOMER_ID_CONFLICT",
+          "The customer profile id is already used by another account.",
+          409,
+        );
+      }
+      return existing;
+    }
+  }
+
   // Profile must be created under an existing, non-deleted account in this
   // tenant. A disabled account cannot receive new profiles (the "new profile"
   // button in the UI only appears under an active account).
@@ -568,6 +582,7 @@ export async function createPosProfile(
   }
 
   const profile = await insertPosProfile(db, {
+    id: input.data.id,
     actorUserId: input.authContext.userId,
     tenantId,
     customerAccountId: input.accountId,
