@@ -19,12 +19,12 @@ import {
   cn,
 } from "@cleanhub/ui";
 import type {
-  PosOrderOverview,
-  PosOrderPaymentStatus,
-  PosOrderSort,
-  PosOrderStatus,
-  PosOrderSummary,
-  PosOrderType,
+  TenantOrderOverview,
+  TenantOrderPaymentStatus,
+  TenantOrderSort,
+  TenantOrderStatus,
+  TenantOrderSummary,
+  TenantOrderType,
 } from "@cleanhub/api-client";
 import {
   Banknote,
@@ -50,7 +50,7 @@ import {
 
 const PAGE_SIZE = 10;
 
-type OrderStatusFilter = "all" | PosOrderStatus;
+type OrderStatusFilter = "all" | TenantOrderStatus;
 type OrderDateFilter =
   | "today"
   | "last_7_days"
@@ -136,7 +136,7 @@ function formatOrderMoney(
 }
 
 function getOrderStatusVariant(
-  status: PosOrderStatus,
+  status: TenantOrderStatus,
 ): "default" | "secondary" | "outline" {
   if (status === "paid" || status === "delivered") {
     return "default";
@@ -146,7 +146,7 @@ function getOrderStatusVariant(
 }
 
 function getPaymentStatusVariant(
-  status: PosOrderPaymentStatus,
+  status: TenantOrderPaymentStatus,
 ): "default" | "secondary" | "outline" {
   if (status === "paid") {
     return "default";
@@ -157,8 +157,8 @@ function getPaymentStatusVariant(
 
 export function TenantOrdersView() {
   const { formatDateTime, locale, m } = useTenantI18n();
-  const [orderDataset, setOrderDataset] = useState<PosOrderSummary[]>([]);
-  const [overview, setOverview] = useState<PosOrderOverview | null>(null);
+  const [orderDataset, setOrderDataset] = useState<TenantOrderSummary[]>([]);
+  const [overview, setOverview] = useState<TenantOrderOverview | null>(null);
   const [branchNames, setBranchNames] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<OrderStatusFilter>("all");
@@ -166,7 +166,7 @@ export function TenantOrdersView() {
   const [dateFilter, setDateFilter] = useState<OrderDateFilter>("all");
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [sort, setSort] = useState<PosOrderSort>("created_desc");
+  const [sort, setSort] = useState<TenantOrderSort>("created_desc");
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE_COLUMNS);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [listLoading, setListLoading] = useState(true);
@@ -293,7 +293,7 @@ export function TenantOrdersView() {
   );
   const visibleColumnCount =
     Object.values(visibleColumns).filter(Boolean).length;
-  const sortOptions: Array<{ label: string; value: PosOrderSort }> = [
+  const sortOptions: Array<{ label: string; value: TenantOrderSort }> = [
     {
       label: m.orders.toolbar.sortOptions.createdDesc,
       value: "created_desc",
@@ -411,7 +411,7 @@ export function TenantOrdersView() {
     setPage(1);
   }
 
-  function changeSort(nextSort: PosOrderSort) {
+  function changeSort(nextSort: TenantOrderSort) {
     if (nextSort === sort) {
       return;
     }
@@ -775,7 +775,7 @@ export function TenantOrdersView() {
                   ) : null}
                   {visibleColumns.type ? (
                     <TableCell>
-                      {m.orders.typeLabels[order.orderType as PosOrderType]}
+                      {m.orders.typeLabels[order.orderType as TenantOrderType]}
                     </TableCell>
                   ) : null}
                   {visibleColumns.items ? (

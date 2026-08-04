@@ -1,7 +1,7 @@
 import type {
-  PosOrderListQuery,
-  PosOrderListResponse,
-  PosOrderSummary,
+  TenantOrderListQuery,
+  TenantOrderListResponse,
+  TenantOrderSummary,
 } from "@cleanhub/api-client";
 
 import { webAdminApi } from "@/lib/api-client";
@@ -9,26 +9,26 @@ import { webAdminApi } from "@/lib/api-client";
 const TENANT_ORDER_DATASET_CHUNK_SIZE = 100;
 
 type TenantOrderDatasetQuery = Omit<
-  PosOrderListQuery,
+  TenantOrderListQuery,
   "limit" | "offset" | "q"
 >;
 
 export async function getTenantOrderListQuery(
-  query: PosOrderListQuery,
-): Promise<PosOrderListResponse> {
-  return webAdminApi.pos.orders.list(query);
+  query: TenantOrderListQuery,
+): Promise<TenantOrderListResponse> {
+  return webAdminApi.tenant.orders.list(query);
 }
 
 export async function getTenantOrderDatasetQuery(
   query: TenantOrderDatasetQuery,
   signal?: AbortSignal,
-): Promise<PosOrderSummary[]> {
-  const orders: PosOrderSummary[] = [];
+): Promise<TenantOrderSummary[]> {
+  const orders: TenantOrderSummary[] = [];
   let offset = 0;
   let total = 0;
 
   do {
-    const result = await webAdminApi.pos.orders.list(
+    const result = await webAdminApi.tenant.orders.list(
       {
         ...query,
         limit: TENANT_ORDER_DATASET_CHUNK_SIZE,

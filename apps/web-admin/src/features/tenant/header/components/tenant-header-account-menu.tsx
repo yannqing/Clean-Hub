@@ -12,6 +12,7 @@ import {
   ChevronDown,
   Settings,
   UserRound,
+  UsersRound,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -127,6 +128,14 @@ export function TenantHeaderAccountMenu({
           >
             <Icon aria-hidden icon={UserRound} size={16} />
             {copy.account.profile}
+          </Link>
+          <Link
+            className="flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            href={webAdminRoutes.tenant.users}
+            onClick={() => onOpenChange(false)}
+          >
+            <Icon aria-hidden icon={UsersRound} size={16} />
+            {copy.account.employees}
           </Link>
           <Link
             className="flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

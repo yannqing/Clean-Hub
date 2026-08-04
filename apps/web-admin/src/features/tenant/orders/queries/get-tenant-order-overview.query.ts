@@ -1,12 +1,12 @@
 import type {
-  PosOrderOverview,
-  PosOrderOverviewQuery,
+  TenantOrderOverview,
+  TenantOrderOverviewQuery,
 } from "@cleanhub/api-client";
 
 import { webAdminApi } from "@/lib/api-client";
 
 export async function getTenantOrderOverviewQuery(
-  query: PosOrderOverviewQuery = { period: "all" },
-): Promise<PosOrderOverview> {
-  return webAdminApi.pos.orders.overview(query);
+  query: TenantOrderOverviewQuery = { period: "all" },
+): Promise<TenantOrderOverview> {
+  return webAdminApi.tenant.orders.overview(query);
 }

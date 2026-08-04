@@ -1,4 +1,4 @@
-import type { PosCustomerProfileWithAccount } from "@cleanhub/api-client";
+import type { TenantCustomerSummary } from "@cleanhub/api-client";
 
 import { webAdminApi } from "@/lib/api-client";
 
@@ -6,25 +6,22 @@ const TENANT_CUSTOMER_DATASET_CHUNK_SIZE = 100;
 
 export async function getTenantCustomerDatasetQuery(
   signal?: AbortSignal,
-): Promise<PosCustomerProfileWithAccount[]> {
-  const customers = new Map<string, PosCustomerProfileWithAccount>();
+): Promise<TenantCustomerSummary[]> {
+  const customers = new Map<string, TenantCustomerSummary>();
   let offset = 0;
   let total: number | null = null;
 
   do {
-    const result = await webAdminApi.pos.customers.list(
+    const result = await webAdminApi.tenant.customers.list(
       {
         limit: TENANT_CUSTOMER_DATASET_CHUNK_SIZE,
         offset,
-        resultType: "profile",
       },
       { signal },
     );
 
-    for (const entry of result.data) {
-      if (entry.kind === "profile") {
-        customers.set(entry.profile.id, entry.profile);
-      }
+    for (const customer of result.data) {
+      customers.set(customer.id, customer);
     }
 
     total ??= result.total;

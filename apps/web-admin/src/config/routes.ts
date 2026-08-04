@@ -44,6 +44,7 @@ export const webAdminRoutes = {
     profile: "/tenant/profile",
     orders: "/tenant/orders",
     customers: "/tenant/customers",
+    users: "/tenant/users",
     products: "/tenant/products",
     newProduct: "/tenant/products/new",
     product: (productId: string) =>

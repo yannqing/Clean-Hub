@@ -67,6 +67,7 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
     pathname,
     webAdminRoutes.tenant.customers,
   );
+  const isUsersPage = isActivePath(pathname, webAdminRoutes.tenant.users);
   const isProductsPage = isActivePath(pathname, webAdminRoutes.tenant.products);
   const isDiscountsPage = isActivePath(
     pathname,
@@ -94,6 +95,7 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
     isBranchesPage ||
     isOrdersPage ||
     isCustomersPage ||
+    isUsersPage ||
     isProductsPage ||
     isDiscountsPage ||
     isServicesPage ||

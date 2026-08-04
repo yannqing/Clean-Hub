@@ -6,3 +6,4 @@ export * as reports from "./reports";
 export * as finance from "./finance";
 export * as pointOfSale from "./point-of-sale";
 export * as services from "./services";
+export * as users from "./users";

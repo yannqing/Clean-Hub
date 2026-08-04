@@ -54,6 +54,7 @@ const navIconByHref: Record<string, LucideIcon> = {
   [webAdminRoutes.tenant.home]: LayoutDashboard,
   [webAdminRoutes.tenant.orders]: ShoppingBag,
   [webAdminRoutes.tenant.customers]: ContactRound,
+  [webAdminRoutes.tenant.users]: Users,
   [webAdminRoutes.tenant.products]: Package,
   [webAdminRoutes.tenant.discounts]: BadgePercent,
   [webAdminRoutes.tenant.pointOfSale.home]: SquareTerminal,

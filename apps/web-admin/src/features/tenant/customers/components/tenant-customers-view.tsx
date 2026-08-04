@@ -1,8 +1,8 @@
 "use client";
 
 import type {
-  PosCustomerProfileWithAccount,
-  PosCustomerStatus,
+  TenantCustomerStatus,
+  TenantCustomerSummary,
 } from "@cleanhub/api-client";
 import {
   Badge,
@@ -41,7 +41,7 @@ import { getTenantCustomerDatasetQuery } from "../queries";
 
 const PAGE_SIZE = 10;
 
-type CustomerStatusFilter = "all" | PosCustomerStatus;
+type CustomerStatusFilter = "all" | TenantCustomerStatus;
 type CustomerDateFilter =
   | "today"
   | "last_7_days"
@@ -110,7 +110,7 @@ function buildDateRange(filter: CustomerDateFilter): {
 }
 
 function isCustomerWithinDateRange(
-  customer: PosCustomerProfileWithAccount,
+  customer: TenantCustomerSummary,
   filter: CustomerDateFilter,
 ): boolean {
   const { createdAfter, createdBefore } = buildDateRange(filter);
@@ -128,7 +128,7 @@ function isCustomerWithinDateRange(
 }
 
 function getCustomerStatusVariant(
-  status: PosCustomerStatus,
+  status: TenantCustomerStatus,
 ): "default" | "outline" {
   return status === "active" ? "default" : "outline";
 }
@@ -136,7 +136,7 @@ function getCustomerStatusVariant(
 export function TenantCustomersView() {
   const { formatDateTime, locale, m } = useTenantI18n();
   const [customerDataset, setCustomerDataset] = useState<
-    PosCustomerProfileWithAccount[]
+    TenantCustomerSummary[]
   >([]);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<CustomerStatusFilter>("all");
