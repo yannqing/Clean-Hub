@@ -20,6 +20,7 @@ import { createId } from "@cleanhub/id";
 import type { AuthContext } from "../../auth/auth.types.js";
 import { PosTerminalAuthError } from "./auth.errors.js";
 import {
+  bindPosDevice,
   revokePosDevice,
   rotatePosDeviceCredential,
   updatePosDevice,
@@ -68,9 +69,11 @@ export async function runPosTerminalLifecycleRepositorySmoke(): Promise<void> {
   const branchBId = createId();
   const terminalId = createId();
   const deviceId = `pos-security-smoke-${createId()}`;
+  const enrollmentDeviceId = `pos-runtime-smoke-${createId()}`;
   const shiftId = createId();
   const revokeShiftId = createId();
   const refreshTokenIds: string[] = [];
+  let enrollmentTerminalId: string | null = null;
 
   const authContext: AuthContext = {
     userId,
@@ -110,6 +113,45 @@ export async function runPosTerminalLifecycleRepositorySmoke(): Promise<void> {
         updatedBy: userId,
       },
     ]);
+
+    const enrollment = await bindPosDevice(
+      {
+        authContext,
+        cookieSecure: true,
+        data: {
+          deviceId: enrollmentDeviceId,
+          branchId: branchAId,
+          label: "POS runtime metadata smoke",
+          deviceType: "tablet",
+          platform: "ios",
+          platformVersion: "18.0",
+          appVersion: "0.1.0-smoke",
+        },
+      },
+      db,
+    );
+    enrollmentTerminalId = enrollment.device.id;
+    const enrollmentRows = await db
+      .select({
+        deviceType: posTerminalSettings.deviceType,
+        platform: posTerminalSettings.platform,
+        platformVersion: posTerminalSettings.platformVersion,
+        appVersion: posTerminalSettings.appVersion,
+        lastSeenAt: posTerminalSettings.lastSeenAt,
+        syncStatus: posTerminalSettings.syncStatus,
+        lastSyncedAt: posTerminalSettings.lastSyncedAt,
+      })
+      .from(posTerminalSettings)
+      .where(eq(posTerminalSettings.id, enrollmentTerminalId))
+      .limit(1);
+    assert.equal(enrollmentRows[0]?.deviceType, "tablet");
+    assert.equal(enrollmentRows[0]?.platform, "ios");
+    assert.equal(enrollmentRows[0]?.platformVersion, "18.0");
+    assert.equal(enrollmentRows[0]?.appVersion, "0.1.0-smoke");
+    assert.equal(enrollmentRows[0]?.syncStatus, "synced");
+    assert.ok(enrollmentRows[0]?.lastSeenAt);
+    assert.ok(enrollmentRows[0]?.lastSyncedAt);
+
     await db.insert(posTerminalSettings).values({
       id: terminalId,
       tenantId,
@@ -434,7 +476,12 @@ export async function runPosTerminalLifecycleRepositorySmoke(): Promise<void> {
     await db
       .delete(auditLogs)
       .where(
-        inArray(auditLogs.entityId, [terminalId, shiftId, revokeShiftId]),
+        inArray(auditLogs.entityId, [
+          terminalId,
+          shiftId,
+          revokeShiftId,
+          ...(enrollmentTerminalId ? [enrollmentTerminalId] : []),
+        ]),
       );
     await db
       .delete(posStaffShifts)
@@ -446,7 +493,12 @@ export async function runPosTerminalLifecycleRepositorySmoke(): Promise<void> {
     }
     await db
       .delete(posTerminalSettings)
-      .where(eq(posTerminalSettings.id, terminalId));
+      .where(
+        inArray(posTerminalSettings.id, [
+          terminalId,
+          ...(enrollmentTerminalId ? [enrollmentTerminalId] : []),
+        ]),
+      );
     await db
       .delete(branches)
       .where(inArray(branches.id, [branchAId, branchBId]));

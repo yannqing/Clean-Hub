@@ -11,8 +11,7 @@ import { getPosApiErrorMessage } from "@/lib/api-error-message";
 
 import { getOrCreatePosDeviceId } from "../utils/device-id";
 import {
-  POS_PIN_MAX_LENGTH,
-  POS_PIN_MIN_LENGTH,
+  POS_PIN_LENGTH,
   validateLoginForm,
   type LoginFormFieldErrors,
   type LoginFormValues,
@@ -100,7 +99,7 @@ export function LoginForm() {
   }
 
   function updatePin(value: string) {
-    const pin = value.replace(/\D/g, "").slice(0, POS_PIN_MAX_LENGTH);
+    const pin = value.replace(/\D/g, "").slice(0, POS_PIN_LENGTH);
 
     setFormState({ pin });
     setErrorMessage(null);
@@ -109,7 +108,7 @@ export function LoginForm() {
       setFieldErrors({});
     }
 
-    if (pin.length < POS_PIN_MAX_LENGTH) {
+    if (pin.length < POS_PIN_LENGTH) {
       submittedPinRef.current = null;
       return;
     }
@@ -142,7 +141,7 @@ export function LoginForm() {
           disabled={submitting}
           id="pin"
           inputMode="numeric"
-          maxLength={POS_PIN_MAX_LENGTH}
+          maxLength={POS_PIN_LENGTH}
           name="pin"
           onChange={(event) => updatePin(event.target.value)}
           pattern="[0-9]*"
@@ -165,7 +164,7 @@ export function LoginForm() {
         {KEYPAD_KEYS.map((digit) => (
           <button
             className="flex h-12 items-center justify-center rounded-xl border border-border bg-background text-lg font-semibold text-foreground transition-colors hover:bg-muted active:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={submitting || formState.pin.length >= POS_PIN_MAX_LENGTH}
+            disabled={submitting || formState.pin.length >= POS_PIN_LENGTH}
             key={digit}
             onClick={() => appendDigit(digit)}
             type="button"
@@ -183,7 +182,7 @@ export function LoginForm() {
         </button>
         <button
           className="flex h-12 items-center justify-center rounded-xl border border-border bg-background text-lg font-semibold text-foreground transition-colors hover:bg-muted active:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={submitting || formState.pin.length >= POS_PIN_MAX_LENGTH}
+          disabled={submitting || formState.pin.length >= POS_PIN_LENGTH}
           onClick={() => appendDigit("0")}
           type="button"
         >
@@ -201,7 +200,7 @@ export function LoginForm() {
 
       <button
         className="flex h-12 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={submitting || formState.pin.length < POS_PIN_MIN_LENGTH}
+        disabled={submitting || formState.pin.length !== POS_PIN_LENGTH}
         type="submit"
       >
         {submitting ? t("pos.auth.submitting") : t("pos.auth.submit")}

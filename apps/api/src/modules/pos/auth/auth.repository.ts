@@ -183,10 +183,21 @@ export async function insertPosDeviceEnrollment(
       branchId: input.data.branchId,
       deviceId: input.data.deviceId,
       label: input.data.label,
+      deviceType: input.data.deviceType ?? "unknown",
+      platform: input.data.platform ?? null,
+      platformVersion: input.data.platformVersion ?? null,
+      appVersion: input.data.appVersion ?? null,
       status: "active",
       credentialDigest: input.credentialDigest,
       credentialVersion: 1,
       credentialIssuedAt: now,
+      lastSeenAt: now,
+      // A newly registered device has just completed an online exchange and
+      // cannot yet have terminal-scoped offline writes, so its first sync
+      // state is known to be clean rather than the schema's "never" default.
+      syncStatus: "synced",
+      lastSyncedAt: now,
+      lastSyncError: null,
       createdBy: input.actorUserId,
       updatedBy: input.actorUserId,
       metadata: {
@@ -215,11 +226,25 @@ export async function enrollExistingPosDevice(
     .set({
       branchId: input.data.branchId,
       label: input.data.label,
+      deviceType: input.data.deviceType ?? current.deviceType,
+      platform:
+        input.data.platform === undefined
+          ? current.platform
+          : input.data.platform,
+      platformVersion:
+        input.data.platformVersion === undefined
+          ? current.platformVersion
+          : input.data.platformVersion,
+      appVersion:
+        input.data.appVersion === undefined
+          ? current.appVersion
+          : input.data.appVersion,
       status: "active",
       credentialDigest: input.credentialDigest,
       credentialVersion: current.credentialVersion + 1,
       credentialIssuedAt: now,
       credentialRotatedAt: current.credentialDigest ? now : null,
+      lastSeenAt: now,
       updatedAt: now,
       updatedBy: input.actorUserId,
       version: current.version + 1,

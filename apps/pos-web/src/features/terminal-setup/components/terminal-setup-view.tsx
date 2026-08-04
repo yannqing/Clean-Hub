@@ -37,6 +37,7 @@ import {
   recoverCurrentTerminal,
 } from "../api";
 import { getTerminalSetupCopy } from "../copy";
+import { getPosTerminalRuntimeMetadata } from "../terminal-runtime";
 import type {
   SetupAdminSession,
   SetupStep,
@@ -374,10 +375,12 @@ export function TerminalSetupView() {
       if (bootstrap?.status === "credential_lost") {
         await recoverCurrentTerminal(deviceId);
       } else {
+        const runtimeMetadata = await getPosTerminalRuntimeMetadata();
         await enrollCurrentTerminal({
           deviceId,
           label: terminalLabel.trim(),
           branchId: selectedBranch.id,
+          ...runtimeMetadata,
         });
       }
 

@@ -20,10 +20,26 @@ import {
   isPosDeviceSecurityContextChanged,
   requiresClosedPosTerminalShift,
 } from "../pos/auth/auth.service.js";
-import { revokePosDeviceBodySchema } from "../pos/auth/auth.validation.js";
+import {
+  bindPosDeviceBodySchema,
+  revokePosDeviceBodySchema,
+} from "../pos/auth/auth.validation.js";
 
 const credential = generateTerminalCredential();
 const digest = hashTerminalCredential(credential);
+
+const enrollmentRuntime = bindPosDeviceBodySchema.parse({
+  deviceId: "pos-ipad-runtime-smoke",
+  label: "iPad front counter",
+  branchId: "01K00000000000000000000002",
+  deviceType: "tablet",
+  platform: "ios",
+  platformVersion: "18.0",
+  appVersion: "0.1.0",
+});
+assert.equal(enrollmentRuntime.deviceType, "tablet");
+assert.equal(enrollmentRuntime.platform, "ios");
+assert.equal(enrollmentRuntime.appVersion, "0.1.0");
 
 assert.notEqual(credential, digest, "raw terminal credentials are not stored");
 assert.equal(
@@ -315,6 +331,17 @@ assert.equal(
   false,
   "legacy tenantCode input is stripped and cannot select a POS tenant",
 );
+
+for (const pin of ["11111", "1111111", "11a111"]) {
+  assert.throws(
+    () =>
+      posPinLoginRequestSchema.parse({
+        pin,
+        deviceId: terminalRecord.deviceId,
+      }),
+    `POS PIN ${pin} must be rejected unless it has exactly six digits`,
+  );
+}
 
 const mutableTerminal = {
   branchId: terminalRecord.branchId,

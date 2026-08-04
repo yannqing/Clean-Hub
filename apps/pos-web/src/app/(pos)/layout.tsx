@@ -3,7 +3,10 @@ import { PosRuntimeConfigProvider } from "@/components/runtime/pos-runtime-confi
 import { getMyBranchQuery } from "@/features/branches/queries";
 import { getNotificationsOverviewQuery } from "@/features/notifications/queries";
 import { OfflineSyncProvider } from "@/features/offline/components";
-import { PosTerminalSessionGuard } from "@/features/terminal-setup/components/pos-terminal-session-guard";
+import {
+  PosTerminalHeartbeatReporter,
+  PosTerminalSessionGuard,
+} from "@/features/terminal-setup/components";
 import { getCurrentUser } from "@/lib/auth";
 
 export default async function PosLayout({
@@ -45,6 +48,7 @@ export default async function PosLayout({
         userId={user?.userId}
         terminalCredentialVersion={user?.terminalCredentialVersion}
       >
+        <PosTerminalHeartbeatReporter enabled={Boolean(user?.terminalId)} />
         <PosShell
           notificationUnreadCount={notificationsOverview?.unreadCount ?? 0}
           profile={profile}

@@ -1,3 +1,4 @@
+import { PIN_DIGIT_PATTERN } from "@cleanhub/domain/pin";
 import { z } from "zod";
 
 export const saasTenantStatusSchema = z.enum([
@@ -34,7 +35,7 @@ const initialOwnerSchema = z.object({
   email: z.string().trim().email().max(320),
   phone: optionalStringSchema(32),
   password: z.string().min(1).max(128),
-  pin: z.string().regex(/^\d{4,6}$/, "PIN must be 4 to 6 digits."),
+  pin: z.string().regex(PIN_DIGIT_PATTERN, "PIN must be exactly 6 digits."),
 });
 
 export const listSaasTenantsQuerySchema = z.object({

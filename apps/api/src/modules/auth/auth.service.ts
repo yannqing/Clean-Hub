@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 
 import type { Database } from "@cleanhub/db";
+import { isSixDigitPin } from "@cleanhub/domain/pin";
 
 import {
   getRefreshTokenTtlSeconds,
@@ -523,6 +524,7 @@ export class AuthService {
 
   async loginWithPosPin(input: PosPinLoginInput): Promise<AuthResult> {
     const deviceId = input.deviceId.trim();
+    const hasValidPinFormat = isSixDigitPin(input.pin);
     const policy = await resolveEffectiveSecurityPolicy(this.db);
 
     const credentialTerminal = input.terminalCredential
@@ -643,7 +645,10 @@ export class AuthService {
           const matchedUsers: AuthenticatedUser[] = [];
 
           for (const candidate of candidates) {
-            if (await verifyPassword(input.pin, candidate.pinHash)) {
+            if (
+              hasValidPinFormat &&
+              (await verifyPassword(input.pin, candidate.pinHash))
+            ) {
               matchedUsers.push(candidate);
             }
           }

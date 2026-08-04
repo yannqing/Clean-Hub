@@ -1,3 +1,4 @@
+import { PIN_DIGIT_PATTERN } from "@cleanhub/domain/pin";
 import { z } from "zod";
 
 export const loginRequestSchema = z.object({
@@ -7,7 +8,7 @@ export const loginRequestSchema = z.object({
 });
 
 export const posPinLoginRequestSchema = z.object({
-  pin: z.string().regex(/^\d{4,8}$/),
+  pin: z.string().regex(PIN_DIGIT_PATTERN, "PIN must be exactly 6 digits."),
   deviceId: z.string().trim().min(1),
 });
 

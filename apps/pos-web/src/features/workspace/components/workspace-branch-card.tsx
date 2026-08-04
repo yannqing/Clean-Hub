@@ -40,7 +40,7 @@ export function WorkspaceBranchCard({ branch }: WorkspaceBranchCardProps) {
   return (
     <section className="border-y border-border bg-background py-4">
       <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
+        <div className="flex items-center gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-foreground">
             <Icon name="store" className="h-5 w-5" />
           </span>
@@ -48,8 +48,8 @@ export function WorkspaceBranchCard({ branch }: WorkspaceBranchCardProps) {
             <h2 className="text-sm font-semibold text-foreground">
               {branch.name}
             </h2>
-            <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-              ID: {branch.id.slice(0, 8)}...
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              门店编码 · {branch.id.slice(-8).toUpperCase()}
             </p>
           </div>
         </div>

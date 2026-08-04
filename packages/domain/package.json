@@ -7,6 +7,7 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./order-codes": "./src/order-codes.ts"
+    "./order-codes": "./src/order-codes.ts",
+    "./pin": "./src/pin.ts"
   }
 }

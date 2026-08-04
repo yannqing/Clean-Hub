@@ -21,6 +21,11 @@ export type BindPosDeviceRequest = {
   deviceId: string;
   label: string;
   branchId: string;
+  /** Runtime data reported by the terminal during its first enrollment. */
+  deviceType?: "unknown" | "desktop" | "tablet" | "phone" | "browser";
+  platform?: string | null;
+  platformVersion?: string | null;
+  appVersion?: string | null;
 };
 
 export type UpdatePosDeviceRequest = {

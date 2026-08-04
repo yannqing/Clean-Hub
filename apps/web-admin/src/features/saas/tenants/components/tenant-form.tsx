@@ -1,5 +1,6 @@
 "use client";
 
+import { PIN_DIGIT_COUNT } from "@cleanhub/domain/pin";
 import {
   Button,
   Card,
@@ -318,7 +319,9 @@ export function TenantForm({
                       disabled={disabled || submitting}
                       id="initial-owner-pin"
                       inputMode="numeric"
-                      maxLength={6}
+                      maxLength={PIN_DIGIT_COUNT}
+                      minLength={PIN_DIGIT_COUNT}
+                      pattern="[0-9]{6}"
                       onChange={(event) =>
                         updateValue("initialOwnerPin", event.target.value)
                       }

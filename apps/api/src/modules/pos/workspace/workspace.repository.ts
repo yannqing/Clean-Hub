@@ -71,18 +71,24 @@ async function findWorkspaceBranch(
   db: Database,
   input: PosWorkspaceRepositoryInput,
 ): Promise<PosWorkspaceBranch | null> {
-  if (!input.branchId) {
+  let branchId = input.branchId;
+
+  if (!branchId && input.allowedBranchIds !== undefined) {
+    if (input.allowedBranchIds.length === 0) {
+      return null;
+    }
+
+    // A terminal-bound POS session already resolves to exactly one branch.
+    // Use that terminal scope directly; requiring a separate user_branches row
+    // incorrectly makes Owner sessions appear unbound on the workspace.
+    branchId = input.allowedBranchIds[0];
+  }
+
+  if (!branchId) {
     // Try to get the first branch for the user
     const userBranchFilters: SQL[] = [
       eq(userBranches.tenantId, input.tenantId),
     ];
-
-    if (input.allowedBranchIds !== undefined) {
-      if (input.allowedBranchIds.length === 0) {
-        return null;
-      }
-      userBranchFilters.push(eq(userBranches.branchId, input.allowedBranchIds[0]));
-    }
 
     const userBranch = await db
       .select({ branchId: userBranches.branchId })
@@ -94,12 +100,12 @@ async function findWorkspaceBranch(
       return null;
     }
 
-    input.branchId = userBranch[0].branchId;
+    branchId = userBranch[0].branchId;
   }
 
   const branch = await findBranchById(db, {
     tenantId: input.tenantId,
-    branchId: input.branchId,
+    branchId,
   });
 
   if (!branch) {

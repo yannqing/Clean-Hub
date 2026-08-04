@@ -446,7 +446,7 @@ export async function runAuthConcurrencyRepositorySmoke(): Promise<void> {
   const budgetIpAddress = `budget-ip-${createId()}`;
   const interruptIpAddress = `interrupt-ip-${createId()}`;
   const legacyIpAddress = `legacy-ip-${createId()}`;
-  const pin = createId().slice(-10);
+  const pin = "123456";
   const pinHash = await hashPin(pin);
   const refreshCredential = generateTerminalCredential();
   let pinCredential = generateTerminalCredential();
@@ -956,7 +956,7 @@ export async function runAuthConcurrencyRepositorySmoke(): Promise<void> {
 
     const effectivePolicy = await resolveEffectiveSecurityPolicy(db);
     const wrongPinAttemptCount = effectivePolicy.loginMaxAttempts + 3;
-    const wrongPin = `wrong-${createId()}`;
+    const wrongPin = "654321";
     const budgetTerminalBlocker = holdPosPinAdvisoryLock(db, budgetTerminalId);
     await budgetTerminalBlocker.acquired;
     const wrongAttemptPromises = Array.from(

@@ -10,8 +10,11 @@ import { posApi } from "@/lib/api-client";
 type LogoutButtonProps = {
   "aria-label"?: string;
   className?: string;
+  failureMessage?: string;
   signOutLabel?: string;
   signingOutLabel?: string;
+  successMessage?: string;
+  title?: string;
   /**
    * Optional custom trigger content (e.g. an icon). Defaults to the localized
    * sign-out / signing-out labels.
@@ -22,8 +25,11 @@ type LogoutButtonProps = {
 export function LogoutButton({
   "aria-label": ariaLabel,
   className,
+  failureMessage,
   signOutLabel = "退出登录",
   signingOutLabel = "退出中…",
+  successMessage = "已退出登录",
+  title,
   children,
 }: LogoutButtonProps) {
   const router = useRouter();
@@ -34,10 +40,11 @@ export function LogoutButton({
 
     try {
       await posApi.auth.logout();
-      toast.success("已退出登录");
+      toast.success(successMessage);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : "退出登录失败，请重试。";
+        failureMessage ??
+        (error instanceof Error ? error.message : "退出登录失败，请重试。");
       toast.error(message);
     } finally {
       router.replace(posRoutes.login);
@@ -52,6 +59,7 @@ export function LogoutButton({
       className={className}
       disabled={submitting}
       onClick={handleLogout}
+      title={title}
       type="button"
     >
       {children ?? (submitting ? signingOutLabel : signOutLabel)}

@@ -10,7 +10,6 @@ import { posRoutes } from "@/config";
 import { LogoutButton } from "@/features/auth/components";
 import { GlobalSearchBox } from "@/features/global-search";
 import { HeaderNotificationsMenu } from "@/features/notifications/components";
-import { OfflineSyncBadge } from "@/features/offline/components";
 
 import { Icon } from "./icons";
 
@@ -122,7 +121,15 @@ export function PosGlobalHeader({
             <Icon className="h-[18px] w-[18px]" name="search" />
           </button>
 
-          <OfflineSyncBadge className="hidden sm:flex" variant="dark" />
+          <LogoutButton
+            aria-label={t("pos.shell.lockScreen")}
+            className="hidden size-9 items-center justify-center rounded-xl text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-wait disabled:opacity-50 sm:flex"
+            failureMessage={t("pos.shell.lockFailed")}
+            successMessage={t("pos.shell.lockSuccess")}
+            title={t("pos.shell.lockScreen")}
+          >
+            <Icon className="h-4 w-4" name="lock" />
+          </LogoutButton>
           <HeaderNotificationsMenu
             onOpenChange={(open) =>
               setActivePanel(open ? "notifications" : null)

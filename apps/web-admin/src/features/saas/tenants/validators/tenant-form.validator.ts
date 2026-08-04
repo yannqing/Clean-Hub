@@ -1,3 +1,5 @@
+import { isSixDigitPin } from "@cleanhub/domain/pin";
+
 import {
   type PasswordPolicyRules,
   validatePasswordAgainstPolicy,
@@ -216,8 +218,8 @@ function validateInitialOwner(
     errors.initialOwnerPassword = passwordPolicyError;
   }
 
-  if (!/^\d{4,6}$/.test(pin)) {
-    errors.initialOwnerPin = "Owner PIN must be 4 to 6 digits.";
+  if (!isSixDigitPin(pin)) {
+    errors.initialOwnerPin = "Owner PIN must be exactly 6 digits.";
   }
 
   return {

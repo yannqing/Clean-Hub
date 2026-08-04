@@ -3,11 +3,19 @@ import { z } from "zod";
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const deviceIdSchema = z.string().trim().min(1).max(128);
 const reasonSchema = z.string().trim().min(1).max(500);
+const nullableTrimmedString = (max: number) =>
+  z.union([z.string().trim().max(max), z.null()]);
 
 export const bindPosDeviceBodySchema = z.object({
   deviceId: deviceIdSchema,
   label: z.string().trim().min(1).max(64),
   branchId: z.string().regex(ULID_PATTERN),
+  deviceType: z
+    .enum(["unknown", "desktop", "tablet", "phone", "browser"])
+    .optional(),
+  platform: nullableTrimmedString(64).optional(),
+  platformVersion: nullableTrimmedString(64).optional(),
+  appVersion: nullableTrimmedString(64).optional(),
 });
 
 export const updatePosDeviceBodySchema = z
