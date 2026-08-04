@@ -14,6 +14,7 @@ import {
 } from "@cleanhub/ui";
 
 import { Icon, type PosIconName } from "@/components/app-shell";
+import { createCashDrawerOpenRequest } from "@/features/hardware/lib/cash-drawer";
 import { getDesktopBridge } from "@/features/hardware/lib/desktop-bridge";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
@@ -83,9 +84,20 @@ export function HardwareSettingsCard({
         );
       }
 
-      await bridge.hardware.openCashDrawer({
-        reason: authorization.reason,
-      });
+      if (!configuredDrawer) {
+        throw new Error("当前收银终端未配置可用钱箱。");
+      }
+
+      await bridge.hardware.openCashDrawer(
+        createCashDrawerOpenRequest({
+          drawer: configuredDrawer,
+          reason: authorization.reason,
+          trigger: {
+            type: "manual",
+            authorizationId: authorization.authorizationId,
+          },
+        }),
+      );
       toast.success("钱箱已打开。");
       setDrawerDialogOpen(false);
       setDrawerReason("");

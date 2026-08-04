@@ -76,3 +76,19 @@ export type PosPrintJobAuditResult = {
   recorded: boolean;
   idempotent: boolean;
 };
+
+export type RecordCashPaymentDrawerResultRequest = {
+  paymentId: string;
+  status: "opened" | "failed";
+  attempt: number;
+  printerId?: string;
+  error?: string;
+};
+
+export type PosCashPaymentDrawerAuditResult = {
+  paymentId: string;
+  status: RecordCashPaymentDrawerResultRequest["status"];
+  attempt: number;
+  recorded: boolean;
+  idempotent: boolean;
+};

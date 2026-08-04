@@ -7,8 +7,10 @@ import type { AuthContext } from "../../auth/auth.types.js";
 import {
   authorizeManualDrawerOpen,
   authorizePrivilegedReprint,
+  recordCashPaymentDrawerResult,
   recordPosPrintJobResult,
 } from "./hardware.service.js";
+import { recordCashPaymentDrawerResultBodySchema } from "./hardware.validation.js";
 
 function context(role: "manager" | "cashier"): AuthContext {
   return {
@@ -86,7 +88,10 @@ const reprint = await authorizePrivilegedReprint(
   db,
 );
 assert.equal(reprint.action, "privileged_reprint");
-assert.equal(auditRows[1]?.eventType, "pos_hardware.privileged_reprint.authorized");
+assert.equal(
+  auditRows[1]?.eventType,
+  "pos_hardware.privileged_reprint.authorized",
+);
 
 const printJobId = "01K00000000000000000000005";
 const printed = await recordPosPrintJobResult(
@@ -149,6 +154,119 @@ await assert.rejects(
     db,
   ),
   /reason is required/i,
+);
+
+const cashDrawerAuditRows: Array<Record<string, unknown>> = [];
+let paymentEligible = true;
+const cashDrawerDb = {
+  select(selection: Record<string, unknown>) {
+    return {
+      from() {
+        return {
+          where() {
+            if ("id" in selection) {
+              return {
+                limit() {
+                  return Promise.resolve(
+                    paymentEligible
+                      ? [
+                          {
+                            id: "01K00000000000000000000006",
+                            orderId: "01K00000000000000000000007",
+                          },
+                        ]
+                      : [],
+                  );
+                },
+              };
+            }
+
+            return Promise.resolve(
+              cashDrawerAuditRows.map((row) => ({
+                eventType: row.eventType,
+                metadata: row.metadata,
+              })),
+            );
+          },
+        };
+      },
+    };
+  },
+  insert() {
+    return {
+      values(value: Record<string, unknown>) {
+        cashDrawerAuditRows.push(value);
+        return Promise.resolve();
+      },
+    };
+  },
+} as unknown as Database;
+
+const cashDrawerResult = await recordCashPaymentDrawerResult(
+  {
+    authContext: context("cashier"),
+    data: {
+      paymentId: "01K00000000000000000000006",
+      status: "opened",
+      attempt: 1,
+      printerId: "receipt-printer",
+    },
+  },
+  cashDrawerDb,
+);
+assert.equal(cashDrawerResult.recorded, true);
+assert.equal(
+  cashDrawerAuditRows[0]?.eventType,
+  "pos_hardware.cash_payment_drawer.opened",
+);
+assert.equal(cashDrawerAuditRows[0]?.success, true);
+
+const duplicateCashDrawerResult = await recordCashPaymentDrawerResult(
+  {
+    authContext: context("cashier"),
+    data: {
+      paymentId: "01K00000000000000000000006",
+      status: "opened",
+      attempt: 1,
+      printerId: "receipt-printer",
+    },
+  },
+  cashDrawerDb,
+);
+assert.equal(duplicateCashDrawerResult.idempotent, true);
+assert.equal(cashDrawerAuditRows.length, 1);
+
+paymentEligible = false;
+await assert.rejects(
+  recordCashPaymentDrawerResult(
+    {
+      authContext: context("cashier"),
+      data: {
+        paymentId: "01K00000000000000000000008",
+        status: "failed",
+        attempt: 1,
+        error: "No drawer configured",
+      },
+    },
+    cashDrawerDb,
+  ),
+  (error) => error instanceof AuthError && error.code === "FORBIDDEN",
+);
+
+assert.throws(() =>
+  recordCashPaymentDrawerResultBodySchema.parse({
+    paymentId: "01K00000000000000000000006",
+    status: "failed",
+    attempt: 1,
+  }),
+);
+assert.throws(() =>
+  recordCashPaymentDrawerResultBodySchema.parse({
+    paymentId: "01K00000000000000000000006",
+    status: "opened",
+    attempt: 1,
+    error: "must not be accepted",
+  }),
 );
 
 console.log("POS hardware authorization smoke passed.");

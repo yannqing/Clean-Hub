@@ -1,7 +1,4 @@
-import type {
-  AuthContext,
-  AuthRequestMeta,
-} from "../../auth/auth.types.js";
+import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 
 /**
  * POS hardware device — read-only DTOs.
@@ -12,7 +9,11 @@ import type {
 
 export type PosHardwareDeviceType = "printer" | "scanner" | "cash_drawer";
 
-export type PosHardwareConnectionType = "usb" | "bluetooth" | "network" | "other";
+export type PosHardwareConnectionType =
+  | "usb"
+  | "bluetooth"
+  | "network"
+  | "other";
 
 export type PosHardwareDeviceStatus = "active" | "inactive";
 
@@ -29,9 +30,7 @@ export type PosHardwareDeviceSummary = {
   updatedAt: string;
 };
 
-export type PosHardwareAction =
-  | "manual_drawer_open"
-  | "privileged_reprint";
+export type PosHardwareAction = "manual_drawer_open" | "privileged_reprint";
 
 export type AuthorizeManualDrawerOpenRequest = {
   reason: string;
@@ -71,6 +70,22 @@ export type RecordPosPrintJobResultRequest = {
 export type PosPrintJobAuditResult = {
   jobId: string;
   status: RecordPosPrintJobResultRequest["status"];
+  attempt: number;
+  recorded: boolean;
+  idempotent: boolean;
+};
+
+export type RecordCashPaymentDrawerResultRequest = {
+  paymentId: string;
+  status: "opened" | "failed";
+  attempt: number;
+  printerId?: string;
+  error?: string;
+};
+
+export type PosCashPaymentDrawerAuditResult = {
+  paymentId: string;
+  status: RecordCashPaymentDrawerResultRequest["status"];
   attempt: number;
   recorded: boolean;
   idempotent: boolean;

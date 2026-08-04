@@ -12,6 +12,10 @@ import {
 
 import { desktopIpcChannels } from "./bridge.js";
 import {
+  createDesktopCashDrawerAdapter,
+  submitCupsRawPrintJob,
+} from "./cash-drawer.js";
+import {
   createDesktopOfflineStorage,
   desktopOfflineStorageIndexFileName,
 } from "./offline-storage.js";
@@ -300,5 +304,72 @@ assert(
     .status === "printed",
   "desktop printer adapter must preserve job status",
 );
+
+const drawerWrites: Array<{ printerId: string; bytes: Uint8Array }> = [];
+const desktopDrawer = createDesktopCashDrawerAdapter({
+  platform: "darwin",
+  async listPrinters() {
+    return [{ id: "printer_1", name: "Test Printer", isDefault: true }];
+  },
+  async writeRaw(request) {
+    drawerWrites.push(request);
+  },
+});
+assert(await desktopDrawer.isAvailable(), "CUPS drawer must be available");
+await desktopDrawer.open({
+  reason: "Cash payment",
+  trigger: { type: "cash_payment", paymentId: "payment_1" },
+});
+assert(
+  drawerWrites[0]?.printerId === "printer_1" &&
+    drawerWrites[0]?.bytes[0] === 0x1b,
+  "desktop drawer must submit a raw ESC/POS pulse to the default printer",
+);
+
+const windowsDrawer = createDesktopCashDrawerAdapter({
+  platform: "win32",
+  listPrinters: async () => [
+    { id: "printer_1", name: "Test Printer", isDefault: true },
+  ],
+});
+assert(
+  !(await windowsDrawer.isAvailable()),
+  "Windows must safely report unavailable without a vendor raw driver",
+);
+
+const cupsTempRoot = await mkdtemp(
+  path.join(os.tmpdir(), "cleanhub-cups-smoke-"),
+);
+const cupsCommands: Array<{ command: string; args: string[] }> = [];
+try {
+  await submitCupsRawPrintJob(
+    {
+      printerId: "printer_1",
+      bytes: Uint8Array.from([0x1b, 0x70, 0, 60, 120]),
+    },
+    {
+      platform: "linux",
+      temporaryDirectory: cupsTempRoot,
+      async run(command, args) {
+        cupsCommands.push({ command, args });
+        if (command === "lp") {
+          const error = new Error("lp unavailable") as NodeJS.ErrnoException;
+          error.code = "ENOENT";
+          throw error;
+        }
+      },
+    },
+  );
+  assert(
+    cupsCommands.map((entry) => entry.command).join(",") === "lp,lpr",
+    "CUPS raw output must safely fall back from lp to lpr only when lp is missing",
+  );
+  assert(
+    cupsCommands[1]?.args.slice(0, 3).join(",") === "-P,printer_1,-l",
+    "lpr fallback must address the selected printer without a shell",
+  );
+} finally {
+  await rm(cupsTempRoot, { force: true, recursive: true });
+}
 
 console.log("desktop smoke ok");

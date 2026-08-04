@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "smoke:login-form": "tsx src/features/auth/validators/login-form.validator.smoke.ts",
     "smoke:terminal-session": "tsx src/lib/pos-terminal-session.smoke.ts",
-    "smoke:offline-operations": "tsx src/features/offline/lib/pos-offline-operations.smoke.ts"
+    "smoke:offline-operations": "tsx src/features/offline/lib/pos-offline-operations.smoke.ts",
+    "smoke:cash-drawer": "tsx src/features/hardware/lib/cash-drawer.smoke.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.1",

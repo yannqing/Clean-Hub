@@ -1,6 +1,8 @@
 import {
   buildPosReceiptEscPos,
   buildPosReceiptText,
+  buildEscPosCashDrawerPulse,
+  createEscPosPrinterCashDrawerAdapter,
   createPosHardwareRuntime,
   createUnavailablePosCashDrawerAdapter,
   createUnavailablePosPrinterAdapter,
@@ -37,15 +39,24 @@ const capabilities = await runtime.getCapabilities();
 assert(!capabilities.scanner, "scanner must be unavailable");
 assert(!capabilities.printer, "printer must be unavailable");
 assert(!capabilities.cashDrawer, "cash drawer must be unavailable");
-assert(!capabilities.secureTerminalCredential, "secure storage must be unavailable");
-assert((await runtime.listPrinters()).length === 0, "printer list must be empty");
+assert(
+  !capabilities.secureTerminalCredential,
+  "secure storage must be unavailable",
+);
+assert(
+  (await runtime.listPrinters()).length === 0,
+  "printer list must be empty",
+);
 assert(
   (await runtime.print({ id: "print_1", printerId: "missing", content: "x" }))
     .status === "failed",
   "unavailable printer must return a failed job",
 );
 await expectReject(
-  runtime.openCashDrawer({ reason: "Manager approved" }),
+  runtime.openCashDrawer({
+    reason: "Manager approved",
+    trigger: { type: "manual", authorizationId: "authorization_1" },
+  }),
   (error) =>
     error instanceof PosHardwareUnavailableError &&
     error.capability === "cashDrawer" &&
@@ -53,9 +64,54 @@ await expectReject(
   "unknown cash drawer must reject as unavailable",
 );
 await expectReject(
-  runtime.openCashDrawer({ reason: " " }),
-  (error) => error instanceof Error && /reason is required/i.test(error.message),
+  runtime.openCashDrawer({
+    reason: " ",
+    trigger: { type: "manual", authorizationId: "authorization_1" },
+  }),
+  (error) =>
+    error instanceof Error && /reason is required/i.test(error.message),
   "cash drawer reason must be required",
+);
+
+const rawWrites: Array<{ printerId: string; bytes: Uint8Array }> = [];
+const drawerAdapter = createEscPosPrinterCashDrawerAdapter({
+  isSupported: () => true,
+  async listPrinters() {
+    return [
+      { id: "backup", name: "Backup", isDefault: false },
+      { id: "receipt", name: "Receipt", isDefault: true },
+    ];
+  },
+  async writeRaw(request) {
+    rawWrites.push(request);
+  },
+});
+assert(await drawerAdapter.isAvailable(), "ESC/POS drawer must be available");
+await drawerAdapter.open({
+  reason: "Cash payment payment_1",
+  printerId: "backup",
+  pulse: { pin: 1, onTimeMs: 100, offTimeMs: 200 },
+  trigger: { type: "cash_payment", paymentId: "payment_1" },
+});
+assert(rawWrites[0]?.printerId === "backup", "configured printer must win");
+assert(
+  Array.from(rawWrites[0]?.bytes ?? []).join(",") === "27,112,1,50,100",
+  "ESC/POS drawer pulse must preserve pin and timing",
+);
+assert(
+  Array.from(buildEscPosCashDrawerPulse()).join(",") === "27,112,0,60,120",
+  "ESC/POS drawer pulse must have safe defaults",
+);
+await expectReject(
+  drawerAdapter.open({
+    reason: "Cash payment payment_2",
+    printerId: "missing",
+    trigger: { type: "cash_payment", paymentId: "payment_2" },
+  }),
+  (error) =>
+    error instanceof PosHardwareUnavailableError &&
+    /printer was not found/i.test(error.message),
+  "a configured missing printer must fail rather than silently switching printers",
 );
 
 const receipt = {

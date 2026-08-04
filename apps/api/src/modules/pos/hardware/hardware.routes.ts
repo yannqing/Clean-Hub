@@ -5,6 +5,7 @@ import {
   authorizeManualDrawerOpenController,
   authorizePrivilegedReprintController,
   listHardwareDevicesController,
+  recordCashPaymentDrawerResultController,
   recordPosPrintJobResultController,
 } from "./hardware.controller.js";
 
@@ -28,6 +29,10 @@ export function createPosHardwareRoutes() {
     authorizePrivilegedReprintController,
   );
   routes.post("/print-jobs/results", recordPosPrintJobResultController);
+  routes.post(
+    "/cash-payments/drawer-results",
+    recordCashPaymentDrawerResultController,
+  );
 
   return routes;
 }

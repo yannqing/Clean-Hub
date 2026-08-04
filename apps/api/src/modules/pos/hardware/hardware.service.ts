@@ -11,7 +11,10 @@ import {
   requirePosBranchAccess,
   requirePosTenantId,
 } from "../access-control.helper.js";
-import { findHardwareDevicesByTerminal } from "./hardware.repository.js";
+import {
+  findHardwareDevicesByTerminal,
+  findPaidCashPaymentForBranch,
+} from "./hardware.repository.js";
 import type {
   AuthorizeManualDrawerOpenRequest,
   AuthorizePosHardwareActionInput,
@@ -19,7 +22,9 @@ import type {
   PosHardwareAction,
   PosHardwareActionAuthorization,
   PosHardwareDeviceSummary,
+  PosCashPaymentDrawerAuditResult,
   PosPrintJobAuditResult,
+  RecordCashPaymentDrawerResultRequest,
   RecordPosPrintJobResultRequest,
 } from "./hardware.types.js";
 
@@ -32,7 +37,11 @@ export async function listPosHardwareDevices(
   db: Database = getDb(),
 ): Promise<PosHardwareDeviceSummary[]> {
   const terminal = requireHardwareTerminal(authContext);
-  return findHardwareDevicesByTerminal(db, terminal.tenantId, terminal.terminalId);
+  return findHardwareDevicesByTerminal(
+    db,
+    terminal.tenantId,
+    terminal.terminalId,
+  );
 }
 
 function requireHardwareTerminal(authContext: AuthContext): {
@@ -206,6 +215,92 @@ export async function recordPosPrintJobResult(
 
   return {
     jobId: input.data.jobId,
+    status: input.data.status,
+    attempt: input.data.attempt,
+    recorded: true,
+    idempotent: false,
+  };
+}
+
+export async function recordCashPaymentDrawerResult(
+  input: AuthorizePosHardwareActionInput<RecordCashPaymentDrawerResultRequest>,
+  db: Database = getDb(),
+): Promise<PosCashPaymentDrawerAuditResult> {
+  const terminal = requireHardwareTerminal(input.authContext);
+  const payment = await findPaidCashPaymentForBranch(db, {
+    tenantId: terminal.tenantId,
+    branchId: terminal.branchId,
+    paymentId: input.data.paymentId,
+  });
+
+  if (!payment) {
+    throw new AuthError(
+      "FORBIDDEN",
+      "Cash-drawer results must reference a paid cash payment from the current branch.",
+    );
+  }
+
+  const eventType = `pos_hardware.cash_payment_drawer.${input.data.status}`;
+  const existingEvents = await db
+    .select({
+      eventType: auditLogs.eventType,
+      metadata: auditLogs.metadata,
+    })
+    .from(auditLogs)
+    .where(
+      and(
+        eq(auditLogs.tenantId, terminal.tenantId),
+        eq(auditLogs.branchId, terminal.branchId),
+        eq(auditLogs.entityType, "payment_transaction"),
+        eq(auditLogs.entityId, payment.id),
+      ),
+    );
+  const alreadyRecorded = existingEvents.some(
+    (event) =>
+      event.eventType === eventType &&
+      event.metadata?.attempt === input.data.attempt &&
+      event.metadata?.terminalId === terminal.terminalId,
+  );
+
+  if (alreadyRecorded) {
+    return {
+      paymentId: payment.id,
+      status: input.data.status,
+      attempt: input.data.attempt,
+      recorded: false,
+      idempotent: true,
+    };
+  }
+
+  await writeAuditLog(db, {
+    actorUserId: input.authContext.userId,
+    tenantId: terminal.tenantId,
+    branchId: terminal.branchId,
+    eventCategory: "pos_hardware",
+    eventType,
+    entityType: "payment_transaction",
+    entityId: payment.id,
+    success: input.data.status === "opened",
+    after: {
+      paymentId: payment.id,
+      orderId: payment.orderId,
+      status: input.data.status,
+      attempt: input.data.attempt,
+      printerId: input.data.printerId,
+    },
+    metadata: createPosAuditMetadata(input.authContext, {
+      paymentId: payment.id,
+      orderId: payment.orderId,
+      attempt: input.data.attempt,
+      printerId: input.data.printerId,
+      error: input.data.error,
+    }),
+    ipAddress: input.requestMeta?.ipAddress,
+    userAgent: input.requestMeta?.userAgent,
+  });
+
+  return {
+    paymentId: payment.id,
     status: input.data.status,
     attempt: input.data.attempt,
     recorded: true,

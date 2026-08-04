@@ -3,9 +3,11 @@ import type {
   AuthorizeManualDrawerOpenRequest,
   AuthorizePrivilegedReprintRequest,
   PosHardwareActionAuthorization,
+  PosCashPaymentDrawerAuditResult,
   PosHardwareDeviceListResponse,
   PosPrintJobAuditResult,
   RecordPosPrintJobResultRequest,
+  RecordCashPaymentDrawerResultRequest,
 } from "./hardware.types";
 
 /**
@@ -31,6 +33,13 @@ export function createPosHardwareApi(client: ApiClient) {
     recordPrintJobResult: (input: RecordPosPrintJobResultRequest) =>
       client.post<PosPrintJobAuditResult>(
         "/pos/hardware-devices/print-jobs/results",
+        input,
+      ),
+    recordCashPaymentDrawerResult: (
+      input: RecordCashPaymentDrawerResultRequest,
+    ) =>
+      client.post<PosCashPaymentDrawerAuditResult>(
+        "/pos/hardware-devices/cash-payments/drawer-results",
         input,
       ),
   };

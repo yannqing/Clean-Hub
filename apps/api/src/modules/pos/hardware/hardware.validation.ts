@@ -24,3 +24,28 @@ export const recordPosPrintJobResultBodySchema = z.object({
   authorizationId: z.string().regex(ULID_PATTERN).optional(),
   originalPrintJobId: z.string().regex(ULID_PATTERN).optional(),
 });
+
+export const recordCashPaymentDrawerResultBodySchema = z
+  .object({
+    paymentId: z.string().regex(ULID_PATTERN),
+    status: z.enum(["opened", "failed"]),
+    attempt: z.number().int().positive().max(100),
+    printerId: z.string().trim().min(1).max(256).optional(),
+    error: z.string().trim().min(1).max(1_000).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.status === "failed" && !value.error) {
+      context.addIssue({
+        code: "custom",
+        path: ["error"],
+        message: "A failure reason is required.",
+      });
+    }
+    if (value.status === "opened" && value.error) {
+      context.addIssue({
+        code: "custom",
+        path: ["error"],
+        message: "A successful drawer result cannot include an error.",
+      });
+    }
+  });

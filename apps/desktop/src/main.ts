@@ -13,7 +13,6 @@ import {
 
 import {
   createPosHardwareRuntime,
-  createUnavailablePosCashDrawerAdapter,
   createUnavailablePosScannerAdapter,
   type PosPrinterAdapter,
   type PosDrawerOpenRequest,
@@ -23,6 +22,7 @@ import {
 } from "@cleanhub/hardware";
 
 import { desktopIpcChannels } from "./bridge.js";
+import { createDesktopCashDrawerAdapter } from "./cash-drawer.js";
 import {
   createDesktopOfflineStorage,
   type DesktopOfflineStorage,
@@ -174,9 +174,7 @@ const hardwareRuntime = createPosHardwareRuntime({
     "No native scanner adapter is configured; keyboard-wedge scanning remains available in POS Web.",
   ),
   printer: electronPrinterAdapter,
-  cashDrawer: createUnavailablePosCashDrawerAdapter(
-    "No cash-drawer adapter is configured for this terminal.",
-  ),
+  cashDrawer: createDesktopCashDrawerAdapter({ listPrinters }),
   secureTerminalCredential: () => safeStorage.isEncryptionAvailable(),
 });
 

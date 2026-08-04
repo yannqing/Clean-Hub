@@ -34,6 +34,25 @@ export type PosPrintResult = {
 
 export type PosDrawerOpenRequest = {
   reason: string;
+  printerId?: string;
+  pulse?: PosCashDrawerPulse;
+  trigger:
+    | { type: "cash_payment"; paymentId: string }
+    | { type: "manual"; authorizationId: string };
+};
+
+export type PosCashDrawerPulse = {
+  /** ESC/POS connector pin: 0 = drawer pin 2, 1 = drawer pin 5. */
+  pin?: 0 | 1;
+  /** Energized duration in milliseconds. ESC/POS supports 2-510 ms. */
+  onTimeMs?: number;
+  /** Delay after the pulse in milliseconds. ESC/POS supports 2-510 ms. */
+  offTimeMs?: number;
+};
+
+export type PosRawPrinterWriteRequest = {
+  printerId: string;
+  bytes: Uint8Array;
 };
 
 export type PosScanEvent = {
@@ -68,6 +87,114 @@ export type PosCashDrawerAdapter = {
   isAvailable(): boolean | Promise<boolean>;
   open(request: PosDrawerOpenRequest): Promise<void>;
 };
+
+function requireDrawerRequest(request: PosDrawerOpenRequest): void {
+  if (
+    !request ||
+    typeof request.reason !== "string" ||
+    !request.reason.trim()
+  ) {
+    throw new Error("A reason is required to open the cash drawer.");
+  }
+
+  const trigger = request.trigger;
+  const validCashPaymentTrigger =
+    trigger?.type === "cash_payment" &&
+    typeof trigger.paymentId === "string" &&
+    Boolean(trigger.paymentId.trim());
+  const validManualTrigger =
+    trigger?.type === "manual" &&
+    typeof trigger.authorizationId === "string" &&
+    Boolean(trigger.authorizationId.trim());
+
+  if (!validCashPaymentTrigger && !validManualTrigger) {
+    throw new Error("An authorized cash-drawer trigger is required.");
+  }
+
+  if (
+    request.printerId !== undefined &&
+    (typeof request.printerId !== "string" || !request.printerId.trim())
+  ) {
+    throw new Error("Cash-drawer printer ID must be a non-empty string.");
+  }
+}
+
+function toEscPosPulseUnit(
+  value: number | undefined,
+  fallback: number,
+): number {
+  const duration = value ?? fallback;
+  if (!Number.isFinite(duration) || duration < 2 || duration > 510) {
+    throw new Error("Cash-drawer pulse duration must be between 2 and 510 ms.");
+  }
+  return Math.max(1, Math.min(255, Math.round(duration / 2)));
+}
+
+/** Build the standard ESC/POS `ESC p m t1 t2` cash-drawer pulse command. */
+export function buildEscPosCashDrawerPulse(
+  pulse: PosCashDrawerPulse = {},
+): Uint8Array {
+  const pin = pulse.pin ?? 0;
+  if (pin !== 0 && pin !== 1) {
+    throw new Error("Cash-drawer pulse pin must be 0 or 1.");
+  }
+
+  return Uint8Array.from([
+    0x1b,
+    0x70,
+    pin,
+    toEscPosPulseUnit(pulse.onTimeMs, 120),
+    toEscPosPulseUnit(pulse.offTimeMs, 240),
+  ]);
+}
+
+/**
+ * Cash-drawer adapter for drawers connected to an ESC/POS receipt printer.
+ * The host supplies raw printer transport (for example CUPS on macOS/Linux).
+ */
+export function createEscPosPrinterCashDrawerAdapter(input: {
+  isSupported(): boolean | Promise<boolean>;
+  listPrinters(): Promise<PosPrinterDevice[]>;
+  writeRaw(request: PosRawPrinterWriteRequest): Promise<void>;
+}): PosCashDrawerAdapter {
+  return {
+    async isAvailable() {
+      return (
+        Boolean(await input.isSupported()) &&
+        (await input.listPrinters()).length > 0
+      );
+    },
+    async open(request) {
+      requireDrawerRequest(request);
+
+      if (!(await input.isSupported())) {
+        throw new PosHardwareUnavailableError(
+          "cashDrawer",
+          "Raw ESC/POS cash-drawer output is unavailable on this operating system.",
+        );
+      }
+
+      const printers = await input.listPrinters();
+      const printer = request.printerId
+        ? printers.find((candidate) => candidate.id === request.printerId)
+        : (printers.find((candidate) => candidate.isDefault) ?? printers[0]);
+
+      if (!printer) {
+        throw new PosHardwareUnavailableError(
+          "cashDrawer",
+          request.printerId
+            ? "The configured cash-drawer receipt printer was not found."
+            : "No receipt printer is available for the cash drawer.",
+        );
+      }
+
+      await input.writeRaw({
+        printerId: printer.id,
+        bytes: buildEscPosCashDrawerPulse(request.pulse),
+      });
+    },
+  };
+}
 
 export type PosHardwareRuntime = {
   getCapabilities(): Promise<PosHardwareCapabilities>;
@@ -107,9 +234,7 @@ export function createUnavailablePosCashDrawerAdapter(
   return {
     isAvailable: () => false,
     async open(request) {
-      if (!request.reason.trim()) {
-        throw new Error("A reason is required to open the cash drawer.");
-      }
+      requireDrawerRequest(request);
       throw new PosHardwareUnavailableError("cashDrawer", reason);
     },
   };

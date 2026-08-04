@@ -23,7 +23,10 @@ import {
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { usePosOfflineWrites } from "@/features/offline/lib";
+import { getDesktopBridge } from "@/features/hardware/lib/desktop-bridge";
+import { openCashDrawerForPayment } from "@/features/hardware/lib/cash-drawer";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
+import { posApi } from "@/lib/api-client";
 
 import { deleteOrderAction, payOrderAction } from "../actions";
 import {
@@ -118,11 +121,44 @@ export function OrderActionsPanel({
                 (idempotencyKeyRef.current = createPaymentIdempotencyKey()),
             });
       if (result.ok) {
-        toast.success(
-          paymentOption === "cash"
-            ? "现金收款已记录。"
-            : `${MOBILE_MONEY_PROVIDER_LABELS[paymentOption]} 支付已记录，等待 Manager 确认。`,
-        );
+        if (paymentOption === "cash") {
+          toast.success("现金收款已记录。");
+          const paymentResult = result.data;
+
+          if (
+            paymentResult?.payment.paymentMethod === "cash" &&
+            paymentResult.payment.paymentStatus === "paid" &&
+            !paymentResult.idempotent
+          ) {
+            const drawerOutcome = await openCashDrawerForPayment({
+              paymentId: paymentResult.payment.id,
+              loadDevices: async () => (await posApi.pos.hardware.list()).data,
+              hardware: getDesktopBridge()?.hardware ?? null,
+              reportResult: (drawerResult) =>
+                posApi.pos.hardware.recordCashPaymentDrawerResult(drawerResult),
+            });
+
+            if (drawerOutcome.opened) {
+              toast.success("钱箱已自动打开。");
+            } else {
+              toast.error(`现金收款已记录，但${drawerOutcome.message}`);
+            }
+
+            if (drawerOutcome.auditWarning) {
+              toast.warning(
+                `钱箱操作结果暂未同步审计：${drawerOutcome.auditWarning}`,
+              );
+            }
+          } else if (paymentResult?.idempotent) {
+            toast.info("重复收款请求已确认，本次未重复打开钱箱。");
+          } else if (!paymentResult) {
+            toast.warning("收款已提交，但支付响应不完整，未执行自动开箱。");
+          }
+        } else {
+          toast.success(
+            `${MOBILE_MONEY_PROVIDER_LABELS[paymentOption]} 支付已记录，等待 Manager 确认。`,
+          );
+        }
         idempotencyKeyRef.current = null;
         setExternalReference("");
         router.refresh();

@@ -1,6 +1,10 @@
 import { and, eq, isNull } from "drizzle-orm";
 
-import { hardwareConfigs, type Database } from "@cleanhub/db";
+import {
+  hardwareConfigs,
+  paymentTransactions,
+  type Database,
+} from "@cleanhub/db";
 
 import type { PosHardwareDeviceSummary } from "./hardware.types.js";
 
@@ -44,4 +48,29 @@ export async function findHardwareDevicesByTerminal(
     .orderBy(hardwareConfigs.createdAt);
 
   return rows.map(toSummary);
+}
+
+export async function findPaidCashPaymentForBranch(
+  db: Database,
+  input: { tenantId: string; branchId: string; paymentId: string },
+): Promise<{ id: string; orderId: string } | null> {
+  const rows = await db
+    .select({
+      id: paymentTransactions.id,
+      orderId: paymentTransactions.orderId,
+    })
+    .from(paymentTransactions)
+    .where(
+      and(
+        eq(paymentTransactions.id, input.paymentId),
+        eq(paymentTransactions.tenantId, input.tenantId),
+        eq(paymentTransactions.branchId, input.branchId),
+        eq(paymentTransactions.paymentMethod, "cash"),
+        eq(paymentTransactions.paymentStatus, "paid"),
+        isNull(paymentTransactions.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
 }
