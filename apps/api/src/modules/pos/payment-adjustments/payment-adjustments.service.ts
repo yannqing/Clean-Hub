@@ -126,11 +126,21 @@ async function createAdjustment(
     }
 
     if (refundData) {
+      if (Number(refundData.amount) > Number(order.paidAmount)) {
+        throw new PosOrderError(
+          "PAYMENT_AMOUNT_EXCEEDED",
+          "Refund amount exceeds the order's current paid amount.",
+          409,
+        );
+      }
       const alreadyRefunded = await sumRefundedForPayment(tx, {
         tenantId,
         paymentId: payment.id,
       });
-      if (alreadyRefunded + Number(refundData.amount) > Number(payment.amount)) {
+      if (
+        alreadyRefunded + Number(refundData.amount) >
+        Number(payment.amount)
+      ) {
         throw new PosOrderError(
           "PAYMENT_AMOUNT_EXCEEDED",
           "Refund amount exceeds the remaining refundable amount.",

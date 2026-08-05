@@ -131,6 +131,7 @@ function toOrderItem(row: typeof orderItems.$inferSelect): PosOrderItem {
 type OrderJoinedRow = typeof orders.$inferSelect & {
   customerName: string | null;
   itemCount: string | number | null;
+  itemNames: string[] | null;
 };
 
 function toOrderSummary(row: OrderJoinedRow): PosOrderSummary {
@@ -152,6 +153,7 @@ function toOrderSummary(row: OrderJoinedRow): PosOrderSummary {
     expireAt: row.expireAt ? row.expireAt.toISOString() : null,
     notes: row.notes,
     itemCount: Number(row.itemCount ?? 0),
+    itemNames: row.itemNames ?? [],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     version: row.version,
@@ -269,6 +271,12 @@ export async function findPosOrders(
         where ${orderItems.orderId} = ${orders.id}
           and ${orderItems.deletedAt} is null
       )`,
+      itemNames: sql<string[]>`coalesce((
+        select array_agg(distinct ${orderItems.itemName} order by ${orderItems.itemName})
+        from ${orderItems}
+        where ${orderItems.orderId} = ${orders.id}
+          and ${orderItems.deletedAt} is null
+      ), array[]::text[])`,
     })
     .from(orders)
     .leftJoin(customers, eq(customers.id, orders.customerId))
@@ -306,6 +314,12 @@ export async function findPosOrderById(
         where ${orderItems.orderId} = ${orders.id}
           and ${orderItems.deletedAt} is null
       )`,
+      itemNames: sql<string[]>`coalesce((
+        select array_agg(distinct ${orderItems.itemName} order by ${orderItems.itemName})
+        from ${orderItems}
+        where ${orderItems.orderId} = ${orders.id}
+          and ${orderItems.deletedAt} is null
+      ), array[]::text[])`,
     })
     .from(orders)
     .leftJoin(customers, eq(customers.id, orders.customerId))

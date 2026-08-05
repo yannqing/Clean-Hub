@@ -56,6 +56,7 @@ import type {
 type ProductFilterInput = {
   tenantId: string;
   allowedBranchIds?: string[];
+  q?: string;
   status?: TenantProductListQuery["status"];
   createdAfter?: string;
   createdBefore?: string;
@@ -2288,6 +2289,29 @@ function buildProductFilters(input: ProductFilterInput): SQL[] {
 
   if (branchScopeFilter) {
     filters.push(branchScopeFilter);
+  }
+  if (input.q) {
+    const pattern = `%${input.q.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+    filters.push(
+      or(
+        sql`${products.id} ilike ${pattern} escape '\\'`,
+        sql`${products.name} ilike ${pattern} escape '\\'`,
+        sql`${products.brand} ilike ${pattern} escape '\\'`,
+        sql`${products.description} ilike ${pattern} escape '\\'`,
+        sql`${products.tags}::text ilike ${pattern} escape '\\'`,
+        sql`exists (
+          select 1 from ${productSkus}
+          where ${productSkus.tenantId} = ${products.tenantId}
+            and ${productSkus.productId} = ${products.id}
+            and ${productSkus.deletedAt} is null
+            and (
+              ${productSkus.skuCode} ilike ${pattern} escape '\\'
+              or ${productSkus.barcode} ilike ${pattern} escape '\\'
+              or ${productSkus.variantName} ilike ${pattern} escape '\\'
+            )
+        )`,
+      )!,
+    );
   }
   if (input.status) {
     filters.push(eq(products.status, input.status));

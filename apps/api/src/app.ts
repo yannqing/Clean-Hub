@@ -46,6 +46,7 @@ import { createTenantPosChannelRoutes } from "./modules/tenant/pos-channel/pos-c
 import { createTenantProfileRoutes } from "./modules/tenant/profile/profile.routes.js";
 import { createTenantProductRoutes } from "./modules/tenant/products/products.routes.js";
 import { createTenantReportRoutes } from "./modules/tenant/reports/reports.routes.js";
+import { createTenantSearchRoutes } from "./modules/tenant/search/search.routes.js";
 import { createTenantServiceCategoryRoutes } from "./modules/tenant/service-categories/service-categories.routes.js";
 import { createTenantServiceRoutes } from "./modules/tenant/services/services.routes.js";
 import { createTenantSettingsRoutes } from "./modules/tenant/settings/settings.routes.js";
@@ -185,6 +186,7 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.route("/tenant/finance", createTenantFinanceRoutes());
   app.route("/tenant/pos-channel", createTenantPosChannelRoutes());
   app.route("/tenant/reports", createTenantReportRoutes());
+  app.route("/tenant/search", createTenantSearchRoutes());
   app.route("/tenant/users", createTenantUsersRoutes());
 
   // POS 终端侧（收银员 / 店长 / 店主）

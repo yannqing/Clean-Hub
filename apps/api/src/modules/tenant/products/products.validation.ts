@@ -457,6 +457,7 @@ export const requestTenantProductMediaUploadBodySchema = z
 
 export const tenantProductListQuerySchema = z
   .object({
+    q: z.string().trim().min(1).max(200).optional(),
     status: tenantProductStatusSchema.optional(),
     createdAfter: isoTimestampSchema.optional(),
     createdBefore: isoTimestampSchema.optional(),
