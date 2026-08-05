@@ -68,6 +68,9 @@ jobs:
       - name: Run database migrations
         run: pnpm db:migrate
 
+      - name: Run tenant order integration test
+        run: pnpm test:integration:tenant-orders
+
       - name: Typecheck core apps
         run: |
           pnpm --filter @cleanhub/api typecheck

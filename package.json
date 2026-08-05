@@ -17,6 +17,7 @@
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "test:integration:tenant-orders": "pnpm --filter @cleanhub/api test:integration:tenant-orders",
     "db:up": "docker compose up -d postgres minio minio-init",
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres minio",
