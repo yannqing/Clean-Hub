@@ -49,6 +49,13 @@ export const auditLogs = pgTable(
     index("audit_logs_event_category_idx").on(table.eventCategory),
     index("audit_logs_event_type_idx").on(table.eventType),
     index("audit_logs_entity_idx").on(table.entityType, table.entityId),
+    index("audit_logs_tenant_entity_created_at_idx").on(
+      table.tenantId,
+      table.entityType,
+      table.entityId,
+      table.createdAt,
+      table.id,
+    ),
     index("audit_logs_created_at_idx").on(table.createdAt),
   ],
 );
