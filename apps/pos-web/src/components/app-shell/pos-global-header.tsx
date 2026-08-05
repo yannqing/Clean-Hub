@@ -16,21 +16,27 @@ import { Icon } from "./icons";
 type HeaderPanel = "notifications" | "account";
 
 type PosGlobalHeaderProps = {
+  canReprint: boolean;
   displayInitials: string;
   notificationUnreadCount: number;
   onOpenNavigation: () => void;
   onUnreadCountChange: (count: number) => void;
+  pendingPrintTaskCount: number;
   profileName: string;
   roleLabel: string;
+  syncingPrintTaskCount: number;
 };
 
 export function PosGlobalHeader({
+  canReprint,
   displayInitials,
   notificationUnreadCount,
   onOpenNavigation,
   onUnreadCountChange,
+  pendingPrintTaskCount,
   profileName,
   roleLabel,
+  syncingPrintTaskCount,
 }: PosGlobalHeaderProps) {
   const { t } = useTranslation();
   const accountRootRef = useRef<HTMLDivElement>(null);
@@ -131,11 +137,14 @@ export function PosGlobalHeader({
             <Icon className="h-4 w-4" name="lock" />
           </LogoutButton>
           <HeaderNotificationsMenu
+            canReprint={canReprint}
             onOpenChange={(open) =>
               setActivePanel(open ? "notifications" : null)
             }
             onUnreadCountChange={onUnreadCountChange}
             open={activePanel === "notifications"}
+            pendingPrintTaskCount={pendingPrintTaskCount}
+            syncingPrintTaskCount={syncingPrintTaskCount}
             unreadCount={notificationUnreadCount}
           />
 

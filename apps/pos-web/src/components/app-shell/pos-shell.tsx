@@ -8,7 +8,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { posRoutes, posSidebarNavigation } from "@/config";
-import { PendingPrintJobs } from "@/features/hardware/components/pending-print-jobs";
+import { usePendingPrintJobCounts } from "@/features/hardware/components/pending-print-jobs";
 import { OfflineSyncBadge } from "@/features/offline/components";
 
 import { Icon } from "./icons";
@@ -126,17 +126,26 @@ export function PosShell({
   const settingsActive = isActivePath(pathname, posRoutes.settings);
   const canReprint =
     resolvedProfile.role === "owner" || resolvedProfile.role === "manager";
+  const { actionable: pendingPrintTaskCount, syncPending: syncingPrintTaskCount } =
+    usePendingPrintJobCounts();
+  const printTaskAttentionCount =
+    pendingPrintTaskCount + syncingPrintTaskCount;
+  const hasPrintTaskAttention =
+    printTaskAttentionCount > 0;
 
   return (
     <div className="flex h-screen h-dvh min-h-0 flex-col overflow-hidden bg-muted/30 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-foreground">
       <div className="relative z-50 shrink-0 bg-black pt-[env(safe-area-inset-top)]">
         <PosGlobalHeader
+          canReprint={canReprint}
           displayInitials={displayInitials}
           notificationUnreadCount={currentUnreadCount}
           onOpenNavigation={() => setMobileNavigationOpen(true)}
           onUnreadCountChange={setCurrentUnreadCount}
+          pendingPrintTaskCount={pendingPrintTaskCount}
           profileName={profileName}
           roleLabel={roleLabel}
+          syncingPrintTaskCount={syncingPrintTaskCount}
         />
       </div>
 
@@ -178,17 +187,26 @@ export function PosShell({
             {posSidebarNavigation.map((item) => {
               const active = isActivePath(activePathname, item.href);
               const label = t(item.labelKey);
-              const showUnreadIndicator =
-                currentUnreadCount > 0 && item.href === posRoutes.notifications;
+              const showNotificationIndicator =
+                (currentUnreadCount > 0 || hasPrintTaskAttention) &&
+                item.href === posRoutes.notifications;
 
               return (
                 <Link
                   aria-current={active ? "page" : undefined}
                   aria-label={
-                    showUnreadIndicator
-                      ? t("pos.shell.unreadMessages", {
-                          count: currentUnreadCount,
-                        })
+                    showNotificationIndicator
+                      ? `${
+                          currentUnreadCount > 0
+                            ? t("pos.shell.unreadMessages", {
+                                count: currentUnreadCount,
+                              })
+                            : label
+                        }${
+                          hasPrintTaskAttention
+                            ? `，${printTaskAttentionCount} 个终端打印事项`
+                            : ""
+                        }`
                       : label
                   }
                   className={cn(
@@ -217,8 +235,13 @@ export function PosShell({
                     name={item.icon}
                   />
                   <span className="min-w-0 flex-1 truncate">{label}</span>
-                  {showUnreadIndicator ? (
-                    <span className="h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                  {showNotificationIndicator ? (
+                    <span
+                      className={cn(
+                        "h-2 w-2 shrink-0 rounded-full",
+                        currentUnreadCount > 0 ? "bg-red-500" : "bg-amber-500",
+                      )}
+                    />
                   ) : null}
                 </Link>
               );
@@ -227,7 +250,6 @@ export function PosShell({
 
           <div className="border-t border-sidebar-border pt-3">
             <OfflineSyncBadge className="mb-2 w-full justify-start text-xs" />
-            <PendingPrintJobs canReprint={canReprint} />
             <Link
               aria-current={settingsActive ? "page" : undefined}
               className={cn(

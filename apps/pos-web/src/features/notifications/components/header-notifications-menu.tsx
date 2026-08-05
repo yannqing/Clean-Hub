@@ -12,13 +12,17 @@ import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/app-shell";
 import { posRoutes } from "@/config";
+import { PendingPrintJobs } from "@/features/hardware/components/pending-print-jobs";
 import { posApi } from "@/lib/api-client";
 
 type HeaderNotificationsMenuProps = {
+  canReprint: boolean;
   className?: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   unreadCount: number;
+  pendingPrintTaskCount: number;
+  syncingPrintTaskCount: number;
   onUnreadCountChange?: (count: number) => void;
 };
 
@@ -69,10 +73,13 @@ function getNoticeTypeLabel(
 }
 
 export function HeaderNotificationsMenu({
+  canReprint,
   className,
   open,
   onOpenChange,
   unreadCount,
+  pendingPrintTaskCount,
+  syncingPrintTaskCount,
   onUnreadCountChange,
 }: HeaderNotificationsMenuProps) {
   const { locale, t } = useTranslation();
@@ -80,6 +87,7 @@ export function HeaderNotificationsMenu({
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [items, setItems] = useState<PosNotificationInboxItem[]>([]);
   const [actionId, setActionId] = useState<string | null>(null);
+  const terminalTaskCount = pendingPrintTaskCount + syncingPrintTaskCount;
 
   function closeMenu() {
     onOpenChange(false);
@@ -194,9 +202,15 @@ export function HeaderNotificationsMenu({
       <button
         aria-expanded={open}
         aria-label={
-          unreadCount > 0
-            ? t("pos.shell.unreadMessages", { count: unreadCount })
-            : t("pos.shell.messageCenter")
+          `${
+            unreadCount > 0
+              ? t("pos.shell.unreadMessages", { count: unreadCount })
+              : t("pos.shell.messageCenter")
+          }${
+            terminalTaskCount > 0
+              ? `，${terminalTaskCount} 个终端打印事项`
+              : ""
+          }`
         }
         className={cn(
           "relative z-50 flex size-9 items-center justify-center rounded-xl text-white/75 transition-colors",
@@ -213,6 +227,12 @@ export function HeaderNotificationsMenu({
           <span className="absolute -right-1 -top-1 flex min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-4 text-white ring-2 ring-black">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
+        ) : null}
+        {terminalTaskCount > 0 ? (
+          <span
+            aria-hidden
+            className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-amber-400 ring-2 ring-black"
+          />
         ) : null}
       </button>
 
@@ -244,6 +264,8 @@ export function HeaderNotificationsMenu({
                 : t("pos.notificationsMenu.markAllRead")}
             </button>
           </div>
+
+          <PendingPrintJobs canReprint={canReprint} variant="notification" />
 
           <div className="pos-scrollbar max-h-[420px] overflow-y-auto">
             {loadState === "loading" || loadState === "idle" ? (

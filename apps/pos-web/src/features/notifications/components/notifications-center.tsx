@@ -15,6 +15,7 @@ import {
   PosTableSurface,
 } from "@/components/app-shell";
 import { posRoutes } from "@/config";
+import { PendingPrintJobs } from "@/features/hardware/components/pending-print-jobs";
 
 import {
   archiveNotificationAction,
@@ -40,6 +41,7 @@ import type {
 } from "../types";
 
 type NotificationsCenterProps = {
+  canReprint: boolean;
   notifications: PosNotificationInboxItem[];
   overview: PosNotificationOverview;
   total: number;
@@ -72,6 +74,7 @@ const NOTICE_TYPE_BADGE_CLASSES = {
 } as const;
 
 export function NotificationsCenter({
+  canReprint,
   notifications,
   overview,
   total,
@@ -168,6 +171,8 @@ export function NotificationsCenter({
       />
 
       <NotificationMetrics overview={overview} />
+
+      <PendingPrintJobs canReprint={canReprint} variant="center" />
 
       <PosTableSurface>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-3 py-2.5">

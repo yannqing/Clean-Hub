@@ -35,6 +35,7 @@ export function WorkspaceView({
 }: WorkspaceViewProps) {
   const { locale } = useTranslation();
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : null;
+  const canReprint = user?.role === "owner" || user?.role === "manager";
   const today = new Date().toLocaleDateString(locale, {
     year: "numeric",
     month: "long",
@@ -80,7 +81,7 @@ export function WorkspaceView({
       <WorkspaceQuickActions actions={overview?.quickActions ?? []} />
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <PendingTasks tasks={pendingTasks} />
+        <PendingTasks canReprint={canReprint} tasks={pendingTasks} />
         <RecentActivities activities={recentActivities} />
       </div>
     </div>

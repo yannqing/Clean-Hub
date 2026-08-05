@@ -16,6 +16,7 @@ import {
   getNotificationsListQuery,
   getNotificationsOverviewQuery,
 } from "@/features/notifications/queries";
+import { getCurrentUser } from "@/lib/auth";
 
 type NotificationsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -77,14 +78,16 @@ export default async function NotificationsPage({
   const params = await searchParams;
   const query = buildNotificationQuery(params);
 
-  const [list, overview] = await Promise.all([
+  const [list, overview, user] = await Promise.all([
     getNotificationsListQuery(query),
     getNotificationsOverviewQuery(),
+    getCurrentUser(),
   ]);
 
   return (
     <Suspense fallback={null}>
       <NotificationsCenter
+        canReprint={user?.role === "owner" || user?.role === "manager"}
         notifications={list.data}
         overview={overview}
         total={list.total}

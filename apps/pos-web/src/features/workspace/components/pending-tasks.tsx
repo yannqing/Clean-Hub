@@ -7,6 +7,10 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
 
 import { Icon, type PosIconName } from "@/components/app-shell/icons";
+import {
+  PendingPrintJobs,
+  usePendingPrintJobCounts,
+} from "@/features/hardware/components/pending-print-jobs";
 
 type Priority = "high" | "medium" | "low";
 
@@ -187,16 +191,26 @@ function TaskCard({
   );
 }
 
-export function PendingTasks({ tasks }: { tasks: PosPendingTask[] }) {
+export function PendingTasks({
+  canReprint,
+  tasks,
+}: {
+  canReprint: boolean;
+  tasks: PosPendingTask[];
+}) {
   const { locale } = useTranslation();
-  const totalPending = tasks.reduce((sum, task) => sum + task.count, 0);
+  const { actionable, syncPending } = usePendingPrintJobCounts();
+  const localPrintTaskCount = actionable + syncPending;
+  const totalPending =
+    tasks.reduce((sum, task) => sum + task.count, 0) + localPrintTaskCount;
   const maxCount = Math.max(...tasks.map((task) => task.count), 1);
+  const hasPendingTasks = tasks.length > 0 || localPrintTaskCount > 0;
 
   return (
     <section className="space-y-4">
       <SectionHeader
         action={
-          tasks.length > 0 ? (
+          hasPendingTasks ? (
             <span className="inline-flex h-8 items-center rounded-md bg-muted px-3 text-xs font-semibold text-muted-foreground">
               {formatPendingSummary(totalPending, locale)}
             </span>
@@ -207,10 +221,11 @@ export function PendingTasks({ tasks }: { tasks: PosPendingTask[] }) {
         title="待办任务"
       />
 
-      {tasks.length === 0 ? (
+      {!hasPendingTasks ? (
         <EmptyTasks />
       ) : (
         <div className="space-y-2">
+          <PendingPrintJobs canReprint={canReprint} variant="task" />
           {tasks.map((task) => (
             <TaskCard
               key={task.id}
