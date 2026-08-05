@@ -230,6 +230,7 @@ export type TenantProductSummary = {
 };
 
 export type TenantProductListQuery = {
+  q?: string;
   status?: TenantProductStatus;
   createdAfter?: string;
   createdBefore?: string;

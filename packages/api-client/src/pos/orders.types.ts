@@ -149,6 +149,7 @@ export type PosOrderSummary = {
   expireAt: string | null;
   notes: string | null;
   itemCount: number;
+  itemNames: string[];
   createdAt: string;
   updatedAt: string;
   version: number;
