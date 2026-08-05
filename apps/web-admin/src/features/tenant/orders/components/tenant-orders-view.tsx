@@ -5,6 +5,12 @@ import {
   Badge,
   Button,
   Checkbox,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Icon,
   Input,
   Popover,
@@ -17,8 +23,10 @@ import {
   TableHeader,
   TableRow,
   cn,
+  toast,
 } from "@cleanhub/ui";
 import type {
+  TenantOrderImportFailure,
   TenantOrderOverview,
   TenantOrderPaymentStatus,
   TenantOrderSort,
@@ -32,23 +40,39 @@ import {
   Check,
   CircleDollarSign,
   Clock3,
+  Download,
+  FileDown,
   ListFilter,
+  LoaderCircle,
   Search,
   ShoppingBag,
   SlidersHorizontal,
+  Upload,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 
+import { webAdminRoutes } from "@/config/routes";
 import { getBranchListQuery } from "@/features/tenant/branches/queries";
 import { interpolate, useTenantI18n } from "@/i18n";
 import { formatMoney } from "@/lib/format";
 
+import { importTenantOrdersAction } from "../actions";
 import {
-  getTenantOrderDatasetQuery,
+  downloadTenantOrderExport,
+  downloadTenantOrderImportTemplate,
+  parseTenantOrderImportCsv,
+  type TenantOrderCsvParseError,
+  type TenantOrderCsvParseResult,
+} from "../order-csv";
+import {
+  getTenantOrderExportDatasetQuery,
+  getTenantOrderListQuery,
   getTenantOrderOverviewQuery,
 } from "../queries";
 
 const PAGE_SIZE = 10;
+const MAX_IMPORT_FILE_SIZE = 1024 * 1024;
 
 type OrderStatusFilter = "all" | TenantOrderStatus;
 type OrderDateFilter =
@@ -155,9 +179,15 @@ function getPaymentStatusVariant(
   return status === "partial" ? "secondary" : "outline";
 }
 
-export function TenantOrdersView() {
+export function TenantOrdersView({
+  initialSearchQuery = "",
+}: {
+  initialSearchQuery?: string;
+}) {
+  const router = useRouter();
   const { formatDateTime, locale, m } = useTenantI18n();
-  const [orderDataset, setOrderDataset] = useState<TenantOrderSummary[]>([]);
+  const [orders, setOrders] = useState<TenantOrderSummary[]>([]);
+  const [total, setTotal] = useState(0);
   const [overview, setOverview] = useState<TenantOrderOverview | null>(null);
   const [branchNames, setBranchNames] = useState<Record<string, string>>({});
   const [page, setPage] = useState(1);
@@ -165,7 +195,10 @@ export function TenantOrdersView() {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState<OrderDateFilter>("all");
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(
+    initialSearchQuery.trim(),
+  );
   const [sort, setSort] = useState<TenantOrderSort>("created_desc");
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE_COLUMNS);
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -173,27 +206,60 @@ export function TenantOrdersView() {
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importFileName, setImportFileName] = useState("");
+  const [importParseResult, setImportParseResult] =
+    useState<TenantOrderCsvParseResult | null>(null);
+  const [importFileError, setImportFileError] = useState<string | null>(null);
+  const [importFailures, setImportFailures] = useState<
+    TenantOrderImportFailure[]
+  >([]);
+  const [importing, setImporting] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
   const { createdAfter, createdBefore } = buildDateRange(dateFilter);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   useEffect(() => {
     let current = true;
     const controller = new AbortController();
 
-    getTenantOrderDatasetQuery(
+    getTenantOrderListQuery(
       {
         createdAfter,
         createdBefore,
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+        q: debouncedSearchQuery || undefined,
         sort,
         status: status === "all" ? undefined : status,
       },
-      controller.signal,
+      { signal: controller.signal },
     )
       .then((result) => {
         if (!current) {
           return;
         }
 
-        setOrderDataset(result);
+        const resultTotalPages = Math.max(
+          1,
+          Math.ceil(result.total / PAGE_SIZE),
+        );
+
+        if (page > resultTotalPages) {
+          setPage(resultTotalPages);
+          return;
+        }
+
+        setOrders(result.data);
+        setTotal(result.total);
         setListError(null);
       })
       .catch(() => {
@@ -214,7 +280,9 @@ export function TenantOrdersView() {
   }, [
     createdAfter,
     createdBefore,
+    debouncedSearchQuery,
     m.orders.loadError,
+    page,
     refreshVersion,
     sort,
     status,
@@ -262,35 +330,8 @@ export function TenantOrdersView() {
     };
   }, [createdAfter, createdBefore, m.orders.overviewError, refreshVersion]);
 
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const filteredOrders = useMemo(() => {
-    if (!normalizedSearchQuery) {
-      return orderDataset;
-    }
-
-    return orderDataset.filter((order) => {
-      const searchableValues = [
-        formatPosOrderCode(order.id),
-        order.id,
-        order.customerName,
-      ];
-
-      return searchableValues.some((value) =>
-        value.toLowerCase().includes(normalizedSearchQuery),
-      );
-    });
-  }, [normalizedSearchQuery, orderDataset]);
-  const total = filteredOrders.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const orders = useMemo(
-    () =>
-      filteredOrders.slice(
-        (currentPage - 1) * PAGE_SIZE,
-        currentPage * PAGE_SIZE,
-      ),
-    [currentPage, filteredOrders],
-  );
+  const currentPage = page;
   const visibleColumnCount =
     Object.values(visibleColumns).filter(Boolean).length;
   const sortOptions: Array<{ label: string; value: TenantOrderSort }> = [
@@ -388,6 +429,8 @@ export function TenantOrdersView() {
   }
 
   function goToPage(nextPage: number) {
+    setListLoading(true);
+    setListError(null);
     setPage(nextPage);
   }
 
@@ -407,6 +450,8 @@ export function TenantOrdersView() {
   }
 
   function changeSearchQuery(nextQuery: string) {
+    setListLoading(true);
+    setListError(null);
     setSearchQuery(nextQuery);
     setPage(1);
   }
@@ -444,6 +489,187 @@ export function TenantOrdersView() {
         [column]: checked,
       };
     });
+  }
+
+  function resetImportDialog() {
+    setImportFileName("");
+    setImportParseResult(null);
+    setImportFileError(null);
+    setImportFailures([]);
+    if (importFileInputRef.current) {
+      importFileInputRef.current.value = "";
+    }
+  }
+
+  function changeImportDialogOpen(open: boolean) {
+    if (importing) {
+      return;
+    }
+
+    setImportDialogOpen(open);
+    if (!open) {
+      resetImportDialog();
+    }
+  }
+
+  function formatImportParseError(error: TenantOrderCsvParseError): string {
+    switch (error.code) {
+      case "empty":
+        return m.orders.transfer.parseErrors.empty;
+      case "malformed":
+        return m.orders.transfer.parseErrors.malformed;
+      case "missing_headers":
+        return interpolate(m.orders.transfer.parseErrors.missingHeaders, {
+          fields: error.headers.join(", "),
+        });
+      case "missing_values":
+        return interpolate(m.orders.transfer.parseErrors.missingValues, {
+          fields: error.fields.join(", "),
+          row: String(error.row),
+        });
+      case "invalid_value":
+        return interpolate(m.orders.transfer.parseErrors.invalidValue, {
+          field: error.field,
+          row: String(error.row),
+        });
+      case "conflicting_order":
+        return interpolate(m.orders.transfer.parseErrors.conflictingOrder, {
+          order: error.orderKey,
+          row: String(error.row),
+        });
+      case "too_many_rows":
+        return interpolate(m.orders.transfer.parseErrors.tooManyRows, {
+          limit: String(error.limit),
+        });
+      case "too_many_orders":
+        return interpolate(m.orders.transfer.parseErrors.tooManyOrders, {
+          limit: String(error.limit),
+        });
+    }
+  }
+
+  async function selectImportFile(file: File | undefined) {
+    setImportFailures([]);
+    setImportParseResult(null);
+    setImportFileError(null);
+    setImportFileName(file?.name ?? "");
+
+    if (!file) {
+      return;
+    }
+    if (file.size > MAX_IMPORT_FILE_SIZE) {
+      setImportFileError(m.orders.transfer.fileTooLarge);
+      return;
+    }
+
+    try {
+      setImportParseResult(parseTenantOrderImportCsv(await file.text()));
+    } catch {
+      setImportFileError(m.orders.transfer.importFailed);
+    }
+  }
+
+  async function importOrders() {
+    if (!importParseResult?.ok) {
+      return;
+    }
+
+    setImporting(true);
+    setImportFileError(null);
+    setImportFailures([]);
+
+    try {
+      const result = await importTenantOrdersAction(importParseResult.data);
+      if (!result.ok) {
+        setImportFileError(result.message || m.orders.transfer.importFailed);
+        toast.error(m.orders.transfer.importFailed);
+        return;
+      }
+
+      setImportParseResult(null);
+      setImportFailures(result.data.failures);
+      if (importFileInputRef.current) {
+        importFileInputRef.current.value = "";
+      }
+
+      if (result.data.imported > 0) {
+        refresh();
+      }
+
+      if (result.data.failed > 0) {
+        toast.error(
+          interpolate(m.orders.transfer.importPartial, {
+            failed: String(result.data.failed),
+            imported: String(result.data.imported),
+          }),
+        );
+      } else {
+        toast.success(
+          interpolate(m.orders.transfer.importSuccess, {
+            count: String(result.data.imported),
+          }),
+        );
+        setImportDialogOpen(false);
+        resetImportDialog();
+      }
+    } catch {
+      setImportFileError(m.orders.transfer.importFailed);
+      toast.error(m.orders.transfer.importFailed);
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function exportOrders() {
+    setExporting(true);
+
+    try {
+      const exportOrders = await getTenantOrderExportDatasetQuery({
+        createdAfter,
+        createdBefore,
+        q: debouncedSearchQuery || undefined,
+        sort,
+        status: status === "all" ? undefined : status,
+      });
+
+      if (exportOrders.length === 0) {
+        toast.error(m.orders.transfer.exportEmpty);
+        return;
+      }
+
+      const columns = m.orders.transfer.columns;
+      downloadTenantOrderExport(exportOrders, branchNames, {
+        headers: [
+          columns.orderNumber,
+          columns.orderId,
+          columns.customer,
+          columns.customerId,
+          columns.branch,
+          columns.branchId,
+          columns.type,
+          columns.itemCount,
+          columns.itemNames,
+          columns.subtotal,
+          columns.discount,
+          columns.total,
+          columns.currency,
+          columns.paid,
+          columns.paymentStatus,
+          columns.orderStatus,
+          columns.notes,
+          columns.createdAt,
+          columns.updatedAt,
+        ],
+        paymentStatusLabels: m.orders.paymentStatusLabels,
+        statusLabels: m.orders.statusLabels,
+        typeLabels: m.orders.typeLabels,
+        unknownCustomer: m.orders.unknownCustomer,
+      });
+    } catch {
+      toast.error(m.orders.transfer.exportFailed);
+    } finally {
+      setExporting(false);
+    }
   }
 
   return (
@@ -603,83 +829,118 @@ export function TenantOrdersView() {
             </div>
           </div>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                aria-label={m.orders.toolbar.settingsLabel}
-                size="icon-sm"
-                title={m.orders.toolbar.settingsLabel}
-                type="button"
-                variant="outline"
-              >
-                <Icon aria-hidden icon={SlidersHorizontal} size={15} />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-72 p-3">
-              <div>
-                <p className="px-1 text-xs font-semibold">
-                  {m.orders.toolbar.sortTitle}
-                </p>
-                <div className="mt-2 grid gap-1">
-                  {sortOptions.map((option) => (
-                    <button
-                      aria-pressed={sort === option.value}
-                      className={cn(
-                        "flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs transition-colors hover:bg-accent",
-                        sort === option.value && "bg-accent",
-                      )}
-                      key={option.value}
-                      onClick={() => changeSort(option.value)}
-                      type="button"
-                    >
-                      <Icon
-                        aria-hidden
+          <div className="flex shrink-0 items-center gap-2">
+            <Button
+              className="h-8 gap-1.5 px-2.5 text-xs"
+              onClick={() => setImportDialogOpen(true)}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Icon aria-hidden icon={Upload} size={14} />
+              <span className="hidden sm:inline">
+                {m.orders.transfer.importAction}
+              </span>
+            </Button>
+            <Button
+              className="h-8 gap-1.5 px-2.5 text-xs"
+              disabled={exporting}
+              onClick={() => void exportOrders()}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Icon
+                aria-hidden
+                className={cn(exporting && "animate-spin")}
+                icon={exporting ? LoaderCircle : Download}
+                size={14}
+              />
+              <span className="hidden sm:inline">
+                {exporting
+                  ? m.orders.transfer.exporting
+                  : m.orders.transfer.exportAction}
+              </span>
+            </Button>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  aria-label={m.orders.toolbar.settingsLabel}
+                  size="icon-sm"
+                  title={m.orders.toolbar.settingsLabel}
+                  type="button"
+                  variant="outline"
+                >
+                  <Icon aria-hidden icon={SlidersHorizontal} size={15} />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-3">
+                <div>
+                  <p className="px-1 text-xs font-semibold">
+                    {m.orders.toolbar.sortTitle}
+                  </p>
+                  <div className="mt-2 grid gap-1">
+                    {sortOptions.map((option) => (
+                      <button
+                        aria-pressed={sort === option.value}
                         className={cn(
-                          "text-foreground",
-                          sort === option.value ? "opacity-100" : "opacity-0",
+                          "flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs transition-colors hover:bg-accent",
+                          sort === option.value && "bg-accent",
                         )}
-                        icon={Check}
-                        size={14}
-                      />
-                      {option.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-3 border-t pt-3">
-                <p className="px-1 text-xs font-semibold">
-                  {m.orders.toolbar.columnsTitle}
-                </p>
-                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
-                  {ORDER_COLUMN_KEYS.map((column) => {
-                    const isLastVisible =
-                      visibleColumns[column] && visibleColumnCount === 1;
-
-                    return (
-                      <label
-                        className="flex min-w-0 cursor-pointer items-center gap-2 text-xs"
-                        htmlFor={`tenant-order-column-${column}`}
-                        key={column}
+                        key={option.value}
+                        onClick={() => changeSort(option.value)}
+                        type="button"
                       >
-                        <Checkbox
-                          checked={visibleColumns[column]}
-                          disabled={isLastVisible}
-                          id={`tenant-order-column-${column}`}
-                          onCheckedChange={(checked) =>
-                            setColumnVisible(column, checked === true)
-                          }
+                        <Icon
+                          aria-hidden
+                          className={cn(
+                            "text-foreground",
+                            sort === option.value ? "opacity-100" : "opacity-0",
+                          )}
+                          icon={Check}
+                          size={14}
                         />
-                        <span className="truncate">
-                          {m.orders.columns[column]}
-                        </span>
-                      </label>
-                    );
-                  })}
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+
+                <div className="mt-3 border-t pt-3">
+                  <p className="px-1 text-xs font-semibold">
+                    {m.orders.toolbar.columnsTitle}
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-2">
+                    {ORDER_COLUMN_KEYS.map((column) => {
+                      const isLastVisible =
+                        visibleColumns[column] && visibleColumnCount === 1;
+
+                      return (
+                        <label
+                          className="flex min-w-0 cursor-pointer items-center gap-2 text-xs"
+                          htmlFor={`tenant-order-column-${column}`}
+                          key={column}
+                        >
+                          <Checkbox
+                            checked={visibleColumns[column]}
+                            disabled={isLastVisible}
+                            id={`tenant-order-column-${column}`}
+                            onCheckedChange={(checked) =>
+                              setColumnVisible(column, checked === true)
+                            }
+                          />
+                          <span className="truncate">
+                            {m.orders.columns[column]}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
 
         {listLoading ? (
@@ -753,82 +1014,104 @@ export function TenantOrdersView() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {orders.map((order) => (
-                <TableRow key={order.id}>
-                  {visibleColumns.order ? (
-                    <TableCell className="font-medium">
-                      {formatPosOrderCode(order.id)}
-                    </TableCell>
-                  ) : null}
-                  {visibleColumns.customer ? (
-                    <TableCell>
-                      {order.customerName || m.orders.unknownCustomer}
-                    </TableCell>
-                  ) : null}
-                  {visibleColumns.branch ? (
-                    <TableCell>
-                      {branchNames[order.branchId] ??
-                        interpolate(m.orders.branchFallback, {
-                          id: order.branchId.slice(-8),
-                        })}
-                    </TableCell>
-                  ) : null}
-                  {visibleColumns.type ? (
-                    <TableCell>
-                      {m.orders.typeLabels[order.orderType as TenantOrderType]}
-                    </TableCell>
-                  ) : null}
-                  {visibleColumns.items ? (
-                    <TableCell>
-                      {order.itemCount.toLocaleString(locale)}
-                    </TableCell>
-                  ) : null}
-                  {visibleColumns.amount ? (
-                    <TableCell>
-                      <span className="block font-medium">
-                        {formatOrderMoney(
-                          order.totalAmount,
-                          order.currency,
-                          locale,
-                        )}
-                      </span>
-                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                        {m.orders.paidAmount}{" "}
-                        {formatOrderMoney(
-                          order.paidAmount,
-                          order.currency,
-                          locale,
-                        )}
-                      </span>
-                    </TableCell>
-                  ) : null}
-                  {visibleColumns.payment ? (
-                    <TableCell>
-                      <Badge
-                        className="px-1.5 py-px text-[11px]"
-                        variant={getPaymentStatusVariant(order.paymentStatus)}
-                      >
-                        {m.orders.paymentStatusLabels[order.paymentStatus]}
-                      </Badge>
-                    </TableCell>
-                  ) : null}
-                  {visibleColumns.status ? (
-                    <TableCell>
-                      <Badge
-                        className="px-1.5 py-px text-[11px]"
-                        variant={getOrderStatusVariant(order.status)}
-                      >
-                        {m.orders.statusLabels[order.status]}
-                      </Badge>
-                    </TableCell>
-                  ) : null}
-                  {visibleColumns.createdAt ? (
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {formatDateTime(order.createdAt)}
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
+              {orders.map((order) => {
+                const orderCode = formatPosOrderCode(order.id);
+                const orderHref = webAdminRoutes.tenant.order(order.id);
+
+                return (
+                  <TableRow
+                    aria-label={interpolate(m.orders.detail.openOrder, {
+                      order: orderCode,
+                    })}
+                    className="cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                    key={order.id}
+                    onClick={() => router.push(orderHref)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        router.push(orderHref);
+                      }
+                    }}
+                    role="link"
+                    tabIndex={0}
+                  >
+                    {visibleColumns.order ? (
+                      <TableCell className="font-medium">{orderCode}</TableCell>
+                    ) : null}
+                    {visibleColumns.customer ? (
+                      <TableCell>
+                        {order.customerName || m.orders.unknownCustomer}
+                      </TableCell>
+                    ) : null}
+                    {visibleColumns.branch ? (
+                      <TableCell>
+                        {branchNames[order.branchId] ??
+                          interpolate(m.orders.branchFallback, {
+                            id: order.branchId.slice(-8),
+                          })}
+                      </TableCell>
+                    ) : null}
+                    {visibleColumns.type ? (
+                      <TableCell>
+                        {
+                          m.orders.typeLabels[
+                            order.orderType as TenantOrderType
+                          ]
+                        }
+                      </TableCell>
+                    ) : null}
+                    {visibleColumns.items ? (
+                      <TableCell>
+                        {order.itemCount.toLocaleString(locale)}
+                      </TableCell>
+                    ) : null}
+                    {visibleColumns.amount ? (
+                      <TableCell>
+                        <span className="block font-medium">
+                          {formatOrderMoney(
+                            order.totalAmount,
+                            order.currency,
+                            locale,
+                          )}
+                        </span>
+                        <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                          {m.orders.paidAmount}{" "}
+                          {formatOrderMoney(
+                            order.paidAmount,
+                            order.currency,
+                            locale,
+                          )}
+                        </span>
+                      </TableCell>
+                    ) : null}
+                    {visibleColumns.payment ? (
+                      <TableCell>
+                        <Badge
+                          className="px-1.5 py-px text-[11px]"
+                          variant={getPaymentStatusVariant(order.paymentStatus)}
+                        >
+                          {m.orders.paymentStatusLabels[order.paymentStatus]}
+                        </Badge>
+                      </TableCell>
+                    ) : null}
+                    {visibleColumns.status ? (
+                      <TableCell>
+                        <Badge
+                          className="px-1.5 py-px text-[11px]"
+                          variant={getOrderStatusVariant(order.status)}
+                        >
+                          {m.orders.statusLabels[order.status]}
+                        </Badge>
+                      </TableCell>
+                    ) : null}
+                    {visibleColumns.createdAt ? (
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {formatDateTime(order.createdAt)}
+                      </TableCell>
+                    ) : null}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         )}
@@ -864,6 +1147,128 @@ export function TenantOrdersView() {
           </div>
         </div>
       </section>
+
+      <Dialog onOpenChange={changeImportDialogOpen} open={importDialogOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{m.orders.transfer.importTitle}</DialogTitle>
+            <DialogDescription>
+              {m.orders.transfer.importDescription}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-1">
+            <Button
+              className="w-fit gap-1.5"
+              onClick={downloadTenantOrderImportTemplate}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              <Icon aria-hidden icon={FileDown} size={15} />
+              {m.orders.transfer.templateAction}
+            </Button>
+
+            <div className="grid gap-2">
+              <label className="text-sm font-medium" htmlFor="order-import-csv">
+                {m.orders.transfer.fileLabel}
+              </label>
+              <Input
+                accept=".csv,text/csv"
+                disabled={importing}
+                id="order-import-csv"
+                onChange={(event) =>
+                  void selectImportFile(event.target.files?.[0])
+                }
+                ref={importFileInputRef}
+                type="file"
+              />
+              <p className="text-xs leading-5 text-muted-foreground">
+                {m.orders.transfer.fileHint}
+              </p>
+            </div>
+
+            {importFileName && importParseResult?.ok ? (
+              <div className="rounded-md border bg-muted/30 px-3 py-2.5 text-sm">
+                <p className="font-medium">{importFileName}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {interpolate(m.orders.transfer.readySummary, {
+                    orders: String(importParseResult.orderCount),
+                    rows: String(importParseResult.rowCount),
+                  })}
+                </p>
+              </div>
+            ) : null}
+
+            {importFileError ? (
+              <div
+                className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+                role="alert"
+              >
+                {importFileError}
+              </div>
+            ) : null}
+
+            {importParseResult && !importParseResult.ok ? (
+              <div
+                className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+                role="alert"
+              >
+                <p className="font-medium">{m.orders.transfer.errorsTitle}</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+                  {importParseResult.errors.map((error, index) => (
+                    <li key={`${error.code}-${index}`}>
+                      {formatImportParseError(error)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {importFailures.length > 0 ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+                <p className="font-medium">{m.orders.transfer.failuresTitle}</p>
+                <ul className="mt-2 max-h-40 list-disc space-y-1 overflow-auto pl-5 text-xs">
+                  {importFailures.map((failure) => (
+                    <li key={failure.importKey}>
+                      <span className="font-medium">{failure.importKey}:</span>{" "}
+                      {failure.message}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button
+              disabled={importing}
+              onClick={() => changeImportDialogOpen(false)}
+              type="button"
+              variant="outline"
+            >
+              {m.common.cancel}
+            </Button>
+            <Button
+              disabled={!importParseResult?.ok || importing}
+              onClick={() => void importOrders()}
+              type="button"
+            >
+              {importing ? (
+                <Icon
+                  aria-hidden
+                  className="animate-spin"
+                  icon={LoaderCircle}
+                  size={15}
+                />
+              ) : null}
+              {importing
+                ? m.orders.transfer.importing
+                : m.orders.transfer.submitImport}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

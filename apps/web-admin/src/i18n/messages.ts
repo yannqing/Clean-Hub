@@ -48,6 +48,12 @@ export async function getWebAdminMessages(
     return zhCNMessages;
   }
 
+  if (locale === "fr") {
+    const { frMessages } = await import("./messages/fr");
+    webAdminMessagesCache.set(locale, frMessages);
+    return frMessages;
+  }
+
   // Unknown locales fall back to the default bundle (defensive — the locale is
   // narrowed by `WebAdminLocale`, but this keeps the function total).
   return enMessages;

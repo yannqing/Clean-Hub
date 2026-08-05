@@ -1,5 +1,6 @@
 import type { WebAdminLocale } from "../../locale";
 import { tenantMessagesEn } from "./en";
+import { tenantMessagesFr } from "./fr";
 import type { TenantMessages } from "./types";
 import { tenantMessagesZhCN } from "./zh-CN";
 
@@ -7,6 +8,7 @@ export type { TenantMessages };
 
 export const tenantMessagesByLocale: Record<WebAdminLocale, TenantMessages> = {
   en: tenantMessagesEn,
+  fr: tenantMessagesFr,
   "zh-CN": tenantMessagesZhCN,
 };
 

@@ -253,6 +253,7 @@ export const zhCNMessages: WebAdminMessages = {
     language: "语言",
     languageLabels: {
       en: "English",
+      fr: "Français",
       zhCN: "简体中文",
     },
     theme: "主题",

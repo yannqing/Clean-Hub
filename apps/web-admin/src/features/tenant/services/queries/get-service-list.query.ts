@@ -1,3 +1,5 @@
+import type { ApiRequestOptions } from "@cleanhub/api-client";
+
 import { webAdminApi } from "@/lib/api-client";
 
 import type { ServiceListFilters } from "../types";
@@ -7,12 +9,16 @@ const SERVICE_DATASET_CHUNK_SIZE = 100;
 
 export async function getServiceListQuery(
   filters: ServiceListFilters = {},
+  options: Omit<ApiRequestOptions, "method" | "body" | "query"> = {},
 ): Promise<ServiceSummary[]> {
-  return webAdminApi.tenant.services.list({
-    ...filters,
-    limit: 100,
-    offset: 0,
-  });
+  return webAdminApi.tenant.services.list(
+    {
+      ...filters,
+      limit: 100,
+      offset: 0,
+    },
+    options,
+  );
 }
 
 export async function getServiceDatasetQuery(

@@ -43,6 +43,7 @@ export const webAdminRoutes = {
     home: "/tenant",
     profile: "/tenant/profile",
     orders: "/tenant/orders",
+    order: (orderId: string) => `/tenant/orders/${encodeURIComponent(orderId)}`,
     customers: "/tenant/customers",
     users: "/tenant/users",
     products: "/tenant/products",

@@ -1,29 +1,28 @@
 import type {
+  ApiRequestOptions,
   TenantOrderListQuery,
   TenantOrderListResponse,
-  TenantOrderSummary,
 } from "@cleanhub/api-client";
 
 import { webAdminApi } from "@/lib/api-client";
 
-const TENANT_ORDER_DATASET_CHUNK_SIZE = 100;
+type RequestOptions = Pick<ApiRequestOptions, "signal">;
+type TenantOrderExportQuery = Omit<TenantOrderListQuery, "limit" | "offset">;
 
-type TenantOrderDatasetQuery = Omit<
-  TenantOrderListQuery,
-  "limit" | "offset" | "q"
->;
+const EXPORT_PAGE_SIZE = 100;
 
 export async function getTenantOrderListQuery(
   query: TenantOrderListQuery,
+  options?: RequestOptions,
 ): Promise<TenantOrderListResponse> {
-  return webAdminApi.tenant.orders.list(query);
+  return webAdminApi.tenant.orders.list(query, options);
 }
 
-export async function getTenantOrderDatasetQuery(
-  query: TenantOrderDatasetQuery,
-  signal?: AbortSignal,
-): Promise<TenantOrderSummary[]> {
-  const orders: TenantOrderSummary[] = [];
+export async function getTenantOrderExportDatasetQuery(
+  query: TenantOrderExportQuery,
+  options?: RequestOptions,
+): Promise<TenantOrderListResponse["data"]> {
+  const orders: TenantOrderListResponse["data"] = [];
   let offset = 0;
   let total = 0;
 
@@ -31,10 +30,10 @@ export async function getTenantOrderDatasetQuery(
     const result = await webAdminApi.tenant.orders.list(
       {
         ...query,
-        limit: TENANT_ORDER_DATASET_CHUNK_SIZE,
+        limit: EXPORT_PAGE_SIZE,
         offset,
       },
-      { signal },
+      options,
     );
 
     orders.push(...result.data);

@@ -74,7 +74,11 @@ const EMPTY_PASSWORD_FORM: TenantPasswordFormValues = {
 function getEditableLanguage(
   profile: TenantProfile,
 ): TenantProfileFormValues["language"] {
-  return profile.language === "zh-CN" ? "zh-CN" : "en";
+  if (profile.language === "fr" || profile.language === "zh-CN") {
+    return profile.language;
+  }
+
+  return "en";
 }
 
 function getProfileForm(profile: TenantProfile): TenantProfileFormValues {
@@ -456,6 +460,9 @@ export function TenantProfileView({
                     <SelectContent>
                       <SelectItem value="en">
                         {copy.personal.languageOptions.en}
+                      </SelectItem>
+                      <SelectItem value="fr">
+                        {copy.personal.languageOptions.fr}
                       </SelectItem>
                       <SelectItem value="zh-CN">
                         {copy.personal.languageOptions["zh-CN"]}

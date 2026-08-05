@@ -222,7 +222,11 @@ function isServiceWithinDateRange(
   return createdBefore === undefined || createdAt < createdBefore;
 }
 
-export function ServiceCatalogView() {
+export function ServiceCatalogView({
+  initialSearchQuery = "",
+}: {
+  initialSearchQuery?: string;
+}) {
   const { formatDateTime, locale, m } = useTenantI18n();
   const [serviceDataset, setServiceDataset] = useState<ServiceSummary[]>([]);
   const [categories, setCategories] = useState<ServiceCategorySummary[]>([]);
@@ -232,7 +236,7 @@ export function ServiceCatalogView() {
   const [filterMenuOpen, setFilterMenuOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState<ServiceDateFilter>("all");
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialSearchQuery);
   const [sort, setSort] = useState<ServiceSort>("created_desc");
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE_COLUMNS);
   const [formOpen, setFormOpen] = useState(false);
@@ -1540,10 +1544,7 @@ export function ServiceCatalogView() {
                 </SelectTrigger>
                 <SelectContent>
                   {Array.from(
-                    new Set([
-                      formValues.currency,
-                      ...SERVICE_CURRENCY_OPTIONS,
-                    ]),
+                    new Set([formValues.currency, ...SERVICE_CURRENCY_OPTIONS]),
                   )
                     .filter(Boolean)
                     .map((currency) => (

@@ -101,10 +101,12 @@ const COPY = {
     create: "Create employee",
     saving: "Saving...",
     editTitle: "Edit employee",
-    editDescription: "Update identity, role and the employee's single branch assignment.",
+    editDescription:
+      "Update identity, role and the employee's single branch assignment.",
     save: "Save changes",
     statusTitle: "Change employee status",
-    statusDescription: "Disabling an employee revokes their active refresh sessions.",
+    statusDescription:
+      "Disabling an employee revokes their active refresh sessions.",
     reason: "Reason",
     reasonPlaceholder: "Explain why this change is required",
     confirm: "Confirm",
@@ -123,6 +125,72 @@ const COPY = {
     statusUpdated: "Employee status updated.",
     credentialUpdated: "Credential reset completed.",
     required: "Complete all required fields.",
+  },
+  fr: {
+    title: "Membres de l’équipe",
+    add: "Ajouter un employé",
+    search: "Rechercher par nom, e-mail ou téléphone",
+    allStatus: "Tous les statuts",
+    allRoles: "Tous les rôles",
+    allBranches: "Toutes les succursales",
+    refresh: "Actualiser",
+    name: "Employé",
+    role: "Rôle",
+    branch: "Succursale",
+    status: "Statut",
+    lastLogin: "Dernière connexion",
+    actions: "Actions",
+    empty: "Aucun employé ne correspond à ces filtres.",
+    owner: "Propriétaire",
+    manager: "Responsable",
+    cashier: "Caissier",
+    active: "Actif",
+    disabled: "Désactivé",
+    invited: "Invité",
+    suspended: "Suspendu",
+    never: "Jamais",
+    edit: "Modifier",
+    credentials: "Identifiants",
+    enable: "Activer",
+    disable: "Désactiver",
+    createTitle: "Ajouter un employé",
+    createDescription:
+      "Les responsables utilisent leur e-mail et leur mot de passe dans l’administration. Chaque employé utilise un code PIN unique à six chiffres au point de vente.",
+    displayName: "Nom affiché",
+    email: "Adresse e-mail",
+    phone: "Téléphone",
+    password: "Mot de passe",
+    pin: "Code PIN à six chiffres",
+    language: "Langue",
+    selectBranch: "Sélectionner une succursale",
+    cancel: "Annuler",
+    create: "Créer l’employé",
+    saving: "Enregistrement...",
+    editTitle: "Modifier l’employé",
+    editDescription:
+      "Modifiez l’identité, le rôle et l’unique succursale attribuée à l’employé.",
+    save: "Enregistrer les modifications",
+    statusTitle: "Modifier le statut de l’employé",
+    statusDescription:
+      "La désactivation d’un employé révoque ses sessions d’actualisation actives.",
+    reason: "Motif",
+    reasonPlaceholder: "Expliquez pourquoi cette modification est nécessaire",
+    confirm: "Confirmer",
+    credentialTitle: "Réinitialiser les identifiants",
+    credentialDescription:
+      "La nouvelle valeur est hachée avant d’être enregistrée et n’apparaît jamais dans les journaux d’audit.",
+    credentialType: "Type d’identifiant",
+    passwordCredential: "Mot de passe",
+    pinCredential: "Code PIN du point de vente",
+    newPassword: "Nouveau mot de passe",
+    newPin: "Nouveau code PIN à six chiffres",
+    reset: "Réinitialiser l’identifiant",
+    protectedOwner: "Les comptes propriétaires sont protégés ici.",
+    created: "Employé créé.",
+    updated: "Employé mis à jour.",
+    statusUpdated: "Statut de l’employé mis à jour.",
+    credentialUpdated: "Identifiant réinitialisé.",
+    required: "Renseignez tous les champs obligatoires.",
   },
   "zh-CN": {
     title: "员工管理",
@@ -216,6 +284,7 @@ type TenantUserListViewProps = {
   currentUserId: string;
   initialBranches: BranchSummary[];
   initialError?: string;
+  initialSearchQuery?: string;
   initialUsers: TenantUserSummary[];
 };
 
@@ -228,16 +297,17 @@ export function TenantUserListView({
   currentUserId,
   initialBranches,
   initialError,
+  initialSearchQuery = "",
   initialUsers,
 }: TenantUserListViewProps) {
-  const { locale, formatDateTime } = useTenantI18n();
+  const { locale, formatDateTime, m } = useTenantI18n();
   const copy = COPY[locale];
   const firstLoad = useRef(true);
   const [users, setUsers] = useState(initialUsers);
   const [error, setError] = useState<string | null>(initialError ?? null);
   const [loading, setLoading] = useState(false);
   const [offset, setOffset] = useState(0);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialSearchQuery);
   const [status, setStatus] = useState<"all" | TenantUserStatus>("all");
   const [role, setRole] = useState<"all" | TenantUserRoleCode>("all");
   const [branchId, setBranchId] = useState("all");
@@ -245,14 +315,17 @@ export function TenantUserListView({
   const [createForm, setCreateForm] = useState<EmployeeForm>(() => ({
     ...EMPTY_FORM,
     roleCode: currentRole === "manager" ? "cashier" : "manager",
-    branchId: currentRole === "manager" ? initialBranches[0]?.id ?? "" : "",
+    branchId: currentRole === "manager" ? (initialBranches[0]?.id ?? "") : "",
   }));
   const [editUser, setEditUser] = useState<TenantUserSummary | null>(null);
   const [editForm, setEditForm] = useState<UpdateTenantUserRequest>({});
   const [statusUser, setStatusUser] = useState<TenantUserSummary | null>(null);
   const [statusReason, setStatusReason] = useState("");
-  const [credentialUser, setCredentialUser] = useState<TenantUserSummary | null>(null);
-  const [credentialType, setCredentialType] = useState<"pin" | "password">("pin");
+  const [credentialUser, setCredentialUser] =
+    useState<TenantUserSummary | null>(null);
+  const [credentialType, setCredentialType] = useState<"pin" | "password">(
+    "pin",
+  );
   const [credentialValue, setCredentialValue] = useState("");
   const [credentialReason, setCredentialReason] = useState("");
   const [saving, setSaving] = useState(false);
@@ -275,11 +348,13 @@ export function TenantUserListView({
       setUsers(await getTenantUserListQuery(query));
       setError(null);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Request failed.");
+      setError(
+        loadError instanceof Error ? loadError.message : m.common.requestFailed,
+      );
     } finally {
       setLoading(false);
     }
-  }, [query]);
+  }, [m.common.requestFailed, query]);
 
   useEffect(() => {
     if (firstLoad.current) {
@@ -349,7 +424,7 @@ export function TenantUserListView({
     setCreateForm({
       ...EMPTY_FORM,
       roleCode: currentRole === "manager" ? "cashier" : "manager",
-      branchId: currentRole === "manager" ? initialBranches[0]?.id ?? "" : "",
+      branchId: currentRole === "manager" ? (initialBranches[0]?.id ?? "") : "",
     });
     setOffset(0);
     await loadUsers();
@@ -462,7 +537,11 @@ export function TenantUserListView({
           <Icon aria-hidden icon={Users} size={19} />
           {copy.title}
         </h1>
-        <Button className="h-8 gap-1.5 px-2.5 text-xs" onClick={() => setCreateOpen(true)} size="sm">
+        <Button
+          className="h-8 gap-1.5 px-2.5 text-xs"
+          onClick={() => setCreateOpen(true)}
+          size="sm"
+        >
           <Icon aria-hidden icon={Plus} size={14} />
           {copy.add}
         </Button>
@@ -477,43 +556,95 @@ export function TenantUserListView({
       <section className="min-w-0 border-y bg-background">
         <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2.5">
           <div className="relative min-w-56 flex-1 sm:max-w-sm">
-            <Icon className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" icon={Search} size={14} />
+            <Icon
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+              icon={Search}
+              size={14}
+            />
             <Input
               className="h-8 pl-8 text-xs"
-              onChange={(event) => { setSearch(event.target.value); setOffset(0); }}
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setOffset(0);
+              }}
               placeholder={copy.search}
               value={search}
             />
           </div>
-          <Select onValueChange={(value) => { setStatus(value as typeof status); setOffset(0); }} value={status}>
-            <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+          <Select
+            onValueChange={(value) => {
+              setStatus(value as typeof status);
+              setOffset(0);
+            }}
+            value={status}
+          >
+            <SelectTrigger className="h-8 w-36 text-xs">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{copy.allStatus}</SelectItem>
-              {(["active", "disabled", "invited", "suspended"] as const).map((value) => (
-                <SelectItem key={value} value={value}>{statusLabel(value)}</SelectItem>
-              ))}
+              {(["active", "disabled", "invited", "suspended"] as const).map(
+                (value) => (
+                  <SelectItem key={value} value={value}>
+                    {statusLabel(value)}
+                  </SelectItem>
+                ),
+              )}
             </SelectContent>
           </Select>
-          <Select onValueChange={(value) => { setRole(value as typeof role); setOffset(0); }} value={role}>
-            <SelectTrigger className="h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
+          <Select
+            onValueChange={(value) => {
+              setRole(value as typeof role);
+              setOffset(0);
+            }}
+            value={role}
+          >
+            <SelectTrigger className="h-8 w-36 text-xs">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{copy.allRoles}</SelectItem>
               {(["owner", "manager", "cashier"] as const).map((value) => (
-                <SelectItem key={value} value={value}>{roleLabel(value)}</SelectItem>
+                <SelectItem key={value} value={value}>
+                  {roleLabel(value)}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
           {currentRole === "owner" ? (
-            <Select onValueChange={(value) => { setBranchId(value); setOffset(0); }} value={branchId}>
-              <SelectTrigger className="h-8 w-44 text-xs"><SelectValue /></SelectTrigger>
+            <Select
+              onValueChange={(value) => {
+                setBranchId(value);
+                setOffset(0);
+              }}
+              value={branchId}
+            >
+              <SelectTrigger className="h-8 w-44 text-xs">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{copy.allBranches}</SelectItem>
-                {initialBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}
+                {initialBranches.map((branch) => (
+                  <SelectItem key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           ) : null}
-          <Button aria-label={copy.refresh} disabled={loading} onClick={() => void loadUsers()} size="icon-sm" title={copy.refresh} variant="outline">
-            <Icon className={loading ? "animate-spin" : undefined} icon={RefreshCw} size={14} />
+          <Button
+            aria-label={copy.refresh}
+            disabled={loading}
+            onClick={() => void loadUsers()}
+            size="icon-sm"
+            title={copy.refresh}
+            variant="outline"
+          >
+            <Icon
+              className={loading ? "animate-spin" : undefined}
+              icon={RefreshCw}
+              size={14}
+            />
           </Button>
         </div>
 
@@ -526,33 +657,103 @@ export function TenantUserListView({
                 <TableHead className="h-9 text-xs">{copy.branch}</TableHead>
                 <TableHead className="h-9 text-xs">{copy.status}</TableHead>
                 <TableHead className="h-9 text-xs">{copy.lastLogin}</TableHead>
-                <TableHead className="h-9 text-right text-xs">{copy.actions}</TableHead>
+                <TableHead className="h-9 text-right text-xs">
+                  {copy.actions}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {users.map((user) => {
-                const protectedUser = user.role === "owner" || user.id === currentUserId;
+                const protectedUser =
+                  user.role === "owner" || user.id === currentUserId;
                 return (
                   <TableRow className="h-12" key={user.id}>
                     <TableCell className="py-2">
-                      <div className="text-sm font-medium">{user.displayName}</div>
-                      <div className="text-[11px] text-muted-foreground">{user.email ?? user.phone ?? "—"}</div>
+                      <div className="text-sm font-medium">
+                        {user.displayName}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {user.email ?? user.phone ?? "—"}
+                      </div>
                     </TableCell>
-                    <TableCell className="py-2"><Badge variant="outline">{roleLabel(user.role)}</Badge></TableCell>
+                    <TableCell className="py-2">
+                      <Badge variant="outline">{roleLabel(user.role)}</Badge>
+                    </TableCell>
                     <TableCell className="py-2 text-xs text-muted-foreground">
-                      {user.role === "owner" ? copy.allBranches : user.branchIds.map((id) => branchNames.get(id) ?? id.slice(0, 8)).join(", ") || "—"}
+                      {user.role === "owner"
+                        ? copy.allBranches
+                        : user.branchIds
+                            .map((id) => branchNames.get(id) ?? id.slice(0, 8))
+                            .join(", ") || "—"}
                     </TableCell>
-                    <TableCell className="py-2"><Badge variant={user.status === "active" ? "default" : "secondary"}>{statusLabel(user.status)}</Badge></TableCell>
-                    <TableCell className="py-2 text-xs text-muted-foreground">{user.lastLoginAt ? formatDateTime(user.lastLoginAt) : copy.never}</TableCell>
+                    <TableCell className="py-2">
+                      <Badge
+                        variant={
+                          user.status === "active" ? "default" : "secondary"
+                        }
+                      >
+                        {statusLabel(user.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-2 text-xs text-muted-foreground">
+                      {user.lastLoginAt
+                        ? formatDateTime(user.lastLoginAt)
+                        : copy.never}
+                    </TableCell>
                     <TableCell className="py-2">
                       <div className="flex justify-end gap-1">
                         {protectedUser ? (
-                          <span className="px-2 text-[11px] text-muted-foreground" title={copy.protectedOwner}>{user.role === "owner" ? copy.protectedOwner : "—"}</span>
+                          <span
+                            className="px-2 text-[11px] text-muted-foreground"
+                            title={copy.protectedOwner}
+                          >
+                            {user.role === "owner" ? copy.protectedOwner : "—"}
+                          </span>
                         ) : (
                           <>
-                            <Button aria-label={copy.edit} onClick={() => openEdit(user)} size="icon-sm" title={copy.edit} variant="ghost"><Icon icon={Pencil} size={14} /></Button>
-                            <Button aria-label={copy.credentials} onClick={() => { setCredentialUser(user); setCredentialType("pin"); setCredentialValue(""); setCredentialReason(""); }} size="icon-sm" title={copy.credentials} variant="ghost"><Icon icon={KeyRound} size={14} /></Button>
-                            <Button aria-label={user.status === "disabled" ? copy.enable : copy.disable} onClick={() => { setStatusUser(user); setStatusReason(""); }} size="icon-sm" title={user.status === "disabled" ? copy.enable : copy.disable} variant="ghost"><Icon icon={ShieldCheck} size={14} /></Button>
+                            <Button
+                              aria-label={copy.edit}
+                              onClick={() => openEdit(user)}
+                              size="icon-sm"
+                              title={copy.edit}
+                              variant="ghost"
+                            >
+                              <Icon icon={Pencil} size={14} />
+                            </Button>
+                            <Button
+                              aria-label={copy.credentials}
+                              onClick={() => {
+                                setCredentialUser(user);
+                                setCredentialType("pin");
+                                setCredentialValue("");
+                                setCredentialReason("");
+                              }}
+                              size="icon-sm"
+                              title={copy.credentials}
+                              variant="ghost"
+                            >
+                              <Icon icon={KeyRound} size={14} />
+                            </Button>
+                            <Button
+                              aria-label={
+                                user.status === "disabled"
+                                  ? copy.enable
+                                  : copy.disable
+                              }
+                              onClick={() => {
+                                setStatusUser(user);
+                                setStatusReason("");
+                              }}
+                              size="icon-sm"
+                              title={
+                                user.status === "disabled"
+                                  ? copy.enable
+                                  : copy.disable
+                              }
+                              variant="ghost"
+                            >
+                              <Icon icon={ShieldCheck} size={14} />
+                            </Button>
                           </>
                         )}
                       </div>
@@ -563,53 +764,393 @@ export function TenantUserListView({
             </TableBody>
           </Table>
         </div>
-        {!loading && users.length === 0 ? <p className="px-4 py-12 text-center text-sm text-muted-foreground">{copy.empty}</p> : null}
+        {!loading && users.length === 0 ? (
+          <p className="px-4 py-12 text-center text-sm text-muted-foreground">
+            {copy.empty}
+          </p>
+        ) : null}
       </section>
 
-      <Pagination currentPageCount={users.length} nextLabel="›" offset={offset} onOffsetChange={setOffset} pageSize={PAGE_SIZE} previousLabel="‹" />
+      <Pagination
+        currentPageCount={users.length}
+        nextLabel="›"
+        offset={offset}
+        onOffsetChange={setOffset}
+        pageSize={PAGE_SIZE}
+        previousLabel="‹"
+      />
 
       <Dialog onOpenChange={setCreateOpen} open={createOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader><DialogTitle>{copy.createTitle}</DialogTitle><DialogDescription>{copy.createDescription}</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{copy.createTitle}</DialogTitle>
+            <DialogDescription>{copy.createDescription}</DialogDescription>
+          </DialogHeader>
           <div className="grid gap-4">
-            <div className="grid gap-1.5"><Label>{copy.displayName} *</Label><Input onChange={(event) => updateCreateForm("displayName", event.target.value)} value={createForm.displayName} /></div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5"><Label>{copy.role} *</Label><Select onValueChange={(value) => updateCreateForm("roleCode", value as ManagedTenantUserRoleCode)} value={createForm.roleCode}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roleOptions.map((value) => <SelectItem key={value} value={value}>{roleLabel(value)}</SelectItem>)}</SelectContent></Select></div>
-              <div className="grid gap-1.5"><Label>{copy.branch} *</Label><Select disabled={currentRole === "manager"} onValueChange={(value) => updateCreateForm("branchId", value)} value={createForm.branchId}><SelectTrigger><SelectValue placeholder={copy.selectBranch} /></SelectTrigger><SelectContent>{initialBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select></div>
+            <div className="grid gap-1.5">
+              <Label>{copy.displayName} *</Label>
+              <Input
+                onChange={(event) =>
+                  updateCreateForm("displayName", event.target.value)
+                }
+                value={createForm.displayName}
+              />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5"><Label>{copy.email}{createForm.roleCode === "manager" ? " *" : ""}</Label><Input onChange={(event) => updateCreateForm("email", event.target.value)} type="email" value={createForm.email} /></div>
-              <div className="grid gap-1.5"><Label>{copy.phone}</Label><Input onChange={(event) => updateCreateForm("phone", event.target.value)} value={createForm.phone} /></div>
+              <div className="grid gap-1.5">
+                <Label>{copy.role} *</Label>
+                <Select
+                  onValueChange={(value) =>
+                    updateCreateForm(
+                      "roleCode",
+                      value as ManagedTenantUserRoleCode,
+                    )
+                  }
+                  value={createForm.roleCode}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roleOptions.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {roleLabel(value)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>{copy.branch} *</Label>
+                <Select
+                  disabled={currentRole === "manager"}
+                  onValueChange={(value) => updateCreateForm("branchId", value)}
+                  value={createForm.branchId}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={copy.selectBranch} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {initialBranches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-1.5"><Label>{copy.password}{createForm.roleCode === "manager" ? " *" : ""}</Label><Input autoComplete="new-password" onChange={(event) => updateCreateForm("password", event.target.value)} type="password" value={createForm.password} /></div>
-              <div className="grid gap-1.5"><Label>{copy.pin} *</Label><Input inputMode="numeric" maxLength={6} onChange={(event) => updateCreateForm("pin", normalizeDigits(event.target.value))} value={createForm.pin} /></div>
+              <div className="grid gap-1.5">
+                <Label>
+                  {copy.email}
+                  {createForm.roleCode === "manager" ? " *" : ""}
+                </Label>
+                <Input
+                  onChange={(event) =>
+                    updateCreateForm("email", event.target.value)
+                  }
+                  type="email"
+                  value={createForm.email}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>{copy.phone}</Label>
+                <Input
+                  onChange={(event) =>
+                    updateCreateForm("phone", event.target.value)
+                  }
+                  value={createForm.phone}
+                />
+              </div>
             </div>
-            <div className="grid gap-1.5"><Label>{copy.language}</Label><Select onValueChange={(value) => updateCreateForm("language", value as EmployeeForm["language"])} value={createForm.language}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="en">English</SelectItem><SelectItem value="fr">Français</SelectItem><SelectItem value="zh-CN">简体中文</SelectItem></SelectContent></Select></div>
-            <div className="flex justify-end gap-2"><Button onClick={() => setCreateOpen(false)} variant="outline">{copy.cancel}</Button><Button disabled={saving} onClick={() => void submitCreate()}>{saving ? copy.saving : copy.create}</Button></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label>
+                  {copy.password}
+                  {createForm.roleCode === "manager" ? " *" : ""}
+                </Label>
+                <Input
+                  autoComplete="new-password"
+                  onChange={(event) =>
+                    updateCreateForm("password", event.target.value)
+                  }
+                  type="password"
+                  value={createForm.password}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>{copy.pin} *</Label>
+                <Input
+                  inputMode="numeric"
+                  maxLength={6}
+                  onChange={(event) =>
+                    updateCreateForm("pin", normalizeDigits(event.target.value))
+                  }
+                  value={createForm.pin}
+                />
+              </div>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{copy.language}</Label>
+              <Select
+                onValueChange={(value) =>
+                  updateCreateForm(
+                    "language",
+                    value as EmployeeForm["language"],
+                  )
+                }
+                value={createForm.language}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="en">English</SelectItem>
+                  <SelectItem value="fr">Français</SelectItem>
+                  <SelectItem value="zh-CN">简体中文</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => setCreateOpen(false)} variant="outline">
+                {copy.cancel}
+              </Button>
+              <Button disabled={saving} onClick={() => void submitCreate()}>
+                {saving ? copy.saving : copy.create}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog onOpenChange={(open) => !open && setEditUser(null)} open={editUser !== null}>
+      <Dialog
+        onOpenChange={(open) => !open && setEditUser(null)}
+        open={editUser !== null}
+      >
         <DialogContent className="sm:max-w-lg">
-          <DialogHeader><DialogTitle>{copy.editTitle}</DialogTitle><DialogDescription>{copy.editDescription}</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{copy.editTitle}</DialogTitle>
+            <DialogDescription>{copy.editDescription}</DialogDescription>
+          </DialogHeader>
           <div className="grid gap-4">
-            <div className="grid gap-1.5"><Label>{copy.displayName} *</Label><Input onChange={(event) => setEditForm((current) => ({ ...current, displayName: event.target.value }))} value={editForm.displayName ?? ""} /></div>
-            <div className="grid gap-4 sm:grid-cols-2"><div className="grid gap-1.5"><Label>{copy.email}</Label><Input onChange={(event) => setEditForm((current) => ({ ...current, email: event.target.value }))} type="email" value={editForm.email ?? ""} /></div><div className="grid gap-1.5"><Label>{copy.phone}</Label><Input onChange={(event) => setEditForm((current) => ({ ...current, phone: event.target.value }))} value={editForm.phone ?? ""} /></div></div>
-            <div className="grid gap-4 sm:grid-cols-2"><div className="grid gap-1.5"><Label>{copy.role} *</Label><Select onValueChange={(value) => setEditForm((current) => ({ ...current, roleCode: value as ManagedTenantUserRoleCode, password: value === "manager" && editUser?.role !== "manager" ? current.password : undefined }))} value={editForm.roleCode}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{roleOptions.map((value) => <SelectItem key={value} value={value}>{roleLabel(value)}</SelectItem>)}</SelectContent></Select></div><div className="grid gap-1.5"><Label>{copy.branch} *</Label><Select disabled={currentRole === "manager"} onValueChange={(value) => setEditForm((current) => ({ ...current, branchId: value }))} value={editForm.branchId}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{initialBranches.map((branch) => <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>)}</SelectContent></Select></div></div>
-            {editForm.roleCode === "manager" && editUser?.role !== "manager" ? <div className="grid gap-1.5"><Label>{copy.password} *</Label><Input autoComplete="new-password" onChange={(event) => setEditForm((current) => ({ ...current, password: event.target.value }))} type="password" value={editForm.password ?? ""} /></div> : null}
-            <div className="flex justify-end gap-2"><Button onClick={() => setEditUser(null)} variant="outline">{copy.cancel}</Button><Button disabled={saving} onClick={() => void submitEdit()}>{saving ? copy.saving : copy.save}</Button></div>
+            <div className="grid gap-1.5">
+              <Label>{copy.displayName} *</Label>
+              <Input
+                onChange={(event) =>
+                  setEditForm((current) => ({
+                    ...current,
+                    displayName: event.target.value,
+                  }))
+                }
+                value={editForm.displayName ?? ""}
+              />
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label>{copy.email}</Label>
+                <Input
+                  onChange={(event) =>
+                    setEditForm((current) => ({
+                      ...current,
+                      email: event.target.value,
+                    }))
+                  }
+                  type="email"
+                  value={editForm.email ?? ""}
+                />
+              </div>
+              <div className="grid gap-1.5">
+                <Label>{copy.phone}</Label>
+                <Input
+                  onChange={(event) =>
+                    setEditForm((current) => ({
+                      ...current,
+                      phone: event.target.value,
+                    }))
+                  }
+                  value={editForm.phone ?? ""}
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-1.5">
+                <Label>{copy.role} *</Label>
+                <Select
+                  onValueChange={(value) =>
+                    setEditForm((current) => ({
+                      ...current,
+                      roleCode: value as ManagedTenantUserRoleCode,
+                      password:
+                        value === "manager" && editUser?.role !== "manager"
+                          ? current.password
+                          : undefined,
+                    }))
+                  }
+                  value={editForm.roleCode}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roleOptions.map((value) => (
+                      <SelectItem key={value} value={value}>
+                        {roleLabel(value)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid gap-1.5">
+                <Label>{copy.branch} *</Label>
+                <Select
+                  disabled={currentRole === "manager"}
+                  onValueChange={(value) =>
+                    setEditForm((current) => ({ ...current, branchId: value }))
+                  }
+                  value={editForm.branchId}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {initialBranches.map((branch) => (
+                      <SelectItem key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {editForm.roleCode === "manager" && editUser?.role !== "manager" ? (
+              <div className="grid gap-1.5">
+                <Label>{copy.password} *</Label>
+                <Input
+                  autoComplete="new-password"
+                  onChange={(event) =>
+                    setEditForm((current) => ({
+                      ...current,
+                      password: event.target.value,
+                    }))
+                  }
+                  type="password"
+                  value={editForm.password ?? ""}
+                />
+              </div>
+            ) : null}
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => setEditUser(null)} variant="outline">
+                {copy.cancel}
+              </Button>
+              <Button disabled={saving} onClick={() => void submitEdit()}>
+                {saving ? copy.saving : copy.save}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog onOpenChange={(open) => !open && setStatusUser(null)} open={statusUser !== null}>
-        <DialogContent><DialogHeader><DialogTitle>{copy.statusTitle}</DialogTitle><DialogDescription>{copy.statusDescription}</DialogDescription></DialogHeader><div className="grid gap-4"><div className="grid gap-1.5"><Label>{copy.reason} *</Label><Input onChange={(event) => setStatusReason(event.target.value)} placeholder={copy.reasonPlaceholder} value={statusReason} /></div><div className="flex justify-end gap-2"><Button onClick={() => setStatusUser(null)} variant="outline">{copy.cancel}</Button><Button disabled={saving} onClick={() => void submitStatus()}>{saving ? copy.saving : copy.confirm}</Button></div></div></DialogContent>
+      <Dialog
+        onOpenChange={(open) => !open && setStatusUser(null)}
+        open={statusUser !== null}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{copy.statusTitle}</DialogTitle>
+            <DialogDescription>{copy.statusDescription}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-1.5">
+              <Label>{copy.reason} *</Label>
+              <Input
+                onChange={(event) => setStatusReason(event.target.value)}
+                placeholder={copy.reasonPlaceholder}
+                value={statusReason}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => setStatusUser(null)} variant="outline">
+                {copy.cancel}
+              </Button>
+              <Button disabled={saving} onClick={() => void submitStatus()}>
+                {saving ? copy.saving : copy.confirm}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
       </Dialog>
 
-      <Dialog onOpenChange={(open) => !open && setCredentialUser(null)} open={credentialUser !== null}>
-        <DialogContent><DialogHeader><DialogTitle className="flex items-center gap-2"><Icon icon={UserRoundCog} size={18} />{copy.credentialTitle}</DialogTitle><DialogDescription>{copy.credentialDescription}</DialogDescription></DialogHeader><div className="grid gap-4"><div className="grid gap-1.5"><Label>{copy.credentialType}</Label><Select onValueChange={(value) => { setCredentialType(value as "pin" | "password"); setCredentialValue(""); }} value={credentialType}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="pin">{copy.pinCredential}</SelectItem><SelectItem value="password">{copy.passwordCredential}</SelectItem></SelectContent></Select></div><div className="grid gap-1.5"><Label>{credentialType === "pin" ? copy.newPin : copy.newPassword} *</Label><Input autoComplete="new-password" inputMode={credentialType === "pin" ? "numeric" : undefined} maxLength={credentialType === "pin" ? 6 : 128} onChange={(event) => setCredentialValue(credentialType === "pin" ? normalizeDigits(event.target.value) : event.target.value)} type="password" value={credentialValue} /></div><div className="grid gap-1.5"><Label>{copy.reason} *</Label><Input onChange={(event) => setCredentialReason(event.target.value)} placeholder={copy.reasonPlaceholder} value={credentialReason} /></div><div className="flex justify-end gap-2"><Button onClick={() => setCredentialUser(null)} variant="outline">{copy.cancel}</Button><Button disabled={saving} onClick={() => void submitCredential()}>{saving ? copy.saving : copy.reset}</Button></div></div></DialogContent>
+      <Dialog
+        onOpenChange={(open) => !open && setCredentialUser(null)}
+        open={credentialUser !== null}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon icon={UserRoundCog} size={18} />
+              {copy.credentialTitle}
+            </DialogTitle>
+            <DialogDescription>{copy.credentialDescription}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-1.5">
+              <Label>{copy.credentialType}</Label>
+              <Select
+                onValueChange={(value) => {
+                  setCredentialType(value as "pin" | "password");
+                  setCredentialValue("");
+                }}
+                value={credentialType}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pin">{copy.pinCredential}</SelectItem>
+                  <SelectItem value="password">
+                    {copy.passwordCredential}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-1.5">
+              <Label>
+                {credentialType === "pin" ? copy.newPin : copy.newPassword} *
+              </Label>
+              <Input
+                autoComplete="new-password"
+                inputMode={credentialType === "pin" ? "numeric" : undefined}
+                maxLength={credentialType === "pin" ? 6 : 128}
+                onChange={(event) =>
+                  setCredentialValue(
+                    credentialType === "pin"
+                      ? normalizeDigits(event.target.value)
+                      : event.target.value,
+                  )
+                }
+                type="password"
+                value={credentialValue}
+              />
+            </div>
+            <div className="grid gap-1.5">
+              <Label>{copy.reason} *</Label>
+              <Input
+                onChange={(event) => setCredentialReason(event.target.value)}
+                placeholder={copy.reasonPlaceholder}
+                value={credentialReason}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => setCredentialUser(null)} variant="outline">
+                {copy.cancel}
+              </Button>
+              <Button disabled={saving} onClick={() => void submitCredential()}>
+                {saving ? copy.saving : copy.reset}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
       </Dialog>
     </section>
   );

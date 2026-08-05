@@ -7,6 +7,7 @@ export type { SaasMessages };
 
 export const saasMessagesByLocale: Record<WebAdminLocale, SaasMessages> = {
   en: saasMessagesEn,
+  fr: saasMessagesEn,
   "zh-CN": saasMessagesZhCN,
 };
 

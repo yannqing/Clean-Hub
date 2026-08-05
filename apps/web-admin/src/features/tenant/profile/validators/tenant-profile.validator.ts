@@ -38,7 +38,11 @@ export function validateTenantProfileForm(
     errors.displayName = "displayNameTooLong";
   }
 
-  if (input.language !== "en" && input.language !== "zh-CN") {
+  if (
+    input.language !== "en" &&
+    input.language !== "fr" &&
+    input.language !== "zh-CN"
+  ) {
     errors.language = "invalidLanguage";
   }
 
@@ -94,4 +98,3 @@ export function validateTenantPasswordForm(
     },
   };
 }
-

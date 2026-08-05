@@ -7,7 +7,7 @@ export type { TenantProfile, TenantProfileLanguage };
 
 export type TenantProfileFormValues = {
   displayName: string;
-  language: Extract<TenantProfileLanguage, "en" | "zh-CN">;
+  language: Extract<TenantProfileLanguage, "en" | "fr" | "zh-CN">;
 };
 
 export type TenantProfileFormErrorCode =
@@ -47,4 +47,3 @@ export type TenantProfileActionErrorCode =
   | "TENANT_PROFILE_UPDATE_EMPTY"
   | "TENANT_PROFILE_CONFLICT"
   | "UNKNOWN";
-

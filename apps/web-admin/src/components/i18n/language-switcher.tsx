@@ -13,7 +13,7 @@ import { Languages } from "lucide-react";
 
 import { useWebAdminLocale, type WebAdminLocale } from "@/i18n";
 
-const localeOptions: WebAdminLocale[] = ["en", "zh-CN"];
+const localeOptions: WebAdminLocale[] = ["en", "fr", "zh-CN"];
 
 function getLocaleLabel(
   languageLabels: ReturnType<
@@ -25,7 +25,7 @@ function getLocaleLabel(
     return languageLabels.zhCN;
   }
 
-  return languageLabels.en;
+  return languageLabels[locale];
 }
 
 type LanguageSwitcherProps = {

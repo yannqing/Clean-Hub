@@ -1,8 +1,6 @@
 "use client";
 
 import type { AuthContext } from "@cleanhub/api-client";
-import { Icon, Input } from "@cleanhub/ui";
-import { Search } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -10,6 +8,7 @@ import { webAdminRoutes } from "@/config/routes";
 import {
   TenantHeaderAccountMenu,
   TenantHeaderAssistant,
+  TenantHeaderGlobalSearch,
   TenantHeaderMessages,
   type TenantHeaderCopy,
   type TenantHeaderPanel,
@@ -27,7 +26,9 @@ export function TenantGlobalHeader({
   displayName,
 }: TenantGlobalHeaderProps) {
   const accountName = authContext?.displayName.trim() || displayName;
-  const [activePanel, setActivePanel] = useState<TenantHeaderPanel | null>(null);
+  const [activePanel, setActivePanel] = useState<TenantHeaderPanel | null>(
+    null,
+  );
 
   function handlePanelChange(panel: TenantHeaderPanel, open: boolean) {
     setActivePanel(open ? panel : null);
@@ -55,25 +56,7 @@ export function TenantGlobalHeader({
         </div>
 
         <div className="hidden min-w-0 flex-1 justify-center px-5 md:flex">
-          <div className="relative w-full max-w-xl">
-            <label className="sr-only" htmlFor="tenant-global-search">
-              {copy.searchLabel}
-            </label>
-            <Icon
-              aria-hidden
-              className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-white/55"
-              icon={Search}
-              size={17}
-            />
-            <Input
-              autoComplete="off"
-              className="h-10 rounded-lg border-white/15 bg-white/10 pl-10 text-white shadow-none placeholder:text-white/45 hover:bg-white/[0.12] focus-visible:border-white/30 focus-visible:ring-white/20 dark:bg-white/10"
-              data-testid="tenant-header-search"
-              id="tenant-global-search"
-              placeholder={copy.searchPlaceholder}
-              type="search"
-            />
-          </div>
+          <TenantHeaderGlobalSearch copy={copy} />
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5 pr-0 sm:gap-2 lg:pr-5">

@@ -8,11 +8,28 @@ import {
 
 const PAGE_SIZE = 10;
 
-export default async function TenantUsersPage() {
+type TenantUsersPageProps = {
+  searchParams?: Promise<{ q?: string | string[] }>;
+};
+
+export default async function TenantUsersPage({
+  searchParams,
+}: TenantUsersPageProps) {
+  const queryParam = (await searchParams)?.q;
+  const initialSearchQuery = Array.isArray(queryParam)
+    ? (queryParam[0] ?? "")
+    : (queryParam ?? "");
   const options = await getTenantServerApiRequestOptions();
   const authContext = await getCurrentAuthQuery(options);
   const [usersResult, branchesResult] = await Promise.allSettled([
-    getTenantUserListQuery({ limit: PAGE_SIZE, offset: 0 }, options),
+    getTenantUserListQuery(
+      {
+        q: initialSearchQuery || undefined,
+        limit: PAGE_SIZE,
+        offset: 0,
+      },
+      options,
+    ),
     getTenantBranchListQuery(options),
   ]);
 
@@ -35,6 +52,7 @@ export default async function TenantUsersPage() {
         branchesResult.status === "fulfilled" ? branchesResult.value : []
       }
       initialError={initialError}
+      initialSearchQuery={initialSearchQuery}
       initialUsers={usersResult.status === "fulfilled" ? usersResult.value : []}
     />
   );

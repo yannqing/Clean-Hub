@@ -133,7 +133,11 @@ function getCustomerStatusVariant(
   return status === "active" ? "default" : "outline";
 }
 
-export function TenantCustomersView() {
+export function TenantCustomersView({
+  initialSearchQuery = "",
+}: {
+  initialSearchQuery?: string;
+}) {
   const { formatDateTime, locale, m } = useTenantI18n();
   const [customerDataset, setCustomerDataset] = useState<
     TenantCustomerSummary[]
@@ -143,7 +147,7 @@ export function TenantCustomersView() {
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState<CustomerDateFilter>("all");
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [sort, setSort] = useState<CustomerSort>("created_desc");
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE_COLUMNS);
   const [refreshVersion, setRefreshVersion] = useState(0);

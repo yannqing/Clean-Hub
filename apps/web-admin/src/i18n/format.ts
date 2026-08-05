@@ -6,7 +6,11 @@ type DateFormatOptions = {
 };
 
 function getIntlLocale(locale: WebAdminLocale): string {
-  return locale === "zh-CN" ? "zh-CN" : "en";
+  if (locale === "zh-CN") {
+    return "zh-CN";
+  }
+
+  return locale === "fr" ? "fr-FR" : "en";
 }
 
 export function formatWebAdminDate(

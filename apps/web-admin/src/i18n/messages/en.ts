@@ -282,6 +282,7 @@ export const enMessages: WebAdminMessages = {
     language: "Language",
     languageLabels: {
       en: "English",
+      fr: "French",
       zhCN: "Simplified Chinese",
     },
     theme: "Theme",

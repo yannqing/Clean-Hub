@@ -227,6 +227,7 @@ export type WebAdminMessages = {
     language: string;
     languageLabels: {
       en: string;
+      fr: string;
       zhCN: string;
     };
     theme: string;
