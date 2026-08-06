@@ -374,7 +374,9 @@ export type TenantMessages = {
         deleteTitle: string;
         deleteDescription: string;
         deleteConfirm: string;
+        emojiAction: string;
         mentionAction: string;
+        referencePageAction: string;
         mentionSearchPlaceholder: string;
         noMentionResults: string;
         removeMention: string;
@@ -443,6 +445,75 @@ export type TenantMessages = {
 
   customers: {
     title: string;
+    tabs: {
+      customers: string;
+      accounts: string;
+    };
+    accounts: {
+      title: string;
+      description: string;
+      searchLabel: string;
+      searchPlaceholder: string;
+      statusLabel: string;
+      allStatuses: string;
+      sortLabel: string;
+      metrics: {
+        label: string;
+        totalAccounts: string;
+        activeAccounts: string;
+        disabledAccounts: string;
+        linkedCustomers: string;
+      };
+      sortOptions: {
+        createdDesc: string;
+        createdAsc: string;
+        nameAsc: string;
+        nameDesc: string;
+      };
+      columns: {
+        account: string;
+        customers: string;
+        phone: string;
+        email: string;
+        status: string;
+        createdAt: string;
+      };
+      emptyTitle: string;
+      emptyDescription: string;
+      filteredEmptyTitle: string;
+      filteredEmptyDescription: string;
+      loadError: string;
+      pageSummary: string;
+      detail: {
+        breadcrumbLabel: string;
+        backToAccounts: string;
+        openAccount: string;
+        editAction: string;
+        summaryTitle: string;
+        linkedCustomersTitle: string;
+        linkedCustomersDescription: string;
+        linkedCustomersEmpty: string;
+        recordDetailsTitle: string;
+        accountId: string;
+        accountName: string;
+        phone: string;
+        email: string;
+        status: string;
+        createdAt: string;
+        updatedAt: string;
+        version: string;
+        editTitle: string;
+        editDescription: string;
+        saveAction: string;
+        saveSuccess: string;
+        saveError: string;
+        versionConflict: string;
+        contactRequired: string;
+        accountNameRequired: string;
+        phoneConflict: string;
+        emailConflict: string;
+      };
+    };
     metrics: {
       label: string;
       totalCustomers: string;
@@ -492,6 +563,41 @@ export type TenantMessages = {
     filteredEmptyDescription: string;
     loadError: string;
     pageSummary: string;
+    detail: {
+      breadcrumbLabel: string;
+      backToCustomers: string;
+      openCustomer: string;
+      profileTitle: string;
+      contactTitle: string;
+      accountTitle: string;
+      recordDetailsTitle: string;
+      recentOrdersTitle: string;
+      recentOrdersDescription: string;
+      recentOrdersEmpty: string;
+      relationship: string;
+      address: string;
+      notes: string;
+      customerId: string;
+      accountId: string;
+      createdAt: string;
+      updatedAt: string;
+      accountCreatedAt: string;
+      accountStatus: string;
+      timeline: {
+        title: string;
+        events: {
+          profileCreated: string;
+          profileUpdated: string;
+          profileStatusChanged: string;
+          profileDeleted: string;
+          accountCreated: string;
+          accountUpdated: string;
+          accountStatusChanged: string;
+          accountDeleted: string;
+          unknown: string;
+        };
+      };
+    };
   };
 
   products: {

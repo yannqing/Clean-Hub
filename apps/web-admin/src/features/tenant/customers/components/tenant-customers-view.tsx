@@ -1,6 +1,8 @@
 "use client";
 
 import type {
+  TenantCustomerOverview,
+  TenantCustomerSort,
   TenantCustomerStatus,
   TenantCustomerSummary,
 } from "@cleanhub/api-client";
@@ -13,7 +15,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -21,6 +22,7 @@ import {
   TableRow,
   cn,
 } from "@cleanhub/ui";
+import { DataTable, DataTableMetricCards, DataTablePagePagination, DataTableSurface, DataTableToolbar } from "@cleanhub/ui/data-table";
 import {
   CalendarDays,
   Check,
@@ -33,11 +35,16 @@ import {
   UserRound,
   UserX,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { webAdminRoutes } from "@/config/routes";
 import { interpolate, useTenantI18n } from "@/i18n";
 
-import { getTenantCustomerDatasetQuery } from "../queries";
+import {
+  getTenantCustomerListQuery,
+  getTenantCustomerOverviewQuery,
+} from "../queries";
 
 const PAGE_SIZE = 10;
 
@@ -48,7 +55,6 @@ type CustomerDateFilter =
   | "last_30_days"
   | "last_365_days"
   | "all";
-type CustomerSort = "created_desc" | "created_asc" | "name_asc" | "name_desc";
 type CustomerColumnKey =
   | "customer"
   | "account"
@@ -76,25 +82,23 @@ const DEFAULT_VISIBLE_COLUMNS: Record<CustomerColumnKey, boolean> = {
 };
 
 function buildDateRange(filter: CustomerDateFilter): {
-  createdAfter?: number;
-  createdBefore?: number;
+  createdAfter?: string;
+  createdBefore?: string;
 } {
   if (filter === "all") {
     return {};
   }
 
   const now = new Date();
-  const todayStart = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
+  const todayStart = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
   );
   const dayMs = 24 * 60 * 60 * 1000;
 
   if (filter === "today") {
     return {
-      createdAfter: todayStart,
-      createdBefore: todayStart + dayMs,
+      createdAfter: todayStart.toISOString(),
+      createdBefore: new Date(todayStart.getTime() + dayMs).toISOString(),
     };
   }
 
@@ -105,26 +109,10 @@ function buildDateRange(filter: CustomerDateFilter): {
   }[filter];
 
   return {
-    createdAfter: todayStart - (days - 1) * dayMs,
+    createdAfter: new Date(
+      todayStart.getTime() - (days - 1) * dayMs,
+    ).toISOString(),
   };
-}
-
-function isCustomerWithinDateRange(
-  customer: TenantCustomerSummary,
-  filter: CustomerDateFilter,
-): boolean {
-  const { createdAfter, createdBefore } = buildDateRange(filter);
-
-  if (createdAfter === undefined) {
-    return true;
-  }
-
-  const createdAt = Date.parse(customer.createdAt);
-  if (!Number.isFinite(createdAt) || createdAt < createdAfter) {
-    return false;
-  }
-
-  return createdBefore === undefined || createdAt < createdBefore;
 }
 
 function getCustomerStatusVariant(
@@ -138,43 +126,79 @@ export function TenantCustomersView({
 }: {
   initialSearchQuery?: string;
 }) {
+  const router = useRouter();
   const { formatDateTime, locale, m } = useTenantI18n();
-  const [customerDataset, setCustomerDataset] = useState<
-    TenantCustomerSummary[]
-  >([]);
+  const [customers, setCustomers] = useState<TenantCustomerSummary[]>([]);
+  const [total, setTotal] = useState(0);
+  const [overview, setOverview] = useState<TenantCustomerOverview | null>(null);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState<CustomerStatusFilter>("all");
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [dateFilter, setDateFilter] = useState<CustomerDateFilter>("all");
   const [dateMenuOpen, setDateMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
-  const [sort, setSort] = useState<CustomerSort>("created_desc");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(
+    initialSearchQuery.trim(),
+  );
+  const [sort, setSort] = useState<TenantCustomerSort>("created_desc");
   const [visibleColumns, setVisibleColumns] = useState(DEFAULT_VISIBLE_COLUMNS);
   const [refreshVersion, setRefreshVersion] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [listLoading, setListLoading] = useState(true);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [listError, setListError] = useState<string | null>(null);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
+  const { createdAfter, createdBefore } = buildDateRange(dateFilter);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery.trim());
+    }, 250);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   useEffect(() => {
     let current = true;
     const controller = new AbortController();
 
-    getTenantCustomerDatasetQuery(controller.signal)
+    getTenantCustomerListQuery(
+      {
+        createdAfter,
+        createdBefore,
+        limit: PAGE_SIZE,
+        offset: (page - 1) * PAGE_SIZE,
+        q: debouncedSearchQuery || undefined,
+        sort,
+        status: status === "all" ? undefined : status,
+      },
+      { signal: controller.signal },
+    )
       .then((result) => {
         if (!current) {
           return;
         }
 
-        setCustomerDataset(result);
-        setLoadError(null);
+        const resultTotalPages = Math.max(
+          1,
+          Math.ceil(result.total / PAGE_SIZE),
+        );
+        if (page > resultTotalPages) {
+          setPage(resultTotalPages);
+          return;
+        }
+
+        setCustomers(result.data);
+        setTotal(result.total);
+        setListError(null);
       })
       .catch(() => {
         if (current) {
-          setLoadError(m.customers.loadError);
+          setListError(m.customers.loadError);
         }
       })
       .finally(() => {
         if (current) {
-          setLoading(false);
+          setListLoading(false);
         }
       });
 
@@ -182,101 +206,75 @@ export function TenantCustomersView({
       current = false;
       controller.abort();
     };
-  }, [m.customers.loadError, refreshVersion]);
+  }, [
+    createdAfter,
+    createdBefore,
+    debouncedSearchQuery,
+    m.customers.loadError,
+    page,
+    refreshVersion,
+    sort,
+    status,
+  ]);
 
-  const dateScopedCustomers = useMemo(
-    () =>
-      customerDataset.filter((customer) =>
-        isCustomerWithinDateRange(customer, dateFilter),
-      ),
-    [customerDataset, dateFilter],
-  );
+  useEffect(() => {
+    let current = true;
+    const controller = new AbortController();
+
+    getTenantCustomerOverviewQuery(
+      { createdAfter, createdBefore },
+      { signal: controller.signal },
+    )
+      .then((result) => {
+        if (!current) return;
+        setOverview(result);
+        setOverviewError(null);
+      })
+      .catch(() => {
+        if (current) setOverviewError(m.customers.loadError);
+      })
+      .finally(() => {
+        if (current) setOverviewLoading(false);
+      });
+
+    return () => {
+      current = false;
+      controller.abort();
+    };
+  }, [
+    createdAfter,
+    createdBefore,
+    m.customers.loadError,
+    refreshVersion,
+  ]);
 
   const metrics = useMemo(() => {
-    const activeCustomers = dateScopedCustomers.filter(
-      (customer) => customer.status === "active",
-    ).length;
-    const disabledCustomers = dateScopedCustomers.length - activeCustomers;
-    const linkedAccounts = new Set(
-      dateScopedCustomers.map((customer) => customer.customerAccountId),
-    ).size;
-
     return [
       {
         icon: UserRound,
         label: m.customers.metrics.totalCustomers,
-        value: dateScopedCustomers.length.toLocaleString(locale),
+        value: overview?.totalCustomers.toLocaleString(locale) ?? "—",
       },
       {
         icon: UserCheck,
         label: m.customers.metrics.activeCustomers,
-        value: activeCustomers.toLocaleString(locale),
+        value: overview?.activeCustomers.toLocaleString(locale) ?? "—",
       },
       {
         icon: UserX,
         label: m.customers.metrics.disabledCustomers,
-        value: disabledCustomers.toLocaleString(locale),
+        value: overview?.disabledCustomers.toLocaleString(locale) ?? "—",
       },
       {
         icon: Link2,
         label: m.customers.metrics.linkedAccounts,
-        value: linkedAccounts.toLocaleString(locale),
+        value: overview?.linkedAccounts.toLocaleString(locale) ?? "—",
       },
     ];
-  }, [dateScopedCustomers, locale, m.customers.metrics]);
+  }, [locale, m.customers.metrics, overview]);
 
-  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
-  const filteredCustomers = useMemo(() => {
-    const matchingCustomers = dateScopedCustomers.filter((customer) => {
-      if (status !== "all" && customer.status !== status) {
-        return false;
-      }
-
-      if (!normalizedSearchQuery) {
-        return true;
-      }
-
-      const searchableValues = [
-        customer.id,
-        customer.fullName,
-        customer.accountName,
-        customer.phone,
-        customer.email,
-      ];
-
-      return searchableValues.some((value) =>
-        value?.toLowerCase().includes(normalizedSearchQuery),
-      );
-    });
-
-    return matchingCustomers.toSorted((left, right) => {
-      if (sort === "created_desc") {
-        return right.createdAt.localeCompare(left.createdAt);
-      }
-
-      if (sort === "created_asc") {
-        return left.createdAt.localeCompare(right.createdAt);
-      }
-
-      const nameComparison = left.fullName.localeCompare(
-        right.fullName,
-        locale,
-      );
-      return sort === "name_asc" ? nameComparison : -nameComparison;
-    });
-  }, [dateScopedCustomers, locale, normalizedSearchQuery, sort, status]);
-
-  const total = filteredCustomers.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const currentPage = Math.min(page, totalPages);
-  const customers = useMemo(
-    () =>
-      filteredCustomers.slice(
-        (currentPage - 1) * PAGE_SIZE,
-        currentPage * PAGE_SIZE,
-      ),
-    [currentPage, filteredCustomers],
-  );
+  const currentPage = page;
   const visibleColumnCount =
     Object.values(visibleColumns).filter(Boolean).length;
 
@@ -310,7 +308,7 @@ export function TenantCustomersView({
   const selectedDateLabel =
     dateOptions.find((option) => option.value === dateFilter)?.label ??
     m.customers.toolbar.dateOptions.all;
-  const sortOptions: Array<{ label: string; value: CustomerSort }> = [
+  const sortOptions: Array<{ label: string; value: TenantCustomerSort }> = [
     {
       label: m.customers.toolbar.sortOptions.createdDesc,
       value: "created_desc",
@@ -330,30 +328,51 @@ export function TenantCustomersView({
   ];
 
   function refresh() {
-    setLoading(true);
-    setLoadError(null);
+    setListLoading(true);
+    setOverviewLoading(true);
+    setListError(null);
+    setOverviewError(null);
     setPage(1);
     setRefreshVersion((current) => current + 1);
   }
 
-  function changeStatus(nextStatus: CustomerStatusFilter) {
-    setStatus(nextStatus);
+  function beginFilteredRequest() {
+    setListLoading(true);
+    setListError(null);
     setPage(1);
+  }
+
+  function goToPage(nextPage: number) {
+    setListLoading(true);
+    setListError(null);
+    setPage(nextPage);
+  }
+
+  function changeStatus(nextStatus: CustomerStatusFilter) {
+    if (nextStatus === status) return;
+    beginFilteredRequest();
+    setStatus(nextStatus);
   }
 
   function changeDateFilter(nextFilter: CustomerDateFilter) {
+    if (nextFilter === dateFilter) return;
+    beginFilteredRequest();
+    setOverviewLoading(true);
+    setOverviewError(null);
     setDateFilter(nextFilter);
-    setPage(1);
   }
 
   function changeSearchQuery(nextQuery: string) {
+    setListLoading(true);
+    setListError(null);
     setSearchQuery(nextQuery);
     setPage(1);
   }
 
-  function changeSort(nextSort: CustomerSort) {
+  function changeSort(nextSort: TenantCustomerSort) {
+    if (nextSort === sort) return;
+    beginFilteredRequest();
     setSort(nextSort);
-    setPage(1);
   }
 
   function setColumnVisible(column: CustomerColumnKey, checked: boolean) {
@@ -374,7 +393,7 @@ export function TenantCustomersView({
   const hasActiveFilters =
     dateFilter !== "all" ||
     status !== "all" ||
-    normalizedSearchQuery.length > 0;
+    debouncedSearchQuery.length > 0;
 
   return (
     <section className="space-y-7 pb-8" data-testid="tenant-customers-view">
@@ -430,36 +449,20 @@ export function TenantCustomersView({
         </Popover>
       </header>
 
-      <section
-        aria-label={m.customers.metrics.label}
-        className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4"
-      >
-        {metrics.map((metric) => (
-          <div
-            className="flex min-h-20 items-center gap-2.5 rounded-md border bg-background px-3 py-2.5"
-            key={metric.label}
-          >
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-              <Icon aria-hidden icon={metric.icon} size={15} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[11px] font-medium text-muted-foreground">
-                {metric.label}
-              </span>
-              {loading ? (
-                <span className="mt-1.5 block h-5 w-20 animate-pulse rounded bg-muted" />
-              ) : (
-                <span className="mt-0.5 block truncate text-lg font-semibold">
-                  {metric.value}
-                </span>
-              )}
-            </span>
-          </div>
-        ))}
-      </section>
+      <DataTableMetricCards
+        ariaLabel={m.customers.metrics.label}
+        loading={overviewLoading}
+        metrics={metrics}
+      />
 
-      <section className="min-w-0 border-y bg-background">
-        <div className="flex items-center gap-2 border-b px-3 py-2.5">
+      {overviewError ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {overviewError}
+        </div>
+      ) : null}
+
+      <DataTableSurface>
+        <DataTableToolbar>
           <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
             <Popover onOpenChange={setStatusMenuOpen} open={statusMenuOpen}>
               <PopoverTrigger asChild>
@@ -604,9 +607,9 @@ export function TenantCustomersView({
               </div>
             </PopoverContent>
           </Popover>
-        </div>
+        </DataTableToolbar>
 
-        {loading ? (
+        {listLoading ? (
           <div className="grid gap-2 p-3">
             {[0, 1, 2, 3, 4].map((row) => (
               <div
@@ -615,10 +618,10 @@ export function TenantCustomersView({
               />
             ))}
           </div>
-        ) : loadError ? (
+        ) : listError ? (
           <div className="p-4">
             <div className="flex flex-col gap-3 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between">
-              <span>{loadError}</span>
+              <span>{listError}</span>
               <Button
                 onClick={refresh}
                 size="sm"
@@ -645,7 +648,7 @@ export function TenantCustomersView({
             </div>
           </div>
         ) : (
-          <Table
+          <DataTable
             className="text-xs [&_td]:px-1.5 [&_td]:py-1.5 [&_th]:h-8 [&_th]:px-1.5"
             style={{
               minWidth: `${Math.max(520, visibleColumnCount * 118)}px`,
@@ -675,7 +678,25 @@ export function TenantCustomersView({
             </TableHeader>
             <TableBody>
               {customers.map((customer) => (
-                <TableRow key={customer.id}>
+                <TableRow
+                  aria-label={interpolate(
+                    m.customers.detail.openCustomer,
+                    { customer: customer.fullName },
+                  )}
+                  className="cursor-pointer transition-colors focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  key={customer.id}
+                  onClick={() =>
+                    router.push(webAdminRoutes.tenant.customer(customer.id))
+                  }
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      router.push(webAdminRoutes.tenant.customer(customer.id));
+                    }
+                  }}
+                  role="link"
+                  tabIndex={0}
+                >
                   {visibleColumns.customer ? (
                     <TableCell className="font-medium">
                       {customer.fullName}
@@ -712,40 +733,22 @@ export function TenantCustomersView({
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </DataTable>
         )}
 
-        <div className="flex flex-col gap-2 border-t px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-muted-foreground">
-            {interpolate(m.customers.pageSummary, {
+        <DataTablePagePagination
+          loading={listLoading}
+          nextLabel={m.common.next}
+          onPageChange={goToPage}
+          page={currentPage}
+          previousLabel={m.common.previous}
+          summary={interpolate(m.customers.pageSummary, {
               page: currentPage.toLocaleString(locale),
               pages: totalPages.toLocaleString(locale),
             })}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              className="h-7 px-2 text-xs"
-              disabled={currentPage <= 1 || loading}
-              onClick={() => setPage(Math.max(1, currentPage - 1))}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              {m.common.previous}
-            </Button>
-            <Button
-              className="h-7 px-2 text-xs"
-              disabled={currentPage >= totalPages || loading}
-              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              {m.common.next}
-            </Button>
-          </div>
-        </div>
-      </section>
+          totalPages={totalPages}
+        />
+      </DataTableSurface>
     </section>
   );
 }

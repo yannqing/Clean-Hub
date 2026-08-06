@@ -128,6 +128,10 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
       label: messages.tenant.pointOfSale.tabs.settings,
     },
   ];
+  const customerAccountsActive = isActivePath(
+    pathname,
+    webAdminRoutes.tenant.customerAccounts,
+  );
   const displayName = useMemo(() => getDisplayName(authContext), [authContext]);
 
   useEffect(() => {
@@ -226,6 +230,8 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
               const selfActive = isActivePath(pathname, item.href);
               const isProductsItem =
                 item.href === webAdminRoutes.tenant.products;
+              const isCustomersItem =
+                item.href === webAdminRoutes.tenant.customers;
               const isPointOfSaleItem =
                 item.href === webAdminRoutes.tenant.pointOfSale.home;
               const visualActive =
@@ -237,9 +243,14 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
               return (
                 <div key={item.href}>
                   <Link
-                    aria-current={selfActive ? "page" : undefined}
+                    aria-current={
+                      selfActive &&
+                      (!isCustomersItem || !customerAccountsActive)
+                        ? "page"
+                        : undefined
+                    }
                     aria-expanded={
-                      isProductsItem || isPointOfSaleItem
+                      isProductsItem || isCustomersItem || isPointOfSaleItem
                         ? visualActive
                         : undefined
                     }
@@ -272,6 +283,37 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
                     ) : null}
                     <span className="truncate">{item.label}</span>
                   </Link>
+
+                  {isCustomersItem && visualActive ? (
+                    <div className="ml-4 mt-1 border-l border-sidebar-border pl-2">
+                      <Link
+                        aria-current={
+                          customerAccountsActive ? "page" : undefined
+                        }
+                        className={cn(
+                          "flex h-7 items-center gap-2 rounded-md px-2.5 text-xs font-medium transition-colors",
+                          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          customerAccountsActive
+                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                            : "text-muted-foreground",
+                        )}
+                        href={webAdminRoutes.tenant.customerAccounts}
+                      >
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "size-1.5 rounded-full bg-muted-foreground/50",
+                            customerAccountsActive &&
+                              "bg-sidebar-accent-foreground",
+                          )}
+                        />
+                        <span className="truncate">
+                          {messages.tenant.customers.tabs.accounts}
+                        </span>
+                      </Link>
+                    </div>
+                  ) : null}
 
                   {isProductsItem && visualActive ? (
                     <div className="ml-4 mt-1 border-l border-sidebar-border pl-2">

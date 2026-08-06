@@ -45,6 +45,13 @@ export const webAdminRoutes = {
     orders: "/tenant/orders",
     order: (orderId: string) => `/tenant/orders/${encodeURIComponent(orderId)}`,
     customers: "/tenant/customers",
+    customer: (customerId: string) =>
+      `/tenant/customers/${encodeURIComponent(customerId)}`,
+    customerFromAccount: (customerId: string, accountId: string) =>
+      `/tenant/customers/${encodeURIComponent(customerId)}?sourceAccountId=${encodeURIComponent(accountId)}`,
+    customerAccounts: "/tenant/customers/accounts",
+    customerAccount: (accountId: string) =>
+      `/tenant/customers/accounts/${encodeURIComponent(accountId)}`,
     users: "/tenant/users",
     products: "/tenant/products",
     newProduct: "/tenant/products/new",
