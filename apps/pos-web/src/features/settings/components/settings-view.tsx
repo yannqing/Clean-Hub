@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
 import type { PosHardwareDeviceSummary } from "@cleanhub/api-client";
@@ -79,6 +80,7 @@ function assertCurrentTerminalDevice(
 }
 
 export function SettingsView() {
+  const router = useRouter();
   const [pageState, setPageState] = useState<SettingsPageState>("loading");
   const [terminalSettings, setTerminalSettings] =
     useState<PosTerminalSettings | null>(null);
@@ -182,6 +184,10 @@ export function SettingsView() {
         lockTimeoutSeconds: result.lockTimeoutSeconds,
       });
       toast.success("设置已保存");
+      // The (pos) layout reads lockTimeoutSeconds on the server and feeds the
+      // idle auto lock. Refresh server components so the new value applies
+      // without a full reload.
+      router.refresh();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : "保存失败，请重试。",
