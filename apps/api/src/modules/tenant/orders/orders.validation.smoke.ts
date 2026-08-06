@@ -1,6 +1,20 @@
 import assert from "node:assert/strict";
 
-import { tenantCustomerListQuerySchema } from "../customers/customers.validation.js";
+import {
+  createTenantCustomerCommentBodySchema,
+  deleteTenantCustomerCommentBodySchema,
+  tenantCustomerAttachmentUploadBodySchema,
+  tenantCustomerAccountCustomersQuerySchema,
+  tenantCustomerAccountListQuerySchema,
+  tenantCustomerAccountParamsSchema,
+  tenantCustomerCommentParamsSchema,
+  tenantCustomerListQuerySchema,
+  tenantCustomerOverviewQuerySchema,
+  tenantCustomerParamsSchema,
+  tenantCustomerTimelineQuerySchema,
+  updateTenantCustomerCommentBodySchema,
+  updateTenantCustomerAccountBodySchema,
+} from "../customers/customers.validation.js";
 import {
   createTenantOrderCommentBodySchema,
   createTenantOrderItemBodySchema,
@@ -207,18 +221,152 @@ assert.deepEqual(
     branchId: BRANCH_ID,
     limit: "100",
     offset: "10",
+    q: "  Alice  ",
   }),
   {
     branchId: BRANCH_ID,
     sort: "created_desc",
     limit: 100,
     offset: 10,
+    q: "Alice",
   },
 );
 assert.equal(
   tenantCustomerListQuerySchema.safeParse({ branchId: "not-an-ulid" }).success,
   false,
   "customer branch filters require a valid ULID",
+);
+assert.deepEqual(tenantCustomerOverviewQuerySchema.parse({}), {});
+assert.deepEqual(
+  tenantCustomerParamsSchema.parse({ customerId: CUSTOMER_ID }),
+  { customerId: CUSTOMER_ID },
+);
+assert.equal(
+  tenantCustomerParamsSchema.safeParse({ customerId: "not-an-id" }).success,
+  false,
+  "customer details require a valid ULID",
+);
+assert.equal(
+  tenantCustomerOverviewQuerySchema.safeParse({
+    createdAfter: "2026-08-05T12:00:00.000Z",
+    createdBefore: "2026-08-05T11:00:00.000Z",
+  }).success,
+  false,
+  "customer overview date ranges must be ordered",
+);
+assert.deepEqual(tenantCustomerTimelineQuerySchema.parse({}), { limit: 20 });
+assert.equal(
+  tenantCustomerTimelineQuerySchema.safeParse({ limit: "51" }).success,
+  false,
+  "customer timelines enforce a bounded page size",
+);
+assert.deepEqual(
+  createTenantCustomerCommentBodySchema.parse({
+    body: "  Follow up next week  ",
+    idempotencyKey: "customer-comment-1",
+  }),
+  {
+    body: "Follow up next week",
+    idempotencyKey: "customer-comment-1",
+    mentionedUserIds: [],
+    attachments: [],
+  },
+);
+assert.deepEqual(
+  tenantCustomerCommentParamsSchema.parse({
+    customerId: CUSTOMER_ID,
+    commentId: ORDER_ID,
+  }),
+  { customerId: CUSTOMER_ID, commentId: ORDER_ID },
+);
+assert.equal(
+  createTenantCustomerCommentBodySchema.safeParse({
+    body: "   ",
+    idempotencyKey: "customer-comment-2",
+  }).success,
+  false,
+  "customer comments reject empty content",
+);
+assert.deepEqual(
+  updateTenantCustomerCommentBodySchema.parse({
+    body: " Updated follow-up ",
+    version: 2,
+    mentionedUserIds: [CUSTOMER_ID],
+  }),
+  {
+    body: "Updated follow-up",
+    version: 2,
+    mentionedUserIds: [CUSTOMER_ID],
+  },
+);
+assert.deepEqual(deleteTenantCustomerCommentBodySchema.parse({ version: 3 }), {
+  version: 3,
+});
+assert.deepEqual(
+  tenantCustomerAttachmentUploadBodySchema.parse({
+    contentType: "image/webp",
+    sizeBytes: 2048,
+  }),
+  { contentType: "image/webp", sizeBytes: 2048 },
+);
+assert.equal(
+  tenantCustomerAttachmentUploadBodySchema.safeParse({
+    contentType: "application/pdf",
+    sizeBytes: 2048,
+  }).success,
+  false,
+  "customer timeline attachments only accept safe image formats",
+);
+
+assert.deepEqual(tenantCustomerAccountListQuerySchema.parse({}), {
+  sort: "created_desc",
+  limit: 50,
+  offset: 0,
+});
+assert.deepEqual(
+  tenantCustomerAccountListQuerySchema.parse({
+    q: "  Alice  ",
+    status: "active",
+    sort: "name_asc",
+    limit: "10",
+    offset: "20",
+  }),
+  {
+    q: "Alice",
+    status: "active",
+    sort: "name_asc",
+    limit: 10,
+    offset: 20,
+  },
+);
+assert.deepEqual(tenantCustomerAccountCustomersQuerySchema.parse({}), {
+  limit: 20,
+  offset: 0,
+});
+assert.deepEqual(
+  tenantCustomerAccountParamsSchema.parse({ accountId: CUSTOMER_ID }),
+  { accountId: CUSTOMER_ID },
+);
+assert.deepEqual(
+  updateTenantCustomerAccountBodySchema.parse({
+    accountName: "  Family account  ",
+    phone: null,
+    email: " FAMILY@EXAMPLE.COM ",
+    status: "disabled",
+    version: 3,
+  }),
+  {
+    accountName: "Family account",
+    phone: null,
+    email: "FAMILY@EXAMPLE.COM",
+    status: "disabled",
+    version: 3,
+  },
+);
+assert.equal(
+  updateTenantCustomerAccountBodySchema.safeParse({ version: 3 }).success,
+  false,
+  "account updates require at least one mutable field",
 );
 
 console.log("Tenant order/customer read validation smoke passed.");
