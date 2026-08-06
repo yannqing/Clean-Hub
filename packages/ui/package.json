@@ -10,6 +10,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./data-table": "./src/components/data-display/data-table.tsx",
     "./styles.css": "./src/styles/globals.css"
   },
   "peerDependencies": {
