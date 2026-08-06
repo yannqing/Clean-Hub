@@ -10,13 +10,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import { RefreshCw, ScrollText, Search } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -289,7 +289,7 @@ export function OperationLogListView() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <Table className={saasCompactTableClassName}>
+            <DataTable className={saasCompactTableClassName}>
               <TableHeader>
                 <TableRow>
                   <TableHead>{m.systemLogs.columns.created}</TableHead>
@@ -353,7 +353,7 @@ export function OperationLogListView() {
                   );
                 })}
               </TableBody>
-            </Table>
+            </DataTable>
           </div>
         )}
 

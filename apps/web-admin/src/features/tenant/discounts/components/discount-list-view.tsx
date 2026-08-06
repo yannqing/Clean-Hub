@@ -18,7 +18,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -27,6 +26,7 @@ import {
   cn,
   toast,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import {
   BadgePercent,
   Download,
@@ -568,7 +568,7 @@ export function DiscountListView({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <Table className="min-w-[1160px] text-xs">
+            <DataTable className="min-w-[1160px] text-xs">
               <TableHeader>
                 <TableRow className="bg-muted/30">
                   <TableHead>{m.discounts.list.columns.discount}</TableHead>
@@ -684,7 +684,7 @@ export function DiscountListView({
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </DataTable>
           </div>
         )}
 

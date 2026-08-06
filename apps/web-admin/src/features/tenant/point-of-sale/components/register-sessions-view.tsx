@@ -10,7 +10,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -18,6 +17,7 @@ import {
   TableRow,
   cn,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import {
   Banknote,
   Building2,
@@ -431,7 +431,7 @@ export function RegisterSessionsView({
         {result && result.data.length > 0 ? (
           <>
             <div className="overflow-x-auto">
-              <Table>
+              <DataTable>
                 <TableHeader>
                   <TableRow className="bg-muted/30">
                     {[
@@ -560,7 +560,7 @@ export function RegisterSessionsView({
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </DataTable>
             </div>
             <Pagination
               currentPageCount={result.data.length}

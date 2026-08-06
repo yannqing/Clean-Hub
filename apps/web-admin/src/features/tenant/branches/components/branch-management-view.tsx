@@ -8,7 +8,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -17,6 +16,7 @@ import {
   cn,
   toast,
 } from "@cleanhub/ui";
+import { DataTable, DataTableMetricCards } from "@cleanhub/ui/data-table";
 import {
   Check,
   CircleCheck,
@@ -220,33 +220,12 @@ export function BranchManagementView({
       </header>
 
       {!embedded ? (
-        <section
-          aria-label={m.branches.title}
-          className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3"
-        >
-          {metrics.map((metric) => (
-            <div
-              className="flex min-h-20 items-center gap-2.5 rounded-md border bg-background px-3 py-2.5"
-              key={metric.label}
-            >
-              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <Icon aria-hidden icon={metric.icon} size={15} />
-              </span>
-              <span className="min-w-0">
-                <span className="block text-[11px] font-medium text-muted-foreground">
-                  {metric.label}
-                </span>
-                {loading ? (
-                  <span className="mt-1.5 block h-5 w-16 animate-pulse rounded bg-muted" />
-                ) : (
-                  <span className="mt-0.5 block truncate text-lg font-semibold">
-                    {metric.value}
-                  </span>
-                )}
-              </span>
-            </div>
-          ))}
-        </section>
+        <DataTableMetricCards
+          ariaLabel={m.branches.title}
+          className="xl:grid-cols-3"
+          loading={loading}
+          metrics={metrics}
+        />
       ) : null}
 
       {errorMessage ? (
@@ -345,7 +324,7 @@ export function BranchManagementView({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <Table className="text-xs [&_td]:px-1.5 [&_td]:py-1.5 [&_th]:h-8 [&_th]:px-1.5">
+            <DataTable className="text-xs [&_td]:px-1.5 [&_td]:py-1.5 [&_th]:h-8 [&_th]:px-1.5">
               <TableHeader>
                 <TableRow>
                   <TableHead>{m.branches.list.columns.branch}</TableHead>
@@ -416,7 +395,7 @@ export function BranchManagementView({
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </DataTable>
           </div>
         )}
       </section>

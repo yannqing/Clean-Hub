@@ -10,7 +10,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
   TableBody,
   TableCaption,
   TableCell,
@@ -18,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import {
   CircleCheck,
   MailCheck,
@@ -370,7 +370,7 @@ export function SaasUserListView() {
             </div>
           </div>
         ) : (
-          <Table
+          <DataTable
             aria-describedby={captionId}
             className={saasCompactTableClassName}
           >
@@ -454,7 +454,7 @@ export function SaasUserListView() {
                 );
               })}
             </TableBody>
-          </Table>
+          </DataTable>
         )}
 
         <Pagination

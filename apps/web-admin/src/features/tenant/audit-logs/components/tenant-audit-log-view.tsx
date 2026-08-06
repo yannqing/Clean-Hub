@@ -13,7 +13,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -21,6 +20,7 @@ import {
   TableRow,
   cn,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import {
   ListFilter,
   RefreshCw,
@@ -368,7 +368,7 @@ export function TenantAuditLogView({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <Table className="text-xs [&_td]:px-1.5 [&_td]:py-1.5 [&_th]:h-8 [&_th]:px-1.5">
+            <DataTable className="text-xs [&_td]:px-1.5 [&_td]:py-1.5 [&_th]:h-8 [&_th]:px-1.5">
               <TableHeader>
                 <TableRow>
                   <TableHead>{m.auditLogs.columns.time}</TableHead>
@@ -428,7 +428,7 @@ export function TenantAuditLogView({
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </DataTable>
           </div>
         )}
 

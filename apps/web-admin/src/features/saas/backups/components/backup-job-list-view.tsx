@@ -11,13 +11,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import { DatabaseBackup, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -351,7 +351,7 @@ export function BackupJobListView() {
             </div>
           ) : (
             <div className="min-w-0 border-y bg-background">
-              <Table className={saasCompactTableClassName}>
+              <DataTable className={saasCompactTableClassName}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{m.backups.columns.created}</TableHead>
@@ -402,7 +402,7 @@ export function BackupJobListView() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </DataTable>
             </div>
           )}
         </div>
@@ -498,7 +498,7 @@ export function BackupJobListView() {
               </div>
             ) : (
               <div className="min-w-0 overflow-hidden border-y bg-background">
-                <Table className={saasCompactTableClassName}>
+                <DataTable className={saasCompactTableClassName}>
                   <TableHeader>
                     <TableRow>
                       <TableHead>{m.backups.columns.created}</TableHead>
@@ -566,7 +566,7 @@ export function BackupJobListView() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </DataTable>
               </div>
             )}
           </div>

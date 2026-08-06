@@ -18,8 +18,14 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   cn,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import {
   ArrowDownLeft,
   ArrowRight,
@@ -1007,60 +1013,60 @@ export function FinanceSummaryView({
               </div>
               {summary.branchPerformance.length > 0 ? (
                 <div className="overflow-x-auto border-t">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-muted/35 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      <tr>
-                        <th className="px-5 py-3 font-medium">
+                  <DataTable className="w-full text-left text-xs" density="comfortable">
+                    <TableHeader className="bg-muted/35 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      <TableRow>
+                        <TableHead className="px-5 py-3 font-medium">
                           {m.finance.branches.branch}
-                        </th>
-                        <th className="px-5 py-3 text-right font-medium">
+                        </TableHead>
+                        <TableHead className="px-5 py-3 text-right font-medium">
                           {m.finance.branches.gross}
-                        </th>
-                        <th className="px-5 py-3 text-right font-medium">
+                        </TableHead>
+                        <TableHead className="px-5 py-3 text-right font-medium">
                           {m.finance.branches.refunds}
-                        </th>
-                        <th className="px-5 py-3 text-right font-medium">
+                        </TableHead>
+                        <TableHead className="px-5 py-3 text-right font-medium">
                           {m.finance.branches.net}
-                        </th>
-                        <th className="px-5 py-3 text-right font-medium">
+                        </TableHead>
+                        <TableHead className="px-5 py-3 text-right font-medium">
                           {m.finance.branches.transactions}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="divide-y">
                       {summary.branchPerformance.map((branch) => (
-                        <tr
+                        <TableRow
                           className="transition-colors hover:bg-muted/25"
                           key={branch.branchId}
                         >
-                          <td className="px-5 py-3.5">
+                          <TableCell className="px-5 py-3.5">
                             <span className="flex items-center gap-2 font-medium">
                               <span className="flex size-7 items-center justify-center rounded-md bg-muted">
                                 <Icon icon={Building2} size={13} />
                               </span>
                               {branch.branchName}
                             </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-right text-muted-foreground">
+                          </TableCell>
+                          <TableCell className="px-5 py-3.5 text-right text-muted-foreground">
                             {formatMoney(
                               branch.grossCollected,
                               currency,
                               locale,
                             )}
-                          </td>
-                          <td className="px-5 py-3.5 text-right text-red-600">
+                          </TableCell>
+                          <TableCell className="px-5 py-3.5 text-right text-red-600">
                             {formatMoney(branch.refundAmount, currency, locale)}
-                          </td>
-                          <td className="px-5 py-3.5 text-right font-semibold">
+                          </TableCell>
+                          <TableCell className="px-5 py-3.5 text-right font-semibold">
                             {formatMoney(branch.netCollected, currency, locale)}
-                          </td>
-                          <td className="px-5 py-3.5 text-right text-muted-foreground">
+                          </TableCell>
+                          <TableCell className="px-5 py-3.5 text-right text-muted-foreground">
                             {formatCount(branch.transactionCount, locale)}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </DataTable>
                 </div>
               ) : (
                 <p className="border-t px-5 py-10 text-center text-xs text-muted-foreground">
@@ -1082,43 +1088,43 @@ export function FinanceSummaryView({
               </div>
               {summary.recentTransactions.length > 0 ? (
                 <div className="overflow-x-auto border-t">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-muted/35 text-[10px] uppercase tracking-wide text-muted-foreground">
-                      <tr>
-                        <th className="px-5 py-3 font-medium">
+                  <DataTable className="w-full text-left text-xs" density="comfortable">
+                    <TableHeader className="bg-muted/35 text-[10px] uppercase tracking-wide text-muted-foreground">
+                      <TableRow>
+                        <TableHead className="px-5 py-3 font-medium">
                           {m.finance.activity.date}
-                        </th>
-                        <th className="px-5 py-3 font-medium">
+                        </TableHead>
+                        <TableHead className="px-5 py-3 font-medium">
                           {m.finance.activity.transaction}
-                        </th>
-                        <th className="px-5 py-3 font-medium">
+                        </TableHead>
+                        <TableHead className="px-5 py-3 font-medium">
                           {m.finance.activity.branch}
-                        </th>
-                        <th className="px-5 py-3 font-medium">
+                        </TableHead>
+                        <TableHead className="px-5 py-3 font-medium">
                           {m.finance.activity.method}
-                        </th>
-                        <th className="px-5 py-3 font-medium">
+                        </TableHead>
+                        <TableHead className="px-5 py-3 font-medium">
                           {m.finance.activity.status}
-                        </th>
-                        <th className="px-5 py-3 text-right font-medium">
+                        </TableHead>
+                        <TableHead className="px-5 py-3 text-right font-medium">
                           {m.finance.activity.amount}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody className="divide-y">
                       {summary.recentTransactions.map((transaction) => (
-                        <tr
+                        <TableRow
                           className="transition-colors hover:bg-muted/25"
                           key={`${transaction.source}-${transaction.id}`}
                         >
-                          <td className="whitespace-nowrap px-5 py-3.5 text-muted-foreground">
+                          <TableCell className="whitespace-nowrap px-5 py-3.5 text-muted-foreground">
                             {formatTenantDateTime(
                               transaction.occurredAt,
                               locale,
                               summary.timezone,
                             )}
-                          </td>
-                          <td className="px-5 py-3.5">
+                          </TableCell>
+                          <TableCell className="px-5 py-3.5">
                             <div className="flex items-center gap-2">
                               <span
                                 className={cn(
@@ -1147,14 +1153,14 @@ export function FinanceSummaryView({
                                 </span>
                               </span>
                             </div>
-                          </td>
-                          <td className="max-w-44 truncate px-5 py-3.5 text-muted-foreground">
+                          </TableCell>
+                          <TableCell className="max-w-44 truncate px-5 py-3.5 text-muted-foreground">
                             {transaction.branchName}
-                          </td>
-                          <td className="whitespace-nowrap px-5 py-3.5 text-muted-foreground">
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap px-5 py-3.5 text-muted-foreground">
                             {methodLabels[transaction.paymentMethod]}
-                          </td>
-                          <td className="px-5 py-3.5">
+                          </TableCell>
+                          <TableCell className="px-5 py-3.5">
                             <span
                               className={cn(
                                 "inline-flex rounded-full px-2 py-1 text-[10px] font-medium",
@@ -1165,8 +1171,8 @@ export function FinanceSummaryView({
                             >
                               {statusLabels[transaction.status]}
                             </span>
-                          </td>
-                          <td
+                          </TableCell>
+                          <TableCell
                             className={cn(
                               "whitespace-nowrap px-5 py-3.5 text-right font-semibold",
                               transaction.direction === "debit" &&
@@ -1179,11 +1185,11 @@ export function FinanceSummaryView({
                               transaction.currency,
                               locale,
                             )}
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
+                    </TableBody>
+                  </DataTable>
                 </div>
               ) : (
                 <p className="border-t px-5 py-10 text-center text-xs text-muted-foreground">

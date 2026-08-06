@@ -20,7 +20,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -30,6 +29,7 @@ import {
   cn,
   toast,
 } from "@cleanhub/ui";
+import { DataTable, DataTableMetricCards, DataTablePagePagination, DataTableSurface, DataTableToolbar } from "@cleanhub/ui/data-table";
 import {
   CalendarDays,
   Check,
@@ -816,36 +816,14 @@ export function ServiceCatalogView({
         </div>
       </header>
 
-      <section
-        aria-label={m.services.metrics.label}
-        className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4"
-      >
-        {metrics.map((metric) => (
-          <div
-            className="flex min-h-20 items-center gap-2.5 rounded-md border bg-background px-3 py-2.5"
-            key={metric.label}
-          >
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-              <Icon aria-hidden icon={metric.icon} size={15} />
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[11px] font-medium text-muted-foreground">
-                {metric.label}
-              </span>
-              {loading ? (
-                <span className="mt-1.5 block h-5 w-20 animate-pulse rounded bg-muted" />
-              ) : (
-                <span className="mt-0.5 block truncate text-lg font-semibold">
-                  {metric.value}
-                </span>
-              )}
-            </span>
-          </div>
-        ))}
-      </section>
+      <DataTableMetricCards
+        ariaLabel={m.services.metrics.label}
+        loading={loading}
+        metrics={metrics}
+      />
 
-      <section className="min-w-0 border-y bg-background">
-        <div className="flex items-center gap-2 border-b px-3 py-2.5">
+      <DataTableSurface>
+        <DataTableToolbar>
           <div className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row sm:items-center">
             <Popover onOpenChange={setFilterMenuOpen} open={filterMenuOpen}>
               <PopoverTrigger asChild>
@@ -1059,7 +1037,7 @@ export function ServiceCatalogView({
               </div>
             </PopoverContent>
           </Popover>
-        </div>
+        </DataTableToolbar>
 
         {loading ? (
           <div className="grid gap-2 p-3">
@@ -1100,7 +1078,7 @@ export function ServiceCatalogView({
             </div>
           </div>
         ) : (
-          <Table
+          <DataTable
             className="text-xs [&_td]:px-1.5 [&_td]:py-1.5 [&_th]:h-8 [&_th]:px-1.5"
             style={{
               minWidth: `${Math.max(620, visibleColumnCount * 118 + 84)}px`,
@@ -1235,40 +1213,22 @@ export function ServiceCatalogView({
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </DataTable>
         )}
 
-        <div className="flex flex-col gap-2 border-t px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
-          <span className="text-muted-foreground">
-            {interpolate(m.services.pageSummary, {
+        <DataTablePagePagination
+          loading={loading}
+          nextLabel={m.common.next}
+          onPageChange={setPage}
+          page={currentPage}
+          previousLabel={m.common.previous}
+          summary={interpolate(m.services.pageSummary, {
               page: currentPage.toLocaleString(locale),
               pages: totalPages.toLocaleString(locale),
             })}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              className="h-7 px-2 text-xs"
-              disabled={currentPage <= 1 || loading}
-              onClick={() => setPage(Math.max(1, currentPage - 1))}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              {m.common.previous}
-            </Button>
-            <Button
-              className="h-7 px-2 text-xs"
-              disabled={currentPage >= totalPages || loading}
-              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              {m.common.next}
-            </Button>
-          </div>
-        </div>
-      </section>
+          totalPages={totalPages}
+        />
+      </DataTableSurface>
 
       <Dialog
         onOpenChange={(open) => {

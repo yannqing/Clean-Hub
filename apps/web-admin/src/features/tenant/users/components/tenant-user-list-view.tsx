@@ -16,7 +16,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -24,6 +23,7 @@ import {
   TableRow,
   toast,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import {
   KeyRound,
   Pencil,
@@ -649,7 +649,7 @@ export function TenantUserListView({
         </div>
 
         <div className="overflow-x-auto">
-          <Table>
+          <DataTable>
             <TableHeader>
               <TableRow className="h-9">
                 <TableHead className="h-9 text-xs">{copy.name}</TableHead>
@@ -762,7 +762,7 @@ export function TenantUserListView({
                 );
               })}
             </TableBody>
-          </Table>
+          </DataTable>
         </div>
         {!loading && users.length === 0 ? (
           <p className="px-4 py-12 text-center text-sm text-muted-foreground">

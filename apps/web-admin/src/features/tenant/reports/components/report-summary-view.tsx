@@ -18,8 +18,14 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
   cn,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import {
   ArrowRight,
   Banknote,
@@ -1043,24 +1049,27 @@ export function ReportSummaryView({
           <div className="overflow-hidden rounded-xl border bg-background">
             {summary.branchPerformance.length > 0 ? (
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b bg-muted/45 text-[11px] uppercase tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="px-5 py-3 font-medium">
+                <DataTable
+                  className="w-full text-left text-sm"
+                  density="comfortable"
+                >
+                  <TableHeader className="border-b bg-muted/45 text-[11px] uppercase tracking-wide text-muted-foreground">
+                    <TableRow>
+                      <TableHead className="px-5 py-3 font-medium">
                         {m.reports.branches.branch}
-                      </th>
-                      <th className="px-5 py-3 text-right font-medium">
+                      </TableHead>
+                      <TableHead className="px-5 py-3 text-right font-medium">
                         {m.reports.branches.orders}
-                      </th>
-                      <th className="px-5 py-3 text-right font-medium">
+                      </TableHead>
+                      <TableHead className="px-5 py-3 text-right font-medium">
                         {m.reports.branches.sales}
-                      </th>
-                      <th className="w-[190px] px-5 py-3 font-medium">
+                      </TableHead>
+                      <TableHead className="w-[190px] px-5 py-3 font-medium">
                         {m.reports.branches.share}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y">
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="divide-y">
                     {summary.branchPerformance.map((branch) => {
                       const share =
                         summary.grossSales > 0
@@ -1068,22 +1077,25 @@ export function ReportSummaryView({
                           : 0;
 
                       return (
-                        <tr className="hover:bg-muted/30" key={branch.branchId}>
-                          <td className="px-5 py-3.5 font-medium">
+                        <TableRow
+                          className="hover:bg-muted/30"
+                          key={branch.branchId}
+                        >
+                          <TableCell className="px-5 py-3.5 font-medium">
                             <span className="flex items-center gap-2.5">
                               <span className="flex size-7 items-center justify-center rounded-md bg-muted">
                                 <Icon icon={Building2} size={13} />
                               </span>
                               {branch.branchName}
                             </span>
-                          </td>
-                          <td className="px-5 py-3.5 text-right text-muted-foreground">
+                          </TableCell>
+                          <TableCell className="px-5 py-3.5 text-right text-muted-foreground">
                             {formatCount(branch.orderCount, locale)}
-                          </td>
-                          <td className="px-5 py-3.5 text-right font-medium">
+                          </TableCell>
+                          <TableCell className="px-5 py-3.5 text-right font-medium">
                             {formatMoney(branch.grossSales, currency, locale)}
-                          </td>
-                          <td className="px-5 py-3.5">
+                          </TableCell>
+                          <TableCell className="px-5 py-3.5">
                             <div className="flex items-center gap-3">
                               <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                                 <div
@@ -1095,12 +1107,12 @@ export function ReportSummaryView({
                                 {Math.round(share)}%
                               </span>
                             </div>
-                          </td>
-                        </tr>
+                          </TableCell>
+                        </TableRow>
                       );
                     })}
-                  </tbody>
-                </table>
+                  </TableBody>
+                </DataTable>
               </div>
             ) : (
               <div className="flex min-h-36 flex-col items-center justify-center px-5 py-8 text-center">

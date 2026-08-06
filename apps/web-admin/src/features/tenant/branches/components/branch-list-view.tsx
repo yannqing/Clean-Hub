@@ -10,7 +10,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
   TableBody,
   TableCaption,
   TableCell,
@@ -19,6 +18,7 @@ import {
   TableRow,
   toast,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import Link from "next/link";
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 
@@ -309,7 +309,7 @@ export function BranchListView() {
                 or filters to narrow the list.
               </div>
             ) : null}
-            <Table aria-describedby={captionId}>
+            <DataTable aria-describedby={captionId}>
               <TableCaption className="sr-only" id={captionId}>
                 Branches
               </TableCaption>
@@ -366,7 +366,7 @@ export function BranchListView() {
                   ))
                 )}
               </TableBody>
-            </Table>
+            </DataTable>
           </>
         ) : null}
       </div>

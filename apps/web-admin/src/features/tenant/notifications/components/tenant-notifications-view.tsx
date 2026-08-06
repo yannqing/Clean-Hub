@@ -15,7 +15,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -24,12 +23,11 @@ import {
   cn,
   toast,
 } from "@cleanhub/ui";
+import { DataTable, DataTablePagePagination } from "@cleanhub/ui/data-table";
 import {
   Archive,
   Bell,
   Check,
-  ChevronLeft,
-  ChevronRight,
   CircleAlert,
   ListFilter,
   RefreshCw,
@@ -476,7 +474,7 @@ export function TenantNotificationsView() {
         <>
           <div className="overflow-hidden rounded-lg border bg-background">
             <div className="overflow-x-auto">
-              <Table>
+              <DataTable>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="min-w-[300px]">{copy.table.notification}</TableHead>
@@ -584,52 +582,26 @@ export function TenantNotificationsView() {
                     );
                   })}
                 </TableBody>
-              </Table>
+              </DataTable>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            <span>
-              {interpolate(copy.pageSummary, {
+          <DataTablePagePagination
+            loading={loading}
+            nextLabel={copy.next}
+            onPageChange={(nextPage) => {
+              setLoading(true);
+              setPage(nextPage);
+            }}
+            page={page}
+            previousLabel={copy.previous}
+            summary={interpolate(copy.pageSummary, {
                 from: String(pageFrom),
                 to: String(pageTo),
                 total: String(total),
               })}
-            </span>
-            <div className="flex items-center gap-2">
-              <Button
-                className="h-8 gap-1 px-2.5 text-xs"
-                disabled={page <= 1 || loading}
-                onClick={() => {
-                  setLoading(true);
-                  setPage((current) => Math.max(1, current - 1));
-                }}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                <Icon aria-hidden icon={ChevronLeft} size={14} />
-                {copy.previous}
-              </Button>
-              <span className="min-w-16 text-center">
-                {page} / {totalPages}
-              </span>
-              <Button
-                className="h-8 gap-1 px-2.5 text-xs"
-                disabled={page >= totalPages || loading}
-                onClick={() => {
-                  setLoading(true);
-                  setPage((current) => Math.min(totalPages, current + 1));
-                }}
-                size="sm"
-                type="button"
-                variant="outline"
-              >
-                {copy.next}
-                <Icon aria-hidden icon={ChevronRight} size={14} />
-              </Button>
-            </div>
-          </div>
+            totalPages={totalPages}
+          />
         </>
       )}
     </section>

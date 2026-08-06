@@ -10,7 +10,6 @@ import {
   DialogTitle,
   Icon,
   Input,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -18,6 +17,7 @@ import {
   TableRow,
   cn,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import { RefreshCw, Search, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -222,7 +222,7 @@ export function HardwareListView({
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <Table className="text-xs [&_td]:px-1.5 [&_td]:py-1.5 [&_th]:h-8 [&_th]:px-1.5">
+            <DataTable className="text-xs [&_td]:px-1.5 [&_td]:py-1.5 [&_th]:h-8 [&_th]:px-1.5">
               <TableHeader>
                 <TableRow>
                   <TableHead>{m.hardware.columns.name}</TableHead>
@@ -311,7 +311,7 @@ export function HardwareListView({
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </DataTable>
           </div>
         )}
 

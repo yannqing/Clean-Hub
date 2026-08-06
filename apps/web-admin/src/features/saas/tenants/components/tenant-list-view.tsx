@@ -9,7 +9,6 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-  Table,
   TableBody,
   TableCaption,
   TableCell,
@@ -18,6 +17,7 @@ import {
   TableRow,
   cn,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import {
   Building2,
   Check,
@@ -412,7 +412,7 @@ export function TenantListView() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <Table
+            <DataTable
               aria-describedby={captionId}
               className={saasCompactTableClassName}
             >
@@ -475,7 +475,7 @@ export function TenantListView() {
                   );
                 })}
               </TableBody>
-            </Table>
+            </DataTable>
           </div>
         )}
 

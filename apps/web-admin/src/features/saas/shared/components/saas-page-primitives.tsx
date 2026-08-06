@@ -1,4 +1,12 @@
-import { Icon, cn } from "@cleanhub/ui";
+import {
+  Icon,
+  cn,
+} from "@cleanhub/ui";
+import {
+  DataTableMetricCards,
+  DataTableSurface,
+  dataTableCompactClassName,
+} from "@cleanhub/ui/data-table";
 import { ChevronRight, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
@@ -113,69 +121,6 @@ export function SaasBreadcrumbs({
   );
 }
 
-type SaasMetric = {
-  icon: LucideIcon;
-  label: string;
-  value: React.ReactNode;
-};
-
-type SaasMetricStripProps = {
-  ariaLabel?: string;
-  loading?: boolean;
-  metrics: readonly SaasMetric[];
-};
-
-export function SaasMetricStrip({
-  ariaLabel,
-  loading = false,
-  metrics,
-}: SaasMetricStripProps) {
-  return (
-    <section
-      aria-label={ariaLabel}
-      className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4"
-    >
-      {metrics.map((metric) => (
-        <div
-          className="flex min-h-20 items-center gap-2.5 rounded-md border bg-background px-3 py-2.5"
-          key={metric.label}
-        >
-          <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-            <Icon aria-hidden icon={metric.icon} size={15} />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-[11px] font-medium text-muted-foreground">
-              {metric.label}
-            </span>
-            {loading ? (
-              <span className="mt-1.5 block h-5 w-20 animate-pulse rounded bg-muted" />
-            ) : (
-              <span className="mt-0.5 block truncate text-lg font-semibold">
-                {metric.value}
-              </span>
-            )}
-          </span>
-        </div>
-      ))}
-    </section>
-  );
-}
-
-type SaasTableSurfaceProps = {
-  children: React.ReactNode;
-  className?: string;
-};
-
-export function SaasTableSurface({
-  children,
-  className,
-}: SaasTableSurfaceProps) {
-  return (
-    <section className={cn("min-w-0 border-y bg-background", className)}>
-      {children}
-    </section>
-  );
-}
-
-export const saasCompactTableClassName =
-  "text-xs [&_td]:px-2 [&_td]:py-2 [&_th]:h-9 [&_th]:px-2";
+export const SaasMetricStrip = DataTableMetricCards;
+export const SaasTableSurface = DataTableSurface;
+export const saasCompactTableClassName = dataTableCompactClassName;

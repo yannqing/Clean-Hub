@@ -3,13 +3,13 @@
 import {
   Badge,
   Button,
-  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import { useCallback, useEffect, useState } from "react";
 
 import { useTenantI18n } from "@/i18n";
@@ -129,7 +129,7 @@ export function RestoreRequestList({ refreshKey }: RestoreRequestListProps) {
       ) : null}
 
       {!error && !loading && items.length > 0 ? (
-        <Table>
+        <DataTable>
           <TableHeader>
             <TableRow>
               <TableHead>{m.backups.restoreList.columns.created}</TableHead>
@@ -154,7 +154,7 @@ export function RestoreRequestList({ refreshKey }: RestoreRequestListProps) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </DataTable>
       ) : null}
     </section>
   );

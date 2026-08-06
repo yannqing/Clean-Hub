@@ -12,7 +12,6 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -20,6 +19,7 @@ import {
   TableRow,
   cn,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import { MessageSquareWarning, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -396,7 +396,7 @@ export function FeedbackTicketListView() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <Table className={saasCompactTableClassName}>
+            <DataTable className={saasCompactTableClassName}>
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-9">
@@ -503,7 +503,7 @@ export function FeedbackTicketListView() {
                   );
                 })}
               </TableBody>
-            </Table>
+            </DataTable>
           </div>
         )}
 

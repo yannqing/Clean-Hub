@@ -13,13 +13,13 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Table,
   TableBody,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@cleanhub/ui";
+import { DataTable } from "@cleanhub/ui/data-table";
 import { useMemo, useState } from "react";
 
 import { useTenantI18n } from "@/i18n";
@@ -144,7 +144,7 @@ export function BackupJobListView({
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <DataTable>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{m.backups.columns.created}</TableHead>
@@ -200,7 +200,7 @@ export function BackupJobListView({
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </DataTable>
             </div>
           )}
         </CardContent>
