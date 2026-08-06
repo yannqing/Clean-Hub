@@ -2,7 +2,8 @@ export type MediaObjectPurpose =
   | "delivery_proof"
   | "delivery_signature"
   | "product_image"
-  | "order_comment_attachment";
+  | "order_comment_attachment"
+  | "customer_comment_attachment";
 
 export type MediaObjectStatus = "pending" | "committed" | "deleting";
 
