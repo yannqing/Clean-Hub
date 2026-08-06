@@ -21,6 +21,10 @@ const DEFAULT_IDLE_TIMEOUT_MS = 30_000;
 const DEFAULT_CONNECTION_TIMEOUT_MS = 30_000;
 const DEFAULT_QUERY_TIMEOUT_MS = 30_000;
 const DEFAULT_KEEP_ALIVE_INITIAL_DELAY_MS = 10_000;
+// Rotate pooled connections regularly so a NAT/firewall silently killing a
+// long-lived connection to a remote database cannot poison the pool
+// ("Connection terminated unexpectedly" on the next checkout).
+const DEFAULT_MAX_LIFETIME_SECONDS = 300;
 const DEFAULT_WARM_UP_RETRIES = 5;
 const DEFAULT_WARM_UP_DELAY_MS = 500;
 
@@ -71,6 +75,10 @@ export function getDefaultPoolConfig(
     keepAliveInitialDelayMillis: readPositiveInteger(
       env.DATABASE_POOL_KEEP_ALIVE_INITIAL_DELAY_MS,
       DEFAULT_KEEP_ALIVE_INITIAL_DELAY_MS,
+    ),
+    maxLifetimeSeconds: readPositiveInteger(
+      env.DATABASE_POOL_MAX_LIFETIME_SECONDS,
+      DEFAULT_MAX_LIFETIME_SECONDS,
     ),
     application_name: env.DATABASE_APPLICATION_NAME ?? "cleanhub",
   };

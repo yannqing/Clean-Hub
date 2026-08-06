@@ -8,11 +8,13 @@ import {
   createCustomerAccountOfflineMutation,
   createCustomerProfileOfflineMutation,
   createOrderOfflineMutation,
+  createOrderPaymentOfflineMutation,
   createOrderStatusOfflineMutation,
   createTicketStatusOfflineMutation,
   findQueuedPosCreateDependency,
   getQueuedPosCustomerAccounts,
   getQueuedPosCustomerProfiles,
+  isPosOrderPaymentCreateQueueItem,
   POS_OFFLINE_ENTITIES,
   replayPosOfflineQueueItem,
   resolvePosOfflineDependencyState,
@@ -65,6 +67,16 @@ async function main() {
     to: "pending",
     version: 1,
   });
+  const paymentIdempotencyKey = createId();
+  const paymentMutation = createOrderPaymentOfflineMutation(
+    manualOrderMutation.entityId,
+    {
+      paymentMethod: "cash",
+      amount: "1500.00",
+      idempotencyKey: paymentIdempotencyKey,
+    },
+    [manualOrderMutation.id],
+  );
 
   for (const mutation of [
     accountMutation,
@@ -73,6 +85,7 @@ async function main() {
     ticketOrderMutation,
     orderStatusMutation,
     ticketStatusMutation,
+    paymentMutation,
   ]) {
     assert(mutation.id.length === 26, "offline operation id must be a ULID");
     assert(
@@ -102,6 +115,17 @@ async function main() {
       ticketOrderMutation.metadata.dependsOnOperationIds.length === 0,
     "account, profile, and order mutations must persist explicit dependencies",
   );
+  assert(
+    paymentMutation.payload.orderId === manualOrderMutation.entityId &&
+      paymentMutation.payload.input.idempotencyKey === paymentIdempotencyKey &&
+      paymentMutation.idempotencyKey === paymentIdempotencyKey,
+    "payment mutations must persist the idempotency key captured at enqueue time",
+  );
+  assert(
+    paymentMutation.metadata.dependsOnOperationIds[0] ===
+      manualOrderMutation.id,
+    "payments for offline-created orders must depend on the order create operation",
+  );
 
   const queue = createScopedOfflineQueue({
     storage: createMemoryStorage(),
@@ -120,10 +144,26 @@ async function main() {
     ticketOrderMutation,
     orderStatusMutation,
     ticketStatusMutation,
+    paymentMutation,
   ]) {
     await queue.enqueue(mutation as import("@cleanhub/offline").EnqueueInput);
   }
   const queuedItems = await queue.list();
+  const queuedPayment = queuedItems.find(
+    (item) => item.entity === POS_OFFLINE_ENTITIES.orderPaymentCreate,
+  );
+  assert(
+    queuedPayment !== undefined &&
+      isPosOrderPaymentCreateQueueItem(queuedPayment),
+    "a persisted payment payload must survive the queue round-trip",
+  );
+  assert(
+    !isPosOrderPaymentCreateQueueItem({
+      ...queuedPayment,
+      payload: { orderId: queuedPayment.payload.orderId },
+    } as typeof queuedPayment),
+    "a payment payload missing its idempotency key must be rejected",
+  );
   const queuedAccounts = getQueuedPosCustomerAccounts(queuedItems);
   assert(
     queuedAccounts.length === 1 &&
@@ -227,6 +267,14 @@ async function main() {
         idempotencyKey: options.idempotencyKey,
       });
     },
+    async payOrder(replayedOrderId, input, options) {
+      calls.push({
+        kind: `order-payment:${input.idempotencyKey}`,
+        entityId: replayedOrderId,
+        operationId: options.requestId,
+        idempotencyKey: options.idempotencyKey,
+      });
+    },
     async changeOrderStatus(replayedOrderId, _input, options) {
       calls.push({
         kind: "order-status",
@@ -250,8 +298,12 @@ async function main() {
   );
   assert(!replay.failed, "all eligible POS writes should replay");
   assert(
-    calls.length === 6,
+    calls.length === 7,
     "every eligible POS write should use an API method",
+  );
+  assert(
+    calls.some((call) => call.kind === `order-payment:${paymentIdempotencyKey}`),
+    "replay must resend the enqueued payment idempotency key unchanged",
   );
   assert(
     calls.every(

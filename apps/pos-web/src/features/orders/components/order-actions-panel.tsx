@@ -3,11 +3,13 @@
 import { posToast as toast } from "@/lib/pos-toast";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
-import type {
-  PosMobileMoneyProvider,
-  PosOrderDetail,
-  PosOrderStatus,
-  PosPaymentTransaction,
+import {
+  ApiNetworkError,
+  type CreatePosPaymentRequest,
+  type PosMobileMoneyProvider,
+  type PosOrderDetail,
+  type PosOrderStatus,
+  type PosPaymentTransaction,
 } from "@cleanhub/api-client";
 import { createId } from "@cleanhub/id";
 import { useTranslation } from "@cleanhub/i18n/react";
@@ -57,7 +59,7 @@ export function OrderActionsPanel({
   const { locale } = useTranslation();
   const router = useRouter();
   const text = (value: string) => translatePosText(value, locale);
-  const { changeOrderStatus } = usePosOfflineWrites();
+  const { changeOrderStatus, payOrder } = usePosOfflineWrites();
   const [amount, setAmount] = useState(getOutstandingAmount(order));
   const [paymentOption, setPaymentOption] = useState<PaymentOption>("cash");
   const [externalReference, setExternalReference] = useState("");
@@ -102,69 +104,92 @@ export function OrderActionsPanel({
     }
 
     startTransition(async () => {
-      const result =
+      // 幂等键在入队/提交前生成，离线入队时随 payload 持久化，重放复用同一个键。
+      const idempotencyKey =
+        idempotencyKeyRef.current ??
+        (idempotencyKeyRef.current = createPaymentIdempotencyKey());
+      const request: CreatePosPaymentRequest =
         paymentOption === "cash"
-          ? await payOrderAction(order.id, {
-              paymentMethod: "cash",
-              amount,
-              idempotencyKey:
-                idempotencyKeyRef.current ??
-                (idempotencyKeyRef.current = createPaymentIdempotencyKey()),
-            })
-          : await payOrderAction(order.id, {
+          ? { paymentMethod: "cash", amount, idempotencyKey }
+          : {
               paymentMethod: "app",
               amount,
               provider: paymentOption,
               externalReference: reference,
-              idempotencyKey:
-                idempotencyKeyRef.current ??
-                (idempotencyKeyRef.current = createPaymentIdempotencyKey()),
+              idempotencyKey,
+            };
+
+      let result: Awaited<ReturnType<typeof payOrder>>;
+      try {
+        // 在线仍走现有 server action 路径；请求本身失败（通常是断网）时转换为
+        // 网络错误，让 usePosOfflineWrites 降级入队，联网后自动重放。
+        result = await payOrder(order.id, request, async (input) => {
+          let actionResult: Awaited<ReturnType<typeof payOrderAction>>;
+          try {
+            actionResult = await payOrderAction(order.id, input);
+          } catch (error) {
+            throw new ApiNetworkError("收款请求未能到达服务器。", {
+              cause: error,
             });
-      if (result.ok) {
-        if (paymentOption === "cash") {
-          toast.success("现金收款已记录。");
-          const paymentResult = result.data;
-
-          if (
-            paymentResult?.payment.paymentMethod === "cash" &&
-            paymentResult.payment.paymentStatus === "paid" &&
-            !paymentResult.idempotent
-          ) {
-            const drawerOutcome = await openCashDrawerForPayment({
-              paymentId: paymentResult.payment.id,
-              loadDevices: async () => (await posApi.pos.hardware.list()).data,
-              hardware: getDesktopBridge()?.hardware ?? null,
-              reportResult: (drawerResult) =>
-                posApi.pos.hardware.recordCashPaymentDrawerResult(drawerResult),
-            });
-
-            if (drawerOutcome.opened) {
-              toast.success("钱箱已自动打开。");
-            } else {
-              toast.error(`现金收款已记录，但${drawerOutcome.message}`);
-            }
-
-            if (drawerOutcome.auditWarning) {
-              toast.warning(
-                `钱箱操作结果暂未同步审计：${drawerOutcome.auditWarning}`,
-              );
-            }
-          } else if (paymentResult?.idempotent) {
-            toast.info("重复收款请求已确认，本次未重复打开钱箱。");
-          } else if (!paymentResult) {
-            toast.warning("收款已提交，但支付响应不完整，未执行自动开箱。");
           }
-        } else {
-          toast.success(
-            `${MOBILE_MONEY_PROVIDER_LABELS[paymentOption]} 支付已记录，等待 Manager 确认。`,
-          );
-        }
+          if (!actionResult.ok) {
+            throw new Error(actionResult.message);
+          }
+          return actionResult.data;
+        });
+      } catch (error) {
+        toast.error(getPosApiErrorMessage(error, "收款失败，请重试。"));
+        return;
+      }
+
+      if (result.queued) {
+        toast.success("网络不可用，收款已保存，将在联网后自动提交。");
         idempotencyKeyRef.current = null;
         setExternalReference("");
-        router.refresh();
-      } else {
-        toast.error(result.message);
+        return;
       }
+
+      if (paymentOption === "cash") {
+        toast.success("现金收款已记录。");
+        const paymentResult = result.data;
+
+        if (
+          paymentResult?.payment.paymentMethod === "cash" &&
+          paymentResult.payment.paymentStatus === "paid" &&
+          !paymentResult.idempotent
+        ) {
+          const drawerOutcome = await openCashDrawerForPayment({
+            paymentId: paymentResult.payment.id,
+            loadDevices: async () => (await posApi.pos.hardware.list()).data,
+            hardware: getDesktopBridge()?.hardware ?? null,
+            reportResult: (drawerResult) =>
+              posApi.pos.hardware.recordCashPaymentDrawerResult(drawerResult),
+          });
+
+          if (drawerOutcome.opened) {
+            toast.success("钱箱已自动打开。");
+          } else {
+            toast.error(`现金收款已记录，但${drawerOutcome.message}`);
+          }
+
+          if (drawerOutcome.auditWarning) {
+            toast.warning(
+              `钱箱操作结果暂未同步审计：${drawerOutcome.auditWarning}`,
+            );
+          }
+        } else if (paymentResult?.idempotent) {
+          toast.info("重复收款请求已确认，本次未重复打开钱箱。");
+        } else if (!paymentResult) {
+          toast.warning("收款已提交，但支付响应不完整，未执行自动开箱。");
+        }
+      } else {
+        toast.success(
+          `${MOBILE_MONEY_PROVIDER_LABELS[paymentOption]} 支付已记录，等待 Manager 确认。`,
+        );
+      }
+      idempotencyKeyRef.current = null;
+      setExternalReference("");
+      router.refresh();
     });
   }
 

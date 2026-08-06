@@ -3,7 +3,9 @@ import { PosRuntimeConfigProvider } from "@/components/runtime/pos-runtime-confi
 import { getMyBranchQuery } from "@/features/branches/queries";
 import { getNotificationsOverviewQuery } from "@/features/notifications/queries";
 import { OfflineSyncProvider } from "@/features/offline/components";
+import { getTerminalSettingsQuery } from "@/features/settings/queries/get-terminal-settings.query";
 import {
+  PosIdleLock,
   PosTerminalHeartbeatReporter,
   PosTerminalSessionGuard,
 } from "@/features/terminal-setup/components";
@@ -14,11 +16,13 @@ export default async function PosLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [user, notificationsOverview, branch] = await Promise.all([
-    getCurrentUser(),
-    getNotificationsOverviewQuery().catch(() => null),
-    getMyBranchQuery().catch(() => null),
-  ]);
+  const [user, notificationsOverview, branch, terminalSettings] =
+    await Promise.all([
+      getCurrentUser(),
+      getNotificationsOverviewQuery().catch(() => null),
+      getMyBranchQuery().catch(() => null),
+      getTerminalSettingsQuery().catch(() => null),
+    ]);
 
   const profile: PosShellProfile | undefined = user
     ? (() => {
@@ -49,6 +53,11 @@ export default async function PosLayout({
         terminalCredentialVersion={user?.terminalCredentialVersion}
       >
         <PosTerminalHeartbeatReporter enabled={Boolean(user?.terminalId)} />
+        <PosIdleLock
+          lockTimeoutSeconds={
+            user ? (terminalSettings?.lockTimeoutSeconds ?? null) : null
+          }
+        />
         <PosShell
           notificationUnreadCount={notificationsOverview?.unreadCount ?? 0}
           profile={profile}
