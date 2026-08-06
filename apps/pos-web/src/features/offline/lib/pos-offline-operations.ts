@@ -5,6 +5,8 @@ import {
   type CreatePosAccountRequest,
   type CreatePosProfileRequest,
   type CreatePosOrderRequest,
+  type CreatePosPaymentRequest,
+  type CreatePosPaymentResponse,
   type PosCustomerAccountDetail,
   type PosCustomerProfileSummary,
   type PosCustomerProfileWithAccount,
@@ -18,6 +20,7 @@ export const POS_OFFLINE_ENTITIES = {
   customerAccountCreate: "pos.customer-account.create",
   customerProfileCreate: "pos.customer-profile.create",
   orderCreate: "pos.order.create",
+  orderPaymentCreate: "pos.order.payment.create",
   orderStatusChange: "pos.order.status-change",
   ticketStatusChange: "pos.service-ticket.status-change",
 } as const;
@@ -54,6 +57,13 @@ type OrderCreatePayload = {
   input: StableCreatePosOrderRequest;
 };
 
+// The payment body keeps its own idempotencyKey; it is generated once at
+// enqueue time and must be replayed unchanged so the backend can dedupe.
+export type OrderPaymentCreatePayload = {
+  orderId: string;
+  input: CreatePosPaymentRequest;
+};
+
 type OrderStatusChangePayload = {
   orderId: string;
   input: ChangePosOrderStatusRequest;
@@ -68,6 +78,7 @@ export type PosOfflinePayload =
   | CustomerAccountCreatePayload
   | CustomerProfileCreatePayload
   | OrderCreatePayload
+  | OrderPaymentCreatePayload
   | OrderStatusChangePayload
   | TicketStatusChangePayload;
 
@@ -101,6 +112,11 @@ export type PosOfflineReplayApi = {
   ): Promise<unknown>;
   createOrder(
     input: StableCreatePosOrderRequest,
+    options: ReplayRequestOptions,
+  ): Promise<unknown>;
+  payOrder(
+    orderId: string,
+    input: CreatePosPaymentRequest,
     options: ReplayRequestOptions,
   ): Promise<unknown>;
   changeOrderStatus(
@@ -158,6 +174,25 @@ export function createOrderOfflineMutation(
   );
 }
 
+export function createOrderPaymentOfflineMutation(
+  orderId: string,
+  input: CreatePosPaymentRequest,
+  dependsOnOperationIds: readonly string[] = [],
+): PosOfflineMutation<OrderPaymentCreatePayload> {
+  // Reuse the payment body's idempotency key as the queue key so a duplicate
+  // enqueue collapses into one item and replay always resends the same key.
+  return createMutation(
+    POS_OFFLINE_ENTITIES.orderPaymentCreate,
+    orderId,
+    {
+      orderId,
+      input,
+    },
+    dependsOnOperationIds,
+    input.idempotencyKey,
+  );
+}
+
 export function createOrderStatusOfflineMutation(
   orderId: string,
   input: ChangePosOrderStatusRequest,
@@ -207,6 +242,15 @@ export async function replayPosOfflineQueueItem(
       await api.createOrder(payload.input, options);
       return;
     }
+    case POS_OFFLINE_ENTITIES.orderPaymentCreate: {
+      if (!isPosOrderPaymentCreateQueueItem(item)) {
+        throw new Error(
+          "The queued POS payment payload is invalid and cannot be replayed.",
+        );
+      }
+      await api.payOrder(item.payload.orderId, item.payload.input, options);
+      return;
+    }
     case POS_OFFLINE_ENTITIES.orderStatusChange: {
       const payload = item.payload as OrderStatusChangePayload;
       await api.changeOrderStatus(payload.orderId, payload.input, options);
@@ -234,6 +278,10 @@ export type PosOfflineCustomerProfileResult =
 
 export type PosOfflineOrderResult =
   | { queued: false; data: PosOrderDetail }
+  | { queued: true; entityId: string; operationId: string };
+
+export type PosOfflineOrderPaymentResult =
+  | { queued: false; data: CreatePosPaymentResponse | undefined }
   | { queued: true; entityId: string; operationId: string };
 
 export type PosOfflineOrderStatusResult =
@@ -310,7 +358,8 @@ export function findQueuedPosCreateDependency(
   items: OfflineQueueItem[],
   entity: (typeof POS_OFFLINE_ENTITIES)[
     | "customerAccountCreate"
-    | "customerProfileCreate"],
+    | "customerProfileCreate"
+    | "orderCreate"],
   entityId: string,
 ): PosOfflineCreateDependency | undefined {
   const item = items.find(
@@ -368,6 +417,37 @@ export function resolvePosOfflineDependencyState(
   };
 }
 
+export function isPosOrderPaymentCreateQueueItem(
+  item: OfflineQueueItem,
+): item is OfflineQueueItem & { payload: OrderPaymentCreatePayload } {
+  if (item.entity !== POS_OFFLINE_ENTITIES.orderPaymentCreate) {
+    return false;
+  }
+
+  // Payments move money, so a corrupted persisted payload must be rejected
+  // instead of being replayed with missing idempotency information.
+  const payload = item.payload as
+    | Partial<OrderPaymentCreatePayload>
+    | undefined;
+  const input = payload?.input;
+  if (
+    typeof payload?.orderId !== "string" ||
+    typeof input?.amount !== "string" ||
+    typeof input.idempotencyKey !== "string"
+  ) {
+    return false;
+  }
+
+  if (input.paymentMethod === "cash") {
+    return true;
+  }
+  return (
+    input.paymentMethod === "app" &&
+    (input.provider === "wave" || input.provider === "orange_money") &&
+    typeof input.externalReference === "string"
+  );
+}
+
 function isPosOfflineQueueItemBlocked(
   item: OfflineQueueItem,
   items: OfflineQueueItem[],
@@ -421,6 +501,7 @@ function createMutation<TPayload extends PosOfflinePayload>(
   entityId: string,
   payload: TPayload,
   dependsOnOperationIds: readonly string[] = [],
+  idempotencyKey: string = createId(),
 ): PosOfflineMutation<TPayload> {
   const operationId = createId();
   return {
@@ -429,7 +510,7 @@ function createMutation<TPayload extends PosOfflinePayload>(
     operation: entity.endsWith(".create") ? "create" : "update",
     payload,
     id: operationId,
-    idempotencyKey: createId(),
+    idempotencyKey,
     metadata: {
       entityId,
       dependsOnOperationIds: [...new Set(dependsOnOperationIds)],

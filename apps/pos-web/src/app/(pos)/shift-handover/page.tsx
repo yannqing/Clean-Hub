@@ -5,12 +5,16 @@ import { getShiftOperationsQuery } from "@/features/shift-handover/queries";
 import { getCurrentUser } from "@/lib/auth";
 
 export default async function ShiftHandoverPage() {
-  const [user, branch, summary, operations] = await Promise.all([
+  const [user, branch, operations] = await Promise.all([
     getCurrentUser(),
     getMyBranchQuery().catch(() => null),
-    getShiftHandoverSummaryQuery(),
     getShiftOperationsQuery(),
   ]);
+  // The summary window must match the active shift so the on-screen cash
+  // figures agree with the server-side Z Report snapshot.
+  const summary = await getShiftHandoverSummaryQuery({
+    shiftStartedAt: operations.currentShift?.startedAt ?? null,
+  });
 
   return (
     <ShiftHandoverView

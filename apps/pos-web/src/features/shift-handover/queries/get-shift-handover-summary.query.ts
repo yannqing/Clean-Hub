@@ -18,6 +18,17 @@ import type { ShiftHandoverSummary } from "../types";
 
 const LIST_LIMIT = 5;
 
+export type ShiftHandoverSummaryOptions = {
+  /**
+   * Clock-in time of the active shift. When present the cash/order figures are
+   * computed over the shift window instead of the calendar day, matching the
+   * server-side Z Report snapshot produced by `POST /pos/staff/handovers`.
+   * Without this alignment the page shows "today" totals while the Z Report
+   * stores shift totals, and the cash difference is reported incorrectly.
+   */
+  shiftStartedAt?: string | null;
+};
+
 function todayRange(): { createdAfter: string; createdBefore: string } {
   const now = new Date();
   const start = new Date(
@@ -29,6 +40,20 @@ function todayRange(): { createdAfter: string; createdBefore: string } {
     createdBefore: new Date(
       start.getTime() + 24 * 60 * 60 * 1000,
     ).toISOString(),
+  };
+}
+
+function summaryRange(shiftStartedAt: string | null | undefined): {
+  createdAfter: string;
+  createdBefore: string;
+} {
+  if (!shiftStartedAt) {
+    return todayRange();
+  }
+
+  return {
+    createdAfter: shiftStartedAt,
+    createdBefore: new Date().toISOString(),
   };
 }
 
@@ -46,9 +71,11 @@ function emptyTicketList(): ServiceTicketListResponse {
   };
 }
 
-export async function getShiftHandoverSummaryQuery(): Promise<ShiftHandoverSummary> {
+export async function getShiftHandoverSummaryQuery(
+  options: ShiftHandoverSummaryOptions = {},
+): Promise<ShiftHandoverSummary> {
   const now = new Date();
-  const range = todayRange();
+  const range = summaryRange(options.shiftStartedAt);
 
   const [
     orders,
@@ -59,7 +86,9 @@ export async function getShiftHandoverSummaryQuery(): Promise<ShiftHandoverSumma
     overdueTickets,
     exceptionTickets,
   ] = await Promise.all([
-    getOrderOverviewQuery({ period: "today" }).catch(() => null),
+    // `createdAfter` takes precedence over `period` server-side, so this is
+    // the shift window when a shift is active and "today" otherwise.
+    getOrderOverviewQuery({ period: "today", ...range }).catch(() => null),
     getOrdersListQuery({
       paymentStatus: "unpaid",
       ...range,

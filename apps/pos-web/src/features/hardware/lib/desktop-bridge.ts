@@ -9,6 +9,7 @@ import type {
   PosScanEvent,
 } from "@cleanhub/hardware";
 import {
+  createMemoryStorage,
   createWebStorageAdapter,
   type AsyncKeyValueStorage,
 } from "@cleanhub/offline";
@@ -44,5 +45,11 @@ export function getDesktopBridge(): CleanHubDesktopBridge | null {
 
 export function getPosOfflineStorage(): AsyncKeyValueStorage {
   const desktopStorage = getDesktopBridge()?.offlineStorage;
-  return desktopStorage ?? createWebStorageAdapter(window.localStorage);
+  if (desktopStorage) {
+    return desktopStorage;
+  }
+  if (typeof window === "undefined") {
+    return createMemoryStorage();
+  }
+  return createWebStorageAdapter(window.localStorage);
 }

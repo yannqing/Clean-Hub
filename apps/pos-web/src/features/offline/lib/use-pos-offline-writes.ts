@@ -8,6 +8,8 @@ import {
   type CreatePosAccountRequest,
   type CreatePosProfileRequest,
   type CreatePosOrderRequest,
+  type CreatePosPaymentRequest,
+  type CreatePosPaymentResponse,
   type PosCustomerProfileWithAccount,
 } from "@cleanhub/api-client";
 import type { EnqueueInput } from "@cleanhub/offline";
@@ -21,6 +23,7 @@ import {
   createCustomerAccountOfflineMutation,
   createCustomerProfileOfflineMutation,
   createOrderOfflineMutation,
+  createOrderPaymentOfflineMutation,
   createOrderStatusOfflineMutation,
   createTicketStatusOfflineMutation,
   findQueuedPosCreateDependency,
@@ -32,12 +35,20 @@ import {
   type PosOfflineCustomerAccountResult,
   type PosOfflineCustomerProfileResult,
   type PosOfflineMutation,
+  type PosOfflineOrderPaymentResult,
   type PosOfflineOrderResult,
   type PosOfflineOrderStatusResult,
   type PosOfflinePayload,
   type PosQueuedCustomerAccount,
   type PosOfflineTicketStatusResult,
 } from "./pos-offline-operations";
+
+// Online payment writes can be overridden (for example to keep going through
+// the pay server action) while the offline fallback still uses the queue.
+export type PosOfflinePayOrderWrite = (
+  input: CreatePosPaymentRequest,
+  options: { idempotencyKey: string; requestId: string },
+) => Promise<CreatePosPaymentResponse | undefined>;
 
 export function usePosOfflineWrites() {
   const { pendingCount, queue, refresh } = useOfflineSync();
@@ -149,6 +160,43 @@ export function usePosOfflineWrites() {
     [execute, queue],
   );
 
+  const payOrder = useCallback(
+    async (
+      orderId: string,
+      input: CreatePosPaymentRequest,
+      write?: PosOfflinePayOrderWrite,
+    ): Promise<PosOfflineOrderPaymentResult> => {
+      const items = queue ? await queue.list() : [];
+      // Payments for offline-created orders must wait for the order create
+      // operation, otherwise replay would target a not-yet-synced order id.
+      const orderDependency = findQueuedPosCreateDependency(
+        items,
+        POS_OFFLINE_ENTITIES.orderCreate,
+        orderId,
+      );
+      assertDependencyUsable(orderDependency);
+      const mutation = createOrderPaymentOfflineMutation(
+        orderId,
+        input,
+        orderDependency ? [orderDependency.operationId] : [],
+      );
+      const requestOptions = {
+        idempotencyKey: mutation.idempotencyKey,
+        requestId: mutation.id,
+      };
+      return execute(mutation, () =>
+        write
+          ? write(mutation.payload.input, requestOptions)
+          : posApi.pos.orders.pay(
+              orderId,
+              mutation.payload.input,
+              requestOptions,
+            ),
+      );
+    },
+    [execute, queue],
+  );
+
   const createCustomerProfile = useCallback(
     async (
       accountId: string,
@@ -238,6 +286,7 @@ export function usePosOfflineWrites() {
     createOrder,
     listQueuedCustomerAccounts,
     listQueuedCustomerProfiles,
+    payOrder,
     pendingCount,
     changeOrderStatus,
     changeTicketStatus,

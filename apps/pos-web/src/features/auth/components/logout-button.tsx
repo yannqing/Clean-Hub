@@ -1,11 +1,6 @@
 "use client";
 
-import { posToast as toast } from "@/lib/pos-toast";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-
-import { posRoutes } from "@/config/routes";
-import { posApi } from "@/lib/api-client";
+import { usePosLogout } from "../hooks/use-pos-logout";
 
 type LogoutButtonProps = {
   "aria-label"?: string;
@@ -32,25 +27,10 @@ export function LogoutButton({
   title,
   children,
 }: LogoutButtonProps) {
-  const router = useRouter();
-  const [submitting, setSubmitting] = useState(false);
+  const { logout, submitting } = usePosLogout();
 
-  async function handleLogout() {
-    setSubmitting(true);
-
-    try {
-      await posApi.auth.logout();
-      toast.success(successMessage);
-    } catch (error) {
-      const message =
-        failureMessage ??
-        (error instanceof Error ? error.message : "退出登录失败，请重试。");
-      toast.error(message);
-    } finally {
-      router.replace(posRoutes.login);
-      router.refresh();
-      setSubmitting(false);
-    }
+  function handleLogout() {
+    void logout({ successMessage, failureMessage });
   }
 
   return (
