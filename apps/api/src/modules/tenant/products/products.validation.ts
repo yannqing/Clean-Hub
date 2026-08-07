@@ -213,11 +213,6 @@ export const createTenantProductBodySchema = z
     unitOfMeasure: z.string().trim().min(1).max(32),
     unitsPerSale: positiveProductQuantitySchema,
     salePrice: productMoneySchema,
-    currency: z
-      .string()
-      .trim()
-      .transform((value) => value.toUpperCase())
-      .pipe(z.string().regex(CURRENCY_PATTERN)),
     referenceCost: productMoneySchema.nullable().optional(),
     trackInventory: z.boolean(),
     allowNegativeStock: z.boolean(),

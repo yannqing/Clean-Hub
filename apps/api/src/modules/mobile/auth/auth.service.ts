@@ -619,6 +619,7 @@ export class MobileAuthService {
       displayName: customer.accountName,
       tenantId: tenant.id,
       currency: tenant.defaultCurrency,
+      timezone: tenant.timezone ?? "UTC",
       branchIds: [],
       role: "customer" as const,
       roles: ["customer" as const],
@@ -721,6 +722,7 @@ export class MobileAuthService {
         displayName: access.displayName,
         tenantId: tenant.id,
         currency: tenant.defaultCurrency,
+        timezone: tenant.timezone ?? "UTC",
         branchIds: access.branchIds,
         role,
         roles: access.roles.filter((candidate): candidate is MobileRole =>
@@ -736,7 +738,7 @@ export class MobileAuthService {
 
   private async resolveTenant(
     tenantCode: string,
-  ): Promise<{ id: string; defaultCurrency: string }> {
+  ): Promise<{ id: string; defaultCurrency: string; timezone?: string }> {
     const tenant = await this.repository.findActiveTenantByCode(
       normalizeTenantCode(tenantCode),
     );
@@ -750,7 +752,7 @@ export class MobileAuthService {
 
   private async resolveTenantById(
     tenantId: string,
-  ): Promise<{ id: string; defaultCurrency: string }> {
+  ): Promise<{ id: string; defaultCurrency: string; timezone?: string }> {
     const tenant = await this.repository.findTenantById(tenantId);
 
     if (!tenant) {
@@ -795,6 +797,7 @@ export class MobileAuthService {
       displayName: resolvedCustomer.accountName,
       tenantId: tenant.id,
       currency: tenant.defaultCurrency,
+      timezone: tenant.timezone ?? "UTC",
       branchIds: [],
       role: "customer",
       roles: ["customer"],
@@ -835,6 +838,7 @@ export class MobileAuthService {
       displayName: access.displayName,
       tenantId: tenant.id,
       currency: tenant.defaultCurrency,
+      timezone: tenant.timezone ?? "UTC",
       branchIds: access.branchIds,
       role,
       roles: access.roles.filter((candidate): candidate is MobileRole =>

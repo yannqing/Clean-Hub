@@ -86,4 +86,5 @@ export type PosWorkspaceRepositoryInput = {
   tenantId: string;
   allowedBranchIds?: string[];
   branchId?: string;
+  timeZone?: string;
 };

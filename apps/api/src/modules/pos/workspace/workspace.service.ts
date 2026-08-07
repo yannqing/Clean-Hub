@@ -34,6 +34,7 @@ export async function getPosWorkspaceOverview(
     tenantId,
     allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
+    timeZone: authContext.timezone ?? "UTC",
   });
 }
 

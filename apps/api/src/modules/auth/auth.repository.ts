@@ -9,6 +9,7 @@ import {
   posTerminalSettings,
   rolePermissions,
   roles,
+  tenantSettings,
   tenants,
   userBranches,
   userProfiles,
@@ -29,6 +30,12 @@ import {
   isRoleAssignmentConsistent,
   type LoginSessionKind,
 } from "./login-identity.helper.js";
+
+function resolveTenantLanguage(
+  value: string | null | undefined,
+): "en" | "fr" | "zh-CN" {
+  return value === "fr" || value === "zh-CN" ? value : "en";
+}
 
 export type PosTerminalLoginContext = {
   id: string;
@@ -194,10 +201,25 @@ export class AuthRepository {
     );
 
     const profileRows = await this.db
-      .select({ displayName: userProfiles.displayName })
+      .select({
+        displayName: userProfiles.displayName,
+        language: userProfiles.language,
+        timezone: userProfiles.timezone,
+      })
       .from(userProfiles)
       .where(eq(userProfiles.userId, user.id))
       .limit(1);
+
+    const tenantSettingsRows = user.tenantId
+      ? await this.db
+          .select({
+            defaultLanguage: tenantSettings.defaultLanguage,
+            timezone: tenantSettings.timezone,
+          })
+          .from(tenantSettings)
+          .where(eq(tenantSettings.tenantId, user.tenantId))
+          .limit(1)
+      : [];
 
     const branchRows = await this.db
       .select({
@@ -250,6 +272,15 @@ export class AuthRepository {
       ],
       branchIds: activeBranchRows.map((row) => row.id),
       displayName,
+      language: resolveTenantLanguage(
+        tenantSettingsRows[0]?.defaultLanguage ??
+        profileRows[0]?.language ??
+        "en",
+      ),
+      timezone:
+        tenantSettingsRows[0]?.timezone ??
+        profileRows[0]?.timezone ??
+        "UTC",
       identityConsistent:
         consistentRows.length === rows.length &&
         validBranchRows.length === branchRows.length,

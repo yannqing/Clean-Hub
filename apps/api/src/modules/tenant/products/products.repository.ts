@@ -33,6 +33,7 @@ import { createId } from "@cleanhub/id";
 
 import type { AuthRequestMeta } from "../../auth/auth.types.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { findTenantDefaultCurrency } from "../settings/settings.repository.js";
 import { DEFAULT_PRODUCT_CATEGORIES } from "./products.category-defaults.js";
 import { TenantProductsError } from "./products.errors.js";
 import type {
@@ -1015,6 +1016,10 @@ export async function createTenantProductRecord(
   try {
     return await db.transaction(async (tx) => {
       const branchIds = input.branchSettings.map((setting) => setting.branchId);
+      const defaultCurrency = await findTenantDefaultCurrency(
+        tx,
+        input.tenantId,
+      );
 
       await requireProductBranches(tx, {
         tenantId: input.tenantId,
@@ -1110,7 +1115,7 @@ export async function createTenantProductRecord(
         unitsPerSale: input.unitsPerSale,
         trackInventory: input.trackInventory,
         referenceCostAmount: referenceCost,
-        costCurrency: referenceCost === null ? null : input.currency,
+        costCurrency: referenceCost === null ? null : defaultCurrency,
         status: input.status,
         createdAt: now,
         updatedAt: now,
@@ -1126,7 +1131,7 @@ export async function createTenantProductRecord(
             branchId,
             productSkuId,
             amount: input.salePrice,
-            currency: input.currency,
+            currency: defaultCurrency,
             status: input.status,
             createdAt: now,
             updatedAt: now,
@@ -1163,7 +1168,7 @@ export async function createTenantProductRecord(
             onHandQuantity: setting.openingStock,
             reservedQuantity: "0",
             averageUnitCost: referenceCost,
-            currency: referenceCost === null ? null : input.currency,
+            currency: referenceCost === null ? null : defaultCurrency,
             lastMovementAt: Number(setting.openingStock) > 0 ? now : null,
             createdAt: now,
             updatedAt: now,
@@ -1185,7 +1190,7 @@ export async function createTenantProductRecord(
               movementType: "opening" as const,
               quantityDelta: setting.openingStock,
               unitCost: referenceCost,
-              currency: referenceCost === null ? null : input.currency,
+              currency: referenceCost === null ? null : defaultCurrency,
               referenceType: "product_creation",
               referenceId: productId,
               idempotencyKey: `product:${productId}:${setting.branchId}:opening`,
@@ -1299,7 +1304,7 @@ export async function createTenantProductRecord(
           unitOfMeasure: input.unitOfMeasure,
           unitsPerSale: input.unitsPerSale,
           salePrice: input.salePrice,
-          currency: input.currency,
+          currency: defaultCurrency,
           referenceCost,
           priceScope: input.createTenantDefaultPrice
             ? "tenant_default"
@@ -2853,6 +2858,10 @@ export async function findTenantProductDetailRecord(
     );
   });
   const selectedPrice = sortedPrices[0] ?? null;
+  const currency =
+    selectedPrice?.currency ??
+    primarySku.costCurrency ??
+    (await findTenantDefaultCurrency(db, input.tenantId));
 
   return {
     id: product.id,
@@ -2878,7 +2887,7 @@ export async function findTenantProductDetailRecord(
       referenceCostCurrency: primarySku.costCurrency,
     },
     salePrice: selectedPrice?.amount ?? "0.00",
-    currency: selectedPrice?.currency ?? primarySku.costCurrency ?? "CNY",
+    currency,
     branchSettings: branchSettingRows.map((setting) => ({
       branchId: setting.branchId,
       isAvailable: setting.isAvailable,

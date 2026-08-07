@@ -24,6 +24,7 @@
     "smoke:pos-payment-adjustments": "tsx src/modules/pos/payment-adjustments/payment-adjustments.smoke.ts",
     "smoke:tenant-users": "tsx src/modules/tenant/users/tenant-users.repository.smoke.ts",
     "smoke:tenant-resource-branch-scope": "tsx src/modules/tenant/tenant-resource-branch-scope.smoke.ts",
+    "smoke:tenant-timezone": "tsx src/modules/auth/tenant-timezone.smoke.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "lint": "eslint src",

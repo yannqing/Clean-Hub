@@ -702,14 +702,20 @@ export async function findDiscountOptions(
       .limit(1),
   ]);
   const settings = settingsRows[0];
+  const defaultCurrency = settings?.currency ?? "XOF";
   const currencies = [
     ...new Set([
-      ...(settings?.currency ? [settings.currency] : []),
+      defaultCurrency,
       ...branchRows.map((branch) => branch.currency),
     ]),
-  ].sort();
+  ].sort((left, right) => {
+    if (left === defaultCurrency) return -1;
+    if (right === defaultCurrency) return 1;
+    return left.localeCompare(right);
+  });
 
   return {
+    defaultCurrency,
     branches: branchRows,
     products: productRows,
     productCategories: productCategoryRows,

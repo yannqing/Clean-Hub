@@ -235,6 +235,7 @@ export async function getTenantOrderOverview(
     period: query.period,
     createdAfter: query.createdAfter,
     createdBefore: query.createdBefore,
+    timeZone: authContext.timezone ?? "UTC",
   });
 }
 

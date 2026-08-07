@@ -12,11 +12,6 @@ const nullableStringSchema = (max: number) =>
     z.string().trim().max(max).nullable().optional(),
   );
 
-const currencyCodeSchema = z.preprocess(
-  (value) => (typeof value === "string" ? value.trim().toUpperCase() : value),
-  z.string().regex(/^[A-Z]{3}$/, "Currency must be a 3-letter code."),
-);
-
 const businessHoursSchema = z.record(z.string(), z.unknown()).nullable();
 const versionSchema = z.coerce.number().int().min(1);
 
@@ -37,7 +32,6 @@ export const createBranchBodySchema = z.object({
   phone: nullableStringSchema(32),
   businessHours: businessHoursSchema.optional(),
   defaultLanguage: branchLanguageSchema.default("en"),
-  defaultCurrency: currencyCodeSchema.default("XOF"),
   receiptName: nullableStringSchema(200),
   receiptPhone: nullableStringSchema(32),
   receiptAddress: nullableStringSchema(500),

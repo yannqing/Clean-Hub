@@ -81,4 +81,5 @@ export type PosStatisticsRepositoryInput = {
   allowedBranchIds?: string[];
   branchId?: string;
   period?: PosStatisticsPeriod;
+  timeZone: string;
 };

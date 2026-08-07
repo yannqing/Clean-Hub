@@ -1495,6 +1495,7 @@ export async function getPosOrderOverview(
     period: query.period ?? "today",
     createdAfter: query.createdAfter,
     createdBefore: query.createdBefore,
+    timeZone: authContext.timezone ?? "UTC",
   });
 }
 

@@ -24,6 +24,7 @@ import {
   userProfiles,
   type Database,
 } from "@cleanhub/db";
+import { getDateOnlyInTimeZone } from "@cleanhub/domain/timezone";
 import { createId } from "@cleanhub/id";
 
 import type {
@@ -152,12 +153,16 @@ function toTicketAuditSnapshot(
  */
 async function generateTicketNo(
   db: Database,
-  input: { tenantId: string; branchId: string; now: Date },
+  input: {
+    tenantId: string;
+    branchId: string;
+    now: Date;
+    timeZone: string;
+  },
 ): Promise<string> {
-  const yy = String(input.now.getUTCFullYear()).slice(-2);
-  const mm = String(input.now.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(input.now.getUTCDate()).padStart(2, "0");
-  const datePrefix = `${yy}${mm}${dd}`;
+  const datePrefix = getDateOnlyInTimeZone(input.now, input.timeZone)
+    .slice(2)
+    .replaceAll("-", "");
 
   const countRows = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -166,7 +171,7 @@ async function generateTicketNo(
       and(
         eq(serviceTickets.tenantId, input.tenantId),
         eq(serviceTickets.branchId, input.branchId),
-        sql`to_char(${serviceTickets.createdAt} AT TIME ZONE 'UTC', 'YYMMDD') = ${datePrefix}`,
+        sql`to_char(${serviceTickets.createdAt} AT TIME ZONE ${input.timeZone}, 'YYMMDD') = ${datePrefix}`,
       ),
     );
 
@@ -464,6 +469,7 @@ export async function createServiceTicketRecord(
     currency: string;
     assistantId: string;
     actorUserId: string;
+    timeZone: string;
   },
 ): Promise<ServiceTicketSummary> {
   const ticketId = createId();
@@ -472,6 +478,7 @@ export async function createServiceTicketRecord(
     tenantId: input.tenantId,
     branchId: input.branchId,
     now,
+    timeZone: input.timeZone,
   });
 
   await db.insert(serviceTickets).values({
@@ -709,7 +716,12 @@ export async function findRelatedOrders(
 
 export async function findServiceTicketOverview(
   db: Database,
-  input: { tenantId: string; allowedBranchIds?: string[]; branchId?: string },
+  input: {
+    tenantId: string;
+    allowedBranchIds?: string[];
+    branchId?: string;
+    timeZone: string;
+  },
 ): Promise<ServiceTicketOverview> {
   const baseFilters: SQL[] = [
     eq(serviceTickets.tenantId, input.tenantId),
@@ -763,11 +775,11 @@ export async function findServiceTicketOverview(
       ),
     );
 
-  const todayUtcStart = sql`date_trunc('day', now() AT TIME ZONE 'UTC')`;
+  const todayStart = sql`date_trunc('day', now() AT TIME ZONE ${input.timeZone}) AT TIME ZONE ${input.timeZone}`;
   const todayCreatedRows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(serviceTickets)
-    .where(and(...baseFilters, sql`${serviceTickets.createdAt} >= ${todayUtcStart}`));
+    .where(and(...baseFilters, sql`${serviceTickets.createdAt} >= ${todayStart}`));
 
   const todayPickedUpRows = await db
     .select({ count: sql<number>`count(*)::int` })
@@ -776,7 +788,7 @@ export async function findServiceTicketOverview(
       and(
         ...baseFilters,
         eq(serviceTickets.ticketStatus, "picked_up"),
-        sql`${serviceTickets.completedAt} >= ${todayUtcStart}`,
+        sql`${serviceTickets.completedAt} >= ${todayStart}`,
       ),
     );
 

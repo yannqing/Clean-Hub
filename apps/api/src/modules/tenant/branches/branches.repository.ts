@@ -1,18 +1,10 @@
-import {
-  and,
-  asc,
-  eq,
-  inArray,
-  isNull,
-  or,
-  sql,
-  type SQL,
-} from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 
 import { branches, type Database, userBranches } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { findTenantDefaultCurrency } from "../settings/settings.repository.js";
 import { TenantBranchesError } from "./branches.errors.js";
 import type {
   BranchAuditSnapshot,
@@ -126,6 +118,7 @@ export async function createBranchRecord(
   input: CreateBranchRequest & { tenantId: string; actorUserId: string },
 ): Promise<BranchSummary> {
   const branchId = createId();
+  const defaultCurrency = await findTenantDefaultCurrency(db, input.tenantId);
 
   await db.insert(branches).values({
     id: branchId,
@@ -135,7 +128,7 @@ export async function createBranchRecord(
     phone: normalizeNullable(input.phone),
     businessHours: input.businessHours ?? null,
     defaultLanguage: input.defaultLanguage ?? "en",
-    defaultCurrency: input.defaultCurrency ?? "XOF",
+    defaultCurrency,
     receiptName: normalizeNullable(input.receiptName),
     receiptPhone: normalizeNullable(input.receiptPhone),
     receiptAddress: normalizeNullable(input.receiptAddress),
@@ -190,8 +183,9 @@ export async function updateBranchRecord(
           : input.data.businessHours,
       defaultLanguage:
         input.data.defaultLanguage ?? input.current.defaultLanguage,
-      defaultCurrency:
-        input.data.defaultCurrency ?? input.current.defaultCurrency,
+      // Currency is a tenant-wide setting. Existing branches are synchronized
+      // when that setting changes, so branch edits must not create overrides.
+      defaultCurrency: input.current.defaultCurrency,
       receiptName:
         input.data.receiptName === undefined
           ? input.current.receiptName
@@ -228,12 +222,23 @@ export async function updateBranchRecord(
       branchId: input.branchId,
     });
     if (!existing) {
-      throw new TenantBranchesError("BRANCH_NOT_FOUND", "Branch was not found.", 404);
+      throw new TenantBranchesError(
+        "BRANCH_NOT_FOUND",
+        "Branch was not found.",
+        404,
+      );
     }
-    throw new TenantBranchesError("BRANCH_VERSION_CONFLICT", "Branch has been modified. Refresh and try again.", 409);
+    throw new TenantBranchesError(
+      "BRANCH_VERSION_CONFLICT",
+      "Branch has been modified. Refresh and try again.",
+      409,
+    );
   }
 
-  return findBranchById(db, { tenantId: input.tenantId, branchId: input.branchId });
+  return findBranchById(db, {
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+  });
 }
 
 export async function updateBranchStatusRecord(
@@ -270,12 +275,23 @@ export async function updateBranchStatusRecord(
       branchId: input.branchId,
     });
     if (!existing) {
-      throw new TenantBranchesError("BRANCH_NOT_FOUND", "Branch was not found.", 404);
+      throw new TenantBranchesError(
+        "BRANCH_NOT_FOUND",
+        "Branch was not found.",
+        404,
+      );
     }
-    throw new TenantBranchesError("BRANCH_VERSION_CONFLICT", "Branch has been modified. Refresh and try again.", 409);
+    throw new TenantBranchesError(
+      "BRANCH_VERSION_CONFLICT",
+      "Branch has been modified. Refresh and try again.",
+      409,
+    );
   }
 
-  return findBranchById(db, { tenantId: input.tenantId, branchId: input.branchId });
+  return findBranchById(db, {
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+  });
 }
 
 export async function writeBranchCreatedAuditLog(

@@ -40,11 +40,16 @@ export class MobileAuthRepository {
 
   async findActiveTenantByCode(
     tenantCode: string,
-  ): Promise<{ id: string; defaultCurrency: string } | null> {
+  ): Promise<{
+    id: string;
+    defaultCurrency: string;
+    timezone?: string;
+  } | null> {
     const rows = await this.db
       .select({
         id: tenants.id,
         defaultCurrency: sql<string>`coalesce(${tenantSettings.defaultCurrency}, 'XOF')`,
+        timezone: sql<string>`coalesce(${tenantSettings.timezone}, 'UTC')`,
       })
       .from(tenants)
       .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))
@@ -62,11 +67,16 @@ export class MobileAuthRepository {
 
   async findTenantById(
     tenantId: string,
-  ): Promise<{ id: string; defaultCurrency: string } | null> {
+  ): Promise<{
+    id: string;
+    defaultCurrency: string;
+    timezone?: string;
+  } | null> {
     const rows = await this.db
       .select({
         id: tenants.id,
         defaultCurrency: sql<string>`coalesce(${tenantSettings.defaultCurrency}, 'XOF')`,
+        timezone: sql<string>`coalesce(${tenantSettings.timezone}, 'UTC')`,
       })
       .from(tenants)
       .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))

@@ -15,6 +15,7 @@ import {
 import {
   type Database,
   authRefreshTokens,
+  branches,
   platformSettings,
   tenantFeatureFlags,
   tenantSettings,
@@ -189,7 +190,9 @@ export async function findOtherTenantByPressingCode(
   const rows = await db
     .select({ id: tenants.id })
     .from(tenants)
-    .where(and(eq(tenants.pressingCode, pressingCode), ne(tenants.id, tenantId)))
+    .where(
+      and(eq(tenants.pressingCode, pressingCode), ne(tenants.id, tenantId)),
+    )
     .limit(1);
 
   return rows[0] ?? null;
@@ -531,6 +534,20 @@ export async function updateSaasTenantSettingsRecord(
         version: sql`${tenantSettings.version} + 1`,
       },
     });
+
+  if (defaultCurrency !== input.currentSettings.defaultCurrency) {
+    await db
+      .update(branches)
+      .set({
+        defaultCurrency,
+        updatedAt: new Date(),
+        updatedBy: input.actorUserId,
+        version: sql`${branches.version} + 1`,
+      })
+      .where(
+        and(eq(branches.tenantId, input.tenantId), isNull(branches.deletedAt)),
+      );
+  }
 
   return findSaasTenantSettingsByTenantId(db, input.tenantId);
 }

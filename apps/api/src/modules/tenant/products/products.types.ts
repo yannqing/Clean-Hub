@@ -33,7 +33,6 @@ export type CreateTenantProductRequest = {
   unitOfMeasure: string;
   unitsPerSale: string;
   salePrice: string;
-  currency: string;
   referenceCost?: string | null;
   trackInventory: boolean;
   allowNegativeStock: boolean;
@@ -57,6 +56,7 @@ export type UpdateTenantProductRequest = Omit<
   CreateTenantProductRequest,
   "branchSettings" | "mediaObjectKeys"
 > & {
+  currency: string;
   version: number;
   skuId: string;
   skuVersion: number;

@@ -6,6 +6,10 @@ import {
   serviceTickets,
 } from "@cleanhub/db";
 import {
+  addCalendarDays,
+  getDateOnlyInTimeZone,
+} from "@cleanhub/domain/timezone";
+import {
   type SQL,
   and,
   eq,
@@ -27,18 +31,10 @@ import type {
 // Customer statistics
 // ---------------------------------------------------------------------------
 
-const DAY_MS = 24 * 60 * 60 * 1000;
-
-function getLastSevenUtcDates(): string[] {
-  const now = new Date();
-  const todayUtc = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
-
+function getLastSevenDates(timeZone: string): string[] {
+  const today = getDateOnlyInTimeZone(new Date(), timeZone);
   return Array.from({ length: 7 }, (_, index) =>
-    new Date(todayUtc - (6 - index) * DAY_MS).toISOString().slice(0, 10),
+    addCalendarDays(today, -(6 - index)),
   );
 }
 
@@ -48,6 +44,7 @@ export async function findCustomerStatistics(
     tenantId: string;
     allowedBranchIds?: string[];
     branchId?: string;
+    timeZone: string;
   },
 ): Promise<PosCustomerStatistics> {
   if (input.allowedBranchIds?.length === 0) {
@@ -65,7 +62,7 @@ export async function findCustomerStatistics(
       engagedCustomerCount: 0,
       repeatOrderCustomerCount: 0,
       repeatTicketCustomerCount: 0,
-      sevenDayNewAccounts: getLastSevenUtcDates().map((date) => ({
+      sevenDayNewAccounts: getLastSevenDates(input.timeZone).map((date) => ({
         date,
         count: 0,
       })),
@@ -90,9 +87,9 @@ export async function findCustomerStatistics(
     .from(customerAccounts)
     .where(and(...baseFilters));
 
-  const todayUtcStart = sql`date_trunc('day', now() AT TIME ZONE 'UTC')`;
-  const sevenDayUtcStart = sql`date_trunc('day', now() AT TIME ZONE 'UTC') - interval '6 days'`;
-  const accountCreatedDate = sql<string>`to_char(${customerAccounts.createdAt} AT TIME ZONE 'UTC', 'YYYY-MM-DD')`;
+  const todayStart = sql`date_trunc('day', now() AT TIME ZONE ${input.timeZone}) AT TIME ZONE ${input.timeZone}`;
+  const sevenDayStart = sql`(date_trunc('day', now() AT TIME ZONE ${input.timeZone}) - interval '6 days') AT TIME ZONE ${input.timeZone}`;
+  const accountCreatedDate = sql<string>`to_char(${customerAccounts.createdAt} AT TIME ZONE ${input.timeZone}, 'YYYY-MM-DD')`;
 
   const [todayRows, profileSummaryRows, dailyRows] = await Promise.all([
     db
@@ -101,7 +98,7 @@ export async function findCustomerStatistics(
       .where(
         and(
           ...baseFilters,
-          sql`${customerAccounts.createdAt} >= ${todayUtcStart}`,
+          sql`${customerAccounts.createdAt} >= ${todayStart}`,
         ),
       ),
     db
@@ -109,7 +106,7 @@ export async function findCustomerStatistics(
         profileCount: sql<number>`count(*)::int`,
         activeProfileCount: sql<number>`count(*) filter (where ${customers.status} = 'active')::int`,
         disabledProfileCount: sql<number>`count(*) filter (where ${customers.status} = 'disabled')::int`,
-        todayNewProfileCount: sql<number>`count(*) filter (where ${customers.createdAt} >= ${todayUtcStart})::int`,
+        todayNewProfileCount: sql<number>`count(*) filter (where ${customers.createdAt} >= ${todayStart})::int`,
       })
       .from(customers)
       .where(and(...profileFilters)),
@@ -122,7 +119,7 @@ export async function findCustomerStatistics(
       .where(
         and(
           ...baseFilters,
-          sql`${customerAccounts.createdAt} >= ${sevenDayUtcStart}`,
+          sql`${customerAccounts.createdAt} >= ${sevenDayStart}`,
         ),
       )
       .groupBy(accountCreatedDate),
@@ -202,7 +199,7 @@ export async function findCustomerStatistics(
       .length,
     repeatTicketCustomerCount: ticketCustomerRows.filter((row) => row.count >= 2)
       .length,
-    sevenDayNewAccounts: getLastSevenUtcDates().map((date) => ({
+    sevenDayNewAccounts: getLastSevenDates(input.timeZone).map((date) => ({
       date,
       count: dailyCounts.get(date) ?? 0,
     })),
@@ -223,16 +220,19 @@ export async function findStatisticsOverview(
       allowedBranchIds: input.allowedBranchIds,
       branchId: input.branchId,
       period: input.period ?? "today",
+      timeZone: input.timeZone,
     }),
     findServiceTicketOverview(db, {
       tenantId: input.tenantId,
       allowedBranchIds: input.allowedBranchIds,
       branchId: input.branchId,
+      timeZone: input.timeZone,
     }),
     findCustomerStatistics(db, {
       tenantId: input.tenantId,
       allowedBranchIds: input.allowedBranchIds,
       branchId: input.branchId,
+      timeZone: input.timeZone,
     }),
   ]);
 
@@ -283,6 +283,7 @@ export async function findTicketStatisticsDetail(
     tenantId: input.tenantId,
     allowedBranchIds: input.allowedBranchIds,
     branchId: input.branchId,
+    timeZone: input.timeZone,
   });
 
   return {
@@ -315,6 +316,7 @@ export async function findOrderStatisticsDetail(
     allowedBranchIds: input.allowedBranchIds,
     branchId: input.branchId,
     period: input.period ?? "today",
+    timeZone: input.timeZone,
   });
 
   return {

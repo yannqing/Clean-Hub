@@ -13,6 +13,7 @@ import {
   createServiceRecord,
   findServiceAuditSnapshotById,
   findServiceById,
+  findServiceByCode,
   findServiceByName,
   findServicePriceAuditSnapshotByServiceId,
   findServices,
@@ -93,6 +94,8 @@ function didPriceChange(
 ): boolean {
   return (
     before.amount !== after.amount ||
+    before.compareAtAmount !== after.compareAtAmount ||
+    before.costAmount !== after.costAmount ||
     before.currency !== after.currency ||
     before.status !== after.status
   );
@@ -117,6 +120,8 @@ async function writeServicePriceUpdatedAuditLog(
     serviceName: snapshot.serviceName,
     businessLine: snapshot.businessLine,
     amount: snapshot.amount,
+    compareAtAmount: snapshot.compareAtAmount,
+    costAmount: snapshot.costAmount,
     currency: snapshot.currency,
     status: snapshot.status,
   });
@@ -206,6 +211,32 @@ export async function createTenantService(
     );
   }
 
+  if (data.code) {
+    const duplicateCode = await findServiceByCode(db, {
+      tenantId,
+      code: data.code,
+    });
+
+    if (duplicateCode) {
+      throw new TenantServicesError(
+        "SERVICE_CODE_DUPLICATE",
+        "Service code already exists in this tenant.",
+        409,
+      );
+    }
+  }
+
+  if (
+    data.compareAtPrice != null &&
+    Number(data.compareAtPrice) <= Number(data.standardPrice)
+  ) {
+    throw new TenantServicesError(
+      "SERVICE_COMPARE_AT_PRICE_INVALID",
+      "Compare-at price must be greater than the standard price.",
+      422,
+    );
+  }
+
   return db.transaction(async (tx) => {
     const service = await createServiceRecord(tx, {
       ...data,
@@ -256,6 +287,22 @@ export async function updateTenantService(
     }
   }
 
+  if (data.code) {
+    const duplicateCode = await findServiceByCode(db, {
+      tenantId,
+      code: data.code,
+      excludeServiceId: serviceId,
+    });
+
+    if (duplicateCode) {
+      throw new TenantServicesError(
+        "SERVICE_CODE_DUPLICATE",
+        "Service code already exists in this tenant.",
+        409,
+      );
+    }
+  }
+
   return db.transaction(async (tx) => {
     const [before, beforePrice] = await Promise.all([
       findServiceAuditSnapshotById(tx, {
@@ -273,6 +320,23 @@ export async function updateTenantService(
         "SERVICE_NOT_FOUND",
         "Service was not found.",
         404,
+      );
+    }
+
+    const nextStandardPrice = data.standardPrice ?? beforePrice.amount;
+    const nextCompareAtPrice =
+      data.compareAtPrice === undefined
+        ? beforePrice.compareAtAmount
+        : data.compareAtPrice;
+
+    if (
+      nextCompareAtPrice != null &&
+      Number(nextCompareAtPrice) <= Number(nextStandardPrice)
+    ) {
+      throw new TenantServicesError(
+        "SERVICE_COMPARE_AT_PRICE_INVALID",
+        "Compare-at price must be greater than the standard price.",
+        422,
       );
     }
 

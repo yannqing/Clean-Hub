@@ -287,6 +287,27 @@ export async function runTenantDiscountRepositorySmoke(): Promise<void> {
     assert.equal(options.canManage, true);
     assert.equal(options.canManageAllBranches, false);
 
+    const fixedAmount = await createTenantDiscount({
+      authContext: owner,
+      data: {
+        ...automaticOrderDiscount({
+          title: `Fixed amount ${suffix}`,
+          startsAt: activeStart,
+          allBranches: true,
+        }),
+        type: "amount_off_order",
+        valueType: "fixed_amount",
+        valueAmount: "5.00",
+        currency: options.defaultCurrency === "USD" ? "EUR" : "USD",
+      },
+    });
+    discountIds.push(fixedAmount.id);
+    assert.equal(
+      fixedAmount.currency,
+      options.defaultCurrency,
+      "fixed discounts must use the tenant default currency",
+    );
+
     const updated = await updateTenantDiscount(scheduled.id, {
       authContext: manager,
       data: {

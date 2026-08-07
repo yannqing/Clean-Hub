@@ -184,6 +184,7 @@ export type DiscountOverview = {
 };
 
 export type DiscountOptions = {
+  defaultCurrency: string;
   branches: Array<{ id: string; name: string; currency: string }>;
   products: Array<{ id: string; name: string }>;
   productCategories: Array<{ id: string; name: string }>;

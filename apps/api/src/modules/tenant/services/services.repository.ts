@@ -1,13 +1,14 @@
-import { and, asc, eq, isNull, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, isNull, or, sql, type SQL } from "drizzle-orm";
 
 import {
   prices,
   serviceCategories,
   services,
-  tenantSettings,
   type Database,
 } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
+
+import { findTenantDefaultCurrency } from "../settings/settings.repository.js";
 
 import type {
   CreateServiceRequest,
@@ -26,6 +27,10 @@ function normalizeNullable(value: string | null | undefined): string | null {
   return trimmed ? trimmed : null;
 }
 
+function normalizeCode(value: string | null | undefined): string | null {
+  return normalizeNullable(value)?.toUpperCase() ?? null;
+}
+
 function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
@@ -35,13 +40,19 @@ type ServiceJoinedRow = {
   tenantId: string;
   businessLine: ServiceSummary["businessLine"];
   name: string;
+  code: string | null;
+  shortName: string | null;
   categoryId: string | null;
   categoryName: string;
   description: string | null;
+  internalNotes: string | null;
+  turnaroundMinutes: number | null;
   displayOrder: number;
   pricingUnit: ServiceSummary["pricingUnit"];
   labelRule: ServiceSummary["labelRule"];
   standardPrice: string;
+  compareAtPrice: string | null;
+  costPrice: string | null;
   currency: string;
   status: ServiceSummary["status"];
   createdAt: Date;
@@ -55,13 +66,19 @@ function buildServiceSelect() {
     tenantId: services.tenantId,
     businessLine: services.businessLine,
     name: services.name,
+    code: services.code,
+    shortName: services.shortName,
     categoryId: services.categoryId,
     categoryName: serviceCategories.name,
     description: services.description,
+    internalNotes: services.internalNotes,
+    turnaroundMinutes: services.turnaroundMinutes,
     displayOrder: services.displayOrder,
     pricingUnit: services.pricingUnit,
     labelRule: services.labelRule,
     standardPrice: prices.amount,
+    compareAtPrice: prices.compareAtAmount,
+    costPrice: prices.costAmount,
     currency: prices.currency,
     status: services.status,
     createdAt: services.createdAt,
@@ -80,13 +97,19 @@ function toServiceSummary(row: ServiceJoinedRow): ServiceSummary {
     tenantId: row.tenantId,
     businessLine: row.businessLine,
     name: row.name,
+    code: row.code,
+    shortName: row.shortName,
     categoryId: row.categoryId,
     categoryName: row.categoryName,
     description: row.description,
+    internalNotes: row.internalNotes,
+    turnaroundMinutes: row.turnaroundMinutes,
     displayOrder: row.displayOrder,
     pricingUnit: row.pricingUnit,
     labelRule: row.labelRule,
     standardPrice: row.standardPrice,
+    compareAtPrice: row.compareAtPrice,
+    costPrice: row.costPrice,
     currency: row.currency,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
@@ -100,13 +123,19 @@ function toAuditSnapshot(row: ServiceSummary): ServiceAuditSnapshot {
     tenantId: row.tenantId,
     businessLine: row.businessLine,
     name: row.name,
+    code: row.code,
+    shortName: row.shortName,
     categoryId: row.categoryId,
     categoryName: row.categoryName,
     description: row.description,
+    internalNotes: row.internalNotes,
+    turnaroundMinutes: row.turnaroundMinutes,
     displayOrder: row.displayOrder,
     pricingUnit: row.pricingUnit,
     labelRule: row.labelRule,
     standardPrice: row.standardPrice,
+    compareAtPrice: row.compareAtPrice,
+    costPrice: row.costPrice,
     currency: row.currency,
     status: row.status,
   };
@@ -133,7 +162,13 @@ export async function findServices(
 
   if (input.q) {
     const query = `%${escapeLikePattern(input.q)}%`;
-    filters.push(sql`${services.name} ilike ${query} escape '\\'`);
+    filters.push(
+      or(
+        sql`${services.name} ilike ${query} escape '\\'`,
+        sql`${services.code} ilike ${query} escape '\\'`,
+        sql`${services.shortName} ilike ${query} escape '\\'`,
+      )!,
+    );
   }
 
   const rows = await db
@@ -222,6 +257,8 @@ export async function findServicePriceAuditSnapshotByServiceId(
       serviceName: services.name,
       businessLine: services.businessLine,
       amount: prices.amount,
+      compareAtAmount: prices.compareAtAmount,
+      costAmount: prices.costAmount,
       currency: prices.currency,
       status: prices.status,
     })
@@ -269,25 +306,47 @@ export async function findServiceByName(
   return rows[0] ?? null;
 }
 
+export async function findServiceByCode(
+  db: Database,
+  input: { tenantId: string; code: string; excludeServiceId?: string },
+): Promise<{ id: string } | null> {
+  const filters: SQL[] = [
+    eq(services.tenantId, input.tenantId),
+    sql`upper(${services.code}) = upper(${input.code.trim()})`,
+    isNull(services.deletedAt),
+  ];
+
+  if (input.excludeServiceId) {
+    filters.push(sql`${services.id} <> ${input.excludeServiceId}`);
+  }
+
+  const rows = await db
+    .select({ id: services.id })
+    .from(services)
+    .where(and(...filters))
+    .limit(1);
+
+  return rows[0] ?? null;
+}
+
 export async function createServiceRecord(
   db: Database,
   input: CreateServiceRequest & { tenantId: string; actorUserId: string },
 ): Promise<ServiceSummary> {
   const serviceId = createId();
-  const currencyRows = await db
-    .select({ currency: tenantSettings.defaultCurrency })
-    .from(tenantSettings)
-    .where(eq(tenantSettings.tenantId, input.tenantId))
-    .limit(1);
-  const currency = currencyRows[0]?.currency ?? "XOF";
+  const currency = await findTenantDefaultCurrency(db, input.tenantId);
 
   await db.insert(services).values({
     id: serviceId,
     tenantId: input.tenantId,
     businessLine: input.businessLine,
     name: input.name.trim(),
+    code: normalizeCode(input.code),
+    shortName: normalizeNullable(input.shortName),
     categoryId: input.categoryId,
     description: normalizeNullable(input.description),
+    internalNotes: normalizeNullable(input.internalNotes),
+    turnaroundMinutes: input.turnaroundMinutes ?? null,
     displayOrder: input.displayOrder ?? 0,
     pricingUnit: input.pricingUnit,
     labelRule: input.labelRule,
@@ -301,6 +360,8 @@ export async function createServiceRecord(
     tenantId: input.tenantId,
     serviceId,
     amount: input.standardPrice,
+    compareAtAmount: input.compareAtPrice ?? null,
+    costAmount: input.costPrice ?? null,
     currency,
     status: input.status ?? "active",
     createdBy: input.actorUserId,
@@ -338,12 +399,26 @@ export async function updateServiceRecord(
     .set({
       businessLine: input.businessLine ?? existing.businessLine,
       name: input.name?.trim() ?? existing.name,
+      code:
+        input.code === undefined ? existing.code : normalizeCode(input.code),
+      shortName:
+        input.shortName === undefined
+          ? existing.shortName
+          : normalizeNullable(input.shortName),
       categoryId:
         input.categoryId === undefined ? existing.categoryId : input.categoryId,
       description:
         input.description === undefined
           ? existing.description
           : normalizeNullable(input.description),
+      internalNotes:
+        input.internalNotes === undefined
+          ? existing.internalNotes
+          : normalizeNullable(input.internalNotes),
+      turnaroundMinutes:
+        input.turnaroundMinutes === undefined
+          ? existing.turnaroundMinutes
+          : input.turnaroundMinutes,
       displayOrder: input.displayOrder ?? existing.displayOrder,
       pricingUnit: input.pricingUnit ?? existing.pricingUnit,
       labelRule: input.labelRule ?? existing.labelRule,
@@ -372,14 +447,21 @@ export async function updateServiceRecord(
 
   if (
     input.standardPrice !== undefined ||
-    input.currency !== undefined ||
+    input.compareAtPrice !== undefined ||
+    input.costPrice !== undefined ||
     input.status !== undefined
   ) {
     const updatedPriceRows = await db
       .update(prices)
       .set({
         amount: input.standardPrice ?? existing.standardPrice,
-        currency: input.currency ?? existing.currency,
+        compareAtAmount:
+          input.compareAtPrice === undefined
+            ? existing.compareAtPrice
+            : input.compareAtPrice,
+        costAmount:
+          input.costPrice === undefined ? existing.costPrice : input.costPrice,
+        currency: existing.currency,
         status: input.status ?? existing.status,
         updatedAt: new Date(),
         updatedBy: input.actorUserId,

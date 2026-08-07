@@ -391,6 +391,7 @@ export async function findWorkspaceOverview(
       allowedBranchIds: input.allowedBranchIds,
       branchId: input.branchId,
       period: "today",
+      timeZone: input.timeZone ?? "UTC",
     }),
   ]);
 

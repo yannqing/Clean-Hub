@@ -1,5 +1,9 @@
 import { getDb, type Database } from "@cleanhub/db";
 import { logger } from "@cleanhub/logger";
+import {
+  getDateOnlyInTimeZone,
+  getUtcDayRangeInTimeZone,
+} from "@cleanhub/domain/timezone";
 
 import {
   deliveryStatusChangedEvent,
@@ -283,16 +287,16 @@ function validationError(message: string): DeliveryError {
   );
 }
 
-function getTodayBounds(now = new Date()): { start: Date; end: Date } {
-  const start = new Date(now);
+function getTodayBounds(
+  timeZone: string,
+  now = new Date(),
+): { start: Date; end: Date } {
+  const { from, to } = getUtcDayRangeInTimeZone(
+    getDateOnlyInTimeZone(now, timeZone),
+    timeZone,
+  );
 
-  start.setHours(0, 0, 0, 0);
-
-  const end = new Date(start);
-
-  end.setDate(end.getDate() + 1);
-
-  return { start, end };
+  return { start: from, end: to };
 }
 
 function assertValidTransition(
@@ -330,7 +334,7 @@ export class DeliveryService {
     authContext: MobileAuthContext,
   ): Promise<DeliveryTaskListItem[]> {
     const driver = assertDriverContext(authContext);
-    const { start, end } = getTodayBounds();
+    const { start, end } = getTodayBounds(driver.timezone ?? "UTC");
 
     return this.repository.listDriverTasks({
       tenantId: driver.tenantId,

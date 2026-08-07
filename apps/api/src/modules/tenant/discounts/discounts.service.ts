@@ -8,6 +8,7 @@ import {
   requireTenantRole,
 } from "../../auth/permission.helper.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { findTenantDefaultCurrency } from "../settings/settings.repository.js";
 import { TenantDiscountsError } from "./discounts.errors.js";
 import {
   countDiscounts,
@@ -414,7 +415,15 @@ export async function createTenantDiscount(
   db: Database = getDb(),
 ): Promise<DiscountDetail> {
   const access = await resolveDiscountAccess(input.authContext, db);
-  const data = createDiscountBodySchema.parse(input.data);
+  const parsedData = createDiscountBodySchema.parse(input.data);
+  const defaultCurrency = await findTenantDefaultCurrency(
+    db,
+    access.scope.tenantId,
+  );
+  const data = {
+    ...parsedData,
+    currency: parsedData.currency === null ? null : defaultCurrency,
+  };
   await requireReferences(db, access, data);
 
   try {
@@ -464,7 +473,18 @@ export async function updateTenantDiscount(
     return await db.transaction(async (tx) => {
       const before = await loadDiscountOrThrow(tx, access, discountId);
       requireManageRecord(access, before);
-      const data = mergeUpdate(before, input.data);
+      const mergedData = mergeUpdate(before, input.data);
+      const defaultCurrency = await findTenantDefaultCurrency(
+        tx,
+        access.scope.tenantId,
+      );
+      const data = {
+        ...mergedData,
+        currency:
+          mergedData.currency === null
+            ? null
+            : (before.currency ?? defaultCurrency),
+      };
       await requireReferences(tx, access, data);
       await requireUniqueCode(tx, access.scope.tenantId, data, discountId);
 

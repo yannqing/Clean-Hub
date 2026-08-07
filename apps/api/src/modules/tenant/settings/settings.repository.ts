@@ -1,6 +1,7 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import {
+  branches,
   type Database,
   tenantFeatureFlags,
   tenantSettings,
@@ -22,7 +23,27 @@ export type UpdateTenantSettingsRecordInput = {
   currentSettings: TenantSettings;
 };
 
-function resolveLanguage(value: string | null | undefined): TenantSettingsLanguage {
+const DEFAULT_CURRENCY_FALLBACK = "XOF";
+
+export async function findTenantDefaultCurrency(
+  db: Database,
+  tenantId: string,
+): Promise<string> {
+  const rows = await db
+    .select({ defaultCurrency: tenantSettings.defaultCurrency })
+    .from(tenantSettings)
+    .where(eq(tenantSettings.tenantId, tenantId))
+    .limit(1);
+  const currency = rows[0]?.defaultCurrency.trim().toUpperCase();
+
+  return currency && /^[A-Z]{3}$/.test(currency)
+    ? currency
+    : DEFAULT_CURRENCY_FALLBACK;
+}
+
+function resolveLanguage(
+  value: string | null | undefined,
+): TenantSettingsLanguage {
   if (value === "fr" || value === "zh-CN") {
     return value;
   }
@@ -30,7 +51,9 @@ function resolveLanguage(value: string | null | undefined): TenantSettingsLangua
   return "en";
 }
 
-function resolvePilotStatus(value: string | null | undefined): TenantPilotStatus {
+function resolvePilotStatus(
+  value: string | null | undefined,
+): TenantPilotStatus {
   if (value === "live" || value === "paused") {
     return value;
   }
@@ -81,7 +104,7 @@ export async function findTenantSettingsByTenantId(
     tenantId: row.tenantId,
     tenantName: row.tenantName,
     defaultLanguage: resolveLanguage(row.defaultLanguage),
-    defaultCurrency: row.defaultCurrency ?? "XOF",
+    defaultCurrency: row.defaultCurrency ?? DEFAULT_CURRENCY_FALLBACK,
     timezone: row.timezone ?? "UTC",
     pilotStatus: resolvePilotStatus(row.pilotStatus),
     updatedAt: row.settingsUpdatedAt?.toISOString() ?? null,
@@ -123,6 +146,20 @@ export async function updateTenantSettingsRecord(
       version: sql`${tenantSettings.version} + 1`,
     })
     .where(eq(tenantSettings.tenantId, input.tenantId));
+
+  if (defaultCurrency !== input.currentSettings.defaultCurrency) {
+    await db
+      .update(branches)
+      .set({
+        defaultCurrency,
+        updatedAt: new Date(),
+        updatedBy: input.actorUserId,
+        version: sql`${branches.version} + 1`,
+      })
+      .where(
+        and(eq(branches.tenantId, input.tenantId), isNull(branches.deletedAt)),
+      );
+  }
 
   return findTenantSettingsByTenantId(db, input.tenantId);
 }

@@ -38,7 +38,11 @@ export async function getTenantOverview(
     pendingPickupCount,
     pendingTasksCount,
   ] = await Promise.all([
-    findTenantTodayOrderMetrics(db, tenantId),
+    findTenantTodayOrderMetrics(
+      db,
+      tenantId,
+      input.authContext.timezone ?? "UTC",
+    ),
     findTenantInProgressOrderCount(db, tenantId),
     findTenantPendingPickupCount(db, tenantId),
     findTenantPendingTasksCount(db, tenantId),

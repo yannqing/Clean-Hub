@@ -38,6 +38,7 @@ export async function getPosStatisticsOverview(
     allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
     period: query.period,
+    timeZone: authContext.timezone ?? "UTC",
   });
 }
 
@@ -60,6 +61,7 @@ export async function getPosTicketStatistics(
     allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
     period: query.period,
+    timeZone: authContext.timezone ?? "UTC",
   });
 }
 
@@ -82,6 +84,7 @@ export async function getPosOrderStatistics(
     allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
     period: query.period,
+    timeZone: authContext.timezone ?? "UTC",
   });
 }
 
@@ -103,5 +106,6 @@ export async function getPosCustomerStatistics(
     tenantId,
     allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
+    timeZone: authContext.timezone ?? "UTC",
   });
 }

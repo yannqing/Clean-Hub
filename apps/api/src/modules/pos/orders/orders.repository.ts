@@ -24,6 +24,11 @@ import {
   ticketItems,
   type Database,
 } from "@cleanhub/db";
+import {
+  addCalendarDays,
+  calendarDateStartToUtc,
+  getDateOnlyInTimeZone,
+} from "@cleanhub/domain/timezone";
 import { createId } from "@cleanhub/id";
 import {
   POS_ORDER_CODE_SUFFIX_LENGTH,
@@ -1199,24 +1204,22 @@ export async function recalculateOrderTotalFromItems(
     );
 }
 
-function getPeriodStart(period: PosOrderOverviewPeriod): Date | null {
+function getPeriodStart(
+  period: PosOrderOverviewPeriod,
+  timeZone: string,
+): Date | null {
   if (period === "all") {
     return null;
   }
 
-  const now = new Date();
-  const today = Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate(),
-  );
+  const today = getDateOnlyInTimeZone(new Date(), timeZone);
   if (period === "today") {
-    return new Date(today);
+    return calendarDateStartToUtc(today, timeZone);
   }
   if (period === "week") {
-    return new Date(today - 6 * 24 * 60 * 60 * 1000);
+    return calendarDateStartToUtc(addCalendarDays(today, -6), timeZone);
   }
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+  return calendarDateStartToUtc(`${today.slice(0, 7)}-01`, timeZone);
 }
 
 export async function findPosOrderOverview(
@@ -1228,6 +1231,7 @@ export async function findPosOrderOverview(
     period: PosOrderOverviewPeriod;
     createdAfter?: string;
     createdBefore?: string;
+    timeZone: string;
   },
 ): Promise<PosOrderOverview> {
   const effectiveBranchId =
@@ -1255,7 +1259,7 @@ export async function findPosOrderOverview(
   const currency = currencyRows[0]?.currency ?? "XOF";
   const start = input.createdAfter
     ? new Date(input.createdAfter)
-    : getPeriodStart(input.period);
+    : getPeriodStart(input.period, input.timeZone);
   const end = input.createdBefore ? new Date(input.createdBefore) : null;
   const orderFilters: SQL[] = [
     eq(orders.tenantId, input.tenantId),

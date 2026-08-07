@@ -317,6 +317,7 @@ export async function getPosServiceTicketOverview(
     tenantId,
     allowedBranchIds: resolvePosBranchScope(authContext),
     branchId: query.branchId,
+    timeZone: authContext.timezone ?? "UTC",
   });
 }
 
@@ -375,6 +376,7 @@ export async function createPosServiceTicket(
       assistantId: authContext.userId,
       tenantId,
       actorUserId: authContext.userId,
+      timeZone: authContext.timezone ?? "UTC",
     });
 
     const detail = await findServiceTicketDetail(tx, {

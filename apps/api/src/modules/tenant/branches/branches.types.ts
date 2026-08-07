@@ -34,7 +34,6 @@ export type CreateBranchRequest = {
   phone?: string | null;
   businessHours?: BranchBusinessHours | null;
   defaultLanguage?: BranchLanguage;
-  defaultCurrency?: string;
   receiptName?: string | null;
   receiptPhone?: string | null;
   receiptAddress?: string | null;

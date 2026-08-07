@@ -56,13 +56,17 @@ export async function findTenantOverviewBase(
 
 /**
  * Today's order volume for a tenant: count and total paid amount, excluding
- * cancelled orders. Uses the UTC day boundary to keep the metric stable across
- * the platform.
+ * cancelled orders. The day boundary follows the tenant-wide business time
+ * zone, independently of the database server's local time zone.
  */
 export async function findTenantTodayOrderMetrics(
   db: Database,
   tenantId: string,
+  timeZone: string,
 ): Promise<{ orderCount: number; revenueAmount: number }> {
+  const todayStart = sql`date_trunc('day', now() AT TIME ZONE ${timeZone}) AT TIME ZONE ${timeZone}`;
+  const tomorrowStart = sql`(date_trunc('day', now() AT TIME ZONE ${timeZone}) + interval '1 day') AT TIME ZONE ${timeZone}`;
+
   const rows = await db
     .select({
       orderCount: count(),
@@ -73,7 +77,8 @@ export async function findTenantTodayOrderMetrics(
       and(
         eq(orders.tenantId, tenantId),
         isNull(orders.deletedAt),
-        sql`${orders.createdAt} >= date_trunc('day', now())`,
+        sql`${orders.createdAt} >= ${todayStart}`,
+        sql`${orders.createdAt} < ${tomorrowStart}`,
         sql`${orders.status} <> 'cancelled'`,
       ),
     );

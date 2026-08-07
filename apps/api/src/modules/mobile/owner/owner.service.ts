@@ -1,5 +1,9 @@
 import { getDb, type Database } from "@cleanhub/db";
 import { logger } from "@cleanhub/logger";
+import {
+  getDateOnlyInTimeZone,
+  getUtcDayRangeInTimeZone,
+} from "@cleanhub/domain/timezone";
 
 import type { MobileAuthContext } from "../auth/auth.types.js";
 import { DeliveryRepository } from "../delivery/delivery.repository.js";
@@ -158,16 +162,16 @@ function assertBranchAccess(authContext: OwnerMobileContext, branchId: string): 
   }
 }
 
-function getTodayBounds(now = new Date()): { start: Date; end: Date } {
-  const start = new Date(now);
+function getTodayBounds(
+  timeZone: string,
+  now = new Date(),
+): { start: Date; end: Date } {
+  const { from, to } = getUtcDayRangeInTimeZone(
+    getDateOnlyInTimeZone(now, timeZone),
+    timeZone,
+  );
 
-  start.setHours(0, 0, 0, 0);
-
-  const end = new Date(start);
-
-  end.setDate(end.getDate() + 1);
-
-  return { start, end };
+  return { start: from, end: to };
 }
 
 export class OwnerService implements AppointmentOperationsServiceLike {
@@ -195,7 +199,7 @@ export class OwnerService implements AppointmentOperationsServiceLike {
     authContext: MobileAuthContext,
   ): Promise<OwnerTodaySummary> {
     const owner = assertOwnerContext(authContext);
-    const { start, end } = getTodayBounds();
+    const { start, end } = getTodayBounds(owner.timezone ?? "UTC");
     const tenantBase = await this.repository.findTenantBase(owner.tenantId);
 
     if (!tenantBase) {

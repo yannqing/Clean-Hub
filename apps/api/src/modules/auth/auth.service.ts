@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 
 import type { Database } from "@cleanhub/db";
 import { isSixDigitPin } from "@cleanhub/domain/pin";
+import { resolveTimeZone } from "@cleanhub/domain/timezone";
 
 import {
   getRefreshTokenTtlSeconds,
@@ -55,6 +56,12 @@ import { resolvePosBootstrapState } from "./pos-bootstrap-state.js";
 import { hashOpaqueToken, TokenService } from "./token.service.js";
 
 const REFRESH_TOKEN_ROTATION_GRACE_MS = 10_000;
+
+function resolveTenantLanguage(
+  value: string | null | undefined,
+): "en" | "fr" | "zh-CN" {
+  return value === "fr" || value === "zh-CN" ? value : "en";
+}
 
 function deriveRefreshTokenSuccessor(
   secret: string,
@@ -1117,6 +1124,8 @@ export class AuthService {
       role,
       roles: access.roles,
       permissions: access.permissions,
+      language: resolveTenantLanguage(access.language),
+      timezone: resolveTimeZone(access.timezone),
     };
 
     if (terminal) {

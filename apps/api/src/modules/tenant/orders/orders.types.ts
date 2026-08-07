@@ -308,6 +308,7 @@ export type TenantOrderRepositoryOverviewInput = {
   period: TenantOrderOverviewPeriod;
   createdAfter?: string;
   createdBefore?: string;
+  timeZone: string;
 };
 
 export type TenantOrderListInput = {
