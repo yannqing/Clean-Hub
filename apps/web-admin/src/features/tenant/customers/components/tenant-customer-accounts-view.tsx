@@ -26,6 +26,7 @@ import {
   ContactRound,
   Check,
   ListFilter,
+  Pencil,
   Search,
   SlidersHorizontal,
   UserCheck,
@@ -377,6 +378,9 @@ export function TenantCustomerAccountsView({
                 <TableHead>{copy.columns.email}</TableHead>
                 <TableHead>{copy.columns.status}</TableHead>
                 <TableHead>{copy.columns.createdAt}</TableHead>
+                <TableHead className="text-right">
+                  {copy.columns.actions}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -413,6 +417,25 @@ export function TenantCustomerAccountsView({
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground">
                     {formatDateTime(account.createdAt)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      aria-label={`${copy.detail.editAction}: ${account.accountName}`}
+                      className="h-7 gap-1.5 px-2 text-[11px]"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        router.push(
+                          `${webAdminRoutes.tenant.customerAccount(account.id)}?edit=1`,
+                        );
+                      }}
+                      onKeyDown={(event) => event.stopPropagation()}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Icon aria-hidden icon={Pencil} size={13} />
+                      {m.common.edit}
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}

@@ -67,9 +67,11 @@ function toAccountForm(account: TenantCustomerAccountDetail): AccountForm {
 export function TenantCustomerAccountDetailView({
   initialAccount,
   initialCustomers,
+  initialEditing = false,
 }: {
   initialAccount: TenantCustomerAccountDetail;
   initialCustomers: TenantCustomerAccountCustomersResponse;
+  initialEditing?: boolean;
 }) {
   const router = useRouter();
   const { formatDateTime, locale, m } = useTenantI18n();
@@ -81,7 +83,7 @@ export function TenantCustomerAccountDetailView({
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [customersLoading, setCustomersLoading] = useState(false);
   const [customersError, setCustomersError] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(initialEditing);
   const [form, setForm] = useState<AccountForm>(() => toAccountForm(account));
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -144,6 +146,9 @@ export function TenantCustomerAccountDetailView({
     setForm(toAccountForm(account));
     setFormError(null);
     setEditing(false);
+    router.replace(webAdminRoutes.tenant.customerAccount(account.id), {
+      scroll: false,
+    });
   }
 
   async function saveAccount() {
@@ -189,6 +194,9 @@ export function TenantCustomerAccountDetailView({
     setForm(toAccountForm(result.data));
     setEditing(false);
     toast.success(copy.saveSuccess);
+    router.replace(webAdminRoutes.tenant.customerAccount(result.data.id), {
+      scroll: false,
+    });
     router.refresh();
   }
 

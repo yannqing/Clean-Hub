@@ -16,6 +16,7 @@ import {
   findTenantCustomerDetail,
   findTenantCustomerOverview,
   findTenantCustomers,
+  updateTenantCustomerRecord,
   updateTenantCustomerAccountRecord,
 } from "./customers.repository.js";
 import type {
@@ -32,6 +33,7 @@ import type {
   TenantCustomerListResponse,
   TenantCustomerOverview,
   TenantCustomerOverviewInput,
+  UpdateTenantCustomerInput,
   UpdateTenantCustomerAccountInput,
 } from "./customers.types.js";
 import { TenantCustomersError } from "./customers.errors.js";
@@ -113,6 +115,102 @@ export async function getTenantCustomerDetail(
   }
 
   return customer;
+}
+
+export async function updateTenantCustomer(
+  input: UpdateTenantCustomerInput,
+  db: Database = getDb(),
+): Promise<TenantCustomerDetail> {
+  const scope = await resolveTenantCustomerScope(
+    input.authContext,
+    undefined,
+    db,
+  );
+  const existing = await findTenantCustomerDetail(db, {
+    ...scope,
+    customerId: input.customerId,
+  });
+
+  if (!existing) {
+    throw new TenantCustomersError(
+      "CUSTOMER_NOT_FOUND",
+      "Customer was not found.",
+    );
+  }
+
+  return db.transaction(async (tx) => {
+    const updated = await updateTenantCustomerRecord(tx, {
+      tenantId: scope.tenantId,
+      customerId: input.customerId,
+      actorUserId: input.authContext.userId,
+      data: input.data,
+    });
+
+    if (!updated) {
+      throw new TenantCustomersError(
+        "CUSTOMER_VERSION_CONFLICT",
+        "Customer changed before it could be saved.",
+        409,
+      );
+    }
+
+    const result = await findTenantCustomerDetail(tx, {
+      ...scope,
+      customerId: input.customerId,
+    });
+    if (!result) {
+      throw new TenantCustomersError(
+        "CUSTOMER_NOT_FOUND",
+        "Customer was not found.",
+      );
+    }
+
+    const before = {
+      fullName: existing.fullName,
+      phone: existing.phone,
+      email: existing.email,
+      relationship: existing.relationship,
+      address: existing.address,
+      notes: existing.notes,
+      status: existing.status,
+      version: existing.version,
+    };
+    const after = {
+      fullName: result.fullName,
+      phone: result.phone,
+      email: result.email,
+      relationship: result.relationship,
+      address: result.address,
+      notes: result.notes,
+      status: result.status,
+      version: result.version,
+    };
+    const statusOnlyUpdate =
+      existing.status !== result.status &&
+      existing.fullName === result.fullName &&
+      existing.phone === result.phone &&
+      existing.email === result.email &&
+      existing.relationship === result.relationship &&
+      existing.address === result.address &&
+      existing.notes === result.notes;
+
+    await writeAuditLog(tx, {
+      tenantId: scope.tenantId,
+      actorUserId: input.authContext.userId,
+      eventCategory: "pos_customer",
+      eventType: statusOnlyUpdate
+        ? "pos_customer.profile_status_changed"
+        : "pos_customer.profile_updated",
+      entityType: "customer",
+      entityId: input.customerId,
+      before,
+      after,
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return result;
+  });
 }
 
 export async function listTenantCustomerAccounts(

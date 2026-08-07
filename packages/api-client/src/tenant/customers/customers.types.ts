@@ -99,6 +99,17 @@ export type TenantCustomerDetail = TenantCustomerSummary & {
   };
 };
 
+export type UpdateTenantCustomerRequest = {
+  fullName?: string;
+  phone?: string | null;
+  email?: string | null;
+  relationship?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  status?: TenantCustomerStatus;
+  version: number;
+};
+
 export type TenantCustomerTimelineKind = "system" | "comment";
 export type TenantCustomerTimelineSource =
   | "customer"

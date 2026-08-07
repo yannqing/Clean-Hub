@@ -12,10 +12,12 @@ const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 export default async function TenantCustomerAccountDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ accountId: string }>;
+  searchParams: Promise<{ edit?: string | string[] }>;
 }) {
-  const { accountId } = await params;
+  const [{ accountId }, query] = await Promise.all([params, searchParams]);
   if (!ULID_PATTERN.test(accountId)) notFound();
 
   const requestOptions = await getTenantServerApiRequestOptions();
@@ -41,6 +43,7 @@ export default async function TenantCustomerAccountDetailPage({
     <TenantCustomerAccountDetailView
       initialAccount={account}
       initialCustomers={customers}
+      initialEditing={query.edit === "1"}
     />
   );
 }

@@ -18,6 +18,7 @@ import {
   listTenantCustomerAccountCustomers,
   listTenantCustomerAccounts,
   listTenantCustomers,
+  updateTenantCustomer,
   updateTenantCustomerAccount,
 } from "./customers.service.js";
 import {
@@ -33,6 +34,7 @@ import {
   tenantCustomerParamsSchema,
   tenantCustomerTimelineQuerySchema,
   updateTenantCustomerCommentBodySchema,
+  updateTenantCustomerBodySchema,
   updateTenantCustomerAccountBodySchema,
 } from "./customers.validation.js";
 
@@ -100,6 +102,31 @@ export async function getTenantCustomerDetailController(
   try {
     return c.json(
       await getTenantCustomerDetail(c.get("authContext"), customerId),
+    );
+  } catch (error) {
+    if (error instanceof TenantCustomersError) {
+      return createTenantCustomersErrorResponse(c, error);
+    }
+    throw error;
+  }
+}
+
+export async function updateTenantCustomerController(
+  c: Context<AppBindings>,
+) {
+  const { customerId } = tenantCustomerParamsSchema.parse(c.req.param());
+  const data = updateTenantCustomerBodySchema.parse(
+    await c.req.json().catch(() => ({})),
+  );
+
+  try {
+    return c.json(
+      await updateTenantCustomer({
+        authContext: c.get("authContext"),
+        requestMeta: getRequestMeta(c),
+        customerId,
+        data,
+      }),
     );
   } catch (error) {
     if (error instanceof TenantCustomersError) {

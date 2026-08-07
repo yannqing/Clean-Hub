@@ -29,6 +29,7 @@ import {
   ContactRound,
   Link2,
   ListFilter,
+  Pencil,
   Search,
   SlidersHorizontal,
   UserCheck,
@@ -41,6 +42,7 @@ import { useEffect, useMemo, useState } from "react";
 import { webAdminRoutes } from "@/config/routes";
 import { interpolate, useTenantI18n } from "@/i18n";
 
+import { buildTenantCreatedAtDateRange } from "../../date-range";
 import {
   getTenantCustomerListQuery,
   getTenantCustomerOverviewQuery,
@@ -61,7 +63,8 @@ type CustomerColumnKey =
   | "phone"
   | "email"
   | "status"
-  | "createdAt";
+  | "createdAt"
+  | "actions";
 
 const CUSTOMER_COLUMN_KEYS: CustomerColumnKey[] = [
   "customer",
@@ -70,6 +73,7 @@ const CUSTOMER_COLUMN_KEYS: CustomerColumnKey[] = [
   "email",
   "status",
   "createdAt",
+  "actions",
 ];
 
 const DEFAULT_VISIBLE_COLUMNS: Record<CustomerColumnKey, boolean> = {
@@ -79,41 +83,8 @@ const DEFAULT_VISIBLE_COLUMNS: Record<CustomerColumnKey, boolean> = {
   email: true,
   status: true,
   createdAt: true,
+  actions: true,
 };
-
-function buildDateRange(filter: CustomerDateFilter): {
-  createdAfter?: string;
-  createdBefore?: string;
-} {
-  if (filter === "all") {
-    return {};
-  }
-
-  const now = new Date();
-  const todayStart = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
-  const dayMs = 24 * 60 * 60 * 1000;
-
-  if (filter === "today") {
-    return {
-      createdAfter: todayStart.toISOString(),
-      createdBefore: new Date(todayStart.getTime() + dayMs).toISOString(),
-    };
-  }
-
-  const days = {
-    last_7_days: 7,
-    last_30_days: 30,
-    last_365_days: 365,
-  }[filter];
-
-  return {
-    createdAfter: new Date(
-      todayStart.getTime() - (days - 1) * dayMs,
-    ).toISOString(),
-  };
-}
 
 function getCustomerStatusVariant(
   status: TenantCustomerStatus,
@@ -127,7 +98,7 @@ export function TenantCustomersView({
   initialSearchQuery?: string;
 }) {
   const router = useRouter();
-  const { formatDateTime, locale, m } = useTenantI18n();
+  const { formatDateTime, locale, m, timeZone } = useTenantI18n();
   const [customers, setCustomers] = useState<TenantCustomerSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [overview, setOverview] = useState<TenantCustomerOverview | null>(null);
@@ -147,7 +118,10 @@ export function TenantCustomersView({
   const [overviewLoading, setOverviewLoading] = useState(true);
   const [listError, setListError] = useState<string | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
-  const { createdAfter, createdBefore } = buildDateRange(dateFilter);
+  const { createdAfter, createdBefore } = buildTenantCreatedAtDateRange(
+    dateFilter,
+    timeZone,
+  );
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -674,6 +648,11 @@ export function TenantCustomersView({
                 {visibleColumns.createdAt ? (
                   <TableHead>{m.customers.columns.createdAt}</TableHead>
                 ) : null}
+                {visibleColumns.actions ? (
+                  <TableHead className="text-right">
+                    {m.customers.columns.actions}
+                  </TableHead>
+                ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -728,6 +707,27 @@ export function TenantCustomersView({
                   {visibleColumns.createdAt ? (
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {formatDateTime(customer.createdAt)}
+                    </TableCell>
+                  ) : null}
+                  {visibleColumns.actions ? (
+                    <TableCell className="text-right">
+                      <Button
+                        aria-label={`${m.common.edit}: ${customer.fullName}`}
+                        className="h-7 gap-1.5 px-2 text-[11px]"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          router.push(
+                            `${webAdminRoutes.tenant.customer(customer.id)}?edit=1`,
+                          );
+                        }}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        size="sm"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Icon aria-hidden icon={Pencil} size={13} />
+                        {m.common.edit}
+                      </Button>
                     </TableCell>
                   ) : null}
                 </TableRow>

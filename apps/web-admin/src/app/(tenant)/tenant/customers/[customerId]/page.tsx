@@ -14,7 +14,10 @@ const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 type TenantCustomerDetailPageProps = {
   params: Promise<{ customerId: string }>;
-  searchParams: Promise<{ sourceAccountId?: string | string[] }>;
+  searchParams: Promise<{
+    edit?: string | string[];
+    sourceAccountId?: string | string[];
+  }>;
 };
 
 export default async function TenantCustomerDetailPage({
@@ -66,6 +69,7 @@ export default async function TenantCustomerDetailPage({
     <TenantCustomerDetailView
       customer={customer}
       fromAccountDetail={query.sourceAccountId === customer.account.id}
+      initialEditing={query.edit === "1"}
       initialTimeline={initialTimeline}
       recentOrders={recentOrders.data}
       staffMembers={staffMembers}

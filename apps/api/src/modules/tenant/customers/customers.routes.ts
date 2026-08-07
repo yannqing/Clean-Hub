@@ -14,6 +14,7 @@ import {
   listTenantCustomersController,
   requestTenantCustomerAttachmentUploadController,
   updateTenantCustomerCommentController,
+  updateTenantCustomerController,
   updateTenantCustomerAccountController,
 } from "./customers.controller.js";
 
@@ -50,6 +51,7 @@ export function createTenantCustomerRoutes() {
     "/:customerId/comments/:commentId",
     deleteTenantCustomerCommentController,
   );
+  routes.patch("/:customerId", updateTenantCustomerController);
   routes.get("/:customerId", getTenantCustomerDetailController);
 
   return routes;

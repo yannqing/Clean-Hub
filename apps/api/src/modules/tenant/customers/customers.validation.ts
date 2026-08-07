@@ -70,6 +70,38 @@ export const tenantCustomerParamsSchema = z.object({
   customerId: ulidSchema,
 });
 
+const nullableTrimmedString = (max: number) =>
+  z
+    .union([z.string().trim().max(max), z.null()])
+    .transform((value) => (value === "" ? null : value))
+    .optional();
+
+export const updateTenantCustomerBodySchema = z
+  .object({
+    fullName: z.string().trim().min(1).max(200).optional(),
+    phone: nullableTrimmedString(32),
+    email: z
+      .union([z.string().trim().email().max(320), z.literal(""), z.null()])
+      .transform((value) => (value === "" ? null : value))
+      .optional(),
+    relationship: nullableTrimmedString(80),
+    address: nullableTrimmedString(1000),
+    notes: nullableTrimmedString(2000),
+    status: z.enum(["active", "disabled"]).optional(),
+    version: z.number().int().min(1),
+  })
+  .refine(
+    (data) =>
+      data.fullName !== undefined ||
+      data.phone !== undefined ||
+      data.email !== undefined ||
+      data.relationship !== undefined ||
+      data.address !== undefined ||
+      data.notes !== undefined ||
+      data.status !== undefined,
+    "At least one customer field must be provided.",
+  );
+
 export const tenantCustomerAccountParamsSchema = z.object({
   accountId: ulidSchema,
 });

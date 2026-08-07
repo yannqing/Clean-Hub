@@ -101,6 +101,17 @@ export type TenantCustomerDetail = TenantCustomerSummary & {
   };
 };
 
+export type UpdateTenantCustomerRequest = {
+  fullName?: string;
+  phone?: string | null;
+  email?: string | null;
+  relationship?: string | null;
+  address?: string | null;
+  notes?: string | null;
+  status?: TenantCustomerStatus;
+  version: number;
+};
+
 export type TenantCustomerTimelineKind = "system" | "comment";
 export type TenantCustomerTimelineSource =
   | "customer"
@@ -233,6 +244,13 @@ export type TenantCustomerRepositoryDetailInput = {
   allowedBranchIds?: string[];
 };
 
+export type UpdateTenantCustomerRepositoryInput = {
+  tenantId: string;
+  customerId: string;
+  actorUserId: string;
+  data: UpdateTenantCustomerRequest;
+};
+
 export type TenantCustomerAccountRepositoryListInput =
   TenantCustomerAccountListQuery & {
     tenantId: string;
@@ -272,6 +290,13 @@ export type TenantCustomerListInput = {
 export type TenantCustomerOverviewInput = {
   authContext: AuthContext;
   query: TenantCustomerOverviewQuery;
+};
+
+export type UpdateTenantCustomerInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  customerId: string;
+  data: UpdateTenantCustomerRequest;
 };
 
 export type TenantCustomerAccountListInput = {

@@ -42,6 +42,7 @@ import type {
   TenantCustomerSort,
   TenantCustomerSummary,
   UpdateTenantCustomerAccountRepositoryInput,
+  UpdateTenantCustomerRepositoryInput,
 } from "./customers.types.js";
 
 type TenantCustomerFilterInput = Pick<
@@ -716,6 +717,54 @@ export async function findTenantCustomerDetail(
       updatedAt: row.accountUpdatedAt.toISOString(),
     },
   };
+}
+
+export async function updateTenantCustomerRecord(
+  db: Database,
+  input: UpdateTenantCustomerRepositoryInput,
+): Promise<boolean> {
+  const set: Record<string, unknown> = {
+    updatedAt: new Date(),
+    updatedBy: input.actorUserId,
+    version: sql`${customers.version} + 1`,
+  };
+
+  if (input.data.fullName !== undefined) {
+    set.fullName = input.data.fullName.trim();
+  }
+  if (input.data.phone !== undefined) {
+    set.phone = input.data.phone?.trim() || null;
+  }
+  if (input.data.email !== undefined) {
+    set.email = input.data.email?.trim().toLowerCase() || null;
+  }
+  if (input.data.relationship !== undefined) {
+    set.relationship = input.data.relationship?.trim() || null;
+  }
+  if (input.data.address !== undefined) {
+    set.address = input.data.address?.trim() || null;
+  }
+  if (input.data.notes !== undefined) {
+    set.notes = input.data.notes?.trim() || null;
+  }
+  if (input.data.status !== undefined) {
+    set.status = input.data.status;
+  }
+
+  const [updated] = await db
+    .update(customers)
+    .set(set)
+    .where(
+      and(
+        eq(customers.tenantId, input.tenantId),
+        eq(customers.id, input.customerId),
+        eq(customers.version, input.data.version),
+        isNull(customers.deletedAt),
+      ),
+    )
+    .returning({ id: customers.id });
+
+  return Boolean(updated);
 }
 
 export async function findTenantCustomerOverview(

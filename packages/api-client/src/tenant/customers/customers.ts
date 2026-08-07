@@ -20,6 +20,7 @@ import type {
   TenantCustomerTimelineResponse,
   UpdateTenantCustomerCommentRequest,
   UpdateTenantCustomerAccountRequest,
+  UpdateTenantCustomerRequest,
 } from "./customers.types";
 
 type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
@@ -39,6 +40,16 @@ export function createTenantCustomersApi(client: ApiClient) {
     get: (customerId: string, options?: RequestOptions) =>
       client.get<TenantCustomerDetail>(
         `/tenant/customers/${encodeURIComponent(customerId)}`,
+        options,
+      ),
+    update: (
+      customerId: string,
+      input: UpdateTenantCustomerRequest,
+      options?: RequestOptions,
+    ) =>
+      client.patch<TenantCustomerDetail>(
+        `/tenant/customers/${encodeURIComponent(customerId)}`,
+        input,
         options,
       ),
     listAccounts: (
