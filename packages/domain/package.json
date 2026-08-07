@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./order-codes": "./src/order-codes.ts",
-    "./pin": "./src/pin.ts"
+    "./pin": "./src/pin.ts",
+    "./timezone": "./src/timezone.ts"
   }
 }
