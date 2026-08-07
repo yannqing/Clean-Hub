@@ -98,9 +98,13 @@ export const services = pgTable(
       .references(() => tenants.id),
     categoryId: ulidColumn("category_id").notNull(),
     name: varchar("name", { length: 200 }).notNull(),
+    code: varchar("code", { length: 64 }),
+    shortName: varchar("short_name", { length: 80 }),
     description: text("description"),
+    internalNotes: text("internal_notes"),
     businessLine: businessLineEnum("business_line").notNull(),
     pricingUnit: pricingUnitEnum("pricing_unit").notNull().default("per_item"),
+    turnaroundMinutes: integer("turnaround_minutes"),
     displayOrder: integer("display_order").notNull().default(0),
     labelRule: serviceLabelRuleEnum("label_rule")
       .notNull()
@@ -120,6 +124,9 @@ export const services = pgTable(
   },
   (table) => [
     uniqueIndex("services_tenant_id_id_unique").on(table.tenantId, table.id),
+    uniqueIndex("services_active_code_unique")
+      .on(table.tenantId, table.code)
+      .where(sql`${table.deletedAt} is null and ${table.code} is not null`),
     foreignKey({
       name: "services_tenant_line_category_fk",
       columns: [table.tenantId, table.businessLine, table.categoryId],
@@ -144,6 +151,14 @@ export const services = pgTable(
       "services_name_not_blank_check",
       sql`length(btrim(${table.name})) > 0`,
     ),
+    check(
+      "services_code_not_blank_check",
+      sql`${table.code} is null or length(btrim(${table.code})) > 0`,
+    ),
+    check(
+      "services_turnaround_minutes_check",
+      sql`${table.turnaroundMinutes} is null or (${table.turnaroundMinutes} >= 1 and ${table.turnaroundMinutes} <= 525600)`,
+    ),
     check("services_display_order_check", sql`${table.displayOrder} >= 0`),
   ],
 );
@@ -159,6 +174,8 @@ export const prices = pgTable(
       .notNull()
       .references(() => services.id),
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    compareAtAmount: numeric("compare_at_amount", { precision: 12, scale: 2 }),
+    costAmount: numeric("cost_amount", { precision: 12, scale: 2 }),
     currency: varchar("currency", { length: 3 }).notNull().default("XOF"),
     status: catalogItemStatusEnum("status").notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -178,5 +195,13 @@ export const prices = pgTable(
     index("prices_tenant_id_idx").on(table.tenantId),
     index("prices_status_idx").on(table.status),
     index("prices_deleted_at_idx").on(table.deletedAt),
+    check(
+      "prices_compare_at_amount_check",
+      sql`${table.compareAtAmount} is null or ${table.compareAtAmount} > 0`,
+    ),
+    check(
+      "prices_cost_amount_check",
+      sql`${table.costAmount} is null or ${table.costAmount} > 0`,
+    ),
   ],
 );
