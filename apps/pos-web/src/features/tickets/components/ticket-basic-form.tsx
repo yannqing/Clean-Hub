@@ -1,9 +1,14 @@
 "use client";
 
 import { posToast as toast } from "@/lib/pos-toast";
+import {
+  dateTimeLocalToUtc,
+  toDateTimeLocalValue,
+} from "@cleanhub/domain/timezone";
 import { useState, useTransition } from "react";
 
 import { Icon } from "@/components/app-shell";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 
 import { updateTicketAction } from "../actions";
 import {
@@ -25,13 +30,16 @@ type TicketBasicFormProps = {
  * Status and items are edited through their own affordances, not here.
  */
 export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
+  const { timeZone } = usePosRuntimeConfig();
   const [isPending, startTransition] = useTransition();
   const [values, setValues] = useState<TicketBasicFormValues>({
     ticketType: ticket.ticketType,
     priority: ticket.priority,
     sourceChannel: ticket.sourceChannel,
     // datetime-local expects yyyy-MM-ddTHH:mm (no timezone).
-    expectedPickupAt: toLocalDateTimeInput(ticket.expectedPickupAt),
+    expectedPickupAt: ticket.expectedPickupAt
+      ? toDateTimeLocalValue(ticket.expectedPickupAt, timeZone)
+      : "",
     remark: ticket.remark ?? "",
   });
 
@@ -54,14 +62,19 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
     }
 
     startTransition(async () => {
+      const expectedPickupAt = values.expectedPickupAt
+        ? dateTimeLocalToUtc(values.expectedPickupAt, timeZone)
+        : null;
+      if (values.expectedPickupAt && !expectedPickupAt) {
+        toast.error("预计取件时间无效。");
+        return;
+      }
       const result = await updateTicketAction(ticket.id, {
         ticketType: values.ticketType,
         priority: values.priority,
         sourceChannel: values.sourceChannel,
         // Convert the local datetime-local value to an ISO string; clear when empty.
-        expectedPickupAt: values.expectedPickupAt
-          ? new Date(values.expectedPickupAt).toISOString()
-          : null,
+        expectedPickupAt: expectedPickupAt?.toISOString() ?? null,
         remark: values.remark.trim() || null,
       });
       if (result.ok) {
@@ -171,24 +184,6 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
       </div>
     </form>
   );
-}
-
-/**
- * Convert an ISO timestamp to the value an `<input type="datetime-local">`
- * expects: local time in `yyyy-MM-ddTHH:mm`. Returns "" for null/invalid.
- */
-function toLocalDateTimeInput(iso: string | null | undefined): string {
-  if (!iso) {
-    return "";
-  }
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(
-    date.getDate(),
-  )}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }
 
 const inputClass =

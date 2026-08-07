@@ -17,6 +17,7 @@ import {
 
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 
 import {
@@ -42,6 +43,7 @@ type TicketsTableProps = {
 
 export function TicketsTable({ tickets, total }: TicketsTableProps) {
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const router = useRouter();
   const params = useSearchParams();
   const visibleColumns = parseVisibleColumns(
@@ -155,7 +157,11 @@ export function TicketsTable({ tickets, total }: TicketsTableProps) {
                       }
                     >
                       <span className="block">
-                        {formatTicketDateTime(ticket.expectedPickupAt, locale)}
+                        {formatTicketDateTime(
+                          ticket.expectedPickupAt,
+                          locale,
+                          timeZone,
+                        )}
                       </span>
                       {overdue ? (
                         <span className="mt-0.5 block text-[10px]">
@@ -183,6 +189,7 @@ function TicketCard({
   locale: SupportedLocale;
   ticket: ServiceTicketSummary;
 }) {
+  const { timeZone } = usePosRuntimeConfig();
   const overdue = isOverdue(ticket);
   const detailHref = posRoutes.ticketDetail(ticket.id);
   const text = (value: string) => translatePosText(value, locale);
@@ -223,7 +230,7 @@ function TicketCard({
           }
         >
           {ticket.expectedPickupAt
-            ? formatTicketDateTime(ticket.expectedPickupAt, locale)
+            ? formatTicketDateTime(ticket.expectedPickupAt, locale, timeZone)
             : TICKET_EMPTY_PLACEHOLDER}
           <Icon className="size-3.5" name="chevron-right" />
         </span>

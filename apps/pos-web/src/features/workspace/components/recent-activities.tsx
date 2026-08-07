@@ -11,6 +11,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
 
 import { Icon, type PosIconName } from "@/components/app-shell/icons";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 
 const ACTIVITY_META: Record<
   PosRecentActivityType,
@@ -56,6 +57,7 @@ function formatRelativeTime(
   timestamp: string,
   locale: string,
   now: number | null,
+  timeZone: string,
 ): string {
   if (now === null) {
     return "—";
@@ -91,6 +93,7 @@ function formatRelativeTime(
   return new Intl.DateTimeFormat(locale, {
     day: "numeric",
     month: "short",
+    timeZone,
   }).format(date);
 }
 
@@ -256,6 +259,7 @@ export function RecentActivities({
   activities: PosRecentActivity[];
 }) {
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const [now, setNow] = useState<number | null>(null);
 
   useEffect(() => {
@@ -288,6 +292,7 @@ export function RecentActivities({
                 activity.timestamp,
                 locale,
                 now,
+                timeZone,
               )}
               key={activity.id}
             />

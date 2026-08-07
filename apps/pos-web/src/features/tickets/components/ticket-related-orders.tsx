@@ -2,6 +2,7 @@
 
 import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 
 import {
   formatTicketDateTime,
@@ -40,6 +41,7 @@ export function TicketRelatedOrders({
   orders,
 }: TicketRelatedOrdersProps) {
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
 
   return (
     <section className="border-y bg-background p-5">
@@ -64,7 +66,7 @@ export function TicketRelatedOrders({
                     {order.id.slice(-8).toUpperCase()}
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    {formatTicketDateTime(order.createdAt, locale)}
+                    {formatTicketDateTime(order.createdAt, locale, timeZone)}
                   </div>
                 </div>
                 <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">

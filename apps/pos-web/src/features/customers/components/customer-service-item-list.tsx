@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import type { ServiceTicketItem } from "@cleanhub/api-client";
 
 import { useTranslation } from "@cleanhub/i18n/react";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import {
@@ -47,6 +48,7 @@ export function CustomerServiceItemList({
 }: CustomerServiceItemListProps) {
   const router = useRouter();
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const [rows, setRows] = useState<ServiceItemRow[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -195,7 +197,7 @@ export function CustomerServiceItemList({
                     ) : null}
                   </div>
                   <div className="text-muted-foreground">
-                    {formatDate(item.createdAt, locale)}
+                    {formatDate(item.createdAt, locale, timeZone)}
                   </div>
                   <div>
                     <span
@@ -273,6 +275,7 @@ function CustomerServiceItemCard({
   href: string;
   onOpen: (href: string) => void;
 }) {
+  const { timeZone } = usePosRuntimeConfig();
   const tone =
     CUSTOMER_TICKET_ITEM_STATUS_TONES[item.itemStatus] ??
     "bg-muted text-muted-foreground";
@@ -308,7 +311,7 @@ function CustomerServiceItemCard({
         <div>
           <div className="text-xs text-muted-foreground">创建日期</div>
           <div className="mt-1 text-sm font-medium text-foreground">
-            {formatDate(item.createdAt, locale)}
+            {formatDate(item.createdAt, locale, timeZone)}
           </div>
         </div>
         <button
@@ -323,11 +326,12 @@ function CustomerServiceItemCard({
   );
 }
 
-function formatDate(iso: string, locale: string): string {
+function formatDate(iso: string, locale: string, timeZone: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString(locale, {
     month: "2-digit",
     day: "2-digit",
+    timeZone,
   });
 }

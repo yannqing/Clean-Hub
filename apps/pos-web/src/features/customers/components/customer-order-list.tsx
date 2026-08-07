@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import type { PosOrderSummary } from "@cleanhub/api-client";
 
 import { useTranslation } from "@cleanhub/i18n/react";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posToast as toast } from "@/lib/pos-toast";
 import { formatPosMoney } from "@/lib/money";
 
@@ -39,6 +40,7 @@ export function CustomerOrderList({
 }: CustomerOrderListProps) {
   const router = useRouter();
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const [rows, setRows] = useState<PosOrderSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -158,7 +160,7 @@ export function CustomerOrderList({
                       {order.id.slice(-8).toUpperCase()}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      {formatDate(order.createdAt, locale)}
+                      {formatDate(order.createdAt, locale, timeZone)}
                     </div>
                   </div>
                   <div className="text-foreground">
@@ -250,6 +252,7 @@ function CustomerOrderCard({
   locale: string;
   onOpen: () => void;
 }) {
+  const { timeZone } = usePosRuntimeConfig();
   const statusTone =
     CUSTOMER_ORDER_STATUS_TONES[order.status] ??
     "bg-muted text-muted-foreground";
@@ -272,7 +275,7 @@ function CustomerOrderCard({
             {CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ?? order.orderType}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {formatDate(order.createdAt, locale)}
+            {formatDate(order.createdAt, locale, timeZone)}
           </div>
         </div>
         <span
@@ -319,11 +322,12 @@ function CustomerOrderCardDetail({
   );
 }
 
-function formatDate(iso: string, locale: string): string {
+function formatDate(iso: string, locale: string, timeZone: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString(locale, {
     month: "2-digit",
     day: "2-digit",
+    timeZone,
   });
 }

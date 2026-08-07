@@ -377,7 +377,11 @@ function formatMoney(value: number, currency: string, locale: string): string {
   return `${currency} ${formatNumber(value, locale)}`;
 }
 
-function formatDateTime(value: string, locale: string): string {
+function formatDateTime(
+  value: string,
+  locale: string,
+  timeZone: string,
+): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return value;
@@ -388,6 +392,7 @@ function formatDateTime(value: string, locale: string): string {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone,
   }).format(date);
 }
 
@@ -471,10 +476,12 @@ function OrderRow({
   currency,
   locale,
   order,
+  timeZone,
 }: {
   currency: string;
   locale: string;
   order: PosOrderSummary;
+  timeZone: string;
 }) {
   return (
     <Link
@@ -495,7 +502,7 @@ function OrderRow({
         </p>
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>{formatDateTime(order.createdAt, locale)}</span>
+        <span>{formatDateTime(order.createdAt, locale, timeZone)}</span>
         <span>{formatMoney(toNumber(order.paidAmount), currency, locale)}</span>
       </div>
     </Link>
@@ -506,11 +513,13 @@ function TicketRow({
   currency,
   locale,
   ticket,
+  timeZone,
   unitLabel,
 }: {
   currency: string;
   locale: string;
   ticket: ServiceTicketSummary;
+  timeZone: string;
   unitLabel: string;
 }) {
   return (
@@ -532,7 +541,7 @@ function TicketRow({
         </p>
       </div>
       <div className="mt-2 flex items-center justify-between gap-3 text-xs text-muted-foreground">
-        <span>{formatDateTime(ticket.updatedAt, locale)}</span>
+        <span>{formatDateTime(ticket.updatedAt, locale, timeZone)}</span>
         <span>
           {ticket.itemCount} {unitLabel}
         </span>
@@ -590,6 +599,7 @@ export function ShiftHandoverView({
   const resolvedLocale = resolveLocale(locale);
   const copy = COPY[resolvedLocale];
   const currency = branch?.defaultCurrency ?? DEFAULT_POS_CURRENCY;
+  const timeZone = user?.timezone ?? "UTC";
   const cashierName = user?.displayName ?? "-";
   const branchName = branch?.name ?? "-";
   const expectedCash = useMemo(() => {
@@ -808,7 +818,7 @@ export function ShiftHandoverView({
               {copy.generatedAt}
             </p>
             <p className="mt-1 text-sm font-semibold text-foreground">
-              {formatDateTime(summary.generatedAt, locale)}
+              {formatDateTime(summary.generatedAt, locale, timeZone)}
             </p>
           </div>
         </div>
@@ -1080,7 +1090,7 @@ export function ShiftHandoverView({
                         Z-{report.id.slice(-8).toUpperCase()}
                       </p>
                       <span className="text-xs font-medium text-muted-foreground">
-                        {formatDateTime(report.cutoffAt, locale)}
+                        {formatDateTime(report.cutoffAt, locale, timeZone)}
                       </span>
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
@@ -1227,6 +1237,7 @@ export function ShiftHandoverView({
                   key={order.id}
                   locale={locale}
                   order={order}
+                  timeZone={timeZone}
                 />
               ))
             ) : (
@@ -1255,6 +1266,7 @@ export function ShiftHandoverView({
                   key={ticket.id}
                   locale={locale}
                   ticket={ticket}
+                  timeZone={timeZone}
                   unitLabel={copy.items}
                 />
               ))
@@ -1292,6 +1304,7 @@ export function ShiftHandoverView({
                   key={ticket.id}
                   locale={locale}
                   ticket={ticket}
+                  timeZone={timeZone}
                   unitLabel={copy.items}
                 />
               ))}

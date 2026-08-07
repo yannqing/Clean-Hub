@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { Icon } from "@/components/app-shell";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 import { PendingPrintJobs } from "@/features/hardware/components/pending-print-jobs";
 import { posApi } from "@/lib/api-client";
@@ -45,7 +46,11 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-function formatSentAt(value: string | null, locale: string): string {
+function formatSentAt(
+  value: string | null,
+  locale: string,
+  timeZone: string,
+): string {
   if (!value) {
     return "";
   }
@@ -61,6 +66,7 @@ function formatSentAt(value: string | null, locale: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    timeZone,
   }).format(date);
 }
 
@@ -83,6 +89,7 @@ export function HeaderNotificationsMenu({
   onUnreadCountChange,
 }: HeaderNotificationsMenuProps) {
   const { locale, t } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const abortRef = useRef<AbortController | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [items, setItems] = useState<PosNotificationInboxItem[]>([]);
@@ -320,6 +327,7 @@ export function HeaderNotificationsMenu({
                   const sentAt = formatSentAt(
                     notification.sentAt ?? notification.createdAt,
                     locale,
+                    timeZone,
                   );
 
                   return (

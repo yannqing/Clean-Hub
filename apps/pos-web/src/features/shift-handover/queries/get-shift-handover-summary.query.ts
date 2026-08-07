@@ -4,6 +4,10 @@ import type {
   PosOrderListResponse,
   ServiceTicketListResponse,
 } from "@cleanhub/api-client";
+import {
+  getDateOnlyInTimeZone,
+  getUtcDayRangeInTimeZone,
+} from "@cleanhub/domain/timezone";
 
 import {
   getOrderOverviewQuery,
@@ -27,28 +31,31 @@ export type ShiftHandoverSummaryOptions = {
    * stores shift totals, and the cash difference is reported incorrectly.
    */
   shiftStartedAt?: string | null;
+  timeZone?: string;
 };
 
-function todayRange(): { createdAfter: string; createdBefore: string } {
-  const now = new Date();
-  const start = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
+function todayRange(timeZone: string): {
+  createdAfter: string;
+  createdBefore: string;
+} {
+  const today = getDateOnlyInTimeZone(new Date(), timeZone);
+  const range = getUtcDayRangeInTimeZone(today, timeZone);
 
   return {
-    createdAfter: start.toISOString(),
-    createdBefore: new Date(
-      start.getTime() + 24 * 60 * 60 * 1000,
-    ).toISOString(),
+    createdAfter: range.from.toISOString(),
+    createdBefore: range.to.toISOString(),
   };
 }
 
-function summaryRange(shiftStartedAt: string | null | undefined): {
+function summaryRange(
+  shiftStartedAt: string | null | undefined,
+  timeZone: string,
+): {
   createdAfter: string;
   createdBefore: string;
 } {
   if (!shiftStartedAt) {
-    return todayRange();
+    return todayRange(timeZone);
   }
 
   return {
@@ -75,7 +82,7 @@ export async function getShiftHandoverSummaryQuery(
   options: ShiftHandoverSummaryOptions = {},
 ): Promise<ShiftHandoverSummary> {
   const now = new Date();
-  const range = summaryRange(options.shiftStartedAt);
+  const range = summaryRange(options.shiftStartedAt, options.timeZone ?? "UTC");
 
   const [
     orders,

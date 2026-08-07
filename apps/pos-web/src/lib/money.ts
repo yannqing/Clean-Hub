@@ -1,4 +1,6 @@
-export const DEFAULT_POS_CURRENCY = "XOF";
+// Runtime configuration should supply the tenant currency. `XXX` is a neutral
+// ISO fallback that avoids mislabeling an amount as a real tenant currency.
+export const DEFAULT_POS_CURRENCY = "XXX";
 
 export function normalizeCurrencyCode(
   currency: string | null | undefined,

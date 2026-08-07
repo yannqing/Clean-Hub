@@ -5,17 +5,25 @@ import { posToast as toast } from "@/lib/pos-toast";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { useRouter } from "next/navigation";
 import type { PosOrderDetail } from "@cleanhub/api-client";
+import {
+  calendarDateEndToUtc,
+  getDateOnlyInTimeZone,
+} from "@cleanhub/domain/timezone";
 
 import { Icon } from "@/components/app-shell";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 
 import { updateOrderAction } from "../actions";
 import { formatOrderDateTime, formatOrderMoney } from "../constants";
 
 export function OrderInfoEditor({ order }: { order: PosOrderDetail }) {
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
-  const [expireAt, setExpireAt] = useState(toDateInput(order.expireAt));
+  const [expireAt, setExpireAt] = useState(
+    toDateInput(order.expireAt, timeZone),
+  );
   const [notes, setNotes] = useState(order.notes ?? "");
   const [isPending, startTransition] = useTransition();
   const canEdit =
@@ -27,7 +35,7 @@ export function OrderInfoEditor({ order }: { order: PosOrderDetail }) {
   function save() {
     startTransition(async () => {
       const result = await updateOrderAction(order.id, {
-        expireAt: toIsoOrNull(expireAt),
+        expireAt: toIsoOrNull(expireAt, timeZone),
         notes: notes.trim() || null,
         version: order.version,
       });
@@ -69,11 +77,11 @@ export function OrderInfoEditor({ order }: { order: PosOrderDetail }) {
         />
         <SummaryItem
           label="创建时间"
-          value={formatOrderDateTime(order.createdAt, locale)}
+          value={formatOrderDateTime(order.createdAt, locale, timeZone)}
         />
         <SummaryItem
           label="过期时间"
-          value={formatOrderDateTime(order.expireAt, locale)}
+          value={formatOrderDateTime(order.expireAt, locale, timeZone)}
         />
       </div>
 
@@ -137,7 +145,7 @@ function SummaryItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function toDateInput(iso: string | null): string {
+function toDateInput(iso: string | null, timeZone: string): string {
   if (!iso) {
     return "";
   }
@@ -145,12 +153,12 @@ function toDateInput(iso: string | null): string {
   if (Number.isNaN(date.getTime())) {
     return "";
   }
-  return date.toISOString().slice(0, 10);
+  return getDateOnlyInTimeZone(date, timeZone);
 }
 
-function toIsoOrNull(value: string): string | null {
+function toIsoOrNull(value: string, timeZone: string): string | null {
   if (!value) {
     return null;
   }
-  return new Date(`${value}T23:59:59`).toISOString();
+  return calendarDateEndToUtc(value, timeZone).toISOString();
 }

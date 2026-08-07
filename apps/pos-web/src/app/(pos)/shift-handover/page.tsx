@@ -14,6 +14,7 @@ export default async function ShiftHandoverPage() {
   // figures agree with the server-side Z Report snapshot.
   const summary = await getShiftHandoverSummaryQuery({
     shiftStartedAt: operations.currentShift?.startedAt ?? null,
+    timeZone: user?.timezone,
   });
 
   return (

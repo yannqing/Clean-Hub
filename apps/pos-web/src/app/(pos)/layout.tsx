@@ -43,6 +43,7 @@ export default async function PosLayout({
       userId={user?.userId}
       terminalCredentialVersion={user?.terminalCredentialVersion}
       currency={branch?.defaultCurrency}
+      timeZone={user?.timezone}
     >
       <PosTerminalSessionGuard />
       <OfflineSyncProvider

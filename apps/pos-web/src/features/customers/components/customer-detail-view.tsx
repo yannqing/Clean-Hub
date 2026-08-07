@@ -69,7 +69,7 @@ export function CustomerDetailView({
 }: CustomerDetailViewProps) {
   const router = useRouter();
   const { locale } = useTranslation();
-  const { currency } = usePosRuntimeConfig();
+  const { currency, timeZone } = usePosRuntimeConfig();
 
   // Whether this detail view was reached via 客户接待 (intake). Controls the
   // breadcrumb trail and the back-button destination so the clerk returns to
@@ -346,7 +346,11 @@ export function CustomerDetailView({
                   查看工单
                 </button>
               </div>
-              <CurrentServiceCard locale={locale} ticket={recentTickets[0]} />
+              <CurrentServiceCard
+                locale={locale}
+                ticket={recentTickets[0]}
+                timeZone={timeZone}
+              />
             </section>
             <section className="border-y bg-background p-5">
               <div className="flex items-center justify-between">
@@ -363,6 +367,7 @@ export function CustomerDetailView({
                 locale={locale}
                 tickets={recentTickets}
                 orders={recentOrders}
+                timeZone={timeZone}
               />
             </section>
           </div>
@@ -375,7 +380,7 @@ export function CustomerDetailView({
                 <Detail label="账户关系" value={relationshipLabel} />
                 <Detail
                   label="建档时间"
-                  value={formatDate(profile.createdAt, locale)}
+                  value={formatDate(profile.createdAt, locale, timeZone)}
                 />
                 <Detail label="地址" value={profile.address ?? "未填写"} />
               </div>
@@ -600,7 +605,7 @@ function NotificationPermissionsPanel({
   );
 }
 
-function formatDate(iso: string, locale: string): string {
+function formatDate(iso: string, locale: string, timeZone: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return date.toLocaleString(locale, {
@@ -609,6 +614,7 @@ function formatDate(iso: string, locale: string): string {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone,
   });
 }
 
@@ -620,7 +626,11 @@ function formatMoney(
   return formatPosMoney(amount, currency, locale);
 }
 
-function formatDateShort(iso: string, locale: string): string {
+function formatDateShort(
+  iso: string,
+  locale: string,
+  timeZone: string,
+): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString(locale, {
@@ -628,6 +638,7 @@ function formatDateShort(iso: string, locale: string): string {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone,
   });
 }
 
@@ -639,9 +650,11 @@ function formatDateShort(iso: string, locale: string): string {
 function CurrentServiceCard({
   locale,
   ticket,
+  timeZone,
 }: {
   locale: string;
   ticket: ServiceTicketSummary | undefined;
+  timeZone: string;
 }) {
   if (!ticket) {
     return (
@@ -661,12 +674,12 @@ function CurrentServiceCard({
         </div>
         <div className="mt-1 text-xs text-muted-foreground">
           工单 {ticket.ticketNo || "—"} · {ticket.itemCount} 个项目 ·{" "}
-          {formatDateShort(ticket.createdAt, locale)}
+          {formatDateShort(ticket.createdAt, locale, timeZone)}
         </div>
       </div>
       <span className="text-sm text-muted-foreground">
         {ticket.expectedPickupAt
-          ? formatDateShort(ticket.expectedPickupAt, locale)
+          ? formatDateShort(ticket.expectedPickupAt, locale, timeZone)
           : "未设置取件"}
       </span>
       <span
@@ -694,10 +707,12 @@ function RecentActivity({
   locale,
   tickets,
   orders,
+  timeZone,
 }: {
   locale: string;
   tickets: ServiceTicketSummary[];
   orders: PosOrderSummary[];
+  timeZone: string;
 }) {
   const items: Array<ActivityItem & { timestamp: string }> = [
     ...tickets
@@ -705,7 +720,7 @@ function RecentActivity({
       .map<ActivityItem & { timestamp: string }>((ticket) => ({
         title: "工单创建",
         detail: `${CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType} · ${ticket.itemCount} 个项目`,
-        time: formatDateShort(ticket.createdAt, locale),
+        time: formatDateShort(ticket.createdAt, locale, timeZone),
         timestamp: ticket.createdAt,
         amount: ticket.totalAmount
           ? formatMoney(ticket.totalAmount, locale, ticket.currency)
@@ -716,7 +731,7 @@ function RecentActivity({
       .map<ActivityItem & { timestamp: string }>((order) => ({
         title: "订单记录",
         detail: `${CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ?? order.orderType} · ${CUSTOMER_ORDER_PAYMENT_LABELS[order.paymentStatus] ?? order.paymentStatus}`,
-        time: formatDateShort(order.createdAt, locale),
+        time: formatDateShort(order.createdAt, locale, timeZone),
         timestamp: order.createdAt,
         amount: order.totalAmount
           ? formatMoney(order.totalAmount, locale, order.currency)

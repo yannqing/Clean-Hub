@@ -176,6 +176,7 @@ export function formatOrderMoney(
 export function formatOrderDateTime(
   iso: string | null | undefined,
   locale = "zh-CN",
+  timeZone = "UTC",
   options: Intl.DateTimeFormatOptions = {
     month: "numeric",
     day: "numeric",
@@ -190,7 +191,7 @@ export function formatOrderDateTime(
   if (Number.isNaN(date.getTime())) {
     return ORDER_EMPTY_PLACEHOLDER;
   }
-  return date.toLocaleString(locale, options);
+  return date.toLocaleString(locale, { ...options, timeZone });
 }
 
 export function displayOrderCode(orderId: string): string {

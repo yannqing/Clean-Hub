@@ -7,6 +7,7 @@ import type { SupportedLocale } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { buildPosReceiptText } from "@cleanhub/hardware";
 import { createId } from "@cleanhub/id";
+import { calendarDateEndToUtc } from "@cleanhub/domain/timezone";
 import { createScopedPrintJobQueue } from "@cleanhub/offline";
 import type {
   CreateManualOrderRequest,
@@ -36,7 +37,7 @@ import {
 import { usePosOfflineWrites } from "@/features/offline/lib";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
-import { normalizeCurrencyCode } from "@/lib/money";
+import { DEFAULT_POS_CURRENCY, normalizeCurrencyCode } from "@/lib/money";
 
 import { formatOrderMoney } from "../constants";
 
@@ -82,11 +83,11 @@ function emptyItem(): ManualItemForm {
   };
 }
 
-function toIsoOrNull(value: string): string | null {
+function toIsoOrNull(value: string, timeZone: string): string | null {
   if (!value) {
     return null;
   }
-  return new Date(`${value}T23:59:59`).toISOString();
+  return calendarDateEndToUtc(value, timeZone).toISOString();
 }
 
 type OrderCreateDialogProps = {
@@ -118,6 +119,7 @@ export function OrderCreateDialog({
     currency: runtimeCurrency,
     tenantId: runtimeTenantId,
     terminalId: runtimeTerminalId,
+    timeZone,
   } = usePosRuntimeConfig();
   const { createOrder } = usePosOfflineWrites();
   const [open, setOpen] = useState(false);
@@ -170,7 +172,7 @@ export function OrderCreateDialog({
       return {
         orderType: "ticket",
         ticketId: selectedTicket.id,
-        expireAt: toIsoOrNull(expireAt),
+        expireAt: toIsoOrNull(expireAt, timeZone),
         notes: normalizedNotes,
       };
     }
@@ -241,7 +243,7 @@ export function OrderCreateDialog({
         specialRequest: item.specialRequest,
         itemIdentifier: item.itemIdentifier,
       })),
-      expireAt: toIsoOrNull(expireAt),
+      expireAt: toIsoOrNull(expireAt, timeZone),
       notes: normalizedNotes,
     };
   }
@@ -350,7 +352,7 @@ export function OrderCreateDialog({
               <ManualOrderFields
                 canOverridePrice={canManageSensitiveOperations}
                 catalog={catalog}
-                currency={catalog[0]?.currency ?? "XOF"}
+                currency={runtimeCurrency}
                 selectedCustomer={selectedCustomer}
                 items={items}
                 onAddItem={() =>
@@ -473,33 +475,32 @@ function buildOfflineOrderReceipt(input: {
     input.payload.orderType === "manual" ? input.payload : null;
   const currency = resolveReceiptCurrency(
     manualPayload
-      ? input.catalog.find(
-          (service) => service.id === manualPayload.items[0]?.serviceId,
-        )?.currency ??
-        input.runtimeCurrency ??
-        "XOF"
-      : input.runtimeCurrency ?? "XOF",
+      ? (input.runtimeCurrency ??
+          input.catalog.find(
+            (service) => service.id === manualPayload.items[0]?.serviceId,
+          )?.currency ??
+          DEFAULT_POS_CURRENCY)
+      : (input.runtimeCurrency ?? DEFAULT_POS_CURRENCY),
   );
-  const receiptItems =
-    manualPayload
-      ? buildOfflineManualReceiptItems(manualPayload, input.catalog, currency)
-      : [
-          {
-            name: input.ticket?.ticketNo
-              ? `Ticket ${input.ticket.ticketNo}`
-              : "Service ticket",
-            quantity: Math.max(1, input.ticket?.itemCount ?? 1),
-            unitAmountMinor: toMinorUnits(
-              Number(input.ticket?.totalAmount ?? 0) /
-                Math.max(1, input.ticket?.itemCount ?? 1),
-              currency,
-            ),
-            totalAmountMinor: toMinorUnits(
-              Number(input.ticket?.totalAmount ?? 0),
-              currency,
-            ),
-          },
-        ];
+  const receiptItems = manualPayload
+    ? buildOfflineManualReceiptItems(manualPayload, input.catalog, currency)
+    : [
+        {
+          name: input.ticket?.ticketNo
+            ? `Ticket ${input.ticket.ticketNo}`
+            : "Service ticket",
+          quantity: Math.max(1, input.ticket?.itemCount ?? 1),
+          unitAmountMinor: toMinorUnits(
+            Number(input.ticket?.totalAmount ?? 0) /
+              Math.max(1, input.ticket?.itemCount ?? 1),
+            currency,
+          ),
+          totalAmountMinor: toMinorUnits(
+            Number(input.ticket?.totalAmount ?? 0),
+            currency,
+          ),
+        },
+      ];
   const totalMinor = receiptItems.reduce(
     (total, item) => total + item.totalAmountMinor,
     0,
@@ -577,7 +578,7 @@ function resolveReceiptCurrency(value: string): string {
     }).format(0);
     return normalized;
   } catch {
-    return "XOF";
+    return DEFAULT_POS_CURRENCY;
   }
 }
 
@@ -587,25 +588,26 @@ function buildOfflineManualReceiptItems(
   currency: string,
 ) {
   return payload.items.map((item) => {
-    const service = catalog.find((candidate) => candidate.id === item.serviceId);
+    const service = catalog.find(
+      (candidate) => candidate.id === item.serviceId,
+    );
     const quantity = item.weight
       ? Number(item.weight)
       : Number(item.quantity ?? 1);
     const unitAmount = Number(item.chargedUnitAmount ?? service?.amount ?? 0);
-    const safeQuantity = Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
+    const safeQuantity =
+      Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
     const safeUnitAmount = Number.isFinite(unitAmount) ? unitAmount : 0;
 
     return {
       name: service?.name ?? item.serviceId,
       quantity: safeQuantity,
       unitAmountMinor: toMinorUnits(safeUnitAmount, currency),
-      totalAmountMinor: toMinorUnits(
-        safeQuantity * safeUnitAmount,
-        currency,
-      ),
-      note: [item.itemColor, item.defectNotes, item.specialRequest]
-        .filter(Boolean)
-        .join("; ") || undefined,
+      totalAmountMinor: toMinorUnits(safeQuantity * safeUnitAmount, currency),
+      note:
+        [item.itemColor, item.defectNotes, item.specialRequest]
+          .filter(Boolean)
+          .join("; ") || undefined,
     };
   });
 }

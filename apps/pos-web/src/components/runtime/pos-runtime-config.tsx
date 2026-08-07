@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useMemo } from "react";
+import { resolveTimeZone } from "@cleanhub/domain/timezone";
 
 import { DEFAULT_POS_CURRENCY, normalizeCurrencyCode } from "@/lib/money";
 
@@ -11,6 +12,7 @@ type PosRuntimeConfig = {
   userId: string | null;
   terminalCredentialVersion: number | null;
   currency: string;
+  timeZone: string;
 };
 
 const PosRuntimeConfigContext = createContext<PosRuntimeConfig>({
@@ -20,6 +22,7 @@ const PosRuntimeConfigContext = createContext<PosRuntimeConfig>({
   userId: null,
   terminalCredentialVersion: null,
   currency: DEFAULT_POS_CURRENCY,
+  timeZone: "UTC",
 });
 
 export function PosRuntimeConfigProvider({
@@ -29,6 +32,7 @@ export function PosRuntimeConfigProvider({
   userId,
   terminalCredentialVersion,
   currency,
+  timeZone,
   children,
 }: {
   tenantId?: string | null;
@@ -37,6 +41,7 @@ export function PosRuntimeConfigProvider({
   userId?: string | null;
   terminalCredentialVersion?: number | null;
   currency?: string | null;
+  timeZone?: string | null;
   children: React.ReactNode;
 }) {
   const value = useMemo<PosRuntimeConfig>(
@@ -47,6 +52,7 @@ export function PosRuntimeConfigProvider({
       userId: userId ?? null,
       terminalCredentialVersion: terminalCredentialVersion ?? null,
       currency: normalizeCurrencyCode(currency),
+      timeZone: resolveTimeZone(timeZone),
     }),
     [
       branchId,
@@ -54,6 +60,7 @@ export function PosRuntimeConfigProvider({
       tenantId,
       terminalCredentialVersion,
       terminalId,
+      timeZone,
       userId,
     ],
   );

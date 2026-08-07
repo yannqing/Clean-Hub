@@ -13,6 +13,7 @@ export type PosSessionUser = {
   role: AdminRole;
   roles: string[];
   permissions: string[];
+  timezone?: string;
   terminalId?: string;
   terminalBranchId?: string;
   terminalDeviceId?: string;

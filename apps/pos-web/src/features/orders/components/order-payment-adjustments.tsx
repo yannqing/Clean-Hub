@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
 
 import { Icon } from "@/components/app-shell";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import { createPaymentCorrectionAction, createRefundAction } from "../actions";
@@ -39,6 +40,7 @@ export function OrderPaymentAdjustments({
   payments: PosPaymentTransaction[];
 }) {
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const router = useRouter();
   const idempotencyKeyRef = useRef<string | null>(null);
   const [mode, setMode] = useState<AdjustmentMode | null>(null);
@@ -219,7 +221,7 @@ export function OrderPaymentAdjustments({
                   {adjustment.reason}
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {formatOrderDateTime(adjustment.occurredAt, locale)}
+                  {formatOrderDateTime(adjustment.occurredAt, locale, timeZone)}
                 </div>
               </div>
               <div

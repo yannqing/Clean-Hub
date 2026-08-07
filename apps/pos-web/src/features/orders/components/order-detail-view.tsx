@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { PosBreadcrumb } from "@/components/app-shell";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { customerDetailPath, posRoutes } from "@/config";
 import { PrintJobControl } from "@/features/hardware/components";
 
@@ -322,6 +323,7 @@ function OrderPaymentsCard({
   payments: PosPaymentTransaction[];
 }) {
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const router = useRouter();
   const [resolution, setResolution] = useState<{
     payment: PosPaymentTransaction;
@@ -412,6 +414,7 @@ function OrderPaymentsCard({
                   {formatOrderDateTime(
                     payment.paidAt ?? payment.createdAt,
                     locale,
+                    timeZone,
                   )}
                 </div>
               </div>

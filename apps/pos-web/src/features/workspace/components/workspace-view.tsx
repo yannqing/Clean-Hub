@@ -8,6 +8,7 @@ import type {
 import { useTranslation } from "@cleanhub/i18n/react";
 import type { PosSessionUser } from "@/lib/session";
 import { Icon } from "@/components/app-shell/icons";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { WorkspaceBranchCard } from "./workspace-branch-card";
 import { WorkspaceStatistics } from "./workspace-statistics";
 import { WorkspaceQuickActions } from "./workspace-quick-actions";
@@ -34,6 +35,7 @@ export function WorkspaceView({
   pendingTasks,
 }: WorkspaceViewProps) {
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : null;
   const canReprint = user?.role === "owner" || user?.role === "manager";
   const today = new Date().toLocaleDateString(locale, {
@@ -41,6 +43,7 @@ export function WorkspaceView({
     month: "long",
     day: "numeric",
     weekday: "long",
+    timeZone,
   });
 
   return (

@@ -5,6 +5,10 @@ import type {
   PosNoticeType,
   PosNotificationInboxItem,
 } from "@cleanhub/api-client";
+import {
+  addCalendarDays,
+  getDateOnlyInTimeZone,
+} from "@cleanhub/domain/timezone";
 
 export const NOTIFICATIONS_PAGE_TITLE = "通知中心";
 export const DEFAULT_NOTIFICATION_PAGE_SIZE = 50;
@@ -79,6 +83,7 @@ export const NOTICE_RELATED_TYPE_OPTIONS: ReadonlyArray<{
 export function formatNotificationDateTime(
   value: string | null,
   locale = "zh-CN",
+  timeZone = "UTC",
 ): string {
   if (!value) {
     return "-";
@@ -95,11 +100,14 @@ export function formatNotificationDateTime(
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    timeZone,
   }).format(date);
 }
 
 export function getNotificationDateGroup(
   notification: PosNotificationInboxItem,
+  timeZone = "UTC",
+  now = new Date(),
 ): "today" | "yesterday" | "older" {
   const value = notification.sentAt ?? notification.createdAt;
   const date = new Date(value);
@@ -107,14 +115,14 @@ export function getNotificationDateGroup(
     return "older";
   }
 
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+  const today = getDateOnlyInTimeZone(now, timeZone);
+  const yesterday = addCalendarDays(today, -1);
+  const notificationDate = getDateOnlyInTimeZone(date, timeZone);
 
-  if (date >= todayStart) {
+  if (notificationDate === today) {
     return "today";
   }
-  if (date >= yesterdayStart) {
+  if (notificationDate === yesterday) {
     return "yesterday";
   }
   return "older";

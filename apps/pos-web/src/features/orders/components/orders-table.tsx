@@ -17,6 +17,7 @@ import {
 
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 
 import {
@@ -39,6 +40,7 @@ type OrdersTableProps = {
 
 export function OrdersTable({ orders, total }: OrdersTableProps) {
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const router = useRouter();
   const params = useSearchParams();
   const visibleColumns = parseVisibleColumns(
@@ -157,7 +159,7 @@ export function OrdersTable({ orders, total }: OrdersTableProps) {
                 ) : null}
                 {visibleColumns.has("createdAt") ? (
                   <TableCell className="text-muted-foreground">
-                    {formatOrderDateTime(order.createdAt, locale)}
+                    {formatOrderDateTime(order.createdAt, locale, timeZone)}
                   </TableCell>
                 ) : null}
               </TableRow>
@@ -178,6 +180,7 @@ function OrderCard({
   locale: SupportedLocale;
   order: PosOrderSummary;
 }) {
+  const { timeZone } = usePosRuntimeConfig();
   const detailHref = posRoutes.orderDetail(order.id);
   const text = (value: string) => translatePosText(value, locale);
 
@@ -210,7 +213,7 @@ function OrderCard({
           <OrderPaymentStatusBadge status={order.paymentStatus} />
         </div>
         <span className="flex items-center gap-1 text-muted-foreground">
-          {formatOrderDateTime(order.createdAt, locale)}
+          {formatOrderDateTime(order.createdAt, locale, timeZone)}
           <Icon className="size-3.5" name="chevron-right" />
         </span>
       </div>

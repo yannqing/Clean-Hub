@@ -13,6 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@cleanhub/ui";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 
 import {
   CUSTOMER_COLUMN_KEYS,
@@ -46,6 +47,7 @@ export function CustomerTable({
   onService,
 }: CustomerTableProps) {
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const visibleColumnCount = CUSTOMER_COLUMN_KEYS.filter((column) =>
     visibleColumns.has(column),
   ).length;
@@ -118,6 +120,7 @@ export function CustomerTable({
           <CustomerCard
             key={`${row.kind}-${row.id}`}
             locale={locale}
+            timeZone={timeZone}
             onClick={(event) => handleRowClick(event, row)}
             onDelete={onDelete ? () => onDelete(row) : undefined}
             onEdit={() => onEdit(row)}
@@ -207,7 +210,7 @@ export function CustomerTable({
                 ) : null}
                 {visibleColumns.has("createdAt") ? (
                   <TableCell className="text-muted-foreground">
-                    {formatCustomerDate(row.createdAt, locale)}
+                    {formatCustomerDate(row.createdAt, locale, timeZone)}
                   </TableCell>
                 ) : null}
                 {visibleColumns.has("actions") ? (
@@ -244,6 +247,7 @@ export function CustomerTable({
 function CustomerCard({
   row,
   locale,
+  timeZone,
   onToggleStatus,
   onEdit,
   onDelete,
@@ -252,6 +256,7 @@ function CustomerCard({
 }: {
   row: CustomerListRow;
   locale: string;
+  timeZone: string;
   onToggleStatus: () => void;
   onEdit: () => void;
   onDelete?: () => void;
@@ -292,7 +297,7 @@ function CustomerCard({
           ) : null}
         </div>
         <span className="text-xs text-muted-foreground">
-          {formatCustomerDate(row.createdAt, locale)}
+          {formatCustomerDate(row.createdAt, locale, timeZone)}
         </span>
       </div>
 
@@ -325,7 +330,11 @@ function CustomerCard({
   );
 }
 
-function formatCustomerDate(value: string, locale: string): string {
+function formatCustomerDate(
+  value: string,
+  locale: string,
+  timeZone: string,
+): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
     return "—";
@@ -335,5 +344,6 @@ function formatCustomerDate(value: string, locale: string): string {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone,
   });
 }

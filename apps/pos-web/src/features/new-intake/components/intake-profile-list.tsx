@@ -67,7 +67,7 @@ export function IntakeProfileList({
 }: IntakeProfileListProps) {
   const { locale } = useTranslation();
   const text = (value: string) => translatePosText(value, locale);
-  const { currency } = usePosRuntimeConfig();
+  const { currency, timeZone } = usePosRuntimeConfig();
   const isAccountMode = mode === "accountProfiles";
   const pages = buildPaginationWindow(page, pageCount);
 
@@ -270,7 +270,7 @@ export function IntakeProfileList({
                 </div>
 
                 <div className="text-muted-foreground">
-                  {formatDisplayDate(row.createdAt, locale)}
+                  {formatDisplayDate(row.createdAt, locale, timeZone)}
                 </div>
 
                 <div className="text-right font-semibold text-muted-foreground">
@@ -324,7 +324,7 @@ export function IntakeProfileList({
                 </div>
 
                 <div className="text-muted-foreground">
-                  {formatDisplayDate(row.createdAt, locale)}
+                  {formatDisplayDate(row.createdAt, locale, timeZone)}
                 </div>
 
                 <div className="text-right font-semibold text-foreground">
@@ -403,6 +403,7 @@ function IntakeResultCard({
   locale: SupportedLocale;
   onSelect: () => void;
 }) {
+  const { timeZone } = usePosRuntimeConfig();
   const isAccount = row.kind === "account";
   const name = isAccount ? row.accountName : row.fullName;
   const text = (value: string) => translatePosText(value, locale);
@@ -470,7 +471,7 @@ function IntakeResultCard({
         <div>
           <dt className="text-xs text-muted-foreground">创建时间</dt>
           <dd className="mt-1 text-sm font-medium text-foreground">
-            {formatDisplayDate(row.createdAt, locale)}
+            {formatDisplayDate(row.createdAt, locale, timeZone)}
           </dd>
         </div>
       </dl>
@@ -520,7 +521,11 @@ function profileTier(row: IntakeProfileRow): string {
   return "普通客户";
 }
 
-function formatDisplayDate(value: string, locale: SupportedLocale): string {
+function formatDisplayDate(
+  value: string,
+  locale: SupportedLocale,
+  timeZone: string,
+): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
 
@@ -528,5 +533,6 @@ function formatDisplayDate(value: string, locale: SupportedLocale): string {
     year: "numeric",
     month: "short",
     day: "2-digit",
+    timeZone,
   }).format(date);
 }

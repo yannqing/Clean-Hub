@@ -14,6 +14,7 @@ import {
   PosPageHeader,
   PosTableSurface,
 } from "@/components/app-shell";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 import { PendingPrintJobs } from "@/features/hardware/components/pending-print-jobs";
 
@@ -80,6 +81,7 @@ export function NotificationsCenter({
   total,
 }: NotificationsCenterProps) {
   const router = useRouter();
+  const { timeZone } = usePosRuntimeConfig();
   const params = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -100,11 +102,13 @@ export function NotificationsCenter({
     };
 
     for (const notification of notifications) {
-      initial[getNotificationDateGroup(notification)].push(notification);
+      initial[getNotificationDateGroup(notification, timeZone)].push(
+        notification,
+      );
     }
 
     return initial;
-  }, [notifications]);
+  }, [notifications, timeZone]);
 
   const applyFilters = useCallback(
     (next: Record<string, string | undefined>) => {
@@ -413,6 +417,7 @@ function NotificationRow({
   onMarkRead: (deliveryId: string) => void;
   onArchive: (deliveryId: string) => void;
 }) {
+  const { timeZone } = usePosRuntimeConfig();
   const { locale } = useTranslation();
 
   return (
@@ -440,7 +445,11 @@ function NotificationRow({
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span>
-              {formatNotificationDateTime(notification.sentAt, locale)}
+              {formatNotificationDateTime(
+                notification.sentAt,
+                locale,
+                timeZone,
+              )}
             </span>
             {notification.relatedType ? (
               <span>
@@ -501,6 +510,7 @@ function NotificationDetailPanel({
   onArchive: (deliveryId: string) => void;
 }) {
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
 
   if (!notification) {
     return (
@@ -519,7 +529,11 @@ function NotificationDetailPanel({
           <div>
             <h2 className="font-semibold text-foreground">通知详情</h2>
             <p className="mt-1 text-xs text-muted-foreground">
-              {formatNotificationDateTime(notification.sentAt, locale)}
+              {formatNotificationDateTime(
+                notification.sentAt,
+                locale,
+                timeZone,
+              )}
             </p>
           </div>
           <NotificationBadge

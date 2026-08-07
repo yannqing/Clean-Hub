@@ -10,6 +10,12 @@ import type {
 } from "@cleanhub/api-client";
 
 import { useTranslation } from "@cleanhub/i18n/react";
+import {
+  addCalendarDays,
+  calendarDateStartToUtc,
+  getDateOnlyInTimeZone,
+} from "@cleanhub/domain/timezone";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import {
@@ -50,6 +56,7 @@ export function CustomerTicketList({
 }: CustomerTicketListProps) {
   const router = useRouter();
   const { locale } = useTranslation();
+  const { timeZone } = usePosRuntimeConfig();
   const [rows, setRows] = useState<ServiceTicketSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -65,7 +72,7 @@ export function CustomerTicketList({
     reloadRequestIdRef.current = requestId;
     setLoading(true);
     try {
-      const dateRange = getCreatedDateRange(dateFilter);
+      const dateRange = getCreatedDateRange(dateFilter, timeZone);
       const result = await fetchCustomerTickets(
         customerId,
         page,
@@ -95,7 +102,15 @@ export function CustomerTicketList({
         setLoading(false);
       }
     }
-  }, [customerId, page, currentPageSize, query, serviceFilter, dateFilter]);
+  }, [
+    customerId,
+    page,
+    currentPageSize,
+    query,
+    serviceFilter,
+    dateFilter,
+    timeZone,
+  ]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- async data fetch; setState happens in the async continuation.
@@ -211,7 +226,7 @@ export function CustomerTicketList({
                       {ticket.ticketNo || "—"}
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {formatDate(ticket.createdAt, locale)}
+                      {formatDate(ticket.createdAt, locale, timeZone)}
                     </div>
                   </div>
                   <div className="font-medium text-foreground">
@@ -231,7 +246,7 @@ export function CustomerTicketList({
                   </div>
                   <div className="text-muted-foreground">
                     {ticket.expectedPickupAt
-                      ? formatDate(ticket.expectedPickupAt, locale)
+                      ? formatDate(ticket.expectedPickupAt, locale, timeZone)
                       : "未设置"}
                   </div>
                 </button>
@@ -302,6 +317,7 @@ function CustomerTicketCard({
   href: string;
   onOpen: (href: string) => void;
 }) {
+  const { timeZone } = usePosRuntimeConfig();
   const tone =
     CUSTOMER_TICKET_STATUS_TONES[ticket.ticketStatus] ??
     "bg-muted text-muted-foreground";
@@ -322,7 +338,7 @@ function CustomerTicketCard({
               ticket.ticketType}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {formatDate(ticket.createdAt, locale)}
+            {formatDate(ticket.createdAt, locale, timeZone)}
           </div>
         </div>
         <span
@@ -342,7 +358,7 @@ function CustomerTicketCard({
           label="预计取件"
           value={
             ticket.expectedPickupAt
-              ? formatDate(ticket.expectedPickupAt, locale)
+              ? formatDate(ticket.expectedPickupAt, locale, timeZone)
               : "未设置"
           }
         />
@@ -367,32 +383,33 @@ function CustomerTicketCardDetail({
   );
 }
 
-function getCreatedDateRange(filter: string): {
+function getCreatedDateRange(filter: string, timeZone: string): {
   createdAfter?: string;
   createdBefore?: string;
 } {
   if (filter === "all") return {};
 
   const end = new Date();
-  const start = new Date(end);
+  const today = getDateOnlyInTimeZone(end, timeZone);
+  let startDate: string;
 
   if (filter === "today") {
-    start.setHours(0, 0, 0, 0);
+    startDate = today;
   } else if (filter === "7d") {
-    start.setDate(start.getDate() - 7);
+    startDate = addCalendarDays(today, -7);
   } else if (filter === "30d") {
-    start.setDate(start.getDate() - 30);
+    startDate = addCalendarDays(today, -30);
   } else {
     return {};
   }
 
   return {
-    createdAfter: start.toISOString(),
+    createdAfter: calendarDateStartToUtc(startDate, timeZone).toISOString(),
     createdBefore: end.toISOString(),
   };
 }
 
-function formatDate(iso: string, locale: string): string {
+function formatDate(iso: string, locale: string, timeZone: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleString(locale, {
@@ -400,5 +417,6 @@ function formatDate(iso: string, locale: string): string {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone,
   });
 }

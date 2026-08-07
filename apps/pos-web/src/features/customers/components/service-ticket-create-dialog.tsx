@@ -1,6 +1,7 @@
 "use client";
 
 import { posToast as toast } from "@/lib/pos-toast";
+import { dateTimeLocalToUtc } from "@cleanhub/domain/timezone";
 import { useEffect, useState } from "react";
 
 import type {
@@ -17,6 +18,7 @@ import {
 } from "@cleanhub/ui";
 
 import { posApi } from "@/lib/api-client";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 
 type ServiceTicketCreateDialogProps = {
   open: boolean;
@@ -84,6 +86,7 @@ export function ServiceTicketCreateDialog({
   onOpenChange,
   onCreated,
 }: ServiceTicketCreateDialogProps) {
+  const { timeZone } = usePosRuntimeConfig();
   const [form, setForm] = useState<FormValues>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [branchId, setBranchId] = useState<string | null>(null);
@@ -122,6 +125,13 @@ export function ServiceTicketCreateDialog({
       toast.error("无法确定当前门店，请先绑定门店后再创建工单。");
       return;
     }
+    const expectedPickupAt = form.expectedPickupAt
+      ? dateTimeLocalToUtc(form.expectedPickupAt, timeZone)
+      : null;
+    if (form.expectedPickupAt && !expectedPickupAt) {
+      toast.error("预计取件时间无效。");
+      return;
+    }
     setSubmitting(true);
     try {
       const ticket = await posApi.pos.serviceTickets.create({
@@ -130,9 +140,7 @@ export function ServiceTicketCreateDialog({
         ticketType: form.ticketType,
         priority: form.priority,
         sourceChannel: form.sourceChannel,
-        expectedPickupAt: form.expectedPickupAt
-          ? new Date(form.expectedPickupAt).toISOString()
-          : undefined,
+        expectedPickupAt: expectedPickupAt?.toISOString(),
         remark: form.remark.trim() || undefined,
       });
       toast.success("服务工单已创建");

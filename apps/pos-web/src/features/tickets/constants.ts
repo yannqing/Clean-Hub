@@ -362,6 +362,7 @@ export function formatTicketMoney(
 export function formatTicketDateTime(
   iso: string | null | undefined,
   locale = "zh-CN",
+  timeZone = "UTC",
   options: Intl.DateTimeFormatOptions = {
     month: "numeric",
     day: "numeric",
@@ -376,7 +377,7 @@ export function formatTicketDateTime(
   if (Number.isNaN(date.getTime())) {
     return "—";
   }
-  return date.toLocaleString(locale, options);
+  return date.toLocaleString(locale, { ...options, timeZone });
 }
 
 export const TICKET_EMPTY_PLACEHOLDER = "—";
