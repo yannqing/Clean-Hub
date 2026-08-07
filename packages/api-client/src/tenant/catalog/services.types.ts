@@ -15,13 +15,19 @@ export type ServiceSummary = {
   id: string;
   businessLine: ServiceBusinessLine;
   name: string;
+  code: string | null;
+  shortName: string | null;
   categoryId: string;
   categoryName: string;
   description: string | null;
+  internalNotes: string | null;
+  turnaroundMinutes: number | null;
   displayOrder: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   standardPrice: string;
+  compareAtPrice: string | null;
+  costPrice: string | null;
   currency: string;
   status: ServiceStatus;
   createdAt: string;
@@ -32,18 +38,22 @@ export type ServiceSummary = {
 export type CreateServiceRequest = {
   businessLine: ServiceBusinessLine;
   name: string;
+  code?: string | null;
+  shortName?: string | null;
   categoryId: string;
   description?: string | null;
+  internalNotes?: string | null;
+  turnaroundMinutes?: number | null;
   displayOrder?: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   standardPrice: string;
+  compareAtPrice?: string | null;
+  costPrice?: string | null;
   status?: ServiceStatus;
 };
 
-export type UpdateServiceRequest = Partial<
-  CreateServiceRequest & { currency: string }
-> & {
+export type UpdateServiceRequest = Partial<CreateServiceRequest> & {
   /** Optimistic-concurrency version from the record the editor last read. */
   version: number;
 };

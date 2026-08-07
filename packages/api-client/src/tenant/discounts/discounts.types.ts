@@ -221,6 +221,7 @@ export type TenantDiscountServiceCategoryOption = {
 };
 
 export type TenantDiscountOptions = {
+  defaultCurrency: string;
   branches: TenantDiscountBranchOption[];
   products: TenantDiscountNamedOption[];
   productCategories: TenantDiscountNamedOption[];

@@ -20,6 +20,10 @@ export type AuthContext = {
   role: AdminRole;
   roles: string[];
   permissions: Permission[];
+  /** Tenant-wide interface language. Every tenant page follows this value. */
+  language?: "en" | "fr" | "zh-CN";
+  /** Tenant-wide business timezone. Every branch inherits this value. */
+  timezone?: string;
   terminalId?: string;
   terminalBranchId?: string;
   terminalDeviceId?: string;

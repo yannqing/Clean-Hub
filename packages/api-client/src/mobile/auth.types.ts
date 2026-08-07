@@ -7,6 +7,7 @@ export type MobileAuthContext = {
   displayName: string;
   tenantId: string;
   currency: string;
+  timezone?: string;
   branchIds: string[];
   role: MobileRole;
   roles: MobileRole[];
