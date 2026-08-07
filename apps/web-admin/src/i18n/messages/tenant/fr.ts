@@ -457,7 +457,8 @@ export const tenantMessagesFr: TenantMessages = {
     },
     accounts: {
       title: "Comptes clients",
-      description: "Gérez les informations du compte et les profils clients qui lui sont associés.",
+      description:
+        "Gérez les informations du compte et les profils clients qui lui sont associés.",
       searchLabel: "Rechercher des comptes",
       searchPlaceholder: "Nom, téléphone, e-mail, identifiant ou client",
       statusLabel: "Statut du compte",
@@ -483,11 +484,14 @@ export const tenantMessagesFr: TenantMessages = {
         email: "E-mail",
         status: "Statut",
         createdAt: "Créé",
+        actions: "Actions",
       },
       emptyTitle: "Aucun compte",
-      emptyDescription: "Les comptes clients apparaîtront ici après leur création.",
+      emptyDescription:
+        "Les comptes clients apparaîtront ici après leur création.",
       filteredEmptyTitle: "Aucun compte correspondant",
-      filteredEmptyDescription: "Essayez d'ajuster la recherche ou les filtres.",
+      filteredEmptyDescription:
+        "Essayez d'ajuster la recherche ou les filtres.",
       loadError: "Les comptes n'ont pas pu être chargés. Veuillez réessayer.",
       pageSummary: "Page {page} sur {pages} · {total} comptes",
       detail: {
@@ -497,8 +501,10 @@ export const tenantMessagesFr: TenantMessages = {
         editAction: "Modifier le compte",
         summaryTitle: "Informations du compte",
         linkedCustomersTitle: "Clients associés",
-        linkedCustomersDescription: "Ce compte possède {count} profils clients associés.",
-        linkedCustomersEmpty: "Ce compte ne possède aucun profil client associé.",
+        linkedCustomersDescription:
+          "Ce compte possède {count} profils clients associés.",
+        linkedCustomersEmpty:
+          "Ce compte ne possède aucun profil client associé.",
         recordDetailsTitle: "Détails du compte",
         accountId: "ID du compte",
         accountName: "Nom du compte",
@@ -509,15 +515,20 @@ export const tenantMessagesFr: TenantMessages = {
         updatedAt: "Mis à jour",
         version: "Version",
         editTitle: "Modifier le compte client",
-        editDescription: "Mettez à jour le nom, les coordonnées et le statut du compte.",
+        editDescription:
+          "Mettez à jour le nom, les coordonnées et le statut du compte.",
         saveAction: "Enregistrer le compte",
         saveSuccess: "Compte mis à jour.",
         saveError: "Le compte n'a pas pu être mis à jour. Veuillez réessayer.",
-        versionConflict: "Ce compte a été modifié par une autre personne. Actualisez puis réessayez.",
-        contactRequired: "Saisissez au moins un numéro de téléphone ou une adresse e-mail.",
+        versionConflict:
+          "Ce compte a été modifié par une autre personne. Actualisez puis réessayez.",
+        contactRequired:
+          "Saisissez au moins un numéro de téléphone ou une adresse e-mail.",
         accountNameRequired: "Saisissez un nom de compte.",
-        phoneConflict: "Ce numéro de téléphone est déjà utilisé par un autre compte.",
-        emailConflict: "Cette adresse e-mail est déjà utilisée par un autre compte.",
+        phoneConflict:
+          "Ce numéro de téléphone est déjà utilisé par un autre compte.",
+        emailConflict:
+          "Cette adresse e-mail est déjà utilisée par un autre compte.",
       },
     },
     metrics: {
@@ -557,6 +568,7 @@ export const tenantMessagesFr: TenantMessages = {
       email: "E-mail",
       status: "Statut",
       createdAt: "Créé",
+      actions: "Actions",
     },
     statusLabels: {
       active: "Actif",
@@ -574,6 +586,17 @@ export const tenantMessagesFr: TenantMessages = {
       breadcrumbLabel: "Navigation des clients",
       backToCustomers: "Retour aux clients",
       openCustomer: "Ouvrir le client {customer}",
+      editAction: "Modifier le client",
+      editDescription:
+        "Mettez à jour le nom, les coordonnées, le profil et le statut du client directement sur cette page.",
+      fullName: "Nom du client",
+      status: "Statut",
+      saveAction: "Enregistrer le client",
+      saveSuccess: "Profil client mis à jour.",
+      saveError: "Le profil client n'a pas pu être mis à jour. Veuillez réessayer.",
+      versionConflict:
+        "Ce profil client a été modifié par une autre personne. Actualisez puis réessayez.",
+      fullNameRequired: "Saisissez un nom de client.",
       profileTitle: "Profil client",
       contactTitle: "Coordonnées",
       accountTitle: "Compte lié",
@@ -694,6 +717,11 @@ export const tenantMessagesFr: TenantMessages = {
         "Ce produit comporte des modifications non enregistrées. Êtes-vous sûr de vouloir partir ?",
       showMoreSettings: "Afficher plus de paramètres",
       hideMoreSettings: "Masquer plus de paramètres",
+      currencyFromSettings:
+        "Les nouveaux prix produit utilisent la devise par défaut du locataire définie dans les paramètres.",
+      existingCurrencyNotice:
+        "Ce prix conserve sa devise d'origine ; modifier la devise par défaut ne convertit pas les montants historiques.",
+      changeDefaultCurrency: "Modifier la devise par défaut",
       categoryMetafields: {
         uncategorized: "Non classé",
         loading: "Chargement des attributs de catégorie…",
@@ -1336,7 +1364,7 @@ export const tenantMessagesFr: TenantMessages = {
         timezone:
           "Les heures de début et de fin sont interprétées dans le fuseau horaire du locataire, {timezone}.",
         fixedCurrency:
-          "Les montants fixes s'appliquent uniquement aux succursales qui utilisent la devise sélectionnée.",
+          "Les montants fixes utilisent la devise par défaut du locataire gérée dans les paramètres.",
       },
       buttons: {
         cancel: "Annuler",
@@ -1501,7 +1529,7 @@ export const tenantMessagesFr: TenantMessages = {
   services: {
     eyebrow: "Catalogue du locataire",
     title: "Services",
-    searchPlaceholder: "Nom du service",
+    searchPlaceholder: "Nom, nom court ou code",
     metrics: {
       label: "Statistiques des services",
       totalServices: "Total des services",
@@ -1530,17 +1558,41 @@ export const tenantMessagesFr: TenantMessages = {
         nameDesc: "Nom du service : Z à A",
       },
     },
+    sections: {
+      basicInformation: "Informations de base",
+      basicInformationDescription:
+        "Ajoutez le nom du service et les informations destinées au client.",
+      pricing: "Tarification",
+      pricingDescription:
+        "Définissez le prix de vente, le prix de référence et le coût interne.",
+      operations: "Exécution du service",
+      operationsDescription:
+        "Définissez le délai prévu et les notes destinées au personnel.",
+      catalogSettings: "Paramètres du catalogue",
+      catalogSettingsDescription:
+        "Contrôlez les étiquettes et la position du service dans le catalogue.",
+      status: "Statut",
+      organization: "Organisation du service",
+      organizationDescription:
+        "Classez le service par secteur d'activité et par catégorie.",
+    },
     formLabels: {
       search: "Rechercher",
       businessLine: "Secteur d'activité",
       status: "Statut",
       name: "Nom",
+      shortName: "Nom court",
+      code: "Code du service",
       category: "Catégorie de service",
       description: "Description",
+      internalNotes: "Notes internes",
+      turnaroundMinutes: "Délai estimé (minutes)",
       displayOrder: "Ordre d'affichage",
       pricing: "Unité de prix",
       labelRule: "Règle d'étiquetage",
       standardPrice: "Prix standard",
+      compareAtPrice: "Prix de comparaison",
+      costPrice: "Coût du service",
       currency: "Devise",
     },
     labelRuleLabels: {
@@ -1559,13 +1611,26 @@ export const tenantMessagesFr: TenantMessages = {
       title: "Ajouter un service",
       breadcrumbLabel: "Fil d'Ariane",
       namePlaceholder: "Entrez un nom de service",
+      shortNamePlaceholder: "Nom court pour le POS et les reçus",
+      codePlaceholder: "Par exemple, NET-SEC-01",
       categoryPlaceholder: "Sélectionnez une catégorie de service",
       descriptionPlaceholder:
         "Saisissez une description de service facultative",
+      internalNotesPlaceholder:
+        "Ajoutez des étapes ou des notes visibles uniquement par le personnel",
+      turnaroundHint:
+        "Utilisez 60 pour une heure ou 1 440 pour un jour. Laissez vide si le délai varie.",
+      compareAtPriceHint:
+        "Prix de référence facultatif affiché comme prix d'origine ; il doit être supérieur au prix standard.",
+      costPriceHint:
+        "Coût interne facultatif utilisé pour l'analyse de marge et jamais affiché aux clients.",
+      changeDefaultCurrency: "Modifier la devise par défaut",
       displayOrderHint:
         "Les numéros inférieurs apparaissent plus tôt dans le catalogue de services.",
       pricingHint:
-        "Le prix standard utilise la devise par défaut du locataire. Son montant et sa devise peuvent être mis à jour depuis le catalogue de services après sauvegarde.",
+        "Le prix standard utilise la devise par défaut du locataire. Son montant peut être modifié dans le catalogue ; la devise est gérée dans les paramètres.",
+      existingCurrencyNotice:
+        "Ce prix conserve sa devise enregistrée ; modifier la devise par défaut ne convertit pas les montants historiques.",
       categoriesLoadFailed:
         "Les catégories de services n'ont pas pu être chargées, ce service ne peut donc pas encore être créé.",
       currencyLoadFailed:
@@ -1583,10 +1648,18 @@ export const tenantMessagesFr: TenantMessages = {
       businessLineInvalid: "Choisissez un secteur d'activité pris en charge.",
       nameRequired: "Entrez un nom de service.",
       nameTooLong: "Le nom du service doit comporter 200 caractères maximum.",
+      codeInvalid:
+        "Utilisez au maximum 64 lettres, chiffres, points, tirets bas ou traits d'union.",
+      codeDuplicate: "Ce code de service est déjà utilisé.",
+      shortNameTooLong: "Le nom court doit comporter 80 caractères maximum.",
       categoryRequired: "Sélectionnez une catégorie de service.",
       categoryInvalid: "Sélectionnez une catégorie de service valide.",
       descriptionTooLong:
         "La description du service doit comporter 2 000 caractères ou moins.",
+      internalNotesTooLong:
+        "Les notes internes doivent comporter 5 000 caractères ou moins.",
+      turnaroundMinutesInvalid:
+        "Le délai doit être un nombre entier compris entre 1 et 525 600 minutes.",
       displayOrderInvalid:
         "L'ordre d'affichage doit être un nombre entier compris entre 0 et 1 000 000.",
       pricingUnitInvalid:
@@ -1594,6 +1667,10 @@ export const tenantMessagesFr: TenantMessages = {
       labelRuleInvalid: "Choisissez une règle d'étiquette prise en charge.",
       standardPriceInvalid:
         "Le prix standard doit être supérieur à 0, ne pas dépasser 9 999 999 999,99 et utiliser au maximum 2 décimales.",
+      compareAtPriceInvalid:
+        "Le prix de comparaison doit être supérieur au prix standard et utiliser au maximum 2 décimales.",
+      costPriceInvalid:
+        "Le coût doit être supérieur à 0 et utiliser au maximum 2 décimales.",
       currencyInvalid:
         "Choisissez un code de devise à 3 lettres pris en charge.",
       statusInvalid: "Choisissez un statut de service pris en charge.",
@@ -2509,9 +2586,13 @@ export const tenantMessagesFr: TenantMessages = {
       title: "Les prix restent fidèles à ce que vous vendez",
       description:
         "Le catalogue de prix séparé a été supprimé. Gérez chaque prix directement avec son produit ou service afin que les informations du catalogue restent ensemble.",
+      defaultCurrencyTitle: "Devise par défaut",
+      defaultCurrencyDescription:
+        "Les nouveaux prix du catalogue, remises fixes, transactions de succursale et de PDV, ainsi que les rapports utilisent ce code ISO.",
+      saveDefaultCurrency: "Enregistrer la devise",
       productsTitle: "Prix des produits",
       productsDescription:
-        "Gérez le prix de vente, la devise, les variantes et la disponibilité des succursales à partir du catalogue de produits.",
+        "Gérez le prix de vente, les variantes et la disponibilité des succursales dans le catalogue. La devise provient de ce paramètre du locataire.",
       servicesTitle: "Tarifs des prestations",
       servicesDescription:
         "Gérez le prix standard actuel et l'unité de tarification à partir du catalogue de services.",

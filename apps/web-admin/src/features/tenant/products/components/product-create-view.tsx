@@ -318,9 +318,7 @@ export function ProductCreateView({
   const [salePrice, setSalePrice] = useState(
     () => initialProduct?.salePrice ?? "",
   );
-  const [currency, setCurrency] = useState(
-    () => initialProduct?.currency ?? defaultCurrency ?? "",
-  );
+  const currency = initialProduct?.currency ?? defaultCurrency ?? "";
   const [referenceCost, setReferenceCost] = useState(
     () => initialProduct?.sku.referenceCost ?? "",
   );
@@ -1266,34 +1264,29 @@ export function ProductCreateView({
                       <Label htmlFor="product-currency">
                         {m.products.create.fields.currency} <RequiredMark />
                       </Label>
-                      <Select
+                      <Input
+                        aria-readonly="true"
+                        id="product-currency"
                         name="currency"
-                        onValueChange={(value) => {
-                          setCurrency(value);
-                          markChanged("currency");
-                        }}
+                        readOnly
                         value={currency}
-                      >
-                        <SelectTrigger
-                          aria-invalid={Boolean(errors.currency)}
-                          aria-required="true"
-                          className="w-full"
-                          id="product-currency"
+                      />
+                      <div className="flex items-start justify-between gap-3 text-xs text-muted-foreground">
+                        <span>
+                          {isEditMode
+                            ? m.products.create.existingCurrencyNotice
+                            : m.products.create.currencyFromSettings}
+                        </span>
+                        <Link
+                          className="shrink-0 font-medium text-foreground underline-offset-4 hover:underline"
+                          href={
+                            webAdminRoutes.tenant.system.settingsSections
+                              .pricing
+                          }
                         >
-                          <SelectValue
-                            placeholder={
-                              m.products.create.placeholders.currency
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableCurrencies.map((currencyCode) => (
-                            <SelectItem key={currencyCode} value={currencyCode}>
-                              {currencyCode}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                          {m.products.create.changeDefaultCurrency}
+                        </Link>
+                      </div>
                       <FieldError message={getErrorMessage("currency")} />
                     </div>
                   </div>

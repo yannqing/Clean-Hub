@@ -11,7 +11,7 @@ export default async function NewBranchPage() {
     .catch(() => ({
       settings: undefined,
       defaultsWarning:
-        "Tenant defaults could not be loaded. Review language and currency before creating the branch.",
+        "Tenant defaults could not be displayed. The current tenant currency will still be applied when the branch is created.",
     }));
 
   return (

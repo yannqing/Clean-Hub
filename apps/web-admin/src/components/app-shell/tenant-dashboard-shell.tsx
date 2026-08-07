@@ -14,12 +14,17 @@ import {
   TENANT_PROFILE_UPDATED_EVENT,
   type TenantProfileUpdatedEventDetail,
 } from "@/features/tenant/profile/events";
-import { useWebAdminLocale } from "@/i18n";
+import {
+  TENANT_SETTINGS_UPDATED_EVENT,
+  type TenantSettingsUpdatedEventDetail,
+} from "@/features/tenant/settings/events";
+import { TenantTimeZoneProvider, useWebAdminLocale } from "@/i18n";
 
 import { TenantGlobalHeader } from "./tenant-global-header";
 
 type TenantDashboardShellProps = {
   children: React.ReactNode;
+  initialAuthContext?: AuthContext | null;
 };
 
 function isActivePath(pathname: string, href: string): boolean {
@@ -45,11 +50,16 @@ function getDisplayName(authContext: AuthContext | null): string {
   return authContext?.displayName.trim() || getRoleLabel(authContext);
 }
 
-export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
+export function TenantDashboardShell({
+  children,
+  initialAuthContext = null,
+}: TenantDashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { messages } = useWebAdminLocale();
-  const [authContext, setAuthContext] = useState<AuthContext | null>(null);
+  const { locale, messages, setLocale } = useWebAdminLocale();
+  const [authContext, setAuthContext] = useState<AuthContext | null>(
+    initialAuthContext,
+  );
   const sidebarItems = useMemo(
     () =>
       filterSidebarSections(messages.sidebar.tenant)
@@ -190,27 +200,73 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
     };
   }, []);
 
+  useEffect(() => {
+    if (authContext?.language && authContext.language !== locale) {
+      setLocale(authContext.language);
+    }
+  }, [authContext?.language, locale, setLocale]);
+
+  useEffect(() => {
+    function handleSettingsUpdated(event: Event) {
+      const detail = (event as CustomEvent<TenantSettingsUpdatedEventDetail>)
+        .detail;
+
+      if (!detail?.timezone || !detail.defaultLanguage) {
+        return;
+      }
+
+      if (detail.defaultLanguage !== locale) {
+        setLocale(detail.defaultLanguage);
+      }
+
+      setAuthContext((current) =>
+        current
+          ? {
+              ...current,
+              language: detail.defaultLanguage,
+              timezone: detail.timezone,
+            }
+          : current,
+      );
+    }
+
+    window.addEventListener(
+      TENANT_SETTINGS_UPDATED_EVENT,
+      handleSettingsUpdated,
+    );
+
+    return () => {
+      window.removeEventListener(
+        TENANT_SETTINGS_UPDATED_EVENT,
+        handleSettingsUpdated,
+      );
+    };
+  }, [locale, setLocale]);
+
   if (isSettingsWorkspace) {
     return (
-      <div
-        className="min-h-screen bg-[#f1f1f1] text-foreground"
-        data-testid="tenant-settings-shell"
-      >
-        <TenantGlobalHeader
-          authContext={authContext}
-          copy={messages.shell.tenant.header}
-          displayName={displayName}
-        />
-        <main className="min-w-0">{children}</main>
-      </div>
+      <TenantTimeZoneProvider timeZone={authContext?.timezone}>
+        <div
+          className="min-h-screen bg-[#f1f1f1] text-foreground"
+          data-testid="tenant-settings-shell"
+        >
+          <TenantGlobalHeader
+            authContext={authContext}
+            copy={messages.shell.tenant.header}
+            displayName={displayName}
+          />
+          <main className="min-w-0">{children}</main>
+        </div>
+      </TenantTimeZoneProvider>
     );
   }
 
   return (
-    <div
-      className="min-h-screen bg-muted/30 text-foreground"
-      data-testid="tenant-dashboard-shell"
-    >
+    <TenantTimeZoneProvider timeZone={authContext?.timezone}>
+      <div
+        className="min-h-screen bg-muted/30 text-foreground"
+        data-testid="tenant-dashboard-shell"
+      >
       <TenantGlobalHeader
         authContext={authContext}
         copy={messages.shell.tenant.header}
@@ -416,6 +472,7 @@ export function TenantDashboardShell({ children }: TenantDashboardShellProps) {
           )}
         </main>
       </div>
-    </div>
+      </div>
+    </TenantTimeZoneProvider>
   );
 }

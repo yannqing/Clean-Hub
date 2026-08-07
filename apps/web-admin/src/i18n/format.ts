@@ -17,6 +17,7 @@ export function formatWebAdminDate(
   locale: WebAdminLocale,
   value: string,
   options: DateFormatOptions = { dateStyle: "medium" },
+  timeZone?: string,
 ): string {
   const date = new Date(value);
 
@@ -24,17 +25,21 @@ export function formatWebAdminDate(
     return "";
   }
 
-  return new Intl.DateTimeFormat(getIntlLocale(locale), options).format(date);
+  return new Intl.DateTimeFormat(getIntlLocale(locale), {
+    ...options,
+    timeZone,
+  }).format(date);
 }
 
 export function formatWebAdminDateTime(
   locale: WebAdminLocale,
   value: string,
+  timeZone?: string,
 ): string {
   return (
     formatWebAdminDate(locale, value, {
       dateStyle: "medium",
       timeStyle: "short",
-    }) || value
+    }, timeZone) || value
   );
 }

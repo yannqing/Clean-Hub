@@ -3,11 +3,7 @@ import type {
   UpdateBranchRequest,
 } from "@cleanhub/api-client";
 
-import type {
-  BranchFormValues,
-  BranchLanguage,
-  BranchStatus,
-} from "../types";
+import type { BranchFormValues, BranchLanguage, BranchStatus } from "../types";
 
 const languages: BranchLanguage[] = ["en", "fr", "zh-CN"];
 const statuses: BranchStatus[] = ["active", "inactive"];
@@ -63,7 +59,6 @@ function parseBusinessHours(value: string) {
 function validateBase(input: BranchFormValues) {
   const errors: Partial<Record<keyof BranchFormValues, string>> = {};
   const name = input.name.trim();
-  const currency = input.defaultCurrency.trim().toUpperCase();
   const logoUrl = normalizeOptional(input.logoUrl);
   const businessHours = parseBusinessHours(input.businessHoursJson);
 
@@ -83,10 +78,6 @@ function validateBase(input: BranchFormValues) {
 
   if (!languages.includes(input.defaultLanguage)) {
     errors.defaultLanguage = "Choose a supported default language.";
-  }
-
-  if (!/^[A-Z]{3}$/.test(currency)) {
-    errors.defaultCurrency = "Currency must be a 3-letter code.";
   }
 
   if (input.receiptName.trim().length > 200) {
@@ -121,7 +112,6 @@ function validateBase(input: BranchFormValues) {
       phone: normalizeOptional(input.phone),
       businessHours: businessHours.ok ? businessHours.data : null,
       defaultLanguage: input.defaultLanguage,
-      defaultCurrency: currency,
       receiptName: normalizeOptional(input.receiptName),
       receiptPhone: normalizeOptional(input.receiptPhone),
       receiptAddress: normalizeOptional(input.receiptAddress),
@@ -178,7 +168,6 @@ export function validateBranchUpdateForm(
       phone: result.data.phone,
       businessHours: result.data.businessHours,
       defaultLanguage: result.data.defaultLanguage,
-      defaultCurrency: result.data.defaultCurrency,
       receiptName: result.data.receiptName,
       receiptPhone: result.data.receiptPhone,
       receiptAddress: result.data.receiptAddress,

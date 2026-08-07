@@ -61,6 +61,7 @@ import {
 import type { ReportSummary, ReportSummaryQuery } from "../types";
 
 type ReportSummaryViewProps = {
+  defaultCurrency: string;
   query: ReportSummaryQuery;
   summary?: ReportSummary;
   error?: string;
@@ -365,6 +366,7 @@ function SalesTrendChart({
 }
 
 export function ReportSummaryView({
+  defaultCurrency,
   query,
   summary,
   error,
@@ -377,7 +379,7 @@ export function ReportSummaryView({
   const [customRangeOpen, setCustomRangeOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState(query.from ?? "");
   const [customTo, setCustomTo] = useState(query.to ?? "");
-  const currency = summary?.currency ?? query.currency ?? "XOF";
+  const currency = summary?.currency ?? query.currency ?? defaultCurrency;
   const trend = useMemo(
     () => buildTrendSeries(summary?.salesTrend ?? [], query),
     [query, summary?.salesTrend],

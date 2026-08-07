@@ -43,8 +43,11 @@ export async function createProductAction(
   }
 
   try {
+    const { currency: _tenantManagedCurrency, ...productInput } =
+      validation.data;
+    void _tenantManagedCurrency;
     const product = await webAdminApi.tenant.products.create(
-      validation.data,
+      productInput,
       await getTenantServerApiRequestOptions(),
     );
 

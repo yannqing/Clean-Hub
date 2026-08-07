@@ -457,7 +457,8 @@ export const tenantMessagesEn: TenantMessages = {
     },
     accounts: {
       title: "Customer accounts",
-      description: "Manage account details and the customer profiles linked to each account.",
+      description:
+        "Manage account details and the customer profiles linked to each account.",
       searchLabel: "Search accounts",
       searchPlaceholder: "Account name, phone, email, ID, or customer",
       statusLabel: "Account status",
@@ -483,9 +484,11 @@ export const tenantMessagesEn: TenantMessages = {
         email: "Email",
         status: "Status",
         createdAt: "Created",
+        actions: "Actions",
       },
       emptyTitle: "No accounts yet",
-      emptyDescription: "Customer accounts will appear here after they are created.",
+      emptyDescription:
+        "Customer accounts will appear here after they are created.",
       filteredEmptyTitle: "No matching accounts",
       filteredEmptyDescription: "Try adjusting the search or filters.",
       loadError: "Accounts could not be loaded. Please try again.",
@@ -497,7 +500,8 @@ export const tenantMessagesEn: TenantMessages = {
         editAction: "Edit account",
         summaryTitle: "Account details",
         linkedCustomersTitle: "Linked customers",
-        linkedCustomersDescription: "This account has {count} linked customer profiles.",
+        linkedCustomersDescription:
+          "This account has {count} linked customer profiles.",
         linkedCustomersEmpty: "This account has no linked customer profiles.",
         recordDetailsTitle: "Account record",
         accountId: "Account ID",
@@ -509,11 +513,13 @@ export const tenantMessagesEn: TenantMessages = {
         updatedAt: "Updated",
         version: "Version",
         editTitle: "Edit customer account",
-        editDescription: "Update the account name, contact details, and status.",
+        editDescription:
+          "Update the account name, contact details, and status.",
         saveAction: "Save account",
         saveSuccess: "Account updated.",
         saveError: "The account could not be updated. Please try again.",
-        versionConflict: "This account was changed by someone else. Refresh and try again.",
+        versionConflict:
+          "This account was changed by someone else. Refresh and try again.",
         contactRequired: "Enter at least a phone number or an email address.",
         accountNameRequired: "Enter an account name.",
         phoneConflict: "This phone number is already used by another account.",
@@ -557,6 +563,7 @@ export const tenantMessagesEn: TenantMessages = {
       email: "Email",
       status: "Status",
       createdAt: "Created",
+      actions: "Actions",
     },
     statusLabels: {
       active: "Active",
@@ -574,6 +581,17 @@ export const tenantMessagesEn: TenantMessages = {
       breadcrumbLabel: "Customer navigation",
       backToCustomers: "Back to customers",
       openCustomer: "Open customer {customer}",
+      editAction: "Edit customer",
+      editDescription:
+        "Update the customer's name, contact details, profile, and status directly on this page.",
+      fullName: "Customer name",
+      status: "Status",
+      saveAction: "Save customer",
+      saveSuccess: "Customer profile updated.",
+      saveError: "The customer profile could not be updated. Please try again.",
+      versionConflict:
+        "This customer profile was changed by someone else. Refresh and try again.",
+      fullNameRequired: "Enter a customer name.",
       profileTitle: "Customer profile",
       contactTitle: "Contact details",
       accountTitle: "Linked account",
@@ -694,6 +712,11 @@ export const tenantMessagesEn: TenantMessages = {
         "This product has unsaved changes. Are you sure you want to leave?",
       showMoreSettings: "Show more settings",
       hideMoreSettings: "Hide more settings",
+      currencyFromSettings:
+        "New product prices use the tenant default currency from settings.",
+      existingCurrencyNotice:
+        "This saved price keeps its original currency; changing the tenant default does not convert historical amounts.",
+      changeDefaultCurrency: "Change default currency",
       categoryMetafields: {
         uncategorized: "Uncategorized",
         loading: "Loading category attributes…",
@@ -1325,7 +1348,7 @@ export const tenantMessagesEn: TenantMessages = {
         timezone:
           "Start and end times are interpreted in the tenant timezone, {timezone}.",
         fixedCurrency:
-          "Fixed amounts only apply to branches that use the selected currency.",
+          "Fixed amounts use the tenant default currency managed in settings.",
       },
       buttons: {
         cancel: "Cancel",
@@ -1485,7 +1508,7 @@ export const tenantMessagesEn: TenantMessages = {
   services: {
     eyebrow: "Tenant catalog",
     title: "Services",
-    searchPlaceholder: "Service name",
+    searchPlaceholder: "Name, short name, or code",
     metrics: {
       label: "Service statistics",
       totalServices: "Total services",
@@ -1514,17 +1537,41 @@ export const tenantMessagesEn: TenantMessages = {
         nameDesc: "Service name: Z to A",
       },
     },
+    sections: {
+      basicInformation: "Basic information",
+      basicInformationDescription:
+        "Add the service name and customer-facing details.",
+      pricing: "Pricing",
+      pricingDescription:
+        "Set the selling price, reference price, and internal cost.",
+      operations: "Service fulfillment",
+      operationsDescription:
+        "Define the expected turnaround and notes for staff.",
+      catalogSettings: "Catalog settings",
+      catalogSettingsDescription:
+        "Control labels and the service's position in the catalog.",
+      status: "Status",
+      organization: "Service organization",
+      organizationDescription:
+        "Group the service by business line and category.",
+    },
     formLabels: {
       search: "Search",
       businessLine: "Business line",
       status: "Status",
       name: "Name",
+      shortName: "Short name",
+      code: "Service code",
       category: "Service category",
       description: "Description",
+      internalNotes: "Internal notes",
+      turnaroundMinutes: "Estimated turnaround (minutes)",
       displayOrder: "Display order",
       pricing: "Pricing unit",
       labelRule: "Label rule",
       standardPrice: "Standard price",
+      compareAtPrice: "Compare-at price",
+      costPrice: "Cost per service",
       currency: "Currency",
     },
     labelRuleLabels: {
@@ -1543,11 +1590,24 @@ export const tenantMessagesEn: TenantMessages = {
       title: "Add service",
       breadcrumbLabel: "Breadcrumb",
       namePlaceholder: "Enter a service name",
+      shortNamePlaceholder: "Short label for POS and receipts",
+      codePlaceholder: "For example, DRY-CLEAN-01",
       categoryPlaceholder: "Select a service category",
       descriptionPlaceholder: "Enter an optional service description",
+      internalNotesPlaceholder:
+        "Add preparation steps or notes visible only to staff",
+      turnaroundHint:
+        "Use 60 for one hour or 1,440 for one day. Leave blank when it varies.",
+      compareAtPriceHint:
+        "Optional reference price shown as the original price; it must be higher than the standard price.",
+      costPriceHint:
+        "Optional internal cost used for margin analysis and never shown to customers.",
+      changeDefaultCurrency: "Change default currency",
       displayOrderHint: "Lower numbers appear earlier in the service catalog.",
       pricingHint:
-        "The standard price uses the tenant default currency. Its amount and currency can be updated from the service catalog after saving.",
+        "The standard price uses the tenant default currency. Its amount can be updated from the service catalog; currency is managed in settings.",
+      existingCurrencyNotice:
+        "This saved price keeps its stored currency; changing the tenant default does not convert historical amounts.",
       categoriesLoadFailed:
         "Service categories could not be loaded, so this service cannot be created yet.",
       currencyLoadFailed:
@@ -1565,16 +1625,27 @@ export const tenantMessagesEn: TenantMessages = {
       businessLineInvalid: "Choose a supported business line.",
       nameRequired: "Enter a service name.",
       nameTooLong: "Service name must be 200 characters or fewer.",
+      codeInvalid:
+        "Use up to 64 letters, numbers, periods, underscores, or hyphens.",
+      codeDuplicate: "That service code is already in use.",
+      shortNameTooLong: "Short name must be 80 characters or fewer.",
       categoryRequired: "Select a service category.",
       categoryInvalid: "Select a valid service category.",
       descriptionTooLong:
         "Service description must be 2,000 characters or fewer.",
+      internalNotesTooLong: "Internal notes must be 5,000 characters or fewer.",
+      turnaroundMinutesInvalid:
+        "Turnaround must be a whole number from 1 to 525,600 minutes.",
       displayOrderInvalid:
         "Display order must be a whole number from 0 to 1,000,000.",
       pricingUnitInvalid: "Choose a supported pricing unit.",
       labelRuleInvalid: "Choose a supported label rule.",
       standardPriceInvalid:
         "Standard price must be greater than 0, no more than 9,999,999,999.99, and use at most 2 decimal places.",
+      compareAtPriceInvalid:
+        "Compare-at price must be higher than the standard price and use at most 2 decimal places.",
+      costPriceInvalid:
+        "Cost must be greater than 0 and use at most 2 decimal places.",
       currencyInvalid: "Choose a supported 3-letter currency code.",
       statusInvalid: "Choose a supported service status.",
       versionRequired: "This service is out of date. Refresh and try again.",
@@ -2468,9 +2539,13 @@ export const tenantMessagesEn: TenantMessages = {
       title: "Prices stay with what you sell",
       description:
         "The separate price book has been removed. Manage each price directly with its product or service so catalog information stays together.",
+      defaultCurrencyTitle: "Default currency",
+      defaultCurrencyDescription:
+        "New catalog prices, fixed discounts, branch and POS transactions, and reports use this ISO currency code.",
+      saveDefaultCurrency: "Save currency",
       productsTitle: "Product prices",
       productsDescription:
-        "Manage sale price, currency, variants, and branch availability from the product catalog.",
+        "Manage sale price, variants, and branch availability from the product catalog. Currency comes from this tenant setting.",
       servicesTitle: "Service prices",
       servicesDescription:
         "Manage the current standard price and pricing unit from the service catalog.",

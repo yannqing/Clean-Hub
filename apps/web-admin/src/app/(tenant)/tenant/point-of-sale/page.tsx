@@ -6,6 +6,8 @@ import {
   resolveSelectedPointOfSaleDatePreset,
   type PointOfSaleOverviewQuery,
 } from "@/features/tenant/point-of-sale";
+import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
+import { getTenantDefaultCurrencyQuery } from "@/features/tenant/settings/queries";
 
 type PointOfSalePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -23,6 +25,9 @@ export default async function PointOfSalePage({
   searchParams,
 }: PointOfSalePageProps) {
   const params = (await searchParams) ?? {};
+  const defaultCurrency = await getTenantDefaultCurrencyQuery(
+    await getTenantServerApiRequestOptions(),
+  );
   const requestedQuery: PointOfSaleOverviewQuery = {
     from: getStringParam(params, "from"),
     to: getStringParam(params, "to"),
@@ -64,6 +69,7 @@ export default async function PointOfSalePage({
 
   return (
     <PointOfSaleOverviewView
+      defaultCurrency={defaultCurrency}
       error={result.error}
       query={query}
       selectedPreset={selectedPreset}

@@ -272,17 +272,6 @@ export function BranchListView() {
               </SelectContent>
             </Select>
           </div>
-          <div className="grid gap-2">
-            <Label htmlFor="branch-currency">Default currency</Label>
-            <Input
-              id="branch-currency"
-              maxLength={3}
-              onChange={(event) =>
-                updateForm("defaultCurrency", event.target.value.toUpperCase())
-              }
-              value={form.defaultCurrency}
-            />
-          </div>
         </div>
         {formError ? (
           <p className="text-sm text-destructive">{formError}</p>

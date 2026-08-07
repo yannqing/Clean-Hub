@@ -51,6 +51,7 @@ import { webAdminRoutes } from "@/config/routes";
 import { interpolate, useTenantI18n } from "@/i18n";
 import { formatMoney } from "@/lib/format";
 
+import { buildTenantCreatedAtDateRange } from "../../date-range";
 import {
   getTenantProductMediaDownloadsQuery,
   getTenantProductDatasetQuery,
@@ -111,38 +112,6 @@ const DEFAULT_VISIBLE_COLUMNS: Record<ProductColumnKey, boolean> = {
 type TenantProductsViewProps = {
   canEditProducts: boolean;
 };
-
-function buildDateRange(filter: ProductDateFilter): {
-  createdAfter?: string;
-  createdBefore?: string;
-} {
-  if (filter === "all") {
-    return {};
-  }
-
-  const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dayMs = 24 * 60 * 60 * 1000;
-
-  if (filter === "today") {
-    return {
-      createdAfter: todayStart.toISOString(),
-      createdBefore: new Date(todayStart.getTime() + dayMs).toISOString(),
-    };
-  }
-
-  const days = {
-    last_7_days: 7,
-    last_30_days: 30,
-    last_365_days: 365,
-  }[filter];
-
-  return {
-    createdAfter: new Date(
-      todayStart.getTime() - (days - 1) * dayMs,
-    ).toISOString(),
-  };
-}
 
 function toFiniteNumber(value: string): number {
   const parsed = Number(value);
@@ -225,7 +194,7 @@ export function TenantProductsView({
   canEditProducts,
 }: TenantProductsViewProps) {
   const router = useRouter();
-  const { formatDateTime, locale, m } = useTenantI18n();
+  const { formatDateTime, locale, m, timeZone } = useTenantI18n();
   const [productDataset, setProductDataset] = useState<TenantProductSummary[]>(
     [],
   );
@@ -248,7 +217,10 @@ export function TenantProductsView({
   const [listError, setListError] = useState<string | null>(null);
   const [overviewError, setOverviewError] = useState<string | null>(null);
   const [featureDisabled, setFeatureDisabled] = useState(false);
-  const { createdAfter, createdBefore } = buildDateRange(dateFilter);
+  const { createdAfter, createdBefore } = buildTenantCreatedAtDateRange(
+    dateFilter,
+    timeZone,
+  );
 
   useEffect(() => {
     let current = true;

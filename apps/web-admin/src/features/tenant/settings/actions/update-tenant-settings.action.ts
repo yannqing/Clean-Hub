@@ -1,8 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 
 import { getAuthSessionQuery } from "@/features/auth/queries";
+import { webAdminLocaleCookieName } from "@/i18n";
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
@@ -60,8 +62,18 @@ export async function updateTenantSettingsAction(
       requestOptions,
     );
 
+    (await cookies()).set(webAdminLocaleCookieName, settings.defaultLanguage, {
+      maxAge: 60 * 60 * 24 * 365,
+      path: "/",
+      sameSite: "lax",
+    });
+
     revalidatePath("/tenant/system/settings");
     revalidatePath("/tenant/system/preferences");
+    revalidatePath("/tenant/system/settings/pricing");
+    revalidatePath("/tenant/services/new");
+    revalidatePath("/tenant/products/new");
+    revalidatePath("/tenant", "layout");
 
     return {
       ok: true,

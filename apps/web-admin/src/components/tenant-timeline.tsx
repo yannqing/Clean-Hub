@@ -1,6 +1,10 @@
 "use client";
 
 import type { TenantUserSummary } from "@cleanhub/api-client";
+import {
+  addCalendarDays,
+  getDateOnlyInTimeZone,
+} from "@cleanhub/domain/timezone";
 import { createId } from "@cleanhub/id";
 import {
   Button,
@@ -633,7 +637,7 @@ export function TenantTimeline({
     sizeBytes: number;
   }) => Promise<TimelineUploadResult>;
 }) {
-  const { formatDate, formatDateTime, locale } = useTenantI18n();
+  const { formatDate, formatDateTime, locale, timeZone } = useTenantI18n();
   const [items, setItems] = useState(initialTimeline.data);
   const [nextCursor, setNextCursor] = useState(initialTimeline.nextCursor);
   const [comment, setComment] = useState("");
@@ -653,19 +657,15 @@ export function TenantTimeline({
   const [deleting, setDeleting] = useState(false);
 
   const groups = useMemo(() => {
-    const formatter = new Intl.DateTimeFormat(locale, {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
     const now = new Date();
-    const todayKey = formatter.format(now);
-    const yesterday = new Date(now);
-    yesterday.setDate(now.getDate() - 1);
-    const yesterdayKey = formatter.format(yesterday);
+    const todayKey = getDateOnlyInTimeZone(now, timeZone);
+    const yesterdayKey = addCalendarDays(todayKey, -1);
     const grouped = new Map<string, TenantTimelineItem[]>();
     for (const item of items) {
-      const dateKey = formatter.format(new Date(item.occurredAt));
+      const dateKey = getDateOnlyInTimeZone(
+        new Date(item.occurredAt),
+        timeZone,
+      );
       const label =
         dateKey === todayKey
           ? messages.today
@@ -675,7 +675,7 @@ export function TenantTimeline({
       grouped.set(label, [...(grouped.get(label) ?? []), item]);
     }
     return [...grouped.entries()];
-  }, [formatDate, items, locale, messages.today, messages.yesterday]);
+  }, [formatDate, items, messages.today, messages.yesterday, timeZone]);
 
   function addAttachments(files: File[]) {
     let invalidType = false;
@@ -1218,6 +1218,7 @@ export function TenantTimeline({
                               {new Intl.DateTimeFormat(locale, {
                                 hour: "2-digit",
                                 minute: "2-digit",
+                                timeZone,
                               }).format(new Date(item.occurredAt))}
                             </time>
                           </div>

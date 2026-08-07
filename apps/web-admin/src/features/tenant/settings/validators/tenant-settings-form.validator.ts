@@ -3,6 +3,7 @@ import type {
   TenantSettingsLanguage,
   UpdateTenantSettingsRequest,
 } from "../types";
+import { isSupportedTimeZone } from "@cleanhub/domain/timezone";
 
 export type TenantSettingsValidationResult =
   | {
@@ -40,6 +41,8 @@ export function validateTenantSettingsForm(
     errors.timezone = "Timezone is required.";
   } else if (timezone.length > 64) {
     errors.timezone = "Timezone must be 64 characters or fewer.";
+  } else if (!isSupportedTimeZone(timezone)) {
+    errors.timezone = "Select a valid IANA timezone.";
   }
 
   if (Object.keys(errors).length > 0) {
@@ -59,4 +62,3 @@ export function validateTenantSettingsForm(
     },
   };
 }
-

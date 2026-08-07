@@ -477,6 +477,7 @@ export type TenantMessages = {
         email: string;
         status: string;
         createdAt: string;
+        actions: string;
       };
       emptyTitle: string;
       emptyDescription: string;
@@ -551,6 +552,7 @@ export type TenantMessages = {
       email: string;
       status: string;
       createdAt: string;
+      actions: string;
     };
     statusLabels: {
       active: string;
@@ -567,6 +569,15 @@ export type TenantMessages = {
       breadcrumbLabel: string;
       backToCustomers: string;
       openCustomer: string;
+      editAction: string;
+      editDescription: string;
+      fullName: string;
+      status: string;
+      saveAction: string;
+      saveSuccess: string;
+      saveError: string;
+      versionConflict: string;
+      fullNameRequired: string;
       profileTitle: string;
       contactTitle: string;
       accountTitle: string;
@@ -678,6 +689,9 @@ export type TenantMessages = {
       unsavedChanges: string;
       showMoreSettings: string;
       hideMoreSettings: string;
+      currencyFromSettings: string;
+      existingCurrencyNotice: string;
+      changeDefaultCurrency: string;
       categoryMetafields: {
         uncategorized: string;
         loading: string;
@@ -1204,17 +1218,36 @@ export type TenantMessages = {
         nameDesc: string;
       };
     };
+    sections: {
+      basicInformation: string;
+      basicInformationDescription: string;
+      pricing: string;
+      pricingDescription: string;
+      operations: string;
+      operationsDescription: string;
+      catalogSettings: string;
+      catalogSettingsDescription: string;
+      status: string;
+      organization: string;
+      organizationDescription: string;
+    };
     formLabels: {
       search: string;
       businessLine: string;
       status: string;
       name: string;
+      shortName: string;
+      code: string;
       category: string;
       description: string;
+      internalNotes: string;
+      turnaroundMinutes: string;
       displayOrder: string;
       pricing: string;
       labelRule: string;
       standardPrice: string;
+      compareAtPrice: string;
+      costPrice: string;
       currency: string;
     };
     labelRuleLabels: {
@@ -1233,10 +1266,18 @@ export type TenantMessages = {
       title: string;
       breadcrumbLabel: string;
       namePlaceholder: string;
+      shortNamePlaceholder: string;
+      codePlaceholder: string;
       categoryPlaceholder: string;
       descriptionPlaceholder: string;
+      internalNotesPlaceholder: string;
+      turnaroundHint: string;
+      compareAtPriceHint: string;
+      costPriceHint: string;
+      changeDefaultCurrency: string;
       displayOrderHint: string;
       pricingHint: string;
+      existingCurrencyNotice: string;
       categoriesLoadFailed: string;
       currencyLoadFailed: string;
       noCategoriesForBusinessLine: string;
@@ -1250,13 +1291,20 @@ export type TenantMessages = {
       businessLineInvalid: string;
       nameRequired: string;
       nameTooLong: string;
+      codeInvalid: string;
+      codeDuplicate: string;
+      shortNameTooLong: string;
       categoryRequired: string;
       categoryInvalid: string;
       descriptionTooLong: string;
+      internalNotesTooLong: string;
+      turnaroundMinutesInvalid: string;
       displayOrderInvalid: string;
       pricingUnitInvalid: string;
       labelRuleInvalid: string;
       standardPriceInvalid: string;
+      compareAtPriceInvalid: string;
+      costPriceInvalid: string;
       currencyInvalid: string;
       statusInvalid: string;
       versionRequired: string;
@@ -2080,6 +2128,9 @@ export type TenantMessages = {
     pricingHub: {
       title: string;
       description: string;
+      defaultCurrencyTitle: string;
+      defaultCurrencyDescription: string;
+      saveDefaultCurrency: string;
       productsTitle: string;
       productsDescription: string;
       servicesTitle: string;

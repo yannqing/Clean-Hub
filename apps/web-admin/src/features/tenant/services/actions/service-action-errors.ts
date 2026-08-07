@@ -20,12 +20,18 @@ type ServiceFieldName = keyof ServiceFormValues;
 const serviceFormFields = new Set<ServiceFieldName>([
   "businessLine",
   "name",
+  "code",
+  "shortName",
   "categoryId",
   "description",
+  "internalNotes",
+  "turnaroundMinutes",
   "displayOrder",
   "pricingUnit",
   "labelRule",
   "standardPrice",
+  "compareAtPrice",
+  "costPrice",
   "currency",
   "status",
   "version",
@@ -34,12 +40,18 @@ const serviceFormFields = new Set<ServiceFieldName>([
 const serviceFieldMap: Record<string, ServiceFieldName> = {
   businessLine: "businessLine",
   name: "name",
+  code: "code",
+  shortName: "shortName",
   categoryId: "categoryId",
   description: "description",
+  internalNotes: "internalNotes",
+  turnaroundMinutes: "turnaroundMinutes",
   displayOrder: "displayOrder",
   pricingUnit: "pricingUnit",
   labelRule: "labelRule",
   standardPrice: "standardPrice",
+  compareAtPrice: "compareAtPrice",
+  costPrice: "costPrice",
   currency: "currency",
   status: "status",
   version: "version",
@@ -79,6 +91,14 @@ export function getServiceActionError(
       ].includes(error.code ?? "")
     ) {
       errors.categoryId = "categoryInvalid";
+    }
+
+    if (error.code === "SERVICE_CODE_DUPLICATE") {
+      errors.code = "codeDuplicate";
+    }
+
+    if (error.code === "SERVICE_COMPARE_AT_PRICE_INVALID") {
+      errors.compareAtPrice = "compareAtPriceInvalid";
     }
 
     return {

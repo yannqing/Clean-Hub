@@ -23,7 +23,7 @@ export const emptyBranchFormValues: BranchFormValues = {
   address: "",
   phone: "",
   defaultLanguage: "en",
-  defaultCurrency: "XOF",
+  defaultCurrency: "",
   receiptName: "",
   receiptPhone: "",
   receiptAddress: "",

@@ -29,7 +29,13 @@ import {
   cn,
   toast,
 } from "@cleanhub/ui";
-import { DataTable, DataTableMetricCards, DataTablePagePagination, DataTableSurface, DataTableToolbar } from "@cleanhub/ui/data-table";
+import {
+  DataTable,
+  DataTableMetricCards,
+  DataTablePagePagination,
+  DataTableSurface,
+  DataTableToolbar,
+} from "@cleanhub/ui/data-table";
 import {
   CalendarDays,
   Check,
@@ -75,17 +81,6 @@ import type {
 } from "../types";
 
 const PAGE_SIZE = 10;
-const SERVICE_CURRENCY_OPTIONS = [
-  "XOF",
-  "CNY",
-  "USD",
-  "EUR",
-  "GBP",
-  "CAD",
-  "AUD",
-  "JPY",
-] as const;
-
 type BusinessLineFilter = "all" | ServiceBusinessLine;
 type StatusFilter = "all" | ServiceStatus;
 type ServiceDateFilter =
@@ -131,12 +126,18 @@ const DEFAULT_VISIBLE_COLUMNS: Record<ServiceColumnKey, boolean> = {
 const defaultFormValues: ServiceFormValues = {
   businessLine: "laundry",
   name: "",
+  code: "",
+  shortName: "",
   categoryId: "",
   description: "",
+  internalNotes: "",
+  turnaroundMinutes: "",
   displayOrder: "0",
   pricingUnit: "per_item",
   labelRule: "per_order_item",
   standardPrice: "",
+  compareAtPrice: "",
+  costPrice: "",
   currency: "",
   status: "active",
   version: 0,
@@ -158,12 +159,21 @@ function toFormValues(service: ServiceSummary): ServiceFormValues {
   return {
     businessLine: service.businessLine,
     name: service.name,
+    code: service.code ?? "",
+    shortName: service.shortName ?? "",
     categoryId: service.categoryId,
     description: service.description ?? "",
+    internalNotes: service.internalNotes ?? "",
+    turnaroundMinutes:
+      service.turnaroundMinutes == null
+        ? ""
+        : String(service.turnaroundMinutes),
     displayOrder: String(service.displayOrder),
     pricingUnit: service.pricingUnit,
     labelRule: service.labelRule,
     standardPrice: service.standardPrice,
+    compareAtPrice: service.compareAtPrice ?? "",
+    costPrice: service.costPrice ?? "",
     currency: service.currency,
     status: service.status,
     version: service.version,
@@ -439,6 +449,8 @@ export function ServiceCatalogView({
       const searchableValues = [
         service.id,
         service.name,
+        service.shortName,
+        service.code,
         service.categoryId,
         service.categoryName,
         service.description,
@@ -1113,8 +1125,15 @@ export function ServiceCatalogView({
               {services.map((service) => (
                 <TableRow key={service.id}>
                   {visibleColumns.service ? (
-                    <TableCell className="font-medium">
-                      {service.name}
+                    <TableCell>
+                      <span className="block font-medium">{service.name}</span>
+                      {service.shortName || service.code ? (
+                        <span className="block text-[11px] text-muted-foreground">
+                          {[service.shortName, service.code]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </span>
+                      ) : null}
                     </TableCell>
                   ) : null}
                   {visibleColumns.category ? (
@@ -1134,6 +1153,15 @@ export function ServiceCatalogView({
                           locale,
                         )}
                       </span>
+                      {service.compareAtPrice ? (
+                        <span className="block text-[11px] text-muted-foreground line-through">
+                          {formatMoney(
+                            Number(service.compareAtPrice),
+                            service.currency,
+                            locale,
+                          )}
+                        </span>
+                      ) : null}
                       <span className="block text-[11px] text-muted-foreground">
                         {m.common.pricingUnitLabels[service.pricingUnit]}
                       </span>
@@ -1223,9 +1251,9 @@ export function ServiceCatalogView({
           page={currentPage}
           previousLabel={m.common.previous}
           summary={interpolate(m.services.pageSummary, {
-              page: currentPage.toLocaleString(locale),
-              pages: totalPages.toLocaleString(locale),
-            })}
+            page: currentPage.toLocaleString(locale),
+            pages: totalPages.toLocaleString(locale),
+          })}
           totalPages={totalPages}
         />
       </DataTableSurface>
@@ -1238,7 +1266,7 @@ export function ServiceCatalogView({
         }}
         open={formOpen}
       >
-        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>{m.services.formDialog.editTitle}</DialogTitle>
             <DialogDescription>
@@ -1258,6 +1286,38 @@ export function ServiceCatalogView({
                 value={formValues.name}
               />
               <FieldError message={getFieldError("name")} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="service-form-short-name">
+                {m.services.formLabels.shortName}
+              </Label>
+              <Input
+                aria-invalid={Boolean(formErrors.shortName)}
+                id="service-form-short-name"
+                maxLength={80}
+                onChange={(event) =>
+                  updateFormField("shortName", event.target.value)
+                }
+                value={formValues.shortName}
+              />
+              <FieldError message={getFieldError("shortName")} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="service-form-code">
+                {m.services.formLabels.code}
+              </Label>
+              <Input
+                aria-invalid={Boolean(formErrors.code)}
+                id="service-form-code"
+                maxLength={64}
+                onChange={(event) =>
+                  updateFormField("code", event.target.value.toUpperCase())
+                }
+                value={formValues.code}
+              />
+              <FieldError message={getFieldError("code")} />
             </div>
 
             <div className="grid gap-2">
@@ -1357,6 +1417,43 @@ export function ServiceCatalogView({
                 value={formValues.description}
               />
               <FieldError message={getFieldError("description")} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="service-form-turnaround-minutes">
+                {m.services.formLabels.turnaroundMinutes}
+              </Label>
+              <Input
+                aria-invalid={Boolean(formErrors.turnaroundMinutes)}
+                id="service-form-turnaround-minutes"
+                inputMode="numeric"
+                max={525_600}
+                min={1}
+                onChange={(event) =>
+                  updateFormField("turnaroundMinutes", event.target.value)
+                }
+                step={1}
+                type="number"
+                value={formValues.turnaroundMinutes}
+              />
+              <FieldError message={getFieldError("turnaroundMinutes")} />
+            </div>
+
+            <div className="grid gap-2 sm:col-span-2">
+              <Label htmlFor="service-form-internal-notes">
+                {m.services.formLabels.internalNotes}
+              </Label>
+              <Textarea
+                aria-invalid={Boolean(formErrors.internalNotes)}
+                id="service-form-internal-notes"
+                maxLength={5000}
+                onChange={(event) =>
+                  updateFormField("internalNotes", event.target.value)
+                }
+                rows={3}
+                value={formValues.internalNotes}
+              />
+              <FieldError message={getFieldError("internalNotes")} />
             </div>
 
             <div className="grid gap-2">
@@ -1492,29 +1589,53 @@ export function ServiceCatalogView({
               <Label htmlFor="service-form-currency">
                 {m.services.formLabels.currency}
               </Label>
-              <Select
-                onValueChange={(value) => updateFormField("currency", value)}
+              <Input
+                aria-readonly="true"
+                id="service-form-currency"
+                readOnly
                 value={formValues.currency}
-              >
-                <SelectTrigger
-                  aria-invalid={Boolean(formErrors.currency)}
-                  id="service-form-currency"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from(
-                    new Set([formValues.currency, ...SERVICE_CURRENCY_OPTIONS]),
-                  )
-                    .filter(Boolean)
-                    .map((currency) => (
-                      <SelectItem key={currency} value={currency}>
-                        {currency}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <FieldError message={getFieldError("currency")} />
+              />
+              <p className="text-xs text-muted-foreground">
+                {m.services.create.existingCurrencyNotice}
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="service-form-compare-at-price">
+                {m.services.formLabels.compareAtPrice}
+              </Label>
+              <Input
+                aria-invalid={Boolean(formErrors.compareAtPrice)}
+                id="service-form-compare-at-price"
+                inputMode="decimal"
+                min="0.01"
+                onChange={(event) =>
+                  updateFormField("compareAtPrice", event.target.value)
+                }
+                step="0.01"
+                type="number"
+                value={formValues.compareAtPrice}
+              />
+              <FieldError message={getFieldError("compareAtPrice")} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="service-form-cost-price">
+                {m.services.formLabels.costPrice}
+              </Label>
+              <Input
+                aria-invalid={Boolean(formErrors.costPrice)}
+                id="service-form-cost-price"
+                inputMode="decimal"
+                min="0.01"
+                onChange={(event) =>
+                  updateFormField("costPrice", event.target.value)
+                }
+                step="0.01"
+                type="number"
+                value={formValues.costPrice}
+              />
+              <FieldError message={getFieldError("costPrice")} />
             </div>
           </div>
 

@@ -16,13 +16,20 @@ export type ServiceFormErrorCode =
   | "businessLineInvalid"
   | "nameRequired"
   | "nameTooLong"
+  | "codeInvalid"
+  | "codeDuplicate"
+  | "shortNameTooLong"
   | "categoryRequired"
   | "categoryInvalid"
   | "descriptionTooLong"
+  | "internalNotesTooLong"
+  | "turnaroundMinutesInvalid"
   | "displayOrderInvalid"
   | "pricingUnitInvalid"
   | "labelRuleInvalid"
   | "standardPriceInvalid"
+  | "compareAtPriceInvalid"
+  | "costPriceInvalid"
   | "currencyInvalid"
   | "statusInvalid"
   | "versionRequired";
@@ -31,13 +38,19 @@ export type ServiceSummary = {
   id: string;
   businessLine: ServiceBusinessLine;
   name: string;
+  code: string | null;
+  shortName: string | null;
   categoryId: string;
   categoryName: string;
   description: string | null;
+  internalNotes: string | null;
+  turnaroundMinutes: number | null;
   displayOrder: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   standardPrice: string;
+  compareAtPrice: string | null;
+  costPrice: string | null;
   currency: string;
   status: ServiceStatus;
   createdAt: string;
@@ -57,12 +70,18 @@ export type ServiceCategorySummary = {
 export type ServiceFormValues = {
   businessLine: ServiceBusinessLine;
   name: string;
+  code: string;
+  shortName: string;
   categoryId: string;
   description: string;
+  internalNotes: string;
+  turnaroundMinutes: string;
   displayOrder: string;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   standardPrice: string;
+  compareAtPrice: string;
+  costPrice: string;
   currency: string;
   status: ServiceStatus;
   /**

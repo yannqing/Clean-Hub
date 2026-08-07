@@ -44,6 +44,7 @@ import {
 import type { PointOfSaleOverview, PointOfSaleOverviewQuery } from "../types";
 
 type PointOfSaleOverviewViewProps = {
+  defaultCurrency: string;
   error?: string;
   query: PointOfSaleOverviewQuery;
   selectedPreset: PointOfSaleDatePresetId;
@@ -110,6 +111,7 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
 }
 
 export function PointOfSaleOverviewView({
+  defaultCurrency,
   error,
   query,
   selectedPreset,
@@ -119,7 +121,7 @@ export function PointOfSaleOverviewView({
   const router = useRouter();
   const { locale, m } = useTenantI18n();
   const [isPending, startTransition] = useTransition();
-  const currency = summary?.currency ?? query.currency ?? "XOF";
+  const currency = summary?.currency ?? query.currency ?? defaultCurrency;
 
   function navigate(changes: Partial<PointOfSaleOverviewQuery>) {
     const values = { ...query, ...changes };

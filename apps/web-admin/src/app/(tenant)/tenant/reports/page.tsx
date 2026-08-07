@@ -6,6 +6,8 @@ import {
   resolveSelectedReportDatePreset,
   type ReportSummaryQuery,
 } from "@/features/tenant/reports";
+import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
+import { getTenantDefaultCurrencyQuery } from "@/features/tenant/settings/queries";
 
 type ReportsPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -22,6 +24,9 @@ function getStringParam(
 
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const params = (await searchParams) ?? {};
+  const defaultCurrency = await getTenantDefaultCurrencyQuery(
+    await getTenantServerApiRequestOptions(),
+  );
   const requestedQuery: ReportSummaryQuery = {
     from: getStringParam(params, "from"),
     to: getStringParam(params, "to"),
@@ -60,6 +65,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
   return (
     <ReportSummaryView
+      defaultCurrency={defaultCurrency}
       error={reportResult.error}
       query={query}
       selectedPreset={selectedPreset}

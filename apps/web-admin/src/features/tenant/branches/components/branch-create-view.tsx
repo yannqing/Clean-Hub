@@ -93,7 +93,9 @@ export function BranchCreateView({
       router.refresh();
     } catch (submitError) {
       const message =
-        submitError instanceof Error ? submitError.message : m.common.requestFailed;
+        submitError instanceof Error
+          ? submitError.message
+          : m.common.requestFailed;
       setFormError(message);
       toast.error(message);
     } finally {
@@ -134,7 +136,10 @@ export function BranchCreateView({
 
       <form className="space-y-5" noValidate onSubmit={handleCreate}>
         {defaultsWarning ? (
-          <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm" role="alert">
+          <p
+            className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2.5 text-sm"
+            role="alert"
+          >
             {defaultsWarning}
           </p>
         ) : null}
@@ -151,7 +156,9 @@ export function BranchCreateView({
                     <Input
                       aria-invalid={Boolean(errors.name)}
                       id="branch-name"
-                      onChange={(event) => updateForm("name", event.target.value)}
+                      onChange={(event) =>
+                        updateForm("name", event.target.value)
+                      }
                       required
                       value={formValues.name}
                     />
@@ -166,7 +173,9 @@ export function BranchCreateView({
                       <Input
                         aria-invalid={Boolean(errors.phone)}
                         id="branch-phone"
-                        onChange={(event) => updateForm("phone", event.target.value)}
+                        onChange={(event) =>
+                          updateForm("phone", event.target.value)
+                        }
                         value={formValues.phone}
                       />
                       <FieldError message={errors.phone} />
@@ -178,7 +187,9 @@ export function BranchCreateView({
                       <Input
                         aria-invalid={Boolean(errors.logoUrl)}
                         id="branch-logo-url"
-                        onChange={(event) => updateForm("logoUrl", event.target.value)}
+                        onChange={(event) =>
+                          updateForm("logoUrl", event.target.value)
+                        }
                         value={formValues.logoUrl}
                       />
                       <FieldError message={errors.logoUrl} />
@@ -227,7 +238,9 @@ export function BranchCreateView({
                     <Textarea
                       aria-invalid={Boolean(errors.address)}
                       id="branch-address"
-                      onChange={(event) => updateForm("address", event.target.value)}
+                      onChange={(event) =>
+                        updateForm("address", event.target.value)
+                      }
                       value={formValues.address}
                     />
                     <FieldError message={errors.address} />
@@ -275,15 +288,25 @@ export function BranchCreateView({
                       {m.branches.create.fields.currency}
                     </Label>
                     <Input
-                      aria-invalid={Boolean(errors.defaultCurrency)}
+                      aria-readonly="true"
                       id="branch-currency"
                       maxLength={3}
-                      onChange={(event) =>
-                        updateForm("defaultCurrency", event.target.value.toUpperCase())
-                      }
+                      readOnly
                       value={formValues.defaultCurrency}
                     />
-                    <FieldError message={errors.defaultCurrency} />
+                    <div className="flex items-start justify-between gap-3 text-xs text-muted-foreground">
+                      <span>
+                        {m.settings.pricingHub.defaultCurrencyDescription}
+                      </span>
+                      <Link
+                        className="shrink-0 font-medium text-foreground underline-offset-4 hover:underline"
+                        href={
+                          webAdminRoutes.tenant.system.settingsSections.pricing
+                        }
+                      >
+                        {m.settings.pricingHub.defaultCurrencyTitle}
+                      </Link>
+                    </div>
                   </div>
 
                   <div className="grid gap-2">
@@ -350,7 +373,13 @@ export function BranchCreateView({
 
           <div className="pointer-events-none sticky bottom-4 z-30 flex justify-end px-1">
             <div className="pointer-events-auto grid w-full grid-cols-2 items-center gap-1.5 rounded-xl border border-border/80 bg-background/90 p-1.5 shadow-[0_14px_40px_-16px_rgba(0,0,0,0.45)] backdrop-blur-xl sm:flex sm:w-auto">
-              <Button asChild className="rounded-lg" size="sm" type="button" variant="ghost">
+              <Button
+                asChild
+                className="rounded-lg"
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
                 <Link href={basePath}>{m.common.cancel}</Link>
               </Button>
               <Button

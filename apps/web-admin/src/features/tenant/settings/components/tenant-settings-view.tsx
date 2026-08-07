@@ -3,7 +3,6 @@
 import {
   Badge,
   Button,
-  Input,
   Label,
   Select,
   SelectContent,
@@ -12,13 +11,17 @@ import {
   SelectValue,
   toast,
 } from "@cleanhub/ui";
-import { Building2, ChevronRight, Clock3 } from "lucide-react";
+import { Building2, ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 
 import { useTenantI18n } from "@/i18n";
 
 import { updateTenantSettingsAction } from "../actions";
+import {
+  TENANT_SETTINGS_UPDATED_EVENT,
+  type TenantSettingsUpdatedEventDetail,
+} from "../events";
 import {
   tenantSettingsFeatureFlagOptions,
   tenantSettingsLanguageOptions,
@@ -32,17 +35,8 @@ import {
   tenantSettingsNavigationItems,
   useTenantSettingsWorkspace,
 } from "./tenant-settings-workspace";
-
-const TENANT_CURRENCY_OPTIONS = [
-  "XOF",
-  "CNY",
-  "USD",
-  "EUR",
-  "GBP",
-  "CAD",
-  "AUD",
-  "JPY",
-] as const;
+import { TenantDefaultCurrencyField } from "./tenant-default-currency-field";
+import { TenantTimezoneField } from "./tenant-timezone-field";
 
 function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -128,15 +122,6 @@ export function TenantSettingsView() {
       ).length,
     [settings],
   );
-  const currencyOptions = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          [form.defaultCurrency, ...TENANT_CURRENCY_OPTIONS].filter(Boolean),
-        ),
-      ),
-    [form.defaultCurrency],
-  );
   const formDisabled = saving || !authLoaded || !canUpdateSettings;
 
   function updateForm<K extends keyof TenantSettingsFormValues>(
@@ -182,6 +167,17 @@ export function TenantSettingsView() {
       if (result.ok) {
         updateSettings(result.data);
         setForm(toFormValues(result.data));
+        window.dispatchEvent(
+          new CustomEvent<TenantSettingsUpdatedEventDetail>(
+            TENANT_SETTINGS_UPDATED_EVENT,
+            {
+              detail: {
+                defaultLanguage: result.data.defaultLanguage,
+                timezone: result.data.timezone,
+              },
+            },
+          ),
+        );
         setErrors({});
         toast.success(m.settings.settingsUpdated);
       } else {
@@ -250,40 +246,13 @@ export function TenantSettingsView() {
         <form onSubmit={handleSubmit}>
           <div className="grid gap-5 p-4 sm:p-5">
             <div className="grid gap-5 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="tenant-default-currency">
-                  {m.settings.labels.defaultCurrency}
-                </Label>
-                <Select
-                  disabled={formDisabled}
-                  onValueChange={(value) =>
-                    updateForm("defaultCurrency", value)
-                  }
-                  value={form.defaultCurrency}
-                >
-                  <SelectTrigger
-                    className="w-full bg-white"
-                    id="tenant-default-currency"
-                  >
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {currencyOptions.map((currency) => (
-                      <SelectItem key={currency} value={currency}>
-                        {currency}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs leading-5 text-slate-500">
-                  {m.settings.general.currencyHint}
-                </p>
-                {errors.defaultCurrency ? (
-                  <p className="text-xs text-destructive">
-                    {errors.defaultCurrency}
-                  </p>
-                ) : null}
-              </div>
+              <TenantDefaultCurrencyField
+                disabled={formDisabled}
+                error={errors.defaultCurrency}
+                id="tenant-default-currency"
+                onChange={(value) => updateForm("defaultCurrency", value)}
+                value={form.defaultCurrency}
+              />
 
               <div className="grid gap-2">
                 <Label htmlFor="tenant-default-language">
@@ -324,34 +293,13 @@ export function TenantSettingsView() {
               </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label htmlFor="tenant-timezone">
-                {m.settings.labels.timezone}
-              </Label>
-              <div className="relative">
-                <Clock3
-                  aria-hidden
-                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
-                />
-                <Input
-                  aria-invalid={Boolean(errors.timezone)}
-                  className="bg-white pl-9"
-                  disabled={formDisabled}
-                  id="tenant-timezone"
-                  onChange={(event) =>
-                    updateForm("timezone", event.target.value)
-                  }
-                  placeholder="Africa/Dakar"
-                  value={form.timezone}
-                />
-              </div>
-              <p className="text-xs leading-5 text-slate-500">
-                {m.settings.general.timezoneHint}
-              </p>
-              {errors.timezone ? (
-                <p className="text-xs text-destructive">{errors.timezone}</p>
-              ) : null}
-            </div>
+            <TenantTimezoneField
+              disabled={formDisabled}
+              error={errors.timezone}
+              id="tenant-timezone"
+              onChange={(value) => updateForm("timezone", value)}
+              value={form.timezone}
+            />
 
             {saveError ? (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">

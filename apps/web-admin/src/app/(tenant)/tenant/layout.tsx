@@ -1,9 +1,18 @@
 import { TenantDashboardShell } from "@/components/app-shell";
+import { getAuthSessionQuery } from "@/features/auth/queries";
+import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
 
-export default function TenantLayout({
+export default async function TenantLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <TenantDashboardShell>{children}</TenantDashboardShell>;
+  const requestOptions = await getTenantServerApiRequestOptions();
+  const initialAuthContext = await getAuthSessionQuery(requestOptions);
+
+  return (
+    <TenantDashboardShell initialAuthContext={initialAuthContext}>
+      {children}
+    </TenantDashboardShell>
+  );
 }

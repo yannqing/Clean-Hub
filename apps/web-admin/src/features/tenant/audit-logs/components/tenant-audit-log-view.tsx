@@ -22,6 +22,10 @@ import {
 } from "@cleanhub/ui";
 import { DataTable } from "@cleanhub/ui/data-table";
 import {
+  calendarDateEndToUtc,
+  calendarDateStartToUtc,
+} from "@cleanhub/domain/timezone";
+import {
   ListFilter,
   RefreshCw,
   ScrollText,
@@ -72,12 +76,12 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-function toIsoStart(value: string): string | undefined {
-  return value ? new Date(`${value}T00:00:00`).toISOString() : undefined;
+function toIsoStart(value: string, timeZone: string): string | undefined {
+  return value ? calendarDateStartToUtc(value, timeZone).toISOString() : undefined;
 }
 
-function toIsoEnd(value: string): string | undefined {
-  return value ? new Date(`${value}T23:59:59.999`).toISOString() : undefined;
+function toIsoEnd(value: string, timeZone: string): string | undefined {
+  return value ? calendarDateEndToUtc(value, timeZone).toISOString() : undefined;
 }
 
 function getStatusVariant(success: boolean): "default" | "destructive" {
@@ -91,7 +95,7 @@ export type TenantAuditLogViewProps = {
 export function TenantAuditLogView({
   embedded = false,
 }: TenantAuditLogViewProps = {}) {
-  const { m, formatDateTime } = useTenantI18n();
+  const { m, formatDateTime, timeZone } = useTenantI18n();
   const router = useRouter();
   const [logs, setLogs] = useState<TenantAuditLogSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -112,12 +116,12 @@ export function TenantAuditLogView({
       eventType: eventType.trim() || undefined,
       branchId: branchId.trim() || undefined,
       success: success === "all" ? undefined : success === "true",
-      dateFrom: toIsoStart(dateFrom),
-      dateTo: toIsoEnd(dateTo),
+      dateFrom: toIsoStart(dateFrom, timeZone),
+      dateTo: toIsoEnd(dateTo, timeZone),
       limit: TENANT_AUDIT_LOG_PAGE_SIZE,
       offset,
     }),
-    [branchId, category, dateFrom, dateTo, eventType, offset, success],
+    [branchId, category, dateFrom, dateTo, eventType, offset, success, timeZone],
   );
 
   const loadLogs = useCallback(async () => {

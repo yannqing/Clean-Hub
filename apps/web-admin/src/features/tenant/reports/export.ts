@@ -120,7 +120,10 @@ export function buildZReportCsv(
   const meta: CsvRow[] = [
     [labels.storeName, tenantName ?? ""],
     [labels.period, `${query.from ?? ""} - ${query.to ?? ""}`],
-    [labels.generatedAt, now.toLocaleString()],
+    [
+      labels.generatedAt,
+      now.toLocaleString(undefined, { timeZone: summary.timezone }),
+    ],
   ];
 
   const blank: CsvRow = [];

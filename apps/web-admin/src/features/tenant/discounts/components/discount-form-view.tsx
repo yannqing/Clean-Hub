@@ -99,11 +99,7 @@ function createInitialForm(
     enabled: initial?.enabled ?? true,
     valueType: initial?.valueType ?? defaultValueType(type),
     valueAmount: initial?.valueAmount ?? "",
-    currency:
-      initial?.currency ??
-      options.currencies[0] ??
-      options.branches[0]?.currency ??
-      "",
+    currency: initial?.currency ?? options.defaultCurrency,
     targetScope: "specific",
     targets: initial?.targets ?? [],
     eligibility: initial?.eligibility ?? "all_customers",
@@ -647,24 +643,12 @@ export function DiscountFormView({
                       <Label htmlFor="discount-currency">
                         {m.discounts.form.fields.currency} <RequiredMark />
                       </Label>
-                      <Select
-                        onValueChange={(value) => update("currency", value)}
+                      <Input
+                        aria-readonly="true"
+                        id="discount-currency"
+                        readOnly
                         value={form.currency}
-                      >
-                        <SelectTrigger
-                          aria-invalid={Boolean(errors.currency)}
-                          id="discount-currency"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {options.currencies.map((currency) => (
-                            <SelectItem key={currency} value={currency}>
-                              {currency}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      />
                       <p className="text-xs text-muted-foreground">
                         {m.discounts.form.hints.fixedCurrency}
                       </p>

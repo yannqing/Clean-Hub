@@ -6,6 +6,8 @@ import {
   resolveSelectedFinanceDatePreset,
   type FinanceSummaryQuery,
 } from "@/features/tenant/finance";
+import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
+import { getTenantDefaultCurrencyQuery } from "@/features/tenant/settings/queries";
 
 type FinancePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -22,6 +24,9 @@ function getStringParam(
 
 export default async function FinancePage({ searchParams }: FinancePageProps) {
   const params = (await searchParams) ?? {};
+  const defaultCurrency = await getTenantDefaultCurrencyQuery(
+    await getTenantServerApiRequestOptions(),
+  );
   const requestedQuery: FinanceSummaryQuery = {
     from: getStringParam(params, "from"),
     to: getStringParam(params, "to"),
@@ -60,6 +65,7 @@ export default async function FinancePage({ searchParams }: FinancePageProps) {
 
   return (
     <FinanceSummaryView
+      defaultCurrency={defaultCurrency}
       error={result.error}
       query={query}
       selectedPreset={selectedPreset}

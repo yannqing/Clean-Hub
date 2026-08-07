@@ -68,6 +68,7 @@ import type {
 } from "../types";
 
 type FinanceSummaryViewProps = {
+  defaultCurrency: string;
   query: FinanceSummaryQuery;
   selectedPreset: FinanceDatePresetId | "custom";
   summary?: FinanceSummary;
@@ -315,6 +316,7 @@ function paymentMethodIcon(method: FinancePaymentMethod): LucideIcon {
 }
 
 export function FinanceSummaryView({
+  defaultCurrency,
   error,
   query,
   selectedPreset,
@@ -328,7 +330,7 @@ export function FinanceSummaryView({
   const [customRangeOpen, setCustomRangeOpen] = useState(false);
   const [customFrom, setCustomFrom] = useState(query.from ?? "");
   const [customTo, setCustomTo] = useState(query.to ?? "");
-  const currency = summary?.currency ?? query.currency ?? "XOF";
+  const currency = summary?.currency ?? query.currency ?? defaultCurrency;
 
   const methodLabels: Record<FinancePaymentMethod, string> = {
     app: m.finance.paymentMethods.labels.app,
@@ -1013,7 +1015,10 @@ export function FinanceSummaryView({
               </div>
               {summary.branchPerformance.length > 0 ? (
                 <div className="overflow-x-auto border-t">
-                  <DataTable className="w-full text-left text-xs" density="comfortable">
+                  <DataTable
+                    className="w-full text-left text-xs"
+                    density="comfortable"
+                  >
                     <TableHeader className="bg-muted/35 text-[10px] uppercase tracking-wide text-muted-foreground">
                       <TableRow>
                         <TableHead className="px-5 py-3 font-medium">
@@ -1088,7 +1093,10 @@ export function FinanceSummaryView({
               </div>
               {summary.recentTransactions.length > 0 ? (
                 <div className="overflow-x-auto border-t">
-                  <DataTable className="w-full text-left text-xs" density="comfortable">
+                  <DataTable
+                    className="w-full text-left text-xs"
+                    density="comfortable"
+                  >
                     <TableHeader className="bg-muted/35 text-[10px] uppercase tracking-wide text-muted-foreground">
                       <TableRow>
                         <TableHead className="px-5 py-3 font-medium">

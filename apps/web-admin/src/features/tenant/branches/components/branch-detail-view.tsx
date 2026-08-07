@@ -36,7 +36,10 @@ import type {
   BranchSummary,
 } from "../types";
 
-function isVersionConflict(result: { code?: string; status?: number }): boolean {
+function isVersionConflict(result: {
+  code?: string;
+  status?: number;
+}): boolean {
   return result.status === 409 || result.code === "BRANCH_VERSION_CONFLICT";
 }
 
@@ -231,7 +234,9 @@ export function BranchDetailView({
                     <Input
                       aria-invalid={Boolean(errors.name)}
                       id="branch-detail-name"
-                      onChange={(event) => updateForm("name", event.target.value)}
+                      onChange={(event) =>
+                        updateForm("name", event.target.value)
+                      }
                       value={formValues.name}
                     />
                     <FieldError message={errors.name} />
@@ -245,7 +250,9 @@ export function BranchDetailView({
                       <Input
                         aria-invalid={Boolean(errors.phone)}
                         id="branch-detail-phone"
-                        onChange={(event) => updateForm("phone", event.target.value)}
+                        onChange={(event) =>
+                          updateForm("phone", event.target.value)
+                        }
                         value={formValues.phone}
                       />
                       <FieldError message={errors.phone} />
@@ -257,7 +264,9 @@ export function BranchDetailView({
                       <Input
                         aria-invalid={Boolean(errors.logoUrl)}
                         id="branch-detail-logo-url"
-                        onChange={(event) => updateForm("logoUrl", event.target.value)}
+                        onChange={(event) =>
+                          updateForm("logoUrl", event.target.value)
+                        }
                         value={formValues.logoUrl}
                       />
                       <FieldError message={errors.logoUrl} />
@@ -308,7 +317,9 @@ export function BranchDetailView({
                     <Textarea
                       aria-invalid={Boolean(errors.address)}
                       id="branch-detail-address"
-                      onChange={(event) => updateForm("address", event.target.value)}
+                      onChange={(event) =>
+                        updateForm("address", event.target.value)
+                      }
                       value={formValues.address}
                     />
                     <FieldError message={errors.address} />
@@ -355,18 +366,25 @@ export function BranchDetailView({
                       {m.branches.create.fields.currency}
                     </Label>
                     <Input
-                      aria-invalid={Boolean(errors.defaultCurrency)}
+                      aria-readonly="true"
                       id="branch-detail-currency"
                       maxLength={3}
-                      onChange={(event) =>
-                        updateForm(
-                          "defaultCurrency",
-                          event.target.value.toUpperCase(),
-                        )
-                      }
+                      readOnly
                       value={formValues.defaultCurrency}
                     />
-                    <FieldError message={errors.defaultCurrency} />
+                    <div className="flex items-start justify-between gap-3 text-xs text-muted-foreground">
+                      <span>
+                        {m.settings.pricingHub.defaultCurrencyDescription}
+                      </span>
+                      <Link
+                        className="shrink-0 font-medium text-foreground underline-offset-4 hover:underline"
+                        href={
+                          webAdminRoutes.tenant.system.settingsSections.pricing
+                        }
+                      >
+                        {m.settings.pricingHub.defaultCurrencyTitle}
+                      </Link>
+                    </div>
                   </div>
 
                   <div className="grid gap-2">
@@ -397,7 +415,9 @@ export function BranchDetailView({
                     <Label>{m.branches.create.fields.status}</Label>
                     <div className="flex h-10 items-center justify-between rounded-md border bg-muted/30 px-3">
                       <Badge
-                        variant={branch.status === "active" ? "default" : "outline"}
+                        variant={
+                          branch.status === "active" ? "default" : "outline"
+                        }
                       >
                         {m.common.statusLabels[branch.status]}
                       </Badge>

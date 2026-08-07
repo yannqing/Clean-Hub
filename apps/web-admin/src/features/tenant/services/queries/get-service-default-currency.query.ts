@@ -1,4 +1,4 @@
-import { webAdminApi } from "@/lib/api-client";
+import { getTenantDefaultCurrencyQuery } from "@/features/tenant/settings/queries";
 
 import type { ApiRequestOptions } from "@cleanhub/api-client";
 
@@ -10,12 +10,5 @@ type TenantSettingsRequestOptions = Omit<
 export async function getServiceDefaultCurrencyQuery(
   options: TenantSettingsRequestOptions = {},
 ): Promise<string> {
-  const settings = await webAdminApi.tenant.settings.get(options);
-  const currency = settings.defaultCurrency.trim().toUpperCase();
-
-  if (!/^[A-Z]{3}$/.test(currency)) {
-    throw new Error("Tenant default currency is invalid.");
-  }
-
-  return currency;
+  return getTenantDefaultCurrencyQuery(options);
 }

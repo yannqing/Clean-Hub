@@ -12,7 +12,7 @@ const DECIMAL_12_2_PATTERN = /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
 export type ProductFormValidationResult =
   | {
       ok: true;
-      data: CreateTenantProductRequest;
+      data: CreateTenantProductRequest & { currency: string };
     }
   | {
       ok: false;

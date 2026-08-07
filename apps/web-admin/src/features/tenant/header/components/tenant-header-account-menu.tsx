@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { LanguageSwitcher } from "@/components/i18n/language-switcher";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { webAdminRoutes } from "@/config/routes";
 import { LogoutButton } from "@/features/auth/components";
@@ -147,8 +146,7 @@ export function TenantHeaderAccountMenu({
           </Link>
         </nav>
 
-        <div className="flex items-center gap-2 border-t px-3 py-3">
-          <LanguageSwitcher className="min-w-0 flex-1" />
+        <div className="flex justify-end border-t px-3 py-3">
           <ThemeToggle />
         </div>
 

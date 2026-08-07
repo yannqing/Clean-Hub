@@ -1,15 +1,71 @@
 "use client";
 
-import { Button } from "@cleanhub/ui";
-import { ArrowRight, ClipboardList, Package } from "lucide-react";
+import { Badge, Button, toast } from "@cleanhub/ui";
+import {
+  ArrowRight,
+  CircleDollarSign,
+  ClipboardList,
+  Package,
+} from "lucide-react";
 import Link from "next/link";
+import { type FormEvent, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
-import { TenantSettingsSurface } from "@/features/tenant/settings/components";
+import { updateTenantSettingsAction } from "@/features/tenant/settings/actions";
+import {
+  TenantDefaultCurrencyField,
+  TenantSettingsSurface,
+  useTenantSettingsWorkspace,
+} from "@/features/tenant/settings/components";
 import { useTenantI18n } from "@/i18n";
 
 export default function TenantSettingsPricingPage() {
   const { m } = useTenantI18n();
+  const { authLoaded, canUpdateSettings, settings, updateSettings } =
+    useTenantSettingsWorkspace();
+  const [defaultCurrency, setDefaultCurrency] = useState(
+    settings.defaultCurrency,
+  );
+  const [currencyError, setCurrencyError] = useState<string>();
+  const [savingCurrency, setSavingCurrency] = useState(false);
+
+  async function handleCurrencySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const normalizedCurrency = defaultCurrency.trim().toUpperCase();
+    setDefaultCurrency(normalizedCurrency);
+    setCurrencyError(undefined);
+
+    if (normalizedCurrency === settings.defaultCurrency) {
+      toast.success(m.settings.settingsUpToDate);
+      return;
+    }
+
+    setSavingCurrency(true);
+
+    try {
+      const result = await updateTenantSettingsAction({
+        defaultCurrency: normalizedCurrency,
+        defaultLanguage: settings.defaultLanguage,
+        timezone: settings.timezone,
+      });
+
+      if (!result.ok) {
+        setCurrencyError(result.errors.defaultCurrency ?? result.message);
+        toast.error(result.message);
+        return;
+      }
+
+      updateSettings(result.data);
+      setDefaultCurrency(result.data.defaultCurrency);
+      toast.success(m.settings.settingsUpdated);
+    } catch {
+      setCurrencyError(m.settings.requestFailed);
+      toast.error(m.settings.requestFailed);
+    } finally {
+      setSavingCurrency(false);
+    }
+  }
 
   return (
     <TenantSettingsSurface>
@@ -23,6 +79,57 @@ export default function TenantSettingsPricingPage() {
       </div>
 
       <div className="divide-y divide-black/10">
+        <section className="px-4 py-5 sm:px-5">
+          <div className="flex min-w-0 gap-3">
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+              <CircleDollarSign aria-hidden className="size-5" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h3 className="text-sm font-medium text-slate-950">
+                {m.settings.pricingHub.defaultCurrencyTitle}
+              </h3>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                {m.settings.pricingHub.defaultCurrencyDescription}
+              </p>
+
+              <form
+                className="mt-4 grid max-w-xl gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end"
+                onSubmit={handleCurrencySubmit}
+              >
+                <TenantDefaultCurrencyField
+                  disabled={
+                    savingCurrency || !authLoaded || !canUpdateSettings
+                  }
+                  error={currencyError}
+                  id="pricing-default-currency"
+                  onChange={(value) => {
+                    setDefaultCurrency(value);
+                    setCurrencyError(undefined);
+                  }}
+                  value={defaultCurrency}
+                />
+                {canUpdateSettings ? (
+                  <Button
+                    disabled={savingCurrency || !authLoaded}
+                    size="sm"
+                    type="submit"
+                  >
+                    {savingCurrency
+                      ? m.common.saving
+                      : m.settings.pricingHub.saveDefaultCurrency}
+                  </Button>
+                ) : (
+                  <Badge className="w-fit" variant="outline">
+                    {authLoaded
+                      ? m.settings.readOnly
+                      : m.settings.checkingPermissions}
+                  </Badge>
+                )}
+              </form>
+            </div>
+          </div>
+        </section>
+
         <section className="flex flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div className="flex min-w-0 gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">

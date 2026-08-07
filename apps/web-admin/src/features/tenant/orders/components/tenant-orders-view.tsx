@@ -57,6 +57,7 @@ import { getBranchListQuery } from "@/features/tenant/branches/queries";
 import { interpolate, useTenantI18n } from "@/i18n";
 import { formatMoney } from "@/lib/format";
 
+import { buildTenantCreatedAtDateRange } from "../../date-range";
 import { importTenantOrdersAction } from "../actions";
 import {
   downloadTenantOrderExport,
@@ -116,40 +117,6 @@ const DEFAULT_VISIBLE_COLUMNS: Record<OrderColumnKey, boolean> = {
   createdAt: true,
 };
 
-function buildDateRange(filter: OrderDateFilter): {
-  createdAfter?: string;
-  createdBefore?: string;
-} {
-  if (filter === "all") {
-    return {};
-  }
-
-  const now = new Date();
-  const todayStart = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()),
-  );
-  const dayMs = 24 * 60 * 60 * 1000;
-
-  if (filter === "today") {
-    return {
-      createdAfter: todayStart.toISOString(),
-      createdBefore: new Date(todayStart.getTime() + dayMs).toISOString(),
-    };
-  }
-
-  const days = {
-    last_7_days: 7,
-    last_30_days: 30,
-    last_365_days: 365,
-  }[filter];
-
-  return {
-    createdAfter: new Date(
-      todayStart.getTime() - (days - 1) * dayMs,
-    ).toISOString(),
-  };
-}
-
 function formatOrderMoney(
   value: string,
   currency: string,
@@ -185,7 +152,7 @@ export function TenantOrdersView({
   initialSearchQuery?: string;
 }) {
   const router = useRouter();
-  const { formatDateTime, locale, m } = useTenantI18n();
+  const { formatDateTime, locale, m, timeZone } = useTenantI18n();
   const [orders, setOrders] = useState<TenantOrderSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [overview, setOverview] = useState<TenantOrderOverview | null>(null);
@@ -217,7 +184,10 @@ export function TenantOrdersView({
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const importFileInputRef = useRef<HTMLInputElement>(null);
-  const { createdAfter, createdBefore } = buildDateRange(dateFilter);
+  const { createdAfter, createdBefore } = buildTenantCreatedAtDateRange(
+    dateFilter,
+    timeZone,
+  );
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {

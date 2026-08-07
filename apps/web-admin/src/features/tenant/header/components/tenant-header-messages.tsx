@@ -18,7 +18,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
-import { interpolate, useWebAdminLocale } from "@/i18n";
+import {
+  interpolate,
+  useTenantTimeZone,
+  useWebAdminLocale,
+} from "@/i18n";
 
 import {
   markAllTenantHeaderNotificationsReadAction,
@@ -44,7 +48,11 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-function formatSentAt(value: string | null, locale: string): string {
+function formatSentAt(
+  value: string | null,
+  locale: string,
+  timeZone: string,
+): string {
   if (!value) {
     return "";
   }
@@ -60,6 +68,7 @@ function formatSentAt(value: string | null, locale: string): string {
     hour: "2-digit",
     minute: "2-digit",
     hour12: false,
+    timeZone,
   }).format(date);
 }
 
@@ -69,6 +78,7 @@ export function TenantHeaderMessages({
   onOpenChange,
 }: TenantHeaderMessagesProps) {
   const { locale } = useWebAdminLocale();
+  const timeZone = useTenantTimeZone();
   const abortRef = useRef<AbortController | null>(null);
   const [loadState, setLoadState] = useState<LoadState>("idle");
   const [items, setItems] = useState<TenantNotificationInboxItem[]>([]);
@@ -288,6 +298,7 @@ export function TenantHeaderMessages({
                 const sentAt = formatSentAt(
                   notification.sentAt ?? notification.createdAt,
                   locale,
+                  timeZone,
                 );
                 const typeLabel =
                   notification.noticeType === "business"
