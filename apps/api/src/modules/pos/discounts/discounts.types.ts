@@ -136,7 +136,7 @@ export type PosDiscountOrderRecord = {
   id: string;
   tenantId: string;
   branchId: string;
-  customerId: string;
+  customerId: string | null;
   currency: string;
   status: "draft" | "received" | "paid" | "delivered" | "cancelled";
   paidAmount: string;

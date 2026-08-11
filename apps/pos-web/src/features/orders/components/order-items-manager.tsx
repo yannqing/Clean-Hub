@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type {
+  PosCatalogProduct,
   PosCatalogService,
   PosOrderDetail,
   PosOrderItem,
@@ -27,7 +28,9 @@ import {
 import { formatOrderMoney } from "../constants";
 
 type ItemDraft = {
+  itemKind: "service" | "product";
   serviceId: string;
+  productSkuId: string;
   pricingUnit: "per_item" | "per_kg";
   standardUnitAmount: string;
   chargedUnitAmount: string;
@@ -45,7 +48,9 @@ type ItemDraft = {
 type ItemDialogMode = { type: "create" } | { type: "edit"; item: PosOrderItem };
 
 const EMPTY_DRAFT: ItemDraft = {
+  itemKind: "product",
   serviceId: "",
+  productSkuId: "",
   pricingUnit: "per_item",
   standardUnitAmount: "0",
   chargedUnitAmount: "0",
@@ -63,10 +68,12 @@ const EMPTY_DRAFT: ItemDraft = {
 export function OrderItemsManager({
   canManageSensitiveOperations,
   catalog,
+  products,
   order,
 }: {
   canManageSensitiveOperations: boolean;
   catalog: PosCatalogService[];
+  products: PosCatalogProduct[];
   order: PosOrderDetail;
 }) {
   const router = useRouter();
@@ -107,7 +114,7 @@ export function OrderItemsManager({
         {canEdit ? (
           <button
             className="flex h-11 items-center justify-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-60"
-            disabled={isPending || catalog.length === 0}
+            disabled={isPending || (catalog.length === 0 && products.length === 0)}
             onClick={() => setItemDialog({ type: "create" })}
             type="button"
           >
@@ -121,9 +128,9 @@ export function OrderItemsManager({
         )}
       </div>
 
-      {catalog.length === 0 && canEdit ? (
+      {catalog.length === 0 && products.length === 0 && canEdit ? (
         <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
-          当前门店没有可用的服务及有效价格。
+          当前门店没有可用的服务或商品及有效价格。
         </div>
       ) : null}
 
@@ -182,6 +189,7 @@ export function OrderItemsManager({
             router.refresh();
           }}
           orderId={order.id}
+          products={products}
         />
       ) : null}
 
@@ -304,6 +312,7 @@ function OrderItemDialog({
   orderId,
   mode,
   catalog,
+  products,
   canOverridePrice,
   currency,
   disabled,
@@ -313,6 +322,7 @@ function OrderItemDialog({
   orderId: string;
   mode: ItemDialogMode;
   catalog: PosCatalogService[];
+  products: PosCatalogProduct[];
   canOverridePrice: boolean;
   currency: string;
   disabled: boolean;
@@ -322,7 +332,9 @@ function OrderItemDialog({
   const editingItem = mode.type === "edit" ? mode.item : null;
   const [draft, setDraft] = useState<ItemDraft>(() => ({
     ...EMPTY_DRAFT,
+    itemKind: editingItem?.itemKind === "product" ? "product" : "service",
     serviceId: editingItem?.serviceId ?? "",
+    productSkuId: editingItem?.productSkuId ?? "",
     pricingUnit: editingItem?.pricingUnit ?? "per_item",
     standardUnitAmount: editingItem?.standardUnitAmount ?? "0",
     chargedUnitAmount: editingItem?.chargedUnitAmount ?? "0",
@@ -348,15 +360,52 @@ function OrderItemDialog({
     setDraft((current) => ({ ...current, [key]: value }));
   }
 
-  function selectService(serviceId: string) {
-    const service = catalog.find((entry) => entry.id === serviceId);
+  function selectCatalogItem(value: string) {
+    const [kind, id] = value.split(":", 2);
+    if (kind === "product") {
+      const product = products.find((entry) => entry.productSkuId === id);
+      if (!product) {
+        setDraft((current) => ({
+          ...current,
+          serviceId: "",
+          productSkuId: "",
+        }));
+        return;
+      }
+      setDraft((current) => ({
+        ...current,
+        itemKind: "product",
+        serviceId: "",
+        productSkuId: product.productSkuId,
+        pricingUnit: "per_item",
+        standardUnitAmount: product.amount,
+        chargedUnitAmount: product.amount,
+        priceTouched: true,
+        quantity: current.quantity || "1",
+        weight: "",
+        bagCount: "1",
+        itemColor: "",
+        defectNotes: "",
+        specialRequest: "",
+        itemIdentifier: product.barcode ?? product.sku,
+        overrideReason: "",
+      }));
+      return;
+    }
+    const service = catalog.find((entry) => entry.id === id);
     if (!service) {
-      update("serviceId", "");
+      setDraft((current) => ({
+        ...current,
+        serviceId: "",
+        productSkuId: "",
+      }));
       return;
     }
     setDraft((current) => ({
       ...current,
+      itemKind: "service",
       serviceId: service.id,
+      productSkuId: "",
       pricingUnit: service.pricingUnit,
       standardUnitAmount: service.amount,
       chargedUnitAmount: service.amount,
@@ -371,8 +420,11 @@ function OrderItemDialog({
   }
 
   function save() {
-    if (!draft.serviceId) {
-      toast.error("请选择服务项目。");
+    if (
+      (draft.itemKind === "service" && !draft.serviceId) ||
+      (draft.itemKind === "product" && !draft.productSkuId)
+    ) {
+      toast.error("请选择服务或商品。");
       return;
     }
     if (
@@ -402,7 +454,6 @@ function OrderItemDialog({
     }
 
     const common = {
-      serviceId: draft.serviceId,
       quantity:
         draft.pricingUnit === "per_item" ? draft.quantity.trim() : undefined,
       weight: draft.pricingUnit === "per_kg" ? draft.weight.trim() : undefined,
@@ -421,18 +472,26 @@ function OrderItemDialog({
       specialRequest: draft.specialRequest.trim() || undefined,
       itemIdentifier: draft.itemIdentifier.trim() || undefined,
     };
+    const catalogReference =
+      draft.itemKind === "product"
+        ? { productSkuId: draft.productSkuId }
+        : { serviceId: draft.serviceId };
 
     startTransition(async () => {
       const result = editingItem
         ? await updateOrderItemAction(orderId, editingItem.id, {
             ...common,
+            ...catalogReference,
             itemColor: draft.itemColor.trim() || null,
             defectNotes: draft.defectNotes.trim() || null,
             specialRequest: draft.specialRequest.trim() || null,
             itemIdentifier: draft.itemIdentifier.trim() || null,
             version: editingItem.version,
           })
-        : await createOrderItemAction(orderId, common);
+        : await createOrderItemAction(orderId, {
+            ...common,
+            ...catalogReference,
+          });
 
       if (result.ok) {
         toast.success(editingItem ? "订单条目已保存。" : "订单条目已添加。");
@@ -471,22 +530,57 @@ function OrderItemDialog({
 
           <label className="block">
             <span className="mb-1 block text-xs font-semibold text-muted-foreground">
-              服务项目
+              服务或商品
             </span>
             <select
               className={inputClass}
               disabled={blocked}
-              onChange={(event) => selectService(event.target.value)}
-              value={draft.serviceId}
+              onChange={(event) => selectCatalogItem(event.target.value)}
+              value={
+                draft.itemKind === "product" && draft.productSkuId
+                  ? `product:${draft.productSkuId}`
+                  : draft.serviceId
+                    ? `service:${draft.serviceId}`
+                    : ""
+              }
             >
-              <option value="">请选择服务</option>
+              <option value="">请选择服务或商品</option>
+              {products.length > 0 ? (
+                <optgroup label="商品">
+                  {products.map((product) => {
+                    const outOfStock =
+                      product.trackInventory &&
+                      !product.allowNegativeStock &&
+                      Number(product.availableQuantity ?? 0) <= 0;
+                    return (
+                      <option
+                        disabled={outOfStock}
+                        key={product.productSkuId}
+                        value={`product:${product.productSkuId}`}
+                      >
+                        {product.name}
+                        {product.variantName ? ` · ${product.variantName}` : ""}
+                        {" · "}
+                        {formatOrderMoney(product.amount, product.currency)}
+                        {product.trackInventory
+                          ? ` · 库存 ${Number(product.availableQuantity ?? 0)}`
+                          : ""}
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              ) : null}
+              {catalog.length > 0 ? (
+                <optgroup label="服务">
               {catalog.map((service) => (
-                <option key={service.id} value={service.id}>
+                <option key={service.id} value={`service:${service.id}`}>
                   {service.name} ·{" "}
                   {service.pricingUnit === "per_kg" ? "按公斤" : "按件"} ·{" "}
                   {formatOrderMoney(service.amount, service.currency)}
                 </option>
               ))}
+                </optgroup>
+              ) : null}
             </select>
           </label>
 
@@ -559,32 +653,36 @@ function OrderItemDialog({
             />
           ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <SmallInput
-              disabled={blocked}
-              label="颜色"
-              onChange={(value) => update("itemColor", value)}
-              value={draft.itemColor}
-            />
-            <SmallInput
-              disabled={blocked}
-              label="物品 / 袋标识"
-              onChange={(value) => update("itemIdentifier", value)}
-              value={draft.itemIdentifier}
-            />
-          </div>
-          <TextAreaField
-            disabled={blocked}
-            label="瑕疵"
-            onChange={(value) => update("defectNotes", value)}
-            value={draft.defectNotes}
-          />
-          <TextAreaField
-            disabled={blocked}
-            label="特殊要求"
-            onChange={(value) => update("specialRequest", value)}
-            value={draft.specialRequest}
-          />
+          {draft.itemKind === "service" ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SmallInput
+                  disabled={blocked}
+                  label="颜色"
+                  onChange={(value) => update("itemColor", value)}
+                  value={draft.itemColor}
+                />
+                <SmallInput
+                  disabled={blocked}
+                  label="物品 / 袋标识"
+                  onChange={(value) => update("itemIdentifier", value)}
+                  value={draft.itemIdentifier}
+                />
+              </div>
+              <TextAreaField
+                disabled={blocked}
+                label="瑕疵"
+                onChange={(value) => update("defectNotes", value)}
+                value={draft.defectNotes}
+              />
+              <TextAreaField
+                disabled={blocked}
+                label="特殊要求"
+                onChange={(value) => update("specialRequest", value)}
+                value={draft.specialRequest}
+              />
+            </>
+          ) : null}
 
           <DialogFooter>
             <button
@@ -681,6 +779,11 @@ function ItemHeading({ item }: { item: PosOrderItem }) {
       <div className="truncate font-semibold text-foreground">
         {item.itemName}
       </div>
+      {item.itemKind === "product" && item.sku ? (
+        <div className="mt-1 font-mono text-[11px] text-muted-foreground">
+          SKU {item.sku}
+        </div>
+      ) : null}
       {item.itemIdentifier ? (
         <div className="mt-1 font-mono text-[11px] text-foreground">
           标识 {item.itemIdentifier}
@@ -706,7 +809,7 @@ function IntakeDetails({ item }: { item: PosOrderItem }) {
 function formatMeasurement(item: PosOrderItem): string {
   return item.pricingUnit === "per_kg"
     ? `${item.weight ?? "0"} kg${item.bagCount ? ` · ${item.bagCount} 袋` : ""}`
-    : `${item.quantity} 件`;
+    : `${item.quantity} ${item.unitOfMeasure ?? "件"}`;
 }
 
 function moneyEquals(left: string, right: string): boolean {

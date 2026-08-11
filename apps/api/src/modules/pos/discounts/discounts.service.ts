@@ -151,7 +151,7 @@ async function resolveRequestedRule(
   input: {
     tenantId: string;
     branchId: string;
-    customerId: string;
+    customerId: string | null;
     orderId: string;
     now: Date;
     request: ApplyPosOrderDiscountRequest;

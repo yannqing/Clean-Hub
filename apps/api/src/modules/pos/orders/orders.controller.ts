@@ -105,7 +105,7 @@ export function createPosOrderController({
       });
       const tenantId = c.get("authContext").tenantId;
 
-      if (tenantId) {
+      if (tenantId && order.customerId) {
         try {
           await notificationPublisher?.publish(
             orderCreatedEvent({

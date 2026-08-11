@@ -7,7 +7,7 @@ import {
   getOrderPaymentAdjustmentsQuery,
   getOrderPaymentsQuery,
 } from "@/features/orders/queries";
-import { getPosCatalogQuery } from "@/features/orders/queries/get-pos-catalog.query";
+import { getPosCatalogQuery } from "@/features/catalog/queries";
 import { getCurrentUser } from "@/lib/auth";
 
 type OrderDetailPageProps = {
@@ -29,7 +29,6 @@ export default async function OrderDetailPage({
   let payments: Awaited<ReturnType<typeof getOrderPaymentsQuery>>;
   let adjustments: Awaited<ReturnType<typeof getOrderPaymentAdjustmentsQuery>>;
   const userPromise = getCurrentUser();
-  const catalogPromise = getPosCatalogQuery().catch(() => ({ data: [] }));
 
   try {
     [order, payments, adjustments] = await Promise.all([
@@ -44,7 +43,13 @@ export default async function OrderDetailPage({
     throw error;
   }
 
-  const [user, catalog] = await Promise.all([userPromise, catalogPromise]);
+  const [user, catalog] = await Promise.all([
+    userPromise,
+    getPosCatalogQuery({ branchId: order.branchId }).catch(() => ({
+      data: [],
+      products: [],
+    })),
+  ]);
 
   return (
     <OrderDetailView
@@ -55,6 +60,7 @@ export default async function OrderDetailPage({
       catalog={catalog.data}
       order={order}
       payments={payments.data}
+      products={catalog.products}
       source={source}
     />
   );

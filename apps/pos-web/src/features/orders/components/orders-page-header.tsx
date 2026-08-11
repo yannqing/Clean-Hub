@@ -2,7 +2,10 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
-import type { PosCatalogService } from "@cleanhub/api-client";
+import type {
+  PosCatalogProduct,
+  PosCatalogService,
+} from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Button,
@@ -21,6 +24,7 @@ import { OrderCreateDialog } from "./order-create-dialog";
 type OrdersPageHeaderProps = {
   canManageSensitiveOperations?: boolean;
   catalog?: PosCatalogService[];
+  products?: PosCatalogProduct[];
   defaultBranchId?: string;
 };
 
@@ -37,6 +41,7 @@ const DATE_OPTIONS: ReadonlyArray<{
 export function OrdersPageHeader({
   canManageSensitiveOperations = false,
   catalog = [],
+  products = [],
   defaultBranchId,
 }: OrdersPageHeaderProps) {
   const { locale } = useTranslation();
@@ -117,6 +122,7 @@ export function OrdersPageHeader({
           canManageSensitiveOperations={canManageSensitiveOperations}
           catalog={catalog}
           defaultBranchId={defaultBranchId}
+          products={products}
           triggerClassName="flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
         />
       </div>

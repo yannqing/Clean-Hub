@@ -45,7 +45,7 @@ import type {
 type FindDiscountRulesInput = {
   tenantId: string;
   branchId: string;
-  customerId: string;
+  customerId: string | null;
   orderId: string;
   now: Date;
   method?: "code" | "automatic";
@@ -197,31 +197,33 @@ export async function findPosDiscountRules(
       ),
     )
     .groupBy(orderDiscountApplications.discountId);
-  const customerUsageRows = await db
-    .select({
-      discountId: orderDiscountApplications.discountId,
-      count: sql<number>`count(*)::int`,
-    })
-    .from(orderDiscountApplications)
-    .innerJoin(
-      orders,
-      and(
-        eq(orders.tenantId, orderDiscountApplications.tenantId),
-        eq(orders.id, orderDiscountApplications.orderId),
-      ),
-    )
-    .where(
-      and(
-        eq(orderDiscountApplications.tenantId, input.tenantId),
-        inArray(orderDiscountApplications.discountId, ids),
-        eq(orderDiscountApplications.customerId, input.customerId),
-        eq(orderDiscountApplications.status, "applied"),
-        ne(orderDiscountApplications.orderId, input.orderId),
-        ne(orders.status, "cancelled"),
-        isNull(orders.deletedAt),
-      ),
-    )
-    .groupBy(orderDiscountApplications.discountId);
+  const customerUsageRows = input.customerId
+    ? await db
+        .select({
+          discountId: orderDiscountApplications.discountId,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(orderDiscountApplications)
+        .innerJoin(
+          orders,
+          and(
+            eq(orders.tenantId, orderDiscountApplications.tenantId),
+            eq(orders.id, orderDiscountApplications.orderId),
+          ),
+        )
+        .where(
+          and(
+            eq(orderDiscountApplications.tenantId, input.tenantId),
+            inArray(orderDiscountApplications.discountId, ids),
+            eq(orderDiscountApplications.customerId, input.customerId),
+            eq(orderDiscountApplications.status, "applied"),
+            ne(orderDiscountApplications.orderId, input.orderId),
+            ne(orders.status, "cancelled"),
+            isNull(orders.deletedAt),
+          ),
+        )
+        .groupBy(orderDiscountApplications.discountId)
+    : [];
 
   const branchIds = new Map<string, Set<string>>();
   for (const row of branchRows) {
@@ -260,10 +262,12 @@ export async function findPosDiscountRules(
     const discount = row.discount;
     if (
       discount.valueType === null ||
+      (discount.oncePerCustomer && input.customerId === null) ||
       (!discount.allBranches &&
         !branchIds.get(discount.id)?.has(input.branchId)) ||
       (discount.eligibility === "specific_customers" &&
-        !customerIds.get(discount.id)?.has(input.customerId))
+        (input.customerId === null ||
+          !customerIds.get(discount.id)?.has(input.customerId)))
     ) {
       return [];
     }
@@ -581,7 +585,7 @@ export async function createPosDiscountApplicationRecord(
   input: {
     tenantId: string;
     branchId: string;
-    customerId: string;
+    customerId: string | null;
     orderId: string;
     rule: PosDiscountRule;
     amountMinor: bigint;

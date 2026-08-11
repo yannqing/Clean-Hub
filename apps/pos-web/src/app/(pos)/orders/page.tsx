@@ -21,11 +21,11 @@ import {
   OrdersToolbar,
 } from "@/features/orders/components";
 import { getMyBranchQuery } from "@/features/branches/queries";
+import { getPosCatalogQuery } from "@/features/catalog/queries";
 import {
   getOrderOverviewQuery,
   getOrdersListQuery,
 } from "@/features/orders/queries";
-import { getPosCatalogQuery } from "@/features/orders/queries/get-pos-catalog.query";
 import { getCurrentUser } from "@/lib/auth";
 
 type OrdersPageProps = {
@@ -141,13 +141,15 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
   const query = buildOrderListQuery(normalized);
   const overviewPeriod = buildOverviewPeriod(normalized);
 
-  const [list, overview, branch, catalog, user] = await Promise.all([
+  const [list, overview, branch, user] = await Promise.all([
     getOrdersListQuery(query),
     getOrderOverviewQuery({ period: overviewPeriod }),
     getMyBranchQuery().catch(() => null),
-    getPosCatalogQuery().catch(() => ({ data: [] })),
     getCurrentUser(),
   ]);
+  const catalog = await getPosCatalogQuery(
+    branch ? { branchId: branch.id } : {},
+  ).catch(() => ({ data: [], products: [] }));
 
   return (
     <section className="space-y-7 pb-8">
@@ -157,6 +159,7 @@ export default async function OrdersPage({ searchParams }: OrdersPageProps) {
         }
         catalog={catalog.data}
         defaultBranchId={branch?.id}
+        products={catalog.products}
       />
 
       <OrderMetrics overview={overview} />

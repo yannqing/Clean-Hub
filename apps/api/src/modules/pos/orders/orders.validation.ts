@@ -92,8 +92,7 @@ export const posOrderItemParamsSchema = z.object({
   itemId: ulidSchema,
 });
 
-const createManualOrderItemBodySchema = z.object({
-  serviceId: ulidSchema,
+const manualOrderItemFields = {
   quantity: quantitySchema.optional(),
   weight: weightSchema.optional(),
   bagCount: z.coerce.number().int().min(1).max(9999).optional(),
@@ -103,7 +102,20 @@ const createManualOrderItemBodySchema = z.object({
   defectNotes: z.string().trim().max(2000).optional(),
   specialRequest: z.string().trim().max(2000).optional(),
   itemIdentifier: z.string().trim().max(64).optional(),
-});
+};
+
+const createManualOrderItemBodySchema = z.union([
+  z.object({
+    ...manualOrderItemFields,
+    serviceId: ulidSchema,
+    productSkuId: z.never().optional(),
+  }),
+  z.object({
+    ...manualOrderItemFields,
+    serviceId: z.never().optional(),
+    productSkuId: ulidSchema,
+  }),
+]);
 
 export const createPosOrderBodySchema = z.discriminatedUnion("orderType", [
   z.object({
@@ -118,7 +130,7 @@ export const createPosOrderBodySchema = z.discriminatedUnion("orderType", [
     id: ulidSchema.optional(),
     orderType: z.literal("manual"),
     branchId: ulidSchema,
-    customerId: ulidSchema,
+    customerId: ulidSchema.optional(),
     items: z.array(createManualOrderItemBodySchema).min(1).max(100),
     expireAt: isoTimestampSchema.nullable().optional(),
     notes: z.string().trim().max(2000).nullable().optional(),
@@ -190,6 +202,7 @@ export const createPosOrderItemBodySchema = createManualOrderItemBodySchema;
 export const updatePosOrderItemBodySchema = z
   .object({
     serviceId: ulidSchema.optional(),
+    productSkuId: ulidSchema.optional(),
     quantity: quantitySchema.optional(),
     weight: weightSchema.optional(),
     bagCount: z.coerce.number().int().min(1).max(9999).optional(),
@@ -204,6 +217,7 @@ export const updatePosOrderItemBodySchema = z
   .refine(
     (value) =>
       value.serviceId !== undefined ||
+      value.productSkuId !== undefined ||
       value.quantity !== undefined ||
       value.weight !== undefined ||
       value.bagCount !== undefined ||
@@ -213,6 +227,11 @@ export const updatePosOrderItemBodySchema = z
       value.specialRequest !== undefined ||
       value.itemIdentifier !== undefined,
     "At least one item field must be provided.",
+  )
+  .refine(
+    (value) =>
+      value.serviceId === undefined || value.productSkuId === undefined,
+    "An order item cannot reference both a service and a product.",
   );
 
 export const deletePosOrderItemBodySchema = z.object({

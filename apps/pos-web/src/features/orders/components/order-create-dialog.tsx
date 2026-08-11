@@ -12,6 +12,7 @@ import { createScopedPrintJobQueue } from "@cleanhub/offline";
 import type {
   CreateManualOrderRequest,
   CreatePosOrderRequest,
+  PosCatalogProduct,
   PosCatalogService,
   PosCustomerProfileWithAccount,
   ServiceTicketSummary,
@@ -43,7 +44,9 @@ import { formatOrderMoney } from "../constants";
 
 type ManualItemForm = {
   key: string;
+  itemKind: "service" | "product";
   serviceId: string;
+  productSkuId: string;
   pricingUnit: "per_item" | "per_kg";
   standardUnitAmount: string;
   chargedUnitAmount: string;
@@ -67,7 +70,9 @@ type OfflineOrderReceipt = {
 function emptyItem(): ManualItemForm {
   return {
     key: `${Date.now()}-${Math.random()}`,
+    itemKind: "product",
     serviceId: "",
+    productSkuId: "",
     pricingUnit: "per_item",
     standardUnitAmount: "0",
     chargedUnitAmount: "0",
@@ -93,6 +98,7 @@ function toIsoOrNull(value: string, timeZone: string): string | null {
 type OrderCreateDialogProps = {
   canManageSensitiveOperations?: boolean;
   catalog?: PosCatalogService[];
+  products?: PosCatalogProduct[];
   defaultBranchId?: string;
   initialTicket?: ServiceTicketSummary;
   orderDetailHref?: (orderId: string) => string;
@@ -104,6 +110,7 @@ type OrderCreateDialogProps = {
 export function OrderCreateDialog({
   canManageSensitiveOperations = false,
   catalog = [],
+  products = [],
   defaultBranchId,
   initialTicket,
   orderDetailHref,
@@ -182,13 +189,10 @@ export function OrderCreateDialog({
       return null;
     }
 
-    if (!selectedCustomer) {
-      toast.error("请选择客户档案。");
-      return null;
-    }
-
     const normalizedItems = items.map((item) => ({
+      itemKind: item.itemKind,
       serviceId: item.serviceId,
+      productSkuId: item.productSkuId,
       quantity:
         item.pricingUnit === "per_item" ? item.quantity.trim() : undefined,
       weight: item.pricingUnit === "per_kg" ? item.weight.trim() : undefined,
@@ -205,10 +209,19 @@ export function OrderCreateDialog({
       priceTouched: item.priceTouched,
     }));
 
+    if (!selectedCustomer && normalizedItems.some((item) => item.itemKind === "service")) {
+      toast.error(
+        text("散客订单只能添加商品；服务订单需要选择客户档案。"),
+      );
+      return null;
+    }
+
     if (
       normalizedItems.some(
         (item) =>
-          !item.serviceId ||
+          (item.itemKind === "service"
+            ? !item.serviceId
+            : !item.productSkuId) ||
           (item.pricingUnit === "per_item" &&
             (!Number.isInteger(Number(item.quantity)) ||
               Number(item.quantity) < 1)) ||
@@ -230,19 +243,23 @@ export function OrderCreateDialog({
     return {
       orderType: "manual",
       branchId: defaultBranchId,
-      customerId: selectedCustomer.id,
-      items: normalizedItems.map((item) => ({
-        serviceId: item.serviceId,
-        quantity: item.quantity,
-        weight: item.weight,
-        bagCount: item.bagCount,
-        chargedUnitAmount: item.chargedUnitAmount,
-        overrideReason: item.overrideReason,
-        itemColor: item.itemColor,
-        defectNotes: item.defectNotes,
-        specialRequest: item.specialRequest,
-        itemIdentifier: item.itemIdentifier,
-      })),
+      customerId: selectedCustomer?.id,
+      items: normalizedItems.map((item) => {
+        const common = {
+          quantity: item.quantity,
+          weight: item.weight,
+          bagCount: item.bagCount,
+          chargedUnitAmount: item.chargedUnitAmount,
+          overrideReason: item.overrideReason,
+          itemColor: item.itemColor,
+          defectNotes: item.defectNotes,
+          specialRequest: item.specialRequest,
+          itemIdentifier: item.itemIdentifier,
+        };
+        return item.itemKind === "product"
+          ? { ...common, productSkuId: item.productSkuId }
+          : { ...common, serviceId: item.serviceId };
+      }),
       expireAt: toIsoOrNull(expireAt, timeZone),
       notes: normalizedNotes,
     };
@@ -257,7 +274,28 @@ export function OrderCreateDialog({
     startTransition(async () => {
       let result: Awaited<ReturnType<typeof createOrder>>;
       try {
-        result = await createOrder(payload);
+        const allowOffline =
+          payload.orderType === "ticket" ||
+          payload.items.every((item) => {
+            if (!("productSkuId" in item)) {
+              return true;
+            }
+            const product = products.find(
+              (candidate) =>
+                candidate.productSkuId === item.productSkuId,
+            );
+            if (!product?.allowOfflineSale) {
+              return false;
+            }
+            if (!product.trackInventory || product.allowNegativeStock) {
+              return true;
+            }
+            const offlineAvailable =
+              Number(product.availableQuantity ?? 0) -
+              Number(product.offlineStockBuffer);
+            return offlineAvailable >= Number(item.quantity ?? 1);
+          });
+        result = await createOrder(payload, { allowOffline });
       } catch (error) {
         toast.error(getPosApiErrorMessage(error, "订单创建失败，请重试。"));
         return;
@@ -267,6 +305,7 @@ export function OrderCreateDialog({
         try {
           const receipt = buildOfflineOrderReceipt({
             catalog,
+            products,
             customer: selectedCustomer,
             entityId: result.entityId,
             locale,
@@ -351,7 +390,7 @@ export function OrderCreateDialog({
             {orderType === "manual" ? (
               <ManualOrderFields
                 canOverridePrice={canManageSensitiveOperations}
-                catalog={catalog}
+                catalog={selectedCustomer ? catalog : []}
                 currency={runtimeCurrency}
                 selectedCustomer={selectedCustomer}
                 items={items}
@@ -367,6 +406,7 @@ export function OrderCreateDialog({
                 }
                 onSelectCustomer={setSelectedCustomer}
                 onUpdateItem={updateItem}
+                products={products}
               />
             ) : (
               <TicketOrderFields
@@ -464,6 +504,7 @@ export function OrderCreateDialog({
 
 function buildOfflineOrderReceipt(input: {
   catalog: PosCatalogService[];
+  products: PosCatalogProduct[];
   customer: PosCustomerProfileWithAccount | null;
   entityId: string;
   locale: SupportedLocale;
@@ -476,14 +517,21 @@ function buildOfflineOrderReceipt(input: {
   const currency = resolveReceiptCurrency(
     manualPayload
       ? (input.runtimeCurrency ??
-          input.catalog.find(
-            (service) => service.id === manualPayload.items[0]?.serviceId,
+          resolveManualCatalogItem(
+            manualPayload.items[0],
+            input.catalog,
+            input.products,
           )?.currency ??
           DEFAULT_POS_CURRENCY)
       : (input.runtimeCurrency ?? DEFAULT_POS_CURRENCY),
   );
   const receiptItems = manualPayload
-    ? buildOfflineManualReceiptItems(manualPayload, input.catalog, currency)
+    ? buildOfflineManualReceiptItems(
+        manualPayload,
+        input.catalog,
+        input.products,
+        currency,
+      )
     : [
         {
           name: input.ticket?.ticketNo
@@ -518,7 +566,15 @@ function buildOfflineOrderReceipt(input: {
         currency,
         merchantName: "CleanHub · Offline",
         customerName:
-          input.customer?.fullName ?? input.ticket?.customerName ?? undefined,
+          input.customer?.fullName ??
+          input.ticket?.customerName ??
+          (manualPayload
+            ? input.locale === "zh-CN"
+              ? "散客"
+              : input.locale === "fr"
+                ? "Client de passage"
+                : "Walk-in customer"
+            : undefined),
         items: receiptItems,
         subtotalMinor: totalMinor,
         discountMinor: 0,
@@ -585,22 +641,26 @@ function resolveReceiptCurrency(value: string): string {
 function buildOfflineManualReceiptItems(
   payload: CreateManualOrderRequest,
   catalog: PosCatalogService[],
+  products: PosCatalogProduct[],
   currency: string,
 ) {
   return payload.items.map((item) => {
-    const service = catalog.find(
-      (candidate) => candidate.id === item.serviceId,
-    );
+    const catalogItem = resolveManualCatalogItem(item, catalog, products);
     const quantity = item.weight
       ? Number(item.weight)
       : Number(item.quantity ?? 1);
-    const unitAmount = Number(item.chargedUnitAmount ?? service?.amount ?? 0);
+    const unitAmount = Number(
+      item.chargedUnitAmount ?? catalogItem?.amount ?? 0,
+    );
     const safeQuantity =
       Number.isFinite(quantity) && quantity > 0 ? quantity : 1;
     const safeUnitAmount = Number.isFinite(unitAmount) ? unitAmount : 0;
 
     return {
-      name: service?.name ?? item.serviceId,
+      name:
+        catalogItem?.name ??
+        ("productSkuId" in item ? item.productSkuId : item.serviceId) ??
+        "Unknown item",
       quantity: safeQuantity,
       unitAmountMinor: toMinorUnits(safeUnitAmount, currency),
       totalAmountMinor: toMinorUnits(safeQuantity * safeUnitAmount, currency),
@@ -610,6 +670,19 @@ function buildOfflineManualReceiptItems(
           .join("; ") || undefined,
     };
   });
+}
+
+function resolveManualCatalogItem(
+  item: CreateManualOrderRequest["items"][number] | undefined,
+  catalog: PosCatalogService[],
+  products: PosCatalogProduct[],
+): PosCatalogService | PosCatalogProduct | undefined {
+  if (!item) {
+    return undefined;
+  }
+  return "productSkuId" in item
+    ? products.find((product) => product.productSkuId === item.productSkuId)
+    : catalog.find((service) => service.id === item.serviceId);
 }
 
 function toMinorUnits(value: number, currency: string): number {
@@ -631,6 +704,7 @@ function ManualOrderFields({
   onUpdateItem,
   onAddItem,
   onRemoveItem,
+  products,
 }: {
   canOverridePrice: boolean;
   catalog: PosCatalogService[];
@@ -641,6 +715,7 @@ function ManualOrderFields({
   onUpdateItem: (index: number, patch: Partial<ManualItemForm>) => void;
   onAddItem: () => void;
   onRemoveItem: (index: number) => void;
+  products: PosCatalogProduct[];
 }) {
   const { locale } = useTranslation();
   const text = (value: string) => translatePosText(value, locale);
@@ -674,20 +749,54 @@ function ManualOrderFields({
             >
               <label className="md:col-span-2 lg:col-span-3">
                 <span className="mb-1 block text-xs font-semibold text-muted-foreground">
-                  {text("服务项目")}
+                  {text("服务或商品")}
                 </span>
                 <select
                   className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/20"
                   onChange={(event) => {
-                    const service = catalog.find(
-                      (entry) => entry.id === event.target.value,
-                    );
+                    const [kind, id] = event.target.value.split(":", 2);
+                    if (kind === "product") {
+                      const product = products.find(
+                        (entry) => entry.productSkuId === id,
+                      );
+                      if (!product) {
+                        onUpdateItem(index, {
+                          serviceId: "",
+                          productSkuId: "",
+                        });
+                        return;
+                      }
+                      onUpdateItem(index, {
+                        itemKind: "product",
+                        serviceId: "",
+                        productSkuId: product.productSkuId,
+                        pricingUnit: "per_item",
+                        standardUnitAmount: product.amount,
+                        chargedUnitAmount: product.amount,
+                        priceTouched: true,
+                        quantity: item.quantity || "1",
+                        weight: "",
+                        bagCount: "1",
+                        itemColor: "",
+                        defectNotes: "",
+                        specialRequest: "",
+                        itemIdentifier: product.barcode ?? product.sku,
+                        overrideReason: "",
+                      });
+                      return;
+                    }
+                    const service = catalog.find((entry) => entry.id === id);
                     if (!service) {
-                      onUpdateItem(index, { serviceId: "" });
+                      onUpdateItem(index, {
+                        serviceId: "",
+                        productSkuId: "",
+                      });
                       return;
                     }
                     onUpdateItem(index, {
+                      itemKind: "service",
                       serviceId: service.id,
+                      productSkuId: "",
                       pricingUnit: service.pricingUnit,
                       standardUnitAmount: service.amount,
                       chargedUnitAmount: service.amount,
@@ -705,11 +814,45 @@ function ManualOrderFields({
                       overrideReason: "",
                     });
                   }}
-                  value={item.serviceId}
+                  value={
+                    item.itemKind === "product" && item.productSkuId
+                      ? `product:${item.productSkuId}`
+                      : item.serviceId
+                        ? `service:${item.serviceId}`
+                        : ""
+                  }
                 >
-                  <option value="">{text("请选择服务")}</option>
+                  <option value="">{text("请选择服务或商品")}</option>
+                  {products.length > 0 ? (
+                    <optgroup label={text("商品")}>
+                      {products.map((product) => {
+                        const outOfStock =
+                          product.trackInventory &&
+                          !product.allowNegativeStock &&
+                          Number(product.availableQuantity ?? 0) <= 0;
+                        return (
+                          <option
+                            disabled={outOfStock}
+                            key={product.productSkuId}
+                            value={`product:${product.productSkuId}`}
+                          >
+                            {product.name}
+                            {product.variantName
+                              ? ` · ${product.variantName}`
+                              : ""}{" "}
+                            · {formatOrderMoney(product.amount, product.currency)}
+                            {product.trackInventory
+                              ? ` · ${text("库存")} ${Number(product.availableQuantity ?? 0)}`
+                              : ""}
+                          </option>
+                        );
+                      })}
+                    </optgroup>
+                  ) : null}
+                  {catalog.length > 0 ? (
+                    <optgroup label={text("服务项目")}>
                   {catalog.map((service) => (
-                    <option key={service.id} value={service.id}>
+                    <option key={service.id} value={`service:${service.id}`}>
                       {service.name} ·{" "}
                       {text(
                         service.pricingUnit === "per_kg" ? "按公斤" : "按件",
@@ -717,6 +860,8 @@ function ManualOrderFields({
                       · {formatOrderMoney(service.amount, service.currency)}
                     </option>
                   ))}
+                    </optgroup>
+                  ) : null}
                 </select>
               </label>
               {item.pricingUnit === "per_kg" ? (
@@ -770,32 +915,38 @@ function ManualOrderFields({
                   )}
                 </div>
               </div>
-              <TextField
-                label={text("颜色")}
-                onChange={(value) => onUpdateItem(index, { itemColor: value })}
-                value={item.itemColor}
-              />
-              <TextField
-                label={text("物品 / 袋标识")}
-                onChange={(value) =>
-                  onUpdateItem(index, { itemIdentifier: value })
-                }
-                value={item.itemIdentifier}
-              />
-              <TextField
-                label={text("瑕疵")}
-                onChange={(value) =>
-                  onUpdateItem(index, { defectNotes: value })
-                }
-                value={item.defectNotes}
-              />
-              <TextField
-                label={text("特殊要求")}
-                onChange={(value) =>
-                  onUpdateItem(index, { specialRequest: value })
-                }
-                value={item.specialRequest}
-              />
+              {item.itemKind === "service" ? (
+                <>
+                  <TextField
+                    label={text("颜色")}
+                    onChange={(value) =>
+                      onUpdateItem(index, { itemColor: value })
+                    }
+                    value={item.itemColor}
+                  />
+                  <TextField
+                    label={text("物品 / 袋标识")}
+                    onChange={(value) =>
+                      onUpdateItem(index, { itemIdentifier: value })
+                    }
+                    value={item.itemIdentifier}
+                  />
+                  <TextField
+                    label={text("瑕疵")}
+                    onChange={(value) =>
+                      onUpdateItem(index, { defectNotes: value })
+                    }
+                    value={item.defectNotes}
+                  />
+                  <TextField
+                    label={text("特殊要求")}
+                    onChange={(value) =>
+                      onUpdateItem(index, { specialRequest: value })
+                    }
+                    value={item.specialRequest}
+                  />
+                </>
+              ) : null}
               {canOverridePrice &&
               item.priceTouched &&
               Number(item.chargedUnitAmount).toFixed(2) !==
@@ -933,8 +1084,27 @@ function CustomerProfilePicker({
   }, [keyword, listQueuedCustomerProfiles, pendingCount]);
 
   return (
-    <Field label={text("客户档案")}>
+    <Field label={text("客户档案（选填）")}>
       <div className="rounded-lg border border-border bg-muted/50 p-3">
+        <button
+          className={`mb-3 flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left transition-colors ${
+            selectedCustomer
+              ? "border-border bg-background text-muted-foreground hover:bg-muted"
+              : "border-primary/40 bg-primary/5 text-foreground"
+          }`}
+          onClick={() => onSelect(null)}
+          type="button"
+        >
+          <span>
+            <span className="block text-sm font-semibold">{text("散客")}</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              {text("不关联客户档案，直接创建零售订单")}
+            </span>
+          </span>
+          {!selectedCustomer ? (
+            <Icon className="h-4 w-4 text-primary" name="check" />
+          ) : null}
+        </button>
         <input
           className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
           onChange={(event) => setKeyword(event.target.value)}

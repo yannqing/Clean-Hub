@@ -10,6 +10,7 @@ import {
 } from "@cleanhub/ui";
 import type {
   PosCatalogService,
+  PosCatalogProduct,
   PosOrderDetail,
   PosMobileMoneyProvider,
   PosPaymentAdjustment,
@@ -50,6 +51,7 @@ type OrderDetailViewProps = {
   canResolveManualPayments: boolean;
   adjustments: PosPaymentAdjustment[];
   catalog: PosCatalogService[];
+  products: PosCatalogProduct[];
   order: PosOrderDetail;
   payments: PosPaymentTransaction[];
   source?: {
@@ -64,6 +66,7 @@ export function OrderDetailView({
   canResolveManualPayments,
   adjustments,
   catalog,
+  products,
   order,
   payments,
   source,
@@ -79,7 +82,7 @@ export function OrderDetailView({
       <div className="flex flex-wrap items-center justify-between gap-3 border-y bg-background px-4 py-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-foreground">
-            {order.customerName || "未命名客户"}
+            {order.customerName || "散客"}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {ORDER_TYPE_LABELS[order.orderType]} · {displayOrderCode(order.id)}
@@ -104,10 +107,17 @@ export function OrderDetailView({
           <OrderInfoEditor order={order} />
           <OrderItemsManager
             canManageSensitiveOperations={canResolveManualPayments}
-            catalog={catalog.filter(
-              (service) => service.currency === order.currency,
-            )}
+            catalog={
+              order.customerId
+                ? catalog.filter(
+                    (service) => service.currency === order.currency,
+                  )
+                : []
+            }
             order={order}
+            products={products.filter(
+              (product) => product.currency === order.currency,
+            )}
           />
           <OrderDiscountsCard
             canManageSensitiveOperations={canResolveManualPayments}
@@ -189,7 +199,7 @@ function buildOrderReceiptContent(
       issuedAt: order.paidAt ?? order.updatedAt,
       currency: order.currency,
       merchantName: "CleanHub",
-      customerName: order.customerName,
+      customerName: order.customerName ?? "散客",
       items,
       subtotalMinor,
       discountMinor,
@@ -240,10 +250,14 @@ function buildOrderBreadcrumbItems(
   if (source?.ticketFrom === "intake") {
     return [
       { href: buildIntakeReturnPath(source.q), label: "客户接待" },
-      {
-        href: buildCustomerDetailHref(order.customerId, source),
-        label: order.customerName || "客户档案",
-      },
+      ...(order.customerId
+        ? [
+            {
+              href: buildCustomerDetailHref(order.customerId, source),
+              label: order.customerName || "客户档案",
+            },
+          ]
+        : []),
       { href: ticketHref, label: "工单详情" },
       { label: displayOrderCode(order.id) },
     ];
@@ -252,10 +266,14 @@ function buildOrderBreadcrumbItems(
   if (source?.ticketFrom === "customer") {
     return [
       { href: posRoutes.customers, label: "客户管理" },
-      {
-        href: buildCustomerDetailHref(order.customerId, source),
-        label: order.customerName || "客户档案",
-      },
+      ...(order.customerId
+        ? [
+            {
+              href: buildCustomerDetailHref(order.customerId, source),
+              label: order.customerName || "客户档案",
+            },
+          ]
+        : []),
       { href: ticketHref, label: "工单详情" },
       { label: displayOrderCode(order.id) },
     ];

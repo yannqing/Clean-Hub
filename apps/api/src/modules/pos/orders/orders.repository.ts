@@ -54,8 +54,19 @@ import { minorToMoney, moneyToMinor } from "../discounts/pricing-engine.js";
 import { projectPosOrderPaymentState } from "./order-payment-state.js";
 
 export type ResolvedPosOrderItemInput = {
-  serviceId: string;
+  itemKind: "service" | "product";
+  businessLine: "laundry" | "car_wash" | "retail" | "delivery" | null;
+  serviceId: string | null;
+  productSkuId: string | null;
+  productPriceId: string | null;
   itemName: string;
+  sku: string | null;
+  barcode: string | null;
+  variantName: string | null;
+  unitOfMeasure: string | null;
+  unitCostAmount: string | null;
+  trackInventory: boolean;
+  allowNegativeStock: boolean;
   pricingUnit: "per_item" | "per_kg";
   standardUnitAmount: string;
   chargedUnitAmount: string;
@@ -146,7 +157,7 @@ function toOrderSummary(row: OrderJoinedRow): PosOrderSummary {
     branchId: row.branchId,
     currency: row.currency,
     customerId: row.customerId,
-    customerName: row.customerName ?? "",
+    customerName: row.customerName,
     orderType: row.orderType,
     status: row.status,
     subtotalAmount: row.subtotalAmount,
@@ -487,6 +498,7 @@ export async function findServiceTicketForOrder(
       and(
         eq(serviceTickets.id, input.ticketId),
         eq(serviceTickets.tenantId, input.tenantId),
+        inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
         isNull(serviceTickets.deletedAt),
       ),
     )
@@ -549,7 +561,7 @@ export async function createOrderRecord(
     tenantId: string;
     branchId: string;
     currency: string;
-    customerId: string;
+    customerId: string | null;
     orderType: PosOrderType;
     status: "draft" | "received";
     totalAmount: string;
@@ -633,24 +645,40 @@ export async function insertManualOrderItems(
   input: {
     tenantId: string;
     branchId: string;
-    customerId: string;
+    customerId: string | null;
     orderId: string;
     items: ResolvedPosOrderItemInput[];
     actorUserId: string;
   },
-): Promise<void> {
-  await db.insert(orderItems).values(
-    input.items.map((item) => ({
+): Promise<
+  Array<{
+    orderItemId: string;
+    productSkuId: string | null;
+    quantity: string;
+    trackInventory: boolean;
+    allowNegativeStock: boolean;
+  }>
+> {
+  const records = input.items.map((item) => ({
       id: createId(),
       orderId: input.orderId,
       ticketId: null,
       tenantId: input.tenantId,
       branchId: input.branchId,
       customerId: input.customerId,
-      sourceType: "product" as const,
-      sourceId: item.serviceId,
+      itemKind: item.itemKind,
+      sourceType: item.itemKind,
+      sourceId:
+        item.itemKind === "product" ? item.productSkuId! : item.serviceId!,
       serviceId: item.serviceId,
+      productSkuId: item.productSkuId,
+      productPriceId: item.productPriceId,
       itemName: item.itemName.trim(),
+      skuSnapshot: item.sku,
+      barcodeSnapshot: item.barcode,
+      variantNameSnapshot: item.variantName,
+      unitOfMeasureSnapshot: item.unitOfMeasure,
+      unitCostAmount: item.unitCostAmount,
       quantity: item.quantity,
       pricingUnit: item.pricingUnit,
       standardUnitAmount: item.standardUnitAmount,
@@ -665,8 +693,15 @@ export async function insertManualOrderItems(
       itemIdentifier: normalizeNullable(item.itemIdentifier),
       createdBy: input.actorUserId,
       updatedBy: input.actorUserId,
-    })),
-  );
+    }));
+  await db.insert(orderItems).values(records);
+  return input.items.map((item, index) => ({
+    orderItemId: records[index]!.id,
+    productSkuId: item.productSkuId,
+    quantity: item.quantity,
+    trackInventory: item.trackInventory,
+    allowNegativeStock: item.allowNegativeStock,
+  }));
 }
 
 export function sumOrderItemAmounts(
@@ -798,7 +833,7 @@ export async function createPaymentTransactionRecord(
   input: {
     tenantId: string;
     branchId: string;
-    customerId: string;
+    customerId: string | null;
     orderId: string;
     paymentMethod: PosPaymentMethod;
     amount: string;
@@ -1022,7 +1057,7 @@ export async function createManualOrderItemRecord(
   input: ResolvedPosOrderItemInput & {
     tenantId: string;
     branchId: string;
-    customerId: string;
+    customerId: string | null;
     orderId: string;
     actorUserId: string;
   },
@@ -1036,10 +1071,19 @@ export async function createManualOrderItemRecord(
     tenantId: input.tenantId,
     branchId: input.branchId,
     customerId: input.customerId,
-    sourceType: "product",
-    sourceId: input.serviceId,
+    itemKind: input.itemKind,
+    sourceType: input.itemKind,
+    sourceId:
+      input.itemKind === "product" ? input.productSkuId! : input.serviceId!,
     serviceId: input.serviceId,
+    productSkuId: input.productSkuId,
+    productPriceId: input.productPriceId,
     itemName: input.itemName.trim(),
+    skuSnapshot: input.sku,
+    barcodeSnapshot: input.barcode,
+    variantNameSnapshot: input.variantName,
+    unitOfMeasureSnapshot: input.unitOfMeasure,
+    unitCostAmount: input.unitCostAmount,
     quantity: input.quantity,
     pricingUnit: input.pricingUnit,
     standardUnitAmount: input.standardUnitAmount,
@@ -1085,10 +1129,19 @@ export async function updateManualOrderItemRecord(
   const updatedRows = await db
     .update(orderItems)
     .set({
+      itemKind: input.itemKind,
       serviceId: input.serviceId,
-      sourceType: "product",
-      sourceId: input.serviceId,
+      productSkuId: input.productSkuId,
+      productPriceId: input.productPriceId,
+      sourceType: input.itemKind,
+      sourceId:
+        input.itemKind === "product" ? input.productSkuId! : input.serviceId!,
       itemName: input.itemName.trim(),
+      skuSnapshot: input.sku,
+      barcodeSnapshot: input.barcode,
+      variantNameSnapshot: input.variantName,
+      unitOfMeasureSnapshot: input.unitOfMeasure,
+      unitCostAmount: input.unitCostAmount,
       quantity: input.quantity,
       pricingUnit: input.pricingUnit,
       standardUnitAmount: input.standardUnitAmount,

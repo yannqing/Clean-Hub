@@ -18,7 +18,7 @@ export type MobilePaymentTransaction = {
   id: string;
   tenantId: string;
   branchId: string;
-  customerId: string;
+  customerId: string | null;
   orderId: string;
   amount: string;
   currency: string;

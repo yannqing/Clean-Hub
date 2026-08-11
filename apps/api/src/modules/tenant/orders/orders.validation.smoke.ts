@@ -136,6 +136,20 @@ assert.equal(
     orders: [
       {
         id: ORDER_ID,
+        importKey: "walk-in-1001",
+        branchId: BRANCH_ID,
+        items: [{ serviceId: SERVICE_ID, quantity: "1" }],
+      },
+    ],
+  }).success,
+  true,
+  "order imports should support walk-in retail orders without customer ids",
+);
+assert.equal(
+  tenantOrderImportBodySchema.safeParse({
+    orders: [
+      {
+        id: ORDER_ID,
         importKey: "external-1001",
         branchId: BRANCH_ID,
         customerId: CUSTOMER_ID,

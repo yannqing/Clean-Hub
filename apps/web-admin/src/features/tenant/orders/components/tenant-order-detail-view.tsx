@@ -805,11 +805,16 @@ export function TenantOrderDetailView({
                 </h2>
               </div>
               <p className="mt-4 text-sm font-semibold">
-                {order.customerName || m.orders.unknownCustomer}
+                {order.customerName ||
+                  (order.customerId
+                    ? m.orders.unknownCustomer
+                    : m.orders.guestCustomer)}
               </p>
-              <p className="mt-1 break-all text-xs text-muted-foreground">
-                {order.customerId}
-              </p>
+              {order.customerId ? (
+                <p className="mt-1 break-all text-xs text-muted-foreground">
+                  {order.customerId}
+                </p>
+              ) : null}
             </CardContent>
           </Card>
 

@@ -44,10 +44,18 @@ import {
   updateOrderRecord,
   type ResolvedPosOrderItemInput,
 } from "./orders.repository.js";
-import { findPosCatalogServiceById } from "../catalog/catalog.repository.js";
+import {
+  findPosCatalogProductBySkuId,
+  findPosCatalogServiceById,
+} from "../catalog/catalog.repository.js";
 import { releaseActivePosOrderDiscounts } from "../discounts/discounts.repository.js";
 import { repricePosOrderDiscounts } from "../discounts/discounts.service.js";
 import { moneyToMinor } from "../discounts/pricing-engine.js";
+import {
+  consumeProductInventoryForPaidOrder,
+  releaseProductOrderReservations,
+  reserveProductOrderItem,
+} from "./orders.inventory.js";
 import type {
   ChangePosOrderStatusRequest,
   CreatePosOrderInput,
@@ -194,28 +202,137 @@ function resolveNullableField(
   return trimmed ? trimmed : null;
 }
 
+export function assertGuestOrderItemAllowed(
+  customerId: string | null,
+  itemKind: ResolvedPosOrderItemInput["itemKind"],
+): void {
+  if (customerId === null && itemKind !== "product") {
+    throw new PosOrderError(
+      "CUSTOMER_REQUIRED",
+      "A customer profile is required for non-retail services.",
+      422,
+    );
+  }
+}
+
 async function resolveOrderItemPricing(
   db: Database,
   input: {
     authContext: AuthContext;
     tenantId: string;
+    branchId: string;
     currency: string;
     data: CreatePosOrderItemRequest | UpdatePosOrderItemRequest;
     existing?: PosOrderItem;
   },
 ): Promise<ResolvedPosOrderItemInput & { overrideReason?: string }> {
-  const serviceId = input.data.serviceId ?? input.existing?.serviceId;
-  if (!serviceId) {
+  const selectingProduct = input.data.productSkuId !== undefined;
+  const selectingService = input.data.serviceId !== undefined;
+  const productSkuId = selectingService
+    ? null
+    : (input.data.productSkuId ?? input.existing?.productSkuId);
+  const serviceId = selectingProduct
+    ? null
+    : (input.data.serviceId ?? input.existing?.serviceId);
+  if (!serviceId && !productSkuId) {
     throw new PosOrderError(
       "VALIDATION_ERROR",
-      "A catalog service is required for every order item.",
+      "A catalog service or product is required for every order item.",
       422,
     );
   }
 
+  if (productSkuId) {
+    const product = await findPosCatalogProductBySkuId(db, {
+      tenantId: input.tenantId,
+      branchId: input.branchId,
+      productSkuId,
+    });
+    if (!product) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "The selected product is not available at this branch or has no active price.",
+        422,
+      );
+    }
+    if (product.currency !== input.currency) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "The selected product price currency does not match the order currency.",
+        422,
+      );
+    }
+
+    const productChanged =
+      !input.existing || productSkuId !== input.existing.productSkuId;
+    const standardUnitAmount =
+      productChanged || !input.existing
+        ? product.amount
+        : input.existing.standardUnitAmount;
+    const chargedUnitAmount =
+      input.data.chargedUnitAmount ??
+      (productChanged || !input.existing
+        ? standardUnitAmount
+        : input.existing.chargedUnitAmount);
+    const priceWasSubmitted =
+      input.data.chargedUnitAmount !== undefined || productChanged;
+    const overrideReason =
+      priceWasSubmitted && !moneyEquals(chargedUnitAmount, standardUnitAmount)
+        ? authorizePosSensitiveOperation(
+            input.authContext,
+            "price_override",
+            input.data.overrideReason,
+          )
+        : undefined;
+    const quantity = input.data.quantity ?? input.existing?.quantity;
+    if (
+      !quantity ||
+      !Number.isInteger(Number(quantity)) ||
+      Number(quantity) < 1
+    ) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "A positive whole-number quantity is required for a product.",
+        422,
+      );
+    }
+
+    return {
+      itemKind: "product",
+      businessLine: null,
+      serviceId: null,
+      productSkuId,
+      productPriceId: product.productPriceId,
+      itemName: product.variantName
+        ? `${product.name} · ${product.variantName}`
+        : product.name,
+      sku: product.sku,
+      barcode: product.barcode,
+      variantName: product.variantName,
+      unitOfMeasure: product.unitOfMeasure,
+      unitCostAmount: product.unitCostAmount,
+      trackInventory: product.trackInventory,
+      allowNegativeStock: product.allowNegativeStock,
+      pricingUnit: "per_item",
+      standardUnitAmount,
+      chargedUnitAmount,
+      quantity,
+      weight: null,
+      bagCount: null,
+      itemColor: null,
+      defectNotes: null,
+      specialRequest: null,
+      itemIdentifier: product.barcode ?? product.sku,
+      overrideReason,
+    };
+  }
+
+  const resolvedServiceId = serviceId!;
+
   const service = await findPosCatalogServiceById(db, {
     tenantId: input.tenantId,
-    serviceId,
+    branchId: input.branchId,
+    serviceId: resolvedServiceId,
   });
   if (!service) {
     throw new PosOrderError(
@@ -233,7 +350,7 @@ async function resolveOrderItemPricing(
   }
 
   const serviceChanged =
-    !input.existing || serviceId !== input.existing.serviceId;
+    !input.existing || resolvedServiceId !== input.existing.serviceId;
   const standardUnitAmount =
     serviceChanged || !input.existing
       ? service.amount
@@ -283,8 +400,19 @@ async function resolveOrderItemPricing(
       );
     }
     return {
-      serviceId,
+      itemKind: "service",
+      businessLine: service.businessLine,
+      serviceId: resolvedServiceId,
+      productSkuId: null,
+      productPriceId: null,
       itemName: service.name,
+      sku: null,
+      barcode: null,
+      variantName: null,
+      unitOfMeasure: null,
+      unitCostAmount: null,
+      trackInventory: false,
+      allowNegativeStock: false,
       pricingUnit: service.pricingUnit,
       standardUnitAmount,
       chargedUnitAmount,
@@ -309,8 +437,19 @@ async function resolveOrderItemPricing(
     );
   }
   return {
-    serviceId,
+    itemKind: "service",
+    businessLine: service.businessLine,
+    serviceId: resolvedServiceId,
+    productSkuId: null,
+    productPriceId: null,
     itemName: service.name,
+    sku: null,
+    barcode: null,
+    variantName: null,
+    unitOfMeasure: null,
+    unitCostAmount: null,
+    trackInventory: false,
+    allowNegativeStock: false,
     pricingUnit: service.pricingUnit,
     standardUnitAmount,
     chargedUnitAmount,
@@ -552,10 +691,10 @@ async function createManualOrder(
   },
 ): Promise<PosOrderDetail> {
   requirePosBranchAccess(input.authContext, input.data.branchId);
-  await requireCustomerActive(db, {
-    tenantId,
-    customerId: input.data.customerId,
-  });
+  const customerId = input.data.customerId ?? null;
+  if (customerId) {
+    await requireCustomerActive(db, { tenantId, customerId });
+  }
   const branch = await findBranchById(db, {
     tenantId,
     branchId: input.data.branchId,
@@ -569,14 +708,15 @@ async function createManualOrder(
     ResolvedPosOrderItemInput & { overrideReason?: string }
   > = [];
   for (const item of input.data.items) {
-    resolvedItems.push(
-      await resolveOrderItemPricing(db, {
-        authContext: input.authContext,
-        tenantId,
-        currency: branch.defaultCurrency,
-        data: item,
-      }),
-    );
+    const resolved = await resolveOrderItemPricing(db, {
+      authContext: input.authContext,
+      tenantId,
+      branchId: input.data.branchId,
+      currency: branch.defaultCurrency,
+      data: item,
+    });
+    assertGuestOrderItemAllowed(customerId, resolved.itemKind);
+    resolvedItems.push(resolved);
   }
   const totalAmount = sumOrderItemAmounts(
     resolvedItems.map((item) => ({
@@ -588,7 +728,7 @@ async function createManualOrder(
     tenantId,
     branchId: input.data.branchId,
     currency: branch.defaultCurrency,
-    customerId: input.data.customerId,
+    customerId,
     orderType: "manual",
     status: "received",
     totalAmount,
@@ -597,14 +737,23 @@ async function createManualOrder(
     actorUserId: input.authContext.userId,
   });
 
-  await insertManualOrderItems(db, {
+  const insertedItems = await insertManualOrderItems(db, {
     tenantId,
     branchId: input.data.branchId,
-    customerId: input.data.customerId,
+    customerId,
     orderId,
     items: resolvedItems,
     actorUserId: input.authContext.userId,
   });
+  for (const item of insertedItems) {
+    await reserveProductOrderItem(db, {
+      tenantId,
+      branchId: input.data.branchId,
+      orderId,
+      actorUserId: input.authContext.userId,
+      item,
+    });
+  }
   const createdOrder = await findPosOrderRaw(db, { tenantId, orderId });
   if (!createdOrder) {
     throw new Error("Created order could not be loaded for pricing.");
@@ -633,7 +782,9 @@ async function createManualOrder(
       priceOverrides: resolvedItems
         .filter((item) => item.overrideReason)
         .map((item) => ({
+          itemKind: item.itemKind,
           serviceId: item.serviceId,
+          productSkuId: item.productSkuId,
           standardUnitAmount: item.standardUnitAmount,
           chargedUnitAmount: item.chargedUnitAmount,
           reason: item.overrideReason,
@@ -731,6 +882,11 @@ export async function changePosOrderStatus(
           actorUserId: authContext.userId,
           reason: sensitiveReason ?? "Order cancelled.",
         });
+        await releaseProductOrderReservations(tx, {
+          tenantId,
+          orderId,
+          actorUserId: authContext.userId,
+        });
       }
       const detail = await findPosOrderDetail(tx, { tenantId, orderId });
       if (!detail) {
@@ -804,6 +960,19 @@ export async function changePosOrderStatus(
             reason: sensitiveReason ?? "Order cancelled.",
           })
         : [];
+    if (data.to === "cancelled") {
+      await releaseProductOrderReservations(tx, {
+        tenantId,
+        orderId,
+        actorUserId: authContext.userId,
+      });
+    } else if (data.to === "paid") {
+      await consumeProductInventoryForPaidOrder(tx, {
+        tenantId,
+        orderId,
+        actorUserId: authContext.userId,
+      });
+    }
     const detail = await findPosOrderDetail(tx, { tenantId, orderId });
     if (!detail) {
       throw new Error("Updated order could not be loaded.");
@@ -879,6 +1048,11 @@ export async function deletePosOrder(
       orderId,
       actorUserId: authContext.userId,
       reason,
+    });
+    await releaseProductOrderReservations(tx, {
+      tenantId,
+      orderId,
+      actorUserId: authContext.userId,
     });
     const deleted = await softDeleteOrderRecord(tx, {
       tenantId,
@@ -1060,6 +1234,11 @@ export async function createPosOrderPayment(
         orderId,
         actorUserId: authContext.userId,
       });
+      await consumeProductInventoryForPaidOrder(tx, {
+        tenantId,
+        orderId,
+        actorUserId: authContext.userId,
+      });
     }
 
     const detail = await findPosOrderDetail(tx, { tenantId, orderId });
@@ -1173,6 +1352,11 @@ async function resolvePosManualPayment(
         orderId,
         actorUserId: authContext.userId,
       });
+      await consumeProductInventoryForPaidOrder(tx, {
+        tenantId,
+        orderId,
+        actorUserId: authContext.userId,
+      });
     }
 
     const detail = await findPosOrderDetail(tx, { tenantId, orderId });
@@ -1266,9 +1450,11 @@ export async function createPosOrderItem(
     const resolved = await resolveOrderItemPricing(tx, {
       authContext,
       tenantId,
+      branchId: order.branchId,
       currency: order.currency,
       data,
     });
+    assertGuestOrderItemAllowed(order.customerId, resolved.itemKind);
 
     const item = await createManualOrderItemRecord(tx, {
       ...resolved,
@@ -1277,6 +1463,19 @@ export async function createPosOrderItem(
       customerId: order.customerId,
       orderId,
       actorUserId: authContext.userId,
+    });
+    await reserveProductOrderItem(tx, {
+      tenantId,
+      branchId: order.branchId,
+      orderId,
+      actorUserId: authContext.userId,
+      item: {
+        orderItemId: item.id,
+        productSkuId: resolved.productSkuId,
+        quantity: resolved.quantity,
+        trackInventory: resolved.trackInventory,
+        allowNegativeStock: resolved.allowNegativeStock,
+      },
     });
 
     await repricePosOrderDiscounts(tx, {
@@ -1341,9 +1540,18 @@ export async function updatePosOrderItem(
     const resolved = await resolveOrderItemPricing(tx, {
       authContext,
       tenantId,
+      branchId: order.branchId,
       currency: order.currency,
       data,
       existing,
+    });
+    assertGuestOrderItemAllowed(order.customerId, resolved.itemKind);
+
+    await releaseProductOrderReservations(tx, {
+      tenantId,
+      orderId,
+      actorUserId: authContext.userId,
+      orderItemIds: [itemId],
     });
 
     const result = await updateManualOrderItemRecord(tx, {
@@ -1369,6 +1577,20 @@ export async function updatePosOrderItem(
         409,
       );
     }
+
+    await reserveProductOrderItem(tx, {
+      tenantId,
+      branchId: order.branchId,
+      orderId,
+      actorUserId: authContext.userId,
+      item: {
+        orderItemId: itemId,
+        productSkuId: resolved.productSkuId,
+        quantity: resolved.quantity,
+        trackInventory: resolved.trackInventory,
+        allowNegativeStock: resolved.allowNegativeStock,
+      },
+    });
 
     await repricePosOrderDiscounts(tx, {
       order,
@@ -1439,6 +1661,13 @@ export async function deletePosOrderItem(
         404,
       );
     }
+
+    await releaseProductOrderReservations(tx, {
+      tenantId,
+      orderId,
+      actorUserId: authContext.userId,
+      orderItemIds: [itemId],
+    });
 
     const deleted = await softDeleteOrderItemRecord(tx, {
       tenantId,

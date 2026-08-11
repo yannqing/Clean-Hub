@@ -121,7 +121,7 @@ export function OrdersTable({ orders, total }: OrdersTableProps) {
                 {visibleColumns.has("customer") ? (
                   <TableCell className="max-w-56">
                     <span className="block truncate font-medium text-foreground">
-                      {order.customerName || text("未命名客户")}
+                      {order.customerName || text("散客")}
                     </span>
                     <span className="mt-0.5 block text-[10px] text-muted-foreground">
                       {formatOrderItemCount(order.itemCount, locale)}
@@ -195,7 +195,7 @@ function OrderCard({
             {displayOrderCode(order.id)}
           </div>
           <div className="mt-1 truncate text-sm font-medium text-foreground">
-            {order.customerName || text("未命名客户")}
+            {order.customerName || text("散客")}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {text(ORDER_TYPE_LABELS[order.orderType])} ·{" "}

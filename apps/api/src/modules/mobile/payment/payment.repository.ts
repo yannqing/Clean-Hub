@@ -195,7 +195,8 @@ export class PaymentRepository {
       )
       .limit(1);
 
-    return rows[0] ?? null;
+    const row = rows[0];
+    return row?.customerId ? { ...row, customerId: row.customerId } : null;
   }
 
   async findTransactionByIdempotencyKey(input: {
@@ -657,6 +658,9 @@ export class PaymentRepository {
       .limit(1);
 
     if (!order) {
+      return null;
+    }
+    if (!order.customerId) {
       return null;
     }
 

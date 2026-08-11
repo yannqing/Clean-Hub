@@ -158,7 +158,7 @@ export function parseTenantOrderImportCsv(
     const rowNumber = index + 2;
     const orderKey = getCell(row, headerIndexes, "order_key");
     const branchId = getCell(row, headerIndexes, "branch_id");
-    const customerId = getCell(row, headerIndexes, "customer_id");
+    const customerId = getCell(row, headerIndexes, "customer_id") || undefined;
     const serviceId = getCell(row, headerIndexes, "service_id");
     const quantity = getCell(row, headerIndexes, "quantity");
     const weight = getCell(row, headerIndexes, "weight");
@@ -168,7 +168,6 @@ export function parseTenantOrderImportCsv(
     const missingValues = [
       ["order_key", orderKey],
       ["branch_id", branchId],
-      ["customer_id", customerId],
       ["service_id", serviceId],
     ]
       .filter(([, value]) => !value)
@@ -185,13 +184,16 @@ export function parseTenantOrderImportCsv(
 
     for (const [field, value] of [
       ["branch_id", branchId],
-      ["customer_id", customerId],
       ["service_id", serviceId],
     ] as const) {
       if (!ULID_PATTERN.test(value)) {
         errors.push({ code: "invalid_value", field, row: rowNumber });
         return;
       }
+    }
+    if (customerId && !ULID_PATTERN.test(customerId)) {
+      errors.push({ code: "invalid_value", field: "customer_id", row: rowNumber });
+      return;
     }
 
     if (!quantity && !weight) {
@@ -276,7 +278,7 @@ export function parseTenantOrderImportCsv(
         id: createId(),
         importKey: orderKey,
         branchId,
-        customerId,
+        ...(customerId ? { customerId } : {}),
         ...(notes ? { notes } : {}),
         ...(expireAt ? { expireAt } : {}),
         items: [item],
@@ -312,6 +314,7 @@ export type TenantOrderExportLabels = {
   statusLabels: Record<TenantOrderSummary["status"], string>;
   paymentStatusLabels: Record<TenantOrderSummary["paymentStatus"], string>;
   unknownCustomer: string;
+  guestCustomer: string;
 };
 
 function protectSpreadsheetCell(value: string): string {
@@ -326,8 +329,11 @@ export function downloadTenantOrderExport(
   const rows = orders.map((order) => [
     formatPosOrderCode(order.id),
     order.id,
-    protectSpreadsheetCell(order.customerName || labels.unknownCustomer),
-    order.customerId,
+    protectSpreadsheetCell(
+      order.customerName ||
+        (order.customerId ? labels.unknownCustomer : labels.guestCustomer),
+    ),
+    order.customerId ?? "",
     protectSpreadsheetCell(branchNames[order.branchId] ?? order.branchId),
     order.branchId,
     labels.typeLabels[order.orderType],

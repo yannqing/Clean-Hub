@@ -13,6 +13,8 @@ export type PosOrderErrorCode =
   | "PAYMENT_CONFIRMATION_FORBIDDEN"
   | "CUSTOMER_NOT_FOUND"
   | "CUSTOMER_DISABLED"
+  | "CUSTOMER_REQUIRED"
+  | "INSUFFICIENT_STOCK"
   | "SERVICE_TICKET_NOT_FOUND"
   | "SERVICE_TICKET_EMPTY"
   | "TICKET_ITEM_ALREADY_ORDERED"
@@ -50,6 +52,8 @@ const ORDER_ERROR_MESSAGES: Record<PosOrderErrorCode, string> = {
   PAYMENT_CONFIRMATION_FORBIDDEN: "只有 Owner 或 Manager 可以确认移动支付。",
   CUSTOMER_NOT_FOUND: "客户档案不存在。",
   CUSTOMER_DISABLED: "客户已停用，无法创建订单。",
+  CUSTOMER_REQUIRED: "散客订单只能包含零售项目；服务订单需要选择客户档案。",
+  INSUFFICIENT_STOCK: "当前门店库存不足，无法添加该商品。",
   SERVICE_TICKET_NOT_FOUND: "关联工单不存在。",
   SERVICE_TICKET_EMPTY: "工单至少需要一个项目才能创建订单。",
   TICKET_ITEM_ALREADY_ORDERED: "部分工单项目已生成过订单。",

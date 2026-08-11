@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 
-import { orderItems, paymentTransactions } from "@cleanhub/db";
+import {
+  orderItems,
+  orders,
+  paymentTransactions,
+  serviceTickets,
+} from "@cleanhub/db";
 import {
   formatPosOrderCode,
   isPosOrderLookupQuery,
@@ -9,8 +14,13 @@ import {
 import { getTableConfig } from "drizzle-orm/pg-core";
 
 import { posCatalogQuerySchema } from "../catalog/catalog.validation.js";
+import { createServiceTicketBodySchema } from "../service-tickets/service-tickets.validation.js";
 import { calculatePosOrderItemLineAmount } from "./orders.repository.js";
-import { paymentIntentMatches } from "./orders.service.js";
+import { assertProductStockCanBeReserved } from "./orders.inventory.js";
+import {
+  assertGuestOrderItemAllowed,
+  paymentIntentMatches,
+} from "./orders.service.js";
 import type { PosPaymentTransaction } from "./orders.types.js";
 import {
   createPosOrderBodySchema,
@@ -42,6 +52,7 @@ assert.equal(
 );
 
 const serviceId = "01ARZ3NDEKTSV4RRFFQ69G5FB2";
+const productSkuId = "01ARZ3NDEKTSV4RRFFQ69G5FB3";
 assert.equal(
   posCatalogQuerySchema.safeParse({
     businessLine: "laundry",
@@ -66,6 +77,23 @@ assert.equal(
 );
 assert.equal(
   createPosOrderItemBodySchema.safeParse({
+    productSkuId,
+    quantity: "2",
+  }).success,
+  true,
+  "manual order items should accept a real product SKU",
+);
+assert.equal(
+  createPosOrderItemBodySchema.safeParse({
+    serviceId,
+    productSkuId,
+    quantity: "1",
+  }).success,
+  false,
+  "an order item must not mix service and product references",
+);
+assert.equal(
+  createPosOrderItemBodySchema.safeParse({
     itemName: "free text",
     quantity: "1",
     unitAmount: "100",
@@ -82,6 +110,73 @@ assert.equal(
   }).success,
   true,
   "manual orders should accept catalog-referenced items",
+);
+assert.equal(
+  createPosOrderBodySchema.safeParse({
+    orderType: "manual",
+    branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+    items: [{ productSkuId, quantity: "2" }],
+  }).success,
+  true,
+  "manual product orders should allow a missing customer profile",
+);
+assert.equal(
+  createServiceTicketBodySchema.safeParse({
+    customerId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+    branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+    ticketType: "retail",
+  }).success,
+  false,
+  "retail sales must not be accepted as service-ticket workflows",
+);
+assert.equal(
+  createServiceTicketBodySchema.safeParse({
+    customerId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+    branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+    ticketType: "delivery",
+  }).success,
+  false,
+  "delivery tasks must not be accepted as service-ticket workflows",
+);
+assert.doesNotThrow(
+  () => assertGuestOrderItemAllowed(null, "product"),
+  "walk-in orders should accept retail catalog items",
+);
+assert.throws(
+  () => assertGuestOrderItemAllowed(null, "service"),
+  /customer profile is required/i,
+  "walk-in orders must not bypass customer identification for services",
+);
+assert.doesNotThrow(
+  () =>
+    assertProductStockCanBeReserved({
+      onHandQuantity: "10",
+      reservedQuantity: "3",
+      requestedQuantity: "7",
+      allowNegativeStock: false,
+    }),
+  "available stock should account for active reservations",
+);
+assert.throws(
+  () =>
+    assertProductStockCanBeReserved({
+      onHandQuantity: "10",
+      reservedQuantity: "3",
+      requestedQuantity: "8",
+      allowNegativeStock: false,
+    }),
+  /Only 7 unit/i,
+  "orders must reject quantities above available stock",
+);
+assert.doesNotThrow(
+  () =>
+    assertProductStockCanBeReserved({
+      onHandQuantity: "0",
+      reservedQuantity: "0",
+      requestedQuantity: "2",
+      allowNegativeStock: true,
+    }),
+  "negative-stock branches should remain explicitly supported",
 );
 assert.equal(
   calculatePosOrderItemLineAmount({
@@ -108,6 +203,9 @@ const orderItemColumns = getTableConfig(orderItems).columns.map(
 );
 for (const column of [
   "service_id",
+  "product_sku_id",
+  "product_price_id",
+  "sku_snapshot",
   "pricing_unit",
   "standard_unit_amount",
   "charged_unit_amount",
@@ -120,6 +218,27 @@ for (const column of [
     `order item pricing snapshot should include ${column}`,
   );
 }
+assert.equal(
+  getTableConfig(orders).columns.find((column) => column.name === "customer_id")
+    ?.notNull,
+  false,
+  "orders should support walk-in customers without a profile",
+);
+assert.equal(
+  getTableConfig(orderItems).columns.find(
+    (column) => column.name === "customer_id",
+  )?.notNull,
+  false,
+  "walk-in order items should not require a customer profile",
+);
+assert.equal(
+  getTableConfig(serviceTickets).checks.some(
+    (constraint) =>
+      constraint.name === "service_tickets_service_type_check",
+  ),
+  true,
+  "service tickets should enforce service-only workflows",
+);
 assert.equal(
   createPosPaymentBodySchema.safeParse({
     paymentMethod: "app",

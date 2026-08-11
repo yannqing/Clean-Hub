@@ -50,6 +50,10 @@ export type PosOfflinePayOrderWrite = (
   options: { idempotencyKey: string; requestId: string },
 ) => Promise<CreatePosPaymentResponse | undefined>;
 
+export type PosOfflineOrderWriteOptions = {
+  allowOffline?: boolean;
+};
+
 export function usePosOfflineWrites() {
   const { pendingCount, queue, refresh } = useOfflineSync();
 
@@ -57,6 +61,7 @@ export function usePosOfflineWrites() {
     async <TData, TPayload extends PosOfflinePayload>(
       mutation: PosOfflineMutation<TPayload>,
       write: () => Promise<TData>,
+      options: { allowOffline?: boolean } = {},
     ): Promise<
       | { queued: false; data: TData }
       | { queued: true; entityId: string; operationId: string }
@@ -70,6 +75,11 @@ export function usePosOfflineWrites() {
       }
 
       const enqueue = async () => {
+        if (options.allowOffline === false) {
+          throw new Error(
+            "该订单包含不允许离线销售的商品，请恢复网络后再提交。",
+          );
+        }
         if (isPosTerminalSessionInvalidated()) {
           throw new Error(
             "The enrolled terminal session is no longer active.",
@@ -135,10 +145,13 @@ export function usePosOfflineWrites() {
   );
 
   const createOrder = useCallback(
-    async (input: CreatePosOrderRequest): Promise<PosOfflineOrderResult> => {
+    async (
+      input: CreatePosOrderRequest,
+      options: PosOfflineOrderWriteOptions = {},
+    ): Promise<PosOfflineOrderResult> => {
       const items = queue ? await queue.list() : [];
       const customerDependency =
-        input.orderType === "manual"
+        input.orderType === "manual" && input.customerId
           ? findQueuedPosCreateDependency(
               items,
               POS_OFFLINE_ENTITIES.customerProfileCreate,
@@ -150,11 +163,14 @@ export function usePosOfflineWrites() {
         input,
         customerDependency ? [customerDependency.operationId] : [],
       );
-      return execute(mutation, () =>
-        posApi.pos.orders.create(mutation.payload.input, {
-          idempotencyKey: mutation.idempotencyKey,
-          requestId: mutation.id,
-        }),
+      return execute(
+        mutation,
+        () =>
+          posApi.pos.orders.create(mutation.payload.input, {
+            idempotencyKey: mutation.idempotencyKey,
+            requestId: mutation.id,
+          }),
+        options,
       );
     },
     [execute, queue],

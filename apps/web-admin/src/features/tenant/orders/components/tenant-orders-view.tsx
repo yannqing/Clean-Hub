@@ -634,6 +634,7 @@ export function TenantOrdersView({
         statusLabels: m.orders.statusLabels,
         typeLabels: m.orders.typeLabels,
         unknownCustomer: m.orders.unknownCustomer,
+        guestCustomer: m.orders.guestCustomer,
       });
     } catch {
       toast.error(m.orders.transfer.exportFailed);
@@ -988,7 +989,10 @@ export function TenantOrdersView({
                     ) : null}
                     {visibleColumns.customer ? (
                       <TableCell>
-                        {order.customerName || m.orders.unknownCustomer}
+                        {order.customerName ||
+                          (order.customerId
+                            ? m.orders.unknownCustomer
+                            : m.orders.guestCustomer)}
                       </TableCell>
                     ) : null}
                     {visibleColumns.branch ? (

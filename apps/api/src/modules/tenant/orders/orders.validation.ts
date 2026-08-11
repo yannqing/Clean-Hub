@@ -205,7 +205,7 @@ export const tenantOrderImportBodySchema = z
           id: ulidSchema,
           importKey: z.string().trim().min(1).max(120),
           branchId: ulidSchema,
-          customerId: ulidSchema,
+          customerId: ulidSchema.optional(),
           notes: z.string().trim().max(2000).optional(),
           expireAt: isoTimestampSchema.optional(),
           items: z.array(tenantOrderImportItemSchema).min(1).max(100),

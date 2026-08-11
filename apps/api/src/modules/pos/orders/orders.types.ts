@@ -19,6 +19,7 @@ export type PosOrderSort =
 
 export type PosOrderItemSourceType =
   | "ticket_item"
+  | "service"
   | "subscription"
   | "delivery_fee"
   | "product";
@@ -117,8 +118,8 @@ export type PosOrderSummary = {
   tenantId: string;
   branchId: string;
   currency: string;
-  customerId: string;
-  customerName: string;
+  customerId: string | null;
+  customerName: string | null;
   orderType: PosOrderType;
   status: PosOrderStatus;
   subtotalAmount: string;
@@ -169,8 +170,7 @@ export type CreateTicketBasedOrderRequest = {
   notes?: string | null;
 };
 
-export type CreateManualOrderItemRequest = {
-  serviceId: string;
+type CreateManualOrderItemBaseRequest = {
   quantity?: string;
   weight?: string;
   bagCount?: number;
@@ -182,11 +182,21 @@ export type CreateManualOrderItemRequest = {
   itemIdentifier?: string;
 };
 
+export type CreateManualOrderItemRequest =
+  | (CreateManualOrderItemBaseRequest & {
+      serviceId: string;
+      productSkuId?: never;
+    })
+  | (CreateManualOrderItemBaseRequest & {
+      serviceId?: never;
+      productSkuId: string;
+    });
+
 export type CreateManualOrderRequest = {
   id?: string;
   orderType: "manual";
   branchId: string;
-  customerId: string;
+  customerId?: string;
   items: CreateManualOrderItemRequest[];
   expireAt?: string | null;
   notes?: string | null;
@@ -242,6 +252,7 @@ export type CreatePosOrderItemRequest = CreateManualOrderItemRequest;
 
 export type UpdatePosOrderItemRequest = {
   serviceId?: string;
+  productSkuId?: string;
   quantity?: string;
   weight?: string;
   bagCount?: number;

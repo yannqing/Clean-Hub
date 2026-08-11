@@ -100,7 +100,7 @@ export async function searchTenantGlobalService(
         metadata: {
           branchId: order.branchId,
           currency: order.currency,
-          customerId: order.customerId,
+            ...(order.customerId ? { customerId: order.customerId } : {}),
           totalAmount: order.totalAmount,
         },
       };

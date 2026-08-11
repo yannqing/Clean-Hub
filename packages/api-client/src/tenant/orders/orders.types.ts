@@ -38,8 +38,8 @@ export type TenantOrderSummary = {
   tenantId: string;
   branchId: string;
   currency: string;
-  customerId: string;
-  customerName: string;
+  customerId: string | null;
+  customerName: string | null;
   orderType: TenantOrderType;
   status: TenantOrderStatus;
   subtotalAmount: string;
@@ -226,7 +226,7 @@ export type TenantOrderImportOrder = {
   id: string;
   importKey: string;
   branchId: string;
-  customerId: string;
+  customerId?: string;
   notes?: string;
   expireAt?: string;
   items: TenantOrderImportItem[];

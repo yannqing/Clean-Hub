@@ -12,9 +12,11 @@ import {
   customers,
   getDb,
   orders,
+  paymentTransactions,
   prices,
   serviceCategories,
   services,
+  tenantFeatureFlags,
   tenants,
   userProfiles,
   users,
@@ -25,6 +27,7 @@ import { createId } from "@cleanhub/id";
 import type { AuthContext } from "../../auth/auth.types.js";
 import { PosOrderError } from "../../pos/orders/orders.errors.js";
 import { createPosOrder } from "../../pos/orders/orders.service.js";
+import { updateTenantService } from "../services/services.service.js";
 import {
   createTenantOrderItem,
   createTenantOrderPayment,
@@ -53,14 +56,21 @@ function createFixtureIds() {
     tenantId: createId(),
     userId: createId(),
     branchId: createId(),
+    secondBranchId: createId(),
     customerAccountId: createId(),
     customerId: createId(),
     serviceCategoryId: createId(),
+    retailCategoryId: createId(),
     firstServiceId: createId(),
     secondServiceId: createId(),
+    retailServiceId: createId(),
     firstPriceId: createId(),
     secondPriceId: createId(),
+    retailPriceId: createId(),
     orderId: createId(),
+    guestOrderId: createId(),
+    unavailableBranchOrderId: createId(),
+    rejectedGuestServiceOrderId: createId(),
   };
 }
 
@@ -86,6 +96,12 @@ async function insertFixtures(db: Database, ids: FixtureIds): Promise<void> {
     pressingCode: `INT-${uniqueSuffix}`,
     status: "active",
   });
+  await db.insert(tenantFeatureFlags).values({
+    id: createId(),
+    tenantId: ids.tenantId,
+    laundryEnabled: true,
+    retailProductsEnabled: true,
+  });
   await db.insert(users).values({
     id: ids.userId,
     tenantId: ids.tenantId,
@@ -110,6 +126,14 @@ async function insertFixtures(db: Database, ids: FixtureIds): Promise<void> {
     status: "active",
     createdBy: ids.userId,
   });
+  await db.insert(branches).values({
+    id: ids.secondBranchId,
+    tenantId: ids.tenantId,
+    name: "Integration second branch",
+    defaultCurrency: "CNY",
+    status: "active",
+    createdBy: ids.userId,
+  });
   await db.insert(customerAccounts).values({
     id: ids.customerAccountId,
     tenantId: ids.tenantId,
@@ -126,14 +150,24 @@ async function insertFixtures(db: Database, ids: FixtureIds): Promise<void> {
     status: "active",
     createdBy: ids.userId,
   });
-  await db.insert(serviceCategories).values({
-    id: ids.serviceCategoryId,
-    tenantId: ids.tenantId,
-    name: "Integration laundry",
-    businessLine: "laundry",
-    status: "active",
-    createdBy: ids.userId,
-  });
+  await db.insert(serviceCategories).values([
+    {
+      id: ids.serviceCategoryId,
+      tenantId: ids.tenantId,
+      name: "Integration laundry",
+      businessLine: "laundry",
+      status: "active",
+      createdBy: ids.userId,
+    },
+    {
+      id: ids.retailCategoryId,
+      tenantId: ids.tenantId,
+      name: "Integration retail",
+      businessLine: "retail",
+      status: "active",
+      createdBy: ids.userId,
+    },
+  ]);
   await db.insert(services).values([
     {
       id: ids.firstServiceId,
@@ -157,6 +191,17 @@ async function insertFixtures(db: Database, ids: FixtureIds): Promise<void> {
       status: "active",
       createdBy: ids.userId,
     },
+    {
+      id: ids.retailServiceId,
+      tenantId: ids.tenantId,
+      categoryId: ids.retailCategoryId,
+      name: "Integration fabric freshener",
+      businessLine: "retail",
+      pricingUnit: "per_item",
+      labelRule: "none",
+      status: "active",
+      createdBy: ids.userId,
+    },
   ]);
   await db.insert(prices).values([
     {
@@ -173,6 +218,15 @@ async function insertFixtures(db: Database, ids: FixtureIds): Promise<void> {
       tenantId: ids.tenantId,
       serviceId: ids.secondServiceId,
       amount: "40.00",
+      currency: "CNY",
+      status: "active",
+      createdBy: ids.userId,
+    },
+    {
+      id: ids.retailPriceId,
+      tenantId: ids.tenantId,
+      serviceId: ids.retailServiceId,
+      amount: "12.00",
       currency: "CNY",
       status: "active",
       createdBy: ids.userId,
@@ -196,6 +250,121 @@ async function runOrderLifecycleAssertions(
   };
 
   await insertFixtures(db, ids);
+  const branchScopedService = await updateTenantService(
+    authContext,
+    ids.retailServiceId,
+    {
+      version: 1,
+      allBranches: false,
+      branchSettings: [
+        {
+          branchId: ids.branchId,
+          isAvailable: true,
+          priceOverrideAmount: "9.00",
+          turnaroundMinutesOverride: 30,
+        },
+      ],
+    },
+    requestMeta,
+    db,
+  );
+  assert.equal(branchScopedService.allBranches, false);
+  assert.equal(branchScopedService.branchSettings.length, 1);
+  assert.equal(
+    branchScopedService.branchSettings[0]?.priceOverrideAmount,
+    "9.00",
+  );
+
+  const guestOrder = await createPosOrder(
+    {
+      authContext,
+      requestMeta,
+      data: {
+        id: ids.guestOrderId,
+        orderType: "manual",
+        branchId: ids.branchId,
+        items: [{ serviceId: ids.retailServiceId, quantity: "2" }],
+      },
+    },
+    db,
+  );
+  assert.equal(guestOrder.customerId, null);
+  assert.equal(guestOrder.customerName, null);
+  assert.equal(guestOrder.totalAmount, "18.00");
+  assert.equal(guestOrder.items[0]?.serviceId, ids.retailServiceId);
+
+  const paidGuestOrder = await createTenantOrderPayment(
+    authContext,
+    ids.guestOrderId,
+    {
+      paymentMethod: "cash",
+      amount: "18.00",
+      idempotencyKey: `guest-payment-${ids.guestOrderId}`,
+    },
+    requestMeta,
+    db,
+  );
+  assert.equal(paidGuestOrder.customerId, null);
+  assert.equal(paidGuestOrder.paymentStatus, "paid");
+
+  const guestPayment = paidGuestOrder.payments[0];
+  assert.ok(guestPayment, "the guest payment must be returned");
+  const guestPaymentRows = await db
+    .select({ customerId: paymentTransactions.customerId })
+    .from(paymentTransactions)
+    .where(eq(paymentTransactions.id, guestPayment.id));
+  assert.equal(guestPaymentRows[0]?.customerId, null);
+  const refundedGuestOrder = await createTenantOrderRefund(
+    authContext,
+    ids.guestOrderId,
+    {
+      originalPaymentId: guestPayment.id,
+      amount: "18.00",
+      idempotencyKey: `guest-refund-${ids.guestOrderId}`,
+      reason: "Integration guest refund",
+    },
+    requestMeta,
+    db,
+  );
+  assert.equal(refundedGuestOrder.customerId, null);
+  assert.equal(refundedGuestOrder.paymentStatus, "refunded");
+
+  await assert.rejects(
+    createPosOrder(
+      {
+        authContext,
+        requestMeta,
+        data: {
+          id: ids.unavailableBranchOrderId,
+          orderType: "manual",
+          branchId: ids.secondBranchId,
+          items: [{ serviceId: ids.retailServiceId, quantity: "1" }],
+        },
+      },
+      db,
+    ),
+    isPosOrderError("VALIDATION_ERROR"),
+    "a service must not be sold from an unassigned branch",
+  );
+
+  await assert.rejects(
+    createPosOrder(
+      {
+        authContext,
+        requestMeta,
+        data: {
+          id: ids.rejectedGuestServiceOrderId,
+          orderType: "manual",
+          branchId: ids.branchId,
+          items: [{ serviceId: ids.firstServiceId, quantity: "1" }],
+        },
+      },
+      db,
+    ),
+    isPosOrderError("CUSTOMER_REQUIRED"),
+    "guest orders must reject non-retail services",
+  );
+
   await createPosOrder(
     {
       authContext,
@@ -480,6 +649,14 @@ export async function runTenantOrderIntegrationTest(): Promise<void> {
       .where(eq(orders.id, ids.orderId)),
     [],
     "the integration order must be rolled back",
+  );
+  assert.deepEqual(
+    await db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(eq(orders.id, ids.guestOrderId)),
+    [],
+    "the guest integration order must be rolled back",
   );
 }
 

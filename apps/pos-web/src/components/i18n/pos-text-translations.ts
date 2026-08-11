@@ -1148,6 +1148,7 @@ export const POS_TEXT_TRANSLATIONS: Record<
   "条 / 共": { en: "Articles / Total", fr: "Articles / Total" },
   未关联账户: { en: "Not linked account", fr: "Compte non lié" },
   未命名客户: { en: "Unnamed customer", fr: "Client anonyme" },
+  散客: { en: "Walk-in customer", fr: "Client de passage" },
   未设置取件: { en: "Pickup not set up", fr: "Prise en charge non configurée" },
   未填写邮箱: { en: "Email not provided", fr: "Adresse e-mail non renseignée" },
   项目已更新: {
@@ -1222,6 +1223,17 @@ export const POS_TEXT_TRANSLATIONS: Record<
   订单总数: { en: "Total number of orders", fr: "Nombre total de commandes" },
   服务偏好: { en: "Service preferences", fr: "Préférences de service" },
   服务项目: { en: "Services", fr: "Services" },
+  服务或商品: { en: "Service or product", fr: "Service ou produit" },
+  请选择服务或商品: {
+    en: "Select a service or product",
+    fr: "Sélectionnez un service ou un produit",
+  },
+  商品: { en: "Products", fr: "Produits" },
+  库存: { en: "Stock", fr: "Stock" },
+  "散客订单只能添加商品；服务订单需要选择客户档案。": {
+    en: "Walk-in orders can only contain products; select a customer profile for service orders.",
+    fr: "Les commandes de passage ne peuvent contenir que des produits ; sélectionnez un profil client pour les services.",
+  },
   高优先级: { en: "high priority", fr: "haute priorité" },
   工单创建: { en: "Work order creation", fr: "Création d'un bon de travail" },
   工单订单: { en: "work order order", fr: "ordre de travail" },
@@ -1266,6 +1278,14 @@ export const POS_TEXT_TRANSLATIONS: Record<
   紧急未读: { en: "Urgent unread", fr: "Urgent non lu" },
   聚酯纤维: { en: "polyester fiber", fr: "fibre de polyester" },
   客户档案: { en: "Customer profile", fr: "Profil client" },
+  "客户档案（选填）": {
+    en: "Customer profile (optional)",
+    fr: "Profil client (facultatif)",
+  },
+  "不关联客户档案，直接创建零售订单": {
+    en: "Create a retail order without linking a customer profile",
+    fr: "Créer une commande de détail sans associer de profil client",
+  },
   客户服务: { en: "customer service", fr: "service client" },
   客户管理: { en: "Customer management", fr: "Gestion des clients" },
   客户接待: { en: "Customer reception", fr: "Accueil client" },

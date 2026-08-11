@@ -16,7 +16,7 @@ import type {
 export type PosAdjustmentOrder = {
   id: string;
   branchId: string;
-  customerId: string;
+  customerId: string | null;
   currency: string;
   totalAmount: string;
   paidAmount: string;
@@ -137,7 +137,7 @@ export async function insertPaymentAdjustment(
   input: {
     tenantId: string;
     branchId: string;
-    customerId: string;
+    customerId: string | null;
     orderId: string;
     originalPaymentId?: string;
     adjustmentType: PosPaymentAdjustmentType;
