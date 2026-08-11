@@ -1,3 +1,5 @@
+import { createId } from "@cleanhub/id";
+
 import { ServiceCreateView } from "@/features/tenant/services";
 import {
   getServiceCategoryDatasetQuery,
@@ -21,6 +23,7 @@ export default async function NewServicePage() {
       defaultCurrency={
         currencyResult.status === "fulfilled" ? currencyResult.value : null
       }
+      initialCode={`SVC-${createId().slice(-10)}`}
     />
   );
 }

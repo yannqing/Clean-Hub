@@ -1,5 +1,6 @@
 "use client";
 
+import { createId } from "@cleanhub/id";
 import {
   Button,
   Card,
@@ -36,9 +37,10 @@ import {
 } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
-import { useTenantI18n } from "@/i18n";
+import { isVersionConflict } from "@/features/tenant/shared/version-conflict";
+import { interpolate, useTenantI18n } from "@/i18n";
 
-import { createServiceAction } from "../actions";
+import { createServiceAction, updateServiceAction } from "../actions";
 import type {
   ServiceBusinessLine,
   ServiceCategorySummary,
@@ -47,6 +49,7 @@ import type {
   ServiceLabelRule,
   ServicePricingUnit,
   ServiceStatus,
+  ServiceSummary,
 } from "../types";
 
 const DEFAULT_FORM_VALUES: ServiceFormValues = {
@@ -69,11 +72,54 @@ const DEFAULT_FORM_VALUES: ServiceFormValues = {
   version: 0,
 };
 
+function generateServiceCode(): string {
+  return `SVC-${createId().slice(-10)}`;
+}
+
 type ServiceCreateViewProps = {
   categories: ServiceCategorySummary[];
   categoriesLoadFailed: boolean;
   defaultCurrency: string | null;
+  initialCode?: string;
+  initialService?: ServiceSummary;
 };
+
+function getInitialFormValues(
+  initialService: ServiceSummary | undefined,
+  defaultCurrency: string | null,
+  initialCode: string | undefined,
+): ServiceFormValues {
+  if (!initialService) {
+    return {
+      ...DEFAULT_FORM_VALUES,
+      code: initialCode ?? "",
+      currency: defaultCurrency ?? "",
+    };
+  }
+
+  return {
+    businessLine: initialService.businessLine,
+    name: initialService.name,
+    code: initialService.code ?? "",
+    shortName: initialService.shortName ?? "",
+    categoryId: initialService.categoryId,
+    description: initialService.description ?? "",
+    internalNotes: initialService.internalNotes ?? "",
+    turnaroundMinutes:
+      initialService.turnaroundMinutes === null
+        ? ""
+        : String(initialService.turnaroundMinutes),
+    displayOrder: String(initialService.displayOrder),
+    pricingUnit: initialService.pricingUnit,
+    labelRule: initialService.labelRule,
+    standardPrice: initialService.standardPrice,
+    compareAtPrice: initialService.compareAtPrice ?? "",
+    costPrice: initialService.costPrice ?? "",
+    currency: initialService.currency,
+    status: initialService.status,
+    version: initialService.version,
+  };
+}
 
 function RequiredMark() {
   return (
@@ -95,11 +141,17 @@ export function ServiceCreateView({
   categories,
   categoriesLoadFailed,
   defaultCurrency,
+  initialCode,
+  initialService,
 }: ServiceCreateViewProps) {
   const router = useRouter();
   const { m } = useTenantI18n();
-  const [formValues, setFormValues] =
-    useState<ServiceFormValues>(DEFAULT_FORM_VALUES);
+  const isEditMode = initialService !== undefined;
+  const effectiveCurrency = initialService?.currency ?? defaultCurrency;
+  const pageTitle = isEditMode ? initialService.name : m.services.create.title;
+  const [formValues, setFormValues] = useState<ServiceFormValues>(() =>
+    getInitialFormValues(initialService, defaultCurrency, initialCode),
+  );
   const [errors, setErrors] = useState<ServiceFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -132,12 +184,13 @@ export function ServiceCreateView({
       categories.filter(
         (category) =>
           category.businessLine === formValues.businessLine &&
-          category.status === "active",
+          (category.status === "active" ||
+            category.id === initialService?.categoryId),
       ),
-    [categories, formValues.businessLine],
+    [categories, formValues.businessLine, initialService?.categoryId],
   );
   const requiredDataUnavailable =
-    categoriesLoadFailed || defaultCurrency === null;
+    categoriesLoadFailed || effectiveCurrency === null;
   const submitDisabled =
     saving || requiredDataUnavailable || availableCategories.length === 0;
 
@@ -211,6 +264,10 @@ export function ServiceCreateView({
     setIsDirty(true);
   }
 
+  function handleGenerateServiceCode() {
+    updateField("code", generateServiceCode());
+  }
+
   function confirmNavigation(event?: MouseEvent<HTMLAnchorElement>): boolean {
     if (isDirty && !window.confirm(m.services.create.unsavedChanges)) {
       event?.preventDefault();
@@ -229,7 +286,7 @@ export function ServiceCreateView({
     router.push(webAdminRoutes.tenant.services);
   }
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     if (submitDisabled) {
@@ -241,7 +298,9 @@ export function ServiceCreateView({
     setFormError(null);
 
     try {
-      const result = await createServiceAction(formValues);
+      const result = initialService
+        ? await updateServiceAction(initialService.id, formValues)
+        : await createServiceAction(formValues);
 
       if (!result.ok) {
         if (result.code === "SERVICE_NAME_DUPLICATE") {
@@ -251,25 +310,41 @@ export function ServiceCreateView({
           return;
         }
 
+        if (isVersionConflict(result)) {
+          setFormError(m.services.versionConflict);
+          toast.error(m.services.versionConflict);
+          return;
+        }
+
         setErrors(result.errors);
 
         if (Object.keys(result.errors).length > 0) {
           setFormError(m.services.create.checkForm);
           toast.error(m.services.create.checkForm);
         } else {
-          setFormError(m.services.create.createFailed);
-          toast.error(m.services.create.createFailed);
+          const message = isEditMode
+            ? (result.message ?? m.services.requestFailed)
+            : m.services.create.createFailed;
+          setFormError(message);
+          toast.error(message);
         }
         return;
       }
 
       setIsDirty(false);
-      toast.success(m.services.create.created);
+      toast.success(
+        initialService
+          ? interpolate(m.services.savedToast, { name: result.data.name })
+          : m.services.create.created,
+      );
       router.push(webAdminRoutes.tenant.services);
       router.refresh();
     } catch {
-      setFormError(m.services.create.createFailed);
-      toast.error(m.services.create.createFailed);
+      const message = isEditMode
+        ? m.services.requestFailed
+        : m.services.create.createFailed;
+      setFormError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -278,9 +353,9 @@ export function ServiceCreateView({
   return (
     <section
       className="mx-auto w-full max-w-[1100px] space-y-3 pb-20"
-      data-testid="tenant-service-create-view"
+      data-testid="tenant-service-form-view"
     >
-      <h1 className="sr-only">{m.services.create.title}</h1>
+      <h1 className="sr-only">{pageTitle}</h1>
       <nav aria-label={m.services.create.breadcrumbLabel}>
         <ol className="flex items-center gap-2 text-sm">
           <li>
@@ -299,7 +374,7 @@ export function ServiceCreateView({
           </li>
           <li>
             <span aria-current="page" className="font-medium">
-              {m.services.create.title}
+              {pageTitle}
             </span>
           </li>
         </ol>
@@ -314,7 +389,7 @@ export function ServiceCreateView({
             {categoriesLoadFailed ? (
               <li>{m.services.create.categoriesLoadFailed}</li>
             ) : null}
-            {defaultCurrency === null ? (
+            {effectiveCurrency === null ? (
               <li>{m.services.create.currencyLoadFailed}</li>
             ) : null}
           </ul>
@@ -335,7 +410,7 @@ export function ServiceCreateView({
         aria-busy={saving}
         className="space-y-5"
         noValidate
-        onSubmit={handleCreate}
+        onSubmit={handleSubmit}
       >
         <fieldset className="contents" disabled={saving}>
           <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -391,16 +466,40 @@ export function ServiceCreateView({
                       <Label htmlFor="service-code">
                         {m.services.formLabels.code}
                       </Label>
-                      <Input
-                        aria-invalid={Boolean(errors.code)}
-                        id="service-code"
-                        maxLength={64}
-                        onChange={(event) =>
-                          updateField("code", event.target.value.toUpperCase())
-                        }
-                        placeholder={m.services.create.codePlaceholder}
-                        value={formValues.code}
-                      />
+                      <div className="flex gap-2">
+                        <Input
+                          aria-invalid={Boolean(errors.code)}
+                          className="uppercase"
+                          id="service-code"
+                          maxLength={64}
+                          onChange={(event) =>
+                            updateField(
+                              "code",
+                              event.target.value.toUpperCase(),
+                            )
+                          }
+                          placeholder={m.services.create.codePlaceholder}
+                          value={formValues.code}
+                        />
+                        <Button
+                          aria-label={m.services.create.generateCode}
+                          className="shrink-0 gap-1.5"
+                          onClick={handleGenerateServiceCode}
+                          title={m.services.create.generateCode}
+                          type="button"
+                          variant="outline"
+                        >
+                          <Icon aria-hidden icon={RotateCw} size={14} />
+                          <span className="hidden sm:inline">
+                            {m.services.create.generateCode}
+                          </span>
+                        </Button>
+                      </div>
+                      {!isEditMode ? (
+                        <p className="text-xs text-muted-foreground">
+                          {m.services.create.generatedCodeHint}
+                        </p>
+                      ) : null}
                       <FieldError message={getFieldError("code")} />
                     </div>
                   </div>
@@ -474,7 +573,7 @@ export function ServiceCreateView({
                           value={formValues.standardPrice}
                         />
                         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-                          {defaultCurrency ?? "—"}
+                          {effectiveCurrency ?? "—"}
                         </span>
                       </div>
                       <FieldError message={getFieldError("standardPrice")} />
@@ -529,7 +628,7 @@ export function ServiceCreateView({
                           value={formValues.compareAtPrice}
                         />
                         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-                          {defaultCurrency ?? "—"}
+                          {effectiveCurrency ?? "—"}
                         </span>
                       </div>
                       <FieldError message={getFieldError("compareAtPrice")} />
@@ -555,7 +654,7 @@ export function ServiceCreateView({
                           value={formValues.costPrice}
                         />
                         <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
-                          {defaultCurrency ?? "—"}
+                          {effectiveCurrency ?? "—"}
                         </span>
                       </div>
                       <FieldError message={getFieldError("costPrice")} />
@@ -566,7 +665,9 @@ export function ServiceCreateView({
                   </div>
 
                   <p className="text-xs leading-5 text-muted-foreground">
-                    {m.services.create.pricingHint}
+                    {isEditMode
+                      ? m.services.create.existingCurrencyNotice
+                      : m.services.create.pricingHint}
                   </p>
                 </CardContent>
               </Card>
@@ -599,9 +700,7 @@ export function ServiceCreateView({
                       type="number"
                       value={formValues.turnaroundMinutes}
                     />
-                    <FieldError
-                      message={getFieldError("turnaroundMinutes")}
-                    />
+                    <FieldError message={getFieldError("turnaroundMinutes")} />
                     <p className="text-xs text-muted-foreground">
                       {m.services.create.turnaroundHint}
                     </p>
@@ -851,7 +950,9 @@ export function ServiceCreateView({
                 />
                 {saving
                   ? m.services.formButtons.saving
-                  : m.services.formButtons.createService}
+                  : isEditMode
+                    ? m.services.formButtons.updateService
+                    : m.services.formButtons.createService}
               </Button>
             </div>
           </div>

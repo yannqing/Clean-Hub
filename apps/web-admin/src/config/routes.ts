@@ -74,6 +74,8 @@ export const webAdminRoutes = {
     branches: "/tenant/branches",
     services: "/tenant/services",
     newService: "/tenant/services/new",
+    service: (serviceId: string) =>
+      `/tenant/services/${encodeURIComponent(serviceId)}`,
     hardware: "/tenant/point-of-sale/hardware",
     newHardware: "/tenant/point-of-sale/hardware/new",
     hardwareDevice: (hardwareId: string) =>

@@ -54,7 +54,15 @@ import {
   Trash2,
 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { isVersionConflict } from "@/features/tenant/shared/version-conflict";
@@ -155,31 +163,6 @@ function FieldError({ message }: { message?: string }) {
   ) : null;
 }
 
-function toFormValues(service: ServiceSummary): ServiceFormValues {
-  return {
-    businessLine: service.businessLine,
-    name: service.name,
-    code: service.code ?? "",
-    shortName: service.shortName ?? "",
-    categoryId: service.categoryId,
-    description: service.description ?? "",
-    internalNotes: service.internalNotes ?? "",
-    turnaroundMinutes:
-      service.turnaroundMinutes == null
-        ? ""
-        : String(service.turnaroundMinutes),
-    displayOrder: String(service.displayOrder),
-    pricingUnit: service.pricingUnit,
-    labelRule: service.labelRule,
-    standardPrice: service.standardPrice,
-    compareAtPrice: service.compareAtPrice ?? "",
-    costPrice: service.costPrice ?? "",
-    currency: service.currency,
-    status: service.status,
-    version: service.version,
-  };
-}
-
 function buildDateRange(filter: ServiceDateFilter): {
   createdAfter?: number;
   createdBefore?: number;
@@ -232,11 +215,21 @@ function isServiceWithinDateRange(
   return createdBefore === undefined || createdAt < createdBefore;
 }
 
+function isInteractiveTableTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    target.closest(
+      "a, button, input, select, textarea, [role='button'], [role='menuitem']",
+    ) !== null
+  );
+}
+
 export function ServiceCatalogView({
   initialSearchQuery = "",
 }: {
   initialSearchQuery?: string;
 }) {
+  const router = useRouter();
   const { formatDateTime, locale, m } = useTenantI18n();
   const [serviceDataset, setServiceDataset] = useState<ServiceSummary[]>([]);
   const [categories, setCategories] = useState<ServiceCategorySummary[]>([]);
@@ -570,6 +563,32 @@ export function ServiceCatalogView({
     setPage(1);
   }
 
+  function openServiceFromRow(
+    event: ReactMouseEvent<HTMLTableRowElement>,
+    serviceId: string,
+  ) {
+    if (isInteractiveTableTarget(event.target)) {
+      return;
+    }
+
+    router.push(webAdminRoutes.tenant.service(serviceId));
+  }
+
+  function openServiceFromKeyboard(
+    event: ReactKeyboardEvent<HTMLTableRowElement>,
+    serviceId: string,
+  ) {
+    if (
+      isInteractiveTableTarget(event.target) ||
+      (event.key !== "Enter" && event.key !== " ")
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    router.push(webAdminRoutes.tenant.service(serviceId));
+  }
+
   function setColumnVisible(column: ServiceColumnKey, checked: boolean) {
     setVisibleColumns((current) => {
       const visibleCount = Object.values(current).filter(Boolean).length;
@@ -585,13 +604,9 @@ export function ServiceCatalogView({
     });
   }
 
-  function openEditDialog(service: ServiceSummary) {
-    setEditingServiceId(service.id);
-    setFormValues(toFormValues(service));
-    setFormErrors({});
-    setFormError(null);
+  function openEditPage(service: ServiceSummary) {
     setActionMenuServiceId(null);
-    setFormOpen(true);
+    router.push(webAdminRoutes.tenant.service(service.id));
   }
 
   function closeFormDialog() {
@@ -1123,10 +1138,25 @@ export function ServiceCatalogView({
             </TableHeader>
             <TableBody>
               {services.map((service) => (
-                <TableRow key={service.id}>
+                <TableRow
+                  aria-label={`${m.services.actions.edit}: ${service.name}`}
+                  className="cursor-pointer transition-colors hover:bg-muted/50 focus-visible:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                  key={service.id}
+                  onClick={(event) => openServiceFromRow(event, service.id)}
+                  onKeyDown={(event) =>
+                    openServiceFromKeyboard(event, service.id)
+                  }
+                  role="link"
+                  tabIndex={0}
+                >
                   {visibleColumns.service ? (
                     <TableCell>
-                      <span className="block font-medium">{service.name}</span>
+                      <Link
+                        className="block font-medium hover:underline"
+                        href={webAdminRoutes.tenant.service(service.id)}
+                      >
+                        {service.name}
+                      </Link>
                       {service.shortName || service.code ? (
                         <span className="block text-[11px] text-muted-foreground">
                           {[service.shortName, service.code]
@@ -1206,7 +1236,7 @@ export function ServiceCatalogView({
                         <div className="grid gap-1">
                           <button
                             className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs transition-colors hover:bg-accent"
-                            onClick={() => openEditDialog(service)}
+                            onClick={() => openEditPage(service)}
                             type="button"
                           >
                             <Icon aria-hidden icon={Pencil} size={14} />
