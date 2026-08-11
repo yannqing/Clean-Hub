@@ -104,7 +104,7 @@ export function IntakeCreateCustomerDialog({
         <DialogHeader>
           <DialogTitle>{text("新建客户账户")}</DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField
             id="form-intake-account-name"
             label={text("账户名称")}

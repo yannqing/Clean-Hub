@@ -593,12 +593,12 @@ export function TerminalSetupView() {
                         <Icon className="size-4" name="store" />
                       </span>
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-semibold">
+                        <span className="block break-words text-sm font-semibold sm:truncate">
                           {branch.name}
                         </span>
                         <span
                           className={cn(
-                            "mt-1 block truncate font-mono text-[10px] text-muted-foreground",
+                            "mt-1 block break-all font-mono text-[10px] text-muted-foreground sm:truncate",
                             selected && "text-white/65",
                           )}
                         >
@@ -820,10 +820,10 @@ export function TerminalSetupView() {
     return (
       <div className="flex flex-col gap-3 rounded-xl bg-muted/55 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <p className="truncate text-xs font-semibold">
+          <p className="break-words text-xs font-semibold sm:truncate">
             {session.profile.tenant.name}
           </p>
-          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+          <p className="mt-0.5 break-all text-[11px] text-muted-foreground sm:truncate">
             {session.profile.displayName} · {session.profile.email}
           </p>
         </div>
@@ -861,7 +861,7 @@ function TerminalDetail({
       </dt>
       <dd
         className={cn(
-          "mt-1.5 truncate text-xs font-semibold",
+          "mt-1.5 break-all text-xs font-semibold sm:truncate",
           mono && "font-mono text-[10px]",
         )}
         title={value}

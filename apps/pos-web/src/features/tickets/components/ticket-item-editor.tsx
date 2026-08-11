@@ -494,7 +494,7 @@ function ItemForm({
 
   return (
     <form onSubmit={submit}>
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="服务项目（必填）" wide>
           <select
             className={inputClass}
@@ -737,7 +737,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className={wide ? "col-span-2 lg:col-span-3" : ""}>
+    <label className={wide ? "sm:col-span-2 lg:col-span-3" : ""}>
       <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>

@@ -86,9 +86,7 @@ export function OfflineSyncProvider({
   const handlersRef = useRef<OfflineReplayHandlers>(new Map());
   const replayPromisesRef = useRef(new Map<string, Promise<void>>());
   const activeScopeKeyRef = useRef<string | null>(null);
-  const [online, setOnline] = useState(() =>
-    typeof navigator === "undefined" ? true : navigator.onLine,
-  );
+  const [online, setOnline] = useState(true);
   const [currentPendingCount, setCurrentPendingCount] = useState(0);
   const [quarantinedPendingCount, setQuarantinedPendingCount] = useState(0);
   const [replaying, setReplaying] = useState(false);
@@ -283,6 +281,7 @@ export function OfflineSyncProvider({
     activeScopeKeyRef.current = runtimeQueue?.queueKey ?? null;
 
     const initialRefresh = window.setTimeout(() => {
+      setOnline(navigator.onLine);
       setCurrentPendingCount(0);
       setQuarantinedPendingCount(0);
       setQuarantineWarning(null);

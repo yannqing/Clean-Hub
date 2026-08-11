@@ -92,7 +92,7 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
   return (
     <form className="border-y bg-background p-5" onSubmit={submit}>
       <h3 className="font-semibold text-foreground">基本信息</h3>
-      <div className="mt-4 grid grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="工单类型">
           <select
             className={inputClass}
@@ -199,7 +199,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className={wide ? "col-span-2" : ""}>
+    <label className={wide ? "sm:col-span-2" : ""}>
       <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>

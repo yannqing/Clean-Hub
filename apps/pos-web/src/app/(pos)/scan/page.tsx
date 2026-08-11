@@ -145,7 +145,7 @@ export default function ScanPage() {
           >
             {labels.field}
           </label>
-          <div className="mt-3 flex gap-2">
+          <div className="mt-3 flex flex-col gap-2 min-[360px]:flex-row">
             <div className="flex min-w-0 flex-1 items-center rounded-md border bg-background px-3 focus-within:border-foreground/40 focus-within:ring-2 focus-within:ring-ring">
               <Icon
                 className="mr-3 h-5 w-5 shrink-0 text-muted-foreground"
@@ -165,7 +165,7 @@ export default function ScanPage() {
               />
             </div>
             <button
-              className="flex h-14 items-center gap-2 rounded-md bg-foreground px-5 text-sm font-semibold text-background hover:bg-foreground/85 disabled:bg-muted disabled:text-muted-foreground"
+              className="flex h-14 w-full items-center justify-center gap-2 rounded-md bg-foreground px-5 text-sm font-semibold text-background hover:bg-foreground/85 disabled:bg-muted disabled:text-muted-foreground min-[360px]:w-auto"
               disabled={!value.trim() || status === "searching"}
               type="submit"
             >

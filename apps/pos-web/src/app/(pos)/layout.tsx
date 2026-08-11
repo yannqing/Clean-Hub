@@ -60,6 +60,7 @@ export default async function PosLayout({
           }
         />
         <PosShell
+          branchName={branch?.name ?? "—"}
           notificationUnreadCount={notificationsOverview?.unreadCount ?? 0}
           profile={profile}
         >

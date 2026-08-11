@@ -36,6 +36,11 @@ export const posSidebarNavigation: PosNavItem[] = [
     icon: "users",
   },
   {
+    labelKey: "pos.nav.catalog",
+    href: posRoutes.catalog,
+    icon: "package-check",
+  },
+  {
     labelKey: "pos.nav.tickets",
     href: posRoutes.tickets,
     icon: "clipboard-list",
@@ -61,6 +66,21 @@ export const posSidebarNavigation: PosNavItem[] = [
     icon: "bell",
   },
 ];
+
+const POS_MOBILE_PRIMARY_HREFS = new Set<string>([
+  posRoutes.workspace,
+  posRoutes.newIntake,
+  posRoutes.scan,
+  posRoutes.tickets,
+]);
+
+export const posMobilePrimaryNavigation = posSidebarNavigation.filter((item) =>
+  POS_MOBILE_PRIMARY_HREFS.has(item.href),
+);
+
+export const posMobileOverflowNavigation = posSidebarNavigation.filter(
+  (item) => !POS_MOBILE_PRIMARY_HREFS.has(item.href),
+);
 
 export const posShellCopy = {
   brandName: "CleanHub",

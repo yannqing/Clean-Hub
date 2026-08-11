@@ -5,7 +5,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import { cn } from "@cleanhub/ui";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { posRoutes, posSidebarNavigation } from "@/config";
 import { usePendingPrintJobCounts } from "@/features/hardware/components/pending-print-jobs";
@@ -13,6 +13,7 @@ import { OfflineSyncBadge } from "@/features/offline/components";
 
 import { Icon } from "./icons";
 import { PosGlobalHeader } from "./pos-global-header";
+import { PosMobileNavigation } from "./pos-mobile-navigation";
 
 function isActivePath(pathname: string, href: string): boolean {
   if (href === posRoutes.workspace) {
@@ -29,6 +30,7 @@ export type PosShellProfile = {
 };
 
 type PosShellProps = {
+  branchName?: string;
   children: React.ReactNode;
   notificationUnreadCount?: number;
   profile?: PosShellProfile;
@@ -104,18 +106,19 @@ function resolveActivePathname(
 }
 
 export function PosShell({
+  branchName = "—",
   children,
   notificationUnreadCount = 0,
   profile,
 }: PosShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const contentScrollRef = useRef<HTMLDivElement>(null);
   const activePathname = resolveActivePathname(pathname, searchParams);
   const { locale, t } = useTranslation();
   const [currentUnreadCount, setCurrentUnreadCount] = useState(
     notificationUnreadCount,
   );
-  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const resolvedProfile = profile ?? FALLBACK_PROFILE;
   const roleLabelKey = ROLE_LABEL_KEYS[resolvedProfile.role];
   const roleLabel = roleLabelKey ? t(roleLabelKey) : resolvedProfile.role;
@@ -133,14 +136,17 @@ export function PosShell({
   const hasPrintTaskAttention =
     printTaskAttentionCount > 0;
 
+  useEffect(() => {
+    contentScrollRef.current?.scrollTo({ left: 0, top: 0 });
+  }, [pathname]);
+
   return (
-    <div className="flex h-screen h-dvh min-h-0 flex-col overflow-hidden bg-muted/30 pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-foreground">
-      <div className="relative z-50 shrink-0 bg-black pt-[env(safe-area-inset-top)]">
+    <div className="flex h-screen h-dvh min-h-0 flex-col overflow-hidden bg-muted/30 pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] text-foreground">
+      <div className="relative z-50 hidden shrink-0 bg-black pt-[env(safe-area-inset-top)] lg:block">
         <PosGlobalHeader
           canReprint={canReprint}
           displayInitials={displayInitials}
           notificationUnreadCount={currentUnreadCount}
-          onOpenNavigation={() => setMobileNavigationOpen(true)}
           onUnreadCountChange={setCurrentUnreadCount}
           pendingPrintTaskCount={pendingPrintTaskCount}
           profileName={profileName}
@@ -149,37 +155,11 @@ export function PosShell({
         />
       </div>
 
-      <div className="relative flex min-h-0 flex-1">
-        {mobileNavigationOpen ? (
-          <button
-            aria-label={t("pos.shell.closeNavigation")}
-            className="absolute inset-0 z-30 bg-black/35 backdrop-blur-[1px] lg:hidden"
-            onClick={() => setMobileNavigationOpen(false)}
-            type="button"
-          />
-        ) : null}
-
+      <div className="relative flex min-h-0 flex-1 pt-[env(safe-area-inset-top)] lg:pt-0">
         <aside
-          className={cn(
-            "absolute inset-y-0 left-0 z-40 flex w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-3 py-4 text-sidebar-foreground shadow-xl transition-transform duration-200 lg:static lg:translate-x-0 lg:shadow-none",
-            mobileNavigationOpen ? "translate-x-0" : "-translate-x-full",
-          )}
+          className="hidden w-[240px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-3 py-4 text-sidebar-foreground lg:flex"
           data-testid="pos-sidebar"
         >
-          <div className="mb-3 flex items-center justify-between px-2 lg:hidden">
-            <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              CleanHub POS
-            </span>
-            <button
-              aria-label={t("pos.shell.closeNavigation")}
-              className="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => setMobileNavigationOpen(false)}
-              type="button"
-            >
-              <Icon className="h-[18px] w-[18px]" name="x" />
-            </button>
-          </div>
-
           <nav
             aria-label={t("common.mainNavigation")}
             className="pos-scrollbar grid min-h-0 flex-1 content-start gap-1 overflow-y-auto pb-5"
@@ -219,7 +199,6 @@ export function PosShell({
                   )}
                   href={item.href}
                   key={item.href}
-                  onClick={() => setMobileNavigationOpen(false)}
                 >
                   <span
                     className={cn(
@@ -261,7 +240,6 @@ export function PosShell({
                   : "text-muted-foreground",
               )}
               href={posRoutes.settings}
-              onClick={() => setMobileNavigationOpen(false)}
             >
               <span
                 className={cn(
@@ -282,11 +260,24 @@ export function PosShell({
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col">
-          <div className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 py-6 lg:px-8">
+          <div
+            className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-5 py-6 lg:px-8"
+            ref={contentScrollRef}
+          >
             {children}
           </div>
         </main>
       </div>
+
+      <PosMobileNavigation
+        activePathname={activePathname}
+        branchName={branchName}
+        hasNotificationAttention={
+          currentUnreadCount > 0 || hasPrintTaskAttention
+        }
+        profileName={profileName}
+        settingsActive={settingsActive}
+      />
     </div>
   );
 }

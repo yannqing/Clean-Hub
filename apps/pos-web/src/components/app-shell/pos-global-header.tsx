@@ -19,7 +19,6 @@ type PosGlobalHeaderProps = {
   canReprint: boolean;
   displayInitials: string;
   notificationUnreadCount: number;
-  onOpenNavigation: () => void;
   onUnreadCountChange: (count: number) => void;
   pendingPrintTaskCount: number;
   profileName: string;
@@ -31,7 +30,6 @@ export function PosGlobalHeader({
   canReprint,
   displayInitials,
   notificationUnreadCount,
-  onOpenNavigation,
   onUnreadCountChange,
   pendingPrintTaskCount,
   profileName,
@@ -78,19 +76,6 @@ export function PosGlobalHeader({
     >
       <div className="flex h-full items-center gap-2 px-3 sm:px-4 lg:gap-4 lg:px-0">
         <div className="flex shrink-0 items-center gap-2 lg:w-[240px] lg:px-3">
-          <button
-            aria-label={t("pos.shell.openNavigation")}
-            className="flex size-9 items-center justify-center rounded-xl text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 lg:hidden"
-            onClick={() => {
-              setActivePanel(null);
-              setMobileSearchOpen(false);
-              onOpenNavigation();
-            }}
-            type="button"
-          >
-            <Icon className="h-[18px] w-[18px]" name="menu" />
-          </button>
-
           <Link
             aria-label="CleanHub POS"
             className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
