@@ -593,7 +593,8 @@ export const tenantMessagesFr: TenantMessages = {
       status: "Statut",
       saveAction: "Enregistrer le client",
       saveSuccess: "Profil client mis à jour.",
-      saveError: "Le profil client n'a pas pu être mis à jour. Veuillez réessayer.",
+      saveError:
+        "Le profil client n'a pas pu être mis à jour. Veuillez réessayer.",
       versionConflict:
         "Ce profil client a été modifié par une autre personne. Actualisez puis réessayez.",
       fullNameRequired: "Saisissez un nom de client.",
@@ -1041,7 +1042,7 @@ export const tenantMessagesFr: TenantMessages = {
         branchDuplicate:
           "La sélection de succursales contient des doublons. Sélectionnez à nouveau les succursales.",
         branchInventoryInvalid:
-          "L'inventaire de la succursale doit être égal ou supérieur à 0, avec jusqu'à 3 décimales.",
+          "Le stock de la succursale et le seuil de stock faible doivent être des nombres entiers ; le stock initial doit être supérieur ou égal à 0.",
         serverInvalid: "Ce champ n'est pas valide. Vérifiez-le et réessayez.",
       },
       fields: {
@@ -1474,19 +1475,41 @@ export const tenantMessagesFr: TenantMessages = {
         "Ajoutez un emplacement d’exploitation pour le locataire actuel. La portée des succursales Tenant et Manager est appliquée par l’API.",
       created: "Succursale créée.",
       createButton: "Créer une succursale",
-      businessHoursPlaceholder: '{"mon":"08:00-18:00"}',
+      checkForm: "Vérifiez le formulaire de la succursale.",
+      businessHoursDescription:
+        "Sélectionnez chaque jour d'ouverture et définissez les heures d'ouverture et de fermeture.",
+      opensAt: "Heure d'ouverture",
+      closesAt: "Heure de fermeture",
+      closed: "Fermé",
+      weekdayLabels: {
+        monday: "Lundi",
+        tuesday: "Mardi",
+        wednesday: "Mercredi",
+        thursday: "Jeudi",
+        friday: "Vendredi",
+        saturday: "Samedi",
+        sunday: "Dimanche",
+      },
+      uploadLogo: "Téléverser le logo de la succursale",
+      replaceLogo: "Remplacer l'image",
+      removeLogo: "Supprimer l'image",
+      logoHelp: "JPG, PNG ou WebP, jusqu'à 5 Mo.",
+      logoPreviewAlt: "Aperçu du logo de la succursale",
+      logoTypeInvalid: "Le logo doit être une image JPG, PNG ou WebP.",
+      logoTooLarge: "L'image du logo ne doit pas dépasser 5 Mo.",
+      logoUploadFailed: "Le logo n'a pas pu être téléversé. Réessayez.",
       fields: {
         name: "Nom",
         phone: "Téléphone",
         currency: "Devise",
         defaultLanguage: "Langue par défaut",
         status: "Statut",
-        logoUrl: "URL du logo",
+        logo: "Logo de la succursale",
         receiptName: "Nom du reçu",
         receiptPhone: "Téléphone de réception",
         address: "Adresse",
         receiptAddress: "Adresse de réception",
-        businessHoursJson: "Horaires d'ouverture JSON",
+        businessHours: "Horaires d'ouverture",
       },
     },
     detail: {
@@ -1613,6 +1636,9 @@ export const tenantMessagesFr: TenantMessages = {
       namePlaceholder: "Entrez un nom de service",
       shortNamePlaceholder: "Nom court pour le POS et les reçus",
       codePlaceholder: "Par exemple, NET-SEC-01",
+      generateCode: "Générer",
+      generatedCodeHint:
+        "Un code de service est généré automatiquement et reste modifiable.",
       categoryPlaceholder: "Sélectionnez une catégorie de service",
       descriptionPlaceholder:
         "Saisissez une description de service facultative",
@@ -2557,9 +2583,7 @@ export const tenantMessagesFr: TenantMessages = {
       readOnlyTitle: "Ces paramètres sont en lecture seule",
       storeDefaultsTitle: "Paramètres par défaut du magasin",
       storeDefaultsDescription:
-        "Définissez la langue, la devise et le fuseau horaire professionnel par défaut du locataire.",
-      currencyHint:
-        "La devise par défaut pour les nouveaux prix, commandes et rapports commerciaux.",
+        "Définissez la langue et le fuseau horaire professionnel par défaut du locataire.",
       languageHint:
         "La langue commerciale par défaut pour les nouveaux emplacements et l'espace de travail d'administration.",
       timezoneHint:
@@ -2588,7 +2612,9 @@ export const tenantMessagesFr: TenantMessages = {
         "Le catalogue de prix séparé a été supprimé. Gérez chaque prix directement avec son produit ou service afin que les informations du catalogue restent ensemble.",
       defaultCurrencyTitle: "Devise par défaut",
       defaultCurrencyDescription:
-        "Les nouveaux prix du catalogue, remises fixes, transactions de succursale et de PDV, ainsi que les rapports utilisent ce code ISO.",
+        "Il s'agit de la devise par défaut pour tout le locataire. Les nouveaux prix du catalogue, remises fixes, transactions de succursale et de PDV, ainsi que les rapports utilisent cette valeur.",
+      defaultCurrencyHint:
+        "L'enregistrement met aussi à jour la devise par défaut de chaque succursale existante. Les commandes historiques et les prix existants conservent leur devise d'origine sans conversion.",
       saveDefaultCurrency: "Enregistrer la devise",
       productsTitle: "Prix des produits",
       productsDescription:
@@ -2807,18 +2833,16 @@ export const tenantMessagesFr: TenantMessages = {
     personal: {
       title: "Informations personnelles",
       description:
-        "Votre nom d’affichage apparaît dans l’en-tête CleanHub et les enregistrements d’activité.",
+        "Modifiez le nom et les coordonnées associés à votre compte.",
       displayName: "Nom d'affichage",
       displayNameHint:
         "Utilisez le nom que vous souhaitez que les autres membres du personnel voient.",
-      language: "Langue de l'interface",
-      languageHint:
-        "Ce paramètre met immédiatement à jour l’interface d’administration Web.",
-      languageOptions: {
-        en: "Anglais",
-        "zh-CN": "Chinois simplifié",
-        fr: "Français",
-      },
+      email: "E-mail",
+      emailHint:
+        "Cette adresse e-mail sert également à vous connecter à l’administration Web.",
+      phone: "Téléphone",
+      phoneHint:
+        "Numéro de contact facultatif, avec l’indicatif du pays si nécessaire.",
     },
     account: {
       title: "Informations sur le compte",
@@ -2859,10 +2883,36 @@ export const tenantMessagesFr: TenantMessages = {
     devices: {
       title: "Appareils de connexion",
       description:
-        "Examen et révocation des appareils de connexion individuels.",
-      emptyTitle: "La gestion des appareils n'est pas encore disponible",
+        "Consultez et révoquez les sessions de connexion de ce compte dans les navigateurs.",
+      currentDevice: "Appareil actuel",
+      unknownBrowser: "Navigateur inconnu",
+      unknownOperatingSystem: "Système inconnu",
+      ipAddress: "Adresse IP",
+      unknownIp: "Inconnue",
+      lastActive: "Dernière activité",
+      signedInAt: "Connexion",
+      expiresAt: "Expiration de la session",
+      showAll: "Afficher les {count} appareils",
+      showLess: "Afficher moins d’appareils",
+      revoke: "Déconnecter l’appareil",
+      revoking: "Déconnexion...",
+      revokeDialogTitle: "Déconnecter cet appareil ?",
+      revokeDialogDescription:
+        "Après la révocation, cet appareil devra se reconnecter à la fin de sa session actuelle de courte durée.",
+      cancel: "Annuler",
+      confirmRevoke: "Déconnecter l’appareil",
+      revokeSuccess: "La session de connexion de l’appareil a été révoquée.",
+      revokeFailed:
+        "Impossible de révoquer la session de connexion. Réessayez.",
+      sessionNotFound:
+        "Cette session est déjà terminée. La liste a été mise à jour.",
+      currentSessionForbidden:
+        "L’appareil actuel ne peut pas être déconnecté depuis cet écran.",
+      loadErrorTitle: "Impossible de charger les appareils connectés",
+      loadErrorDescription: "Vérifiez la connexion et réessayez.",
+      emptyTitle: "Aucun appareil connecté actif",
       emptyDescription:
-        "CleanHub n'expose actuellement pas de données de session fiables par appareil, donc aucun appareil réservé n'est affiché ici.",
+        "Ce compte ne possède aucune session d’administration à afficher.",
     },
     statusLabels: {
       invited: "Invité",
@@ -2878,7 +2928,10 @@ export const tenantMessagesFr: TenantMessages = {
       displayNameRequired: "Entrez un nom d'affichage.",
       displayNameTooLong:
         "Le nom d’affichage doit comporter 120 caractères maximum.",
-      invalidLanguage: "Sélectionnez une langue d'interface prise en charge.",
+      emailRequired: "Saisissez une adresse e-mail.",
+      emailInvalid: "Saisissez une adresse e-mail valide.",
+      emailTooLong: "L’adresse e-mail doit comporter 320 caractères maximum.",
+      phoneTooLong: "Le téléphone doit comporter 32 caractères maximum.",
       currentPasswordRequired: "Entrez votre mot de passe actuel.",
       newPasswordRequired: "Entrez un nouveau mot de passe.",
       passwordTooShort:
@@ -2901,6 +2954,8 @@ export const tenantMessagesFr: TenantMessages = {
         "Choisissez un mot de passe différent de celui actuel.",
       passwordPolicyViolation:
         "Le nouveau mot de passe ne respecte pas la politique de sécurité actuelle.",
+      emailConflict:
+        "Cette adresse e-mail est déjà utilisée par un autre compte.",
       conflict: "Votre profil a changé ailleurs. Actualisez et réessayez.",
       notFound: "Votre profil de locataire est introuvable.",
       requestFailed:

@@ -1029,7 +1029,7 @@ export const tenantMessagesEn: TenantMessages = {
         branchDuplicate:
           "The branch selection contains duplicates. Select branches again.",
         branchInventoryInvalid:
-          "Branch inventory must be 0 or greater with up to 3 decimal places.",
+          "Branch inventory and low-stock thresholds must be whole numbers; opening stock must be 0 or greater.",
         serverInvalid: "This field is invalid. Check it and try again.",
       },
       fields: {
@@ -1453,19 +1453,41 @@ export const tenantMessagesEn: TenantMessages = {
         "Add an operating location for the current tenant. Tenant and Manager branch scope are enforced by the API.",
       created: "Branch created.",
       createButton: "Create branch",
-      businessHoursPlaceholder: '{"mon":"08:00-18:00"}',
+      checkForm: "Check the branch form.",
+      businessHoursDescription:
+        "Select each business day and set its opening and closing time.",
+      opensAt: "Opening time",
+      closesAt: "Closing time",
+      closed: "Closed",
+      weekdayLabels: {
+        monday: "Monday",
+        tuesday: "Tuesday",
+        wednesday: "Wednesday",
+        thursday: "Thursday",
+        friday: "Friday",
+        saturday: "Saturday",
+        sunday: "Sunday",
+      },
+      uploadLogo: "Upload branch logo",
+      replaceLogo: "Replace image",
+      removeLogo: "Remove image",
+      logoHelp: "JPG, PNG, or WebP up to 5 MB.",
+      logoPreviewAlt: "Branch logo preview",
+      logoTypeInvalid: "The logo must be a JPG, PNG, or WebP image.",
+      logoTooLarge: "The logo image must be 5 MB or smaller.",
+      logoUploadFailed: "The logo could not be uploaded. Try again.",
       fields: {
         name: "Name",
         phone: "Phone",
         currency: "Currency",
         defaultLanguage: "Default language",
         status: "Status",
-        logoUrl: "Logo URL",
+        logo: "Branch logo",
         receiptName: "Receipt name",
         receiptPhone: "Receipt phone",
         address: "Address",
         receiptAddress: "Receipt address",
-        businessHoursJson: "Business hours JSON",
+        businessHours: "Business hours",
       },
     },
 
@@ -1592,6 +1614,9 @@ export const tenantMessagesEn: TenantMessages = {
       namePlaceholder: "Enter a service name",
       shortNamePlaceholder: "Short label for POS and receipts",
       codePlaceholder: "For example, DRY-CLEAN-01",
+      generateCode: "Generate",
+      generatedCodeHint:
+        "A service code is generated automatically, and you can still edit it.",
       categoryPlaceholder: "Select a service category",
       descriptionPlaceholder: "Enter an optional service description",
       internalNotesPlaceholder:
@@ -2513,9 +2538,7 @@ export const tenantMessagesEn: TenantMessages = {
       readOnlyTitle: "These settings are read-only",
       storeDefaultsTitle: "Store defaults",
       storeDefaultsDescription:
-        "Set the tenant's default language, currency, and business timezone.",
-      currencyHint:
-        "The default currency for new prices, orders, and business reports.",
+        "Set the tenant's default language and business timezone.",
       languageHint:
         "The default business language for new locations and the admin workspace.",
       timezoneHint: "Used to record orders, reports, and operating times.",
@@ -2541,7 +2564,9 @@ export const tenantMessagesEn: TenantMessages = {
         "The separate price book has been removed. Manage each price directly with its product or service so catalog information stays together.",
       defaultCurrencyTitle: "Default currency",
       defaultCurrencyDescription:
-        "New catalog prices, fixed discounts, branch and POS transactions, and reports use this ISO currency code.",
+        "This is the tenant-wide default currency. New catalog prices, fixed discounts, branch and POS transactions, and reports read their default from here.",
+      defaultCurrencyHint:
+        "Saving also updates every existing branch default. Historical orders and existing prices keep their original currency and are not converted.",
       saveDefaultCurrency: "Save currency",
       productsTitle: "Product prices",
       productsDescription:
@@ -2761,16 +2786,14 @@ export const tenantMessagesEn: TenantMessages = {
     personal: {
       title: "Personal information",
       description:
-        "Your display name appears in the CleanHub header and activity records.",
+        "Update the name and contact details associated with your account.",
       displayName: "Display name",
       displayNameHint: "Use the name you want other staff members to see.",
-      language: "Interface language",
-      languageHint: "This setting updates the web admin interface immediately.",
-      languageOptions: {
-        en: "English",
-        fr: "French",
-        "zh-CN": "Simplified Chinese",
-      },
+      email: "Email",
+      emailHint: "This email is also used to sign in to Web Admin.",
+      phone: "Phone",
+      phoneHint:
+        "Optional contact number, including the country code when applicable.",
     },
     account: {
       title: "Account information",
@@ -2810,10 +2833,35 @@ export const tenantMessagesEn: TenantMessages = {
     },
     devices: {
       title: "Login devices",
-      description: "Reviewing and revoking individual login devices.",
-      emptyTitle: "Device management is not available yet",
+      description: "Review and revoke this account's browser login sessions.",
+      currentDevice: "Current device",
+      unknownBrowser: "Unknown browser",
+      unknownOperatingSystem: "Unknown system",
+      ipAddress: "IP address",
+      unknownIp: "Unknown",
+      lastActive: "Last active",
+      signedInAt: "Signed in",
+      expiresAt: "Session expires",
+      showAll: "Show all {count} devices",
+      showLess: "Show fewer devices",
+      revoke: "Sign out device",
+      revoking: "Signing out...",
+      revokeDialogTitle: "Sign out this device?",
+      revokeDialogDescription:
+        "After revocation, this device will be asked to sign in again when its current short-lived session ends.",
+      cancel: "Cancel",
+      confirmRevoke: "Sign out device",
+      revokeSuccess: "The device login session was revoked.",
+      revokeFailed: "The login session could not be revoked. Try again.",
+      sessionNotFound:
+        "That login session has already ended. The list was updated.",
+      currentSessionForbidden:
+        "The current device cannot be signed out from this screen.",
+      loadErrorTitle: "Login devices could not be loaded",
+      loadErrorDescription: "Check the connection and try again.",
+      emptyTitle: "No active login devices",
       emptyDescription:
-        "CleanHub does not currently expose reliable per-device session data, so no placeholder devices are shown here.",
+        "This account has no back-office login sessions to show.",
     },
     statusLabels: {
       invited: "Invited",
@@ -2828,7 +2876,10 @@ export const tenantMessagesEn: TenantMessages = {
     validation: {
       displayNameRequired: "Enter a display name.",
       displayNameTooLong: "Display name must be 120 characters or fewer.",
-      invalidLanguage: "Select a supported interface language.",
+      emailRequired: "Enter an email address.",
+      emailInvalid: "Enter a valid email address.",
+      emailTooLong: "Email must be 320 characters or fewer.",
+      phoneTooLong: "Phone must be 32 characters or fewer.",
       currentPasswordRequired: "Enter your current password.",
       newPasswordRequired: "Enter a new password.",
       passwordTooShort: "Password must be at least {count} characters.",
@@ -2846,6 +2897,7 @@ export const tenantMessagesEn: TenantMessages = {
       passwordUnchanged: "Choose a password different from the current one.",
       passwordPolicyViolation:
         "The new password does not meet the current security policy.",
+      emailConflict: "This email is already used by another account.",
       conflict: "Your profile changed elsewhere. Refresh and try again.",
       notFound: "Your tenant profile could not be found.",
       requestFailed: "The request could not be completed. Please try again.",

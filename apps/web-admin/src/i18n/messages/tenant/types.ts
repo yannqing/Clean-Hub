@@ -1138,19 +1138,40 @@ export type TenantMessages = {
       description: string;
       created: string;
       createButton: string;
-      businessHoursPlaceholder: string;
+      checkForm: string;
+      businessHoursDescription: string;
+      opensAt: string;
+      closesAt: string;
+      closed: string;
+      weekdayLabels: {
+        monday: string;
+        tuesday: string;
+        wednesday: string;
+        thursday: string;
+        friday: string;
+        saturday: string;
+        sunday: string;
+      };
+      uploadLogo: string;
+      replaceLogo: string;
+      removeLogo: string;
+      logoHelp: string;
+      logoPreviewAlt: string;
+      logoTypeInvalid: string;
+      logoTooLarge: string;
+      logoUploadFailed: string;
       fields: {
         name: string;
         phone: string;
         currency: string;
         defaultLanguage: string;
         status: string;
-        logoUrl: string;
+        logo: string;
         receiptName: string;
         receiptPhone: string;
         address: string;
         receiptAddress: string;
-        businessHoursJson: string;
+        businessHours: string;
       };
     };
 
@@ -1268,6 +1289,8 @@ export type TenantMessages = {
       namePlaceholder: string;
       shortNamePlaceholder: string;
       codePlaceholder: string;
+      generateCode: string;
+      generatedCodeHint: string;
       categoryPlaceholder: string;
       descriptionPlaceholder: string;
       internalNotesPlaceholder: string;
@@ -2109,7 +2132,6 @@ export type TenantMessages = {
       readOnlyTitle: string;
       storeDefaultsTitle: string;
       storeDefaultsDescription: string;
-      currencyHint: string;
       languageHint: string;
       timezoneHint: string;
       featureAccessTitle: string;
@@ -2130,6 +2152,7 @@ export type TenantMessages = {
       description: string;
       defaultCurrencyTitle: string;
       defaultCurrencyDescription: string;
+      defaultCurrencyHint: string;
       saveDefaultCurrency: string;
       productsTitle: string;
       productsDescription: string;
@@ -2339,13 +2362,10 @@ export type TenantMessages = {
       description: string;
       displayName: string;
       displayNameHint: string;
-      language: string;
-      languageHint: string;
-      languageOptions: {
-        en: string;
-        fr: string;
-        "zh-CN": string;
-      };
+      email: string;
+      emailHint: string;
+      phone: string;
+      phoneHint: string;
     };
     account: {
       title: string;
@@ -2383,6 +2403,28 @@ export type TenantMessages = {
     devices: {
       title: string;
       description: string;
+      currentDevice: string;
+      unknownBrowser: string;
+      unknownOperatingSystem: string;
+      ipAddress: string;
+      unknownIp: string;
+      lastActive: string;
+      signedInAt: string;
+      expiresAt: string;
+      showAll: string;
+      showLess: string;
+      revoke: string;
+      revoking: string;
+      revokeDialogTitle: string;
+      revokeDialogDescription: string;
+      cancel: string;
+      confirmRevoke: string;
+      revokeSuccess: string;
+      revokeFailed: string;
+      sessionNotFound: string;
+      currentSessionForbidden: string;
+      loadErrorTitle: string;
+      loadErrorDescription: string;
       emptyTitle: string;
       emptyDescription: string;
     };
@@ -2399,7 +2441,10 @@ export type TenantMessages = {
     validation: {
       displayNameRequired: string;
       displayNameTooLong: string;
-      invalidLanguage: string;
+      emailRequired: string;
+      emailInvalid: string;
+      emailTooLong: string;
+      phoneTooLong: string;
       currentPasswordRequired: string;
       newPasswordRequired: string;
       passwordTooShort: string;
@@ -2416,6 +2461,7 @@ export type TenantMessages = {
       currentPasswordIncorrect: string;
       passwordUnchanged: string;
       passwordPolicyViolation: string;
+      emailConflict: string;
       conflict: string;
       notFound: string;
       requestFailed: string;
