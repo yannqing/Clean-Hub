@@ -6,6 +6,7 @@ import {
   createTenantBranch,
   getTenantBranchDetail,
   listTenantBranches,
+  requestTenantBranchLogoUpload,
   updateTenantBranch,
   updateTenantBranchStatus,
 } from "./branches.service.js";
@@ -13,6 +14,7 @@ import {
   branchListQuerySchema,
   branchParamsSchema,
   createBranchBodySchema,
+  requestBranchLogoUploadBodySchema,
   updateBranchBodySchema,
   updateBranchStatusBodySchema,
 } from "./branches.validation.js";
@@ -50,14 +52,42 @@ export async function createTenantBranchController(c: Context<AppBindings>) {
   const rawBody = await c.req.json().catch(() => ({}));
   const data = createBranchBodySchema.parse(rawBody);
 
-  return c.json(
-    await createTenantBranch({
-      authContext: c.get("authContext"),
-      requestMeta: getRequestMeta(c),
-      data,
-    }),
-    201,
-  );
+  try {
+    return c.json(
+      await createTenantBranch({
+        authContext: c.get("authContext"),
+        requestMeta: getRequestMeta(c),
+        data,
+      }),
+      201,
+    );
+  } catch (error) {
+    if (error instanceof TenantBranchesError) {
+      return createTenantBranchesErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function requestTenantBranchLogoUploadController(
+  c: Context<AppBindings>,
+) {
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = requestBranchLogoUploadBodySchema.parse(rawBody);
+
+  try {
+    return c.json(
+      await requestTenantBranchLogoUpload(c.get("authContext"), data),
+      201,
+    );
+  } catch (error) {
+    if (error instanceof TenantBranchesError) {
+      return createTenantBranchesErrorResponse(c, error);
+    }
+
+    throw error;
+  }
 }
 
 export async function getTenantBranchController(c: Context<AppBindings>) {

@@ -19,14 +19,14 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { Check, ChevronRight, LoaderCircle, Store } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { useTenantI18n } from "@/i18n";
 import { tenantQueryKeys } from "@/lib/query-keys";
 
 import { updateBranchAction, updateBranchStatusAction } from "../actions";
-import { BranchPosTerminalBindingCard } from "./branch-pos-terminal-binding-card";
+import { toBranchBusinessHoursFormValues } from "../business-hours";
 import { branchLanguageValues } from "../constants";
 import { useBranchDetailQuery } from "../queries";
 import type {
@@ -35,18 +35,17 @@ import type {
   BranchStatus,
   BranchSummary,
 } from "../types";
+import { uploadBranchLogo } from "../upload-branch-logo";
+import { validateBranchUpdateForm } from "../validators";
+import { BranchBusinessHoursEditor } from "./branch-business-hours-editor";
+import { BranchLogoField } from "./branch-logo-field";
+import { BranchPosTerminalBindingCard } from "./branch-pos-terminal-binding-card";
 
 function isVersionConflict(result: {
   code?: string;
   status?: number;
 }): boolean {
   return result.status === 409 || result.code === "BRANCH_VERSION_CONFLICT";
-}
-
-function businessHoursToText(
-  businessHours: BranchSummary["businessHours"],
-): string {
-  return businessHours ? JSON.stringify(businessHours, null, 2) : "";
 }
 
 function toFormValues(branch: BranchSummary): BranchFormValues {
@@ -59,8 +58,9 @@ function toFormValues(branch: BranchSummary): BranchFormValues {
     receiptName: branch.receiptName ?? "",
     receiptPhone: branch.receiptPhone ?? "",
     receiptAddress: branch.receiptAddress ?? "",
-    logoUrl: branch.logoUrl ?? "",
-    businessHoursJson: businessHoursToText(branch.businessHours),
+    logoObjectKey: branch.logoObjectKey ?? "",
+    removeLogo: false,
+    businessHours: toBranchBusinessHoursFormValues(branch.businessHours),
     status: branch.status,
     version: branch.version,
   };
@@ -98,6 +98,20 @@ export function BranchDetailView({
   >({});
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(
+    branch.logoUrl,
+  );
+  const logoObjectUrlRef = useRef<string | null>(null);
+
+  useEffect(
+    () => () => {
+      if (logoObjectUrlRef.current) {
+        URL.revokeObjectURL(logoObjectUrlRef.current);
+      }
+    },
+    [],
+  );
 
   function applyUpdatedBranch(nextBranch: BranchSummary) {
     queryClient.setQueryData(
@@ -105,6 +119,12 @@ export function BranchDetailView({
       nextBranch,
     );
     setFormValues(toFormValues(nextBranch));
+    if (logoObjectUrlRef.current) {
+      URL.revokeObjectURL(logoObjectUrlRef.current);
+      logoObjectUrlRef.current = null;
+    }
+    setLogoFile(null);
+    setLogoPreviewUrl(nextBranch.logoUrl);
     setErrors({});
   }
 
@@ -122,10 +142,45 @@ export function BranchDetailView({
     setMessage(null);
 
     try {
-      const result = await updateBranchAction(branch.id, {
+      const nextFormValues = {
         ...formValues,
         version: branch.version,
-      });
+      };
+      const validation = validateBranchUpdateForm(nextFormValues);
+
+      if (!validation.ok) {
+        setErrors(validation.errors);
+        setMessage(m.branches.create.checkForm);
+        return;
+      }
+
+      let submission = nextFormValues;
+
+      if (logoFile) {
+        const uploadResult = await uploadBranchLogo(logoFile);
+
+        if (!uploadResult.ok) {
+          const uploadMessage =
+            uploadResult.reason === "type"
+              ? m.branches.create.logoTypeInvalid
+              : uploadResult.reason === "size"
+                ? m.branches.create.logoTooLarge
+                : m.branches.create.logoUploadFailed;
+          setMessage(uploadMessage);
+          toast.error(uploadMessage);
+          return;
+        }
+
+        submission = {
+          ...nextFormValues,
+          logoObjectKey: uploadResult.objectKey,
+          removeLogo: false,
+        };
+        setFormValues(submission);
+        setLogoFile(null);
+      }
+
+      const result = await updateBranchAction(branch.id, submission);
 
       if (!result.ok) {
         const nextMessage = isVersionConflict(result)
@@ -147,6 +202,31 @@ export function BranchDetailView({
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleLogoSelect(file: File) {
+    if (logoObjectUrlRef.current) {
+      URL.revokeObjectURL(logoObjectUrlRef.current);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    logoObjectUrlRef.current = previewUrl;
+    setLogoFile(file);
+    setLogoPreviewUrl(previewUrl);
+    updateForm("removeLogo", false);
+    setErrors((current) => ({ ...current, logoObjectKey: undefined }));
+  }
+
+  function handleLogoRemove() {
+    if (logoObjectUrlRef.current) {
+      URL.revokeObjectURL(logoObjectUrlRef.current);
+      logoObjectUrlRef.current = null;
+    }
+
+    setLogoFile(null);
+    setLogoPreviewUrl(null);
+    updateForm("logoObjectKey", "");
+    updateForm("removeLogo", true);
   }
 
   async function handleStatusChange(status: BranchStatus) {
@@ -242,36 +322,28 @@ export function BranchDetailView({
                     <FieldError message={errors.name} />
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="grid gap-2">
-                      <Label htmlFor="branch-detail-phone">
-                        {m.branches.create.fields.phone}
-                      </Label>
-                      <Input
-                        aria-invalid={Boolean(errors.phone)}
-                        id="branch-detail-phone"
-                        onChange={(event) =>
-                          updateForm("phone", event.target.value)
-                        }
-                        value={formValues.phone}
-                      />
-                      <FieldError message={errors.phone} />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="branch-detail-logo-url">
-                        {m.branches.create.fields.logoUrl}
-                      </Label>
-                      <Input
-                        aria-invalid={Boolean(errors.logoUrl)}
-                        id="branch-detail-logo-url"
-                        onChange={(event) =>
-                          updateForm("logoUrl", event.target.value)
-                        }
-                        value={formValues.logoUrl}
-                      />
-                      <FieldError message={errors.logoUrl} />
-                    </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="branch-detail-phone">
+                      {m.branches.create.fields.phone}
+                    </Label>
+                    <Input
+                      aria-invalid={Boolean(errors.phone)}
+                      id="branch-detail-phone"
+                      onChange={(event) =>
+                        updateForm("phone", event.target.value)
+                      }
+                      value={formValues.phone}
+                    />
+                    <FieldError message={errors.phone} />
                   </div>
+
+                  <BranchLogoField
+                    disabled={saving}
+                    error={errors.logoObjectKey}
+                    onRemove={handleLogoRemove}
+                    onSelect={handleLogoSelect}
+                    previewUrl={logoPreviewUrl}
+                  />
                 </CardContent>
               </Card>
 
@@ -340,20 +412,12 @@ export function BranchDetailView({
                     <FieldError message={errors.receiptAddress} />
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="branch-detail-hours">
-                      {m.branches.create.fields.businessHoursJson}
-                    </Label>
-                    <Textarea
-                      aria-invalid={Boolean(errors.businessHoursJson)}
-                      id="branch-detail-hours"
-                      onChange={(event) =>
-                        updateForm("businessHoursJson", event.target.value)
-                      }
-                      value={formValues.businessHoursJson}
-                    />
-                    <FieldError message={errors.businessHoursJson} />
-                  </div>
+                  <BranchBusinessHoursEditor
+                    disabled={saving}
+                    error={errors.businessHours}
+                    onChange={(value) => updateForm("businessHours", value)}
+                    value={formValues.businessHours}
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -413,7 +477,7 @@ export function BranchDetailView({
 
                   <div className="grid gap-2">
                     <Label>{m.branches.create.fields.status}</Label>
-                    <div className="flex h-10 items-center justify-between rounded-md border bg-muted/30 px-3">
+                    <div className="flex h-10 items-center rounded-md border bg-muted/30 px-3">
                       <Badge
                         variant={
                           branch.status === "active" ? "default" : "outline"
@@ -421,9 +485,6 @@ export function BranchDetailView({
                       >
                         {m.common.statusLabels[branch.status]}
                       </Badge>
-                      <span className="text-xs text-muted-foreground">
-                        v{branch.version}
-                      </span>
                     </div>
                     <p className="text-xs text-muted-foreground">
                       {m.branches.detail.statusHint}

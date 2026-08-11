@@ -14,6 +14,8 @@ import {
   lockPosTerminalsForBranchStatusChange,
   securityForceClosePosTerminalShifts,
 } from "../../pos/terminal-lifecycle/terminal-lifecycle.repository.js";
+import { MediaService } from "../../media/media.service.js";
+import { MediaError, type MediaUploadTicket } from "../../media/media.types.js";
 import { TenantBranchesError } from "./branches.errors.js";
 import {
   createBranchRecord,
@@ -27,12 +29,82 @@ import {
 } from "./branches.repository.js";
 import type {
   BranchListInput,
+  BranchLogoUploadTicket,
   BranchRequestInput,
   BranchSummary,
   CreateBranchRequest,
+  RequestBranchLogoUpload,
   UpdateBranchRequest,
   UpdateBranchStatusRequest,
 } from "./branches.types.js";
+
+const BRANCH_LOGO_PURPOSE = "branch_logo";
+
+type BranchLogoMediaService = Pick<
+  MediaService,
+  | "requestUpload"
+  | "assertOwnedAndCommit"
+  | "createDownloadLinkForKnownCommittedObject"
+>;
+
+function mapBranchLogoMediaError(error: MediaError): TenantBranchesError {
+  return new TenantBranchesError(
+    "BRANCH_LOGO_INVALID",
+    error.message,
+    error.status,
+  );
+}
+
+async function commitBranchLogo(
+  mediaService: BranchLogoMediaService,
+  input: {
+    tenantId: string;
+    actorUserId: string;
+    objectKey: string | null | undefined;
+  },
+): Promise<void> {
+  if (!input.objectKey) {
+    return;
+  }
+
+  try {
+    await mediaService.assertOwnedAndCommit({
+      tenantId: input.tenantId,
+      objectKey: input.objectKey,
+      expectedPurpose: BRANCH_LOGO_PURPOSE,
+      expectedCreatedBy: input.actorUserId,
+    });
+  } catch (error) {
+    if (error instanceof MediaError) {
+      throw mapBranchLogoMediaError(error);
+    }
+
+    throw error;
+  }
+}
+
+async function withBranchLogoUrl(
+  branch: BranchSummary,
+  tenantId: string,
+  mediaService: BranchLogoMediaService,
+): Promise<BranchSummary> {
+  if (!branch.logoObjectKey) {
+    return branch;
+  }
+
+  try {
+    const ticket = await mediaService.createDownloadLinkForKnownCommittedObject(
+      {
+        tenantId,
+        objectKey: branch.logoObjectKey,
+      },
+    );
+
+    return { ...branch, logoUrl: ticket.downloadUrl };
+  } catch {
+    return { ...branch, logoUrl: null };
+  }
+}
 
 async function assertBranchManagementAccess(
   authContext: BranchRequestInput<unknown>["authContext"],
@@ -95,38 +167,55 @@ export async function listTenantBranches(
   authContext: BranchRequestInput<unknown>["authContext"],
   input: BranchListInput,
   db: Database = getDb(),
+  mediaService: BranchLogoMediaService = new MediaService(),
 ): Promise<BranchSummary[]> {
   const tenantId = await assertBranchManagementAccess(authContext, db);
   const branchScope = await resolveAllowedBranchIds(authContext, db);
 
-  return findBranches(db, {
+  const branchList = await findBranches(db, {
     ...input,
     tenantId,
     allowedBranchIds: branchScope === "all" ? undefined : branchScope,
   });
+
+  return Promise.all(
+    branchList.map((branch) =>
+      withBranchLogoUrl(branch, tenantId, mediaService),
+    ),
+  );
 }
 
 export async function getTenantBranchDetail(
   authContext: BranchRequestInput<unknown>["authContext"],
   branchId: string,
   db: Database = getDb(),
+  mediaService: BranchLogoMediaService = new MediaService(),
 ): Promise<BranchSummary> {
   const tenantId = await assertBranchManagementAccess(authContext, db);
   await assertAuthorizedBranch(authContext, branchId, db);
 
-  return requireBranch(db, {
+  const branch = await requireBranch(db, {
     tenantId,
     branchId,
   });
+
+  return withBranchLogoUrl(branch, tenantId, mediaService);
 }
 
 export async function createTenantBranch(
   input: BranchRequestInput<CreateBranchRequest>,
   db: Database = getDb(),
+  mediaService: BranchLogoMediaService = new MediaService(),
 ): Promise<BranchSummary> {
   const tenantId = await assertBranchCreationAccess(input.authContext, db);
 
-  return db.transaction(async (tx) => {
+  await commitBranchLogo(mediaService, {
+    tenantId,
+    actorUserId: input.authContext.userId,
+    objectKey: input.data.logoObjectKey,
+  });
+
+  const branch = await db.transaction(async (tx) => {
     const branch = await createBranchRecord(tx, {
       ...input.data,
       tenantId,
@@ -143,16 +232,30 @@ export async function createTenantBranch(
 
     return branch;
   });
+
+  return withBranchLogoUrl(branch, tenantId, mediaService);
 }
 
 export async function updateTenantBranch(
   branchId: string,
   input: BranchRequestInput<UpdateBranchRequest>,
   db: Database = getDb(),
+  mediaService: BranchLogoMediaService = new MediaService(),
 ): Promise<BranchSummary> {
   const tenantId = await assertBranchManagementAccess(input.authContext, db);
 
-  return db.transaction(async (tx) => {
+  await assertAuthorizedBranch(input.authContext, branchId, db);
+  const currentBranch = await requireBranch(db, { tenantId, branchId });
+
+  if (input.data.logoObjectKey !== currentBranch.logoObjectKey) {
+    await commitBranchLogo(mediaService, {
+      tenantId,
+      actorUserId: input.authContext.userId,
+      objectKey: input.data.logoObjectKey,
+    });
+  }
+
+  const branch = await db.transaction(async (tx) => {
     await assertAuthorizedBranch(input.authContext, branchId, tx);
     const before = await requireBranch(tx, {
       tenantId,
@@ -185,16 +288,19 @@ export async function updateTenantBranch(
 
     return branch;
   });
+
+  return withBranchLogoUrl(branch, tenantId, mediaService);
 }
 
 export async function updateTenantBranchStatus(
   branchId: string,
   input: BranchRequestInput<UpdateBranchStatusRequest>,
   db: Database = getDb(),
+  mediaService: BranchLogoMediaService = new MediaService(),
 ): Promise<BranchSummary> {
   const tenantId = await assertBranchManagementAccess(input.authContext, db);
 
-  return db.transaction(async (tx) => {
+  const branch = await db.transaction(async (tx) => {
     await assertAuthorizedBranch(input.authContext, branchId, tx);
     const before = await requireBranch(tx, {
       tenantId,
@@ -233,11 +339,13 @@ export async function updateTenantBranchStatus(
       // The branch row is now write-locked. Re-read the terminal set to catch
       // a new enrollment or inbound rebind that committed after the first
       // terminal scan but before the branch UPDATE acquired its row lock.
-      const finalLockedTerminals =
-        await lockPosTerminalsForBranchStatusChange(tx, {
+      const finalLockedTerminals = await lockPosTerminalsForBranchStatusChange(
+        tx,
+        {
           tenantId,
           branchId,
-        });
+        },
+      );
 
       if (input.data.status === "inactive") {
         await securityForceClosePosTerminalShifts(tx, {
@@ -275,4 +383,33 @@ export async function updateTenantBranchStatus(
 
     return branch;
   });
+
+  return withBranchLogoUrl(branch, tenantId, mediaService);
+}
+
+export async function requestTenantBranchLogoUpload(
+  authContext: BranchRequestInput<unknown>["authContext"],
+  data: RequestBranchLogoUpload,
+  db: Database = getDb(),
+  mediaService: BranchLogoMediaService = new MediaService(),
+): Promise<BranchLogoUploadTicket> {
+  const tenantId = await assertBranchManagementAccess(authContext, db);
+
+  try {
+    const ticket: MediaUploadTicket = await mediaService.requestUpload({
+      tenantId,
+      actorUserId: authContext.userId,
+      purpose: BRANCH_LOGO_PURPOSE,
+      contentType: data.contentType,
+      sizeBytes: data.sizeBytes,
+    });
+
+    return ticket;
+  } catch (error) {
+    if (error instanceof MediaError) {
+      throw mapBranchLogoMediaError(error);
+    }
+
+    throw error;
+  }
 }

@@ -18,7 +18,7 @@ import {
 import { Check, ChevronRight, LoaderCircle, Store } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { useTenantI18n } from "@/i18n";
@@ -26,6 +26,10 @@ import { useTenantI18n } from "@/i18n";
 import { createBranchAction } from "../actions";
 import { branchLanguageValues, emptyBranchFormValues } from "../constants";
 import type { BranchFormValues, BranchLanguage, BranchStatus } from "../types";
+import { uploadBranchLogo } from "../upload-branch-logo";
+import { validateBranchForm } from "../validators";
+import { BranchBusinessHoursEditor } from "./branch-business-hours-editor";
+import { BranchLogoField } from "./branch-logo-field";
 
 export type BranchCreateViewProps = {
   basePath?: string;
@@ -63,6 +67,18 @@ export function BranchCreateView({
   >({});
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreviewUrl, setLogoPreviewUrl] = useState<string | null>(null);
+  const logoObjectUrlRef = useRef<string | null>(null);
+
+  useEffect(
+    () => () => {
+      if (logoObjectUrlRef.current) {
+        URL.revokeObjectURL(logoObjectUrlRef.current);
+      }
+    },
+    [],
+  );
 
   function updateForm<K extends keyof BranchFormValues>(
     key: K,
@@ -79,7 +95,41 @@ export function BranchCreateView({
     setFormError(null);
 
     try {
-      const result = await createBranchAction(formValues);
+      const validation = validateBranchForm(formValues);
+
+      if (!validation.ok) {
+        setErrors(validation.errors);
+        setFormError(m.branches.create.checkForm);
+        return;
+      }
+
+      let submission = formValues;
+
+      if (logoFile) {
+        const uploadResult = await uploadBranchLogo(logoFile);
+
+        if (!uploadResult.ok) {
+          const uploadMessage =
+            uploadResult.reason === "type"
+              ? m.branches.create.logoTypeInvalid
+              : uploadResult.reason === "size"
+                ? m.branches.create.logoTooLarge
+                : m.branches.create.logoUploadFailed;
+          setFormError(uploadMessage);
+          toast.error(uploadMessage);
+          return;
+        }
+
+        submission = {
+          ...formValues,
+          logoObjectKey: uploadResult.objectKey,
+          removeLogo: false,
+        };
+        setFormValues(submission);
+        setLogoFile(null);
+      }
+
+      const result = await createBranchAction(submission);
 
       if (!result.ok) {
         setErrors(result.errors);
@@ -101,6 +151,31 @@ export function BranchCreateView({
     } finally {
       setSaving(false);
     }
+  }
+
+  function handleLogoSelect(file: File) {
+    if (logoObjectUrlRef.current) {
+      URL.revokeObjectURL(logoObjectUrlRef.current);
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    logoObjectUrlRef.current = previewUrl;
+    setLogoFile(file);
+    setLogoPreviewUrl(previewUrl);
+    updateForm("removeLogo", false);
+    setErrors((current) => ({ ...current, logoObjectKey: undefined }));
+  }
+
+  function handleLogoRemove() {
+    if (logoObjectUrlRef.current) {
+      URL.revokeObjectURL(logoObjectUrlRef.current);
+      logoObjectUrlRef.current = null;
+    }
+
+    setLogoFile(null);
+    setLogoPreviewUrl(null);
+    updateForm("logoObjectKey", "");
+    updateForm("removeLogo", true);
   }
 
   const pageTitle = m.branches.create.title;
@@ -165,36 +240,28 @@ export function BranchCreateView({
                     <FieldError message={errors.name} />
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="grid gap-2">
-                      <Label htmlFor="branch-phone">
-                        {m.branches.create.fields.phone}
-                      </Label>
-                      <Input
-                        aria-invalid={Boolean(errors.phone)}
-                        id="branch-phone"
-                        onChange={(event) =>
-                          updateForm("phone", event.target.value)
-                        }
-                        value={formValues.phone}
-                      />
-                      <FieldError message={errors.phone} />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="branch-logo-url">
-                        {m.branches.create.fields.logoUrl}
-                      </Label>
-                      <Input
-                        aria-invalid={Boolean(errors.logoUrl)}
-                        id="branch-logo-url"
-                        onChange={(event) =>
-                          updateForm("logoUrl", event.target.value)
-                        }
-                        value={formValues.logoUrl}
-                      />
-                      <FieldError message={errors.logoUrl} />
-                    </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="branch-phone">
+                      {m.branches.create.fields.phone}
+                    </Label>
+                    <Input
+                      aria-invalid={Boolean(errors.phone)}
+                      id="branch-phone"
+                      onChange={(event) =>
+                        updateForm("phone", event.target.value)
+                      }
+                      value={formValues.phone}
+                    />
+                    <FieldError message={errors.phone} />
                   </div>
+
+                  <BranchLogoField
+                    disabled={saving}
+                    error={errors.logoObjectKey}
+                    onRemove={handleLogoRemove}
+                    onSelect={handleLogoSelect}
+                    previewUrl={logoPreviewUrl}
+                  />
                 </CardContent>
               </Card>
 
@@ -261,21 +328,12 @@ export function BranchCreateView({
                     <FieldError message={errors.receiptAddress} />
                   </div>
 
-                  <div className="grid gap-2">
-                    <Label htmlFor="branch-business-hours">
-                      {m.branches.create.fields.businessHoursJson}
-                    </Label>
-                    <Textarea
-                      aria-invalid={Boolean(errors.businessHoursJson)}
-                      id="branch-business-hours"
-                      onChange={(event) =>
-                        updateForm("businessHoursJson", event.target.value)
-                      }
-                      placeholder={m.branches.create.businessHoursPlaceholder}
-                      value={formValues.businessHoursJson}
-                    />
-                    <FieldError message={errors.businessHoursJson} />
-                  </div>
+                  <BranchBusinessHoursEditor
+                    disabled={saving}
+                    error={errors.businessHours}
+                    onChange={(value) => updateForm("businessHours", value)}
+                    value={formValues.businessHours}
+                  />
                 </CardContent>
               </Card>
             </div>

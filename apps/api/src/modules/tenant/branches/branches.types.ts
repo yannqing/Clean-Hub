@@ -2,7 +2,21 @@ import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 
 export type BranchStatus = "active" | "inactive";
 export type BranchLanguage = "en" | "fr" | "zh-CN";
-export type BranchBusinessHours = Record<string, unknown>;
+export type BranchWeekday =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+export type BranchBusinessDayHours = {
+  opensAt: string;
+  closesAt: string;
+};
+export type BranchBusinessHours = Partial<
+  Record<BranchWeekday, BranchBusinessDayHours>
+>;
 
 export type BranchSummary = {
   id: string;
@@ -15,6 +29,7 @@ export type BranchSummary = {
   receiptName: string | null;
   receiptPhone: string | null;
   receiptAddress: string | null;
+  logoObjectKey: string | null;
   logoUrl: string | null;
   status: BranchStatus;
   updatedAt: string;
@@ -37,7 +52,7 @@ export type CreateBranchRequest = {
   receiptName?: string | null;
   receiptPhone?: string | null;
   receiptAddress?: string | null;
-  logoUrl?: string | null;
+  logoObjectKey?: string | null;
   status?: BranchStatus;
 };
 
@@ -59,3 +74,15 @@ export type BranchRequestInput<TData> = {
 };
 
 export type BranchAuditSnapshot = Omit<BranchSummary, "updatedAt">;
+
+export type RequestBranchLogoUpload = {
+  contentType: "image/jpeg" | "image/png" | "image/webp";
+  sizeBytes: number;
+};
+
+export type BranchLogoUploadTicket = {
+  objectKey: string;
+  uploadUrl: string;
+  headers: Record<string, string>;
+  expiresAt: string;
+};

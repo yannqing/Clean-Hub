@@ -8,9 +8,11 @@ import { findTenantDefaultCurrency } from "../settings/settings.repository.js";
 import { TenantBranchesError } from "./branches.errors.js";
 import type {
   BranchAuditSnapshot,
+  BranchBusinessHours,
   BranchListInput,
   BranchStatus,
   BranchSummary,
+  BranchWeekday,
   CreateBranchRequest,
   UpdateBranchRequest,
 } from "./branches.types.js";
@@ -24,13 +26,80 @@ function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
+const branchWeekdays: BranchWeekday[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
+
+const legacyWeekdayAliases: Record<string, BranchWeekday> = {
+  mon: "monday",
+  tue: "tuesday",
+  wed: "wednesday",
+  thu: "thursday",
+  fri: "friday",
+  sat: "saturday",
+  sun: "sunday",
+};
+
+function isTime(value: unknown): value is string {
+  return typeof value === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function normalizeBusinessHours(value: unknown): BranchBusinessHours | null {
+  if (!value || Array.isArray(value) || typeof value !== "object") {
+    return null;
+  }
+
+  const normalized: BranchBusinessHours = {};
+
+  for (const [rawWeekday, rawHours] of Object.entries(value)) {
+    const weekday = branchWeekdays.includes(rawWeekday as BranchWeekday)
+      ? (rawWeekday as BranchWeekday)
+      : legacyWeekdayAliases[rawWeekday];
+
+    if (!weekday) {
+      continue;
+    }
+
+    let opensAt: unknown;
+    let closesAt: unknown;
+
+    if (typeof rawHours === "string") {
+      [opensAt, closesAt] = rawHours.split("-");
+    } else if (
+      rawHours &&
+      !Array.isArray(rawHours) &&
+      typeof rawHours === "object"
+    ) {
+      const source = rawHours as Record<string, unknown>;
+      opensAt = source.opensAt ?? source.open;
+      closesAt = source.closesAt ?? source.close;
+    }
+
+    if (isTime(opensAt) && isTime(closesAt) && opensAt < closesAt) {
+      normalized[weekday] = { opensAt, closesAt };
+    }
+  }
+
+  return Object.keys(normalized).length > 0 ? normalized : null;
+}
+
+function isBranchLogoObjectKey(value: string | null): value is string {
+  return Boolean(value?.includes("/branch_logo/unassigned/"));
+}
+
 function toBranchSummary(row: typeof branches.$inferSelect): BranchSummary {
   return {
     id: row.id,
     name: row.name,
     address: row.address,
     phone: row.phone,
-    businessHours: row.businessHours,
+    businessHours: normalizeBusinessHours(row.businessHours),
     defaultLanguage:
       row.defaultLanguage === "fr" || row.defaultLanguage === "zh-CN"
         ? row.defaultLanguage
@@ -39,7 +108,8 @@ function toBranchSummary(row: typeof branches.$inferSelect): BranchSummary {
     receiptName: row.receiptName,
     receiptPhone: row.receiptPhone,
     receiptAddress: row.receiptAddress,
-    logoUrl: row.logoUrl,
+    logoObjectKey: isBranchLogoObjectKey(row.logoUrl) ? row.logoUrl : null,
+    logoUrl: isBranchLogoObjectKey(row.logoUrl) ? null : row.logoUrl,
     status: row.status,
     updatedAt: row.updatedAt.toISOString(),
     version: row.version,
@@ -132,7 +202,7 @@ export async function createBranchRecord(
     receiptName: normalizeNullable(input.receiptName),
     receiptPhone: normalizeNullable(input.receiptPhone),
     receiptAddress: normalizeNullable(input.receiptAddress),
-    logoUrl: normalizeNullable(input.logoUrl),
+    logoUrl: normalizeNullable(input.logoObjectKey),
     status: input.status ?? "active",
     createdBy: input.actorUserId,
     updatedBy: input.actorUserId,
@@ -199,9 +269,9 @@ export async function updateBranchRecord(
           ? input.current.receiptAddress
           : normalizeNullable(input.data.receiptAddress),
       logoUrl:
-        input.data.logoUrl === undefined
-          ? input.current.logoUrl
-          : normalizeNullable(input.data.logoUrl),
+        input.data.logoObjectKey === undefined
+          ? (input.current.logoObjectKey ?? input.current.logoUrl)
+          : normalizeNullable(input.data.logoObjectKey),
       updatedAt: new Date(),
       updatedBy: input.actorUserId,
       version: sql`${branches.version} + 1`,

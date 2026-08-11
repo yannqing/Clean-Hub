@@ -13,12 +13,13 @@ type BranchActionError = {
 };
 
 const branchFieldMap: Record<string, keyof BranchFormValues> = {
-  businessHours: "businessHoursJson",
+  businessHours: "businessHours",
   defaultCurrency: "defaultCurrency",
   defaultLanguage: "defaultLanguage",
   receiptAddress: "receiptAddress",
   receiptName: "receiptName",
   receiptPhone: "receiptPhone",
+  logoObjectKey: "logoObjectKey",
 };
 
 const branchFormFields = new Set<keyof BranchFormValues>([
@@ -30,8 +31,9 @@ const branchFormFields = new Set<keyof BranchFormValues>([
   "receiptName",
   "receiptPhone",
   "receiptAddress",
-  "logoUrl",
-  "businessHoursJson",
+  "logoObjectKey",
+  "removeLogo",
+  "businessHours",
   "status",
   "version",
 ]);

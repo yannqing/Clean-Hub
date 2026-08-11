@@ -2,6 +2,7 @@ export type MediaObjectPurpose =
   | "delivery_proof"
   | "delivery_signature"
   | "product_image"
+  | "branch_logo"
   | "order_comment_attachment"
   | "customer_comment_attachment";
 

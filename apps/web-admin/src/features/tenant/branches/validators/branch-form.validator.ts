@@ -1,8 +1,10 @@
 import type {
+  BranchBusinessHours,
   CreateBranchRequest,
   UpdateBranchRequest,
 } from "@cleanhub/api-client";
 
+import { branchWeekdays } from "../constants";
 import type { BranchFormValues, BranchLanguage, BranchStatus } from "../types";
 
 const languages: BranchLanguage[] = ["en", "fr", "zh-CN"];
@@ -24,43 +26,54 @@ function normalizeOptional(value: string): string | null {
   return trimmed ? trimmed : null;
 }
 
-function parseBusinessHours(value: string) {
-  const trimmed = value.trim();
+function validateBusinessHours(input: BranchFormValues) {
+  const businessHours: BranchBusinessHours = {};
 
-  if (!trimmed) {
-    return {
-      ok: true as const,
-      data: null,
-    };
-  }
+  for (const weekday of branchWeekdays) {
+    const hours = input.businessHours[weekday];
 
-  try {
-    const parsed: unknown = JSON.parse(trimmed);
+    if (!hours.enabled) {
+      continue;
+    }
 
-    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hours.opensAt)) {
       return {
         ok: false as const,
-        message: "Business hours must be a JSON object.",
+        message: "Choose a valid opening time for every open day.",
       };
     }
 
-    return {
-      ok: true as const,
-      data: parsed as Record<string, unknown>,
-    };
-  } catch {
-    return {
-      ok: false as const,
-      message: "Business hours must be valid JSON.",
+    if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(hours.closesAt)) {
+      return {
+        ok: false as const,
+        message: "Choose a valid closing time for every open day.",
+      };
+    }
+
+    if (hours.opensAt >= hours.closesAt) {
+      return {
+        ok: false as const,
+        message: "Closing time must be later than opening time.",
+      };
+    }
+
+    businessHours[weekday] = {
+      opensAt: hours.opensAt,
+      closesAt: hours.closesAt,
     };
   }
+
+  return {
+    ok: true as const,
+    data: Object.keys(businessHours).length > 0 ? businessHours : null,
+  };
 }
 
 function validateBase(input: BranchFormValues) {
   const errors: Partial<Record<keyof BranchFormValues, string>> = {};
   const name = input.name.trim();
-  const logoUrl = normalizeOptional(input.logoUrl);
-  const businessHours = parseBusinessHours(input.businessHoursJson);
+  const logoObjectKey = normalizeOptional(input.logoObjectKey);
+  const businessHours = validateBusinessHours(input);
 
   if (!name) {
     errors.name = "Branch name is required.";
@@ -92,12 +105,12 @@ function validateBase(input: BranchFormValues) {
     errors.receiptAddress = "Receipt address must be 500 characters or fewer.";
   }
 
-  if (logoUrl && logoUrl.length > 2048) {
-    errors.logoUrl = "Logo URL must be 2048 characters or fewer.";
+  if (logoObjectKey && logoObjectKey.length > 1024) {
+    errors.logoObjectKey = "The uploaded logo reference is invalid.";
   }
 
   if (!businessHours.ok) {
-    errors.businessHoursJson = businessHours.message;
+    errors.businessHours = businessHours.message;
   }
 
   if (!statuses.includes(input.status)) {
@@ -115,7 +128,7 @@ function validateBase(input: BranchFormValues) {
       receiptName: normalizeOptional(input.receiptName),
       receiptPhone: normalizeOptional(input.receiptPhone),
       receiptAddress: normalizeOptional(input.receiptAddress),
-      logoUrl,
+      logoObjectKey,
       status: input.status,
     },
   };
@@ -171,7 +184,9 @@ export function validateBranchUpdateForm(
       receiptName: result.data.receiptName,
       receiptPhone: result.data.receiptPhone,
       receiptAddress: result.data.receiptAddress,
-      logoUrl: result.data.logoUrl,
+      logoObjectKey: input.removeLogo
+        ? null
+        : (result.data.logoObjectKey ?? undefined),
       version: input.version,
     },
   };

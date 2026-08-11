@@ -1,4 +1,9 @@
-import type { BranchFormValues, BranchLanguage } from "./types";
+import type {
+  BranchBusinessHoursFormValues,
+  BranchFormValues,
+  BranchLanguage,
+  BranchWeekday,
+} from "./types";
 
 /**
  * 支持的门店默认语言。label 由组件通过 i18n（messages.tenant.common.languageLabels）注入，
@@ -18,6 +23,25 @@ export const branchLanguageOptions: { label: string; value: BranchLanguage }[] =
     { label: "Chinese", value: "zh-CN" },
   ];
 
+export const branchWeekdays: BranchWeekday[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
+
+export function createEmptyBranchBusinessHours(): BranchBusinessHoursFormValues {
+  return Object.fromEntries(
+    branchWeekdays.map((weekday) => [
+      weekday,
+      { enabled: false, opensAt: "09:00", closesAt: "18:00" },
+    ]),
+  ) as BranchBusinessHoursFormValues;
+}
+
 export const emptyBranchFormValues: BranchFormValues = {
   name: "",
   address: "",
@@ -27,7 +51,8 @@ export const emptyBranchFormValues: BranchFormValues = {
   receiptName: "",
   receiptPhone: "",
   receiptAddress: "",
-  logoUrl: "",
-  businessHoursJson: "",
+  logoObjectKey: "",
+  removeLogo: false,
+  businessHours: createEmptyBranchBusinessHours(),
   status: "active",
 };

@@ -1,10 +1,12 @@
 import type {
   BranchBusinessHours,
+  BranchBusinessDayHours,
   BranchDetail,
   BranchLanguage,
   BranchListQuery,
   BranchStatus,
   BranchSummary,
+  BranchWeekday,
   CreateBranchRequest,
   UpdateBranchRequest,
   UpdateBranchStatusRequest,
@@ -12,17 +14,30 @@ import type {
 
 export type {
   BranchBusinessHours,
+  BranchBusinessDayHours,
   BranchDetail,
   BranchLanguage,
   BranchListQuery,
   BranchStatus,
   BranchSummary,
+  BranchWeekday,
   CreateBranchRequest,
   UpdateBranchRequest,
   UpdateBranchStatusRequest,
 };
 
 export type BranchListFilters = Pick<BranchListQuery, "q" | "status">;
+
+export type BranchBusinessDayFormValues = {
+  enabled: boolean;
+  opensAt: string;
+  closesAt: string;
+};
+
+export type BranchBusinessHoursFormValues = Record<
+  BranchWeekday,
+  BranchBusinessDayFormValues
+>;
 
 export type BranchFormValues = {
   name: string;
@@ -33,8 +48,9 @@ export type BranchFormValues = {
   receiptName: string;
   receiptPhone: string;
   receiptAddress: string;
-  logoUrl: string;
-  businessHoursJson: string;
+  logoObjectKey: string;
+  removeLogo: boolean;
+  businessHours: BranchBusinessHoursFormValues;
   status: BranchStatus;
   version?: number;
 };

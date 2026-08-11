@@ -1,9 +1,11 @@
 import type { ApiClient, ApiRequestOptions } from "../../types";
 import type {
   BranchDetail,
+  BranchLogoUploadTicket,
   BranchListQuery,
   BranchSummary,
   CreateBranchRequest,
+  RequestBranchLogoUploadRequest,
   UpdateBranchRequest,
   UpdateBranchStatusRequest,
 } from "./branches.types";
@@ -26,6 +28,15 @@ export function createTenantBranchesApi(client: ApiClient) {
       ),
     create: (input: CreateBranchRequest, options?: RequestOptions) =>
       client.post<BranchDetail>("/tenant/branches", input, options),
+    requestLogoUpload: (
+      input: RequestBranchLogoUploadRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<BranchLogoUploadTicket>(
+        "/tenant/branches/media/uploads",
+        input,
+        options,
+      ),
     update: (
       branchId: string,
       input: UpdateBranchRequest,
