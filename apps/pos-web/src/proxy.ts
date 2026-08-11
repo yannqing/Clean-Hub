@@ -2,8 +2,13 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import type { AdminRole, AuthContext } from "@cleanhub/api-client";
 
-const ACCESS_COOKIE_NAME = "cleanhub_access_token";
-const REFRESH_COOKIE_NAME = "cleanhub_refresh_token";
+import {
+  POS_ACCESS_COOKIE_NAME,
+  POS_AUTH_CLIENT_HEADER_NAME,
+  POS_AUTH_CLIENT_HEADER_VALUE,
+  POS_REFRESH_COOKIE_NAME,
+} from "./lib/auth-client";
+
 const DEFAULT_API_BASE_URL = "http://localhost:4000";
 const API_BASE_URL =
   process.env.CLEANHUB_API_BASE_URL ??
@@ -30,9 +35,9 @@ function isSetupAdministrator(role: AdminRole | string): boolean {
 function isTerminalSession(authContext: AuthContext): boolean {
   return Boolean(
     authContext.terminalId &&
-      authContext.terminalBranchId &&
-      authContext.terminalDeviceId &&
-      typeof authContext.terminalCredentialVersion === "number",
+    authContext.terminalBranchId &&
+    authContext.terminalDeviceId &&
+    typeof authContext.terminalCredentialVersion === "number",
   );
 }
 
@@ -195,6 +200,7 @@ async function requestAuthContext(
       headers: {
         accept: "application/json",
         cookie,
+        [POS_AUTH_CLIENT_HEADER_NAME]: POS_AUTH_CLIENT_HEADER_VALUE,
         "x-request-id": request.headers.get("x-request-id") ?? "",
       },
       cache: "no-store",
@@ -218,8 +224,8 @@ async function requestAuthContext(
 }
 
 async function resolveAuth(request: NextRequest): Promise<AuthOutcome> {
-  const accessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
-  const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
+  const accessToken = request.cookies.get(POS_ACCESS_COOKIE_NAME)?.value;
+  const refreshToken = request.cookies.get(POS_REFRESH_COOKIE_NAME)?.value;
 
   if (accessToken) {
     const outcome = await requestAuthContext("/auth/me", request);
@@ -257,9 +263,7 @@ export async function proxy(request: NextRequest) {
 
   const auth = resolution === "unavailable" ? null : resolution;
   const authContext = auth?.authContext;
-  const terminalSession = authContext
-    ? isTerminalSession(authContext)
-    : false;
+  const terminalSession = authContext ? isTerminalSession(authContext) : false;
 
   if (pathname === LOGIN_PATH) {
     if (!authContext || !isPosAllowedRole(authContext.role)) {

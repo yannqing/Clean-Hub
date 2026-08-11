@@ -119,6 +119,7 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
         "Authorization",
         "X-Request-Id",
         "X-Device-Id",
+        "X-CleanHub-Auth-Client",
         "Idempotency-Key",
       ],
       allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

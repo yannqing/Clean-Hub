@@ -2,10 +2,14 @@ import { cookies, headers } from "next/headers";
 
 import type { AuthContext } from "@cleanhub/api-client";
 
+import {
+  POS_ACCESS_COOKIE_NAME,
+  POS_AUTH_CLIENT_HEADER_NAME,
+  POS_AUTH_CLIENT_HEADER_VALUE,
+  POS_REFRESH_COOKIE_NAME,
+} from "./auth-client";
 import { isPosAllowedRole, type PosSessionUser } from "./session";
 
-const ACCESS_COOKIE_NAME = "cleanhub_access_token";
-const REFRESH_COOKIE_NAME = "cleanhub_refresh_token";
 const DEFAULT_API_BASE_URL = "http://localhost:4000";
 
 function getApiBaseUrl(): string {
@@ -28,6 +32,7 @@ async function callAuth(
       headers: {
         accept: "application/json",
         cookie: cookieHeader,
+        [POS_AUTH_CLIENT_HEADER_NAME]: POS_AUTH_CLIENT_HEADER_VALUE,
         "x-request-id": requestId,
       },
       cache: "no-store",
@@ -50,8 +55,8 @@ async function callAuth(
  */
 export async function getCurrentUser(): Promise<PosSessionUser | null> {
   const cookieStore = await cookies();
-  const accessToken = cookieStore.get(ACCESS_COOKIE_NAME)?.value;
-  const refreshToken = cookieStore.get(REFRESH_COOKIE_NAME)?.value;
+  const accessToken = cookieStore.get(POS_ACCESS_COOKIE_NAME)?.value;
+  const refreshToken = cookieStore.get(POS_REFRESH_COOKIE_NAME)?.value;
   if (!accessToken && !refreshToken) {
     return null;
   }

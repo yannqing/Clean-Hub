@@ -8,6 +8,62 @@ export type AuthCookieOptions = {
 
 export const ACCESS_COOKIE_NAME = "cleanhub_access_token";
 export const REFRESH_COOKIE_NAME = "cleanhub_refresh_token";
+export const POS_ACCESS_COOKIE_NAME = "cleanhub_pos_access_token";
+export const POS_REFRESH_COOKIE_NAME = "cleanhub_pos_refresh_token";
+export const AUTH_CLIENT_HEADER_NAME = "x-cleanhub-auth-client";
+export const POS_AUTH_CLIENT = "pos";
+
+export type AuthCookieNames = {
+  access: string;
+  refresh: string;
+};
+
+export function resolveAuthCookieNames(
+  authClient: string | undefined,
+): AuthCookieNames {
+  return authClient?.trim().toLowerCase() === POS_AUTH_CLIENT
+    ? {
+        access: POS_ACCESS_COOKIE_NAME,
+        refresh: POS_REFRESH_COOKIE_NAME,
+      }
+    : {
+        access: ACCESS_COOKIE_NAME,
+        refresh: REFRESH_COOKIE_NAME,
+      };
+}
+
+/**
+ * Auth services produce the canonical web cookie names. Rewrite only the
+ * cookie-name segment for POS responses so both apps can stay signed in on
+ * the same host. Browser cookies are not isolated by port.
+ */
+export function scopeAuthCookieHeaders(
+  headers: string[],
+  authClient: string | undefined,
+): string[] {
+  const names = resolveAuthCookieNames(authClient);
+
+  if (names.access === ACCESS_COOKIE_NAME) {
+    return headers;
+  }
+
+  return headers.map((header) => {
+    const separatorIndex = header.indexOf("=");
+    if (separatorIndex <= 0) {
+      return header;
+    }
+
+    const name = header.slice(0, separatorIndex);
+    const scopedName =
+      name === ACCESS_COOKIE_NAME
+        ? names.access
+        : name === REFRESH_COOKIE_NAME
+          ? names.refresh
+          : name;
+
+    return `${scopedName}${header.slice(separatorIndex)}`;
+  });
+}
 
 /**
  * Resolve the single Secure-cookie policy used by every browser credential.

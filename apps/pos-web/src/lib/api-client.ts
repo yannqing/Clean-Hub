@@ -8,6 +8,7 @@ import {
   isPosTerminalSessionError,
   redirectToPosLogin,
 } from "@/lib/pos-terminal-session";
+import { POS_AUTH_CLIENT_HEADERS } from "@/lib/auth-client";
 
 const DEFAULT_API_BASE_URL = "http://localhost:4000";
 let refreshRequest: Promise<unknown> | null = null;
@@ -27,6 +28,7 @@ function getApiBaseUrl(): string {
 export const posApi = createCleanHubApiClient({
   baseUrl: getApiBaseUrl(),
   credentials: "include",
+  defaultHeaders: POS_AUTH_CLIENT_HEADERS,
   timeoutMs: 30_000,
   retry: {
     retries: 1,
