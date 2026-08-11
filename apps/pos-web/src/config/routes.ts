@@ -6,6 +6,11 @@ export const posRoutes = {
   newIntake: "/new-intake",
   scan: "/scan",
   customers: "/customers",
+  catalog: "/catalog",
+  catalogProductDetail: (productSkuId: string) =>
+    `/catalog/products/${productSkuId}`,
+  catalogServiceDetail: (serviceId: string) =>
+    `/catalog/services/${serviceId}`,
   tickets: "/tickets",
   ticketDetail: (ticketId: string) => `/tickets/${ticketId}`,
   orders: "/orders",
@@ -15,6 +20,12 @@ export const posRoutes = {
   shiftHandover: "/shift-handover",
   notifications: "/notifications",
   settings: "/settings",
+  settingsTerminal: "/settings/terminal",
+  settingsCheckout: "/settings/checkout",
+  settingsPrinting: "/settings/printing",
+  settingsSecurity: "/settings/security",
+  settingsStore: "/settings/store",
+  settingsHardware: "/settings/hardware",
 } as const;
 
 /**

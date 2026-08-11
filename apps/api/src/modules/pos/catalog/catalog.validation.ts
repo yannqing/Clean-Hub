@@ -8,5 +8,9 @@ export const posCatalogQuerySchema = z.object({
     .enum(["laundry", "car_wash", "retail", "delivery"])
     .optional(),
   q: z.string().trim().min(1).max(100).optional(),
+  includeAll: z
+    .enum(["true"])
+    .transform(() => true as const)
+    .optional(),
   limit: z.coerce.number().int().min(1).max(200).default(100),
 });
