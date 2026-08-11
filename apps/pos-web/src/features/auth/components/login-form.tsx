@@ -129,8 +129,55 @@ export function LoginForm() {
   }
 
   return (
-    <form className="grid gap-4" onSubmit={handleSubmit}>
-      <div className="grid gap-2">
+    <form className="grid gap-3 login-desktop:gap-4" onSubmit={handleSubmit}>
+      <div className="login-desktop:hidden">
+        <label className="sr-only" htmlFor="pin-mobile">
+          {t("pos.auth.pin")}
+        </label>
+        <div className="relative mx-auto flex h-10 w-fit items-center justify-center gap-4">
+          <input
+            aria-invalid={Boolean(fieldErrors.pin)}
+            autoComplete="one-time-code"
+            className="absolute inset-0 z-10 h-full w-full cursor-text opacity-0 disabled:cursor-wait"
+            disabled={submitting}
+            id="pin-mobile"
+            inputMode="numeric"
+            maxLength={POS_PIN_LENGTH}
+            name="pin-mobile"
+            onChange={(event) => updatePin(event.target.value)}
+            pattern="[0-9]*"
+            type="password"
+            value={formState.pin}
+          />
+          {Array.from({ length: POS_PIN_LENGTH }, (_, index) => (
+            <span
+              aria-hidden="true"
+              className={`size-3 rounded-full border transition-colors ${
+                index < formState.pin.length
+                  ? "border-foreground bg-foreground"
+                  : fieldErrors.pin || errorMessage
+                    ? "border-destructive/70"
+                    : "border-muted-foreground/45"
+              }`}
+              key={index}
+            />
+          ))}
+        </div>
+        <p
+          aria-live="polite"
+          className={`mt-0.5 min-h-5 text-center text-xs font-medium ${
+            fieldErrors.pin || errorMessage
+              ? "text-destructive"
+              : "text-muted-foreground"
+          }`}
+        >
+          {submitting
+            ? t("pos.auth.submitting")
+            : fieldErrors.pin || errorMessage || ""}
+        </p>
+      </div>
+
+      <div className="hidden gap-2 login-desktop:grid">
         <label className="text-sm font-semibold text-foreground" htmlFor="pin">
           {t("pos.auth.pin")}
         </label>
@@ -160,10 +207,10 @@ export function LoginForm() {
         ) : null}
       </div>
 
-      <div className="grid grid-cols-3 gap-2">
+      <div className="mx-auto grid w-full max-w-[15.5rem] grid-cols-3 gap-x-7 gap-y-2.5 md:max-w-[18rem] md:gap-x-8 md:gap-y-3 login-desktop:max-w-none login-desktop:gap-2">
         {KEYPAD_KEYS.map((digit) => (
           <button
-            className="flex h-12 items-center justify-center rounded-xl border border-border bg-background text-lg font-semibold text-foreground transition-colors hover:bg-muted active:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex size-[60px] items-center justify-center justify-self-center rounded-full bg-muted/80 text-2xl font-medium text-foreground transition-colors hover:bg-muted active:scale-95 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:size-16 md:text-[26px] login-desktop:h-12 login-desktop:w-full login-desktop:rounded-xl login-desktop:border login-desktop:border-border login-desktop:bg-background login-desktop:text-lg login-desktop:font-semibold login-desktop:hover:bg-muted login-desktop:active:scale-100 login-desktop:active:bg-muted/80"
             disabled={submitting || formState.pin.length >= POS_PIN_LENGTH}
             key={digit}
             onClick={() => appendDigit(digit)}
@@ -173,7 +220,7 @@ export function LoginForm() {
           </button>
         ))}
         <button
-          className="flex h-12 items-center justify-center rounded-xl border border-border bg-muted/60 px-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex size-[60px] items-center justify-center justify-self-center rounded-full px-2 text-xs font-semibold text-muted-foreground transition-colors hover:text-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-30 md:size-16 login-desktop:h-12 login-desktop:w-full login-desktop:rounded-xl login-desktop:border login-desktop:border-border login-desktop:bg-muted/60 login-desktop:hover:bg-muted login-desktop:active:scale-100"
           disabled={submitting || formState.pin.length === 0}
           onClick={clearPin}
           type="button"
@@ -181,7 +228,7 @@ export function LoginForm() {
           {t("pos.auth.clearPin")}
         </button>
         <button
-          className="flex h-12 items-center justify-center rounded-xl border border-border bg-background text-lg font-semibold text-foreground transition-colors hover:bg-muted active:bg-muted/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex size-[60px] items-center justify-center justify-self-center rounded-full bg-muted/80 text-2xl font-medium text-foreground transition-colors hover:bg-muted active:scale-95 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:size-16 md:text-[26px] login-desktop:h-12 login-desktop:w-full login-desktop:rounded-xl login-desktop:border login-desktop:border-border login-desktop:bg-background login-desktop:text-lg login-desktop:font-semibold login-desktop:hover:bg-muted login-desktop:active:scale-100 login-desktop:active:bg-muted/80"
           disabled={submitting || formState.pin.length >= POS_PIN_LENGTH}
           onClick={() => appendDigit("0")}
           type="button"
@@ -189,17 +236,23 @@ export function LoginForm() {
           0
         </button>
         <button
-          className="flex h-12 items-center justify-center rounded-xl border border-border bg-muted/60 px-2 text-xs font-semibold text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={t("pos.auth.deleteDigit")}
+          className="flex size-[60px] items-center justify-center justify-self-center rounded-full px-2 text-xl font-medium text-muted-foreground transition-colors hover:text-foreground active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-30 md:size-16 login-desktop:h-12 login-desktop:w-full login-desktop:rounded-xl login-desktop:border login-desktop:border-border login-desktop:bg-muted/60 login-desktop:text-xs login-desktop:font-semibold login-desktop:hover:bg-muted login-desktop:active:scale-100"
           disabled={submitting || formState.pin.length === 0}
           onClick={removeLastDigit}
           type="button"
         >
-          {t("pos.auth.deleteDigit")}
+          <span aria-hidden="true" className="login-desktop:hidden">
+            ⌫
+          </span>
+          <span className="hidden login-desktop:inline">
+            {t("pos.auth.deleteDigit")}
+          </span>
         </button>
       </div>
 
       <button
-        className="flex h-12 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        className="hidden h-12 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 login-desktop:flex"
         disabled={submitting || formState.pin.length !== POS_PIN_LENGTH}
         type="submit"
       >
@@ -207,7 +260,7 @@ export function LoginForm() {
       </button>
 
       {errorMessage ? (
-        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive">
+        <p className="hidden rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive login-desktop:block">
           {errorMessage}
         </p>
       ) : null}

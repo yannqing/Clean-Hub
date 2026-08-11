@@ -1,5 +1,8 @@
 @import "@cleanhub/ui/styles.css";
 
+/* Keep the touch-first lock screen on iPad, including 13-inch landscape sizes. */
+@custom-variant login-desktop (@media (min-width: 80rem) and (hover: hover) and (pointer: fine));
+
 html,
 body {
   min-height: 100%;
