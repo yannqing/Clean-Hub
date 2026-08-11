@@ -12,6 +12,7 @@ import {
   count,
   desc,
   eq,
+  inArray,
   isNull,
   sql,
 } from "drizzle-orm";
@@ -175,6 +176,7 @@ export async function findRecentActivities(
   // Recent tickets
   const ticketFilters: SQL[] = [
     eq(serviceTickets.tenantId, input.tenantId),
+    inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
     isNull(serviceTickets.deletedAt),
   ];
 
@@ -270,6 +272,7 @@ export async function findPendingTasks(
   // Overdue tickets
   const overdueFilters: SQL[] = [
     eq(serviceTickets.tenantId, input.tenantId),
+    inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
     isNull(serviceTickets.deletedAt),
     sql`${serviceTickets.ticketStatus} IN ('pending', 'in_progress', 'ready_to_pick')`,
     sql`${serviceTickets.expectedPickupAt} <= NOW()`,
@@ -341,6 +344,7 @@ export async function findPendingTasks(
   // Pending pickup tickets
   const pickupFilters: SQL[] = [
     eq(serviceTickets.tenantId, input.tenantId),
+    inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
     isNull(serviceTickets.deletedAt),
     sql`${serviceTickets.ticketStatus} = 'ready_to_pick'`,
   ];

@@ -121,8 +121,6 @@ export const TICKET_SOURCE_TONES: Record<
 export const TICKET_TYPE_LABELS: Record<ServiceTicketType, string> = {
   laundry: "洗衣护理",
   car_wash: "车辆清洗",
-  retail: "零售",
-  delivery: "配送",
 };
 
 // --- 工单项目：颜色 / 品牌 / 材质预设选项 -----------------------------------

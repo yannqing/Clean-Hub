@@ -128,6 +128,7 @@ async function searchServiceTickets(
   const pattern = searchPattern(input.q);
   const filters: SQL[] = [
     eq(serviceTickets.tenantId, input.tenantId),
+    inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
     isNull(serviceTickets.deletedAt),
   ];
   const scopedBranches = branchScopeFilter(

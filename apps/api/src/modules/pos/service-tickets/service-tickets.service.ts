@@ -72,16 +72,13 @@ type ResolvedTicketItemPricing = {
 };
 
 /**
- * Maps a ticket's business line to the tenant feature flag that must be
- * enabled before the ticket can be created or mutated. `retail` and `delivery`
- * map to their dedicated flags; the feature-flag type lives in the auth
- * permission helper.
+ * Maps a service ticket's workflow to the tenant feature flag that must be
+ * enabled before the ticket can be created or mutated. Retail sales and
+ * delivery tasks deliberately do not have service-ticket workflows.
  */
-const BUSINESS_LINE_FEATURES: Record<ServiceTicketType, "laundry" | "car_wash" | "retail" | "delivery"> = {
+const BUSINESS_LINE_FEATURES: Record<ServiceTicketType, "laundry" | "car_wash"> = {
   laundry: "laundry",
   car_wash: "car_wash",
-  retail: "retail",
-  delivery: "delivery",
 };
 
 async function requireTicketFeature(
@@ -138,7 +135,11 @@ async function resolveTicketItemPricing(
   input: {
     authContext: AuthContext;
     tenantId: string;
-    ticket: { currency: string; ticketType: ServiceTicketType };
+    ticket: {
+      branchId: string;
+      currency: string;
+      ticketType: ServiceTicketType;
+    };
     data: CreateServiceTicketItemRequest | UpdateServiceTicketItemRequest;
     existing?: ServiceTicketItem;
   },
@@ -154,6 +155,7 @@ async function resolveTicketItemPricing(
 
   const service = await findPosCatalogServiceById(db, {
     tenantId: input.tenantId,
+    branchId: input.ticket.branchId,
     serviceId,
   });
   if (!service) {

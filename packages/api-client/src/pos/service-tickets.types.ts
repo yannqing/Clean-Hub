@@ -7,7 +7,7 @@
  * client convention).
  */
 
-export type ServiceTicketType = "laundry" | "car_wash" | "retail" | "delivery";
+export type ServiceTicketType = "laundry" | "car_wash";
 
 export type ServiceTicketStatus =
   | "draft"

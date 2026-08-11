@@ -5,6 +5,7 @@ import {
   desc,
   eq,
   getTableColumns,
+  inArray,
   isNull,
   sql,
   type SQL,
@@ -109,6 +110,9 @@ function toCustomerContact(row: typeof customers.$inferSelect): CustomerContact 
 function toOrderListItem(
   row: typeof orders.$inferSelect,
 ): CustomerOrderListItem {
+  if (!row.customerId) {
+    throw new Error("Customer order projection requires a customer profile.");
+  }
   return {
     id: row.id,
     branchId: row.branchId,
@@ -847,6 +851,9 @@ export class CustomerRepository {
     if (!order) {
       return null;
     }
+    if (!order.customerId) {
+      return null;
+    }
 
     const itemRows = await this.db
       .select({ ...getTableColumns(orderItems) })
@@ -883,6 +890,7 @@ export class CustomerRepository {
       .where(
         and(
           eq(serviceTickets.tenantId, tenantId),
+          inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
           eq(customers.tenantId, tenantId),
           eq(customers.customerAccountId, customerAccountId),
           isNull(serviceTickets.deletedAt),
@@ -911,6 +919,7 @@ export class CustomerRepository {
         and(
           eq(serviceTickets.id, ticketId),
           eq(serviceTickets.tenantId, tenantId),
+          inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
           eq(customers.tenantId, tenantId),
           eq(customers.customerAccountId, customerAccountId),
           isNull(serviceTickets.deletedAt),

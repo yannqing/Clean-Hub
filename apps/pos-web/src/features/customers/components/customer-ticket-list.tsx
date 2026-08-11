@@ -39,8 +39,6 @@ const SERVICE_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: "all", label: "全部业务类型" },
   { value: "laundry", label: "洗衣护理" },
   { value: "car_wash", label: "车辆清洗" },
-  { value: "retail", label: "零售" },
-  { value: "delivery", label: "配送" },
 ];
 
 /**

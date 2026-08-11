@@ -122,7 +122,7 @@ export async function findCustomerStatistics(
           sql`${customerAccounts.createdAt} >= ${sevenDayStart}`,
         ),
       )
-      .groupBy(accountCreatedDate),
+      .groupBy(sql`1`),
   ]);
 
   const orderFilters: SQL[] = [
@@ -131,6 +131,7 @@ export async function findCustomerStatistics(
   ];
   const ticketFilters: SQL[] = [
     eq(serviceTickets.tenantId, input.tenantId),
+    inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
     isNull(serviceTickets.deletedAt),
   ];
   let hasBranchScope = true;
@@ -177,7 +178,9 @@ export async function findCustomerStatistics(
   const dailyCounts = new Map(dailyRows.map((row) => [row.date, row.count]));
   const engagedCustomerIds = new Set<string>();
   for (const row of orderCustomerRows) {
-    engagedCustomerIds.add(row.customerId);
+    if (row.customerId) {
+      engagedCustomerIds.add(row.customerId);
+    }
   }
   for (const row of ticketCustomerRows) {
     engagedCustomerIds.add(row.customerId);

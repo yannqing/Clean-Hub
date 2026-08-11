@@ -124,6 +124,7 @@ export async function findTenantPendingPickupCount(
     .where(
       and(
         eq(serviceTickets.tenantId, tenantId),
+        inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
         isNull(serviceTickets.deletedAt),
         eq(serviceTickets.ticketStatus, "ready_to_pick"),
       ),
@@ -146,6 +147,7 @@ export async function findTenantPendingTasksCount(
     .where(
       and(
         eq(serviceTickets.tenantId, tenantId),
+        inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
         isNull(serviceTickets.deletedAt),
         inArray(serviceTickets.ticketStatus, ["pending", "in_progress"]),
       ),

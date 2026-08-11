@@ -519,6 +519,7 @@ export async function findPosCustomerServiceItems(
   const searchQuery = normalizeSearchQuery(query.q);
   const where = and(
     eq(serviceTickets.tenantId, tenantId),
+    inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
     eq(serviceTickets.customerId, customerId),
     query.allowedBranchIds
       ? inArray(serviceTickets.branchId, query.allowedBranchIds)

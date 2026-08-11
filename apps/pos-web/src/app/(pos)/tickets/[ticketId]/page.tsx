@@ -5,8 +5,8 @@ import type {
 import { notFound } from "next/navigation";
 
 import { TicketDetailView } from "@/features/tickets/components/ticket-detail-view";
+import { getPosCatalogQuery } from "@/features/catalog/queries";
 import {
-  getPosCatalogQuery,
   getRelatedOrdersQuery,
   getTicketDetailQuery,
 } from "@/features/tickets/queries";
@@ -23,19 +23,24 @@ export default async function TicketDetailPage({
 }: TicketDetailPageProps) {
   const [{ ticketId }, { from, q }] = await Promise.all([params, searchParams]);
 
-  const [ticket, relatedOrders, catalog, user] = await Promise.all([
+  const [ticket, relatedOrders, user] = await Promise.all([
     getTicketDetailQuery(ticketId),
     // Related orders are best-effort: a failure here must not break the page.
     getRelatedOrdersQuery(ticketId).catch(() => ({
       data: [] as RelatedOrderSummary[],
     })),
-    getPosCatalogQuery().catch(() => ({ data: [] as PosCatalogService[] })),
     getCurrentUser(),
   ]);
 
   if (!ticket) {
     notFound();
   }
+  const catalog = await getPosCatalogQuery({
+    branchId: ticket.branchId,
+  }).catch(() => ({
+    data: [] as PosCatalogService[],
+    products: [],
+  }));
 
   return (
     <TicketDetailView

@@ -2,12 +2,7 @@ import { z } from "zod";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
-export const serviceTicketTypeSchema = z.enum([
-  "laundry",
-  "car_wash",
-  "retail",
-  "delivery",
-]);
+export const serviceTicketTypeSchema = z.enum(["laundry", "car_wash"]);
 
 export const serviceTicketStatusSchema = z.enum([
   "draft",

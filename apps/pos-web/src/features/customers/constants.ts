@@ -124,8 +124,6 @@ export const CUSTOMER_TICKET_STATUS_TONES: Record<string, string> = {
 export const CUSTOMER_TICKET_TYPE_LABELS: Record<string, string> = {
   laundry: "洗衣护理",
   car_wash: "车辆清洗",
-  retail: "零售",
-  delivery: "配送",
 };
 
 export const CUSTOMER_TICKET_PRIORITY_LABELS: Record<string, string> = {

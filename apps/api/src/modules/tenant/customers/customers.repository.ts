@@ -161,6 +161,7 @@ function buildCustomerFilters(
                 and(
                   eq(serviceTickets.tenantId, input.tenantId),
                   eq(serviceTickets.customerId, customers.id),
+                  inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
                   inArray(serviceTickets.branchId, effectiveBranchIds),
                 ),
               ),
@@ -252,6 +253,7 @@ function buildCustomerAccountFilters(
                         and(
                           eq(serviceTickets.tenantId, input.tenantId),
                           eq(serviceTickets.customerId, customers.id),
+                          inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
                           inArray(
                             serviceTickets.branchId,
                             input.allowedBranchIds,

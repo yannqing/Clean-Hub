@@ -40,12 +40,7 @@ export function coerceTicketType(
   raw: unknown,
   fallback: ServiceTicketType = "laundry",
 ): ServiceTicketType {
-  return raw === "laundry" ||
-    raw === "car_wash" ||
-    raw === "retail" ||
-    raw === "delivery"
-    ? raw
-    : fallback;
+  return raw === "laundry" || raw === "car_wash" ? raw : fallback;
 }
 
 export function coerceTicketPriority(

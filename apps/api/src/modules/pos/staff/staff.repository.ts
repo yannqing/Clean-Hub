@@ -525,6 +525,7 @@ export async function calculateHandoverSnapshot(
         and(
           eq(serviceTickets.tenantId, input.tenantId),
           eq(serviceTickets.branchId, input.branchId),
+          inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
           lte(serviceTickets.createdAt, input.cutoffAt),
           notInArray(serviceTickets.ticketStatus, ["picked_up", "cancelled"]),
           isNull(serviceTickets.deletedAt),

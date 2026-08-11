@@ -4,15 +4,10 @@ import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
  * POS service ticket (work order) management — DTOs.
  *
  * The string-literal unions mirror the Drizzle enums defined in
- * `packages/db/src/schema/tickets/service-tickets.ts` (and `businessLineEnum`
- * for `ticketType`).
+ * `packages/db/src/schema/tickets/service-tickets.ts`.
  */
 
-export type ServiceTicketType =
-  | "laundry"
-  | "car_wash"
-  | "retail"
-  | "delivery";
+export type ServiceTicketType = "laundry" | "car_wash";
 
 export type ServiceTicketStatus =
   | "draft"

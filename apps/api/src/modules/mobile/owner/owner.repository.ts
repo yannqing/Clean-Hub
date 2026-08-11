@@ -314,6 +314,7 @@ export class OwnerRepository {
       .where(
         and(
           eq(serviceTickets.tenantId, tenantId),
+          inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
           eq(serviceTickets.ticketStatus, "ready_to_pick"),
           isNull(serviceTickets.deletedAt),
         ),
@@ -329,6 +330,7 @@ export class OwnerRepository {
       .where(
         and(
           eq(serviceTickets.tenantId, tenantId),
+          inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
           eq(serviceTickets.ticketStatus, "in_progress"),
           isNull(serviceTickets.deletedAt),
         ),

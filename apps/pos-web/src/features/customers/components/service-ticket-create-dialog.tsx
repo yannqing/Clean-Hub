@@ -33,8 +33,6 @@ const TYPE_OPTIONS: ReadonlyArray<{ value: ServiceTicketType; label: string }> =
   [
     { value: "laundry", label: "洗衣护理" },
     { value: "car_wash", label: "车辆清洗" },
-    { value: "retail", label: "零售" },
-    { value: "delivery", label: "配送" },
   ];
 
 const PRIORITY_OPTIONS: ReadonlyArray<{

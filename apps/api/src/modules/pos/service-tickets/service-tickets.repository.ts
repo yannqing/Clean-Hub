@@ -279,6 +279,7 @@ export async function countServiceTickets(
 function buildServiceTicketFilters(input: ServiceTicketListInput): SQL[] {
   const filters: SQL[] = [
     eq(serviceTickets.tenantId, input.tenantId),
+    inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
     isNull(serviceTickets.deletedAt),
   ];
 
@@ -387,6 +388,7 @@ export async function findServiceTicketById(
       and(
         eq(serviceTickets.id, input.ticketId),
         eq(serviceTickets.tenantId, input.tenantId),
+        inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
         isNull(serviceTickets.deletedAt),
       ),
     )
@@ -442,6 +444,7 @@ export async function findServiceTicketRaw(
       and(
         eq(serviceTickets.id, input.ticketId),
         eq(serviceTickets.tenantId, input.tenantId),
+        inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
         isNull(serviceTickets.deletedAt),
       ),
     )
@@ -725,6 +728,7 @@ export async function findServiceTicketOverview(
 ): Promise<ServiceTicketOverview> {
   const baseFilters: SQL[] = [
     eq(serviceTickets.tenantId, input.tenantId),
+    inArray(serviceTickets.ticketType, ["laundry", "car_wash"]),
     isNull(serviceTickets.deletedAt),
   ];
 
