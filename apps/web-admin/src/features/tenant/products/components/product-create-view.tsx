@@ -5,13 +5,6 @@ import {
   Card,
   CardContent,
   Checkbox,
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Icon,
   Input,
   Label,
@@ -34,8 +27,6 @@ import {
   Package,
   Plus,
   Search,
-  SlidersHorizontal,
-  Store,
   Upload,
   X,
 } from "lucide-react";
@@ -53,6 +44,7 @@ import {
 } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { BranchSelectionCard } from "@/components/forms";
 import { useTenantI18n } from "@/i18n";
 
 import type { BranchSummary } from "../../branches/types";
@@ -183,12 +175,6 @@ function FieldError({ message }: { message?: string }) {
   ) : null;
 }
 
-function setsEqual(left: ReadonlySet<string>, right: ReadonlySet<string>) {
-  return (
-    left.size === right.size && [...left].every((value) => right.has(value))
-  );
-}
-
 type ProductCreateViewProps = {
   availableCurrencies?: string[];
   branches?: BranchSummary[];
@@ -248,11 +234,6 @@ export function ProductCreateView({
       );
     },
   );
-  const [branchDialogOpen, setBranchDialogOpen] = useState(false);
-  const [draftExcludedBranchIds, setDraftExcludedBranchIds] = useState<
-    Set<string>
-  >(() => new Set());
-  const [branchSearch, setBranchSearch] = useState("");
   const [branchInventory, setBranchInventory] = useState<
     Record<string, BranchInventoryValue>
   >(() =>
@@ -344,7 +325,6 @@ export function ProductCreateView({
     () => branches.filter((branch) => !excludedBranchIds.has(branch.id)),
     [branches, excludedBranchIds],
   );
-  const selectedBranchCount = selectedBranches.length;
   const formUnavailable =
     branchLoadFailed ||
     categoryLoadFailed ||
@@ -352,30 +332,6 @@ export function ProductCreateView({
     availableCurrencies.length === 0 ||
     branches.length === 0 ||
     (isEditMode && !initialProduct);
-  const allBranchesSelected =
-    branches.length > 0 && selectedBranchCount === branches.length;
-  const draftSelectedBranchCount =
-    branches.length - draftExcludedBranchIds.size;
-  const draftAllBranchesSelected =
-    branches.length > 0 && draftSelectedBranchCount === branches.length;
-  const draftBranchSelectionState =
-    draftSelectedBranchCount === 0
-      ? false
-      : draftAllBranchesSelected
-        ? true
-        : "indeterminate";
-  const normalizedBranchSearch = branchSearch.trim().toLowerCase();
-  const filteredBranches = useMemo(
-    () =>
-      normalizedBranchSearch
-        ? branches.filter(
-            (branch) =>
-              branch.name.toLowerCase().includes(normalizedBranchSearch) ||
-              branch.address?.toLowerCase().includes(normalizedBranchSearch),
-          )
-        : branches,
-    [branches, normalizedBranchSearch],
-  );
   const price = Number(salePrice);
   const cost = Number(referenceCost);
   const canCalculateProfit =
@@ -620,44 +576,16 @@ export function ProductCreateView({
     }
   }
 
-  function openBranchDialog() {
-    setDraftExcludedBranchIds(new Set(excludedBranchIds));
-    setBranchSearch("");
-    setBranchDialogOpen(true);
-  }
-
-  function handleAllBranchesChange(checked: boolean | "indeterminate") {
-    setDraftExcludedBranchIds(
-      checked === true
-        ? new Set()
-        : new Set(branches.map((branch) => branch.id)),
+  function updatePublishedBranches(selectedBranchIds: string[]) {
+    const selectedBranchIdSet = new Set(selectedBranchIds);
+    setExcludedBranchIds(
+      new Set(
+        branches
+          .filter((branch) => !selectedBranchIdSet.has(branch.id))
+          .map((branch) => branch.id),
+      ),
     );
-  }
-
-  function handleBranchChange(
-    branchId: string,
-    checked: boolean | "indeterminate",
-  ) {
-    setDraftExcludedBranchIds((current) => {
-      const next = new Set(current);
-
-      if (checked === true) {
-        next.delete(branchId);
-      } else {
-        next.add(branchId);
-      }
-
-      return next;
-    });
-  }
-
-  function confirmBranchSelection() {
-    if (!setsEqual(excludedBranchIds, draftExcludedBranchIds)) {
-      setExcludedBranchIds(new Set(draftExcludedBranchIds));
-      markChanged("branchSettings");
-    }
-
-    setBranchDialogOpen(false);
+    markChanged("branchSettings");
   }
 
   function updateBranchInventory(
@@ -1012,9 +940,6 @@ export function ProductCreateView({
     }
   }
 
-  const selectedBranchCopy = m.products.create.selectedBranchCount
-    .replace("{selected}", String(selectedBranchCount))
-    .replace("{total}", String(branches.length));
   const pageTitle = isEditMode
     ? m.products.edit.title
     : m.products.create.title;
@@ -1649,183 +1574,25 @@ export function ProductCreateView({
                 </CardContent>
               </Card>
 
-              <Dialog
-                onOpenChange={(open) => {
-                  if (open) {
-                    openBranchDialog();
-                  } else {
-                    setBranchDialogOpen(false);
-                  }
-                }}
-                open={branchDialogOpen}
-              >
-                <Card className="gap-0 rounded-lg py-0 shadow-none">
-                  <CardContent className="grid gap-3 py-5">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="text-sm font-semibold">
-                        {m.products.create.fields.publishBranches}
-                      </p>
-                      {!branchLoadFailed && branches.length > 0 ? (
-                        <Button
-                          aria-label={m.products.create.managePublishing}
-                          onClick={openBranchDialog}
-                          size="icon-sm"
-                          title={m.products.create.managePublishing}
-                          type="button"
-                          variant="ghost"
-                        >
-                          <Icon
-                            aria-hidden
-                            icon={SlidersHorizontal}
-                            size={14}
-                          />
-                        </Button>
-                      ) : null}
-                    </div>
-
-                    {branchLoadFailed ? (
-                      <p className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
-                        {m.common.requestFailed}
-                      </p>
-                    ) : branches.length === 0 ? (
-                      <p className="rounded-md border px-3 py-2.5 text-sm text-muted-foreground">
-                        {m.branches.list.empty}
-                      </p>
-                    ) : (
-                      <button
-                        className="flex w-full items-center gap-2 rounded-md py-1 text-left text-sm transition-colors hover:text-foreground"
-                        onClick={openBranchDialog}
-                        type="button"
-                      >
-                        <Icon
-                          aria-hidden
-                          className="shrink-0 text-muted-foreground"
-                          icon={Store}
-                          size={15}
-                        />
-                        <span className="truncate font-medium">
-                          {allBranchesSelected
-                            ? m.common.allBranches
-                            : selectedBranchCopy}
-                        </span>
-                      </button>
-                    )}
-
-                    <FieldError message={getErrorMessage("branchSettings")} />
-                  </CardContent>
-                </Card>
-
-                <DialogContent className="h-[min(620px,calc(100vh-2rem))] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-2xl">
-                  <DialogHeader className="border-b px-5 py-4 pr-12">
-                    <DialogTitle className="text-base">
-                      {m.products.create.managePublishing}
-                    </DialogTitle>
-                    <DialogDescription className="sr-only">
-                      {m.products.create.branchDialogDescription}
-                    </DialogDescription>
-                  </DialogHeader>
-
-                  <div className="min-h-0 overflow-y-auto px-5 py-4">
-                    <div className="relative mb-4">
-                      <Icon
-                        aria-hidden
-                        className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                        icon={Search}
-                        size={15}
-                      />
-                      <Input
-                        aria-label={m.products.create.branchSearchPlaceholder}
-                        className="pl-9"
-                        onChange={(event) =>
-                          setBranchSearch(event.target.value)
-                        }
-                        placeholder={m.products.create.branchSearchPlaceholder}
-                        value={branchSearch}
-                      />
-                    </div>
-
-                    <div className="overflow-hidden rounded-lg border">
-                      <label
-                        className="flex cursor-pointer items-center justify-between gap-3 bg-muted/50 px-3 py-3 text-sm font-medium transition-colors hover:bg-muted"
-                        htmlFor="product-all-branches"
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <Icon
-                            aria-hidden
-                            className="shrink-0 text-muted-foreground"
-                            icon={Store}
-                            size={15}
-                          />
-                          <span className="truncate">
-                            {m.common.allBranches}
-                          </span>
-                        </span>
-                        <Checkbox
-                          checked={draftBranchSelectionState}
-                          id="product-all-branches"
-                          onCheckedChange={handleAllBranchesChange}
-                        />
-                      </label>
-
-                      <div className="max-h-[360px] overflow-y-auto">
-                        {filteredBranches.length > 0 ? (
-                          filteredBranches.map((branch) => (
-                            <label
-                              className="flex cursor-pointer items-center justify-between gap-3 border-t px-3 py-3 text-sm transition-colors hover:bg-muted/40"
-                              htmlFor={`product-branch-${branch.id}`}
-                              key={branch.id}
-                            >
-                              <span className="min-w-0">
-                                <span className="block truncate font-medium">
-                                  {branch.name}
-                                </span>
-                                {branch.address ? (
-                                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                                    {branch.address}
-                                  </span>
-                                ) : null}
-                              </span>
-                              <Checkbox
-                                checked={!draftExcludedBranchIds.has(branch.id)}
-                                id={`product-branch-${branch.id}`}
-                                onCheckedChange={(checked) =>
-                                  handleBranchChange(branch.id, checked)
-                                }
-                              />
-                            </label>
-                          ))
-                        ) : (
-                          <p className="border-t px-3 py-8 text-center text-sm text-muted-foreground">
-                            {m.products.create.noMatchingBranches}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <DialogFooter className="flex-row items-center justify-between border-t px-5 py-3">
-                    <p className="text-xs text-muted-foreground">
-                      {m.products.create.selectedBranchCount
-                        .replace("{selected}", String(draftSelectedBranchCount))
-                        .replace("{total}", String(branches.length))}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <DialogClose asChild>
-                        <Button type="button" variant="outline">
-                          {m.common.cancel}
-                        </Button>
-                      </DialogClose>
-                      <Button
-                        disabled={draftSelectedBranchCount === 0}
-                        onClick={confirmBranchSelection}
-                        type="button"
-                      >
-                        {m.products.create.confirmBranchSelection}
-                      </Button>
-                    </div>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              <BranchSelectionCard
+                allBranchesLabel={m.common.allBranches}
+                branches={branches}
+                cancelLabel={m.common.cancel}
+                confirmLabel={m.products.create.confirmBranchSelection}
+                dialogDescription={m.products.create.branchDialogDescription}
+                emptyLabel={m.branches.list.empty}
+                errorMessage={getErrorMessage("branchSettings")}
+                idPrefix="product-publishing"
+                loadFailed={branchLoadFailed}
+                loadFailedMessage={m.common.requestFailed}
+                manageLabel={m.products.create.managePublishing}
+                noMatchingBranchesLabel={m.products.create.noMatchingBranches}
+                onSelectionChange={updatePublishedBranches}
+                searchPlaceholder={m.products.create.branchSearchPlaceholder}
+                selectedBranchIds={selectedBranches.map((branch) => branch.id)}
+                selectedCountTemplate={m.products.create.selectedBranchCount}
+                title={m.products.create.fields.publishBranches}
+              />
 
               <Card className="gap-0 rounded-lg py-0 shadow-none">
                 <CardContent className="grid gap-4 py-5">

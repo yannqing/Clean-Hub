@@ -57,6 +57,9 @@ function validateBase(input: ServiceFormValues) {
   const turnaroundMinutesValue = input.turnaroundMinutes.trim();
   const turnaroundMinutes = Number(turnaroundMinutesValue);
   const displayOrder = Number(input.displayOrder);
+  const selectedBranchSettings = input.allBranches
+    ? []
+    : input.branchSettings.filter((setting) => setting.isAvailable);
 
   if (!businessLines.includes(input.businessLine)) {
     errors.businessLine = "businessLineInvalid";
@@ -100,6 +103,29 @@ function validateBase(input: ServiceFormValues) {
     errors.turnaroundMinutes = "turnaroundMinutesInvalid";
   }
 
+  if (!input.allBranches && selectedBranchSettings.length === 0) {
+    errors.branchSettings = "branchRequired";
+  }
+  if (
+    selectedBranchSettings.some((setting) => {
+      const price = setting.priceOverrideAmount.trim();
+      const turnaround = setting.turnaroundMinutesOverride.trim();
+      return (
+        !ULID_PATTERN.test(setting.branchId) ||
+        (price !== "" &&
+          (!STANDARD_PRICE_PATTERN.test(price) ||
+            Number(price) <= 0 ||
+            Number(price) > 9_999_999_999.99)) ||
+        (turnaround !== "" &&
+          (!/^\d+$/.test(turnaround) ||
+            Number(turnaround) < 1 ||
+            Number(turnaround) > 525_600))
+      );
+    })
+  ) {
+    errors.branchSettings = "branchSettingsInvalid";
+  }
+
   if (
     !/^\d+$/.test(input.displayOrder.trim()) ||
     !Number.isInteger(displayOrder) ||
@@ -132,6 +158,16 @@ function validateBase(input: ServiceFormValues) {
       description: normalizeOptional(input.description),
       internalNotes: normalizeOptional(input.internalNotes),
       turnaroundMinutes: turnaroundMinutesValue ? turnaroundMinutes : null,
+      allBranches: input.allBranches,
+      branchSettings: selectedBranchSettings.map((setting) => ({
+        branchId: setting.branchId,
+        isAvailable: true,
+        priceOverrideAmount:
+          normalizeOptional(setting.priceOverrideAmount) ?? null,
+        turnaroundMinutesOverride: setting.turnaroundMinutesOverride.trim()
+          ? Number(setting.turnaroundMinutesOverride)
+          : null,
+      })),
       displayOrder,
       pricingUnit: input.pricingUnit,
       labelRule: input.labelRule,

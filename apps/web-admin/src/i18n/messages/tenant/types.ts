@@ -158,6 +158,7 @@ export type TenantMessages = {
     };
     paidAmount: string;
     unknownCustomer: string;
+    guestCustomer: string;
     branchFallback: string;
     emptyTitle: string;
     emptyDescription: string;
@@ -1246,6 +1247,8 @@ export type TenantMessages = {
       pricingDescription: string;
       operations: string;
       operationsDescription: string;
+      locations: string;
+      locationsDescription: string;
       catalogSettings: string;
       catalogSettingsDescription: string;
       status: string;
@@ -1263,6 +1266,11 @@ export type TenantMessages = {
       description: string;
       internalNotes: string;
       turnaroundMinutes: string;
+      locationScope: string;
+      allBranches: string;
+      selectedBranches: string;
+      branchPriceOverride: string;
+      branchTurnaroundOverride: string;
       displayOrder: string;
       pricing: string;
       labelRule: string;
@@ -1295,6 +1303,19 @@ export type TenantMessages = {
       descriptionPlaceholder: string;
       internalNotesPlaceholder: string;
       turnaroundHint: string;
+      allBranchesHint: string;
+      selectedBranchesHint: string;
+      manageBranches: string;
+      branchDialogDescription: string;
+      branchSearchPlaceholder: string;
+      noMatchingBranches: string;
+      confirmBranchSelection: string;
+      selectedBranchCount: string;
+      branchDefaultPrice: string;
+      branchDefaultTurnaround: string;
+      inactiveBranch: string;
+      noBranchesAvailable: string;
+      branchesLoadFailed: string;
       compareAtPriceHint: string;
       costPriceHint: string;
       changeDefaultCurrency: string;
@@ -1322,6 +1343,8 @@ export type TenantMessages = {
       descriptionTooLong: string;
       internalNotesTooLong: string;
       turnaroundMinutesInvalid: string;
+      branchSettingsInvalid: string;
+      branchRequired: string;
       displayOrderInvalid: string;
       pricingUnitInvalid: string;
       labelRuleInvalid: string;

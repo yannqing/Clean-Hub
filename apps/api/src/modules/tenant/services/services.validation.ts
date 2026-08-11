@@ -31,6 +31,46 @@ const standardPriceSchema = z
     message: "Standard price exceeds the supported maximum.",
   });
 const optionalPriceSchema = standardPriceSchema.nullable().optional();
+const serviceBranchSettingSchema = z.object({
+  branchId: z.string().regex(ULID_PATTERN),
+  isAvailable: z.boolean(),
+  priceOverrideAmount: optionalPriceSchema,
+  turnaroundMinutesOverride: z
+    .number()
+    .int()
+    .min(1)
+    .max(525_600)
+    .nullable()
+    .optional(),
+});
+
+function validateBranchSettings(
+  value: {
+    allBranches?: boolean;
+    branchSettings?: Array<{ branchId: string; isAvailable: boolean }>;
+  },
+  context: z.RefinementCtx,
+) {
+  const settings = value.branchSettings ?? [];
+  const uniqueBranchIds = new Set(settings.map((setting) => setting.branchId));
+  if (uniqueBranchIds.size !== settings.length) {
+    context.addIssue({
+      code: "custom",
+      message: "A branch can only be configured once.",
+      path: ["branchSettings"],
+    });
+  }
+  if (
+    value.allBranches === false &&
+    settings.every((setting) => !setting.isAvailable)
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Select at least one available branch.",
+      path: ["branchSettings"],
+    });
+  }
+}
 export const serviceListQuerySchema = z.object({
   businessLine: serviceBusinessLineSchema.optional(),
   status: serviceStatusSchema.optional(),
@@ -58,6 +98,8 @@ const serviceProfileBodySchema = z.object({
   description: z.string().trim().max(2000).nullable().optional(),
   internalNotes: z.string().trim().max(5000).nullable().optional(),
   turnaroundMinutes: z.number().int().min(1).max(525_600).nullable().optional(),
+  allBranches: z.boolean().optional(),
+  branchSettings: z.array(serviceBranchSettingSchema).max(100).optional(),
   displayOrder: z.number().int().min(0).max(1_000_000).optional(),
   pricingUnit: servicePricingUnitSchema,
   labelRule: serviceLabelRuleSchema,
@@ -71,6 +113,7 @@ export const createServiceBodySchema = serviceProfileBodySchema
     costPrice: optionalPriceSchema,
   })
   .superRefine((value, context) => {
+    validateBranchSettings(value, context);
     if (
       value.compareAtPrice != null &&
       Number(value.compareAtPrice) <= Number(value.standardPrice)
@@ -96,6 +139,7 @@ export const updateServiceBodySchema = serviceProfileBodySchema
     "At least one service field must be provided.",
   )
   .superRefine((value, context) => {
+    validateBranchSettings(value, context);
     if (
       value.compareAtPrice != null &&
       value.standardPrice != null &&

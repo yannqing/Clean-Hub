@@ -14,6 +14,18 @@ export type ServiceLabelRule =
   | "per_order_item"
   | "per_bag";
 
+export type ServiceBranchSettingInput = {
+  branchId: string;
+  isAvailable: boolean;
+  priceOverrideAmount?: string | null;
+  turnaroundMinutesOverride?: number | null;
+};
+
+export type ServiceBranchSetting = ServiceBranchSettingInput & {
+  branchName: string;
+  branchStatus: "active" | "inactive";
+};
+
 export type ServiceListInput = {
   businessLine?: ServiceBusinessLine;
   status?: ServiceStatus;
@@ -34,6 +46,8 @@ export type ServiceSummary = {
   description: string | null;
   internalNotes: string | null;
   turnaroundMinutes: number | null;
+  allBranches: boolean;
+  availableBranchCount: number;
   displayOrder: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
@@ -47,6 +61,10 @@ export type ServiceSummary = {
   version: number;
 };
 
+export type ServiceDetail = ServiceSummary & {
+  branchSettings: ServiceBranchSetting[];
+};
+
 export type CreateServiceRequest = {
   businessLine: ServiceBusinessLine;
   name: string;
@@ -56,6 +74,8 @@ export type CreateServiceRequest = {
   description?: string | null;
   internalNotes?: string | null;
   turnaroundMinutes?: number | null;
+  allBranches?: boolean;
+  branchSettings?: ServiceBranchSettingInput[];
   displayOrder?: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
@@ -87,6 +107,8 @@ export type ServiceAuditSnapshot = {
   description: string | null;
   internalNotes: string | null;
   turnaroundMinutes: number | null;
+  allBranches: boolean;
+  branchSettings: ServiceBranchSetting[];
   displayOrder: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;

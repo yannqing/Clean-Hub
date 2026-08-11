@@ -3,7 +3,7 @@ import { webAdminApi } from "@/lib/api-client";
 import type {
   ServiceFormErrors,
   ServiceFormValues,
-  ServiceSummary,
+  ServiceDetail,
 } from "../types";
 import { validateServiceForm } from "../validators";
 import {
@@ -12,7 +12,7 @@ import {
 } from "./service-action-errors";
 
 export type CreateServiceActionResult =
-  | { ok: true; data: ServiceSummary }
+  | { ok: true; data: ServiceDetail }
   | ({ ok: false } & ServiceActionError & { errors: ServiceFormErrors });
 
 export async function createServiceAction(

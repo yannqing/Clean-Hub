@@ -37,19 +37,22 @@ import {
 } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { BranchSelectionCard } from "@/components/forms";
 import { isVersionConflict } from "@/features/tenant/shared/version-conflict";
+import type { BranchSummary } from "@/features/tenant/branches/types";
 import { interpolate, useTenantI18n } from "@/i18n";
 
 import { createServiceAction, updateServiceAction } from "../actions";
 import type {
   ServiceBusinessLine,
+  ServiceBranchFormValue,
   ServiceCategorySummary,
+  ServiceDetail,
   ServiceFormErrors,
   ServiceFormValues,
   ServiceLabelRule,
   ServicePricingUnit,
   ServiceStatus,
-  ServiceSummary,
 } from "../types";
 
 const DEFAULT_FORM_VALUES: ServiceFormValues = {
@@ -61,6 +64,8 @@ const DEFAULT_FORM_VALUES: ServiceFormValues = {
   description: "",
   internalNotes: "",
   turnaroundMinutes: "",
+  allBranches: true,
+  branchSettings: [],
   displayOrder: "0",
   pricingUnit: "per_item",
   labelRule: "per_order_item",
@@ -77,25 +82,50 @@ function generateServiceCode(): string {
 }
 
 type ServiceCreateViewProps = {
+  branches: BranchSummary[];
+  branchesLoadFailed: boolean;
   categories: ServiceCategorySummary[];
   categoriesLoadFailed: boolean;
   defaultCurrency: string | null;
   initialCode?: string;
-  initialService?: ServiceSummary;
+  initialService?: ServiceDetail;
 };
 
+type ServiceBranchOption = Pick<
+  BranchSummary,
+  "address" | "id" | "name" | "status"
+>;
+
 function getInitialFormValues(
-  initialService: ServiceSummary | undefined,
+  initialService: ServiceDetail | undefined,
+  branches: ServiceBranchOption[],
   defaultCurrency: string | null,
   initialCode: string | undefined,
 ): ServiceFormValues {
   if (!initialService) {
     return {
       ...DEFAULT_FORM_VALUES,
+      branchSettings: branches.map((branch) => ({
+        branchId: branch.id,
+        isAvailable: false,
+        priceOverrideAmount: "",
+        turnaroundMinutesOverride: "",
+      })),
       code: initialCode ?? "",
       currency: defaultCurrency ?? "",
     };
   }
+
+  const settingByBranchId = new Map(
+    initialService.branchSettings.map((setting) => [setting.branchId, setting]),
+  );
+  const branchIds = new Set(branches.map((branch) => branch.id));
+  const allBranchIds = [
+    ...branches.map((branch) => branch.id),
+    ...initialService.branchSettings
+      .filter((setting) => !branchIds.has(setting.branchId))
+      .map((setting) => setting.branchId),
+  ];
 
   return {
     businessLine: initialService.businessLine,
@@ -109,6 +139,19 @@ function getInitialFormValues(
       initialService.turnaroundMinutes === null
         ? ""
         : String(initialService.turnaroundMinutes),
+    allBranches: initialService.allBranches,
+    branchSettings: allBranchIds.map((branchId) => {
+      const setting = settingByBranchId.get(branchId);
+      return {
+        branchId,
+        isAvailable: setting?.isAvailable ?? false,
+        priceOverrideAmount: setting?.priceOverrideAmount ?? "",
+        turnaroundMinutesOverride:
+          setting?.turnaroundMinutesOverride == null
+            ? ""
+            : String(setting.turnaroundMinutesOverride),
+      };
+    }),
     displayOrder: String(initialService.displayOrder),
     pricingUnit: initialService.pricingUnit,
     labelRule: initialService.labelRule,
@@ -138,6 +181,8 @@ function FieldError({ message }: { message?: string }) {
 }
 
 export function ServiceCreateView({
+  branches,
+  branchesLoadFailed,
   categories,
   categoriesLoadFailed,
   defaultCurrency,
@@ -150,7 +195,12 @@ export function ServiceCreateView({
   const effectiveCurrency = initialService?.currency ?? defaultCurrency;
   const pageTitle = isEditMode ? initialService.name : m.services.create.title;
   const [formValues, setFormValues] = useState<ServiceFormValues>(() =>
-    getInitialFormValues(initialService, defaultCurrency, initialCode),
+    getInitialFormValues(
+      initialService,
+      branches,
+      defaultCurrency,
+      initialCode,
+    ),
   );
   const [errors, setErrors] = useState<ServiceFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -179,6 +229,45 @@ export function ServiceCreateView({
     },
   ];
 
+  const branchOptions = useMemo<ServiceBranchOption[]>(() => {
+    const options = branches.map(({ address, id, name, status }) => ({
+      address,
+      id,
+      name,
+      status,
+    }));
+    const knownIds = new Set(options.map((branch) => branch.id));
+    for (const setting of initialService?.branchSettings ?? []) {
+      if (!knownIds.has(setting.branchId)) {
+        options.push({
+          address: null,
+          id: setting.branchId,
+          name: setting.branchName,
+          status: setting.branchStatus,
+        });
+      }
+    }
+    return options;
+  }, [branches, initialService?.branchSettings]);
+
+  const selectedBranchIds = useMemo(
+    () =>
+      formValues.allBranches
+        ? branchOptions.map((branch) => branch.id)
+        : formValues.branchSettings
+            .filter((setting) => setting.isAvailable)
+            .map((setting) => setting.branchId),
+    [branchOptions, formValues.allBranches, formValues.branchSettings],
+  );
+  const selectedBranchIdSet = useMemo(
+    () => new Set(selectedBranchIds),
+    [selectedBranchIds],
+  );
+  const selectedBranchOptions = useMemo(
+    () => branchOptions.filter((branch) => selectedBranchIdSet.has(branch.id)),
+    [branchOptions, selectedBranchIdSet],
+  );
+
   const availableCategories = useMemo(
     () =>
       categories.filter(
@@ -190,7 +279,7 @@ export function ServiceCreateView({
     [categories, formValues.businessLine, initialService?.categoryId],
   );
   const requiredDataUnavailable =
-    categoriesLoadFailed || effectiveCurrency === null;
+    categoriesLoadFailed || branchesLoadFailed || effectiveCurrency === null;
   const submitDisabled =
     saving || requiredDataUnavailable || availableCategories.length === 0;
 
@@ -233,6 +322,55 @@ export function ServiceCreateView({
 
       const next = { ...current };
       delete next[field];
+      return next;
+    });
+    setFormError(null);
+    setIsDirty(true);
+  }
+
+  function updateBranchSetting(
+    branchId: string,
+    patch: Partial<ServiceBranchFormValue>,
+  ) {
+    setFormValues((current) => ({
+      ...current,
+      branchSettings: current.branchSettings.map((setting) =>
+        setting.branchId === branchId ? { ...setting, ...patch } : setting,
+      ),
+    }));
+    setErrors((current) => {
+      if (!current.branchSettings) {
+        return current;
+      }
+      const next = { ...current };
+      delete next.branchSettings;
+      return next;
+    });
+    setFormError(null);
+    setIsDirty(true);
+  }
+
+  function updateSelectedBranches(nextSelectedBranchIds: string[]) {
+    const nextSelectedBranchIdSet = new Set(nextSelectedBranchIds);
+    const allBranches =
+      branchOptions.length > 0 &&
+      nextSelectedBranchIdSet.size === branchOptions.length;
+
+    setFormValues((current) => ({
+      ...current,
+      allBranches,
+      branchSettings: current.branchSettings.map((setting) => ({
+        ...setting,
+        isAvailable: nextSelectedBranchIdSet.has(setting.branchId),
+      })),
+    }));
+    setErrors((current) => {
+      if (!current.branchSettings) {
+        return current;
+      }
+
+      const next = { ...current };
+      delete next.branchSettings;
       return next;
     });
     setFormError(null);
@@ -389,6 +527,9 @@ export function ServiceCreateView({
             {categoriesLoadFailed ? (
               <li>{m.services.create.categoriesLoadFailed}</li>
             ) : null}
+            {branchesLoadFailed ? (
+              <li>{m.services.create.branchesLoadFailed}</li>
+            ) : null}
             {effectiveCurrency === null ? (
               <li>{m.services.create.currencyLoadFailed}</li>
             ) : null}
@@ -523,6 +664,129 @@ export function ServiceCreateView({
                   </div>
                 </CardContent>
               </Card>
+
+              {!formValues.allBranches ? (
+                <Card className="gap-0 rounded-lg py-0 shadow-none">
+                  <CardHeader className="border-b py-4">
+                    <CardTitle className="text-base">
+                      {m.services.sections.locations}
+                    </CardTitle>
+                    <CardDescription>
+                      {m.services.sections.locationsDescription}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="grid gap-5 py-5">
+                    {selectedBranchOptions.length === 0 ? (
+                      <p className="rounded-md border border-dashed px-3 py-5 text-center text-sm text-muted-foreground">
+                        {m.services.create.noBranchesAvailable}
+                      </p>
+                    ) : (
+                      <div className="grid gap-3">
+                        {selectedBranchOptions.map((branch) => {
+                          const setting = formValues.branchSettings.find(
+                            (candidate) => candidate.branchId === branch.id,
+                          );
+                          if (!setting) {
+                            return null;
+                          }
+                          return (
+                            <div
+                              className="grid gap-3 rounded-lg border border-primary/30 bg-primary/[0.03] p-3"
+                              key={branch.id}
+                            >
+                              <div className="flex items-center gap-3">
+                                <span className="min-w-0 flex-1 text-sm font-semibold text-foreground">
+                                  {branch.name}
+                                </span>
+                                {branch.status === "inactive" ? (
+                                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                    {m.services.create.inactiveBranch}
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              <div className="grid gap-3 border-t pt-3 sm:grid-cols-2">
+                                <div className="grid gap-1.5">
+                                  <Label
+                                    className="text-xs"
+                                    htmlFor={`service-branch-price-${branch.id}`}
+                                  >
+                                    {m.services.formLabels.branchPriceOverride}
+                                  </Label>
+                                  <div className="relative">
+                                    <Input
+                                      className="pr-16"
+                                      id={`service-branch-price-${branch.id}`}
+                                      inputMode="decimal"
+                                      onChange={(event) =>
+                                        updateBranchSetting(branch.id, {
+                                          priceOverrideAmount:
+                                            event.target.value,
+                                        })
+                                      }
+                                      placeholder="0.00"
+                                      value={setting.priceOverrideAmount}
+                                    />
+                                    <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground">
+                                      {effectiveCurrency ?? "—"}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground">
+                                    {interpolate(
+                                      m.services.create.branchDefaultPrice,
+                                      {
+                                        price:
+                                          `${formValues.standardPrice || "—"} ${effectiveCurrency ?? ""}`.trim(),
+                                      },
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="grid gap-1.5">
+                                  <Label
+                                    className="text-xs"
+                                    htmlFor={`service-branch-turnaround-${branch.id}`}
+                                  >
+                                    {
+                                      m.services.formLabels
+                                        .branchTurnaroundOverride
+                                    }
+                                  </Label>
+                                  <Input
+                                    id={`service-branch-turnaround-${branch.id}`}
+                                    inputMode="numeric"
+                                    max={525_600}
+                                    min={1}
+                                    onChange={(event) =>
+                                      updateBranchSetting(branch.id, {
+                                        turnaroundMinutesOverride:
+                                          event.target.value,
+                                      })
+                                    }
+                                    placeholder="1440"
+                                    step={1}
+                                    type="number"
+                                    value={setting.turnaroundMinutesOverride}
+                                  />
+                                  <p className="text-xs text-muted-foreground">
+                                    {interpolate(
+                                      m.services.create.branchDefaultTurnaround,
+                                      {
+                                        minutes:
+                                          formValues.turnaroundMinutes || "—",
+                                      },
+                                    )}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <FieldError message={getFieldError("branchSettings")} />
+                  </CardContent>
+                </Card>
+              ) : null}
 
               <Card className="gap-0 rounded-lg py-0 shadow-none">
                 <CardHeader className="border-b py-4">
@@ -833,6 +1097,34 @@ export function ServiceCreateView({
                   <FieldError message={getFieldError("status")} />
                 </CardContent>
               </Card>
+
+              <BranchSelectionCard
+                allBranchesLabel={m.services.formLabels.allBranches}
+                branches={branchOptions.map((branch) => ({
+                  address: branch.address,
+                  badge:
+                    branch.status === "inactive"
+                      ? m.services.create.inactiveBranch
+                      : undefined,
+                  id: branch.id,
+                  name: branch.name,
+                }))}
+                cancelLabel={m.common.cancel}
+                confirmLabel={m.services.create.confirmBranchSelection}
+                dialogDescription={m.services.create.branchDialogDescription}
+                emptyLabel={m.services.create.noBranchesAvailable}
+                errorMessage={getFieldError("branchSettings")}
+                idPrefix="service-availability"
+                loadFailed={branchesLoadFailed}
+                loadFailedMessage={m.services.create.branchesLoadFailed}
+                manageLabel={m.services.create.manageBranches}
+                noMatchingBranchesLabel={m.services.create.noMatchingBranches}
+                onSelectionChange={updateSelectedBranches}
+                searchPlaceholder={m.services.create.branchSearchPlaceholder}
+                selectedBranchIds={selectedBranchIds}
+                selectedCountTemplate={m.services.create.selectedBranchCount}
+                title={m.services.formLabels.locationScope}
+              />
 
               <Card className="gap-0 rounded-lg py-0 shadow-none">
                 <CardHeader className="border-b py-4">

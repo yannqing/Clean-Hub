@@ -1,7 +1,9 @@
 import { and, asc, eq, isNull, or, sql, type SQL } from "drizzle-orm";
 
 import {
+  branches,
   prices,
+  serviceBranchSettings,
   serviceCategories,
   services,
   type Database,
@@ -13,6 +15,8 @@ import { findTenantDefaultCurrency } from "../settings/settings.repository.js";
 import type {
   CreateServiceRequest,
   ServiceAuditSnapshot,
+  ServiceBranchSetting,
+  ServiceDetail,
   ServiceListInput,
   ServicePriceAuditSnapshot,
   ServiceStatus,
@@ -47,6 +51,8 @@ type ServiceJoinedRow = {
   description: string | null;
   internalNotes: string | null;
   turnaroundMinutes: number | null;
+  allBranches: boolean;
+  availableBranchCount: string | number | null;
   displayOrder: number;
   pricingUnit: ServiceSummary["pricingUnit"];
   labelRule: ServiceSummary["labelRule"];
@@ -73,6 +79,24 @@ function buildServiceSelect() {
     description: services.description,
     internalNotes: services.internalNotes,
     turnaroundMinutes: services.turnaroundMinutes,
+    allBranches: services.allBranches,
+    availableBranchCount: sql<number>`(
+      case when ${services.allBranches} then (
+        select count(*)::int from ${branches}
+        where ${branches.tenantId} = ${services.tenantId}
+          and ${branches.status} = 'active'
+          and ${branches.deletedAt} is null
+      ) else (
+        select count(*)::int from ${serviceBranchSettings}
+        inner join ${branches} on ${branches.id} = ${serviceBranchSettings.branchId}
+          and ${branches.tenantId} = ${serviceBranchSettings.tenantId}
+        where ${serviceBranchSettings.tenantId} = ${services.tenantId}
+          and ${serviceBranchSettings.serviceId} = ${services.id}
+          and ${serviceBranchSettings.isAvailable} = true
+          and ${branches.status} = 'active'
+          and ${branches.deletedAt} is null
+      ) end
+    )`,
     displayOrder: services.displayOrder,
     pricingUnit: services.pricingUnit,
     labelRule: services.labelRule,
@@ -104,6 +128,8 @@ function toServiceSummary(row: ServiceJoinedRow): ServiceSummary {
     description: row.description,
     internalNotes: row.internalNotes,
     turnaroundMinutes: row.turnaroundMinutes,
+    allBranches: row.allBranches,
+    availableBranchCount: Number(row.availableBranchCount ?? 0),
     displayOrder: row.displayOrder,
     pricingUnit: row.pricingUnit,
     labelRule: row.labelRule,
@@ -118,7 +144,7 @@ function toServiceSummary(row: ServiceJoinedRow): ServiceSummary {
   };
 }
 
-function toAuditSnapshot(row: ServiceSummary): ServiceAuditSnapshot {
+function toAuditSnapshot(row: ServiceDetail): ServiceAuditSnapshot {
   return {
     tenantId: row.tenantId,
     businessLine: row.businessLine,
@@ -130,6 +156,8 @@ function toAuditSnapshot(row: ServiceSummary): ServiceAuditSnapshot {
     description: row.description,
     internalNotes: row.internalNotes,
     turnaroundMinutes: row.turnaroundMinutes,
+    allBranches: row.allBranches,
+    branchSettings: row.branchSettings,
     displayOrder: row.displayOrder,
     pricingUnit: row.pricingUnit,
     labelRule: row.labelRule,
@@ -138,6 +166,52 @@ function toAuditSnapshot(row: ServiceSummary): ServiceAuditSnapshot {
     costPrice: row.costPrice,
     currency: row.currency,
     status: row.status,
+  };
+}
+
+export async function findServiceBranchSettings(
+  db: Database,
+  input: { tenantId: string; serviceId: string },
+): Promise<ServiceBranchSetting[]> {
+  return db
+    .select({
+      branchId: serviceBranchSettings.branchId,
+      branchName: branches.name,
+      branchStatus: branches.status,
+      isAvailable: serviceBranchSettings.isAvailable,
+      priceOverrideAmount: serviceBranchSettings.priceOverrideAmount,
+      turnaroundMinutesOverride:
+        serviceBranchSettings.turnaroundMinutesOverride,
+    })
+    .from(serviceBranchSettings)
+    .innerJoin(
+      branches,
+      and(
+        eq(branches.id, serviceBranchSettings.branchId),
+        eq(branches.tenantId, serviceBranchSettings.tenantId),
+        isNull(branches.deletedAt),
+      ),
+    )
+    .where(
+      and(
+        eq(serviceBranchSettings.tenantId, input.tenantId),
+        eq(serviceBranchSettings.serviceId, input.serviceId),
+      ),
+    )
+    .orderBy(asc(branches.name), asc(branches.id));
+}
+
+export async function findServiceDetailById(
+  db: Database,
+  input: { tenantId: string; serviceId: string },
+): Promise<ServiceDetail | null> {
+  const service = await findServiceById(db, input);
+  if (!service) {
+    return null;
+  }
+  return {
+    ...service,
+    branchSettings: await findServiceBranchSettings(db, input),
   };
 }
 
@@ -240,7 +314,7 @@ export async function findServiceAuditSnapshotById(
   db: Database,
   input: { tenantId: string; serviceId: string },
 ): Promise<ServiceAuditSnapshot | null> {
-  const service = await findServiceById(db, input);
+  const service = await findServiceDetailById(db, input);
 
   return service ? toAuditSnapshot(service) : null;
 }
@@ -329,10 +403,47 @@ export async function findServiceByCode(
   return rows[0] ?? null;
 }
 
+export async function replaceServiceBranchSettings(
+  db: Database,
+  input: {
+    tenantId: string;
+    serviceId: string;
+    actorUserId: string;
+    branchSettings: NonNullable<CreateServiceRequest["branchSettings"]>;
+  },
+): Promise<void> {
+  await db
+    .delete(serviceBranchSettings)
+    .where(
+      and(
+        eq(serviceBranchSettings.tenantId, input.tenantId),
+        eq(serviceBranchSettings.serviceId, input.serviceId),
+      ),
+    );
+
+  if (input.branchSettings.length === 0) {
+    return;
+  }
+
+  await db.insert(serviceBranchSettings).values(
+    input.branchSettings.map((setting) => ({
+      id: createId(),
+      tenantId: input.tenantId,
+      serviceId: input.serviceId,
+      branchId: setting.branchId,
+      isAvailable: setting.isAvailable,
+      priceOverrideAmount: setting.priceOverrideAmount ?? null,
+      turnaroundMinutesOverride: setting.turnaroundMinutesOverride ?? null,
+      createdBy: input.actorUserId,
+      updatedBy: input.actorUserId,
+    })),
+  );
+}
+
 export async function createServiceRecord(
   db: Database,
   input: CreateServiceRequest & { tenantId: string; actorUserId: string },
-): Promise<ServiceSummary> {
+): Promise<ServiceDetail> {
   const serviceId = createId();
   const currency = await findTenantDefaultCurrency(db, input.tenantId);
 
@@ -347,6 +458,7 @@ export async function createServiceRecord(
     description: normalizeNullable(input.description),
     internalNotes: normalizeNullable(input.internalNotes),
     turnaroundMinutes: input.turnaroundMinutes ?? null,
+    allBranches: input.allBranches ?? true,
     displayOrder: input.displayOrder ?? 0,
     pricingUnit: input.pricingUnit,
     labelRule: input.labelRule,
@@ -368,7 +480,14 @@ export async function createServiceRecord(
     updatedBy: input.actorUserId,
   });
 
-  const service = await findServiceById(db, {
+  await replaceServiceBranchSettings(db, {
+    tenantId: input.tenantId,
+    serviceId,
+    actorUserId: input.actorUserId,
+    branchSettings: input.branchSettings ?? [],
+  });
+
+  const service = await findServiceDetailById(db, {
     tenantId: input.tenantId,
     serviceId,
   });
@@ -387,7 +506,7 @@ export async function updateServiceRecord(
     serviceId: string;
     actorUserId: string;
   },
-): Promise<ServiceSummary | null> {
+): Promise<ServiceDetail | null> {
   const existing = await findServiceById(db, input);
 
   if (!existing) {
@@ -419,6 +538,7 @@ export async function updateServiceRecord(
         input.turnaroundMinutes === undefined
           ? existing.turnaroundMinutes
           : input.turnaroundMinutes,
+      allBranches: input.allBranches ?? existing.allBranches,
       displayOrder: input.displayOrder ?? existing.displayOrder,
       pricingUnit: input.pricingUnit ?? existing.pricingUnit,
       labelRule: input.labelRule ?? existing.labelRule,
@@ -485,7 +605,16 @@ export async function updateServiceRecord(
     }
   }
 
-  return findServiceById(db, input);
+  if (input.branchSettings !== undefined) {
+    await replaceServiceBranchSettings(db, {
+      tenantId: input.tenantId,
+      serviceId: input.serviceId,
+      actorUserId: input.actorUserId,
+      branchSettings: input.branchSettings,
+    });
+  }
+
+  return findServiceDetailById(db, input);
 }
 
 export async function updateServiceStatusRecord(

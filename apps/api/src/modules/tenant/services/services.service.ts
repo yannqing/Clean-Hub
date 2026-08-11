@@ -7,13 +7,14 @@ import {
 } from "../../auth/permission.helper.js";
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { findBranchById } from "../branches/branches.repository.js";
 import { findServiceCategoryById } from "../service-categories/service-categories.repository.js";
 import { TenantServicesError } from "./services.errors.js";
 import {
   createServiceRecord,
   findServiceAuditSnapshotById,
-  findServiceById,
   findServiceByCode,
+  findServiceDetailById,
   findServiceByName,
   findServicePriceAuditSnapshotByServiceId,
   findServices,
@@ -24,6 +25,8 @@ import {
 import type {
   CreateServiceRequest,
   ServiceBusinessLine,
+  ServiceBranchSettingInput,
+  ServiceDetail,
   ServiceListInput,
   ServiceStatus,
   ServiceSummary,
@@ -85,6 +88,61 @@ async function requireCompatibleServiceCategory(
       "Inactive service categories cannot be assigned.",
       422,
     );
+  }
+}
+
+async function requireValidServiceBranchSettings(
+  db: Database,
+  input: {
+    tenantId: string;
+    allBranches: boolean;
+    branchSettings: ServiceBranchSettingInput[];
+    allowInactiveBranchIds?: Set<string>;
+  },
+): Promise<void> {
+  if (
+    !input.allBranches &&
+    input.branchSettings.every((setting) => !setting.isAvailable)
+  ) {
+    throw new TenantServicesError(
+      "SERVICE_BRANCH_REQUIRED",
+      "Select at least one branch that provides this service.",
+      422,
+    );
+  }
+
+  const branchIds = new Set<string>();
+  for (const setting of input.branchSettings) {
+    if (branchIds.has(setting.branchId)) {
+      throw new TenantServicesError(
+        "SERVICE_BRANCH_NOT_FOUND",
+        "A branch can only be configured once.",
+        422,
+      );
+    }
+    branchIds.add(setting.branchId);
+
+    const branch = await findBranchById(db, {
+      tenantId: input.tenantId,
+      branchId: setting.branchId,
+    });
+    if (!branch) {
+      throw new TenantServicesError(
+        "SERVICE_BRANCH_NOT_FOUND",
+        "One or more selected branches were not found.",
+        422,
+      );
+    }
+    if (
+      branch.status !== "active" &&
+      !input.allowInactiveBranchIds?.has(branch.id)
+    ) {
+      throw new TenantServicesError(
+        "SERVICE_BRANCH_INACTIVE",
+        "Inactive branches cannot be newly assigned to a service.",
+        422,
+      );
+    }
   }
 }
 
@@ -159,12 +217,12 @@ export async function getTenantServiceDetail(
   authContext: AuthContext,
   serviceId: string,
   db: Database = getDb(),
-): Promise<ServiceSummary> {
+): Promise<ServiceDetail> {
   const tenantId = requireTenantContext(authContext);
 
   await requireTenantReadyForServices(authContext, db);
 
-  const service = await findServiceById(db, {
+  const service = await findServiceDetailById(db, {
     tenantId,
     serviceId,
   });
@@ -187,7 +245,7 @@ export async function createTenantService(
   data: CreateServiceRequest,
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
-): Promise<ServiceSummary> {
+): Promise<ServiceDetail> {
   const tenantId = requireTenantContext(authContext);
 
   await requireTenantReadyForServices(authContext, db, data.businessLine);
@@ -237,6 +295,12 @@ export async function createTenantService(
     );
   }
 
+  await requireValidServiceBranchSettings(db, {
+    tenantId,
+    allBranches: data.allBranches ?? true,
+    branchSettings: data.branchSettings ?? [],
+  });
+
   return db.transaction(async (tx) => {
     const service = await createServiceRecord(tx, {
       ...data,
@@ -266,7 +330,7 @@ export async function updateTenantService(
   data: UpdateServiceRequest,
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
-): Promise<ServiceSummary> {
+): Promise<ServiceDetail> {
   const tenantId = requireTenantContext(authContext);
 
   await requireTenantReadyForServices(authContext, db);
@@ -322,6 +386,17 @@ export async function updateTenantService(
         404,
       );
     }
+
+    const nextAllBranches = data.allBranches ?? before.allBranches;
+    const nextBranchSettings = data.branchSettings ?? before.branchSettings;
+    await requireValidServiceBranchSettings(tx, {
+      tenantId,
+      allBranches: nextAllBranches,
+      branchSettings: nextBranchSettings,
+      allowInactiveBranchIds: new Set(
+        before.branchSettings.map((setting) => setting.branchId),
+      ),
+    });
 
     const nextStandardPrice = data.standardPrice ?? beforePrice.amount;
     const nextCompareAtPrice =

@@ -2,7 +2,7 @@ import type { ApiRequestOptions } from "@cleanhub/api-client";
 
 import { webAdminApi } from "@/lib/api-client";
 
-import type { ServiceSummary } from "../types";
+import type { ServiceDetail } from "../types";
 
 type ServiceDetailRequestOptions = Omit<
   ApiRequestOptions,
@@ -12,6 +12,6 @@ type ServiceDetailRequestOptions = Omit<
 export async function getServiceDetailQuery(
   serviceId: string,
   options: ServiceDetailRequestOptions = {},
-): Promise<ServiceSummary> {
+): Promise<ServiceDetail> {
   return webAdminApi.tenant.services.getDetail(serviceId, options);
 }

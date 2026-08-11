@@ -3,6 +3,7 @@ import type {
   CreateServiceRequest,
   ServiceCategoryListQuery,
   ServiceCategorySummary,
+  ServiceDetail,
   ServiceListQuery,
   ServiceSummary,
   UpdateServiceStatusRequest,
@@ -27,18 +28,18 @@ export function createTenantServicesApi(client: ApiClient) {
         ...options,
       }),
     getDetail: (serviceId: string, options?: RequestOptions) =>
-      client.get<ServiceSummary>(
+      client.get<ServiceDetail>(
         `/tenant/services/${encodeURIComponent(serviceId)}`,
         options,
       ),
     create: (data: CreateServiceRequest, options?: RequestOptions) =>
-      client.post<ServiceSummary>("/tenant/services", data, options),
+      client.post<ServiceDetail>("/tenant/services", data, options),
     update: (
       serviceId: string,
       data: UpdateServiceRequest,
       options?: RequestOptions,
     ) =>
-      client.patch<ServiceSummary>(
+      client.patch<ServiceDetail>(
         `/tenant/services/${encodeURIComponent(serviceId)}`,
         data,
         options,

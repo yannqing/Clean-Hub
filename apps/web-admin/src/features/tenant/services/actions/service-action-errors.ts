@@ -26,6 +26,8 @@ const serviceFormFields = new Set<ServiceFieldName>([
   "description",
   "internalNotes",
   "turnaroundMinutes",
+  "allBranches",
+  "branchSettings",
   "displayOrder",
   "pricingUnit",
   "labelRule",
@@ -46,6 +48,8 @@ const serviceFieldMap: Record<string, ServiceFieldName> = {
   description: "description",
   internalNotes: "internalNotes",
   turnaroundMinutes: "turnaroundMinutes",
+  allBranches: "allBranches",
+  branchSettings: "branchSettings",
   displayOrder: "displayOrder",
   pricingUnit: "pricingUnit",
   labelRule: "labelRule",
@@ -99,6 +103,15 @@ export function getServiceActionError(
 
     if (error.code === "SERVICE_COMPARE_AT_PRICE_INVALID") {
       errors.compareAtPrice = "compareAtPriceInvalid";
+    }
+    if (error.code === "SERVICE_BRANCH_REQUIRED") {
+      errors.branchSettings = "branchRequired";
+    }
+    if (
+      error.code === "SERVICE_BRANCH_NOT_FOUND" ||
+      error.code === "SERVICE_BRANCH_INACTIVE"
+    ) {
+      errors.branchSettings = "branchSettingsInvalid";
     }
 
     return {

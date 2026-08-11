@@ -2,6 +2,7 @@ import { isApiHttpError } from "@cleanhub/api-client";
 import { notFound } from "next/navigation";
 
 import { ServiceCreateView } from "@/features/tenant/services";
+import { getBranchListQuery } from "@/features/tenant/branches/queries";
 import {
   getServiceCategoryDatasetQuery,
   getServiceDetailQuery,
@@ -38,8 +39,9 @@ export default async function EditServicePage({
       throw error;
     },
   );
-  const [categoryResult] = await Promise.allSettled([
+  const [categoryResult, branchResult] = await Promise.allSettled([
     getServiceCategoryDatasetQuery({}, requestOptions),
+    getBranchListQuery({}, requestOptions),
   ]);
 
   return (
@@ -48,6 +50,8 @@ export default async function EditServicePage({
         categoryResult.status === "fulfilled" ? categoryResult.value : []
       }
       categoriesLoadFailed={categoryResult.status === "rejected"}
+      branches={branchResult.status === "fulfilled" ? branchResult.value : []}
+      branchesLoadFailed={branchResult.status === "rejected"}
       defaultCurrency={service.currency}
       initialService={service}
     />

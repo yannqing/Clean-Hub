@@ -3,6 +3,7 @@ import { webAdminApi } from "@/lib/api-client";
 import type {
   ServiceFormErrors,
   ServiceFormValues,
+  ServiceDetail,
   ServiceStatus,
   ServiceSummary,
 } from "../types";
@@ -13,7 +14,7 @@ import {
 } from "./service-action-errors";
 
 export type UpdateServiceActionResult =
-  | { ok: true; data: ServiceSummary }
+  | { ok: true; data: ServiceDetail }
   | ({ ok: false } & ServiceActionError & { errors: ServiceFormErrors });
 
 export async function updateServiceAction(

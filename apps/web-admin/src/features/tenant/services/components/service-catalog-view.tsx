@@ -140,6 +140,8 @@ const defaultFormValues: ServiceFormValues = {
   description: "",
   internalNotes: "",
   turnaroundMinutes: "",
+  allBranches: true,
+  branchSettings: [],
   displayOrder: "0",
   pricingUnit: "per_item",
   labelRule: "per_order_item",

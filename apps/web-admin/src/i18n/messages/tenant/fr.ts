@@ -145,6 +145,7 @@ export const tenantMessagesFr: TenantMessages = {
     },
     paidAmount: "Reçu",
     unknownCustomer: "Client inconnu",
+    guestCustomer: "Client de passage",
     branchFallback: "Succursale {id}",
     emptyTitle: "Aucune commande pour l'instant",
     emptyDescription:
@@ -1591,6 +1592,9 @@ export const tenantMessagesFr: TenantMessages = {
       operations: "Exécution du service",
       operationsDescription:
         "Définissez le délai prévu et les notes destinées au personnel.",
+      locations: "Remplacements par établissement",
+      locationsDescription:
+        "Définissez un prix ou un délai pour les établissements sélectionnés. Les champs vides utilisent les valeurs par défaut du service.",
       catalogSettings: "Paramètres du catalogue",
       catalogSettingsDescription:
         "Contrôlez les étiquettes et la position du service dans le catalogue.",
@@ -1610,6 +1614,11 @@ export const tenantMessagesFr: TenantMessages = {
       description: "Description",
       internalNotes: "Notes internes",
       turnaroundMinutes: "Délai estimé (minutes)",
+      locationScope: "Établissements disponibles",
+      allBranches: "Tous les établissements",
+      selectedBranches: "Établissements sélectionnés",
+      branchPriceOverride: "Prix de l’établissement",
+      branchTurnaroundOverride: "Délai de l’établissement (minutes)",
       displayOrder: "Ordre d'affichage",
       pricing: "Unité de prix",
       labelRule: "Règle d'étiquetage",
@@ -1646,6 +1655,24 @@ export const tenantMessagesFr: TenantMessages = {
         "Ajoutez des étapes ou des notes visibles uniquement par le personnel",
       turnaroundHint:
         "Utilisez 60 pour une heure ou 1 440 pour un jour. Laissez vide si le délai varie.",
+      allBranchesHint:
+        "Ce service est disponible dans tous les établissements du locataire.",
+      selectedBranchesHint:
+        "Seuls les établissements cochés affichent ce service dans le POS. Laissez les remplacements vides pour utiliser les valeurs par défaut.",
+      manageBranches: "Gérer les établissements disponibles",
+      branchDialogDescription:
+        "Sélectionnez les établissements qui proposent ce service.",
+      branchSearchPlaceholder: "Rechercher des établissements",
+      noMatchingBranches: "Aucun établissement correspondant",
+      confirmBranchSelection: "Terminé",
+      selectedBranchCount: "{selected} établissements sélectionnés sur {total}",
+      branchDefaultPrice: "Par défaut {price}",
+      branchDefaultTurnaround: "Par défaut {minutes}",
+      inactiveBranch: "Inactif",
+      noBranchesAvailable:
+        "Ce locataire ne possède encore aucun établissement configurable.",
+      branchesLoadFailed:
+        "Les établissements n’ont pas pu être chargés, ce service ne peut donc pas encore être enregistré.",
       compareAtPriceHint:
         "Prix de référence facultatif affiché comme prix d'origine ; il doit être supérieur au prix standard.",
       costPriceHint:
@@ -1686,6 +1713,9 @@ export const tenantMessagesFr: TenantMessages = {
         "Les notes internes doivent comporter 5 000 caractères ou moins.",
       turnaroundMinutesInvalid:
         "Le délai doit être un nombre entier compris entre 1 et 525 600 minutes.",
+      branchSettingsInvalid:
+        "Saisissez un prix et un délai valides pour l’établissement.",
+      branchRequired: "Sélectionnez au moins un établissement pour ce service.",
       displayOrderInvalid:
         "L'ordre d'affichage doit être un nombre entier compris entre 0 et 1 000 000.",
       pricingUnitInvalid:

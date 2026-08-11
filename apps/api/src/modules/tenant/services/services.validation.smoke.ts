@@ -6,6 +6,7 @@ import {
 } from "./services.validation.js";
 
 const CATEGORY_ID = "01KRERJN820000000000000003";
+const BRANCH_ID = "01KRERJN8G0000000000000040";
 
 function validServiceBody() {
   return {
@@ -17,6 +18,15 @@ function validServiceBody() {
     description: "Professional garment cleaning",
     internalNotes: "Inspect delicate trims before cleaning.",
     turnaroundMinutes: 1440,
+    allBranches: false,
+    branchSettings: [
+      {
+        branchId: BRANCH_ID,
+        isAvailable: true,
+        priceOverrideAmount: "45.00",
+        turnaroundMinutesOverride: 720,
+      },
+    ],
     displayOrder: 10,
     pricingUnit: "per_item" as const,
     labelRule: "per_order_item" as const,
@@ -34,6 +44,8 @@ export function runTenantServiceValidationSmokeChecks(): void {
   assert.equal(parsed.turnaroundMinutes, 1440);
   assert.equal(parsed.compareAtPrice, "50.00");
   assert.equal(parsed.costPrice, "18.50");
+  assert.equal(parsed.allBranches, false);
+  assert.equal(parsed.branchSettings?.[0]?.priceOverrideAmount, "45.00");
 
   assert.equal(
     createServiceBodySchema.safeParse({
@@ -69,6 +81,30 @@ export function runTenantServiceValidationSmokeChecks(): void {
     }).success,
     false,
     "turnaround time is capped at one year",
+  );
+
+  assert.equal(
+    createServiceBodySchema.safeParse({
+      ...validServiceBody(),
+      branchSettings: [],
+    }).success,
+    false,
+    "specific-location services require at least one available branch",
+  );
+
+  assert.equal(
+    createServiceBodySchema.safeParse({
+      ...validServiceBody(),
+      branchSettings: [
+        {
+          branchId: BRANCH_ID,
+          isAvailable: true,
+          priceOverrideAmount: "0",
+        },
+      ],
+    }).success,
+    false,
+    "branch price overrides must be positive",
   );
 
   const clearedOptionals = updateServiceBodySchema.parse({

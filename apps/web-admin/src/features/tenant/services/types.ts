@@ -12,6 +12,22 @@ export type ServiceLabelRule =
   | "per_order_item"
   | "per_bag";
 
+export type ServiceBranchSetting = {
+  branchId: string;
+  branchName: string;
+  branchStatus: "active" | "inactive";
+  isAvailable: boolean;
+  priceOverrideAmount?: string | null;
+  turnaroundMinutesOverride?: number | null;
+};
+
+export type ServiceBranchFormValue = {
+  branchId: string;
+  isAvailable: boolean;
+  priceOverrideAmount: string;
+  turnaroundMinutesOverride: string;
+};
+
 export type ServiceFormErrorCode =
   | "businessLineInvalid"
   | "nameRequired"
@@ -24,6 +40,8 @@ export type ServiceFormErrorCode =
   | "descriptionTooLong"
   | "internalNotesTooLong"
   | "turnaroundMinutesInvalid"
+  | "branchSettingsInvalid"
+  | "branchRequired"
   | "displayOrderInvalid"
   | "pricingUnitInvalid"
   | "labelRuleInvalid"
@@ -45,6 +63,8 @@ export type ServiceSummary = {
   description: string | null;
   internalNotes: string | null;
   turnaroundMinutes: number | null;
+  allBranches: boolean;
+  availableBranchCount: number;
   displayOrder: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
@@ -56,6 +76,10 @@ export type ServiceSummary = {
   createdAt: string;
   updatedAt: string;
   version: number;
+};
+
+export type ServiceDetail = ServiceSummary & {
+  branchSettings: ServiceBranchSetting[];
 };
 
 export type ServiceCategorySummary = {
@@ -76,6 +100,8 @@ export type ServiceFormValues = {
   description: string;
   internalNotes: string;
   turnaroundMinutes: string;
+  allBranches: boolean;
+  branchSettings: ServiceBranchFormValue[];
   displayOrder: string;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;

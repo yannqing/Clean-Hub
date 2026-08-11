@@ -149,6 +149,7 @@ export const tenantMessagesEn: TenantMessages = {
     },
     paidAmount: "Received",
     unknownCustomer: "Unknown customer",
+    guestCustomer: "Walk-in customer",
     branchFallback: "Branch {id}",
     emptyTitle: "No orders yet",
     emptyDescription:
@@ -1569,6 +1570,9 @@ export const tenantMessagesEn: TenantMessages = {
       operations: "Service fulfillment",
       operationsDescription:
         "Define the expected turnaround and notes for staff.",
+      locations: "Location overrides",
+      locationsDescription:
+        "Set a price or turnaround for selected locations. Blank values use the service defaults.",
       catalogSettings: "Catalog settings",
       catalogSettingsDescription:
         "Control labels and the service's position in the catalog.",
@@ -1588,6 +1592,11 @@ export const tenantMessagesEn: TenantMessages = {
       description: "Description",
       internalNotes: "Internal notes",
       turnaroundMinutes: "Estimated turnaround (minutes)",
+      locationScope: "Available locations",
+      allBranches: "All locations",
+      selectedBranches: "Selected locations",
+      branchPriceOverride: "Location price",
+      branchTurnaroundOverride: "Location turnaround (minutes)",
       displayOrder: "Display order",
       pricing: "Pricing unit",
       labelRule: "Label rule",
@@ -1623,6 +1632,22 @@ export const tenantMessagesEn: TenantMessages = {
         "Add preparation steps or notes visible only to staff",
       turnaroundHint:
         "Use 60 for one hour or 1,440 for one day. Leave blank when it varies.",
+      allBranchesHint: "This service is available at every tenant location.",
+      selectedBranchesHint:
+        "Only checked locations show this service in POS. Leave overrides blank to use service defaults.",
+      manageBranches: "Manage available locations",
+      branchDialogDescription:
+        "Select the locations that provide this service.",
+      branchSearchPlaceholder: "Search locations",
+      noMatchingBranches: "No matching locations",
+      confirmBranchSelection: "Done",
+      selectedBranchCount: "{selected} of {total} locations selected",
+      branchDefaultPrice: "Default {price}",
+      branchDefaultTurnaround: "Default {minutes}",
+      inactiveBranch: "Inactive",
+      noBranchesAvailable: "This tenant has no locations to configure yet.",
+      branchesLoadFailed:
+        "Locations could not be loaded, so this service cannot be saved yet.",
       compareAtPriceHint:
         "Optional reference price shown as the original price; it must be higher than the standard price.",
       costPriceHint:
@@ -1661,6 +1686,9 @@ export const tenantMessagesEn: TenantMessages = {
       internalNotesTooLong: "Internal notes must be 5,000 characters or fewer.",
       turnaroundMinutesInvalid:
         "Turnaround must be a whole number from 1 to 525,600 minutes.",
+      branchSettingsInvalid:
+        "Enter a valid location price and turnaround time.",
+      branchRequired: "Select at least one location for this service.",
       displayOrderInvalid:
         "Display order must be a whole number from 0 to 1,000,000.",
       pricingUnitInvalid: "Choose a supported pricing unit.",
