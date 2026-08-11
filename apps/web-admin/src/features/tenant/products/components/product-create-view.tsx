@@ -92,6 +92,12 @@ type BranchInventoryValue = {
   reorderPoint: string;
 };
 
+function normalizeWholeQuantityInput(value: string): string {
+  const quantity = Number(value);
+
+  return Number.isInteger(quantity) ? String(quantity) : value;
+}
+
 type ExistingProductImage = {
   kind: "existing";
   id: string;
@@ -254,10 +260,12 @@ export function ProductCreateView({
       branches.map((branch) => [
         branch.id,
         {
-          openingStock:
+          openingStock: normalizeWholeQuantityInput(
             initialBranchSettingsById.get(branch.id)?.onHandQuantity ?? "0",
-          reorderPoint:
+          ),
+          reorderPoint: normalizeWholeQuantityInput(
             initialBranchSettingsById.get(branch.id)?.reorderPoint ?? "0",
+          ),
         },
       ]),
     ),
@@ -877,7 +885,7 @@ export function ProductCreateView({
       barcode: String(formData.get("barcode") ?? ""),
       variantName: String(formData.get("variantName") ?? ""),
       unitOfMeasure,
-      unitsPerSale: String(formData.get("unitsPerSale") ?? ""),
+      unitsPerSale: "1",
       salePrice,
       currency,
       referenceCost,
@@ -1423,7 +1431,8 @@ export function ProductCreateView({
                                       event.target.value,
                                     )
                                   }
-                                  step="0.001"
+                                  inputMode="numeric"
+                                  step="1"
                                   type="number"
                                   value={inventory.openingStock}
                                 />
@@ -1446,7 +1455,8 @@ export function ProductCreateView({
                                       event.target.value,
                                     )
                                   }
-                                  step="0.001"
+                                  inputMode="numeric"
+                                  step="1"
                                   type="number"
                                   value={inventory.reorderPoint}
                                 />
@@ -1565,58 +1575,40 @@ export function ProductCreateView({
                     <FieldError message={getErrorMessage("variantName")} />
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="grid gap-2">
-                      <Label htmlFor="product-unit">
-                        {m.products.create.fields.unitOfMeasure}
-                      </Label>
-                      <Select
-                        name="unitOfMeasure"
-                        onValueChange={(value) => {
-                          setUnitOfMeasure(value);
-                          markChanged("unitOfMeasure");
-                        }}
-                        value={unitOfMeasure}
+                  <div className="grid gap-2">
+                    <Label htmlFor="product-unit">
+                      {m.products.create.fields.unitOfMeasure}
+                    </Label>
+                    <Select
+                      name="unitOfMeasure"
+                      onValueChange={(value) => {
+                        setUnitOfMeasure(value);
+                        markChanged("unitOfMeasure");
+                      }}
+                      value={unitOfMeasure}
+                    >
+                      <SelectTrigger
+                        aria-invalid={Boolean(errors.unitOfMeasure)}
+                        id="product-unit"
                       >
-                        <SelectTrigger
-                          aria-invalid={Boolean(errors.unitOfMeasure)}
-                          id="product-unit"
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="piece">
-                            {m.products.create.unitOptions.piece}
-                          </SelectItem>
-                          <SelectItem value="box">
-                            {m.products.create.unitOptions.box}
-                          </SelectItem>
-                          <SelectItem value="bottle">
-                            {m.products.create.unitOptions.bottle}
-                          </SelectItem>
-                          <SelectItem value="pack">
-                            {m.products.create.unitOptions.pack}
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FieldError message={getErrorMessage("unitOfMeasure")} />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label htmlFor="product-units-per-sale">
-                        {m.products.create.fields.unitsPerSale}
-                      </Label>
-                      <Input
-                        aria-invalid={Boolean(errors.unitsPerSale)}
-                        defaultValue={initialProduct?.sku.unitsPerSale ?? "1"}
-                        id="product-units-per-sale"
-                        min="0.001"
-                        name="unitsPerSale"
-                        step="0.001"
-                        type="number"
-                      />
-                      <FieldError message={getErrorMessage("unitsPerSale")} />
-                    </div>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="piece">
+                          {m.products.create.unitOptions.piece}
+                        </SelectItem>
+                        <SelectItem value="box">
+                          {m.products.create.unitOptions.box}
+                        </SelectItem>
+                        <SelectItem value="bottle">
+                          {m.products.create.unitOptions.bottle}
+                        </SelectItem>
+                        <SelectItem value="pack">
+                          {m.products.create.unitOptions.pack}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FieldError message={getErrorMessage("unitOfMeasure")} />
                   </div>
                 </CardContent>
               </Card>

@@ -41,17 +41,31 @@ function decimalStringSchema(input: {
 const productQuantitySchema = decimalStringSchema({
   integerDigits: 11,
   scale: 3,
-});
+}).refine(
+  (value) => Number.isInteger(Number(value)),
+  "Product quantities must be whole numbers.",
+);
 const signedProductQuantitySchema = decimalStringSchema({
   integerDigits: 11,
   scale: 3,
   signed: true,
+}).refine(
+  (value) => Number.isInteger(Number(value)),
+  "Product quantities must be whole numbers.",
+);
+const legacySignedProductQuantitySchema = decimalStringSchema({
+  integerDigits: 11,
+  scale: 3,
+  signed: true,
 });
-const positiveProductQuantitySchema = decimalStringSchema({
+const singleUnitPerSaleSchema = decimalStringSchema({
   integerDigits: 11,
   scale: 3,
   positive: true,
-});
+}).refine(
+  (value) => Number(value) === 1,
+  "Products must be sold as one inventory unit per sale.",
+);
 const productMoneySchema = decimalStringSchema({
   integerDigits: 10,
   scale: 2,
@@ -211,7 +225,7 @@ export const createTenantProductBodySchema = z
     barcode: optionalTrimmedStringSchema(80),
     variantName: optionalTrimmedStringSchema(160),
     unitOfMeasure: z.string().trim().min(1).max(32),
-    unitsPerSale: positiveProductQuantitySchema,
+    unitsPerSale: singleUnitPerSaleSchema,
     salePrice: productMoneySchema,
     referenceCost: productMoneySchema.nullable().optional(),
     trackInventory: z.boolean(),
@@ -278,7 +292,7 @@ const updateTenantProductBranchSettingsSchema = z
     z
       .object({
         branchId: z.string().regex(ULID_PATTERN),
-        expectedStockOnHand: signedProductQuantitySchema,
+        expectedStockOnHand: legacySignedProductQuantitySchema,
         stockOnHand: signedProductQuantitySchema,
         reorderPoint: productQuantitySchema,
       })
@@ -318,7 +332,7 @@ export const updateTenantProductBodySchema = z
     barcode: optionalTrimmedStringSchema(80),
     variantName: optionalTrimmedStringSchema(160),
     unitOfMeasure: z.string().trim().min(1).max(32),
-    unitsPerSale: positiveProductQuantitySchema,
+    unitsPerSale: singleUnitPerSaleSchema,
     salePrice: productMoneySchema,
     currency: z
       .string()

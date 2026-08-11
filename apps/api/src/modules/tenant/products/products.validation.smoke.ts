@@ -101,6 +101,39 @@ export function runTenantProductValidationSmokeChecks(): void {
     "per-branch opening stock must be preserved",
   );
 
+  const fractionalStockBody = validProductBody();
+  fractionalStockBody.branchSettings[0]!.openingStock = "2.5";
+  assert.equal(
+    createTenantProductBodySchema.safeParse(fractionalStockBody).success,
+    false,
+    "discrete product opening stock must be a whole number",
+  );
+
+  const fractionalReorderPointBody = validProductBody();
+  fractionalReorderPointBody.branchSettings[0]!.reorderPoint = "1.25";
+  assert.equal(
+    createTenantProductBodySchema.safeParse(fractionalReorderPointBody).success,
+    false,
+    "discrete product reorder points must be whole numbers",
+  );
+
+  const multipleUnitsPerSaleBody = validProductBody();
+  multipleUnitsPerSaleBody.unitsPerSale = "2";
+  assert.equal(
+    createTenantProductBodySchema.safeParse(multipleUnitsPerSaleBody).success,
+    false,
+    "the deprecated units-per-sale input must remain fixed at one",
+  );
+
+  const databaseFormattedWholeStockBody = validProductBody();
+  databaseFormattedWholeStockBody.branchSettings[0]!.openingStock = "2.000";
+  assert.equal(
+    createTenantProductBodySchema.safeParse(databaseFormattedWholeStockBody)
+      .success,
+    true,
+    "database-formatted whole quantities must remain compatible",
+  );
+
   const legacyBody = validProductBody();
   delete (legacyBody as Partial<typeof legacyBody>).categoryAttributes;
   const parsedLegacyBody = createTenantProductBodySchema.parse(legacyBody);
@@ -289,6 +322,34 @@ export function runTenantProductValidationSmokeChecks(): void {
     parsedUpdate.branchSettings.map((setting) => setting.stockOnHand),
     ["2", "8"],
     "product updates must preserve each branch's target stock on hand",
+  );
+
+  assert.equal(
+    updateTenantProductBodySchema.safeParse({
+      ...updateBody,
+      branchSettings: updateBody.branchSettings.map((setting, index) =>
+        index === 0 ? { ...setting, stockOnHand: "-0.5" } : setting,
+      ),
+    }).success,
+    false,
+    "product updates must reject fractional stock adjustments",
+  );
+
+  assert.equal(
+    updateTenantProductBodySchema.safeParse({
+      ...updateBody,
+      branchSettings: updateBody.branchSettings.map((setting, index) =>
+        index === 0
+          ? {
+              ...setting,
+              expectedStockOnHand: "0.004",
+              stockOnHand: "0",
+            }
+          : setting,
+      ),
+    }).success,
+    true,
+    "legacy fractional stock must remain correctable through an audited adjustment",
   );
 
   assert.equal(

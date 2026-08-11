@@ -5,8 +5,8 @@ import type { ProductFormErrors, ProductFormValues } from "../types";
 const MAX_CATEGORY_ATTRIBUTES = 30;
 const PRODUCT_STATUSES = new Set(["active", "inactive"]);
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
-const DECIMAL_14_3_PATTERN = /^(?:0|[1-9]\d{0,10})(?:\.\d{1,3})?$/;
-const SIGNED_DECIMAL_14_3_PATTERN = /^-?(?:0|[1-9]\d{0,10})(?:\.\d{1,3})?$/;
+const WHOLE_QUANTITY_PATTERN = /^(?:0|[1-9]\d{0,10})(?:\.0{1,3})?$/;
+const SIGNED_WHOLE_QUANTITY_PATTERN = /^-?(?:0|[1-9]\d{0,10})(?:\.0{1,3})?$/;
 const DECIMAL_12_2_PATTERN = /^(?:0|[1-9]\d{0,9})(?:\.\d{1,2})?$/;
 
 export type ProductFormValidationResult =
@@ -209,7 +209,10 @@ export function validateProductForm(
     errors.unitOfMeasure = "unitOfMeasureTooLong";
   }
 
-  if (!isPositiveDecimal(unitsPerSale, DECIMAL_14_3_PATTERN)) {
+  if (
+    !isPositiveDecimal(unitsPerSale, WHOLE_QUANTITY_PATTERN) ||
+    Number(unitsPerSale) !== 1
+  ) {
     errors.unitsPerSale = "unitsPerSaleInvalid";
   }
 
@@ -244,9 +247,11 @@ export function validateProductForm(
       (setting) =>
         !isNonNegativeDecimal(
           setting.openingStock,
-          mode === "edit" ? SIGNED_DECIMAL_14_3_PATTERN : DECIMAL_14_3_PATTERN,
+          mode === "edit"
+            ? SIGNED_WHOLE_QUANTITY_PATTERN
+            : WHOLE_QUANTITY_PATTERN,
         ) ||
-        !isNonNegativeDecimal(setting.reorderPoint, DECIMAL_14_3_PATTERN) ||
+        !isNonNegativeDecimal(setting.reorderPoint, WHOLE_QUANTITY_PATTERN) ||
         (!input.trackInventory &&
           (Number(setting.openingStock) !== 0 ||
             Number(setting.reorderPoint) !== 0)),
