@@ -4,6 +4,9 @@ export type TenantProfileErrorCode =
   | "CURRENT_PASSWORD_INCORRECT"
   | "NEW_PASSWORD_UNCHANGED"
   | "PASSWORD_POLICY_VIOLATION"
+  | "TENANT_PROFILE_EMAIL_CONFLICT"
+  | "TENANT_LOGIN_SESSION_NOT_FOUND"
+  | "TENANT_CURRENT_SESSION_REVOKE_FORBIDDEN"
   | "TENANT_PROFILE_CONFLICT";
 
 export class TenantProfileError extends Error {
@@ -16,4 +19,3 @@ export class TenantProfileError extends Error {
     this.name = "TenantProfileError";
   }
 }
-

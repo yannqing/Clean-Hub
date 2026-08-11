@@ -3,13 +3,14 @@
 import {
   Badge,
   Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
   Input,
   Label,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   cn,
   toast,
 } from "@cleanhub/ui";
@@ -20,36 +21,38 @@ import {
   Eye,
   EyeOff,
   KeyRound,
-  Languages,
   LaptopMinimal,
-  Mail,
   MapPin,
-  Phone,
   RefreshCw,
   ShieldCheck,
+  Smartphone,
   UserRound,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   type FormEvent,
   type ReactNode,
+  useEffect,
   useMemo,
   useState,
 } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { logoutAction } from "@/features/auth/actions";
-import { useTenantI18n, useWebAdminLocale } from "@/i18n";
+import { useTenantI18n } from "@/i18n";
 
 import {
   changeTenantProfilePasswordAction,
+  revokeTenantLoginSessionAction,
   updateTenantProfileAction,
 } from "../actions";
 import { dispatchTenantProfileUpdated } from "../events";
+import { getTenantLoginSessionsQuery } from "../queries";
 import type {
   TenantPasswordFormErrorCode,
   TenantPasswordFormErrors,
   TenantPasswordFormValues,
+  TenantLoginSession,
   TenantProfile,
   TenantProfileActionErrorCode,
   TenantProfileFormErrorCode,
@@ -63,7 +66,57 @@ import {
 
 type TenantProfileViewProps = {
   initialProfile: TenantProfile | null;
+  initialSessions: TenantLoginSession[] | null;
 };
+
+type LoginSessionDevice = {
+  browser: string;
+  operatingSystem: string;
+  mobile: boolean;
+};
+
+const DEFAULT_VISIBLE_LOGIN_SESSIONS = 5;
+
+function describeLoginSessionDevice(
+  userAgent: string | null,
+  unknownBrowser: string,
+  unknownOperatingSystem: string,
+): LoginSessionDevice {
+  if (!userAgent) {
+    return {
+      browser: unknownBrowser,
+      operatingSystem: unknownOperatingSystem,
+      mobile: false,
+    };
+  }
+
+  const browser = /Edg\//.test(userAgent)
+    ? "Microsoft Edge"
+    : /(?:Chrome|CriOS)\//.test(userAgent)
+      ? "Google Chrome"
+      : /(?:Firefox|FxiOS)\//.test(userAgent)
+        ? "Mozilla Firefox"
+        : /Safari\//.test(userAgent)
+          ? "Safari"
+          : unknownBrowser;
+  const operatingSystem = /iPad|iPhone|iPod/.test(userAgent)
+    ? "iOS"
+    : /Android/.test(userAgent)
+      ? "Android"
+      : /Windows/.test(userAgent)
+        ? "Windows"
+        : /Macintosh|Mac OS X/.test(userAgent)
+          ? "macOS"
+          : /Linux/.test(userAgent)
+            ? "Linux"
+            : unknownOperatingSystem;
+
+  return {
+    browser,
+    operatingSystem,
+    mobile: /Android|iPad|iPhone|iPod|Mobile/.test(userAgent),
+  };
+}
 
 const EMPTY_PASSWORD_FORM: TenantPasswordFormValues = {
   currentPassword: "",
@@ -71,20 +124,11 @@ const EMPTY_PASSWORD_FORM: TenantPasswordFormValues = {
   confirmPassword: "",
 };
 
-function getEditableLanguage(
-  profile: TenantProfile,
-): TenantProfileFormValues["language"] {
-  if (profile.language === "fr" || profile.language === "zh-CN") {
-    return profile.language;
-  }
-
-  return "en";
-}
-
 function getProfileForm(profile: TenantProfile): TenantProfileFormValues {
   return {
     displayName: profile.displayName,
-    language: getEditableLanguage(profile),
+    email: profile.email ?? "",
+    phone: profile.phone ?? "",
   };
 }
 
@@ -153,10 +197,10 @@ function ReadOnlyField({
 
 export function TenantProfileView({
   initialProfile,
+  initialSessions,
 }: TenantProfileViewProps) {
   const router = useRouter();
   const { m, formatDate, formatDateTime } = useTenantI18n();
-  const { setLocale } = useWebAdminLocale();
   const copy = m.profile;
   const [profile, setProfile] = useState(initialProfile);
   const [profileForm, setProfileForm] = useState<TenantProfileFormValues | null>(
@@ -173,6 +217,14 @@ export function TenantProfileView({
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loginSessions, setLoginSessions] =
+    useState<TenantLoginSession[] | null>(initialSessions);
+  const [showAllLoginSessions, setShowAllLoginSessions] = useState(false);
+  const [sessionToRevoke, setSessionToRevoke] =
+    useState<TenantLoginSession | null>(null);
+  const [revokingSessionId, setRevokingSessionId] = useState<string | null>(
+    null,
+  );
 
   const profileDirty = useMemo(() => {
     if (!profile || !profileForm) {
@@ -181,9 +233,28 @@ export function TenantProfileView({
 
     return (
       profileForm.displayName.trim() !== profile.displayName ||
-      profileForm.language !== getEditableLanguage(profile)
+      profileForm.email.trim().toLowerCase() !== (profile.email ?? "") ||
+      profileForm.phone.trim() !== (profile.phone ?? "")
     );
   }, [profile, profileForm]);
+
+  useEffect(() => {
+    let active = true;
+
+    void getTenantLoginSessionsQuery()
+      .then((sessions) => {
+        if (active) {
+          setLoginSessions(sessions);
+        }
+      })
+      .catch(() => {
+        // Keep the server-rendered list when the browser refresh request fails.
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   if (!profile || !profileForm) {
     return (
@@ -252,6 +323,8 @@ export function TenantProfileView({
         return copy.feedback.passwordPolicyViolation;
       case "TENANT_PROFILE_CONFLICT":
         return copy.feedback.conflict;
+      case "TENANT_PROFILE_EMAIL_CONFLICT":
+        return copy.feedback.emailConflict;
       case "TENANT_PROFILE_NOT_FOUND":
         return copy.feedback.notFound;
       default:
@@ -308,7 +381,6 @@ export function TenantProfileView({
       setProfileForm(getProfileForm(result.data));
       setProfileErrors({});
       dispatchTenantProfileUpdated({ displayName: result.data.displayName });
-      setLocale(getEditableLanguage(result.data));
       toast.success(copy.feedback.profileSaved);
     } catch {
       toast.error(copy.feedback.requestFailed);
@@ -351,6 +423,49 @@ export function TenantProfileView({
       toast.error(copy.feedback.requestFailed);
     } finally {
       setSavingPassword(false);
+    }
+  }
+
+  async function handleSessionRevoke() {
+    if (!sessionToRevoke || sessionToRevoke.current) {
+      return;
+    }
+
+    setRevokingSessionId(sessionToRevoke.id);
+
+    try {
+      const result = await revokeTenantLoginSessionAction(sessionToRevoke.id);
+
+      if (!result.ok) {
+        if (result.code === "TENANT_LOGIN_SESSION_NOT_FOUND") {
+          setLoginSessions((current) =>
+            current?.filter((session) => session.id !== sessionToRevoke.id) ??
+            current,
+          );
+          setSessionToRevoke(null);
+          toast.error(copy.devices.sessionNotFound);
+          return;
+        }
+
+        if (result.code === "TENANT_CURRENT_SESSION_REVOKE_FORBIDDEN") {
+          toast.error(copy.devices.currentSessionForbidden);
+          return;
+        }
+
+        toast.error(copy.devices.revokeFailed);
+        return;
+      }
+
+      setLoginSessions((current) =>
+        current?.filter((session) => session.id !== result.sessionId) ??
+        current,
+      );
+      setSessionToRevoke(null);
+      toast.success(copy.devices.revokeSuccess);
+    } catch {
+      toast.error(copy.devices.revokeFailed);
+    } finally {
+      setRevokingSessionId(null);
     }
   }
 
@@ -408,8 +523,8 @@ export function TenantProfileView({
             title={copy.personal.title}
           >
             <form onSubmit={handleProfileSubmit}>
-              <div className="grid gap-5 p-4 sm:grid-cols-2 sm:p-5">
-                <div className="grid gap-2 sm:col-span-2">
+              <div className="grid gap-5 p-4 sm:p-5">
+                <div className="grid gap-2">
                   <Label htmlFor="tenant-profile-display-name">
                     {copy.personal.displayName}
                   </Label>
@@ -435,49 +550,60 @@ export function TenantProfileView({
                   )}
                 </div>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="tenant-profile-language">
-                    {copy.personal.language}
-                  </Label>
-                  <Select
-                    disabled={savingProfile}
-                    onValueChange={(value) =>
-                      updateProfileForm(
-                        "language",
-                        value as TenantProfileFormValues["language"],
-                      )
-                    }
-                    value={profileForm.language}
-                  >
-                    <SelectTrigger
-                      aria-invalid={Boolean(profileErrors.language)}
-                      className="w-full"
-                      id="tenant-profile-language"
-                    >
-                      <Languages aria-hidden className="size-4" />
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="en">
-                        {copy.personal.languageOptions.en}
-                      </SelectItem>
-                      <SelectItem value="fr">
-                        {copy.personal.languageOptions.fr}
-                      </SelectItem>
-                      <SelectItem value="zh-CN">
-                        {copy.personal.languageOptions["zh-CN"]}
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {profileErrors.language ? (
-                    <p className="text-xs text-destructive">
-                      {getProfileErrorMessage(profileErrors.language)}
-                    </p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">
-                      {copy.personal.languageHint}
-                    </p>
-                  )}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="tenant-profile-email">
+                      {copy.personal.email}
+                    </Label>
+                    <Input
+                      aria-invalid={Boolean(profileErrors.email)}
+                      autoComplete="email"
+                      disabled={savingProfile}
+                      id="tenant-profile-email"
+                      maxLength={320}
+                      onChange={(event) =>
+                        updateProfileForm("email", event.target.value)
+                      }
+                      type="email"
+                      value={profileForm.email}
+                    />
+                    {profileErrors.email ? (
+                      <p className="text-xs text-destructive">
+                        {getProfileErrorMessage(profileErrors.email)}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {copy.personal.emailHint}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label htmlFor="tenant-profile-phone">
+                      {copy.personal.phone}
+                    </Label>
+                    <Input
+                      aria-invalid={Boolean(profileErrors.phone)}
+                      autoComplete="tel"
+                      disabled={savingProfile}
+                      id="tenant-profile-phone"
+                      maxLength={32}
+                      onChange={(event) =>
+                        updateProfileForm("phone", event.target.value)
+                      }
+                      type="tel"
+                      value={profileForm.phone}
+                    />
+                    {profileErrors.phone ? (
+                      <p className="text-xs text-destructive">
+                        {getProfileErrorMessage(profileErrors.phone)}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {copy.personal.phoneHint}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -692,15 +818,149 @@ export function TenantProfileView({
             icon={<LaptopMinimal aria-hidden className="size-4" />}
             title={copy.devices.title}
           >
-            <div className="px-4 py-8 text-center sm:px-5">
-              <span className="mx-auto flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <LaptopMinimal aria-hidden className="size-4" />
-              </span>
-              <p className="mt-3 text-sm font-medium">{copy.devices.emptyTitle}</p>
-              <p className="mx-auto mt-1 max-w-lg text-xs leading-5 text-muted-foreground">
-                {copy.devices.emptyDescription}
-              </p>
-            </div>
+            {loginSessions === null ? (
+              <div className="px-4 py-8 text-center sm:px-5">
+                <span className="mx-auto flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <LaptopMinimal aria-hidden className="size-4" />
+                </span>
+                <p className="mt-3 text-sm font-medium">
+                  {copy.devices.loadErrorTitle}
+                </p>
+                <p className="mx-auto mt-1 max-w-lg text-xs leading-5 text-muted-foreground">
+                  {copy.devices.loadErrorDescription}
+                </p>
+                <Button
+                  className="mt-4"
+                  onClick={() => router.refresh()}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <RefreshCw aria-hidden />
+                  {copy.retry}
+                </Button>
+              </div>
+            ) : loginSessions.length === 0 ? (
+              <div className="px-4 py-8 text-center sm:px-5">
+                <span className="mx-auto flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <LaptopMinimal aria-hidden className="size-4" />
+                </span>
+                <p className="mt-3 text-sm font-medium">
+                  {copy.devices.emptyTitle}
+                </p>
+                <p className="mx-auto mt-1 max-w-lg text-xs leading-5 text-muted-foreground">
+                  {copy.devices.emptyDescription}
+                </p>
+              </div>
+            ) : (
+              <ul className="divide-y">
+                {(showAllLoginSessions
+                  ? loginSessions
+                  : loginSessions.slice(0, DEFAULT_VISIBLE_LOGIN_SESSIONS)
+                ).map((session) => {
+                  const device = describeLoginSessionDevice(
+                    session.userAgent,
+                    copy.devices.unknownBrowser,
+                    copy.devices.unknownOperatingSystem,
+                  );
+
+                  return (
+                    <li
+                      className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-start sm:px-5"
+                      key={session.id}
+                    >
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                        {device.mobile ? (
+                          <Smartphone aria-hidden className="size-4" />
+                        ) : (
+                          <LaptopMinimal aria-hidden className="size-4" />
+                        )}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-semibold">
+                            {device.browser}
+                          </p>
+                          {session.current ? (
+                            <Badge variant="secondary">
+                              {copy.devices.currentDevice}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {device.operatingSystem}
+                        </p>
+                        <dl className="mt-3 grid gap-x-5 gap-y-2 text-xs sm:grid-cols-2">
+                          <div>
+                            <dt className="text-muted-foreground">
+                              {copy.devices.ipAddress}
+                            </dt>
+                            <dd className="mt-0.5 font-medium">
+                              {session.ipAddress || copy.devices.unknownIp}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">
+                              {copy.devices.lastActive}
+                            </dt>
+                            <dd className="mt-0.5 font-medium">
+                              {formatDateTime(session.lastActiveAt)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">
+                              {copy.devices.signedInAt}
+                            </dt>
+                            <dd className="mt-0.5 font-medium">
+                              {formatDateTime(session.signedInAt)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-muted-foreground">
+                              {copy.devices.expiresAt}
+                            </dt>
+                            <dd className="mt-0.5 font-medium">
+                              {formatDateTime(session.expiresAt)}
+                            </dd>
+                          </div>
+                        </dl>
+                      </div>
+                      {session.current ? null : (
+                        <Button
+                          className="shrink-0"
+                          disabled={revokingSessionId !== null}
+                          onClick={() => setSessionToRevoke(session)}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                        >
+                          {copy.devices.revoke}
+                        </Button>
+                      )}
+                    </li>
+                  );
+                })}
+                {loginSessions.length > DEFAULT_VISIBLE_LOGIN_SESSIONS ? (
+                  <li className="flex justify-center px-4 py-3 sm:px-5">
+                    <Button
+                      onClick={() =>
+                        setShowAllLoginSessions((current) => !current)
+                      }
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      {showAllLoginSessions
+                        ? copy.devices.showLess
+                        : copy.devices.showAll.replace(
+                            "{count}",
+                            String(loginSessions.length),
+                          )}
+                    </Button>
+                  </li>
+                ) : null}
+              </ul>
+            )}
           </ProfileSection>
         </div>
 
@@ -710,16 +970,6 @@ export function TenantProfileView({
             title={copy.account.title}
           >
             <dl className="divide-y px-4 sm:px-5">
-              <ReadOnlyField
-                icon={<Mail aria-hidden className="size-4" />}
-                label={copy.account.email}
-                value={profile.email || copy.notProvided}
-              />
-              <ReadOnlyField
-                icon={<Phone aria-hidden className="size-4" />}
-                label={copy.account.phone}
-                value={profile.phone || copy.notProvided}
-              />
               <ReadOnlyField
                 icon={<Clock3 aria-hidden className="size-4" />}
                 label={copy.account.lastLogin}
@@ -822,6 +1072,44 @@ export function TenantProfileView({
           </ProfileSection>
         </div>
       </div>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && revokingSessionId === null) {
+            setSessionToRevoke(null);
+          }
+        }}
+        open={Boolean(sessionToRevoke)}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{copy.devices.revokeDialogTitle}</DialogTitle>
+            <DialogDescription>
+              {copy.devices.revokeDialogDescription}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              disabled={revokingSessionId !== null}
+              onClick={() => setSessionToRevoke(null)}
+              type="button"
+              variant="outline"
+            >
+              {copy.devices.cancel}
+            </Button>
+            <Button
+              disabled={revokingSessionId !== null}
+              onClick={() => void handleSessionRevoke()}
+              type="button"
+              variant="destructive"
+            >
+              {revokingSessionId
+                ? copy.devices.revoking
+                : copy.devices.confirmRevoke}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

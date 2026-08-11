@@ -48,6 +48,8 @@ export type TenantProfile = {
 
 export type UpdateTenantProfileRequest = {
   displayName?: string;
+  email?: string;
+  phone?: string | null;
   language?: TenantProfileLanguage;
 };
 
@@ -61,11 +63,30 @@ export type ChangeTenantProfilePasswordResult = {
   sessionsRevoked: number;
 };
 
+export type TenantLoginSession = {
+  id: string;
+  deviceId: string | null;
+  userAgent: string | null;
+  ipAddress: string | null;
+  signedInAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  current: boolean;
+};
+
+export type RevokeTenantLoginSessionResult = {
+  id: string;
+  revoked: true;
+  sessionsRevoked: number;
+};
+
 export type TenantProfileErrorCode =
   | "TENANT_PROFILE_NOT_FOUND"
   | "TENANT_PROFILE_UPDATE_EMPTY"
   | "CURRENT_PASSWORD_INCORRECT"
   | "NEW_PASSWORD_UNCHANGED"
   | "PASSWORD_POLICY_VIOLATION"
+  | "TENANT_PROFILE_EMAIL_CONFLICT"
+  | "TENANT_LOGIN_SESSION_NOT_FOUND"
+  | "TENANT_CURRENT_SESSION_REVOKE_FORBIDDEN"
   | "TENANT_PROFILE_CONFLICT";
-

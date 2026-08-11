@@ -175,6 +175,7 @@ export const zhCNMessages: WebAdminMessages = {
           allBranches: "全部门店",
           assignedBranches: "已分配 {count} 个门店",
           profile: "个人中心",
+          loadingProfile: "正在加载个人中心…",
           employees: "员工管理",
           settings: "租户设置",
         },

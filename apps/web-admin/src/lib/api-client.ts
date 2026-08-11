@@ -10,6 +10,7 @@ import {
   AUTH_REDIRECT_REASON_PARAM,
   type AuthRedirectReason,
 } from "@/config/auth-routing";
+import { getOrCreateWebAdminDeviceId } from "@/features/auth/utils";
 
 const DEFAULT_API_BASE_URL = "http://localhost:4000";
 let refreshRequest: Promise<unknown> | null = null;
@@ -64,6 +65,10 @@ function isTenantAccessDeniedError(error: unknown): boolean {
 export const webAdminApi = createCleanHubApiClient({
   baseUrl: getApiBaseUrl(),
   credentials: "include",
+  defaultHeaders: (): Record<string, string> =>
+    typeof window === "undefined"
+      ? {}
+      : { "x-device-id": getOrCreateWebAdminDeviceId() },
   timeoutMs: 30_000,
   retry: {
     retries: 1,

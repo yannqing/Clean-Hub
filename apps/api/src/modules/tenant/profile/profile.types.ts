@@ -50,6 +50,8 @@ export type TenantProfile = {
 
 export type UpdateTenantProfileRequest = {
   displayName?: string;
+  email?: string;
+  phone?: string | null;
   language?: TenantProfileLanguage;
 };
 
@@ -63,6 +65,32 @@ export type ChangeTenantProfilePasswordResult = {
   sessionsRevoked: number;
 };
 
+export type TenantLoginSession = {
+  id: string;
+  deviceId: string | null;
+  userAgent: string | null;
+  ipAddress: string | null;
+  signedInAt: string;
+  lastActiveAt: string;
+  expiresAt: string;
+  current: boolean;
+};
+
+export type RevokeTenantLoginSessionResult = {
+  id: string;
+  revoked: true;
+  sessionsRevoked: number;
+};
+
+export type TenantLoginSessionRecord = Omit<
+  TenantLoginSession,
+  "current" | "signedInAt" | "lastActiveAt" | "expiresAt"
+> & {
+  signedInAt: Date;
+  lastActiveAt: Date;
+  expiresAt: Date;
+};
+
 export type TenantProfileRequestInput<TData> = {
   authContext: AuthContext;
   requestMeta?: AuthRequestMeta;
@@ -73,5 +101,5 @@ export type TenantProfileRecord = Omit<TenantProfile, "passwordPolicy">;
 
 export type TenantProfileMutableFields = Pick<
   TenantProfile,
-  "displayName" | "language"
+  "displayName" | "email" | "phone" | "language"
 >;

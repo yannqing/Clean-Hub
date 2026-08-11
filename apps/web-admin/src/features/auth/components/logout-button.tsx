@@ -10,12 +10,14 @@ import { logoutAction } from "../actions/logout.action";
 
 type LogoutButtonProps = {
   className?: string;
+  leadingIcon?: React.ReactNode;
   signOutLabel?: string;
   signingOutLabel?: string;
 };
 
 export function LogoutButton({
   className,
+  leadingIcon,
   signOutLabel = "Sign out",
   signingOutLabel = "Signing out...",
 }: LogoutButtonProps) {
@@ -54,6 +56,7 @@ export function LogoutButton({
       type="button"
       variant="ghost"
     >
+      {leadingIcon}
       {submitting ? signingOutLabel : signOutLabel}
     </Button>
   );

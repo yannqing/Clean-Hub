@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import {
   authRefreshTokens,
@@ -14,6 +14,7 @@ import {
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import type {
   TenantProfileLanguage,
+  TenantLoginSessionRecord,
   TenantProfileMutableFields,
   TenantProfileRecord,
   TenantProfileRole,
@@ -152,27 +153,55 @@ export async function updateTenantSelfProfileRecord(
   db: Database,
   input: {
     userId: string;
+    tenantId: string;
     fields: TenantProfileMutableFields;
+    updateIdentity: boolean;
+    updateProfile: boolean;
   },
 ): Promise<void> {
   const now = new Date();
 
-  await db
-    .insert(userProfiles)
-    .values({
-      userId: input.userId,
-      displayName: input.fields.displayName.trim(),
-      language: input.fields.language,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: userProfiles.userId,
-      set: {
+  if (input.updateIdentity) {
+    const email = input.fields.email?.trim().toLowerCase() ?? null;
+    const phone = input.fields.phone?.trim() || null;
+
+    await db
+      .update(users)
+      .set({
+        email,
+        normalizedEmail: email,
+        phone,
+        updatedAt: now,
+        version: sql`${users.version} + 1`,
+      })
+      .where(
+        and(
+          eq(users.id, input.userId),
+          eq(users.tenantId, input.tenantId),
+          eq(users.userType, "tenant"),
+          isNull(users.deletedAt),
+        ),
+      );
+  }
+
+  if (input.updateProfile) {
+    await db
+      .insert(userProfiles)
+      .values({
+        userId: input.userId,
         displayName: input.fields.displayName.trim(),
         language: input.fields.language,
         updatedAt: now,
-      },
-    });
+      })
+      .onConflictDoUpdate({
+        target: userProfiles.userId,
+        set: {
+          displayName: input.fields.displayName.trim(),
+          language: input.fields.language,
+          updatedAt: now,
+        },
+      });
+  }
 }
 
 export async function findTenantUserCredential(
@@ -243,6 +272,153 @@ export async function revokeTenantUserRefreshTokens(
     .returning({ id: authRefreshTokens.id });
 
   return rows.length;
+}
+
+export async function findTenantLoginSessionFamilyIdByTokenHash(
+  db: Database,
+  input: { tenantId: string; userId: string; tokenHash: string },
+): Promise<string | null> {
+  const rows = await db
+    .select({ familyId: authRefreshTokens.familyId })
+    .from(authRefreshTokens)
+    .where(
+      and(
+        eq(authRefreshTokens.userId, input.userId),
+        eq(authRefreshTokens.tenantId, input.tenantId),
+        eq(authRefreshTokens.tokenHash, input.tokenHash),
+        isNull(authRefreshTokens.terminalId),
+      ),
+    )
+    .limit(1);
+
+  return rows[0]?.familyId ?? null;
+}
+
+export async function listTenantLoginSessionRecords(
+  db: Database,
+  input: { tenantId: string; userId: string },
+): Promise<TenantLoginSessionRecord[]> {
+  const now = new Date();
+  const activeTokens = await db
+    .select({
+      id: authRefreshTokens.familyId,
+      deviceId: authRefreshTokens.deviceId,
+      userAgent: authRefreshTokens.userAgent,
+      ipAddress: authRefreshTokens.ipAddress,
+      lastActiveAt: authRefreshTokens.createdAt,
+      expiresAt: authRefreshTokens.expiresAt,
+    })
+    .from(authRefreshTokens)
+    .where(
+      and(
+        eq(authRefreshTokens.userId, input.userId),
+        eq(authRefreshTokens.tenantId, input.tenantId),
+        isNull(authRefreshTokens.terminalId),
+        isNull(authRefreshTokens.revokedAt),
+        gt(authRefreshTokens.expiresAt, now),
+      ),
+    )
+    .orderBy(desc(authRefreshTokens.createdAt));
+
+  if (activeTokens.length === 0) {
+    return [];
+  }
+
+  const familyIds = [...new Set(activeTokens.map((token) => token.id))];
+  const familyStarts = await db
+    .select({
+      familyId: authRefreshTokens.familyId,
+      signedInAt: sql<Date>`min(${authRefreshTokens.createdAt})`.as(
+        "signed_in_at",
+      ),
+    })
+    .from(authRefreshTokens)
+    .where(
+      and(
+        eq(authRefreshTokens.userId, input.userId),
+        eq(authRefreshTokens.tenantId, input.tenantId),
+        isNull(authRefreshTokens.terminalId),
+        inArray(authRefreshTokens.familyId, familyIds),
+      ),
+    )
+    .groupBy(authRefreshTokens.familyId);
+  const signedInAtByFamily = new Map(
+    familyStarts.map((row) => [row.familyId, row.signedInAt]),
+  );
+
+  return activeTokens.map((token) => ({
+    ...token,
+    signedInAt: signedInAtByFamily.get(token.id) ?? token.lastActiveAt,
+  }));
+}
+
+export async function findTenantLoginSessionRecord(
+  db: Database,
+  input: { tenantId: string; userId: string; sessionId: string },
+): Promise<TenantLoginSessionRecord | null> {
+  const sessions = await listTenantLoginSessionRecords(db, input);
+  return sessions.find((session) => session.id === input.sessionId) ?? null;
+}
+
+export async function revokeTenantLoginDeviceSessions(
+  db: Database,
+  input: {
+    tenantId: string;
+    userId: string;
+    session: TenantLoginSessionRecord;
+    currentFamilyId: string | null;
+  },
+): Promise<number> {
+  const deviceFilter = input.session.deviceId
+    ? eq(authRefreshTokens.deviceId, input.session.deviceId)
+    : isNull(authRefreshTokens.deviceId);
+  const rows = await db
+    .update(authRefreshTokens)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(authRefreshTokens.userId, input.userId),
+        eq(authRefreshTokens.tenantId, input.tenantId),
+        isNull(authRefreshTokens.terminalId),
+        isNull(authRefreshTokens.revokedAt),
+        gt(authRefreshTokens.expiresAt, new Date()),
+        deviceFilter,
+        input.currentFamilyId
+          ? ne(authRefreshTokens.familyId, input.currentFamilyId)
+          : undefined,
+      ),
+    )
+    .returning({ id: authRefreshTokens.id });
+
+  return rows.length;
+}
+
+export async function writeTenantLoginSessionRevokedAuditLog(
+  db: Database,
+  input: {
+    tenantId: string;
+    actorUserId: string;
+    sessionId: string;
+    deviceId: string | null;
+    sessionsRevoked: number;
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    eventCategory: "auth",
+    eventType: "auth.session.revoked",
+    success: true,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    metadata: {
+      sessionId: input.sessionId,
+      deviceId: input.deviceId,
+      sessionsRevoked: input.sessionsRevoked,
+    },
+  });
 }
 
 export async function writeTenantProfileUpdatedAuditLog(

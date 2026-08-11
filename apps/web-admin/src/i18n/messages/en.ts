@@ -180,6 +180,7 @@ export const enMessages: WebAdminMessages = {
           allBranches: "All branches",
           assignedBranches: "{count} assigned branches",
           profile: "Personal center",
+          loadingProfile: "Loading personal center…",
           employees: "Employee management",
           settings: "Tenant settings",
         },

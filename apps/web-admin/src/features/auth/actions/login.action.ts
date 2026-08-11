@@ -1,6 +1,7 @@
 "use server";
 
 import type { AuthContext } from "@cleanhub/api-client";
+import { headers } from "next/headers";
 
 import { getWebAdminHomePath } from "@/config/auth-routing";
 import { webAdminApi } from "@/lib/api-client";
@@ -58,6 +59,19 @@ export async function loginAction(
   }
 
   try {
+    const incomingHeaders = await headers();
+    const forwardedHeaders: Record<string, string> = {};
+    const userAgent = incomingHeaders.get("user-agent");
+    const forwardedFor = incomingHeaders.get("x-forwarded-for");
+
+    if (userAgent) {
+      forwardedHeaders["user-agent"] = userAgent;
+    }
+
+    if (forwardedFor) {
+      forwardedHeaders["x-forwarded-for"] = forwardedFor;
+    }
+
     let loginResponse: Response | undefined;
     const result = await webAdminApi.auth.login(
       {
@@ -66,6 +80,7 @@ export async function loginAction(
         deviceId: input.deviceId,
       },
       {
+        headers: forwardedHeaders,
         afterResponse: (response) => {
           loginResponse = response;
         },

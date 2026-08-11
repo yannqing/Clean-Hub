@@ -5,6 +5,8 @@ export const tenantProfileLanguageSchema = z.enum(["en", "fr", "zh-CN"]);
 export const updateTenantProfileBodySchema = z
   .object({
     displayName: z.string().trim().min(1).max(120).optional(),
+    email: z.string().trim().email().max(320).optional(),
+    phone: z.string().trim().max(32).nullable().optional(),
     language: tenantProfileLanguageSchema.optional(),
   })
   .strict()
@@ -19,3 +21,7 @@ export const changeTenantProfilePasswordBodySchema = z
     newPassword: z.string().min(1).max(128),
   })
   .strict();
+
+export const tenantLoginSessionParamsSchema = z.object({
+  sessionId: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+});

@@ -5,6 +5,9 @@ import type {
   TenantProfileFormErrors,
   TenantProfileFormValues,
 } from "../types";
+import { z } from "zod";
+
+const PROFILE_EMAIL_SCHEMA = z.string().email();
 
 type TenantProfileValidationResult =
   | {
@@ -31,6 +34,8 @@ export function validateTenantProfileForm(
 ): TenantProfileValidationResult {
   const errors: TenantProfileFormErrors = {};
   const displayName = input.displayName.trim();
+  const email = input.email.trim().toLowerCase();
+  const phone = input.phone.trim();
 
   if (!displayName) {
     errors.displayName = "displayNameRequired";
@@ -38,12 +43,16 @@ export function validateTenantProfileForm(
     errors.displayName = "displayNameTooLong";
   }
 
-  if (
-    input.language !== "en" &&
-    input.language !== "fr" &&
-    input.language !== "zh-CN"
-  ) {
-    errors.language = "invalidLanguage";
+  if (!email) {
+    errors.email = "emailRequired";
+  } else if (email.length > 320) {
+    errors.email = "emailTooLong";
+  } else if (!PROFILE_EMAIL_SCHEMA.safeParse(email).success) {
+    errors.email = "emailInvalid";
+  }
+
+  if (phone.length > 32) {
+    errors.phone = "phoneTooLong";
   }
 
   if (Object.keys(errors).length > 0) {
@@ -54,7 +63,8 @@ export function validateTenantProfileForm(
     ok: true,
     data: {
       displayName,
-      language: input.language,
+      email,
+      phone,
     },
   };
 }

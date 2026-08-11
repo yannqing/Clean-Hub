@@ -628,6 +628,57 @@ export class AuthRepository {
     return rows[0]?.id ?? "";
   }
 
+  async createWebRefreshTokenReplacingDeviceSessions({
+    userId,
+    tenantId,
+    tokenHash,
+    familyId,
+    expiresAt,
+    meta,
+  }: {
+    userId: string;
+    tenantId: string | null;
+    tokenHash: string;
+    familyId: string;
+    expiresAt: Date;
+    meta?: AuthRequestMeta;
+  }): Promise<string> {
+    return this.db.transaction(async (tx) => {
+      if (meta?.deviceId) {
+        await tx
+          .update(authRefreshTokens)
+          .set({ revokedAt: new Date() })
+          .where(
+            and(
+              eq(authRefreshTokens.userId, userId),
+              tenantId === null
+                ? isNull(authRefreshTokens.tenantId)
+                : eq(authRefreshTokens.tenantId, tenantId),
+              eq(authRefreshTokens.deviceId, meta.deviceId),
+              isNull(authRefreshTokens.terminalId),
+              isNull(authRefreshTokens.revokedAt),
+            ),
+          );
+      }
+
+      const rows = await tx
+        .insert(authRefreshTokens)
+        .values({
+          userId,
+          tenantId,
+          tokenHash,
+          familyId,
+          deviceId: meta?.deviceId,
+          ipAddress: meta?.ipAddress,
+          userAgent: meta?.userAgent,
+          expiresAt,
+        })
+        .returning({ id: authRefreshTokens.id });
+
+      return rows[0]?.id ?? "";
+    });
+  }
+
   async findRefreshTokenByHash(
     tokenHash: string,
   ): Promise<StoredRefreshToken | null> {

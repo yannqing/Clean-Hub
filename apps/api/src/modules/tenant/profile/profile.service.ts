@@ -3,30 +3,58 @@ import { getDb, type Database } from "@cleanhub/db";
 import { resolveAllowedBranchIds } from "../../auth/branch-scope.helper.js";
 import { validatePasswordAgainstPolicy } from "../../auth/password-policy.helper.js";
 import { hashPassword, verifyPassword } from "../../auth/password.service.js";
+import { isNormalizedEmailUniqueViolation } from "../../auth/email-identity.helper.js";
 import {
   assertActiveTenant,
   requireTenantRole,
 } from "../../auth/permission.helper.js";
 import { resolveEffectiveSecurityPolicy } from "../../saas/security/security-policy.js";
+import { hashOpaqueToken } from "../../auth/token.service.js";
 import { TenantProfileError } from "./profile.errors.js";
 import {
+  findTenantLoginSessionFamilyIdByTokenHash,
+  findTenantLoginSessionRecord,
   findTenantSelfProfile,
   findTenantUserCredential,
+  listTenantLoginSessionRecords,
+  revokeTenantLoginDeviceSessions,
   revokeTenantUserRefreshTokens,
   updateTenantSelfProfileRecord,
   updateTenantUserPasswordRecord,
+  writeTenantLoginSessionRevokedAuditLog,
   writeTenantPasswordChangedAuditLog,
   writeTenantProfileUpdatedAuditLog,
 } from "./profile.repository.js";
 import type {
   ChangeTenantProfilePasswordRequest,
   ChangeTenantProfilePasswordResult,
+  RevokeTenantLoginSessionResult,
+  TenantLoginSession,
   TenantProfile,
   TenantProfileMutableFields,
   TenantProfileRecord,
   TenantProfileRequestInput,
   UpdateTenantProfileRequest,
 } from "./profile.types.js";
+
+function toIsoString(value: Date): string {
+  return new Date(value).toISOString();
+}
+
+async function resolveCurrentLoginSessionFamilyId(
+  db: Database,
+  input: { tenantId: string; userId: string; refreshToken?: string },
+): Promise<string | null> {
+  if (!input.refreshToken) {
+    return null;
+  }
+
+  return findTenantLoginSessionFamilyIdByTokenHash(db, {
+    tenantId: input.tenantId,
+    userId: input.userId,
+    tokenHash: hashOpaqueToken(input.refreshToken),
+  });
+}
 
 function requireTenantId(
   authContext: TenantProfileRequestInput<unknown>["authContext"],
@@ -65,8 +93,60 @@ function toMutableFields(
 ): TenantProfileMutableFields {
   return {
     displayName: profile.displayName,
+    email: profile.email,
+    phone: profile.phone,
     language: profile.language,
   };
+}
+
+function normalizeOptionalPhone(phone: string | null): string | null {
+  return phone?.trim() || null;
+}
+
+function getLoginDeviceGroupKey(session: TenantLoginSession): string {
+  if (session.deviceId) {
+    return `device:${session.deviceId}`;
+  }
+
+  return "legacy:unknown";
+}
+
+function groupLoginSessionsByDevice(
+  sessions: TenantLoginSession[],
+): TenantLoginSession[] {
+  const sortedSessions = [...sessions].sort((left, right) => {
+    if (left.current !== right.current) {
+      return left.current ? -1 : 1;
+    }
+
+    return right.lastActiveAt.localeCompare(left.lastActiveAt);
+  });
+  const devices = new Map<string, TenantLoginSession>();
+
+  for (const session of sortedSessions) {
+    const key = getLoginDeviceGroupKey(session);
+    const existing = devices.get(key);
+
+    if (!existing) {
+      devices.set(key, { ...session });
+      continue;
+    }
+
+    if (session.lastActiveAt > existing.lastActiveAt) {
+      existing.lastActiveAt = session.lastActiveAt;
+    }
+    if (session.expiresAt > existing.expiresAt) {
+      existing.expiresAt = session.expiresAt;
+    }
+  }
+
+  return [...devices.values()].sort((left, right) => {
+    if (left.current !== right.current) {
+      return left.current ? -1 : 1;
+    }
+
+    return right.lastActiveAt.localeCompare(left.lastActiveAt);
+  });
 }
 
 async function attachPasswordPolicy(
@@ -96,6 +176,124 @@ export async function getTenantSelfProfile(
   return attachPasswordPolicy(profile, db);
 }
 
+export async function getTenantLoginSessions(
+  input: {
+    authContext: TenantProfileRequestInput<unknown>["authContext"];
+    requestMeta?: TenantProfileRequestInput<unknown>["requestMeta"];
+    refreshToken?: string;
+  },
+  db: Database = getDb(),
+): Promise<TenantLoginSession[]> {
+  const tenantId = requireTenantId(input.authContext);
+  await assertActiveTenant(input.authContext, db);
+
+  const [sessions, currentFamilyId] = await Promise.all([
+    listTenantLoginSessionRecords(db, {
+      tenantId,
+      userId: input.authContext.userId,
+    }),
+    resolveCurrentLoginSessionFamilyId(db, {
+      tenantId,
+      userId: input.authContext.userId,
+      refreshToken: input.refreshToken,
+    }),
+  ]);
+
+  return groupLoginSessionsByDevice(
+    sessions.map((session) => {
+      const current = session.id === currentFamilyId;
+
+      return {
+        id: session.id,
+        deviceId: current
+          ? (input.requestMeta?.deviceId ?? session.deviceId)
+          : session.deviceId,
+        userAgent: current
+          ? (input.requestMeta?.userAgent ?? session.userAgent)
+          : session.userAgent,
+        ipAddress: current
+          ? (input.requestMeta?.ipAddress ?? session.ipAddress)
+          : session.ipAddress,
+        signedInAt: toIsoString(session.signedInAt),
+        lastActiveAt: toIsoString(session.lastActiveAt),
+        expiresAt: toIsoString(session.expiresAt),
+        current,
+      };
+    }),
+  );
+}
+
+export async function revokeTenantLoginSession(
+  input: {
+    authContext: TenantProfileRequestInput<unknown>["authContext"];
+    requestMeta?: TenantProfileRequestInput<unknown>["requestMeta"];
+    refreshToken?: string;
+    sessionId: string;
+  },
+  db: Database = getDb(),
+): Promise<RevokeTenantLoginSessionResult> {
+  const tenantId = requireTenantId(input.authContext);
+  await assertActiveTenant(input.authContext, db);
+
+  return db.transaction(async (tx) => {
+    const [session, currentFamilyId] = await Promise.all([
+      findTenantLoginSessionRecord(tx, {
+        tenantId,
+        userId: input.authContext.userId,
+        sessionId: input.sessionId,
+      }),
+      resolveCurrentLoginSessionFamilyId(tx, {
+        tenantId,
+        userId: input.authContext.userId,
+        refreshToken: input.refreshToken,
+      }),
+    ]);
+
+    if (!session) {
+      throw new TenantProfileError(
+        "TENANT_LOGIN_SESSION_NOT_FOUND",
+        "The login session was not found or is no longer active.",
+        404,
+      );
+    }
+
+    if (session.id === currentFamilyId) {
+      throw new TenantProfileError(
+        "TENANT_CURRENT_SESSION_REVOKE_FORBIDDEN",
+        "The current login session cannot be revoked from this screen.",
+        409,
+      );
+    }
+
+    const revokedCount = await revokeTenantLoginDeviceSessions(tx, {
+      tenantId,
+      userId: input.authContext.userId,
+      session,
+      currentFamilyId,
+    });
+
+    if (revokedCount === 0) {
+      throw new TenantProfileError(
+        "TENANT_LOGIN_SESSION_NOT_FOUND",
+        "The login session was not found or is no longer active.",
+        404,
+      );
+    }
+
+    await writeTenantLoginSessionRevokedAuditLog(tx, {
+      tenantId,
+      actorUserId: input.authContext.userId,
+      sessionId: session.id,
+      deviceId: session.deviceId,
+      sessionsRevoked: revokedCount,
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return { id: session.id, revoked: true, sessionsRevoked: revokedCount };
+  });
+}
+
 export async function updateTenantSelfProfile(
   input: TenantProfileRequestInput<UpdateTenantProfileRequest>,
   db: Database = getDb(),
@@ -111,38 +309,63 @@ export async function updateTenantSelfProfile(
     );
   }
 
-  return db.transaction(async (tx) => {
-    const before = await loadSelfProfile(tx, {
-      authContext: input.authContext,
-      tenantId,
-    });
-    const beforeFields = toMutableFields(before);
-    const fields: TenantProfileMutableFields = {
-      displayName: input.data.displayName ?? beforeFields.displayName,
-      language: input.data.language ?? beforeFields.language,
-    };
+  try {
+    return await db.transaction(async (tx) => {
+      const before = await loadSelfProfile(tx, {
+        authContext: input.authContext,
+        tenantId,
+      });
+      const beforeFields = toMutableFields(before);
+      const fields: TenantProfileMutableFields = {
+        displayName: input.data.displayName ?? beforeFields.displayName,
+        email:
+          input.data.email !== undefined
+            ? input.data.email.trim().toLowerCase()
+            : beforeFields.email,
+        phone:
+          input.data.phone !== undefined
+            ? normalizeOptionalPhone(input.data.phone)
+            : beforeFields.phone,
+        language: input.data.language ?? beforeFields.language,
+      };
 
-    await updateTenantSelfProfileRecord(tx, {
-      userId: input.authContext.userId,
-      fields,
-    });
+      await updateTenantSelfProfileRecord(tx, {
+        userId: input.authContext.userId,
+        tenantId,
+        fields,
+        updateIdentity:
+          input.data.email !== undefined || input.data.phone !== undefined,
+        updateProfile:
+          input.data.displayName !== undefined || input.data.language !== undefined,
+      });
 
-    const after = await loadSelfProfile(tx, {
-      authContext: input.authContext,
-      tenantId,
-    });
+      const after = await loadSelfProfile(tx, {
+        authContext: input.authContext,
+        tenantId,
+      });
 
-    await writeTenantProfileUpdatedAuditLog(tx, {
-      tenantId,
-      actorUserId: input.authContext.userId,
-      before: beforeFields,
-      after: toMutableFields(after),
-      ipAddress: input.requestMeta?.ipAddress,
-      userAgent: input.requestMeta?.userAgent,
-    });
+      await writeTenantProfileUpdatedAuditLog(tx, {
+        tenantId,
+        actorUserId: input.authContext.userId,
+        before: beforeFields,
+        after: toMutableFields(after),
+        ipAddress: input.requestMeta?.ipAddress,
+        userAgent: input.requestMeta?.userAgent,
+      });
 
-    return attachPasswordPolicy(after, tx);
-  });
+      return attachPasswordPolicy(after, tx);
+    });
+  } catch (error) {
+    if (isNormalizedEmailUniqueViolation(error)) {
+      throw new TenantProfileError(
+        "TENANT_PROFILE_EMAIL_CONFLICT",
+        "An account with this email already exists.",
+        409,
+      );
+    }
+
+    throw error;
+  }
 }
 
 export async function changeTenantSelfPassword(

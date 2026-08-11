@@ -1,19 +1,20 @@
-import type {
-  TenantProfile,
-  TenantProfileLanguage,
-} from "@cleanhub/api-client";
+import type { TenantLoginSession, TenantProfile } from "@cleanhub/api-client";
 
-export type { TenantProfile, TenantProfileLanguage };
+export type { TenantLoginSession, TenantProfile };
 
 export type TenantProfileFormValues = {
   displayName: string;
-  language: Extract<TenantProfileLanguage, "en" | "fr" | "zh-CN">;
+  email: string;
+  phone: string;
 };
 
 export type TenantProfileFormErrorCode =
   | "displayNameRequired"
   | "displayNameTooLong"
-  | "invalidLanguage";
+  | "emailRequired"
+  | "emailInvalid"
+  | "emailTooLong"
+  | "phoneTooLong";
 
 export type TenantProfileFormErrors = Partial<
   Record<keyof TenantProfileFormValues, TenantProfileFormErrorCode>
@@ -45,5 +46,11 @@ export type TenantProfileActionErrorCode =
   | "PASSWORD_POLICY_VIOLATION"
   | "TENANT_PROFILE_NOT_FOUND"
   | "TENANT_PROFILE_UPDATE_EMPTY"
+  | "TENANT_PROFILE_EMAIL_CONFLICT"
   | "TENANT_PROFILE_CONFLICT"
+  | "UNKNOWN";
+
+export type TenantLoginSessionActionErrorCode =
+  | "TENANT_LOGIN_SESSION_NOT_FOUND"
+  | "TENANT_CURRENT_SESSION_REVOKE_FORBIDDEN"
   | "UNKNOWN";

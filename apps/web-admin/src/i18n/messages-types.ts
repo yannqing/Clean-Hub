@@ -170,6 +170,7 @@ type TenantShellCopy = ShellCopy & {
       allBranches: string;
       assignedBranches: string;
       profile: string;
+      loadingProfile: string;
       employees: string;
       settings: string;
     };

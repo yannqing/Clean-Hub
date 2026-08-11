@@ -8,18 +8,14 @@ import {
   PopoverTrigger,
   cn,
 } from "@cleanhub/ui";
-import {
-  ChevronDown,
-  Settings,
-  UserRound,
-  UsersRound,
-} from "lucide-react";
+import { ChevronDown, LoaderCircle, LogOut, UserRound } from "lucide-react";
 import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useTransition } from "react";
 
-import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { webAdminRoutes } from "@/config/routes";
 import { LogoutButton } from "@/features/auth/components";
-import { interpolate, useWebAdminLocale } from "@/i18n";
+import { useWebAdminLocale } from "@/i18n";
 
 import type { TenantHeaderCopy } from "../types";
 
@@ -31,6 +27,21 @@ type TenantHeaderAccountMenuProps = {
   onOpenChange: (open: boolean) => void;
 };
 
+function getAccountInitials(accountName: string): string {
+  const parts = accountName.trim().split(/\s+/).filter(Boolean);
+
+  if (parts.length > 1) {
+    return `${Array.from(parts[0] ?? "")[0] ?? ""}${
+      Array.from(parts.at(-1) ?? "")[0] ?? ""
+    }`.toUpperCase();
+  }
+
+  return Array.from(parts[0] ?? "CH")
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
+
 export function TenantHeaderAccountMenu({
   accountName,
   authContext,
@@ -39,125 +50,140 @@ export function TenantHeaderAccountMenu({
   onOpenChange,
 }: TenantHeaderAccountMenuProps) {
   const { messages } = useWebAdminLocale();
+  const pathname = usePathname();
+  const router = useRouter();
+  const [isProfilePending, startProfileTransition] = useTransition();
   const roleLabel = authContext
     ? messages.tenant.settings.navigation.roleLabels[authContext.role]
     : messages.tenant.settings.navigation.accountFallback;
-  const branchScope =
-    authContext?.role === "owner"
-      ? copy.account.allBranches
-      : interpolate(copy.account.assignedBranches, {
-          count: String(authContext?.branchIds.length ?? 0),
-        });
+  const initials = getAccountInitials(accountName);
+  const profileHref = webAdminRoutes.tenant.profile;
+
+  useEffect(() => {
+    router.prefetch(profileHref);
+  }, [profileHref, router]);
+
+  function handleProfileClick(event: React.MouseEvent<HTMLAnchorElement>) {
+    if (
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+
+    onOpenChange(false);
+
+    if (pathname === profileHref) {
+      return;
+    }
+
+    event.preventDefault();
+    startProfileTransition(() => {
+      router.push(profileHref);
+    });
+  }
 
   return (
-    <Popover onOpenChange={onOpenChange} open={open}>
-      <PopoverTrigger asChild>
-        <button
-          aria-expanded={open}
-          aria-label={`${copy.accountLabel}: ${accountName}`}
-          className={cn(
-            "flex min-w-0 items-center gap-2 border-l border-white/15 pl-2 text-left transition sm:pl-3",
-            "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
-          )}
-          data-testid="tenant-header-user"
-          title={copy.account.menuLabel}
-          type="button"
-        >
-          <span
+    <>
+      <Popover onOpenChange={onOpenChange} open={open}>
+        <PopoverTrigger asChild>
+          <button
+            aria-expanded={open}
+            aria-label={`${copy.accountLabel}: ${accountName}`}
             className={cn(
-              "flex size-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/85 transition-colors",
-              "hover:bg-white/15",
-              open && "bg-white/20 text-white",
+              "flex h-10 min-w-0 items-center gap-2 rounded-lg border border-white/10 bg-white/[0.06] p-1 pr-2 text-left transition-colors",
+              "hover:border-white/15 hover:bg-white/10",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60",
+              open && "border-white/20 bg-white/15",
             )}
+            data-testid="tenant-header-user"
+            title={copy.account.menuLabel}
+            type="button"
           >
-            <Icon aria-hidden icon={UserRound} />
-          </span>
-          <span className="hidden min-w-0 sm:block">
-            <span className="block max-w-36 truncate text-sm font-medium text-white">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-white text-xs font-semibold text-black">
+              {initials}
+            </span>
+            <span className="hidden max-w-36 truncate text-sm font-medium text-white sm:block">
               {accountName}
             </span>
-            <span className="block max-w-36 truncate text-[11px] text-white/55">
-              {roleLabel}
-            </span>
-          </span>
-          <Icon
-            aria-hidden
+            <Icon
+              aria-hidden
+              className={cn(
+                "hidden shrink-0 text-white/60 transition-transform sm:block",
+                open && "rotate-180",
+              )}
+              icon={ChevronDown}
+              size={14}
+            />
+          </button>
+        </PopoverTrigger>
+
+        <PopoverContent
+          align="end"
+          className="w-[288px] overflow-hidden rounded-xl p-1.5 shadow-2xl"
+          sideOffset={8}
+        >
+          <Link
+            aria-disabled={isProfilePending}
+            aria-label={copy.account.profile}
             className={cn(
-              "hidden shrink-0 text-white/55 transition-transform sm:block",
-              open && "rotate-180",
+              "flex items-center gap-3 rounded-lg bg-muted/65 px-3 py-2.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              isProfilePending && "pointer-events-none opacity-60",
             )}
-            icon={ChevronDown}
-            size={14}
-          />
-        </button>
-      </PopoverTrigger>
-
-      <PopoverContent
-        align="end"
-        className="w-[310px] overflow-hidden rounded-xl p-0 shadow-xl"
-        sideOffset={10}
-      >
-        <div className="border-b bg-muted/35 px-4 py-4">
-          <div className="flex items-center gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background">
-              <Icon aria-hidden icon={UserRound} size={18} />
+            href={profileHref}
+            onClick={handleProfileClick}
+          >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-foreground text-xs font-semibold text-background">
+              {initials}
             </span>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">{accountName}</p>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold">
+                {accountName}
+              </span>
+              <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                 {roleLabel}
-              </p>
-            </div>
+              </span>
+            </span>
+            <Icon
+              aria-hidden
+              className="shrink-0 text-muted-foreground"
+              icon={UserRound}
+              size={16}
+            />
+          </Link>
+
+          <div className="mt-1.5 border-t pt-1.5">
+            <LogoutButton
+              className="h-10 w-full justify-start rounded-lg px-3 text-sm font-normal"
+              leadingIcon={<Icon aria-hidden icon={LogOut} size={16} />}
+              signOutLabel={messages.common.signOut}
+              signingOutLabel={messages.common.signingOut}
+            />
           </div>
-          <dl className="mt-4 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
-            <dt className="text-muted-foreground">{copy.account.roleLabel}</dt>
-            <dd className="truncate text-right font-medium">{roleLabel}</dd>
-            <dt className="text-muted-foreground">
-              {copy.account.branchScopeLabel}
-            </dt>
-            <dd className="truncate text-right font-medium">{branchScope}</dd>
-          </dl>
-        </div>
+        </PopoverContent>
+      </Popover>
 
-        <nav className="grid gap-1 p-2">
-          <Link
-            className="flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            href={webAdminRoutes.tenant.profile}
-            onClick={() => onOpenChange(false)}
-          >
-            <Icon aria-hidden icon={UserRound} size={16} />
-            {copy.account.profile}
-          </Link>
-          <Link
-            className="flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            href={webAdminRoutes.tenant.users}
-            onClick={() => onOpenChange(false)}
-          >
-            <Icon aria-hidden icon={UsersRound} size={16} />
-            {copy.account.employees}
-          </Link>
-          <Link
-            className="flex h-9 items-center gap-2.5 rounded-lg px-2.5 text-sm font-medium transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            href={webAdminRoutes.tenant.system.settings}
-            onClick={() => onOpenChange(false)}
-          >
-            <Icon aria-hidden icon={Settings} size={16} />
-            {copy.account.settings}
-          </Link>
-        </nav>
-
-        <div className="flex justify-end border-t px-3 py-3">
-          <ThemeToggle />
+      {isProfilePending ? (
+        <div
+          aria-busy="true"
+          aria-live="polite"
+          className="fixed inset-x-0 bottom-0 top-16 z-40 grid place-items-center bg-background/80 text-foreground backdrop-blur-[1px]"
+          role="status"
+        >
+          <div className="flex items-center gap-2.5 rounded-full border bg-background px-4 py-2.5 text-sm font-medium shadow-lg">
+            <Icon
+              aria-hidden
+              className="animate-spin text-muted-foreground"
+              icon={LoaderCircle}
+              size={18}
+            />
+            {copy.account.loadingProfile}
+          </div>
         </div>
-
-        <div className="border-t p-2">
-          <LogoutButton
-            className="h-9 w-full justify-start px-2.5 text-sm font-medium"
-            signOutLabel={messages.common.signOut}
-            signingOutLabel={messages.common.signingOut}
-          />
-        </div>
-      </PopoverContent>
-    </Popover>
+      ) : null}
+    </>
   );
 }

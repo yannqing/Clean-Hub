@@ -117,6 +117,7 @@ export const frMessages: WebAdminMessages = {
           allBranches: "Toutes les succursales",
           assignedBranches: "{count} succursale(s) attribuée(s)",
           profile: "Espace personnel",
+          loadingProfile: "Chargement de l’espace personnel…",
           employees: "Gestion des employés",
           settings: "Paramètres du locataire",
         },

@@ -1,4 +1,5 @@
 import {
+  getTenantLoginSessionsQuery,
   getTenantProfileQuery,
   TenantProfileView,
 } from "@/features/tenant/profile";
@@ -6,7 +7,12 @@ import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-r
 
 export default async function TenantProfilePage() {
   const requestOptions = await getTenantServerApiRequestOptions();
-  const profile = await getTenantProfileQuery(requestOptions).catch(() => null);
+  const [profile, sessions] = await Promise.all([
+    getTenantProfileQuery(requestOptions).catch(() => null),
+    getTenantLoginSessionsQuery(requestOptions).catch(() => null),
+  ]);
 
-  return <TenantProfileView initialProfile={profile} />;
+  return (
+    <TenantProfileView initialProfile={profile} initialSessions={sessions} />
+  );
 }

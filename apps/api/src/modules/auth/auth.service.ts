@@ -277,15 +277,15 @@ export class AuthService {
       authContextBase,
       tokens.accessTokenExpiresAt,
     );
-    const refreshTokenId = await this.repository.createRefreshToken({
-      userId: user.id,
-      tenantId: user.tenantId,
-      tokenHash: hashOpaqueToken(tokens.refreshToken),
-      familyId: tokens.refreshTokenFamilyId,
-      expiresAt: tokens.refreshTokenExpiresAt,
-      terminalId: input.terminal?.id,
-      meta: input.meta,
-    });
+    const refreshTokenId =
+      await this.repository.createWebRefreshTokenReplacingDeviceSessions({
+        userId: user.id,
+        tenantId: user.tenantId,
+        tokenHash: hashOpaqueToken(tokens.refreshToken),
+        familyId: tokens.refreshTokenFamilyId,
+        expiresAt: tokens.refreshTokenExpiresAt,
+        meta: input.meta,
+      });
 
     if (!refreshTokenId) {
       throw new AuthError("TOKEN_INVALID", "Failed to create refresh token.");
@@ -953,7 +953,12 @@ export class AuthService {
             familyId: storedToken.familyId,
             expiresAt: tokens.refreshTokenExpiresAt,
             terminalId: terminal?.id,
-            meta: terminal ? { ...input, deviceId: terminal.deviceId } : input,
+            meta: terminal
+              ? { ...input, deviceId: terminal.deviceId }
+              : {
+                  ...input,
+                  deviceId: storedToken.deviceId ?? input.deviceId,
+                },
           });
 
           if (!newRefreshTokenId) {
