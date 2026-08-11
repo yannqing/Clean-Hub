@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from "@cleanhub/ui";
 
-import { Icon } from "@/components/app-shell";
+import { Icon, type PosIconName } from "@/components/app-shell";
 
 import {
   LOCK_TIMEOUT_OPTIONS,
@@ -26,17 +26,95 @@ import type { TerminalSettingsFormValues } from "../types";
 type TerminalSettingsCardProps = {
   initial: TerminalSettingsFormValues;
   loading: boolean;
+  mode?: TerminalSettingsMode;
   saving: boolean;
   onSave: (values: TerminalSettingsFormValues) => void;
 };
 
+export type TerminalSettingsMode =
+  | "all"
+  | "terminal"
+  | "checkout"
+  | "printing"
+  | "security";
+
+const MODE_COPY: Record<
+  TerminalSettingsMode,
+  { description: string; icon: PosIconName; title: string }
+> = {
+  all: {
+    description: "配置当前终端的收银偏好、打印和锁屏策略。",
+    icon: "settings",
+    title: "终端设置",
+  },
+  terminal: {
+    description: "设置当前收银终端在设备列表中显示的名称。",
+    icon: "monitor",
+    title: "终端信息",
+  },
+  checkout: {
+    description: "配置当前终端默认使用的支付方式和金额处理规则。",
+    icon: "wallet-cards",
+    title: "收银偏好",
+  },
+  printing: {
+    description: "配置收据的自动打印策略和默认打印联数。",
+    icon: "printer",
+    title: "打印设置",
+  },
+  security: {
+    description: "设置终端在无操作后自动锁屏的等待时间。",
+    icon: "lock",
+    title: "安全设置",
+  },
+};
+
+function MobileSettingSwitch({
+  checked,
+  label,
+  onCheckedChange,
+}: {
+  checked: boolean;
+  label: string;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex min-h-[76px] items-center gap-4 lg:hidden">
+      <div className="min-w-0 flex-1">
+        <p className="text-base font-medium text-foreground">{label}</p>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          {checked ? "已开启" : "已关闭"}
+        </p>
+      </div>
+      <button
+        aria-checked={checked}
+        aria-label={label}
+        className={`relative h-8 w-[52px] shrink-0 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          checked ? "bg-primary" : "bg-muted-foreground/35"
+        }`}
+        onClick={() => onCheckedChange(!checked)}
+        role="switch"
+        type="button"
+      >
+        <span
+          className={`absolute left-0 top-1 size-6 rounded-full bg-background shadow-sm transition-transform ${
+            checked ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
+
 export function TerminalSettingsCard({
   initial,
   loading,
+  mode = "all",
   saving,
   onSave,
 }: TerminalSettingsCardProps) {
   const [form, setForm] = useState<TerminalSettingsFormValues>(initial);
+  const copy = MODE_COPY[mode];
 
   function updateField<K extends keyof TerminalSettingsFormValues>(
     key: K,
@@ -54,20 +132,25 @@ export function TerminalSettingsCard({
     return (
       <section
         aria-busy="true"
-        className="overflow-hidden border-y bg-background"
+        className="bg-background lg:overflow-hidden lg:border-y"
       >
-        <header className="border-b px-4 py-3">
+        <header className="pb-7 lg:border-b lg:px-4 lg:py-3">
           <div className="flex items-center gap-2">
-            <Icon className="h-4 w-4 text-muted-foreground" name="settings" />
-            <h2 className="text-sm font-semibold text-foreground">终端设置</h2>
+            <Icon
+              className="hidden h-4 w-4 text-muted-foreground lg:block"
+              name={copy.icon}
+            />
+            <h2 className="text-3xl font-bold tracking-tight text-foreground lg:text-sm lg:font-semibold lg:tracking-normal">
+              {copy.title}
+            </h2>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-2 text-sm text-muted-foreground lg:mt-1 lg:text-xs">
             正在加载终端设置…
           </p>
         </header>
-        <div className="grid gap-3 p-4">
+        <div className="grid gap-4 lg:p-4">
           {[0, 1, 2, 3].map((item) => (
-            <div className="h-9 animate-pulse rounded-md bg-muted" key={item} />
+            <div className="h-12 animate-pulse bg-muted lg:h-9 lg:rounded-md" key={item} />
           ))}
         </div>
       </section>
@@ -75,148 +158,187 @@ export function TerminalSettingsCard({
   }
 
   return (
-    <section className="overflow-hidden border-y bg-background">
-      <header className="border-b px-4 py-3">
+    <section className="bg-background lg:overflow-hidden lg:border-y">
+      <header className="pb-7 lg:border-b lg:px-4 lg:py-3">
         <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-muted-foreground" name="settings" />
-          <h2 className="text-sm font-semibold text-foreground">终端设置</h2>
+          <Icon
+            className="hidden h-4 w-4 text-muted-foreground lg:block"
+            name={copy.icon}
+          />
+          <h2 className="text-3xl font-bold tracking-tight text-foreground lg:text-sm lg:font-semibold lg:tracking-normal">
+            {copy.title}
+          </h2>
         </div>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
-          配置当前终端的收银偏好、打印和锁屏策略。
+        <p className="mt-2 text-sm leading-6 text-muted-foreground lg:mt-1 lg:text-xs lg:leading-5">
+          {copy.description}
         </p>
       </header>
       <form onSubmit={handleSubmit}>
-        <div className="space-y-5 p-4">
+        <div className="space-y-7 lg:space-y-5 lg:p-4">
           {/* 设备标签 */}
-          <div className="space-y-1.5">
-            <Label htmlFor="terminal-label">设备标签</Label>
-            <Input
-              className="h-9"
-              id="terminal-label"
-              maxLength={64}
-              onChange={(e) => updateField("label", e.target.value)}
-              placeholder="如：前台收银机1"
-              value={form.label}
-            />
-            <p className="text-xs text-muted-foreground">
-              给终端起一个可读的名称，方便管理多台设备。
-            </p>
-          </div>
+          {mode === "all" || mode === "terminal" ? (
+            <div className="space-y-1.5 py-2 lg:py-0">
+              <Label
+                className="text-base font-medium lg:text-sm"
+                htmlFor="terminal-label"
+              >
+                设备标签
+              </Label>
+              <Input
+                className="h-12 rounded-none border-x-0 border-t-0 bg-transparent px-0 text-base shadow-none lg:h-9 lg:rounded-md lg:border lg:px-3 lg:text-sm"
+                id="terminal-label"
+                maxLength={64}
+                onChange={(e) => updateField("label", e.target.value)}
+                placeholder="如：前台收银机1"
+                value={form.label}
+              />
+              <p className="text-sm leading-6 text-muted-foreground lg:text-xs lg:leading-normal">
+                给终端起一个可读的名称，方便管理多台设备。
+              </p>
+            </div>
+          ) : null}
 
           {/* 默认支付方式 */}
-          <div className="space-y-1.5">
-            <Label>默认支付方式</Label>
-            <Select
-              onValueChange={(value) =>
-                updateField(
-                  "defaultPaymentMethod",
-                  value as TerminalSettingsFormValues["defaultPaymentMethod"],
-                )
-              }
-              value={form.defaultPaymentMethod}
-            >
-              <SelectTrigger className="h-9 w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAYMENT_METHOD_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {mode === "all" || mode === "checkout" ? (
+            <div className="space-y-1.5 py-2 lg:py-0">
+              <Label className="text-base font-medium lg:text-sm">
+                默认支付方式
+              </Label>
+              <Select
+                onValueChange={(value) =>
+                  updateField(
+                    "defaultPaymentMethod",
+                    value as TerminalSettingsFormValues["defaultPaymentMethod"],
+                  )
+                }
+                value={form.defaultPaymentMethod}
+              >
+                <SelectTrigger className="h-12 w-full rounded-none border-x-0 border-t-0 bg-transparent px-0 text-base shadow-none lg:h-9 lg:rounded-md lg:border lg:px-3 lg:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHOD_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
 
           {/* 抹零规则 */}
-          <div className="space-y-1.5">
-            <Label>抹零规则</Label>
-            <Select
-              onValueChange={(value) =>
-                updateField(
-                  "roundingRule",
-                  value as TerminalSettingsFormValues["roundingRule"],
-                )
-              }
-              value={form.roundingRule}
-            >
-              <SelectTrigger className="h-9 w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {ROUNDING_RULE_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {mode === "all" || mode === "checkout" ? (
+            <div className="space-y-1.5 py-2 lg:py-0">
+              <Label className="text-base font-medium lg:text-sm">
+                抹零规则
+              </Label>
+              <Select
+                onValueChange={(value) =>
+                  updateField(
+                    "roundingRule",
+                    value as TerminalSettingsFormValues["roundingRule"],
+                  )
+                }
+                value={form.roundingRule}
+              >
+                <SelectTrigger className="h-12 w-full rounded-none border-x-0 border-t-0 bg-transparent px-0 text-base shadow-none lg:h-9 lg:rounded-md lg:border lg:px-3 lg:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROUNDING_RULE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
 
           {/* 自动打印收据 */}
-          <div className="flex items-center gap-3">
-            <Checkbox
-              checked={form.autoPrintReceipt}
-              id="auto-print"
-              onCheckedChange={(checked) =>
-                updateField("autoPrintReceipt", checked === true)
-              }
-            />
-            <Label className="cursor-pointer" htmlFor="auto-print">
-              取衣完成后自动打印收据
-            </Label>
-          </div>
+          {mode === "all" || mode === "printing" ? (
+            <>
+              <MobileSettingSwitch
+                checked={form.autoPrintReceipt}
+                label="自动打印收据"
+                onCheckedChange={(checked) =>
+                  updateField("autoPrintReceipt", checked)
+                }
+              />
+              <div className="hidden items-center gap-3 lg:flex">
+                <Checkbox
+                  checked={form.autoPrintReceipt}
+                  id="auto-print"
+                  onCheckedChange={(checked) =>
+                    updateField("autoPrintReceipt", checked === true)
+                  }
+                />
+                <Label className="cursor-pointer" htmlFor="auto-print">
+                  取衣完成后自动打印收据
+                </Label>
+              </div>
+            </>
+          ) : null}
 
           {/* 打印联数 */}
-          <div className="space-y-1.5">
-            <Label>打印联数</Label>
-            <Select
-              onValueChange={(value) =>
-                updateField("printCopies", Number(value))
-              }
-              value={String(form.printCopies)}
-            >
-              <SelectTrigger className="h-9 w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PRINT_COPIES_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={String(option.value)}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {mode === "all" || mode === "printing" ? (
+            <div className="space-y-1.5 py-2 lg:py-0">
+              <Label className="text-base font-medium lg:text-sm">
+                打印联数
+              </Label>
+              <Select
+                onValueChange={(value) =>
+                  updateField("printCopies", Number(value))
+                }
+                value={String(form.printCopies)}
+              >
+                <SelectTrigger className="h-12 w-full rounded-none border-x-0 border-t-0 bg-transparent px-0 text-base shadow-none lg:h-9 lg:rounded-md lg:border lg:px-3 lg:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRINT_COPIES_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : null}
 
           {/* 锁屏超时 */}
-          <div className="space-y-1.5">
-            <Label>自动锁屏</Label>
-            <Select
-              onValueChange={(value) =>
-                updateField("lockTimeoutSeconds", Number(value))
-              }
-              value={String(form.lockTimeoutSeconds)}
-            >
-              <SelectTrigger className="h-9 w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LOCK_TIMEOUT_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={String(option.value)}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              无操作后自动锁定终端，需输入 PIN 解锁。
-            </p>
-          </div>
+          {mode === "all" || mode === "security" ? (
+            <div className="space-y-1.5 py-2 lg:py-0">
+              <Label className="text-base font-medium lg:text-sm">
+                自动锁屏
+              </Label>
+              <Select
+                onValueChange={(value) =>
+                  updateField("lockTimeoutSeconds", Number(value))
+                }
+                value={String(form.lockTimeoutSeconds)}
+              >
+                <SelectTrigger className="h-12 w-full rounded-none border-x-0 border-t-0 bg-transparent px-0 text-base shadow-none lg:h-9 lg:rounded-md lg:border lg:px-3 lg:text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {LOCK_TIMEOUT_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={String(option.value)}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm leading-6 text-muted-foreground lg:text-xs lg:leading-normal">
+                无操作后自动锁定终端，需输入 PIN 解锁。
+              </p>
+            </div>
+          ) : null}
         </div>
-        <footer className="flex justify-end border-t px-4 py-3">
+        <footer className="mt-8 flex justify-end lg:mt-0 lg:border-t lg:px-4 lg:py-3">
           <button
-            className="h-9 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+            className="h-12 w-full rounded-xl bg-foreground px-5 text-base font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-50 lg:h-9 lg:w-auto lg:rounded-md lg:px-4 lg:text-sm"
             disabled={saving}
             type="submit"
           >

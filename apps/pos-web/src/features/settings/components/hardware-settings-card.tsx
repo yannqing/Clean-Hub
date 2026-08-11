@@ -111,25 +111,30 @@ export function HardwareSettingsCard({
   }
 
   return (
-    <section className="overflow-hidden border-y bg-background">
-      <header className="border-b px-4 py-3">
+    <section className="bg-background lg:overflow-hidden lg:border-y">
+      <header className="pb-7 lg:border-b lg:px-4 lg:py-3">
         <div className="flex items-center gap-2">
-          <Icon className="h-4 w-4 text-muted-foreground" name="printer" />
-          <h2 className="text-sm font-semibold text-foreground">硬件设备</h2>
+          <Icon
+            className="hidden h-4 w-4 text-muted-foreground lg:block"
+            name="printer"
+          />
+          <h2 className="text-3xl font-bold tracking-tight text-foreground lg:text-sm lg:font-semibold lg:tracking-normal">
+            硬件设备
+          </h2>
         </div>
-        <p className="mt-1 text-xs leading-5 text-muted-foreground">
+        <p className="mt-2 text-sm leading-6 text-muted-foreground lg:mt-1 lg:text-xs lg:leading-5">
           当前收银终端已配置的硬件设备。如需添加或修改，请联系管理员在后台操作。
         </p>
       </header>
-      <div className="p-4">
+      <div className="lg:p-4">
         {loading ? (
-          <div className="flex h-24 items-center justify-center">
+          <div className="flex min-h-24 items-center lg:justify-center">
             <div className="text-sm text-muted-foreground">
               正在加载设备列表…
             </div>
           </div>
         ) : devices.length === 0 ? (
-          <div className="flex h-24 items-center justify-center rounded-md border border-dashed">
+          <div className="flex min-h-24 items-center lg:justify-center lg:rounded-md lg:border lg:border-dashed">
             <p className="text-sm text-muted-foreground">
               暂无已配置的硬件设备
             </p>
@@ -138,19 +143,19 @@ export function HardwareSettingsCard({
           <div className="space-y-2">
             {devices.map((device) => (
               <div
-                className="flex items-center justify-between gap-3 border-b py-3 last:border-b-0"
+                className="flex min-h-[76px] items-center justify-between gap-3 py-3 lg:min-h-0 lg:border-b lg:last:border-b-0"
                 key={device.id}
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <Icon
-                    className="h-5 w-5 shrink-0 text-muted-foreground"
+                    className="hidden h-5 w-5 shrink-0 text-muted-foreground lg:block"
                     name={DEVICE_ICONS[device.deviceType] ?? "settings"}
                   />
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">
+                    <p className="truncate text-base font-medium text-foreground lg:text-sm">
                       {device.name}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="mt-0.5 text-sm text-muted-foreground lg:mt-0 lg:text-xs">
                       {DEVICE_TYPE_LABELS[device.deviceType] ??
                         device.deviceType}
                       {" · "}
@@ -160,10 +165,10 @@ export function HardwareSettingsCard({
                   </div>
                 </div>
                 <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  className={`text-sm font-medium lg:rounded-full lg:px-2 lg:py-0.5 lg:text-xs ${
                     device.status === "active"
-                      ? "bg-emerald-50 text-emerald-700"
-                      : "bg-muted text-muted-foreground"
+                      ? "text-emerald-700 lg:bg-emerald-50"
+                      : "text-muted-foreground lg:bg-muted"
                   }`}
                 >
                   {device.status === "active" ? "已配置" : "已停用"}
@@ -175,17 +180,19 @@ export function HardwareSettingsCard({
       </div>
 
       {canManageSensitiveHardware ? (
-        <footer className="flex items-center justify-between gap-4 border-t px-4 py-3">
+        <footer className="flex items-center justify-between gap-4 py-4 lg:border-t lg:px-4 lg:py-3">
           <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground">钱箱控制</p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="text-base font-medium text-foreground lg:text-sm">
+              钱箱控制
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground lg:text-xs">
               {configuredDrawer
                 ? configuredDrawer.name
                 : "当前收银终端未配置可用钱箱"}
             </p>
           </div>
           <button
-            className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-md border px-4 text-sm font-semibold text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-foreground px-4 text-sm font-semibold text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50 lg:rounded-md lg:border lg:bg-transparent lg:text-foreground lg:hover:bg-accent"
             disabled={!configuredDrawer || loading}
             onClick={() => setDrawerDialogOpen(true)}
             type="button"
