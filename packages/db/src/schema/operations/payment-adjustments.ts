@@ -39,9 +39,7 @@ export const posPaymentAdjustments = pgTable(
     branchId: ulidColumn("branch_id")
       .notNull()
       .references(() => branches.id),
-    customerId: ulidColumn("customer_id")
-      .notNull()
-      .references(() => customers.id),
+    customerId: ulidColumn("customer_id").references(() => customers.id),
     orderId: ulidColumn("order_id")
       .notNull()
       .references(() => orders.id),

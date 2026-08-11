@@ -43,6 +43,7 @@ export const orderPaymentStatusEnum = pgEnum("order_payment_status", [
 
 export const orderItemSourceTypeEnum = pgEnum("order_item_source_type", [
   "ticket_item",
+  "service",
   "subscription",
   "delivery_fee",
   "product",
@@ -96,9 +97,7 @@ export const orders = pgTable(
       .notNull()
       .references(() => branches.id),
     currency: varchar("currency", { length: 3 }).notNull().default("XOF"),
-    customerId: ulidColumn("customer_id")
-      .notNull()
-      .references(() => customers.id),
+    customerId: ulidColumn("customer_id").references(() => customers.id),
     orderType: orderTypeEnum("order_type").notNull().default("ticket"),
     status: orderStatusEnum("status").notNull().default("draft"),
     subtotalAmount: numeric("subtotal_amount", { precision: 12, scale: 2 })
@@ -163,9 +162,7 @@ export const orderItems = pgTable(
     branchId: ulidColumn("branch_id")
       .notNull()
       .references(() => branches.id),
-    customerId: ulidColumn("customer_id")
-      .notNull()
-      .references(() => customers.id),
+    customerId: ulidColumn("customer_id").references(() => customers.id),
     itemKind: orderItemKindEnum("item_kind").notNull().default("service"),
     sourceType: orderItemSourceTypeEnum("source_type").notNull(),
     sourceId: ulidColumn("source_id").notNull(),
@@ -263,9 +260,7 @@ export const paymentTransactions = pgTable(
     branchId: ulidColumn("branch_id")
       .notNull()
       .references(() => branches.id),
-    customerId: ulidColumn("customer_id")
-      .notNull()
-      .references(() => customers.id),
+    customerId: ulidColumn("customer_id").references(() => customers.id),
     orderId: ulidColumn("order_id")
       .notNull()
       .references(() => orders.id),

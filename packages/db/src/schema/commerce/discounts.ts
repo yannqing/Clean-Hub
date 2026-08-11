@@ -489,9 +489,7 @@ export const orderDiscountApplications = pgTable(
     orderId: ulidColumn("order_id")
       .notNull()
       .references(() => orders.id),
-    customerId: ulidColumn("customer_id")
-      .notNull()
-      .references(() => customers.id),
+    customerId: ulidColumn("customer_id").references(() => customers.id),
     discountId: ulidColumn("discount_id")
       .notNull()
       .references(() => discounts.id),

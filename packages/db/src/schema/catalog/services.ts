@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  boolean,
   check,
   foreignKey,
   index,
@@ -15,6 +16,7 @@ import {
 
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
+import { branches } from "../tenancy/branches.js";
 import { tenants } from "../tenancy/tenants.js";
 
 export const businessLineEnum = pgEnum("business_line", [
@@ -105,6 +107,7 @@ export const services = pgTable(
     businessLine: businessLineEnum("business_line").notNull(),
     pricingUnit: pricingUnitEnum("pricing_unit").notNull().default("per_item"),
     turnaroundMinutes: integer("turnaround_minutes"),
+    allBranches: boolean("all_branches").notNull().default(true),
     displayOrder: integer("display_order").notNull().default(0),
     labelRule: serviceLabelRuleEnum("label_rule")
       .notNull()
@@ -202,6 +205,67 @@ export const prices = pgTable(
     check(
       "prices_cost_amount_check",
       sql`${table.costAmount} is null or ${table.costAmount} > 0`,
+    ),
+  ],
+);
+
+export const serviceBranchSettings = pgTable(
+  "service_branch_settings",
+  {
+    id: ulidPrimaryKey(),
+    tenantId: ulidColumn("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    serviceId: ulidColumn("service_id").notNull(),
+    branchId: ulidColumn("branch_id").notNull(),
+    isAvailable: boolean("is_available").notNull().default(true),
+    priceOverrideAmount: numeric("price_override_amount", {
+      precision: 12,
+      scale: 2,
+    }),
+    turnaroundMinutesOverride: integer("turnaround_minutes_override"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdBy: ulidColumn("created_by").references(() => users.id),
+    updatedBy: ulidColumn("updated_by").references(() => users.id),
+    version: integer("version").notNull().default(1),
+  },
+  (table) => [
+    uniqueIndex("service_branch_settings_scope_unique").on(
+      table.tenantId,
+      table.serviceId,
+      table.branchId,
+    ),
+    foreignKey({
+      name: "service_branch_settings_tenant_service_fk",
+      columns: [table.tenantId, table.serviceId],
+      foreignColumns: [services.tenantId, services.id],
+    }).onDelete("cascade"),
+    foreignKey({
+      name: "service_branch_settings_tenant_branch_fk",
+      columns: [table.tenantId, table.branchId],
+      foreignColumns: [branches.tenantId, branches.id],
+    }).onDelete("cascade"),
+    index("service_branch_settings_branch_available_idx").on(
+      table.tenantId,
+      table.branchId,
+      table.isAvailable,
+    ),
+    index("service_branch_settings_service_idx").on(
+      table.tenantId,
+      table.serviceId,
+    ),
+    check(
+      "service_branch_settings_price_override_check",
+      sql`${table.priceOverrideAmount} is null or ${table.priceOverrideAmount} > 0`,
+    ),
+    check(
+      "service_branch_settings_turnaround_override_check",
+      sql`${table.turnaroundMinutesOverride} is null or (${table.turnaroundMinutesOverride} >= 1 and ${table.turnaroundMinutesOverride} <= 525600)`,
     ),
   ],
 );

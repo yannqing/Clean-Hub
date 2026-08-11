@@ -1,4 +1,6 @@
+import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   numeric,
@@ -75,7 +77,9 @@ export const serviceTickets = pgTable(
       .references(() => customers.id),
     assistantId: ulidColumn("assistant_id").references(() => users.id),
     ticketNo: varchar("ticket_no", { length: 32 }),
-    ticketType: businessLineEnum("ticket_type").notNull(),
+    ticketType: businessLineEnum("ticket_type")
+      .$type<"laundry" | "car_wash">()
+      .notNull(),
     ticketStatus: ticketStatusEnum("ticket_status")
       .notNull()
       .default("draft"),
@@ -119,6 +123,10 @@ export const serviceTickets = pgTable(
       table.tenantId,
       table.ticketStatus,
       table.expectedPickupAt,
+    ),
+    check(
+      "service_tickets_service_type_check",
+      sql`${table.ticketType}::text in ('laundry', 'car_wash')`,
     ),
   ],
 );
