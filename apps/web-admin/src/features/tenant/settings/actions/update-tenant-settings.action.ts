@@ -8,8 +8,15 @@ import { webAdminLocaleCookieName } from "@/i18n";
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
-import type { TenantSettings, TenantSettingsFormValues } from "../types";
-import { validateTenantSettingsForm } from "../validators";
+import type {
+  TenantDefaultCurrencyFormValues,
+  TenantSettings,
+  TenantSettingsFormValues,
+} from "../types";
+import {
+  validateTenantDefaultCurrencyForm,
+  validateTenantSettingsForm,
+} from "../validators";
 
 type TenantSettingsActionResult =
   | {
@@ -22,6 +29,17 @@ type TenantSettingsActionResult =
       message: string;
     };
 
+type TenantDefaultCurrencyActionResult =
+  | {
+      ok: true;
+      data: TenantSettings;
+    }
+  | {
+      ok: false;
+      errors: Partial<Record<keyof TenantDefaultCurrencyFormValues, string>>;
+      message: string;
+    };
+
 const OWNER_ONLY_MESSAGE = "Only tenant owners can update tenant settings.";
 
 function getActionErrorMessage(error: unknown): string {
@@ -30,6 +48,18 @@ function getActionErrorMessage(error: unknown): string {
   }
 
   return "Tenant settings could not be updated.";
+}
+
+function revalidateTenantCurrencyConsumers(): void {
+  revalidatePath("/tenant/system/settings");
+  revalidatePath("/tenant/system/settings/pricing");
+  revalidatePath("/tenant/services/new");
+  revalidatePath("/tenant/products/new");
+  revalidatePath("/tenant/branches/new");
+  revalidatePath("/tenant/finance");
+  revalidatePath("/tenant/point-of-sale");
+  revalidatePath("/tenant/reports");
+  revalidatePath("/tenant", "layout");
 }
 
 export async function updateTenantSettingsAction(
@@ -70,10 +100,51 @@ export async function updateTenantSettingsAction(
 
     revalidatePath("/tenant/system/settings");
     revalidatePath("/tenant/system/preferences");
-    revalidatePath("/tenant/system/settings/pricing");
-    revalidatePath("/tenant/services/new");
-    revalidatePath("/tenant/products/new");
     revalidatePath("/tenant", "layout");
+
+    return {
+      ok: true,
+      data: settings,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      errors: {},
+      message: getActionErrorMessage(error),
+    };
+  }
+}
+
+export async function updateTenantDefaultCurrencyAction(
+  input: TenantDefaultCurrencyFormValues,
+): Promise<TenantDefaultCurrencyActionResult> {
+  const requestOptions = await getTenantServerApiRequestOptions();
+  const authContext = await getAuthSessionQuery(requestOptions);
+
+  if (!authContext || authContext.role !== "owner" || !authContext.tenantId) {
+    return {
+      ok: false,
+      errors: {},
+      message: OWNER_ONLY_MESSAGE,
+    };
+  }
+
+  const validation = validateTenantDefaultCurrencyForm(input);
+
+  if (!validation.ok) {
+    return {
+      ...validation,
+      message: validation.message ?? "Check the default currency.",
+    };
+  }
+
+  try {
+    const settings = await webAdminApi.tenant.settings.update(
+      validation.data,
+      requestOptions,
+    );
+
+    revalidateTenantCurrencyConsumers();
 
     return {
       ok: true,

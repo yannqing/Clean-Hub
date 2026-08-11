@@ -11,7 +11,7 @@ import Link from "next/link";
 import { type FormEvent, useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
-import { updateTenantSettingsAction } from "@/features/tenant/settings/actions";
+import { updateTenantDefaultCurrencyAction } from "@/features/tenant/settings/actions";
 import {
   TenantDefaultCurrencyField,
   TenantSettingsSurface,
@@ -44,10 +44,8 @@ export default function TenantSettingsPricingPage() {
     setSavingCurrency(true);
 
     try {
-      const result = await updateTenantSettingsAction({
+      const result = await updateTenantDefaultCurrencyAction({
         defaultCurrency: normalizedCurrency,
-        defaultLanguage: settings.defaultLanguage,
-        timezone: settings.timezone,
       });
 
       if (!result.ok) {

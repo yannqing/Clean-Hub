@@ -35,7 +35,6 @@ import {
   tenantSettingsNavigationItems,
   useTenantSettingsWorkspace,
 } from "./tenant-settings-workspace";
-import { TenantDefaultCurrencyField } from "./tenant-default-currency-field";
 import { TenantTimezoneField } from "./tenant-timezone-field";
 
 function getErrorMessage(error: unknown, fallback: string): string {
@@ -45,7 +44,6 @@ function getErrorMessage(error: unknown, fallback: string): string {
 function toFormValues(settings: TenantSettings): TenantSettingsFormValues {
   return {
     defaultLanguage: settings.defaultLanguage,
-    defaultCurrency: settings.defaultCurrency,
     timezone: settings.timezone,
   };
 }
@@ -55,7 +53,6 @@ function normalizeFormValues(
 ): TenantSettingsFormValues {
   return {
     defaultLanguage: values.defaultLanguage,
-    defaultCurrency: values.defaultCurrency.trim().toUpperCase(),
     timezone: values.timezone.trim(),
   };
 }
@@ -68,7 +65,6 @@ function hasSettingsChange(
 
   return (
     normalizedValues.defaultLanguage !== settings.defaultLanguage ||
-    normalizedValues.defaultCurrency !== settings.defaultCurrency ||
     normalizedValues.timezone !== settings.timezone
   );
 }
@@ -246,14 +242,6 @@ export function TenantSettingsView() {
         <form onSubmit={handleSubmit}>
           <div className="grid gap-5 p-4 sm:p-5">
             <div className="grid gap-5 sm:grid-cols-2">
-              <TenantDefaultCurrencyField
-                disabled={formDisabled}
-                error={errors.defaultCurrency}
-                id="tenant-default-currency"
-                onChange={(value) => updateForm("defaultCurrency", value)}
-                value={form.defaultCurrency}
-              />
-
               <div className="grid gap-2">
                 <Label htmlFor="tenant-default-language">
                   {m.settings.labels.defaultLanguage}
@@ -291,15 +279,15 @@ export function TenantSettingsView() {
                   </p>
                 ) : null}
               </div>
-            </div>
 
-            <TenantTimezoneField
-              disabled={formDisabled}
-              error={errors.timezone}
-              id="tenant-timezone"
-              onChange={(value) => updateForm("timezone", value)}
-              value={form.timezone}
-            />
+              <TenantTimezoneField
+                disabled={formDisabled}
+                error={errors.timezone}
+                id="tenant-timezone"
+                onChange={(value) => updateForm("timezone", value)}
+                value={form.timezone}
+              />
+            </div>
 
             {saveError ? (
               <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">

@@ -1,4 +1,5 @@
 import type {
+  TenantDefaultCurrencyFormValues,
   TenantSettingsFormValues,
   TenantSettingsLanguage,
   UpdateTenantSettingsRequest,
@@ -16,6 +17,17 @@ export type TenantSettingsValidationResult =
       message?: string;
     };
 
+export type TenantDefaultCurrencyValidationResult =
+  | {
+      ok: true;
+      data: UpdateTenantSettingsRequest;
+    }
+  | {
+      ok: false;
+      errors: Partial<Record<keyof TenantDefaultCurrencyFormValues, string>>;
+      message?: string;
+    };
+
 function isTenantSettingsLanguage(
   value: string,
 ): value is TenantSettingsLanguage {
@@ -26,15 +38,10 @@ export function validateTenantSettingsForm(
   input: TenantSettingsFormValues,
 ): TenantSettingsValidationResult {
   const errors: Partial<Record<keyof TenantSettingsFormValues, string>> = {};
-  const defaultCurrency = input.defaultCurrency.trim().toUpperCase();
   const timezone = input.timezone.trim();
 
   if (!isTenantSettingsLanguage(input.defaultLanguage)) {
     errors.defaultLanguage = "Select a valid language.";
-  }
-
-  if (!/^[A-Z]{3}$/.test(defaultCurrency)) {
-    errors.defaultCurrency = "Currency must be a 3-letter code.";
   }
 
   if (!timezone) {
@@ -57,8 +64,28 @@ export function validateTenantSettingsForm(
     ok: true,
     data: {
       defaultLanguage: input.defaultLanguage,
-      defaultCurrency,
       timezone,
     },
+  };
+}
+
+export function validateTenantDefaultCurrencyForm(
+  input: TenantDefaultCurrencyFormValues,
+): TenantDefaultCurrencyValidationResult {
+  const defaultCurrency = input.defaultCurrency.trim().toUpperCase();
+
+  if (!/^[A-Z]{3}$/.test(defaultCurrency)) {
+    return {
+      ok: false,
+      errors: {
+        defaultCurrency: "Currency must be a 3-letter code.",
+      },
+      message: "Currency must be a 3-letter code.",
+    };
+  }
+
+  return {
+    ok: true,
+    data: { defaultCurrency },
   };
 }

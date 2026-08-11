@@ -17,6 +17,9 @@ export type UpdateTenantSettingsRequest = UpdateTenantBackOfficeSettingsRequest;
 
 export type TenantSettingsFormValues = {
   defaultLanguage: TenantSettingsLanguage;
-  defaultCurrency: string;
   timezone: string;
+};
+
+export type TenantDefaultCurrencyFormValues = {
+  defaultCurrency: string;
 };

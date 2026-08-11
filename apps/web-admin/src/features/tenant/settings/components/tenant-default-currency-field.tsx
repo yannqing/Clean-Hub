@@ -53,7 +53,7 @@ export function TenantDefaultCurrencyField({
         </SelectContent>
       </Select>
       <p className="text-xs leading-5 text-slate-500">
-        {m.settings.general.currencyHint}
+        {m.settings.pricingHub.defaultCurrencyHint}
       </p>
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
     </div>
