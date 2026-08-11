@@ -37,7 +37,12 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { type FormEvent, useState, useTransition } from "react";
+import {
+  type FormEvent,
+  type MouseEvent as ReactMouseEvent,
+  useState,
+  useTransition,
+} from "react";
 
 import { Pagination } from "@/components/pagination";
 import { webAdminRoutes } from "@/config/routes";
@@ -153,6 +158,22 @@ export function DiscountListView({
       { q: value || undefined, offset: 0 },
       value ? ["offset"] : ["q", "offset"],
     );
+  }
+
+  function openDiscountFromRow(
+    event: ReactMouseEvent<HTMLTableRowElement>,
+    discountId: string,
+  ) {
+    const target = event.target;
+
+    if (
+      target instanceof Element &&
+      target.closest("a, button, input, select, textarea, [role='button']")
+    ) {
+      return;
+    }
+
+    router.push(webAdminRoutes.tenant.discount(discountId));
   }
 
   function getCsvHeaders(): string[] {
@@ -587,7 +608,13 @@ export function DiscountListView({
               </TableHeader>
               <TableBody>
                 {result.data.map((discount) => (
-                  <TableRow key={discount.id}>
+                  <TableRow
+                    className="cursor-pointer transition-colors hover:bg-muted/50"
+                    key={discount.id}
+                    onClick={(event) =>
+                      openDiscountFromRow(event, discount.id)
+                    }
+                  >
                     <TableCell>
                       <Link
                         className="block max-w-52 truncate font-medium hover:underline"
