@@ -174,16 +174,17 @@ SET
   status = EXCLUDED.status,
   updated_at = now();
 
-INSERT INTO user_profiles (user_id, display_name, first_name, last_name, language, timezone)
+INSERT INTO user_profiles (user_id, tenant_id, display_name, first_name, last_name, language, timezone)
 VALUES
-  ('01KRERJN880000000000000009', 'SaaS Admin 1', 'SaaS', 'Admin 1', 'en', 'Asia/Shanghai'),
-  ('01KRERJN890000000000000010', 'SaaS Admin 2', 'SaaS', 'Admin 2', 'en', 'Asia/Shanghai'),
-  ('01KRERJN8A0000000000000011', 'SaaS Support 1', 'SaaS', 'Support 1', 'en', 'Asia/Shanghai'),
-  ('01KRERJN8B0000000000000012', 'Tenant Admin 1', 'Tenant', 'Admin 1', 'en', 'Asia/Shanghai'),
-  ('01KRERJN8C0000000000000013', 'Tenant Admin 2', 'Tenant', 'Admin 2', 'en', 'Asia/Shanghai'),
-  ('01KRERJN8D0000000000000014', 'Tenant Admin 3', 'Tenant', 'Admin 3', 'en', 'Asia/Shanghai')
+  ('01KRERJN880000000000000009', NULL, 'SaaS Admin 1', 'SaaS', 'Admin 1', 'en', 'Asia/Shanghai'),
+  ('01KRERJN890000000000000010', NULL, 'SaaS Admin 2', 'SaaS', 'Admin 2', 'en', 'Asia/Shanghai'),
+  ('01KRERJN8A0000000000000011', NULL, 'SaaS Support 1', 'SaaS', 'Support 1', 'en', 'Asia/Shanghai'),
+  ('01KRERJN8B0000000000000012', '01KRERJN800000000000000001', 'Tenant Admin 1', 'Tenant', 'Admin 1', 'en', 'Asia/Shanghai'),
+  ('01KRERJN8C0000000000000013', '01KRERJN810000000000000002', 'Tenant Admin 2', 'Tenant', 'Admin 2', 'en', 'Asia/Shanghai'),
+  ('01KRERJN8D0000000000000014', '01KRERJN820000000000000003', 'Tenant Admin 3', 'Tenant', 'Admin 3', 'en', 'Asia/Shanghai')
 ON CONFLICT (user_id) DO UPDATE
 SET
+  tenant_id = EXCLUDED.tenant_id,
   display_name = EXCLUDED.display_name,
   first_name = EXCLUDED.first_name,
   last_name = EXCLUDED.last_name,

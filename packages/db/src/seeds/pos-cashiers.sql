@@ -70,7 +70,7 @@ VALUES
     '上海市黄浦区南京东路 1 号',
     '+86 21 0000 0000',
     'zh-CN',
-    'CNY',
+    'XOF',
     'CleanHub 旗舰店',
     'active'
   )
@@ -150,14 +150,15 @@ SET
   updated_at = now();
 
 -- 3) Display names for the POS shell profile card.
-INSERT INTO user_profiles (user_id, display_name, first_name, last_name, language, timezone)
+INSERT INTO user_profiles (user_id, tenant_id, display_name, first_name, last_name, language, timezone)
 VALUES
-  ('01KRERJN8F0000000000000031', '收银员 01', 'Cashier', '01', 'zh-CN', 'Asia/Shanghai'),
-  ('01KRERJN8F0000000000000032', '收银员 02', 'Cashier', '02', 'zh-CN', 'Asia/Shanghai'),
-  ('01KRERJN8F0000000000000033', '收银员 03', 'Cashier', '03', 'zh-CN', 'Asia/Shanghai'),
-  ('01KRERJN8F0000000000000034', '收银员 04', 'Cashier', '04', 'zh-CN', 'Asia/Shanghai')
+  ('01KRERJN8F0000000000000031', '01KRERJN800000000000000001', '收银员 01', 'Cashier', '01', 'zh-CN', 'Asia/Shanghai'),
+  ('01KRERJN8F0000000000000032', '01KRERJN800000000000000001', '收银员 02', 'Cashier', '02', 'zh-CN', 'Asia/Shanghai'),
+  ('01KRERJN8F0000000000000033', '01KRERJN800000000000000001', '收银员 03', 'Cashier', '03', 'zh-CN', 'Asia/Shanghai'),
+  ('01KRERJN8F0000000000000034', '01KRERJN800000000000000001', '收银员 04', 'Cashier', '04', 'zh-CN', 'Asia/Shanghai')
 ON CONFLICT (user_id) DO UPDATE
 SET
+  tenant_id = EXCLUDED.tenant_id,
   display_name = EXCLUDED.display_name,
   first_name = EXCLUDED.first_name,
   last_name = EXCLUDED.last_name,

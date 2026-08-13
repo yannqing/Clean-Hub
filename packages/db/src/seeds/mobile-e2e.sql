@@ -33,7 +33,7 @@ VALUES
     '01SEEDM0B0TST00000000001',
     '01KRERJN800000000000000001',
     'fr',
-    'CNY',
+    'XOF',
     'Asia/Shanghai',
     'pilot'
   ),
@@ -41,7 +41,7 @@ VALUES
     '01SEEDM0B0TST00000000002',
     '01KRERJN810000000000000002',
     'fr',
-    'CNY',
+    'XOF',
     'Asia/Shanghai',
     'pilot'
   )
@@ -106,7 +106,7 @@ VALUES (
   '上海市静安区南京西路 200 号',
   '+86 21 0000 0002',
   'zh-CN',
-  'CNY',
+  'XOF',
   'CleanHub Tenant 2 Branch',
   'active'
 )
@@ -371,6 +371,7 @@ ON CONFLICT (id) DO UPDATE SET
 
 INSERT INTO user_profiles (
   user_id,
+  tenant_id,
   display_name,
   first_name,
   last_name,
@@ -380,6 +381,7 @@ INSERT INTO user_profiles (
 VALUES
   (
     '01SEEDM0B0USR00000000001',
+    '01KRERJN800000000000000001',
     'Mobile Driver 1',
     'Mobile',
     'Driver 1',
@@ -388,6 +390,7 @@ VALUES
   ),
   (
     '01SEEDM0B0USR00000000002',
+    '01KRERJN800000000000000001',
     'Mobile Driver 2',
     'Mobile',
     'Driver 2',
@@ -395,6 +398,7 @@ VALUES
     'Asia/Shanghai'
   )
 ON CONFLICT (user_id) DO UPDATE SET
+  tenant_id = EXCLUDED.tenant_id,
   display_name = EXCLUDED.display_name,
   first_name = EXCLUDED.first_name,
   last_name = EXCLUDED.last_name,

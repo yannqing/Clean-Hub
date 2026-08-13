@@ -27,16 +27,21 @@ const SEED_FILES = [
 async function runSeeds(): Promise<void> {
   const seedsDir = dirname(fileURLToPath(import.meta.url));
   const connection = createDbConnection({ databaseUrl: getDatabaseUrl() });
+  const client = await connection.pool.connect();
 
   try {
+    await client.query("select set_config('app.current_tenant_id', '', false)");
+    await client.query("select set_config('app.rls_bypass', 'on', false)");
+
     for (const file of SEED_FILES) {
       const sql = readFileSync(join(seedsDir, file), "utf8");
-      await connection.pool.query(sql);
+      await client.query(sql);
       console.log(`Seed applied: ${file}`);
     }
 
     console.log("Database seeding completed.");
   } finally {
+    client.release();
     await connection.pool.end();
   }
 }

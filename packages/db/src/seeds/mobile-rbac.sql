@@ -52,8 +52,8 @@ SET
   name = EXCLUDED.name,
   description = EXCLUDED.description;
 
-INSERT INTO role_permissions (role_id, permission_id)
-SELECT role.id, permission.id
+INSERT INTO role_permissions (tenant_id, role_id, permission_id)
+SELECT role.tenant_id, role.id, permission.id
 FROM roles role
 CROSS JOIN permissions permission
 WHERE
