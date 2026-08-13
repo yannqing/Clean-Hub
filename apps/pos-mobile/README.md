@@ -73,6 +73,18 @@ pnpm --filter @cleanhub/pos-mobile cap:run:android
 pnpm --filter @cleanhub/pos-mobile cap:android
 ```
 
+也可以在仓库根目录一条命令生成可侧载的 Debug APK：
+
+```bash
+CLEANHUB_POS_VERSION=0.1.0 \
+CLEANHUB_POS_BUILD_NUMBER=1 \
+pnpm package:pos-android:debug
+```
+
+脚本会先根据 `apps/pos-mobile/.env` 同步 Capacitor，再将 APK 和包含
+SHA-256 的构建清单复制到 `release/pos-mobile/android/`。Debug APK 使用
+Android 开发签名，只能用于开发和受控测试，不能用于正式升级链路。
+
 iOS 已声明本地网络用途并仅放开本地网络 ATS。HTTP 只允许开发环境，且必须
 显式设置 `CLEANHUB_POS_ALLOW_CLEARTEXT=true`。
 
@@ -124,6 +136,33 @@ pnpm --filter @cleanhub/pos-mobile release:sync:android
 pnpm --filter @cleanhub/pos-mobile cap:ios
 pnpm --filter @cleanhub/pos-mobile cap:android
 ```
+
+Android 也提供完整的一键签名打包流程。签名信息只从当前 shell/CI secret
+读取，不要写进 `.env.production`：
+
+```bash
+export CLEANHUB_POS_VERSION=0.1.0
+export CLEANHUB_POS_BUILD_NUMBER=1
+export CLEANHUB_ANDROID_KEYSTORE_PATH=/secure/path/cleanhub-pos-release.keystore
+export CLEANHUB_ANDROID_KEYSTORE_PASSWORD='...'
+export CLEANHUB_ANDROID_KEY_ALIAS=cleanhub-pos-release
+export CLEANHUB_ANDROID_KEY_PASSWORD='...'
+
+pnpm package:pos-android
+```
+
+该命令会读取 `apps/pos-mobile/.env.production`、执行 TypeScript 构建、
+Capacitor Android 同步和生产安全校验，然后生成签名 APK 与 AAB：
+
+```text
+release/pos-mobile/android/CleanHub-POS-<version>-<build>.apk
+release/pos-mobile/android/CleanHub-POS-<version>-<build>.aab
+release/pos-mobile/android/CleanHub-POS-<version>-<build>-release.json
+```
+
+`CLEANHUB_POS_BUILD_NUMBER` 必须为正整数，并且每次对已安装应用发布升级时
+都必须递增。keystore、alias 和密码必须长期安全保存；丢失签名密钥后无法
+以相同应用 ID `com.cleanhub.pos` 覆盖升级。
 
 不要在发布前执行开发用的 `cap:sync*`；它会按 `.env` 生成开发配置，并使
 `release:validate` 明确失败。正式归档前再次运行 `release:validate`。

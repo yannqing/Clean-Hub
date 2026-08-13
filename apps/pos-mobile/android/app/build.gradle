@@ -1,5 +1,21 @@
 apply plugin: 'com.android.application'
 
+def envOrProperty = { String name ->
+    if (project.hasProperty(name)) {
+        return project.property(name)
+    }
+
+    return System.getenv(name)
+}
+
+def androidVersionCode = (envOrProperty('CLEANHUB_POS_BUILD_NUMBER') ?: envOrProperty('CLEANHUB_ANDROID_VERSION_CODE') ?: '1') as Integer
+def androidVersionName = envOrProperty('CLEANHUB_POS_VERSION') ?: envOrProperty('CLEANHUB_ANDROID_VERSION_NAME') ?: '0.1.0'
+def releaseKeystorePath = envOrProperty('CLEANHUB_ANDROID_KEYSTORE_PATH')
+def releaseKeystorePassword = envOrProperty('CLEANHUB_ANDROID_KEYSTORE_PASSWORD')
+def releaseKeyAlias = envOrProperty('CLEANHUB_ANDROID_KEY_ALIAS')
+def releaseKeyPassword = envOrProperty('CLEANHUB_ANDROID_KEY_PASSWORD')
+def hasReleaseSigning = releaseKeystorePath && releaseKeystorePassword && releaseKeyAlias && releaseKeyPassword
+
 android {
     namespace = "com.cleanhub.pos"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +23,8 @@ android {
         applicationId "com.cleanhub.pos"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode androidVersionCode
+        versionName androidVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,8 +32,21 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseKeystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -19,6 +19,8 @@
     "release:sync:android": "node scripts/release.mjs sync android",
     "release:sync:ios": "node scripts/release.mjs sync ios",
     "release:validate": "node scripts/release.mjs validate",
+    "package:android": "node scripts/package-android.mjs release",
+    "package:android:debug": "node scripts/package-android.mjs debug",
     "smoke:native-release-validation": "node scripts/native-release-validation.smoke.mjs"
   },
   "dependencies": {

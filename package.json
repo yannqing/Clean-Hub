@@ -30,6 +30,8 @@
     "db:studio": "pnpm --filter @cleanhub/db db:studio",
     "openapi:generate": "node scripts/generate-openapi-from-routes.mjs",
     "release:build": "node scripts/build-release.mjs",
+    "package:pos-android": "pnpm --filter @cleanhub/pos-mobile package:android",
+    "package:pos-android:debug": "pnpm --filter @cleanhub/pos-mobile package:android:debug",
     "format": "prettier --write ."
   },
   "devDependencies": {

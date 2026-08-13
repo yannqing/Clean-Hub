@@ -102,7 +102,7 @@ WORKDIR /app/web-admin/apps/web-admin
 RUN mkdir -p /tmp/next-runtime \
   && cd /tmp/next-runtime \
   && npm init -y \
-  && npm install next react react-dom @swc/helpers@0.5.15 @next/env --omit=dev --no-audit --no-fund --registry=https://registry.npmmirror.com \
+  && npm install next@16.2.6 react@19.2.4 react-dom@19.2.4 @swc/helpers@0.5.15 @next/env@16.2.6 --omit=dev --no-audit --no-fund --registry=https://registry.npmmirror.com \
   && rm -rf /app/web-admin/apps/web-admin/node_modules \
   && mkdir -p /app/web-admin/apps/web-admin/node_modules \
   && cp -R /tmp/next-runtime/node_modules/. /app/web-admin/apps/web-admin/node_modules \
@@ -122,7 +122,7 @@ WORKDIR /app/pos-web/apps/pos-web
 RUN mkdir -p /tmp/next-runtime \
   && cd /tmp/next-runtime \
   && npm init -y \
-  && npm install next react react-dom @swc/helpers@0.5.15 @next/env --omit=dev --no-audit --no-fund --registry=https://registry.npmmirror.com \
+  && npm install next@16.2.6 react@19.2.4 react-dom@19.2.4 @swc/helpers@0.5.15 @next/env@16.2.6 --omit=dev --no-audit --no-fund --registry=https://registry.npmmirror.com \
   && rm -rf /app/pos-web/apps/pos-web/node_modules \
   && mkdir -p /app/pos-web/apps/pos-web/node_modules \
   && cp -R /tmp/next-runtime/node_modules/. /app/pos-web/apps/pos-web/node_modules \
@@ -148,7 +148,7 @@ async function writeReleaseCompose() {
     restart: unless-stopped
     environment:
       POSTGRES_DB: \${POSTGRES_DB:-cleanhub}
-      POSTGRES_USER: \${POSTGRES_USER:-cleanhub}
+      POSTGRES_USER: \${POSTGRES_USER:-cleanhub_admin}
       POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
       - cleanhub-postgres-data:/var/lib/postgresql/data
@@ -156,12 +156,71 @@ async function writeReleaseCompose() {
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U ${composeDollar}${composeDollar}{POSTGRES_USER:-cleanhub} -d ${composeDollar}${composeDollar}{POSTGRES_DB:-cleanhub}",
+          "pg_isready -U ${composeDollar}${composeDollar}{POSTGRES_USER:-cleanhub_admin} -d ${composeDollar}${composeDollar}{POSTGRES_DB:-cleanhub}",
         ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - cleanhub
+
+  db-role-init:
+    image: postgres:16-alpine
+    container_name: cleanhub-db-role-init
+    restart: "no"
+    env_file:
+      - ./.env.production
+    environment:
+      POSTGRES_HOST: postgres
+    entrypoint:
+      - /bin/sh
+      - /opt/cleanhub/postgres/ensure-app-role.sh
+    volumes:
+      - ./postgres/ensure-app-role.sh:/opt/cleanhub/postgres/ensure-app-role.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cleanhub
+
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: cleanhub-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: \${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: \${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    volumes:
+      - cleanhub-minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - cleanhub
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    container_name: cleanhub-minio-init
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: \${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: \${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      OBJECT_STORAGE_BUCKET: \${OBJECT_STORAGE_BUCKET:-cleanhub-media}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        mc alias set cleanhub http://minio:9000 "${composeDollar}${composeDollar}MINIO_ROOT_USER" "${composeDollar}${composeDollar}MINIO_ROOT_PASSWORD"
+        mc mb --ignore-existing "cleanhub/${composeDollar}${composeDollar}OBJECT_STORAGE_BUCKET"
+        mc anonymous set none "cleanhub/${composeDollar}${composeDollar}OBJECT_STORAGE_BUCKET"
     networks:
       - cleanhub
 
@@ -173,17 +232,44 @@ async function writeReleaseCompose() {
       context: .
       dockerfile: Dockerfile
       target: api
-    env_file:
-      - ./.env.production
     environment:
       NODE_ENV: production
       PORT: 4000
-      DATABASE_URL: \${DATABASE_URL:-postgres://cleanhub:\${POSTGRES_PASSWORD}@postgres:5432/cleanhub}
+      DATABASE_URL: \${DATABASE_URL:?DATABASE_URL for the restricted app role is required}
+      DATABASE_POOL_MAX: \${DATABASE_POOL_MAX:-10}
+      DATABASE_POOL_IDLE_TIMEOUT_MS: \${DATABASE_POOL_IDLE_TIMEOUT_MS:-30000}
+      DATABASE_POOL_CONNECTION_TIMEOUT_MS: \${DATABASE_POOL_CONNECTION_TIMEOUT_MS:-10000}
+      DATABASE_POOL_QUERY_TIMEOUT_MS: \${DATABASE_POOL_QUERY_TIMEOUT_MS:-30000}
+      DATABASE_POOL_KEEP_ALIVE_INITIAL_DELAY_MS: \${DATABASE_POOL_KEEP_ALIVE_INITIAL_DELAY_MS:-10000}
+      DATABASE_APPLICATION_NAME: \${DATABASE_APPLICATION_NAME:-cleanhub}
+      DATABASE_REQUIRE_RLS: "true"
+      AUTH_TOKEN_SECRET: \${AUTH_TOKEN_SECRET:?AUTH_TOKEN_SECRET is required}
+      AUTH_ACCESS_TOKEN_TTL_SECONDS: \${AUTH_ACCESS_TOKEN_TTL_SECONDS:-900}
+      AUTH_REFRESH_TOKEN_TTL_SECONDS: \${AUTH_REFRESH_TOKEN_TTL_SECONDS:-2592000}
+      AUTH_COOKIE_SECURE: "true"
+      WEB_ADMIN_PUBLIC_ORIGIN: \${WEB_ADMIN_PUBLIC_ORIGIN:?WEB_ADMIN_PUBLIC_ORIGIN is required}
+      POS_PUBLIC_ORIGIN: \${POS_PUBLIC_ORIGIN:?POS_PUBLIC_ORIGIN is required}
+      CORS_ORIGINS: \${CORS_ORIGINS:?CORS_ORIGINS is required}
+      CORS_ENFORCE_SAME_ORIGIN: "true"
+      LOG_LEVEL: \${LOG_LEVEL:-info}
+      SERVICE_NAME: \${SERVICE_NAME:-cleanhub}
+      OBJECT_STORAGE_ENDPOINT: \${OBJECT_STORAGE_ENDPOINT:?OBJECT_STORAGE_ENDPOINT is required}
+      OBJECT_STORAGE_REGION: \${OBJECT_STORAGE_REGION:-us-east-1}
+      OBJECT_STORAGE_BUCKET: \${OBJECT_STORAGE_BUCKET:?OBJECT_STORAGE_BUCKET is required}
+      OBJECT_STORAGE_ACCESS_KEY: \${OBJECT_STORAGE_ACCESS_KEY:?OBJECT_STORAGE_ACCESS_KEY is required}
+      OBJECT_STORAGE_SECRET_KEY: \${OBJECT_STORAGE_SECRET_KEY:?OBJECT_STORAGE_SECRET_KEY is required}
+      OBJECT_STORAGE_FORCE_PATH_STYLE: \${OBJECT_STORAGE_FORCE_PATH_STYLE:-true}
+      EMAIL_DELIVERY_DISABLED: \${EMAIL_DELIVERY_DISABLED:-true}
+      PUSH_DELIVERY_DISABLED: \${PUSH_DELIVERY_DISABLED:-true}
     ports:
       - "127.0.0.1:\${API_HOST_PORT:-4010}:4000"
     depends_on:
       postgres:
         condition: service_healthy
+      db-role-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - cleanhub
 
@@ -195,8 +281,6 @@ async function writeReleaseCompose() {
       context: .
       dockerfile: Dockerfile
       target: web-admin
-    env_file:
-      - ./.env.production
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -222,8 +306,6 @@ async function writeReleaseCompose() {
       context: .
       dockerfile: Dockerfile
       target: pos-web
-    env_file:
-      - ./.env.production
     environment:
       NODE_ENV: production
       PORT: 3001
@@ -235,6 +317,28 @@ async function writeReleaseCompose() {
     depends_on:
       api:
         condition: service_started
+    networks:
+      - cleanhub
+
+  gateway:
+    image: caddy:2.10-alpine
+    container_name: cleanhub-gateway
+    restart: unless-stopped
+    environment:
+      POS_PUBLIC_HOST: \${POS_PUBLIC_HOST:?POS_PUBLIC_HOST is required}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - cleanhub-caddy-data:/data
+      - cleanhub-caddy-config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+      pos-web:
+        condition: service_healthy
     networks:
       - cleanhub
 
@@ -250,11 +354,13 @@ async function writeReleaseCompose() {
       - ./.env.production
     environment:
       NODE_ENV: production
-      DATABASE_URL: \${DATABASE_URL:-postgres://cleanhub:\${POSTGRES_PASSWORD}@postgres:5432/cleanhub}
+      DATABASE_URL: \${DATABASE_ADMIN_URL:?DATABASE_ADMIN_URL is required for migrations}
       DRIZZLE_MIGRATIONS_FOLDER: /app/db/drizzle
     depends_on:
       postgres:
         condition: service_healthy
+      db-role-init:
+        condition: service_completed_successfully
     networks:
       - cleanhub
 
@@ -270,11 +376,13 @@ async function writeReleaseCompose() {
       - ./.env.production
     environment:
       NODE_ENV: production
-      DATABASE_URL: \${DATABASE_URL:-postgres://cleanhub:\${POSTGRES_PASSWORD}@postgres:5432/cleanhub}
+      DATABASE_URL: \${DATABASE_ADMIN_URL:?DATABASE_ADMIN_URL is required for seeds}
       CLEANHUB_SEEDS_FOLDER: /app/db/seeds
     depends_on:
       postgres:
         condition: service_healthy
+      db-role-init:
+        condition: service_completed_successfully
     networks:
       - cleanhub
 
@@ -285,6 +393,12 @@ networks:
 volumes:
   cleanhub-postgres-data:
     name: cleanhub-postgres-data
+  cleanhub-minio-data:
+    name: cleanhub-minio-data
+  cleanhub-caddy-data:
+    name: cleanhub-caddy-data
+  cleanhub-caddy-config:
+    name: cleanhub-caddy-config
 `,
   );
 }
@@ -394,7 +508,14 @@ async function copyWebAdminStandalone() {
   // flattening pnpm links for Linux deployment. Ensure it exists in artifact.
   const swcHelpersCandidates = [
     join(webAdminDir, "node_modules", "@swc", "helpers"),
-    join(webAdminDir, "node_modules", "next", "node_modules", "@swc", "helpers"),
+    join(
+      webAdminDir,
+      "node_modules",
+      "next",
+      "node_modules",
+      "@swc",
+      "helpers",
+    ),
     join(rootDir, "node_modules", "@swc", "helpers"),
     join(rootDir, "node_modules", "next", "node_modules", "@swc", "helpers"),
   ];
@@ -615,6 +736,8 @@ async function writeManifest() {
     "web-admin/apps/web-admin/server.js",
     "pos-web/apps/pos-web/server.js",
     "env/production.env.example",
+    "postgres/ensure-app-role.sh",
+    "caddy/Caddyfile",
     "nginx/cleanhub.conf.example",
   ];
   const checksums = {};
@@ -647,6 +770,8 @@ async function main() {
   await mkdir(join(artifactDir, "db"), { recursive: true });
   await mkdir(join(artifactDir, "db", "seeds"), { recursive: true });
   await mkdir(join(artifactDir, "env"), { recursive: true });
+  await mkdir(join(artifactDir, "postgres"), { recursive: true });
+  await mkdir(join(artifactDir, "caddy"), { recursive: true });
   await mkdir(join(artifactDir, "nginx"), { recursive: true });
 
   await run("pnpm", ["--filter", "@cleanhub/api-client", "typecheck"]);
@@ -683,6 +808,14 @@ async function main() {
     join(artifactDir, "env", "production.env.example"),
   );
   await cp(
+    join(rootDir, "deploy", "postgres", "ensure-app-role.sh"),
+    join(artifactDir, "postgres", "ensure-app-role.sh"),
+  );
+  await cp(
+    join(rootDir, "deploy", "caddy", "Caddyfile"),
+    join(artifactDir, "caddy", "Caddyfile"),
+  );
+  await cp(
     join(rootDir, "deploy", "nginx", "cleanhub.conf.example"),
     join(artifactDir, "nginx", "cleanhub.conf.example"),
   );
@@ -690,7 +823,9 @@ async function main() {
   await writeReleaseCompose();
   await writeManifest();
 
-  console.log(`Release artifact generated at ${relative(rootDir, artifactDir)}.`);
+  console.log(
+    `Release artifact generated at ${relative(rootDir, artifactDir)}.`,
+  );
 }
 
 await main();

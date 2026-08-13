@@ -33,6 +33,8 @@ release/cleanhub/
     drizzle/
   env/
     production.env.example
+  caddy/
+    Caddyfile
   nginx/
     cleanhub.conf.example
 ```
@@ -42,7 +44,10 @@ release/cleanhub/
 - `api/index.js` 是通过 esbuild 生成的 API standalone bundle。
 - `api/migrate.js` 是 release 包内的数据库迁移 runner。
 - `web-admin/` 是 Next.js `output: "standalone"` 产物。
+- `pos-web/` 是 POS Next.js `output: "standalone"` 产物。
 - `db/drizzle/` 是 Drizzle SQL migration 文件。
+- `caddy/Caddyfile` 是 POS HTTPS 网关配置，证书由 Let’s Encrypt 自动签发和续期。
+- PostgreSQL 与 MinIO 数据分别保存在命名 Docker volumes 中，均不直接暴露到公网。
 
 ## 本地或 CI 构建
 
@@ -88,11 +93,14 @@ cp env/production.env.example .env.production
 编辑 `.env.production`，至少修改：
 
 - `POSTGRES_PASSWORD`
+- `POSTGRES_APP_PASSWORD`（必须与管理员密码不同）
 - `DATABASE_URL`
+- `DATABASE_ADMIN_URL`
 - `AUTH_TOKEN_SECRET`
 - `CORS_ORIGINS`
 - `NEXT_PUBLIC_API_BASE_URL`
 - `CLEANHUB_API_BASE_URL`
+- `POS_PUBLIC_HOST`
 
 同域名部署建议：
 
@@ -101,9 +109,15 @@ NEXT_PUBLIC_API_BASE_URL=/api
 CLEANHUB_API_BASE_URL=http://api:4000
 CORS_ORIGINS=https://cleanhub.example.com
 AUTH_COOKIE_SECURE=true
+POS_PUBLIC_HOST=pos.cleanhub.example.com
 ```
 
 不要提交真实 `.env.production`。
+
+`DATABASE_URL` 只供 API 使用，必须连接 `NOSUPERUSER NOBYPASSRLS` 的
+`POSTGRES_APP_USER`。`DATABASE_ADMIN_URL` 仅供迁移和 seed 工具使用，不能注入 API
+容器。release 中的 `db-role-init` 会幂等创建/校正应用角色、授予业务表 DML 权限，
+并设置后续迁移所需的默认权限。
 
 ## 启动
 
@@ -125,18 +139,30 @@ docker compose --env-file .env.production up -d postgres
 docker compose --env-file .env.production --profile tools run --rm migrate
 ```
 
-启动应用：
+迁移会为 `public` schema 的全部业务表启用并强制 PostgreSQL RLS：租户表按
+`tenant_id` 隔离，`tenants` 根表按自身 `id` 隔离，全局配置表只开放明确需要的
+读取路径。API 在生产启动时还会再次检查：应用角色若是超级用户、拥有
+`BYPASSRLS`，或任意业务表缺少强制 RLS/基础策略，启动会直接失败，避免以不安全
+配置对外提供服务。
+
+启动应用和 HTTPS 网关：
 
 ```bash
-docker compose --env-file .env.production up -d api web-admin
+docker compose --env-file .env.production up -d api pos-web gateway
 ```
 
 本机检查：
 
 ```bash
 curl http://127.0.0.1:4010/health
-curl -I http://127.0.0.1:3010/login
+curl -I http://127.0.0.1:3011/login
+curl -I https://pos.cleanhub.example.com/login
 ```
+
+`gateway` 使用 Caddy，只向公网开放 80/443，并强制使用 Let’s Encrypt ACME。
+DNS 必须先指向服务器，防火墙必须允许 TCP 80/443 和 UDP 443。证书及 Caddy
+状态保存在 `cleanhub-caddy-data`、`cleanhub-caddy-config` volumes 中，更新 release
+文件时不得删除这些 volumes。
 
 ## Nginx
 
@@ -173,7 +199,7 @@ systemctl reload nginx
 cd /opt/cleanhub
 docker compose --env-file .env.production build
 docker compose --env-file .env.production --profile tools run --rm migrate
-docker compose --env-file .env.production up -d api web-admin
+docker compose --env-file .env.production up -d api pos-web gateway
 ```
 
 ## 回滚
@@ -182,7 +208,7 @@ docker compose --env-file .env.production up -d api web-admin
 
 ```bash
 docker compose --env-file .env.production build
-docker compose --env-file .env.production up -d api web-admin
+docker compose --env-file .env.production up -d api pos-web gateway
 ```
 
 数据库迁移一旦执行，不应假设可以自动回滚。涉及破坏性迁移时，需要先做数据库备份。
