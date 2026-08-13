@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 
 import { LanguageSwitcher } from "@/components/i18n";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
+import { CleanHubBrandMark } from "@/components/branding";
 import type { AuthRedirectReason } from "@/config/auth-routing";
 import { useWebAdminLocale } from "@/i18n";
 
@@ -140,9 +141,10 @@ export function LoginPageContent({ reason }: LoginPageContentProps) {
       <div className="relative z-10 flex min-h-screen flex-col">
         <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8 sm:py-7 lg:px-10">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-zinc-950 text-xs font-extrabold tracking-tight text-white shadow-[0_10px_32px_rgba(24,24,27,0.18)] dark:bg-white dark:text-zinc-950">
-              CH
-            </span>
+            <CleanHubBrandMark
+              className="size-10 shadow-[0_10px_32px_rgba(24,24,27,0.18)]"
+              priority
+            />
             <div className="min-w-0">
               <p className="truncate text-sm font-bold tracking-tight sm:text-base">
                 {auth.brandName}

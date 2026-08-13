@@ -5,6 +5,7 @@ import { cn } from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell/icons";
 import { LanguageSwitcher } from "@/components/i18n";
+import { CleanHubBrandMark } from "@/components/branding";
 
 import { getTerminalSetupCopy } from "../copy";
 import type { SetupStep } from "../types";
@@ -50,9 +51,10 @@ export function TerminalSetupShell({
       <div className="relative z-10 flex min-h-screen min-h-dvh flex-col">
         <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-5 py-5 sm:px-8 sm:py-7">
           <div className="flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-xl bg-black text-xs font-extrabold tracking-tight text-white shadow-[0_12px_28px_rgba(0,0,0,0.18)]">
-              CH
-            </span>
+            <CleanHubBrandMark
+              className="size-10 shadow-[0_12px_28px_rgba(0,0,0,0.18)]"
+              priority
+            />
             <div>
               <p className="text-sm font-bold tracking-tight sm:text-base">
                 CleanHub
@@ -88,8 +90,7 @@ export function TerminalSetupShell({
                         <span
                           className={cn(
                             "flex size-6 shrink-0 items-center justify-center rounded-full border text-[10px] font-bold transition-colors",
-                            complete &&
-                              "border-black bg-black text-white",
+                            complete && "border-black bg-black text-white",
                             active &&
                               "border-black bg-white text-black shadow-sm",
                             !complete &&

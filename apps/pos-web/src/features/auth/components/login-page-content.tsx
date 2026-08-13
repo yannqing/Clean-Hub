@@ -4,6 +4,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import type { CSSProperties } from "react";
 
 import { LanguageSwitcher } from "@/components/i18n";
+import { CleanHubBrandMark } from "@/components/branding";
 import { TerminalPinLoginGate } from "@/features/terminal-setup/components/terminal-pin-login-gate";
 
 import { LoginForm } from "./login-form";
@@ -111,9 +112,10 @@ export function LoginPageContent() {
       <div className="relative z-10 flex min-h-screen min-h-dvh flex-col">
         <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-4 md:px-8 lg:px-10 login-desktop:py-7">
           <div className="flex items-center gap-2.5 md:gap-3">
-            <span className="flex size-9 items-center justify-center rounded-full bg-foreground text-[11px] font-extrabold tracking-tight text-background md:size-10 md:text-xs login-desktop:rounded-xl login-desktop:shadow-[0_10px_32px_rgba(24,24,27,0.18)]">
-              CH
-            </span>
+            <CleanHubBrandMark
+              className="size-9 shadow-[0_10px_32px_rgba(24,24,27,0.18)] md:size-10"
+              priority
+            />
             <div className="min-w-0">
               <p className="truncate text-sm font-bold tracking-tight md:text-base">
                 CleanHub

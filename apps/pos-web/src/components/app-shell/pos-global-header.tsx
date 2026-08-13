@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { LanguageSwitcher } from "@/components/i18n";
+import { CleanHubBrandMark } from "@/components/branding";
 import { posRoutes } from "@/config";
 import { LogoutButton } from "@/features/auth/components";
 import { GlobalSearchBox } from "@/features/global-search";
@@ -81,9 +82,7 @@ export function PosGlobalHeader({
             className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             href={posRoutes.workspace}
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-semibold tracking-tight text-black">
-              CH
-            </span>
+            <CleanHubBrandMark className="size-10 rounded-lg" priority />
             <span className="hidden min-w-0 items-center gap-2 sm:flex">
               <span className="truncate text-sm font-semibold tracking-tight">
                 CleanHub

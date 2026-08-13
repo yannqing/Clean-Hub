@@ -14,6 +14,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "CleanHub Admin",
   description: "CleanHub SaaS administration and back office",
+  icons: {
+    icon: "/cleanhub-logo-mark.jpg",
+    shortcut: "/cleanhub-logo-mark.jpg",
+    apple: "/cleanhub-logo-mark.jpg",
+  },
 };
 
 export default async function RootLayout({

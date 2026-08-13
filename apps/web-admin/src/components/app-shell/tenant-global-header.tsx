@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { CleanHubBrandMark } from "@/components/branding";
 import {
   TenantHeaderAccountMenu,
   TenantHeaderAssistant,
@@ -46,9 +47,7 @@ export function TenantGlobalHeader({
             className="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             href={webAdminRoutes.tenant.home}
           >
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white text-sm font-semibold text-black">
-              CH
-            </span>
+            <CleanHubBrandMark className="size-10 rounded-lg" priority />
             <span className="hidden text-sm font-semibold tracking-tight sm:block">
               CleanHub
             </span>
