@@ -1,11 +1,13 @@
 import type { ApiClient, ApiRequestOptions, QueryParams } from "../../types";
 import type {
   CreateServiceRequest,
+  RequestTenantServiceMediaUploadRequest,
   ServiceCategoryListQuery,
   ServiceCategorySummary,
   ServiceDetail,
   ServiceListQuery,
   ServiceSummary,
+  TenantServiceMediaUploadTicket,
   UpdateServiceStatusRequest,
   UpdateServiceRequest,
 } from "./services.types";
@@ -27,6 +29,15 @@ export function createTenantServicesApi(client: ApiClient) {
         query,
         ...options,
       }),
+    requestMediaUpload: (
+      data: RequestTenantServiceMediaUploadRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<TenantServiceMediaUploadTicket>(
+        "/tenant/services/media/uploads",
+        data,
+        options,
+      ),
     getDetail: (serviceId: string, options?: RequestOptions) =>
       client.get<ServiceDetail>(
         `/tenant/services/${encodeURIComponent(serviceId)}`,

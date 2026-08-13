@@ -7,11 +7,13 @@ import {
   deleteTenantService,
   getTenantServiceDetail,
   listTenantServices,
+  requestTenantServiceMediaUpload,
   updateTenantService,
   updateTenantServiceStatus,
 } from "./services.service.js";
 import {
   createServiceBodySchema,
+  requestTenantServiceMediaUploadBodySchema,
   serviceListQuerySchema,
   serviceParamsSchema,
   updateServiceBodySchema,
@@ -62,6 +64,35 @@ export async function createTenantServiceController(c: Context<AppBindings>) {
       return createTenantServicesErrorResponse(c, error);
     }
 
+    throw error;
+  }
+}
+
+export async function requestTenantServiceMediaUploadController(
+  c: Context<AppBindings>,
+) {
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = requestTenantServiceMediaUploadBodySchema.parse(rawBody);
+
+  try {
+    const result = await requestTenantServiceMediaUpload(
+      c.get("authContext"),
+      data,
+    );
+    c.get("logger").info(
+      {
+        tenantId: c.get("authContext").tenantId,
+        actorUserId: c.get("authContext").userId,
+        objectKey: result.objectKey,
+        sizeBytes: data.sizeBytes,
+      },
+      "Created service image upload ticket",
+    );
+    return c.json(result, 201);
+  } catch (error) {
+    if (error instanceof TenantServicesError) {
+      return createTenantServicesErrorResponse(c, error);
+    }
     throw error;
   }
 }

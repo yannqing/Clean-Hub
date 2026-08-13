@@ -794,10 +794,12 @@ export const enMessages = {
     },
     catalog: {
       title: "Products & services",
-      description: "View products for sale and services available at this store.",
+      description:
+        "View products for sale and services available at this store.",
       branchScope: "Current store: {branch}",
       readOnlyBadge: "Read-only catalog",
-      readOnlyHint: "The POS is view-only. Use the tenant admin to add, edit, deactivate, or delete catalog items.",
+      readOnlyHint:
+        "The POS is view-only. Use the tenant admin to add, edit, deactivate, or delete catalog items.",
       searchPlaceholder: "Search name, category, SKU, or barcode",
       search: "Search",
       clearSearch: "Clear search",
@@ -832,10 +834,17 @@ export const enMessages = {
       identifiers: "Identifiers",
       salesInventory: "Sales and inventory",
       pricingDelivery: "Pricing and delivery",
+      images: "Images",
+      coverImage: "Cover image",
+      detailImage: "Detail image",
+      descriptionTitle: "Description",
+      noDescription: "No description provided.",
       fields: {
         name: "Name",
         variant: "Variant",
         category: "Category",
+        brand: "Brand",
+        shortName: "Short name",
         sku: "SKU",
         barcode: "Barcode",
         unit: "Unit of measure",

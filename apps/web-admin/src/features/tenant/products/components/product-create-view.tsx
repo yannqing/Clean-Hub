@@ -1121,6 +1121,11 @@ export function ProductCreateView({
                               src={image.previewUrl}
                               unoptimized
                             />
+                            <span className="absolute bottom-1.5 left-1.5 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-medium shadow-sm">
+                              {index === 0
+                                ? m.products.create.coverImage
+                                : m.products.create.detailImage}
+                            </span>
                             <Button
                               aria-label={`${m.products.create.removeImage} ${getProductImageName(image)}`}
                               className="absolute right-1.5 top-1.5 size-7 bg-background/90 opacity-100 shadow-sm sm:opacity-0 sm:group-hover:opacity-100"

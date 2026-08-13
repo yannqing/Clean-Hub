@@ -4,10 +4,7 @@ import type {
   PosCatalogProduct,
   PosCatalogService,
 } from "@cleanhub/api-client";
-import {
-  businessLineLabels,
-  type SupportedLocale,
-} from "@cleanhub/i18n";
+import { businessLineLabels, type SupportedLocale } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Badge,
@@ -22,6 +19,7 @@ import {
   cn,
 } from "@cleanhub/ui";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   useState,
@@ -202,10 +200,7 @@ export function CatalogView({
         {rows.length > 0 ? (
           <CatalogTable locale={locale} rows={rows} />
         ) : (
-          <CatalogEmptyState
-            filter={filter}
-            hasQuery={Boolean(query)}
-          />
+          <CatalogEmptyState filter={filter} hasQuery={Boolean(query)} />
         )}
       </PosTableSurface>
     </section>
@@ -241,7 +236,11 @@ function CatalogTable({
     <>
       <div className="divide-y min-[900px]:hidden">
         {rows.map((row) => (
-          <CatalogMobileCard key={getCatalogItemKey(row)} locale={locale} row={row} />
+          <CatalogMobileCard
+            key={getCatalogItemKey(row)}
+            locale={locale}
+            row={row}
+          />
         ))}
       </div>
 
@@ -274,21 +273,30 @@ function CatalogTable({
                   tabIndex={0}
                 >
                   <TableCell className="max-w-64">
-                    <span className="block truncate font-medium text-foreground">
-                      {product ? product.name : service?.name}
-                    </span>
-                    <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
-                      {product
-                        ? product.variantName ?? product.unitOfMeasure
-                        : businessLineLabels[locale][service!.businessLine]}
-                    </span>
+                    <div className="flex min-w-0 items-center gap-2.5">
+                      <CatalogThumbnail
+                        className="size-10"
+                        item={row.item}
+                        name={product ? product.name : service!.name}
+                      />
+                      <div className="min-w-0">
+                        <span className="block truncate font-medium text-foreground">
+                          {product ? product.name : service?.name}
+                        </span>
+                        <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
+                          {product
+                            ? (product.variantName ?? product.unitOfMeasure)
+                            : businessLineLabels[locale][service!.businessLine]}
+                        </span>
+                      </div>
+                    </div>
                   </TableCell>
                   <TableCell>
                     <CatalogTypeBadge kind={row.kind} />
                   </TableCell>
                   <TableCell className="max-w-44 truncate">
                     {product
-                      ? product.categoryName ?? t("common.unavailable")
+                      ? (product.categoryName ?? t("common.unavailable"))
                       : service?.categoryName}
                   </TableCell>
                   <TableCell className="max-w-56">
@@ -308,7 +316,11 @@ function CatalogTable({
                     )}
                   </TableCell>
                   <TableCell className="font-medium">
-                    {formatCatalogMoney(row.item.amount, row.item.currency, locale)}
+                    {formatCatalogMoney(
+                      row.item.amount,
+                      row.item.currency,
+                      locale,
+                    )}
                   </TableCell>
                   <TableCell>
                     {product
@@ -316,7 +328,10 @@ function CatalogTable({
                       : formatTurnaround(service!.turnaroundMinutes, t)}
                   </TableCell>
                   <TableCell>
-                    <Icon className="size-3.5 text-muted-foreground" name="chevron-right" />
+                    <Icon
+                      className="size-3.5 text-muted-foreground"
+                      name="chevron-right"
+                    />
                   </TableCell>
                 </TableRow>
               );
@@ -344,42 +359,85 @@ function CatalogMobileCard({
       className="block min-h-28 px-3 py-3 transition-colors hover:bg-muted/50 focus-visible:bg-muted/50 focus-visible:outline-none"
       href={getCatalogItemHref(row)}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <CatalogTypeBadge kind={row.kind} />
-            <span className="truncate text-sm font-medium text-foreground">
-              {product ? formatProductName(product) : service?.name}
+      <div className="flex items-start gap-3">
+        <CatalogThumbnail
+          className="size-16 sm:size-18"
+          item={row.item}
+          name={product ? product.name : service!.name}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <CatalogTypeBadge kind={row.kind} />
+                <span className="truncate text-sm font-medium text-foreground">
+                  {product ? formatProductName(product) : service?.name}
+                </span>
+              </div>
+              <p className="mt-2 truncate text-xs text-foreground">
+                {product
+                  ? (product.categoryName ?? t("common.unavailable"))
+                  : service?.categoryName}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                {product
+                  ? product.sku
+                  : `${businessLineLabels[locale][service!.businessLine]} · ${formatPricingUnit(service!.pricingUnit, t)}`}
+              </p>
+            </div>
+            <span className="shrink-0 text-sm font-semibold">
+              {formatCatalogMoney(row.item.amount, row.item.currency, locale)}
             </span>
           </div>
-          <p className="mt-2 truncate text-xs text-foreground">
-            {product
-              ? product.categoryName ?? t("common.unavailable")
-              : service?.categoryName}
-          </p>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">
-            {product
-              ? product.sku
-              : `${businessLineLabels[locale][service!.businessLine]} · ${formatPricingUnit(service!.pricingUnit, t)}`}
-          </p>
-        </div>
-        <span className="shrink-0 text-sm font-semibold">
-          {formatCatalogMoney(row.item.amount, row.item.currency, locale)}
-        </span>
-      </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2 border-t pt-2 text-xs text-muted-foreground">
-        <span>
-          {product
-            ? formatProductInventory(product, locale, t)
-            : formatTurnaround(service!.turnaroundMinutes, t)}
-        </span>
-        <span className="flex items-center gap-1">
-          {t("pos.catalog.view")}
-          <Icon className="size-3.5" name="chevron-right" />
-        </span>
+          <div className="mt-3 flex items-center justify-between gap-2 border-t pt-2 text-xs text-muted-foreground">
+            <span>
+              {product
+                ? formatProductInventory(product, locale, t)
+                : formatTurnaround(service!.turnaroundMinutes, t)}
+            </span>
+            <span className="flex items-center gap-1">
+              {t("pos.catalog.view")}
+              <Icon className="size-3.5" name="chevron-right" />
+            </span>
+          </div>
+        </div>
       </div>
     </Link>
+  );
+}
+
+function CatalogThumbnail({
+  className,
+  item,
+  name,
+}: {
+  className?: string;
+  item: PosCatalogProduct | PosCatalogService;
+  name: string;
+}) {
+  const cover = item.media.find((media) => media.isPrimary) ?? item.media[0];
+
+  return (
+    <span
+      className={cn(
+        "relative flex shrink-0 overflow-hidden rounded-md border bg-muted text-muted-foreground",
+        className,
+      )}
+    >
+      {cover ? (
+        <Image
+          alt={name}
+          className="object-cover"
+          fill
+          sizes="72px"
+          src={cover.downloadUrl}
+          unoptimized
+        />
+      ) : (
+        <Icon className="m-auto size-5" name="package-check" />
+      )}
+    </span>
   );
 }
 
@@ -388,7 +446,9 @@ function CatalogTypeBadge({ kind }: { kind: CatalogListItem["kind"] }) {
 
   return (
     <Badge variant={kind === "product" ? "secondary" : "outline"}>
-      {kind === "product" ? t("pos.catalog.products") : t("pos.catalog.services")}
+      {kind === "product"
+        ? t("pos.catalog.products")
+        : t("pos.catalog.services")}
     </Badge>
   );
 }
@@ -467,7 +527,9 @@ export function formatProductInventory(
 
   const quantity = Number(product.availableQuantity);
   const formatted = Number.isFinite(quantity)
-    ? new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(quantity)
+    ? new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(
+        quantity,
+      )
     : product.availableQuantity;
   return `${formatted} ${product.unitOfMeasure}`;
 }

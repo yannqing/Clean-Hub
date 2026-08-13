@@ -12,12 +12,10 @@ import {
 } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { Badge, cn } from "@cleanhub/ui";
+import Image from "next/image";
 import type { ReactNode } from "react";
 
-import {
-  Icon,
-  PosBreadcrumb,
-} from "@/components/app-shell";
+import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { posRoutes } from "@/config";
 
 import {
@@ -53,6 +51,8 @@ export function CatalogDetailView(props: CatalogDetailViewProps) {
     props.kind === "product" ? formatProductName(props.item) : props.item.name;
   const identifier =
     props.kind === "product" ? props.item.productSkuId : props.item.id;
+  const cover =
+    props.item.media.find((media) => media.isPrimary) ?? props.item.media[0];
 
   return (
     <section className="mx-auto w-full max-w-[1080px] space-y-4 pb-12">
@@ -66,8 +66,19 @@ export function CatalogDetailView(props: CatalogDetailViewProps) {
       <section className="overflow-hidden border-y bg-background">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b px-4 py-3">
           <div className="flex min-w-0 items-start gap-3">
-            <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-              <Icon className="size-5" name="package-check" />
+            <span className="relative flex size-12 shrink-0 overflow-hidden rounded-md border bg-muted text-muted-foreground">
+              {cover ? (
+                <Image
+                  alt={displayName}
+                  className="object-cover"
+                  fill
+                  sizes="48px"
+                  src={cover.downloadUrl}
+                  unoptimized
+                />
+              ) : (
+                <Icon className="m-auto size-5" name="package-check" />
+              )}
             </span>
             <div className="min-w-0">
               <h1 className="truncate text-lg font-semibold text-foreground">
@@ -98,6 +109,10 @@ export function CatalogDetailView(props: CatalogDetailViewProps) {
           <ServiceMetricStrip item={props.item} locale={locale} />
         )}
       </section>
+
+      {props.item.media.length > 0 ? (
+        <CatalogMediaGallery media={props.item.media} name={displayName} />
+      ) : null}
 
       {props.kind === "product" ? (
         <ProductDetail item={props.item} locale={locale} />
@@ -220,11 +235,24 @@ function ProductDetail({
             label={t("pos.catalog.fields.category")}
             value={item.categoryName ?? t("common.unavailable")}
           />
-          <DetailField label={t("pos.catalog.fields.unit")} value={item.unitOfMeasure} />
+          <DetailField
+            label={t("pos.catalog.fields.brand")}
+            value={item.brand ?? t("pos.catalog.values.none")}
+          />
+          <DetailField
+            label={t("pos.catalog.fields.unit")}
+            value={item.unitOfMeasure}
+          />
         </DetailSection>
 
+        <DescriptionSection description={item.description} />
+
         <DetailSection title={t("pos.catalog.identifiers")}>
-          <DetailField label={t("pos.catalog.fields.sku")} mono value={item.sku} />
+          <DetailField
+            label={t("pos.catalog.fields.sku")}
+            mono
+            value={item.sku}
+          />
           <DetailField
             label={t("pos.catalog.fields.barcode")}
             mono={Boolean(item.barcode)}
@@ -272,18 +300,29 @@ function ServiceDetail({
 
   return (
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <DetailSection title={t("pos.catalog.serviceDetails")}>
-        <DetailField label={t("pos.catalog.fields.name")} value={item.name} />
-        <DetailField label={t("pos.catalog.fields.category")} value={item.categoryName} />
-        <DetailField
-          label={t("pos.catalog.fields.businessLine")}
-          value={businessLineLabels[locale][item.businessLine]}
-        />
-        <DetailField
-          label={t("pos.catalog.fields.labelRule")}
-          value={t(LABEL_RULE_KEYS[item.labelRule])}
-        />
-      </DetailSection>
+      <div className="min-w-0 space-y-4">
+        <DetailSection title={t("pos.catalog.serviceDetails")}>
+          <DetailField label={t("pos.catalog.fields.name")} value={item.name} />
+          <DetailField
+            label={t("pos.catalog.fields.shortName")}
+            value={item.shortName ?? t("pos.catalog.values.none")}
+          />
+          <DetailField
+            label={t("pos.catalog.fields.category")}
+            value={item.categoryName}
+          />
+          <DetailField
+            label={t("pos.catalog.fields.businessLine")}
+            value={businessLineLabels[locale][item.businessLine]}
+          />
+          <DetailField
+            label={t("pos.catalog.fields.labelRule")}
+            value={t(LABEL_RULE_KEYS[item.labelRule])}
+          />
+        </DetailSection>
+
+        <DescriptionSection description={item.description} />
+      </div>
 
       <aside className="xl:sticky xl:top-4 xl:self-start">
         <DetailSection singleColumn title={t("pos.catalog.pricingDelivery")}>
@@ -305,6 +344,111 @@ function ServiceDetail({
   );
 }
 
+function CatalogMediaGallery({
+  media,
+  name,
+}: {
+  media: PosCatalogProduct["media"] | PosCatalogService["media"];
+  name: string;
+}) {
+  const { t } = useTranslation();
+  const orderedMedia = [...media].sort(
+    (left, right) =>
+      Number(right.isPrimary) - Number(left.isPrimary) ||
+      left.sortOrder - right.sortOrder,
+  );
+  const [cover, ...details] = orderedMedia;
+
+  if (!cover) {
+    return null;
+  }
+
+  return (
+    <section className="border-y bg-background p-4 sm:p-5">
+      <h2 className="font-semibold text-foreground">
+        {t("pos.catalog.images")}
+      </h2>
+      <div
+        className={cn(
+          "mt-4 grid gap-3",
+          details.length > 0 &&
+            "md:grid-cols-[minmax(0,1.4fr)_minmax(240px,1fr)]",
+        )}
+      >
+        <figure className="min-w-0">
+          <div className="relative aspect-[4/3] overflow-hidden rounded-lg border bg-muted sm:aspect-[16/9]">
+            <Image
+              alt={`${name} · ${t("pos.catalog.coverImage")}`}
+              className="object-cover"
+              fill
+              priority
+              sizes="(max-width: 768px) 100vw, 62vw"
+              src={cover.downloadUrl}
+              unoptimized
+            />
+          </div>
+          <figcaption className="mt-1.5 text-xs text-muted-foreground">
+            {t("pos.catalog.coverImage")}
+          </figcaption>
+        </figure>
+
+        {details.length > 0 ? (
+          <div className="grid grid-cols-2 content-start gap-3">
+            {details.map((image, index) => (
+              <figure className="min-w-0" key={image.id}>
+                <div className="relative aspect-square overflow-hidden rounded-lg border bg-muted">
+                  <Image
+                    alt={`${name} · ${t("pos.catalog.detailImage")} ${index + 1}`}
+                    className="object-cover"
+                    fill
+                    sizes="(max-width: 768px) 50vw, 220px"
+                    src={image.downloadUrl}
+                    unoptimized
+                  />
+                </div>
+                <figcaption className="mt-1.5 text-xs text-muted-foreground">
+                  {t("pos.catalog.detailImage")} {index + 1}
+                </figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </section>
+  );
+}
+
+function DescriptionSection({ description }: { description: string | null }) {
+  const { t } = useTranslation();
+
+  return (
+    <section className="border-y bg-background p-5">
+      <h2 className="font-semibold text-foreground">
+        {t("pos.catalog.descriptionTitle")}
+      </h2>
+      <p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-foreground">
+        {description
+          ? stripDescriptionMarkup(description)
+          : t("pos.catalog.noDescription")}
+      </p>
+    </section>
+  );
+}
+
+function stripDescriptionMarkup(value: string): string {
+  return value
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>|<\/div>|<\/li>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 function DetailSection({
   children,
   singleColumn = false,
@@ -317,7 +461,12 @@ function DetailSection({
   return (
     <section className="border-y bg-background p-5">
       <h2 className="font-semibold text-foreground">{title}</h2>
-      <dl className={cn("mt-4 grid gap-x-8 gap-y-4", !singleColumn && "sm:grid-cols-2")}>
+      <dl
+        className={cn(
+          "mt-4 grid gap-x-8 gap-y-4",
+          !singleColumn && "sm:grid-cols-2",
+        )}
+      >
         {children}
       </dl>
     </section>

@@ -804,10 +804,12 @@ export const frMessages = {
     },
     catalog: {
       title: "Produits et services",
-      description: "Consultez les produits vendus et les services disponibles dans ce magasin.",
+      description:
+        "Consultez les produits vendus et les services disponibles dans ce magasin.",
       branchScope: "Magasin actuel : {branch}",
       readOnlyBadge: "Catalogue en lecture seule",
-      readOnlyHint: "Le POS permet uniquement la consultation. Utilisez l’administration du tenant pour ajouter, modifier, désactiver ou supprimer des éléments.",
+      readOnlyHint:
+        "Le POS permet uniquement la consultation. Utilisez l’administration du tenant pour ajouter, modifier, désactiver ou supprimer des éléments.",
       searchPlaceholder: "Rechercher par nom, catégorie, SKU ou code-barres",
       search: "Rechercher",
       clearSearch: "Effacer la recherche",
@@ -822,7 +824,8 @@ export const frMessages = {
       servicesTitle: "Services",
       itemCount: "{count} éléments",
       noResultsTitle: "Aucun élément correspondant",
-      noResultsHint: "Essayez un autre nom, une autre catégorie, un SKU ou un code-barres.",
+      noResultsHint:
+        "Essayez un autre nom, une autre catégorie, un SKU ou un code-barres.",
       noProducts: "Aucun produit n’est disponible dans ce magasin.",
       noServices: "Aucun service n’est disponible dans ce magasin.",
       view: "Voir",
@@ -842,10 +845,17 @@ export const frMessages = {
       identifiers: "Identifiants",
       salesInventory: "Vente et stock",
       pricingDelivery: "Tarification et délai",
+      images: "Images",
+      coverImage: "Image de couverture",
+      detailImage: "Image de détail",
+      descriptionTitle: "Description",
+      noDescription: "Aucune description renseignée.",
       fields: {
         name: "Nom",
         variant: "Variante",
         category: "Catégorie",
+        brand: "Marque",
+        shortName: "Nom court",
         sku: "SKU",
         barcode: "Code-barres",
         unit: "Unité de mesure",

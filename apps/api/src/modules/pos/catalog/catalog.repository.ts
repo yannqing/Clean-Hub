@@ -2,32 +2,149 @@ import {
   branches,
   branchProductSettings,
   inventoryBalances,
+  mediaObjects,
   prices,
   productCategories,
   productPrices,
+  productMedia,
   products,
   productSkus,
   serviceBranchSettings,
   serviceCategories,
+  serviceMedia,
   services,
   type Database,
 } from "@cleanhub/db";
-import { and, asc, eq, isNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
 import type {
-  PosCatalogProduct,
+  PosCatalogProductRecord,
   PosCatalogQuery,
-  PosCatalogService,
+  PosCatalogServiceRecord,
+  PosCatalogMediaRecord,
 } from "./catalog.types.js";
 
 function escapeLikePattern(value: string): string {
   return value.replace(/[\\%_]/g, (character) => `\\${character}`);
 }
 
+async function findPosProductMedia(
+  db: Database,
+  input: { tenantId: string; productIds: string[] },
+): Promise<Map<string, PosCatalogMediaRecord[]>> {
+  if (input.productIds.length === 0) {
+    return new Map();
+  }
+  const rows = await db
+    .select({
+      productId: productMedia.productId,
+      id: productMedia.id,
+      objectKey: mediaObjects.objectKey,
+      isPrimary: productMedia.isPrimary,
+      sortOrder: productMedia.sortOrder,
+    })
+    .from(productMedia)
+    .innerJoin(
+      mediaObjects,
+      and(
+        eq(mediaObjects.tenantId, productMedia.tenantId),
+        eq(mediaObjects.id, productMedia.mediaObjectId),
+        eq(mediaObjects.status, "committed"),
+        isNull(mediaObjects.deletedAt),
+      ),
+    )
+    .where(
+      and(
+        eq(productMedia.tenantId, input.tenantId),
+        inArray(productMedia.productId, input.productIds),
+        isNull(productMedia.productSkuId),
+        isNull(productMedia.deletedAt),
+      ),
+    )
+    .orderBy(
+      desc(productMedia.isPrimary),
+      asc(productMedia.sortOrder),
+      asc(productMedia.id),
+    );
+  const mediaByProduct = new Map<string, PosCatalogMediaRecord[]>();
+  for (const row of rows) {
+    const media = mediaByProduct.get(row.productId) ?? [];
+    media.push({
+      id: row.id,
+      objectKey: row.objectKey,
+      isPrimary: row.isPrimary,
+      sortOrder: row.sortOrder,
+    });
+    mediaByProduct.set(row.productId, media);
+  }
+  return mediaByProduct;
+}
+
+async function findPosServiceMedia(
+  db: Database,
+  input: { tenantId: string; serviceIds: string[] },
+): Promise<Map<string, PosCatalogMediaRecord[]>> {
+  if (input.serviceIds.length === 0) {
+    return new Map();
+  }
+  const rows = await db
+    .select({
+      serviceId: serviceMedia.serviceId,
+      id: serviceMedia.id,
+      objectKey: mediaObjects.objectKey,
+      isPrimary: serviceMedia.isPrimary,
+      sortOrder: serviceMedia.sortOrder,
+    })
+    .from(serviceMedia)
+    .innerJoin(
+      mediaObjects,
+      and(
+        eq(mediaObjects.tenantId, serviceMedia.tenantId),
+        eq(mediaObjects.id, serviceMedia.mediaObjectId),
+        eq(mediaObjects.status, "committed"),
+        isNull(mediaObjects.deletedAt),
+      ),
+    )
+    .where(
+      and(
+        eq(serviceMedia.tenantId, input.tenantId),
+        inArray(serviceMedia.serviceId, input.serviceIds),
+        isNull(serviceMedia.deletedAt),
+      ),
+    )
+    .orderBy(
+      desc(serviceMedia.isPrimary),
+      asc(serviceMedia.sortOrder),
+      asc(serviceMedia.id),
+    );
+  const mediaByService = new Map<string, PosCatalogMediaRecord[]>();
+  for (const row of rows) {
+    const media = mediaByService.get(row.serviceId) ?? [];
+    media.push({
+      id: row.id,
+      objectKey: row.objectKey,
+      isPrimary: row.isPrimary,
+      sortOrder: row.sortOrder,
+    });
+    mediaByService.set(row.serviceId, media);
+  }
+  return mediaByService;
+}
+
 export async function findPosCatalogServices(
   db: Database,
   input: PosCatalogQuery & { tenantId: string },
-): Promise<PosCatalogService[]> {
+): Promise<PosCatalogServiceRecord[]> {
   const filters: SQL[] = [
     eq(services.tenantId, input.tenantId),
     eq(services.status, "active"),
@@ -62,13 +179,17 @@ export async function findPosCatalogServices(
     .select({
       id: services.id,
       name: services.name,
+      shortName: services.shortName,
+      description: services.description,
       categoryId: services.categoryId,
       categoryName: serviceCategories.name,
       businessLine: services.businessLine,
       pricingUnit: services.pricingUnit,
       labelRule: services.labelRule,
       turnaroundMinutes: input.branchId
-        ? sql<number | null>`coalesce(${serviceBranchSettings.turnaroundMinutesOverride}, ${services.turnaroundMinutes})`
+        ? sql<
+            number | null
+          >`coalesce(${serviceBranchSettings.turnaroundMinutesOverride}, ${services.turnaroundMinutes})`
         : services.turnaroundMinutes,
       amount: input.branchId
         ? sql<string>`coalesce(${serviceBranchSettings.priceOverrideAmount}, ${prices.amount})`
@@ -108,23 +229,35 @@ export async function findPosCatalogServices(
       asc(services.id),
     );
 
-  return input.includeAll ? query : query.limit(input.limit);
+  const rows = await (input.includeAll ? query : query.limit(input.limit));
+  const mediaByService = await findPosServiceMedia(db, {
+    tenantId: input.tenantId,
+    serviceIds: rows.map((row) => row.id),
+  });
+  return rows.map((row) => ({
+    ...row,
+    media: mediaByService.get(row.id) ?? [],
+  }));
 }
 
 export async function findPosCatalogServiceById(
   db: Database,
   input: { tenantId: string; branchId: string; serviceId: string },
-): Promise<PosCatalogService | null> {
+): Promise<PosCatalogServiceRecord | null> {
   const rows = await db
     .select({
       id: services.id,
       name: services.name,
+      shortName: services.shortName,
+      description: services.description,
       categoryId: services.categoryId,
       categoryName: serviceCategories.name,
       businessLine: services.businessLine,
       pricingUnit: services.pricingUnit,
       labelRule: services.labelRule,
-      turnaroundMinutes: sql<number | null>`coalesce(${serviceBranchSettings.turnaroundMinutesOverride}, ${services.turnaroundMinutes})`,
+      turnaroundMinutes: sql<
+        number | null
+      >`coalesce(${serviceBranchSettings.turnaroundMinutesOverride}, ${services.turnaroundMinutes})`,
       amount: sql<string>`coalesce(${serviceBranchSettings.priceOverrideAmount}, ${prices.amount})`,
       currency: prices.currency,
     })
@@ -169,13 +302,21 @@ export async function findPosCatalogServiceById(
     )
     .limit(1);
 
-  return rows[0] ?? null;
+  const service = rows[0];
+  if (!service) {
+    return null;
+  }
+  const mediaByService = await findPosServiceMedia(db, {
+    tenantId: input.tenantId,
+    serviceIds: [service.id],
+  });
+  return { ...service, media: mediaByService.get(service.id) ?? [] };
 }
 
 export async function findPosCatalogProducts(
   db: Database,
   input: PosCatalogQuery & { tenantId: string; branchId: string },
-): Promise<PosCatalogProduct[]> {
+): Promise<PosCatalogProductRecord[]> {
   const filters: SQL[] = [
     eq(products.tenantId, input.tenantId),
     eq(products.status, "active"),
@@ -220,6 +361,8 @@ export async function findPosCatalogProducts(
       productSkuId: productSkus.id,
       productPriceId: productPrices.id,
       name: products.name,
+      brand: products.brand,
+      description: products.description,
       categoryId: products.categoryId,
       categoryName: productCategories.name,
       sku: productSkus.skuCode,
@@ -290,12 +433,10 @@ export async function findPosCatalogProducts(
       sql`${productPrices.branchId} is null`,
     );
 
-  const rows = await (input.includeAll
-    ? query
-    : query.limit(input.limit * 2));
+  const rows = await (input.includeAll ? query : query.limit(input.limit * 2));
 
   const seenSkuIds = new Set<string>();
-  const catalog: PosCatalogProduct[] = [];
+  const catalog: Array<Omit<PosCatalogProductRecord, "media">> = [];
   for (const row of rows) {
     if (seenSkuIds.has(row.productSkuId)) {
       continue;
@@ -312,6 +453,8 @@ export async function findPosCatalogProducts(
       productSkuId: row.productSkuId,
       productPriceId: row.productPriceId,
       name: row.name,
+      brand: row.brand,
+      description: row.description,
       categoryId: row.categoryId,
       categoryName: row.categoryName,
       sku: row.sku,
@@ -331,13 +474,20 @@ export async function findPosCatalogProducts(
       break;
     }
   }
-  return catalog;
+  const mediaByProduct = await findPosProductMedia(db, {
+    tenantId: input.tenantId,
+    productIds: [...new Set(catalog.map((product) => product.productId))],
+  });
+  return catalog.map((product) => ({
+    ...product,
+    media: mediaByProduct.get(product.productId) ?? [],
+  }));
 }
 
 export async function findPosCatalogProductBySkuId(
   db: Database,
   input: { tenantId: string; branchId: string; productSkuId: string },
-): Promise<PosCatalogProduct | null> {
+): Promise<PosCatalogProductRecord | null> {
   const products = await findPosCatalogProducts(db, {
     tenantId: input.tenantId,
     branchId: input.branchId,

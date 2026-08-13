@@ -704,7 +704,9 @@ export const tenantMessagesEn: TenantMessages = {
       },
       addImages: "Add product images",
       mediaHelp:
-        "JPG, PNG, or WebP. Up to 5 MB each and 10 images per product.",
+        "The first image is the cover; the rest are detail images. JPG, PNG, or WebP, up to 5 MB each and 10 images total.",
+      coverImage: "Cover",
+      detailImage: "Detail",
       mediaTypeInvalid: "Upload JPG, PNG, or WebP images only.",
       mediaTooLarge: "Each image must be 5 MB or smaller.",
       mediaLimitReached: "A product can have up to 10 images.",
@@ -1564,6 +1566,9 @@ export const tenantMessagesEn: TenantMessages = {
       basicInformation: "Basic information",
       basicInformationDescription:
         "Add the service name and customer-facing details.",
+      media: "Service images",
+      mediaDescription:
+        "The first image is the cover; remaining images show service details.",
       pricing: "Pricing",
       pricingDescription:
         "Set the selling price, reference price, and internal cost.",
@@ -1670,6 +1675,18 @@ export const tenantMessagesEn: TenantMessages = {
       checkForm: "Check the service form.",
       unsavedChanges:
         "This service has unsaved changes. Are you sure you want to leave?",
+      addImages: "Add service images",
+      removeImage: "Remove image",
+      mediaHelp:
+        "The first image is the cover; the rest are detail images. JPG, PNG, or WebP, up to 5 MB each and 10 images total.",
+      coverImage: "Cover",
+      detailImage: "Detail",
+      mediaTypeInvalid: "Upload JPG, PNG, or WebP images only.",
+      mediaTooLarge: "Each image must be 5 MB or smaller.",
+      mediaLimitReached: "A service can have up to 10 images.",
+      mediaUploadFailed: "Service images could not be uploaded. Try again.",
+      mediaSaveConflict:
+        "The service images expired. Save the selected images again.",
     },
     validation: {
       businessLineInvalid: "Choose a supported business line.",
@@ -1683,6 +1700,7 @@ export const tenantMessagesEn: TenantMessages = {
       categoryInvalid: "Select a valid service category.",
       descriptionTooLong:
         "Service description must be 2,000 characters or fewer.",
+      mediaInvalid: "Service images are invalid or exceed the 10-image limit.",
       internalNotesTooLong: "Internal notes must be 5,000 characters or fewer.",
       turnaroundMinutesInvalid:
         "Turnaround must be a whole number from 1 to 525,600 minutes.",

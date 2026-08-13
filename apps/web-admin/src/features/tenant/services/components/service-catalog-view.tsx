@@ -138,6 +138,7 @@ const defaultFormValues: ServiceFormValues = {
   shortName: "",
   categoryId: "",
   description: "",
+  mediaObjectKeys: [],
   internalNotes: "",
   turnaroundMinutes: "",
   allBranches: true,

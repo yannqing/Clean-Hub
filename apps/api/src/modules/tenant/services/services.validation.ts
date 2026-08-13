@@ -1,6 +1,18 @@
 import { z } from "zod";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+const serviceMediaObjectKeysSchema = z
+  .array(z.string().trim().min(1).max(1_024))
+  .max(10)
+  .refine((keys) => new Set(keys).size === keys.length, {
+    message: "Service images must be unique.",
+  });
+const retainedServiceMediaIdsSchema = z
+  .array(z.string().regex(ULID_PATTERN))
+  .max(10)
+  .refine((ids) => new Set(ids).size === ids.length, {
+    message: "Retained service images must be unique.",
+  });
 
 export const serviceBusinessLineSchema = z.enum([
   "laundry",
@@ -104,6 +116,7 @@ const serviceProfileBodySchema = z.object({
   pricingUnit: servicePricingUnitSchema,
   labelRule: serviceLabelRuleSchema,
   status: serviceStatusSchema.optional(),
+  mediaObjectKeys: serviceMediaObjectKeysSchema.optional(),
 });
 
 export const createServiceBodySchema = serviceProfileBodySchema
@@ -127,12 +140,15 @@ export const createServiceBodySchema = serviceProfileBodySchema
   });
 
 export const updateServiceBodySchema = serviceProfileBodySchema
+  .omit({ mediaObjectKeys: true })
   .partial()
   .extend({
     standardPrice: standardPriceSchema.optional(),
     compareAtPrice: optionalPriceSchema,
     costPrice: optionalPriceSchema,
     version: z.number().int().positive(),
+    retainedMediaIds: retainedServiceMediaIdsSchema.optional(),
+    newMediaObjectKeys: serviceMediaObjectKeysSchema.optional(),
   })
   .refine(
     (value) => Object.keys(value).some((key) => key !== "version"),
@@ -140,6 +156,17 @@ export const updateServiceBodySchema = serviceProfileBodySchema
   )
   .superRefine((value, context) => {
     validateBranchSettings(value, context);
+    if (
+      (value.retainedMediaIds?.length ?? 0) +
+        (value.newMediaObjectKeys?.length ?? 0) >
+      10
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "A service can have at most 10 images.",
+        path: ["newMediaObjectKeys"],
+      });
+    }
     if (
       value.compareAtPrice != null &&
       value.standardPrice != null &&
@@ -152,6 +179,17 @@ export const updateServiceBodySchema = serviceProfileBodySchema
       });
     }
   });
+
+export const requestTenantServiceMediaUploadBodySchema = z
+  .object({
+    contentType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+    sizeBytes: z
+      .number()
+      .int()
+      .positive()
+      .max(5 * 1_024 * 1_024),
+  })
+  .strict();
 
 export const updateServiceStatusBodySchema = z.object({
   status: serviceStatusSchema,

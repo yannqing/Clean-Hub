@@ -7,6 +7,11 @@ import {
 } from "../../auth/permission.helper.js";
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import {
+  MediaError,
+  MediaService,
+  type MediaUploadTicket,
+} from "../../media/index.js";
 import { findBranchById } from "../branches/branches.repository.js";
 import { findServiceCategoryById } from "../service-categories/service-categories.repository.js";
 import { TenantServicesError } from "./services.errors.js";
@@ -24,15 +29,118 @@ import {
 } from "./services.repository.js";
 import type {
   CreateServiceRequest,
+  RequestTenantServiceMediaUpload,
   ServiceBusinessLine,
   ServiceBranchSettingInput,
   ServiceDetail,
+  ServiceDetailRecord,
   ServiceListInput,
   ServiceStatus,
   ServiceSummary,
   ServicePriceAuditSnapshot,
+  TenantServiceMediaUploadTicket,
   UpdateServiceRequest,
 } from "./services.types.js";
+
+const SERVICE_IMAGE_PURPOSE = "service_image";
+
+type TenantServiceMediaServiceLike = Pick<
+  MediaService,
+  "requestUpload" | "assertOwnedPendingAndUploaded"
+>;
+
+type TenantServiceMediaDownloadServiceLike = Pick<
+  MediaService,
+  "createDownloadLinkForKnownCommittedObject"
+>;
+
+function mapServiceMediaError(error: MediaError): TenantServicesError {
+  if (error.code === "MEDIA_FORBIDDEN") {
+    return new TenantServicesError(
+      "SERVICE_MEDIA_FORBIDDEN",
+      "Service image is not accessible.",
+      403,
+    );
+  }
+  if (error.code === "MEDIA_NOT_FOUND") {
+    return new TenantServicesError(
+      "SERVICE_MEDIA_NOT_FOUND",
+      error.message,
+      404,
+    );
+  }
+  if (error.code === "MEDIA_CONFLICT") {
+    return new TenantServicesError(
+      "SERVICE_MEDIA_CONFLICT",
+      "Service image has already been used.",
+      409,
+    );
+  }
+  if (error.code === "MEDIA_STORAGE_ERROR") {
+    return new TenantServicesError(
+      "SERVICE_MEDIA_STORAGE_ERROR",
+      "Service image storage is unavailable.",
+      500,
+    );
+  }
+  return new TenantServicesError("SERVICE_MEDIA_INVALID", error.message, 422);
+}
+
+async function assertPendingServiceImages(
+  mediaService: TenantServiceMediaServiceLike,
+  input: {
+    tenantId: string;
+    actorUserId: string;
+    objectKeys: string[];
+  },
+): Promise<void> {
+  try {
+    await Promise.all(
+      input.objectKeys.map((objectKey) =>
+        mediaService.assertOwnedPendingAndUploaded({
+          tenantId: input.tenantId,
+          objectKey,
+          expectedPurpose: SERVICE_IMAGE_PURPOSE,
+          expectedCreatedBy: input.actorUserId,
+        }),
+      ),
+    );
+  } catch (error) {
+    if (error instanceof MediaError) {
+      throw mapServiceMediaError(error);
+    }
+    throw error;
+  }
+}
+
+async function addServiceMediaDownloadLinks(
+  tenantId: string,
+  record: ServiceDetailRecord,
+  mediaService: TenantServiceMediaDownloadServiceLike,
+): Promise<ServiceDetail> {
+  try {
+    const media = await Promise.all(
+      record.media.map(async (item) => {
+        const ticket =
+          await mediaService.createDownloadLinkForKnownCommittedObject({
+            tenantId,
+            objectKey: item.objectKey,
+          });
+        return {
+          ...item,
+          downloadUrl: ticket.downloadUrl,
+          expiresAt: ticket.expiresAt,
+        };
+      }),
+    );
+    return { ...record, media };
+  } catch (error) {
+    if (error instanceof MediaError) {
+      throw mapServiceMediaError(error);
+    }
+    throw error;
+  }
+}
 
 function requireTenantContext(authContext: AuthContext): string {
   assertTenantContext(authContext);
@@ -217,6 +325,7 @@ export async function getTenantServiceDetail(
   authContext: AuthContext,
   serviceId: string,
   db: Database = getDb(),
+  mediaService: TenantServiceMediaDownloadServiceLike = new MediaService(),
 ): Promise<ServiceDetail> {
   const tenantId = requireTenantContext(authContext);
 
@@ -237,7 +346,7 @@ export async function getTenantServiceDetail(
 
   await requireTenantReadyForServices(authContext, db, service.businessLine);
 
-  return service;
+  return addServiceMediaDownloadLinks(tenantId, service, mediaService);
 }
 
 export async function createTenantService(
@@ -245,6 +354,8 @@ export async function createTenantService(
   data: CreateServiceRequest,
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
+  mediaService: TenantServiceMediaServiceLike &
+    TenantServiceMediaDownloadServiceLike = new MediaService(),
 ): Promise<ServiceDetail> {
   const tenantId = requireTenantContext(authContext);
 
@@ -301,7 +412,13 @@ export async function createTenantService(
     branchSettings: data.branchSettings ?? [],
   });
 
-  return db.transaction(async (tx) => {
+  await assertPendingServiceImages(mediaService, {
+    tenantId,
+    actorUserId: authContext.userId,
+    objectKeys: data.mediaObjectKeys ?? [],
+  });
+
+  const service = await db.transaction(async (tx) => {
     const service = await createServiceRecord(tx, {
       ...data,
       tenantId,
@@ -322,6 +439,8 @@ export async function createTenantService(
 
     return service;
   });
+
+  return addServiceMediaDownloadLinks(tenantId, service, mediaService);
 }
 
 export async function updateTenantService(
@@ -330,6 +449,8 @@ export async function updateTenantService(
   data: UpdateServiceRequest,
   requestMeta: AuthRequestMeta = {},
   db: Database = getDb(),
+  mediaService: TenantServiceMediaServiceLike &
+    TenantServiceMediaDownloadServiceLike = new MediaService(),
 ): Promise<ServiceDetail> {
   const tenantId = requireTenantContext(authContext);
 
@@ -367,7 +488,13 @@ export async function updateTenantService(
     }
   }
 
-  return db.transaction(async (tx) => {
+  await assertPendingServiceImages(mediaService, {
+    tenantId,
+    actorUserId: authContext.userId,
+    objectKeys: data.newMediaObjectKeys ?? [],
+  });
+
+  const service = await db.transaction(async (tx) => {
     const [before, beforePrice] = await Promise.all([
       findServiceAuditSnapshotById(tx, {
         tenantId,
@@ -477,6 +604,34 @@ export async function updateTenantService(
 
     return service;
   });
+
+  return addServiceMediaDownloadLinks(tenantId, service, mediaService);
+}
+
+export async function requestTenantServiceMediaUpload(
+  authContext: AuthContext,
+  data: RequestTenantServiceMediaUpload,
+  db: Database = getDb(),
+  mediaService: TenantServiceMediaServiceLike = new MediaService(),
+): Promise<TenantServiceMediaUploadTicket> {
+  const tenantId = requireTenantContext(authContext);
+  await requireTenantReadyForServices(authContext, db);
+
+  try {
+    const ticket: MediaUploadTicket = await mediaService.requestUpload({
+      tenantId,
+      actorUserId: authContext.userId,
+      purpose: SERVICE_IMAGE_PURPOSE,
+      contentType: data.contentType,
+      sizeBytes: data.sizeBytes,
+    });
+    return ticket;
+  } catch (error) {
+    if (error instanceof MediaError) {
+      throw mapServiceMediaError(error);
+    }
+    throw error;
+  }
 }
 
 export async function updateTenantServiceStatus(

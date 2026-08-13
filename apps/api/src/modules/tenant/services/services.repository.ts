@@ -1,10 +1,22 @@
-import { and, asc, eq, isNull, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNull,
+  or,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
 import {
   branches,
+  mediaObjects,
   prices,
   serviceBranchSettings,
   serviceCategories,
+  serviceMedia,
   services,
   type Database,
 } from "@cleanhub/db";
@@ -16,9 +28,10 @@ import type {
   CreateServiceRequest,
   ServiceAuditSnapshot,
   ServiceBranchSetting,
-  ServiceDetail,
+  ServiceDetailRecord,
   ServiceListInput,
   ServicePriceAuditSnapshot,
+  ServiceMediaRecord,
   ServiceStatus,
   ServiceSummary,
   UpdateServiceRequest,
@@ -144,7 +157,7 @@ function toServiceSummary(row: ServiceJoinedRow): ServiceSummary {
   };
 }
 
-function toAuditSnapshot(row: ServiceDetail): ServiceAuditSnapshot {
+function toAuditSnapshot(row: ServiceDetailRecord): ServiceAuditSnapshot {
   return {
     tenantId: row.tenantId,
     businessLine: row.businessLine,
@@ -158,6 +171,7 @@ function toAuditSnapshot(row: ServiceDetail): ServiceAuditSnapshot {
     turnaroundMinutes: row.turnaroundMinutes,
     allBranches: row.allBranches,
     branchSettings: row.branchSettings,
+    media: row.media,
     displayOrder: row.displayOrder,
     pricingUnit: row.pricingUnit,
     labelRule: row.labelRule,
@@ -167,6 +181,41 @@ function toAuditSnapshot(row: ServiceDetail): ServiceAuditSnapshot {
     currency: row.currency,
     status: row.status,
   };
+}
+
+export async function findServiceMediaRecords(
+  db: Database,
+  input: { tenantId: string; serviceId: string },
+): Promise<ServiceMediaRecord[]> {
+  return db
+    .select({
+      id: serviceMedia.id,
+      objectKey: mediaObjects.objectKey,
+      isPrimary: serviceMedia.isPrimary,
+      sortOrder: serviceMedia.sortOrder,
+    })
+    .from(serviceMedia)
+    .innerJoin(
+      mediaObjects,
+      and(
+        eq(mediaObjects.tenantId, serviceMedia.tenantId),
+        eq(mediaObjects.id, serviceMedia.mediaObjectId),
+        eq(mediaObjects.status, "committed"),
+        isNull(mediaObjects.deletedAt),
+      ),
+    )
+    .where(
+      and(
+        eq(serviceMedia.tenantId, input.tenantId),
+        eq(serviceMedia.serviceId, input.serviceId),
+        isNull(serviceMedia.deletedAt),
+      ),
+    )
+    .orderBy(
+      desc(serviceMedia.isPrimary),
+      asc(serviceMedia.sortOrder),
+      asc(serviceMedia.id),
+    );
 }
 
 export async function findServiceBranchSettings(
@@ -204,7 +253,7 @@ export async function findServiceBranchSettings(
 export async function findServiceDetailById(
   db: Database,
   input: { tenantId: string; serviceId: string },
-): Promise<ServiceDetail | null> {
+): Promise<ServiceDetailRecord | null> {
   const service = await findServiceById(db, input);
   if (!service) {
     return null;
@@ -212,7 +261,266 @@ export async function findServiceDetailById(
   return {
     ...service,
     branchSettings: await findServiceBranchSettings(db, input),
+    media: await findServiceMediaRecords(db, input),
   };
+}
+
+type LockedServiceMediaObject = {
+  id: string;
+  objectKey: string;
+};
+
+async function lockPendingServiceMediaObjects(
+  db: Database,
+  input: {
+    tenantId: string;
+    actorUserId: string;
+    objectKeys: string[];
+  },
+): Promise<LockedServiceMediaObject[]> {
+  if (input.objectKeys.length === 0) {
+    return [];
+  }
+
+  const rows = await db
+    .select({
+      id: mediaObjects.id,
+      objectKey: mediaObjects.objectKey,
+      status: mediaObjects.status,
+      purpose: mediaObjects.purpose,
+      createdBy: mediaObjects.createdBy,
+      expiresAt: mediaObjects.expiresAt,
+    })
+    .from(mediaObjects)
+    .where(
+      and(
+        eq(mediaObjects.tenantId, input.tenantId),
+        inArray(mediaObjects.objectKey, input.objectKeys),
+        isNull(mediaObjects.deletedAt),
+      ),
+    )
+    .orderBy(asc(mediaObjects.objectKey))
+    .for("update");
+  const rowsByKey = new Map(rows.map((row) => [row.objectKey, row]));
+
+  for (const objectKey of input.objectKeys) {
+    const row = rowsByKey.get(objectKey);
+    if (!row) {
+      throw new TenantServicesError(
+        "SERVICE_MEDIA_NOT_FOUND",
+        "One or more service images were not found.",
+        404,
+      );
+    }
+    if (row.createdBy !== input.actorUserId) {
+      throw new TenantServicesError(
+        "SERVICE_MEDIA_FORBIDDEN",
+        "One or more service images are not accessible.",
+        403,
+      );
+    }
+    if (row.purpose !== "service_image" || row.status !== "pending") {
+      throw new TenantServicesError(
+        "SERVICE_MEDIA_CONFLICT",
+        "One or more service images are invalid or have already been used.",
+        409,
+      );
+    }
+    if (row.expiresAt.getTime() < Date.now()) {
+      throw new TenantServicesError(
+        "SERVICE_MEDIA_INVALID",
+        "One or more service image upload tickets have expired.",
+        422,
+      );
+    }
+  }
+
+  const orderedRows = input.objectKeys.map(
+    (objectKey) => rowsByKey.get(objectKey)!,
+  );
+  const boundRows = await db
+    .select({ id: serviceMedia.id })
+    .from(serviceMedia)
+    .where(
+      and(
+        eq(serviceMedia.tenantId, input.tenantId),
+        inArray(
+          serviceMedia.mediaObjectId,
+          orderedRows.map((row) => row.id),
+        ),
+        isNull(serviceMedia.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  if (boundRows[0]) {
+    throw new TenantServicesError(
+      "SERVICE_MEDIA_CONFLICT",
+      "One or more service images have already been used.",
+      409,
+    );
+  }
+
+  return orderedRows.map(({ id, objectKey }) => ({ id, objectKey }));
+}
+
+async function commitServiceMediaObjects(
+  db: Database,
+  input: {
+    tenantId: string;
+    serviceId: string;
+    actorUserId: string;
+    retainedMediaIds: string[];
+    newMediaObjectKeys: string[];
+  },
+): Promise<void> {
+  const existingMediaRows = await db
+    .select({
+      id: serviceMedia.id,
+      mediaObjectId: serviceMedia.mediaObjectId,
+    })
+    .from(serviceMedia)
+    .where(
+      and(
+        eq(serviceMedia.tenantId, input.tenantId),
+        eq(serviceMedia.serviceId, input.serviceId),
+        isNull(serviceMedia.deletedAt),
+      ),
+    )
+    .orderBy(asc(serviceMedia.sortOrder), asc(serviceMedia.id))
+    .for("update");
+  const existingMediaById = new Map(
+    existingMediaRows.map((media) => [media.id, media]),
+  );
+
+  if (
+    input.retainedMediaIds.some((mediaId) => !existingMediaById.has(mediaId))
+  ) {
+    throw new TenantServicesError(
+      "SERVICE_MEDIA_NOT_FOUND",
+      "One or more retained service images were not found.",
+      404,
+    );
+  }
+
+  const lockedMediaObjects = await lockPendingServiceMediaObjects(db, {
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    objectKeys: input.newMediaObjectKeys,
+  });
+  const now = new Date();
+
+  if (existingMediaRows.length > 0) {
+    await db
+      .update(serviceMedia)
+      .set({ isPrimary: false })
+      .where(
+        and(
+          eq(serviceMedia.tenantId, input.tenantId),
+          eq(serviceMedia.serviceId, input.serviceId),
+          isNull(serviceMedia.deletedAt),
+        ),
+      );
+  }
+
+  const retainedMediaIdSet = new Set(input.retainedMediaIds);
+  const removedMediaRows = existingMediaRows.filter(
+    (media) => !retainedMediaIdSet.has(media.id),
+  );
+  if (removedMediaRows.length > 0) {
+    await db
+      .update(serviceMedia)
+      .set({ deletedAt: now, deletedBy: input.actorUserId })
+      .where(
+        and(
+          eq(serviceMedia.tenantId, input.tenantId),
+          inArray(
+            serviceMedia.id,
+            removedMediaRows.map((media) => media.id),
+          ),
+          isNull(serviceMedia.deletedAt),
+        ),
+      );
+    await db
+      .update(mediaObjects)
+      .set({
+        status: "deleting",
+        cleanupClaimToken: createId(),
+        cleanupClaimedAt: new Date(0),
+      })
+      .where(
+        and(
+          eq(mediaObjects.tenantId, input.tenantId),
+          inArray(
+            mediaObjects.id,
+            removedMediaRows.map((media) => media.mediaObjectId),
+          ),
+          eq(mediaObjects.status, "committed"),
+          isNull(mediaObjects.deletedAt),
+        ),
+      );
+  }
+
+  for (const [index, mediaId] of input.retainedMediaIds.entries()) {
+    await db
+      .update(serviceMedia)
+      .set({ isPrimary: index === 0, sortOrder: index })
+      .where(
+        and(
+          eq(serviceMedia.tenantId, input.tenantId),
+          eq(serviceMedia.id, mediaId),
+          isNull(serviceMedia.deletedAt),
+        ),
+      );
+  }
+
+  if (lockedMediaObjects.length === 0) {
+    return;
+  }
+
+  await db.insert(serviceMedia).values(
+    lockedMediaObjects.map((mediaObject, index) => {
+      const sortOrder = input.retainedMediaIds.length + index;
+      return {
+        id: createId(),
+        tenantId: input.tenantId,
+        serviceId: input.serviceId,
+        mediaObjectId: mediaObject.id,
+        isPrimary: sortOrder === 0,
+        sortOrder,
+        createdAt: now,
+        createdBy: input.actorUserId,
+      };
+    }),
+  );
+  const committedRows = await db
+    .update(mediaObjects)
+    .set({
+      status: "committed",
+      committedAt: now,
+      cleanupClaimToken: null,
+      cleanupClaimedAt: null,
+    })
+    .where(
+      and(
+        eq(mediaObjects.tenantId, input.tenantId),
+        inArray(
+          mediaObjects.id,
+          lockedMediaObjects.map((mediaObject) => mediaObject.id),
+        ),
+        eq(mediaObjects.status, "pending"),
+        isNull(mediaObjects.deletedAt),
+      ),
+    )
+    .returning({ id: mediaObjects.id });
+
+  if (committedRows.length !== lockedMediaObjects.length) {
+    throw new TenantServicesError(
+      "SERVICE_MEDIA_CONFLICT",
+      "One or more service images have already been used.",
+      409,
+    );
+  }
 }
 
 export async function findServices(
@@ -443,7 +751,7 @@ export async function replaceServiceBranchSettings(
 export async function createServiceRecord(
   db: Database,
   input: CreateServiceRequest & { tenantId: string; actorUserId: string },
-): Promise<ServiceDetail> {
+): Promise<ServiceDetailRecord> {
   const serviceId = createId();
   const currency = await findTenantDefaultCurrency(db, input.tenantId);
 
@@ -487,6 +795,14 @@ export async function createServiceRecord(
     branchSettings: input.branchSettings ?? [],
   });
 
+  await commitServiceMediaObjects(db, {
+    tenantId: input.tenantId,
+    serviceId,
+    actorUserId: input.actorUserId,
+    retainedMediaIds: [],
+    newMediaObjectKeys: input.mediaObjectKeys ?? [],
+  });
+
   const service = await findServiceDetailById(db, {
     tenantId: input.tenantId,
     serviceId,
@@ -506,7 +822,7 @@ export async function updateServiceRecord(
     serviceId: string;
     actorUserId: string;
   },
-): Promise<ServiceDetail | null> {
+): Promise<ServiceDetailRecord | null> {
   const existing = await findServiceById(db, input);
 
   if (!existing) {
@@ -614,6 +930,19 @@ export async function updateServiceRecord(
     });
   }
 
+  if (
+    input.retainedMediaIds !== undefined ||
+    input.newMediaObjectKeys !== undefined
+  ) {
+    await commitServiceMediaObjects(db, {
+      tenantId: input.tenantId,
+      serviceId: input.serviceId,
+      actorUserId: input.actorUserId,
+      retainedMediaIds: input.retainedMediaIds ?? [],
+      newMediaObjectKeys: input.newMediaObjectKeys ?? [],
+    });
+  }
+
   return findServiceDetailById(db, input);
 }
 
@@ -676,12 +1005,13 @@ export async function softDeleteServiceRecord(
   db: Database,
   input: { tenantId: string; serviceId: string; actorUserId: string },
 ): Promise<boolean> {
+  const now = new Date();
   const updatedRows = await db
     .update(services)
     .set({
-      deletedAt: new Date(),
+      deletedAt: now,
       deletedBy: input.actorUserId,
-      updatedAt: new Date(),
+      updatedAt: now,
       updatedBy: input.actorUserId,
       version: sql`${services.version} + 1`,
     })
@@ -694,5 +1024,54 @@ export async function softDeleteServiceRecord(
     )
     .returning({ id: services.id });
 
-  return Boolean(updatedRows[0]);
+  if (!updatedRows[0]) {
+    return false;
+  }
+
+  const mediaRows = await db
+    .select({
+      id: serviceMedia.id,
+      mediaObjectId: serviceMedia.mediaObjectId,
+    })
+    .from(serviceMedia)
+    .where(
+      and(
+        eq(serviceMedia.tenantId, input.tenantId),
+        eq(serviceMedia.serviceId, input.serviceId),
+        isNull(serviceMedia.deletedAt),
+      ),
+    );
+
+  if (mediaRows.length > 0) {
+    await db
+      .update(serviceMedia)
+      .set({ deletedAt: now, deletedBy: input.actorUserId })
+      .where(
+        and(
+          eq(serviceMedia.tenantId, input.tenantId),
+          eq(serviceMedia.serviceId, input.serviceId),
+          isNull(serviceMedia.deletedAt),
+        ),
+      );
+    await db
+      .update(mediaObjects)
+      .set({
+        status: "deleting",
+        cleanupClaimToken: createId(),
+        cleanupClaimedAt: new Date(0),
+      })
+      .where(
+        and(
+          eq(mediaObjects.tenantId, input.tenantId),
+          inArray(
+            mediaObjects.id,
+            mediaRows.map((media) => media.mediaObjectId),
+          ),
+          eq(mediaObjects.status, "committed"),
+          isNull(mediaObjects.deletedAt),
+        ),
+      );
+  }
+
+  return true;
 }

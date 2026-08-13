@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   createServiceBodySchema,
+  requestTenantServiceMediaUploadBodySchema,
   updateServiceBodySchema,
 } from "./services.validation.js";
 
@@ -124,6 +125,52 @@ export function runTenantServiceValidationSmokeChecks(): void {
     updateServiceBodySchema.safeParse({ version: 2, currency: "USD" }).success,
     false,
     "service currency must be managed through tenant settings",
+  );
+
+  assert.equal(
+    createServiceBodySchema.safeParse({
+      ...validServiceBody(),
+      mediaObjectKeys: Array.from(
+        { length: 11 },
+        (_, index) => `tenant/service-image-${index}`,
+      ),
+    }).success,
+    false,
+    "a service can contain at most ten images",
+  );
+
+  assert.equal(
+    updateServiceBodySchema.safeParse({
+      version: 2,
+      retainedMediaIds: Array.from(
+        { length: 6 },
+        (_, index) => `01KRERJN8G00000000000000${index}`,
+      ),
+      newMediaObjectKeys: Array.from(
+        { length: 5 },
+        (_, index) => `tenant/new-service-image-${index}`,
+      ),
+    }).success,
+    false,
+    "retained and new service images share the ten-image limit",
+  );
+
+  assert.equal(
+    requestTenantServiceMediaUploadBodySchema.safeParse({
+      contentType: "image/webp",
+      sizeBytes: 5 * 1_024 * 1_024,
+    }).success,
+    true,
+    "supported service images can request an upload ticket",
+  );
+
+  assert.equal(
+    requestTenantServiceMediaUploadBodySchema.safeParse({
+      contentType: "image/gif",
+      sizeBytes: 1_024,
+    }).success,
+    false,
+    "unsupported service image formats are rejected",
   );
 }
 

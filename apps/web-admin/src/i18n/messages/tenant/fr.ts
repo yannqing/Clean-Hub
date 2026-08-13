@@ -709,7 +709,9 @@ export const tenantMessagesFr: TenantMessages = {
       },
       addImages: "Ajouter des images de produits",
       mediaHelp:
-        "JPG, PNG ou WebP. Jusqu'à 5 Mo chacun et 10 images par produit.",
+        "La première image sert de couverture, les autres de détails. JPG, PNG ou WebP, 5 Mo maximum par image et 10 images au total.",
+      coverImage: "Couverture",
+      detailImage: "Détail",
       mediaTypeInvalid: "Téléchargez uniquement des images JPG, PNG ou WebP.",
       mediaTooLarge: "Chaque image doit faire 5 Mo ou moins.",
       mediaLimitReached: "Un produit peut contenir jusqu'à 10 images.",
@@ -1586,6 +1588,9 @@ export const tenantMessagesFr: TenantMessages = {
       basicInformation: "Informations de base",
       basicInformationDescription:
         "Ajoutez le nom du service et les informations destinées au client.",
+      media: "Images du service",
+      mediaDescription:
+        "La première image sert de couverture, les autres illustrent les détails du service.",
       pricing: "Tarification",
       pricingDescription:
         "Définissez le prix de vente, le prix de référence et le coût interne.",
@@ -1696,6 +1701,19 @@ export const tenantMessagesFr: TenantMessages = {
       checkForm: "Consultez le formulaire de service.",
       unsavedChanges:
         "Ce service comporte des modifications non enregistrées. Êtes-vous sûr de vouloir partir ?",
+      addImages: "Ajouter des images du service",
+      removeImage: "Retirer l’image",
+      mediaHelp:
+        "La première image sert de couverture, les autres de détails. JPG, PNG ou WebP, 5 Mo maximum par image et 10 images au total.",
+      coverImage: "Couverture",
+      detailImage: "Détail",
+      mediaTypeInvalid: "Seules les images JPG, PNG ou WebP sont acceptées.",
+      mediaTooLarge: "Chaque image doit faire au maximum 5 Mo.",
+      mediaLimitReached: "Un service peut contenir jusqu’à 10 images.",
+      mediaUploadFailed:
+        "Échec du téléversement des images du service. Réessayez.",
+      mediaSaveConflict:
+        "Les images du service ont expiré. Enregistrez-les à nouveau.",
     },
     validation: {
       businessLineInvalid: "Choisissez un secteur d'activité pris en charge.",
@@ -1709,6 +1727,8 @@ export const tenantMessagesFr: TenantMessages = {
       categoryInvalid: "Sélectionnez une catégorie de service valide.",
       descriptionTooLong:
         "La description du service doit comporter 2 000 caractères ou moins.",
+      mediaInvalid:
+        "Les images du service sont invalides ou dépassent la limite de 10 images.",
       internalNotesTooLong:
         "Les notes internes doivent comporter 5 000 caractères ou moins.",
       turnaroundMinutesInvalid:

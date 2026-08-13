@@ -674,7 +674,10 @@ export const tenantMessagesZhCN: TenantMessages = {
         clearFormatting: "清除格式",
       },
       addImages: "添加商品图片",
-      mediaHelp: "支持 JPG、PNG、WebP，单张不超过 5 MB，最多 10 张。",
+      mediaHelp:
+        "第一张作为封面图，其余作为详情图。支持 JPG、PNG、WebP，单张不超过 5 MB，最多 10 张。",
+      coverImage: "封面图",
+      detailImage: "详情图",
       mediaTypeInvalid: "只能上传 JPG、PNG 或 WebP 图片。",
       mediaTooLarge: "每张图片不能超过 5 MB。",
       mediaLimitReached: "一个产品最多可以添加 10 张图片。",
@@ -1489,6 +1492,8 @@ export const tenantMessagesZhCN: TenantMessages = {
     sections: {
       basicInformation: "基本信息",
       basicInformationDescription: "填写服务名称及面向顾客展示的信息。",
+      media: "服务图片",
+      mediaDescription: "第一张作为封面图，其余图片用于展示服务详情。",
       pricing: "定价",
       pricingDescription: "设置销售价格、参考价格和内部成本。",
       operations: "服务履约",
@@ -1580,6 +1585,17 @@ export const tenantMessagesZhCN: TenantMessages = {
       nameConflict: "该服务名称已被使用，请更换后重试。",
       checkForm: "请检查服务表单中的内容。",
       unsavedChanges: "当前服务尚未保存，确定要离开吗？",
+      addImages: "添加服务图片",
+      removeImage: "移除图片",
+      mediaHelp:
+        "第一张作为封面图，其余作为详情图。支持 JPG、PNG、WebP，单张不超过 5 MB，最多 10 张。",
+      coverImage: "封面图",
+      detailImage: "详情图",
+      mediaTypeInvalid: "只能上传 JPG、PNG 或 WebP 图片。",
+      mediaTooLarge: "每张图片不能超过 5 MB。",
+      mediaLimitReached: "一个服务最多可以添加 10 张图片。",
+      mediaUploadFailed: "服务图片上传失败，请稍后重试。",
+      mediaSaveConflict: "服务图片已失效，请重新保存以上图片。",
     },
     validation: {
       businessLineInvalid: "请选择有效的业务线。",
@@ -1591,6 +1607,7 @@ export const tenantMessagesZhCN: TenantMessages = {
       categoryRequired: "请选择服务分类。",
       categoryInvalid: "所选服务分类无效，请重新选择。",
       descriptionTooLong: "服务描述不能超过 2000 个字符。",
+      mediaInvalid: "服务图片无效或超过 10 张，请重新选择。",
       internalNotesTooLong: "内部备注不能超过 5000 个字符。",
       turnaroundMinutesInvalid:
         "预计完成时间必须是 1 至 525600 之间的整数分钟。",

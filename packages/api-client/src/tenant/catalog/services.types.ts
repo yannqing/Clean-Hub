@@ -23,6 +23,15 @@ export type ServiceBranchSetting = ServiceBranchSettingInput & {
   branchStatus: "active" | "inactive";
 };
 
+export type ServiceMedia = {
+  id: string;
+  objectKey: string;
+  downloadUrl: string;
+  expiresAt: string;
+  isPrimary: boolean;
+  sortOrder: number;
+};
+
 export type ServiceSummary = {
   id: string;
   businessLine: ServiceBusinessLine;
@@ -51,6 +60,7 @@ export type ServiceSummary = {
 
 export type ServiceDetail = ServiceSummary & {
   branchSettings: ServiceBranchSetting[];
+  media: ServiceMedia[];
 };
 
 export type CreateServiceRequest = {
@@ -71,11 +81,28 @@ export type CreateServiceRequest = {
   compareAtPrice?: string | null;
   costPrice?: string | null;
   status?: ServiceStatus;
+  mediaObjectKeys?: string[];
 };
 
-export type UpdateServiceRequest = Partial<CreateServiceRequest> & {
+export type UpdateServiceRequest = Partial<
+  Omit<CreateServiceRequest, "mediaObjectKeys">
+> & {
   /** Optimistic-concurrency version from the record the editor last read. */
   version: number;
+  retainedMediaIds?: string[];
+  newMediaObjectKeys?: string[];
+};
+
+export type RequestTenantServiceMediaUploadRequest = {
+  contentType: string;
+  sizeBytes: number;
+};
+
+export type TenantServiceMediaUploadTicket = {
+  objectKey: string;
+  uploadUrl: string;
+  headers: Record<string, string>;
+  expiresAt: string;
 };
 
 export type UpdateServiceStatusRequest = {

@@ -38,6 +38,7 @@ export type ServiceFormErrorCode =
   | "categoryRequired"
   | "categoryInvalid"
   | "descriptionTooLong"
+  | "mediaInvalid"
   | "internalNotesTooLong"
   | "turnaroundMinutesInvalid"
   | "branchSettingsInvalid"
@@ -80,6 +81,16 @@ export type ServiceSummary = {
 
 export type ServiceDetail = ServiceSummary & {
   branchSettings: ServiceBranchSetting[];
+  media: ServiceMedia[];
+};
+
+export type ServiceMedia = {
+  id: string;
+  objectKey: string;
+  downloadUrl: string;
+  expiresAt: string;
+  isPrimary: boolean;
+  sortOrder: number;
 };
 
 export type ServiceCategorySummary = {
@@ -98,6 +109,7 @@ export type ServiceFormValues = {
   shortName: string;
   categoryId: string;
   description: string;
+  mediaObjectKeys: string[];
   internalNotes: string;
   turnaroundMinutes: string;
   allBranches: boolean;

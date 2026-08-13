@@ -29,6 +29,7 @@ const statuses: ServiceStatus[] = ["active", "inactive"];
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const STANDARD_PRICE_PATTERN = /^\d+(\.\d{1,2})?$/;
 const SERVICE_CODE_PATTERN = /^[A-Z0-9][A-Z0-9._-]{0,63}$/;
+const MAX_SERVICE_IMAGES = 10;
 
 export type ServiceFormValidationResult<TData> =
   | {
@@ -87,6 +88,14 @@ function validateBase(input: ServiceFormValues) {
 
   if (description.length > 2000) {
     errors.description = "descriptionTooLong";
+  }
+
+  if (
+    input.mediaObjectKeys.length > MAX_SERVICE_IMAGES ||
+    new Set(input.mediaObjectKeys).size !== input.mediaObjectKeys.length ||
+    input.mediaObjectKeys.some((key) => !key.trim())
+  ) {
+    errors.mediaObjectKeys = "mediaInvalid";
   }
 
   if (internalNotes.length > 5000) {
@@ -156,6 +165,7 @@ function validateBase(input: ServiceFormValues) {
       shortName: shortName || null,
       categoryId,
       description: normalizeOptional(input.description),
+      mediaObjectKeys: input.mediaObjectKeys,
       internalNotes: normalizeOptional(input.internalNotes),
       turnaroundMinutes: turnaroundMinutesValue ? turnaroundMinutes : null,
       allBranches: input.allBranches,
@@ -224,6 +234,7 @@ export function validateServiceForm(
       standardPrice,
       compareAtPrice: compareAtPrice || null,
       costPrice: costPrice || null,
+      mediaObjectKeys: result.data.mediaObjectKeys,
     },
   };
 }
@@ -281,6 +292,7 @@ export function validateServiceUpdateForm(
       standardPrice,
       compareAtPrice: compareAtPrice || null,
       costPrice: costPrice || null,
+      newMediaObjectKeys: result.data.mediaObjectKeys,
       version: input.version,
     },
   };

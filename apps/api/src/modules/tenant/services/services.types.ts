@@ -26,6 +26,18 @@ export type ServiceBranchSetting = ServiceBranchSettingInput & {
   branchStatus: "active" | "inactive";
 };
 
+export type ServiceMediaRecord = {
+  id: string;
+  objectKey: string;
+  isPrimary: boolean;
+  sortOrder: number;
+};
+
+export type ServiceMedia = ServiceMediaRecord & {
+  downloadUrl: string;
+  expiresAt: string;
+};
+
 export type ServiceListInput = {
   businessLine?: ServiceBusinessLine;
   status?: ServiceStatus;
@@ -63,6 +75,12 @@ export type ServiceSummary = {
 
 export type ServiceDetail = ServiceSummary & {
   branchSettings: ServiceBranchSetting[];
+  media: ServiceMedia[];
+};
+
+export type ServiceDetailRecord = ServiceSummary & {
+  branchSettings: ServiceBranchSetting[];
+  media: ServiceMediaRecord[];
 };
 
 export type CreateServiceRequest = {
@@ -83,11 +101,28 @@ export type CreateServiceRequest = {
   compareAtPrice?: string | null;
   costPrice?: string | null;
   status?: ServiceStatus;
+  mediaObjectKeys?: string[];
 };
 
-export type UpdateServiceRequest = Partial<CreateServiceRequest> & {
+export type UpdateServiceRequest = Partial<
+  Omit<CreateServiceRequest, "mediaObjectKeys">
+> & {
   /** Optimistic-concurrency version from the record the editor last read. */
   version: number;
+  retainedMediaIds?: string[];
+  newMediaObjectKeys?: string[];
+};
+
+export type RequestTenantServiceMediaUpload = {
+  contentType: string;
+  sizeBytes: number;
+};
+
+export type TenantServiceMediaUploadTicket = {
+  objectKey: string;
+  uploadUrl: string;
+  headers: Record<string, string>;
+  expiresAt: string;
 };
 
 export type TenantServiceInput<TData> = {
@@ -109,6 +144,7 @@ export type ServiceAuditSnapshot = {
   turnaroundMinutes: number | null;
   allBranches: boolean;
   branchSettings: ServiceBranchSetting[];
+  media: ServiceMediaRecord[];
   displayOrder: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;

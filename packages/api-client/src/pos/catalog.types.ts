@@ -11,9 +11,19 @@ export type PosCatalogLabelRule =
   | "per_order_item"
   | "per_bag";
 
+export type PosCatalogMedia = {
+  id: string;
+  downloadUrl: string;
+  expiresAt: string;
+  isPrimary: boolean;
+  sortOrder: number;
+};
+
 export type PosCatalogService = {
   id: string;
   name: string;
+  shortName: string | null;
+  description: string | null;
   categoryId: string;
   categoryName: string;
   businessLine: PosCatalogBusinessLine;
@@ -22,6 +32,7 @@ export type PosCatalogService = {
   turnaroundMinutes: number | null;
   amount: string;
   currency: string;
+  media: PosCatalogMedia[];
 };
 
 export type PosCatalogProduct = {
@@ -30,6 +41,8 @@ export type PosCatalogProduct = {
   productSkuId: string;
   productPriceId: string;
   name: string;
+  brand: string | null;
+  description: string | null;
   categoryId: string | null;
   categoryName: string | null;
   sku: string;
@@ -44,6 +57,7 @@ export type PosCatalogProduct = {
   allowNegativeStock: boolean;
   allowOfflineSale: boolean;
   offlineStockBuffer: string;
+  media: PosCatalogMedia[];
 };
 
 export type PosCatalogQuery = {

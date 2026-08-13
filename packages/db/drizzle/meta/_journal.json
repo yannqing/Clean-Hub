@@ -225,6 +225,13 @@
       "when": 1786425834934,
       "tag": "0031_glorious_vermin",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1786512974668,
+      "tag": "0032_optimal_korvac",
+      "breakpoints": true
     }
   ]
 }

@@ -20,6 +20,7 @@ export type UpdateServiceActionResult =
 export async function updateServiceAction(
   serviceId: string,
   input: ServiceFormValues,
+  retainedMediaIds?: string[],
 ): Promise<UpdateServiceActionResult> {
   const validation = validateServiceUpdateForm(input);
 
@@ -32,10 +33,11 @@ export async function updateServiceAction(
   }
 
   try {
-    const service = await webAdminApi.tenant.services.update(
-      serviceId,
-      validation.data,
-    );
+    const service = await webAdminApi.tenant.services.update(serviceId, {
+      ...(retainedMediaIds
+        ? { ...validation.data, retainedMediaIds }
+        : { ...validation.data, newMediaObjectKeys: undefined }),
+    });
 
     return {
       ok: true,

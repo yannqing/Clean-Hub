@@ -23,15 +23,21 @@ import {
   Check,
   ChevronRight,
   ClipboardList,
+  ImagePlus,
   LoaderCircle,
   RotateCw,
+  Upload,
+  X,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type ChangeEvent,
   type FormEvent,
   type MouseEvent,
 } from "react";
@@ -42,7 +48,11 @@ import { isVersionConflict } from "@/features/tenant/shared/version-conflict";
 import type { BranchSummary } from "@/features/tenant/branches/types";
 import { interpolate, useTenantI18n } from "@/i18n";
 
-import { createServiceAction, updateServiceAction } from "../actions";
+import {
+  createServiceAction,
+  updateServiceAction,
+  uploadServiceMediaAction,
+} from "../actions";
 import type {
   ServiceBusinessLine,
   ServiceBranchFormValue,
@@ -62,6 +72,7 @@ const DEFAULT_FORM_VALUES: ServiceFormValues = {
   shortName: "",
   categoryId: "",
   description: "",
+  mediaObjectKeys: [],
   internalNotes: "",
   turnaroundMinutes: "",
   allBranches: true,
@@ -76,6 +87,35 @@ const DEFAULT_FORM_VALUES: ServiceFormValues = {
   status: "active",
   version: 0,
 };
+
+const MAX_SERVICE_IMAGES = 10;
+const MAX_SERVICE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const SERVICE_IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+type ExistingServiceImage = {
+  kind: "existing";
+  id: string;
+  mediaId: string;
+  objectKey: string;
+  previewUrl: string;
+};
+
+type NewServiceImage = {
+  kind: "new";
+  id: string;
+  file: File;
+  previewUrl: string;
+  objectKey?: string;
+  expiresAt?: string;
+};
+
+type SelectedServiceImage = ExistingServiceImage | NewServiceImage;
+
+function getServiceImageName(image: SelectedServiceImage): string {
+  return image.kind === "new"
+    ? image.file.name
+    : image.objectKey.split("/").at(-1) || image.objectKey;
+}
 
 function generateServiceCode(): string {
   return `SVC-${createId().slice(-10)}`;
@@ -134,6 +174,7 @@ function getInitialFormValues(
     shortName: initialService.shortName ?? "",
     categoryId: initialService.categoryId,
     description: initialService.description ?? "",
+    mediaObjectKeys: [],
     internalNotes: initialService.internalNotes ?? "",
     turnaroundMinutes:
       initialService.turnaroundMinutes === null
@@ -206,6 +247,24 @@ export function ServiceCreateView({
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const selectedImagesRef = useRef<SelectedServiceImage[]>([]);
+  const [selectedImages, setSelectedImages] = useState<SelectedServiceImage[]>(
+    () =>
+      [...(initialService?.media ?? [])]
+        .sort(
+          (left, right) =>
+            Number(right.isPrimary) - Number(left.isPrimary) ||
+            left.sortOrder - right.sortOrder,
+        )
+        .map((media) => ({
+          kind: "existing",
+          id: `existing-${media.id}`,
+          mediaId: media.id,
+          objectKey: media.objectKey,
+          previewUrl: media.downloadUrl,
+        })),
+  );
 
   const businessLineOptions: Array<{
     label: string;
@@ -284,6 +343,21 @@ export function ServiceCreateView({
     saving || requiredDataUnavailable || availableCategories.length === 0;
 
   useEffect(() => {
+    selectedImagesRef.current = selectedImages;
+  }, [selectedImages]);
+
+  useEffect(
+    () => () => {
+      selectedImagesRef.current.forEach((image) => {
+        if (image.kind === "new") {
+          URL.revokeObjectURL(image.previewUrl);
+        }
+      });
+    },
+    [],
+  );
+
+  useEffect(() => {
     if (!isDirty) {
       return;
     }
@@ -348,6 +422,146 @@ export function ServiceCreateView({
     });
     setFormError(null);
     setIsDirty(true);
+  }
+
+  function addServiceImages(files: File[]) {
+    let invalidType = false;
+    let oversized = false;
+    const validFiles = files.filter((file) => {
+      if (!SERVICE_IMAGE_TYPES.has(file.type)) {
+        invalidType = true;
+        return false;
+      }
+      if (file.size > MAX_SERVICE_IMAGE_SIZE_BYTES) {
+        oversized = true;
+        return false;
+      }
+      return true;
+    });
+
+    if (invalidType) {
+      toast.error(m.services.create.mediaTypeInvalid);
+    }
+    if (oversized) {
+      toast.error(m.services.create.mediaTooLarge);
+    }
+
+    const existingFiles = new Set(
+      selectedImages.flatMap((image) =>
+        image.kind === "new"
+          ? [`${image.file.name}:${image.file.size}:${image.file.lastModified}`]
+          : [],
+      ),
+    );
+    const newFiles = validFiles.filter(
+      (file) =>
+        !existingFiles.has(`${file.name}:${file.size}:${file.lastModified}`),
+    );
+    const uniqueFiles = newFiles.slice(
+      0,
+      MAX_SERVICE_IMAGES - selectedImages.length,
+    );
+
+    if (uniqueFiles.length < newFiles.length) {
+      toast.error(m.services.create.mediaLimitReached);
+    }
+
+    if (uniqueFiles.length > 0) {
+      setSelectedImages((current) => [
+        ...current,
+        ...uniqueFiles.map((file) => ({
+          kind: "new" as const,
+          id: `${file.name}-${file.lastModified}-${crypto.randomUUID()}`,
+          file,
+          previewUrl: URL.createObjectURL(file),
+        })),
+      ]);
+      updateField("mediaObjectKeys", []);
+    }
+  }
+
+  function handleImageSelection(event: ChangeEvent<HTMLInputElement>) {
+    addServiceImages(Array.from(event.target.files ?? []));
+    event.target.value = "";
+  }
+
+  function removeServiceImage(imageId: string) {
+    const image = selectedImages.find((candidate) => candidate.id === imageId);
+    if (image?.kind === "new") {
+      URL.revokeObjectURL(image.previewUrl);
+    }
+    setSelectedImages((current) =>
+      current.filter((candidate) => candidate.id !== imageId),
+    );
+    updateField("mediaObjectKeys", []);
+  }
+
+  async function uploadPendingImages(): Promise<string[] | null> {
+    const objectKeys: string[] = [];
+
+    for (const image of selectedImages) {
+      if (image.kind === "existing") {
+        continue;
+      }
+
+      const uploadExpiresAt = image.expiresAt
+        ? new Date(image.expiresAt).getTime()
+        : 0;
+      if (
+        image.objectKey &&
+        Number.isFinite(uploadExpiresAt) &&
+        uploadExpiresAt - Date.now() > 60_000
+      ) {
+        objectKeys.push(image.objectKey);
+        continue;
+      }
+
+      const result = await uploadServiceMediaAction({
+        contentType: image.file.type,
+        sizeBytes: image.file.size,
+      });
+      if (!result.ok) {
+        toast.error(
+          result.reason === "type"
+            ? m.services.create.mediaTypeInvalid
+            : result.reason === "size"
+              ? m.services.create.mediaTooLarge
+              : m.services.create.mediaUploadFailed,
+        );
+        return null;
+      }
+
+      let uploadResponse: Response;
+      try {
+        uploadResponse = await fetch(result.ticket.uploadUrl, {
+          method: "PUT",
+          headers: result.ticket.headers,
+          body: image.file,
+        });
+      } catch {
+        toast.error(m.services.create.mediaUploadFailed);
+        return null;
+      }
+      if (!uploadResponse.ok) {
+        toast.error(m.services.create.mediaUploadFailed);
+        return null;
+      }
+
+      objectKeys.push(result.ticket.objectKey);
+      setSelectedImages((current) =>
+        current.map((candidate) =>
+          candidate.kind === "new" && candidate.id === image.id
+            ? {
+                ...candidate,
+                objectKey: result.ticket.objectKey,
+                expiresAt: result.ticket.expiresAt,
+              }
+            : candidate,
+        ),
+      );
+    }
+
+    return objectKeys;
   }
 
   function updateSelectedBranches(nextSelectedBranchIds: string[]) {
@@ -436,11 +650,38 @@ export function ServiceCreateView({
     setFormError(null);
 
     try {
+      const mediaObjectKeys = await uploadPendingImages();
+      if (mediaObjectKeys === null) {
+        return;
+      }
+      const nextFormValues = { ...formValues, mediaObjectKeys };
+      const retainedMediaIds = selectedImages.flatMap((image) =>
+        image.kind === "existing" ? [image.mediaId] : [],
+      );
       const result = initialService
-        ? await updateServiceAction(initialService.id, formValues)
-        : await createServiceAction(formValues);
+        ? await updateServiceAction(
+            initialService.id,
+            nextFormValues,
+            retainedMediaIds,
+          )
+        : await createServiceAction(nextFormValues);
 
       if (!result.ok) {
+        if (result.code?.startsWith("SERVICE_MEDIA_")) {
+          setSelectedImages((current) =>
+            current.map((image) =>
+              image.kind === "existing"
+                ? image
+                : {
+                    kind: "new",
+                    id: image.id,
+                    file: image.file,
+                    previewUrl: image.previewUrl,
+                  },
+            ),
+          );
+          toast.error(m.services.create.mediaSaveConflict);
+        }
         if (result.code === "SERVICE_NAME_DUPLICATE") {
           setErrors({ name: m.services.create.nameConflict });
           setFormError(m.services.create.nameConflict);
@@ -662,6 +903,92 @@ export function ServiceCreateView({
                     />
                     <FieldError message={getFieldError("description")} />
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card className="gap-0 rounded-lg py-0 shadow-none">
+                <CardHeader className="border-b py-4">
+                  <CardTitle className="text-base">
+                    {m.services.sections.media}
+                  </CardTitle>
+                  <CardDescription>
+                    {m.services.sections.mediaDescription}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-3 py-5">
+                  <input
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    id="service-images"
+                    multiple
+                    onChange={handleImageSelection}
+                    ref={imageInputRef}
+                    type="file"
+                  />
+
+                  {selectedImages.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      {selectedImages.map((image, index) => (
+                        <div
+                          className="group relative aspect-square overflow-hidden rounded-md border bg-muted"
+                          key={image.id}
+                        >
+                          <Image
+                            alt={getServiceImageName(image)}
+                            className="object-cover"
+                            fill
+                            priority={index === 0}
+                            sizes="(max-width: 640px) 50vw, 180px"
+                            src={image.previewUrl}
+                            unoptimized
+                          />
+                          <span className="absolute bottom-1.5 left-1.5 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-medium shadow-sm">
+                            {index === 0
+                              ? m.services.create.coverImage
+                              : m.services.create.detailImage}
+                          </span>
+                          <Button
+                            aria-label={`${m.services.create.removeImage} ${getServiceImageName(image)}`}
+                            className="absolute right-1.5 top-1.5 size-7 bg-background/90 opacity-100 shadow-sm sm:opacity-0 sm:group-hover:opacity-100"
+                            onClick={() => removeServiceImage(image.id)}
+                            size="icon"
+                            type="button"
+                            variant="outline"
+                          >
+                            <Icon aria-hidden icon={X} size={13} />
+                          </Button>
+                        </div>
+                      ))}
+
+                      {selectedImages.length < MAX_SERVICE_IMAGES ? (
+                        <button
+                          className="flex aspect-square flex-col items-center justify-center gap-2 rounded-md border border-dashed text-sm text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-muted/50 hover:text-foreground"
+                          onClick={() => imageInputRef.current?.click()}
+                          type="button"
+                        >
+                          <Icon aria-hidden icon={ImagePlus} size={20} />
+                          <span>{m.services.create.addImages}</span>
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <button
+                      className="flex min-h-32 flex-col items-center justify-center gap-2 rounded-md border border-dashed px-4 text-center text-sm text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-muted/50 hover:text-foreground"
+                      onClick={() => imageInputRef.current?.click()}
+                      type="button"
+                    >
+                      <span className="flex size-9 items-center justify-center rounded-full bg-muted">
+                        <Icon aria-hidden icon={Upload} size={17} />
+                      </span>
+                      <span className="font-medium text-foreground">
+                        {m.services.create.addImages}
+                      </span>
+                      <span className="max-w-lg text-xs">
+                        {m.services.create.mediaHelp}
+                      </span>
+                    </button>
+                  )}
+                  <FieldError message={getFieldError("mediaObjectKeys")} />
                 </CardContent>
               </Card>
 

@@ -16,6 +16,7 @@ import {
 
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
+import { mediaObjects } from "../platform/media.js";
 import { branches } from "../tenancy/branches.js";
 import { tenants } from "../tenancy/tenants.js";
 
@@ -267,5 +268,53 @@ export const serviceBranchSettings = pgTable(
       "service_branch_settings_turnaround_override_check",
       sql`${table.turnaroundMinutesOverride} is null or (${table.turnaroundMinutesOverride} >= 1 and ${table.turnaroundMinutesOverride} <= 525600)`,
     ),
+  ],
+);
+
+export const serviceMedia = pgTable(
+  "service_media",
+  {
+    id: ulidPrimaryKey(),
+    tenantId: ulidColumn("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    serviceId: ulidColumn("service_id").notNull(),
+    mediaObjectId: ulidColumn("media_object_id").notNull(),
+    isPrimary: boolean("is_primary").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdBy: ulidColumn("created_by").references(() => users.id),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    deletedBy: ulidColumn("deleted_by").references(() => users.id),
+  },
+  (table) => [
+    uniqueIndex("service_media_service_object_unique")
+      .on(table.tenantId, table.serviceId, table.mediaObjectId)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("service_media_tenant_object_unique")
+      .on(table.tenantId, table.mediaObjectId)
+      .where(sql`${table.deletedAt} is null`),
+    uniqueIndex("service_media_service_primary_unique")
+      .on(table.tenantId, table.serviceId)
+      .where(sql`${table.deletedAt} is null and ${table.isPrimary} = true`),
+    foreignKey({
+      name: "service_media_tenant_service_fk",
+      columns: [table.tenantId, table.serviceId],
+      foreignColumns: [services.tenantId, services.id],
+    }).onDelete("restrict"),
+    foreignKey({
+      name: "service_media_tenant_media_object_fk",
+      columns: [table.tenantId, table.mediaObjectId],
+      foreignColumns: [mediaObjects.tenantId, mediaObjects.id],
+    }).onDelete("restrict"),
+    index("service_media_media_object_id_idx").on(table.mediaObjectId),
+    index("service_media_service_sort_idx").on(
+      table.tenantId,
+      table.serviceId,
+      table.sortOrder,
+    ),
+    index("service_media_deleted_at_idx").on(table.deletedAt),
   ],
 );

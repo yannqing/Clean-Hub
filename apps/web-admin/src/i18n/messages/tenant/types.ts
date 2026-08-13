@@ -683,6 +683,8 @@ export type TenantMessages = {
       };
       addImages: string;
       mediaHelp: string;
+      coverImage: string;
+      detailImage: string;
       mediaTypeInvalid: string;
       mediaTooLarge: string;
       mediaLimitReached: string;
@@ -1243,6 +1245,8 @@ export type TenantMessages = {
     sections: {
       basicInformation: string;
       basicInformationDescription: string;
+      media: string;
+      mediaDescription: string;
       pricing: string;
       pricingDescription: string;
       operations: string;
@@ -1330,6 +1334,16 @@ export type TenantMessages = {
       nameConflict: string;
       checkForm: string;
       unsavedChanges: string;
+      addImages: string;
+      removeImage: string;
+      mediaHelp: string;
+      coverImage: string;
+      detailImage: string;
+      mediaTypeInvalid: string;
+      mediaTooLarge: string;
+      mediaLimitReached: string;
+      mediaUploadFailed: string;
+      mediaSaveConflict: string;
     };
     validation: {
       businessLineInvalid: string;
@@ -1341,6 +1355,7 @@ export type TenantMessages = {
       categoryRequired: string;
       categoryInvalid: string;
       descriptionTooLong: string;
+      mediaInvalid: string;
       internalNotesTooLong: string;
       turnaroundMinutesInvalid: string;
       branchSettingsInvalid: string;
