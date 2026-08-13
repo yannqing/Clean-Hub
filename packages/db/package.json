@@ -11,6 +11,7 @@
     "db:push": "drizzle-kit push",
     "db:seed": "tsx src/seeds/index.ts",
     "db:studio": "drizzle-kit studio",
+    "test:rls": "tsx src/rls.integration.ts",
     "test": "tsx src/client.test.ts",
     "typecheck": "tsc --noEmit"
   },

@@ -1,6 +1,8 @@
 import type { MiddlewareHandler } from "hono";
 import { getCookie } from "hono/cookie";
 
+import { runWithSystemDatabaseContext } from "@cleanhub/db";
+
 import { AuthError } from "../modules/auth/auth.errors.js";
 import type { AuthService } from "../modules/auth/auth.service.js";
 import {
@@ -22,7 +24,9 @@ export function createRequireAuthMiddleware(
       throw new AuthError("TOKEN_INVALID", "Access token is required.");
     }
 
-    const authContext = await authService.getAuthContext(accessToken);
+    const authContext = await runWithSystemDatabaseContext(() =>
+      authService.getAuthContext(accessToken),
+    );
 
     c.set("authContext", authContext);
 

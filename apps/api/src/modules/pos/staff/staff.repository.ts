@@ -171,7 +171,13 @@ export async function findStaffForBranch(
       role: roles.code,
     })
     .from(users)
-    .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .innerJoin(
+      userProfiles,
+      and(
+        eq(userProfiles.userId, users.id),
+        eq(userProfiles.tenantId, input.tenantId),
+      ),
+    )
     .innerJoin(userRoles, eq(userRoles.userId, users.id))
     .innerJoin(roles, eq(roles.id, userRoles.roleId))
     .where(

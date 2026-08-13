@@ -1,6 +1,13 @@
 import { MockPaymentGateway } from "./mock-payment.gateway.js";
-import { addAmounts, subtractAmounts, compareAmounts } from "./payment-money.js";
-import { PaymentService, type PaymentRepositoryLike } from "./payment.service.js";
+import {
+  addAmounts,
+  subtractAmounts,
+  compareAmounts,
+} from "./payment-money.js";
+import {
+  PaymentService,
+  type PaymentRepositoryLike,
+} from "./payment.service.js";
 import { PaymentError } from "./payment.types.js";
 import type {
   CustomerPaymentTransaction,
@@ -154,7 +161,10 @@ function createRepository(): PaymentRepositoryLike & {
   orders: Map<string, PaymentOrderRecord>;
   transactions: Map<string, CustomerPaymentTransaction>;
   refunds: Map<string, RefundRequest>;
-  callbackStatuses: Map<string, "processed" | "rejected" | "failed" | "received">;
+  callbackStatuses: Map<
+    string,
+    "processed" | "rejected" | "failed" | "received"
+  >;
 } {
   let transactionCount = 0;
   let callbackCount = 0;
@@ -278,7 +288,11 @@ function createRepository(): PaymentRepositoryLike & {
       transactions.set(transaction.id, transaction);
       return { transaction, idempotent: false };
     },
-    async attachGatewayPayment({ transactionId, gateway: gatewayName, externalId }) {
+    async attachGatewayPayment({
+      transactionId,
+      gateway: gatewayName,
+      externalId,
+    }) {
       const transaction = transactions.get(transactionId);
 
       if (!transaction) {
@@ -363,7 +377,11 @@ function createRepository(): PaymentRepositoryLike & {
         null;
 
       if (!transaction) {
-        await this.markCallback({ callbackId, status: "failed" });
+        await this.markCallback({
+          tenantId: verification.tenantId,
+          callbackId,
+          status: "failed",
+        });
         return null;
       }
 
@@ -371,7 +389,11 @@ function createRepository(): PaymentRepositoryLike & {
         transaction.externalId !== verification.externalId ||
         compareAmounts(transaction.amount, verification.amount) !== 0
       ) {
-        await this.markCallback({ callbackId, status: "failed" });
+        await this.markCallback({
+          tenantId: verification.tenantId,
+          callbackId,
+          status: "failed",
+        });
         return null;
       }
 
@@ -379,7 +401,11 @@ function createRepository(): PaymentRepositoryLike & {
         transaction.paymentStatus === "paid" &&
         verification.status !== "refunded"
       ) {
-        await this.markCallback({ callbackId, status: "processed" });
+        await this.markCallback({
+          tenantId: verification.tenantId,
+          callbackId,
+          status: "processed",
+        });
         return transaction;
       }
 
@@ -405,7 +431,11 @@ function createRepository(): PaymentRepositoryLike & {
         }
       }
 
-      await this.markCallback({ callbackId, status: "processed" });
+      await this.markCallback({
+        tenantId: verification.tenantId,
+        callbackId,
+        status: "processed",
+      });
       return updated;
     },
     async createRefundRequest(input) {
@@ -433,12 +463,20 @@ function createRepository(): PaymentRepositoryLike & {
       refunds.set(refund.id, refund);
       return refund;
     },
-    async listRefundRequests({ tenantId, customerAccountId, branchIds, status }) {
+    async listRefundRequests({
+      tenantId,
+      customerAccountId,
+      branchIds,
+      status,
+    }) {
       return [...refunds.values()].filter(
         (refund) =>
           refund.tenantId === tenantId &&
-          (!customerAccountId || refund.customerAccountId === customerAccountId) &&
-          (!branchIds || branchIds.length === 0 || branchIds.includes(refund.branchId)) &&
+          (!customerAccountId ||
+            refund.customerAccountId === customerAccountId) &&
+          (!branchIds ||
+            branchIds.length === 0 ||
+            branchIds.includes(refund.branchId)) &&
           (!status || refund.status === status),
       );
     },
@@ -484,7 +522,11 @@ function createRepository(): PaymentRepositoryLike & {
     async startRefundProcessing({ tenantId, refundRequestId, operatorUserId }) {
       const refund = refunds.get(refundRequestId);
 
-      if (!refund || refund.tenantId !== tenantId || refund.status !== "pending") {
+      if (
+        !refund ||
+        refund.tenantId !== tenantId ||
+        refund.status !== "pending"
+      ) {
         return null;
       }
 
@@ -499,10 +541,19 @@ function createRepository(): PaymentRepositoryLike & {
       refunds.set(updated.id, updated);
       return updated;
     },
-    async attachRefundGateway({ tenantId, refundRequestId, gateway: gatewayName, externalId }) {
+    async attachRefundGateway({
+      tenantId,
+      refundRequestId,
+      gateway: gatewayName,
+      externalId,
+    }) {
       const refund = refunds.get(refundRequestId);
 
-      if (!refund || refund.tenantId !== tenantId || refund.status !== "processing") {
+      if (
+        !refund ||
+        refund.tenantId !== tenantId ||
+        refund.status !== "processing"
+      ) {
         return null;
       }
 
@@ -516,10 +567,19 @@ function createRepository(): PaymentRepositoryLike & {
       refunds.set(updated.id, updated);
       return updated;
     },
-    async rejectRefundRequest({ tenantId, refundRequestId, operatorUserId, reason }) {
+    async rejectRefundRequest({
+      tenantId,
+      refundRequestId,
+      operatorUserId,
+      reason,
+    }) {
       const refund = refunds.get(refundRequestId);
 
-      if (!refund || refund.tenantId !== tenantId || refund.status !== "pending") {
+      if (
+        !refund ||
+        refund.tenantId !== tenantId ||
+        refund.status !== "pending"
+      ) {
         return null;
       }
 
@@ -548,7 +608,11 @@ function createRepository(): PaymentRepositoryLike & {
         null;
 
       if (!refund) {
-        await this.markCallback({ callbackId, status: "failed" });
+        await this.markCallback({
+          tenantId: verification.tenantId,
+          callbackId,
+          status: "failed",
+        });
         return null;
       }
 
@@ -556,12 +620,20 @@ function createRepository(): PaymentRepositoryLike & {
         refund.externalId !== verification.externalId ||
         compareAmounts(refund.amount, verification.amount) !== 0
       ) {
-        await this.markCallback({ callbackId, status: "failed" });
+        await this.markCallback({
+          tenantId: verification.tenantId,
+          callbackId,
+          status: "failed",
+        });
         return null;
       }
 
       if (refund.status === "refunded") {
-        await this.markCallback({ callbackId, status: "processed" });
+        await this.markCallback({
+          tenantId: verification.tenantId,
+          callbackId,
+          status: "processed",
+        });
         return refund;
       }
 
@@ -578,7 +650,7 @@ function createRepository(): PaymentRepositoryLike & {
         failedReason:
           verification.status === "refunded"
             ? null
-            : verification.failureReason ?? "Refund failed.",
+            : (verification.failureReason ?? "Refund failed."),
         updatedAt: new Date().toISOString(),
       };
 
@@ -594,7 +666,11 @@ function createRepository(): PaymentRepositoryLike & {
         }
       }
 
-      await this.markCallback({ callbackId, status: "processed" });
+      await this.markCallback({
+        tenantId: verification.tenantId,
+        callbackId,
+        status: "processed",
+      });
       return updated;
     },
     async sumPaidTransactions({ tenantId, orderId }) {
@@ -605,7 +681,10 @@ function createRepository(): PaymentRepositoryLike & {
             transaction.orderId === orderId &&
             transaction.paymentStatus === "paid",
         )
-        .reduce((total, transaction) => addAmounts(total, transaction.amount), "0.00");
+        .reduce(
+          (total, transaction) => addAmounts(total, transaction.amount),
+          "0.00",
+        );
     },
     async listPaidTransactionsForOrder({ tenantId, orderId }) {
       return [...transactions.values()].filter(
@@ -683,7 +762,10 @@ export async function runPaymentSmokeChecks(): Promise<void> {
   });
 
   assert(first.transaction.id === "tx_1", "payment should create tx_1");
-  assert(first.gateway.externalId === "mock_pay_tx_1", "mock external id should be stable");
+  assert(
+    first.gateway.externalId === "mock_pay_tx_1",
+    "mock external id should be stable",
+  );
   assert(!first.idempotent, "first payment should not be idempotent");
 
   const replay = await service.createPayment({
@@ -694,7 +776,10 @@ export async function runPaymentSmokeChecks(): Promise<void> {
   });
 
   assert(replay.idempotent, "same idempotency key should replay");
-  assert(repository.transactions.size === 1, "replay must not insert a transaction");
+  assert(
+    repository.transactions.size === 1,
+    "replay must not insert a transaction",
+  );
 
   await assertRejectsPayment(
     () =>

@@ -237,9 +237,7 @@ export async function findActiveSaasRolesByCodes(
   }));
 }
 
-export async function findSaasRoles(
-  db: Database,
-): Promise<SaasRoleListItem[]> {
+export async function findSaasRoles(db: Database): Promise<SaasRoleListItem[]> {
   const roleRows = await db
     .select({
       id: roles.id,
@@ -341,6 +339,7 @@ export async function createSaasUserRecord(
 
   await db.insert(userProfiles).values({
     userId,
+    tenantId: null,
     displayName: input.displayName,
     language: input.language,
   });

@@ -1,4 +1,5 @@
 import { createLogger } from "@cleanhub/logger";
+import { runWithSystemDatabaseContext } from "@cleanhub/db";
 
 import { NotificationsService } from "../modules/notifications/index.js";
 
@@ -27,36 +28,38 @@ function isDisabled(value: string | undefined): boolean {
 export async function runEmailDeliveryOnce(
   service = new NotificationsService(),
 ): Promise<void> {
-  const batchSize = readPositiveInteger(
-    process.env.EMAIL_DELIVERY_BATCH_SIZE,
-    50,
-  );
-  const pushBatchSize = readPositiveInteger(
-    process.env.PUSH_DELIVERY_BATCH_SIZE,
-    50,
-  );
-  const overdueBatchSize = readPositiveInteger(
-    process.env.EMAIL_OVERDUE_TICKET_BATCH_SIZE,
-    100,
-  );
-  const [overdueResult, deliveryResult, pushResult] = await Promise.all([
-    isDisabled(process.env.EMAIL_OVERDUE_TICKET_DISABLED)
-      ? Promise.resolve(null)
-      : service.publishOverdueTicketEvents({ limit: overdueBatchSize }),
-    service.processEmailDeliveries({ limit: batchSize }),
-    isDisabled(process.env.PUSH_DELIVERY_DISABLED)
-      ? Promise.resolve(null)
-      : service.processPushDeliveries({ limit: pushBatchSize }),
-  ]);
+  await runWithSystemDatabaseContext(async () => {
+    const batchSize = readPositiveInteger(
+      process.env.EMAIL_DELIVERY_BATCH_SIZE,
+      50,
+    );
+    const pushBatchSize = readPositiveInteger(
+      process.env.PUSH_DELIVERY_BATCH_SIZE,
+      50,
+    );
+    const overdueBatchSize = readPositiveInteger(
+      process.env.EMAIL_OVERDUE_TICKET_BATCH_SIZE,
+      100,
+    );
+    const [overdueResult, deliveryResult, pushResult] = await Promise.all([
+      isDisabled(process.env.EMAIL_OVERDUE_TICKET_DISABLED)
+        ? Promise.resolve(null)
+        : service.publishOverdueTicketEvents({ limit: overdueBatchSize }),
+      service.processEmailDeliveries({ limit: batchSize }),
+      isDisabled(process.env.PUSH_DELIVERY_DISABLED)
+        ? Promise.resolve(null)
+        : service.processPushDeliveries({ limit: pushBatchSize }),
+    ]);
 
-  logger.info(
-    {
-      overdue: overdueResult,
-      deliveries: deliveryResult,
-      pushDeliveries: pushResult,
-    },
-    "Notification delivery cron completed",
-  );
+    logger.info(
+      {
+        overdue: overdueResult,
+        deliveries: deliveryResult,
+        pushDeliveries: pushResult,
+      },
+      "Notification delivery cron completed",
+    );
+  });
 }
 
 async function main(): Promise<void> {

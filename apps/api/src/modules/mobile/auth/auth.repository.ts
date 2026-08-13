@@ -1,13 +1,5 @@
 import { createId } from "@cleanhub/id";
-import {
-  and,
-  desc,
-  eq,
-  getTableColumns,
-  isNull,
-  or,
-  sql,
-} from "drizzle-orm";
+import { and, desc, eq, getTableColumns, isNull, or, sql } from "drizzle-orm";
 
 import {
   authRefreshTokens,
@@ -38,9 +30,7 @@ import type {
 export class MobileAuthRepository {
   constructor(private readonly db: Database) {}
 
-  async findActiveTenantByCode(
-    tenantCode: string,
-  ): Promise<{
+  async findActiveTenantByCode(tenantCode: string): Promise<{
     id: string;
     defaultCurrency: string;
     timezone?: string;
@@ -65,9 +55,7 @@ export class MobileAuthRepository {
     return rows[0] ?? null;
   }
 
-  async findTenantById(
-    tenantId: string,
-  ): Promise<{
+  async findTenantById(tenantId: string): Promise<{
     id: string;
     defaultCurrency: string;
     timezone?: string;
@@ -178,9 +166,10 @@ export class MobileAuthRepository {
     return rows[0] ?? null;
   }
 
-  async findCustomerCredential(
-    customerAccountId: string,
-  ): Promise<MobileCustomerCredential | null> {
+  async findCustomerCredential(input: {
+    tenantId: string;
+    customerAccountId: string;
+  }): Promise<MobileCustomerCredential | null> {
     const rows = await this.db
       .select({
         id: customerCredentials.id,
@@ -193,7 +182,8 @@ export class MobileAuthRepository {
       .from(customerCredentials)
       .where(
         and(
-          eq(customerCredentials.customerAccountId, customerAccountId),
+          eq(customerCredentials.tenantId, input.tenantId),
+          eq(customerCredentials.customerAccountId, input.customerAccountId),
           isNull(customerCredentials.deletedAt),
         ),
       )
@@ -263,11 +253,19 @@ export class MobileAuthRepository {
     return rows[0] ?? null;
   }
 
-  async incrementCustomerOtpAttempts(otpId: string): Promise<void> {
+  async incrementCustomerOtpAttempts(input: {
+    tenantId: string;
+    otpId: string;
+  }): Promise<void> {
     const rows = await this.db
       .select({ attempts: customerAuthOtps.attempts })
       .from(customerAuthOtps)
-      .where(eq(customerAuthOtps.id, otpId))
+      .where(
+        and(
+          eq(customerAuthOtps.tenantId, input.tenantId),
+          eq(customerAuthOtps.id, input.otpId),
+        ),
+      )
       .limit(1);
 
     await this.db
@@ -276,25 +274,40 @@ export class MobileAuthRepository {
         attempts: (rows[0]?.attempts ?? 0) + 1,
         updatedAt: new Date(),
       })
-      .where(eq(customerAuthOtps.id, otpId));
+      .where(
+        and(
+          eq(customerAuthOtps.tenantId, input.tenantId),
+          eq(customerAuthOtps.id, input.otpId),
+        ),
+      );
   }
 
-  async consumeCustomerOtp(otpId: string): Promise<void> {
+  async consumeCustomerOtp(input: {
+    tenantId: string;
+    otpId: string;
+  }): Promise<void> {
     await this.db
       .update(customerAuthOtps)
       .set({
         consumedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(customerAuthOtps.id, otpId));
+      .where(
+        and(
+          eq(customerAuthOtps.tenantId, input.tenantId),
+          eq(customerAuthOtps.id, input.otpId),
+        ),
+      );
   }
 
   async recordCustomerPasswordFailure({
     credentialId,
+    tenantId,
     failedAttempts,
     lockedUntil,
   }: {
     credentialId: string;
+    tenantId: string;
     failedAttempts: number;
     lockedUntil: Date | null;
   }): Promise<void> {
@@ -305,10 +318,18 @@ export class MobileAuthRepository {
         lockedUntil,
         updatedAt: new Date(),
       })
-      .where(eq(customerCredentials.id, credentialId));
+      .where(
+        and(
+          eq(customerCredentials.tenantId, tenantId),
+          eq(customerCredentials.id, credentialId),
+        ),
+      );
   }
 
-  async clearCustomerPasswordFailures(credentialId: string): Promise<void> {
+  async clearCustomerPasswordFailures(input: {
+    tenantId: string;
+    credentialId: string;
+  }): Promise<void> {
     await this.db
       .update(customerCredentials)
       .set({
@@ -316,7 +337,12 @@ export class MobileAuthRepository {
         lockedUntil: null,
         updatedAt: new Date(),
       })
-      .where(eq(customerCredentials.id, credentialId));
+      .where(
+        and(
+          eq(customerCredentials.tenantId, input.tenantId),
+          eq(customerCredentials.id, input.credentialId),
+        ),
+      );
   }
 
   async createCustomerRefreshToken({
@@ -373,9 +399,11 @@ export class MobileAuthRepository {
 
   async revokeCustomerRefreshToken({
     tokenId,
+    tenantId,
     replacedByTokenId,
   }: {
     tokenId: string;
+    tenantId: string;
     replacedByTokenId?: string;
   }): Promise<void> {
     await this.db
@@ -385,27 +413,48 @@ export class MobileAuthRepository {
         replacedByTokenId,
         updatedAt: new Date(),
       })
-      .where(eq(customerAuthRefreshTokens.id, tokenId));
+      .where(
+        and(
+          eq(customerAuthRefreshTokens.tenantId, tenantId),
+          eq(customerAuthRefreshTokens.id, tokenId),
+        ),
+      );
   }
 
-  async revokeCustomerRefreshTokenFamily(familyId: string): Promise<void> {
+  async revokeCustomerRefreshTokenFamily(input: {
+    tenantId: string;
+    familyId: string;
+  }): Promise<void> {
     await this.db
       .update(customerAuthRefreshTokens)
       .set({
         revokedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(customerAuthRefreshTokens.familyId, familyId));
+      .where(
+        and(
+          eq(customerAuthRefreshTokens.tenantId, input.tenantId),
+          eq(customerAuthRefreshTokens.familyId, input.familyId),
+        ),
+      );
   }
 
-  async revokeCustomerRefreshTokenByHash(tokenHash: string): Promise<void> {
+  async revokeCustomerRefreshTokenByHash(input: {
+    tenantId: string;
+    tokenHash: string;
+  }): Promise<void> {
     await this.db
       .update(customerAuthRefreshTokens)
       .set({
         revokedAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(customerAuthRefreshTokens.tokenHash, tokenHash));
+      .where(
+        and(
+          eq(customerAuthRefreshTokens.tenantId, input.tenantId),
+          eq(customerAuthRefreshTokens.tokenHash, input.tokenHash),
+        ),
+      );
   }
 
   async findStaffLoginUser({
@@ -438,19 +487,31 @@ export class MobileAuthRepository {
     return rows[0] ?? null;
   }
 
-  async findStaffUserById(userId: string): Promise<MobileStaffUser | null> {
+  async findStaffUserById(input: {
+    tenantId: string;
+    userId: string;
+  }): Promise<MobileStaffUser | null> {
     const rows = await this.db
       .select({
         ...getTableColumns(users),
       })
       .from(users)
-      .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+      .where(
+        and(
+          eq(users.tenantId, input.tenantId),
+          eq(users.id, input.userId),
+          isNull(users.deletedAt),
+        ),
+      )
       .limit(1);
 
     return rows[0] ?? null;
   }
 
-  async getStaffAccess(userId: string): Promise<UserAccess> {
+  async getStaffAccess(input: {
+    tenantId: string;
+    userId: string;
+  }): Promise<UserAccess> {
     const rows = await this.db
       .select({
         roleCode: roles.code,
@@ -459,11 +520,19 @@ export class MobileAuthRepository {
       })
       .from(userRoles)
       .innerJoin(roles, eq(userRoles.roleId, roles.id))
-      .leftJoin(rolePermissions, eq(rolePermissions.roleId, roles.id))
+      .leftJoin(
+        rolePermissions,
+        and(
+          eq(rolePermissions.tenantId, input.tenantId),
+          eq(rolePermissions.roleId, roles.id),
+        ),
+      )
       .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
       .where(
         and(
-          eq(userRoles.userId, userId),
+          eq(userRoles.tenantId, input.tenantId),
+          eq(userRoles.userId, input.userId),
+          eq(roles.tenantId, input.tenantId),
           isNull(userRoles.revokedAt),
           eq(roles.scope, "tenant"),
           eq(roles.status, "active"),
@@ -474,7 +543,12 @@ export class MobileAuthRepository {
     const profileRows = await this.db
       .select({ displayName: userProfiles.displayName })
       .from(userProfiles)
-      .where(eq(userProfiles.userId, userId))
+      .where(
+        and(
+          eq(userProfiles.tenantId, input.tenantId),
+          eq(userProfiles.userId, input.userId),
+        ),
+      )
       .limit(1);
 
     return {
@@ -493,18 +567,23 @@ export class MobileAuthRepository {
             .filter((branchId): branchId is string => Boolean(branchId)),
         ),
       ],
-      displayName: profileRows[0]?.displayName ?? userId,
+      displayName: profileRows[0]?.displayName ?? input.userId,
     };
   }
 
-  async updateStaffLastLoginAt(userId: string): Promise<void> {
+  async updateStaffLastLoginAt(input: {
+    tenantId: string;
+    userId: string;
+  }): Promise<void> {
     await this.db
       .update(users)
       .set({
         lastLoginAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(users.id, userId));
+      .where(
+        and(eq(users.tenantId, input.tenantId), eq(users.id, input.userId)),
+      );
   }
 
   async createStaffRefreshToken({
@@ -570,9 +649,11 @@ export class MobileAuthRepository {
 
   async revokeStaffRefreshToken({
     tokenId,
+    tenantId,
     replacedByTokenId,
   }: {
     tokenId: string;
+    tenantId: string;
     replacedByTokenId?: string;
   }): Promise<void> {
     await this.db
@@ -581,24 +662,45 @@ export class MobileAuthRepository {
         revokedAt: new Date(),
         replacedByTokenId,
       })
-      .where(eq(authRefreshTokens.id, tokenId));
+      .where(
+        and(
+          eq(authRefreshTokens.tenantId, tenantId),
+          eq(authRefreshTokens.id, tokenId),
+        ),
+      );
   }
 
-  async revokeStaffRefreshTokenFamily(familyId: string): Promise<void> {
+  async revokeStaffRefreshTokenFamily(input: {
+    tenantId: string;
+    familyId: string;
+  }): Promise<void> {
     await this.db
       .update(authRefreshTokens)
       .set({
         revokedAt: new Date(),
       })
-      .where(eq(authRefreshTokens.familyId, familyId));
+      .where(
+        and(
+          eq(authRefreshTokens.tenantId, input.tenantId),
+          eq(authRefreshTokens.familyId, input.familyId),
+        ),
+      );
   }
 
-  async revokeStaffRefreshTokenByHash(tokenHash: string): Promise<void> {
+  async revokeStaffRefreshTokenByHash(input: {
+    tenantId: string;
+    tokenHash: string;
+  }): Promise<void> {
     await this.db
       .update(authRefreshTokens)
       .set({
         revokedAt: new Date(),
       })
-      .where(eq(authRefreshTokens.tokenHash, tokenHash));
+      .where(
+        and(
+          eq(authRefreshTokens.tenantId, input.tenantId),
+          eq(authRefreshTokens.tokenHash, input.tokenHash),
+        ),
+      );
   }
 }

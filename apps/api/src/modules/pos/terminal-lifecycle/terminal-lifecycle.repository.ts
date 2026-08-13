@@ -1,12 +1,4 @@
-import {
-  and,
-  asc,
-  eq,
-  inArray,
-  isNull,
-  ne,
-  sql,
-} from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import {
   authRefreshTokens,
@@ -272,6 +264,7 @@ export async function invalidateLockedPosTerminalsForBranchStatusChange(
     .set({ revokedAt: changedAt })
     .where(
       and(
+        eq(authRefreshTokens.tenantId, input.tenantId),
         inArray(authRefreshTokens.terminalId, terminalIds),
         isNull(authRefreshTokens.revokedAt),
       ),
@@ -294,8 +287,7 @@ export async function invalidateLockedPosTerminalsForBranchStatusChange(
       entityId: terminal.id,
       reason: `Branch was ${input.branchStatus === "inactive" ? "disabled" : "enabled"}.`,
       before: {
-        branchStatus:
-          input.branchStatus === "inactive" ? "active" : "inactive",
+        branchStatus: input.branchStatus === "inactive" ? "active" : "inactive",
         terminalStatus: terminal.status,
         credentialVersion: terminal.credentialVersion,
         version: terminal.version,
@@ -365,6 +357,7 @@ export async function invalidateLockedPosTerminalsForTenantStatusChange(
     .set({ revokedAt: changedAt })
     .where(
       and(
+        eq(authRefreshTokens.tenantId, input.tenantId),
         inArray(authRefreshTokens.terminalId, terminalIds),
         isNull(authRefreshTokens.revokedAt),
       ),

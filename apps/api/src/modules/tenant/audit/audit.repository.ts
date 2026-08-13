@@ -1,4 +1,14 @@
-import { and, count, desc, eq, gte, inArray, lte, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  lte,
+  sql,
+  type SQL,
+} from "drizzle-orm";
 
 import { auditLogs, type Database, userProfiles } from "@cleanhub/db";
 
@@ -48,14 +58,22 @@ function buildWhereClause(
 
   const conditions: (SQL | undefined)[] = [
     eq(auditLogs.tenantId, tenantId),
-    query.actorUserId ? eq(auditLogs.actorUserId, query.actorUserId) : undefined,
-    query.eventCategory ? eq(auditLogs.eventCategory, query.eventCategory) : undefined,
+    query.actorUserId
+      ? eq(auditLogs.actorUserId, query.actorUserId)
+      : undefined,
+    query.eventCategory
+      ? eq(auditLogs.eventCategory, query.eventCategory)
+      : undefined,
     query.eventType ? eq(auditLogs.eventType, query.eventType) : undefined,
     query.entityType ? eq(auditLogs.entityType, query.entityType) : undefined,
     query.entityId ? eq(auditLogs.entityId, query.entityId) : undefined,
     query.branchId ? eq(auditLogs.branchId, query.branchId) : undefined,
-    query.success !== undefined ? eq(auditLogs.success, query.success) : undefined,
-    query.dateFrom ? gte(auditLogs.createdAt, new Date(query.dateFrom)) : undefined,
+    query.success !== undefined
+      ? eq(auditLogs.success, query.success)
+      : undefined,
+    query.dateFrom
+      ? gte(auditLogs.createdAt, new Date(query.dateFrom))
+      : undefined,
     query.dateTo ? lte(auditLogs.createdAt, new Date(query.dateTo)) : undefined,
     branchScopeCondition,
   ];
@@ -102,7 +120,13 @@ export async function findTenantAuditLogs(
         createdAt: auditLogs.createdAt,
       })
       .from(auditLogs)
-      .leftJoin(userProfiles, eq(userProfiles.userId, auditLogs.actorUserId))
+      .leftJoin(
+        userProfiles,
+        and(
+          eq(userProfiles.userId, auditLogs.actorUserId),
+          eq(userProfiles.tenantId, tenantId),
+        ),
+      )
       .where(whereClause)
       .orderBy(desc(auditLogs.createdAt))
       .limit(query.limit)
@@ -143,7 +167,13 @@ export async function findTenantAuditLogById(
       createdAt: auditLogs.createdAt,
     })
     .from(auditLogs)
-    .leftJoin(userProfiles, eq(userProfiles.userId, auditLogs.actorUserId))
+    .leftJoin(
+      userProfiles,
+      and(
+        eq(userProfiles.userId, auditLogs.actorUserId),
+        eq(userProfiles.tenantId, tenantId),
+      ),
+    )
     .where(
       and(
         eq(auditLogs.id, logId),

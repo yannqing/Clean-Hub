@@ -76,6 +76,7 @@ export const permissions = pgTable(
 export const rolePermissions = pgTable(
   "role_permissions",
   {
+    tenantId: ulidColumn("tenant_id").references(() => tenants.id),
     roleId: ulidColumn("role_id")
       .notNull()
       .references(() => roles.id, { onDelete: "cascade" }),
@@ -91,6 +92,7 @@ export const rolePermissions = pgTable(
       columns: [table.roleId, table.permissionId],
       name: "role_permissions_pk",
     }),
+    index("role_permissions_tenant_id_idx").on(table.tenantId),
     index("role_permissions_permission_id_idx").on(table.permissionId),
   ],
 );

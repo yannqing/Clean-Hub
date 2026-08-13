@@ -57,7 +57,13 @@ export async function findTenantCustomerTimelineRows(
         createdAt: auditLogs.createdAt,
       })
       .from(auditLogs)
-      .leftJoin(userProfiles, eq(userProfiles.userId, auditLogs.actorUserId))
+      .leftJoin(
+        userProfiles,
+        and(
+          eq(userProfiles.userId, auditLogs.actorUserId),
+          eq(userProfiles.tenantId, input.tenantId),
+        ),
+      )
       .where(
         and(
           eq(auditLogs.tenantId, input.tenantId),
@@ -92,7 +98,10 @@ export async function findTenantCustomerTimelineRows(
       .from(customerComments)
       .leftJoin(
         userProfiles,
-        eq(userProfiles.userId, customerComments.authorUserId),
+        and(
+          eq(userProfiles.userId, customerComments.authorUserId),
+          eq(userProfiles.tenantId, input.tenantId),
+        ),
       )
       .where(
         and(
@@ -137,7 +146,10 @@ export async function findTenantCustomerTimelineRows(
           .from(customerCommentMentions)
           .innerJoin(
             userProfiles,
-            eq(userProfiles.userId, customerCommentMentions.mentionedUserId),
+            and(
+              eq(userProfiles.userId, customerCommentMentions.mentionedUserId),
+              eq(userProfiles.tenantId, input.tenantId),
+            ),
           )
           .where(
             and(
@@ -217,7 +229,13 @@ export async function findActiveTenantCustomerMentionUsers(
       language: userProfiles.language,
     })
     .from(users)
-    .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .innerJoin(
+      userProfiles,
+      and(
+        eq(userProfiles.userId, users.id),
+        eq(userProfiles.tenantId, input.tenantId),
+      ),
+    )
     .where(
       and(
         eq(users.tenantId, input.tenantId),

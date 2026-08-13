@@ -260,6 +260,7 @@ export async function enrollExistingPosDevice(
     .where(
       and(
         eq(posTerminalSettings.id, current.id),
+        eq(posTerminalSettings.tenantId, current.tenantId),
         eq(posTerminalSettings.version, current.version),
       ),
     )
@@ -313,6 +314,7 @@ export async function updatePosDeviceRecord(
     .where(
       and(
         eq(posTerminalSettings.id, current.id),
+        eq(posTerminalSettings.tenantId, current.tenantId),
         eq(posTerminalSettings.version, current.version),
       ),
     )
@@ -352,6 +354,7 @@ export async function revokePosDeviceRecord(
     .where(
       and(
         eq(posTerminalSettings.id, current.id),
+        eq(posTerminalSettings.tenantId, current.tenantId),
         eq(posTerminalSettings.version, current.version),
       ),
     )
@@ -396,6 +399,7 @@ export async function rotatePosDeviceCredentialRecord(
     .where(
       and(
         eq(posTerminalSettings.id, current.id),
+        eq(posTerminalSettings.tenantId, current.tenantId),
         eq(posTerminalSettings.version, current.version),
       ),
     )
@@ -406,6 +410,7 @@ export async function rotatePosDeviceCredentialRecord(
 
 export async function revokePosTerminalRefreshTokens(
   db: Database,
+  tenantId: string,
   terminalId: string,
 ): Promise<void> {
   await db
@@ -413,6 +418,7 @@ export async function revokePosTerminalRefreshTokens(
     .set({ revokedAt: new Date() })
     .where(
       and(
+        eq(authRefreshTokens.tenantId, tenantId),
         eq(authRefreshTokens.terminalId, terminalId),
         isNull(authRefreshTokens.revokedAt),
       ),

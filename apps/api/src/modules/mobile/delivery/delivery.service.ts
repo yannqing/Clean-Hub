@@ -89,15 +89,14 @@ export type DeliveryRepositoryLike = {
     tenantId: string;
     taskId: string;
   }): Promise<DeliveryTaskDetail | null>;
-  isTenantDriver(input: {
-    tenantId: string;
-    userId: string;
-  }): Promise<boolean>;
+  isTenantDriver(input: { tenantId: string; userId: string }): Promise<boolean>;
   findTaskEventByIdempotencyKey(input: {
+    tenantId: string;
     taskId: string;
     idempotencyKey: string;
   }): Promise<DeliveryTaskEvent | null>;
   findProofByIdempotencyKey(input: {
+    tenantId: string;
     taskId: string;
     idempotencyKey: string;
   }): Promise<DeliveryProof | null>;
@@ -280,11 +279,7 @@ function conflict(
 }
 
 function validationError(message: string): DeliveryError {
-  return new MobileDeliveryError(
-    "DELIVERY_VALIDATION_ERROR",
-    message,
-    422,
-  );
+  return new MobileDeliveryError("DELIVERY_VALIDATION_ERROR", message, 422);
 }
 
 function getTodayBounds(
@@ -391,6 +386,7 @@ export class DeliveryService {
     }
 
     const existingEvent = await this.repository.findTaskEventByIdempotencyKey({
+      tenantId: driver.tenantId,
       taskId: task.id,
       idempotencyKey: input.idempotencyKey,
     });
@@ -476,6 +472,7 @@ export class DeliveryService {
     }
 
     const existingProof = await this.repository.findProofByIdempotencyKey({
+      tenantId: driver.tenantId,
       taskId: task.id,
       idempotencyKey: input.idempotencyKey,
     });
@@ -514,7 +511,9 @@ export class DeliveryService {
     };
   }
 
-  async signTask(input: DeliverySignTaskInput): Promise<DeliveryMutationResult> {
+  async signTask(
+    input: DeliverySignTaskInput,
+  ): Promise<DeliveryMutationResult> {
     const driver = assertDriverContext(input.authContext);
     const task = await this.repository.findOwnedTaskById({
       tenantId: driver.tenantId,
@@ -528,10 +527,12 @@ export class DeliveryService {
 
     const [existingEvent, existingProof] = await Promise.all([
       this.repository.findTaskEventByIdempotencyKey({
+        tenantId: driver.tenantId,
         taskId: task.id,
         idempotencyKey: input.idempotencyKey,
       }),
       this.repository.findProofByIdempotencyKey({
+        tenantId: driver.tenantId,
         taskId: task.id,
         idempotencyKey: input.idempotencyKey,
       }),
@@ -703,6 +704,7 @@ export class DeliveryService {
     await this.assertTenantDriver(owner.tenantId, input.assigneeUserId);
 
     const existingEvent = await this.repository.findTaskEventByIdempotencyKey({
+      tenantId: owner.tenantId,
       taskId: task.id,
       idempotencyKey: input.idempotencyKey,
     });
@@ -765,6 +767,7 @@ export class DeliveryService {
     await this.assertTenantDriver(owner.tenantId, input.assigneeUserId);
 
     const existingEvent = await this.repository.findTaskEventByIdempotencyKey({
+      tenantId: owner.tenantId,
       taskId: task.id,
       idempotencyKey: input.idempotencyKey,
     });
@@ -786,7 +789,11 @@ export class DeliveryService {
     }
 
     if (TERMINAL_STATUSES.has(task.status)) {
-      throw conflict("Terminal delivery tasks cannot be reassigned.", task.status, []);
+      throw conflict(
+        "Terminal delivery tasks cannot be reassigned.",
+        task.status,
+        [],
+      );
     }
 
     const event = await this.repository.reassignTask({
@@ -822,13 +829,16 @@ export class DeliveryService {
     };
   }
 
-  async cancelTask(input: DeliveryCancelTaskInput): Promise<DeliveryMutationResult> {
+  async cancelTask(
+    input: DeliveryCancelTaskInput,
+  ): Promise<DeliveryMutationResult> {
     const owner = assertOwnerContext(input.authContext);
     const task = await this.getDispatchableTask(owner.tenantId, input.taskId);
 
     this.assertBranchAccess(owner, task.branchId);
 
     const existingEvent = await this.repository.findTaskEventByIdempotencyKey({
+      tenantId: owner.tenantId,
       taskId: task.id,
       idempotencyKey: input.idempotencyKey,
     });
@@ -842,7 +852,11 @@ export class DeliveryService {
     }
 
     if (TERMINAL_STATUSES.has(task.status)) {
-      throw conflict("Terminal delivery tasks cannot be cancelled.", task.status, []);
+      throw conflict(
+        "Terminal delivery tasks cannot be cancelled.",
+        task.status,
+        [],
+      );
     }
 
     const cancelled = await this.repository.cancelTask({
@@ -928,7 +942,10 @@ export class DeliveryService {
     authContext: MobileAuthContext,
     branchId: string,
   ): void {
-    if (authContext.branchIds.length > 0 && !authContext.branchIds.includes(branchId)) {
+    if (
+      authContext.branchIds.length > 0 &&
+      !authContext.branchIds.includes(branchId)
+    ) {
       throw forbidden();
     }
   }
@@ -959,7 +976,10 @@ export class DeliveryService {
     tenantId: string,
     taskId: string,
   ): Promise<DeliveryTaskDetail> {
-    const detail = await this.repository.getTaskDetailById({ tenantId, taskId });
+    const detail = await this.repository.getTaskDetailById({
+      tenantId,
+      taskId,
+    });
 
     if (!detail) {
       throw taskNotFound();
@@ -973,7 +993,10 @@ export class DeliveryService {
     taskId: string,
     fallbackStatus: DeliveryTaskStatus,
   ): Promise<never> {
-    const currentTask = await this.repository.findTaskById({ tenantId, taskId });
+    const currentTask = await this.repository.findTaskById({
+      tenantId,
+      taskId,
+    });
 
     throw conflict(
       "Delivery task changed while processing the request.",

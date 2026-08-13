@@ -97,9 +97,7 @@ function normalizePhone(phone: string): string {
 }
 
 function generateOtpCode(): string {
-  return randomInt(0, OTP_CODE_MAX)
-    .toString()
-    .padStart(6, "0");
+  return randomInt(0, OTP_CODE_MAX).toString().padStart(6, "0");
 }
 
 function assertActiveCustomer(customer: MobileCustomerAccount): void {
@@ -117,7 +115,11 @@ function assertActiveStaff(user: MobileStaffUser): void {
     throw new AuthError("USER_SUSPENDED", "User is suspended.");
   }
 
-  if (user.status !== "active" || user.userType !== "tenant" || !user.tenantId) {
+  if (
+    user.status !== "active" ||
+    user.userType !== "tenant" ||
+    !user.tenantId
+  ) {
     throw invalidCredentials();
   }
 }
@@ -151,7 +153,9 @@ function unwrapRefreshToken(refreshToken: string): {
   throw new AuthError("TOKEN_INVALID", "Refresh token is invalid.");
 }
 
-function readOptionalPositiveInteger(value: string | undefined): number | undefined {
+function readOptionalPositiveInteger(
+  value: string | undefined,
+): number | undefined {
   if (!value) {
     return undefined;
   }
@@ -329,11 +333,17 @@ export class MobileAuthService {
     }
 
     if (otp.code !== input.code.trim()) {
-      await this.repository.incrementCustomerOtpAttempts(otp.id);
+      await this.repository.incrementCustomerOtpAttempts({
+        tenantId: tenant.id,
+        otpId: otp.id,
+      });
       throw invalidCredentials();
     }
 
-    await this.repository.consumeCustomerOtp(otp.id);
+    await this.repository.consumeCustomerOtp({
+      tenantId: tenant.id,
+      otpId: otp.id,
+    });
 
     return this.issueCustomerTokens(customer, input);
   }
@@ -354,7 +364,10 @@ export class MobileAuthService {
 
     assertActiveCustomer(customer);
 
-    const credential = await this.repository.findCustomerCredential(customer.id);
+    const credential = await this.repository.findCustomerCredential({
+      tenantId: tenant.id,
+      customerAccountId: customer.id,
+    });
 
     if (!credential) {
       throw invalidCredentials();
@@ -383,11 +396,10 @@ export class MobileAuthService {
 
       if (failedAttempts >= policy.loginMaxAttempts) {
         await this.repository.recordCustomerPasswordFailure({
+          tenantId: tenant.id,
           credentialId: credential.id,
           failedAttempts: 0,
-          lockedUntil: new Date(
-            now + policy.lockoutMinutes * 60 * 1000,
-          ),
+          lockedUntil: new Date(now + policy.lockoutMinutes * 60 * 1000),
         });
         throw new AuthError(
           "ACCOUNT_LOCKED",
@@ -396,6 +408,7 @@ export class MobileAuthService {
       }
 
       await this.repository.recordCustomerPasswordFailure({
+        tenantId: tenant.id,
         credentialId: credential.id,
         failedAttempts,
         lockedUntil: null,
@@ -403,7 +416,10 @@ export class MobileAuthService {
       throw invalidCredentials();
     }
 
-    await this.repository.clearCustomerPasswordFailures(credential.id);
+    await this.repository.clearCustomerPasswordFailures({
+      tenantId: tenant.id,
+      credentialId: credential.id,
+    });
 
     return this.issueCustomerTokens(customer, input);
   }
@@ -431,14 +447,19 @@ export class MobileAuthService {
 
     assertActiveStaff(user);
 
-    const access = await this.repository.getStaffAccess(user.id);
-
+    const access = await this.repository.getStaffAccess({
+      tenantId: tenant.id,
+      userId: user.id,
+    });
     if (!access.roles.includes(input.role)) {
       await recordLoginFailure(this.db, lockKey, policy);
       throw invalidCredentials();
     }
 
-    const passwordValid = await verifyPassword(input.password, user.passwordHash);
+    const passwordValid = await verifyPassword(
+      input.password,
+      user.passwordHash,
+    );
 
     if (!passwordValid) {
       await recordLoginFailure(this.db, lockKey, policy);
@@ -446,7 +467,10 @@ export class MobileAuthService {
     }
 
     await clearLoginLockout(this.db, lockKey);
-    await this.repository.updateStaffLastLoginAt(user.id);
+    await this.repository.updateStaffLastLoginAt({
+      tenantId: tenant.id,
+      userId: user.id,
+    });
 
     return this.issueStaffTokens(user, access, input.role, input);
   }
@@ -466,11 +490,25 @@ export class MobileAuthService {
     const tokenHash = hashOpaqueToken(parsed.rawToken);
 
     if (parsed.kind === "customer") {
-      await this.repository.revokeCustomerRefreshTokenByHash(tokenHash);
+      const storedToken =
+        await this.repository.findCustomerRefreshTokenByHash(tokenHash);
+      if (storedToken) {
+        await this.repository.revokeCustomerRefreshTokenByHash({
+          tenantId: storedToken.tenantId,
+          tokenHash,
+        });
+      }
       return;
     }
 
-    await this.repository.revokeStaffRefreshTokenByHash(tokenHash);
+    const storedToken =
+      await this.repository.findStaffRefreshTokenByHash(tokenHash);
+    if (storedToken) {
+      await this.repository.revokeStaffRefreshTokenByHash({
+        tenantId: storedToken.tenantId,
+        tokenHash,
+      });
+    }
   }
 
   async getMobileAuthContext(accessToken: string): Promise<MobileAuthContext> {
@@ -500,7 +538,10 @@ export class MobileAuthService {
       await this.findCustomerAccountByRefreshToken(storedToken);
 
     if (!resolvedCustomer) {
-      throw new AuthError("TOKEN_INVALID", "Refresh token customer is invalid.");
+      throw new AuthError(
+        "TOKEN_INVALID",
+        "Refresh token customer is invalid.",
+      );
     }
 
     assertActiveCustomer(resolvedCustomer);
@@ -510,6 +551,7 @@ export class MobileAuthService {
     });
 
     await this.repository.revokeCustomerRefreshToken({
+      tenantId: storedToken.tenantId,
       tokenId: storedToken.id,
       replacedByTokenId: issued.refreshTokenId,
     });
@@ -522,7 +564,10 @@ export class MobileAuthService {
     input: MobileRefreshInput,
   ): Promise<MobileAuthResult> {
     const storedToken = await this.findValidStaffRefreshToken(rawToken);
-    const user = await this.repository.findStaffUserById(storedToken.subjectId);
+    const user = await this.repository.findStaffUserById({
+      tenantId: storedToken.tenantId,
+      userId: storedToken.subjectId,
+    });
 
     if (!user) {
       throw new AuthError("TOKEN_INVALID", "Refresh token user is invalid.");
@@ -530,7 +575,10 @@ export class MobileAuthService {
 
     assertActiveStaff(user);
 
-    const access = await this.repository.getStaffAccess(user.id);
+    const access = await this.repository.getStaffAccess({
+      tenantId: storedToken.tenantId,
+      userId: user.id,
+    });
     const role = this.resolveMobileStaffRole(access.roles);
 
     if (!role) {
@@ -542,6 +590,7 @@ export class MobileAuthService {
     });
 
     await this.repository.revokeStaffRefreshToken({
+      tenantId: storedToken.tenantId,
       tokenId: storedToken.id,
       replacedByTokenId: issued.refreshTokenId,
     });
@@ -561,7 +610,10 @@ export class MobileAuthService {
     }
 
     if (storedToken.revokedAt) {
-      await this.repository.revokeCustomerRefreshTokenFamily(storedToken.familyId);
+      await this.repository.revokeCustomerRefreshTokenFamily({
+        tenantId: storedToken.tenantId,
+        familyId: storedToken.familyId,
+      });
       throw new AuthError(
         "TOKEN_REUSE_DETECTED",
         "Refresh token reuse detected.",
@@ -570,6 +622,7 @@ export class MobileAuthService {
 
     if (storedToken.expiresAt.getTime() <= Date.now()) {
       await this.repository.revokeCustomerRefreshToken({
+        tenantId: storedToken.tenantId,
         tokenId: storedToken.id,
       });
       throw new AuthError("TOKEN_EXPIRED", "Refresh token has expired.");
@@ -590,7 +643,10 @@ export class MobileAuthService {
     }
 
     if (storedToken.revokedAt) {
-      await this.repository.revokeStaffRefreshTokenFamily(storedToken.familyId);
+      await this.repository.revokeStaffRefreshTokenFamily({
+        tenantId: storedToken.tenantId,
+        familyId: storedToken.familyId,
+      });
       throw new AuthError(
         "TOKEN_REUSE_DETECTED",
         "Refresh token reuse detected.",
@@ -599,6 +655,7 @@ export class MobileAuthService {
 
     if (storedToken.expiresAt.getTime() <= Date.now()) {
       await this.repository.revokeStaffRefreshToken({
+        tenantId: storedToken.tenantId,
         tokenId: storedToken.id,
       });
       throw new AuthError("TOKEN_EXPIRED", "Refresh token has expired.");
@@ -609,7 +666,11 @@ export class MobileAuthService {
 
   private async issueCustomerTokens(
     customer: MobileCustomerAccount,
-    meta: MobileRequestOtpInput | MobileVerifyOtpInput | MobileCustomerPasswordLoginInput | MobileRefreshInput,
+    meta:
+      | MobileRequestOtpInput
+      | MobileVerifyOtpInput
+      | MobileCustomerPasswordLoginInput
+      | MobileRefreshInput,
     options?: { familyId?: string },
   ): Promise<MobileAuthResult & { refreshTokenId: string }> {
     const tenant = await this.resolveTenantById(customer.tenantId);
@@ -672,7 +733,12 @@ export class MobileAuthService {
 
   private async issueStaffTokens(
     user: MobileStaffUser,
-    access: { displayName: string; roles: string[]; permissions: string[]; branchIds: string[] },
+    access: {
+      displayName: string;
+      roles: string[];
+      permissions: string[];
+      branchIds: string[];
+    },
     role: "driver" | "owner",
     meta: MobileStaffLoginInput | MobileRefreshInput,
     options?: { familyId?: string },
@@ -701,7 +767,9 @@ export class MobileAuthService {
       refreshTokenFamilyId:
         options?.familyId ?? issuedTokens.refreshTokenFamilyId,
     };
-    const rawRefreshToken = tokens.refreshToken.slice(STAFF_REFRESH_PREFIX.length);
+    const rawRefreshToken = tokens.refreshToken.slice(
+      STAFF_REFRESH_PREFIX.length,
+    );
     const refreshTokenId = await this.repository.createStaffRefreshToken({
       userId: user.id,
       tenantId: tenant.id,
@@ -725,8 +793,9 @@ export class MobileAuthService {
         timezone: tenant.timezone ?? "UTC",
         branchIds: access.branchIds,
         role,
-        roles: access.roles.filter((candidate): candidate is MobileRole =>
-          candidate === "driver" || candidate === "owner",
+        roles: access.roles.filter(
+          (candidate): candidate is MobileRole =>
+            candidate === "driver" || candidate === "owner",
         ),
         permissions: access.permissions,
         accessTokenExpiresAt: tokens.accessTokenExpiresAt.toISOString(),
@@ -813,7 +882,10 @@ export class MobileAuthService {
       throw new AuthError("TOKEN_INVALID", "Access token is invalid.");
     }
 
-    const user = await this.repository.findStaffUserById(claims.sub);
+    const user = await this.repository.findStaffUserById({
+      tenantId: claims.tenantId,
+      userId: claims.sub,
+    });
 
     if (!user) {
       throw new AuthError("TOKEN_INVALID", "Access token user is invalid.");
@@ -822,7 +894,10 @@ export class MobileAuthService {
     assertActiveStaff(user);
     const tenant = await this.resolveTenantById(claims.tenantId);
 
-    const access = await this.repository.getStaffAccess(user.id);
+    const access = await this.repository.getStaffAccess({
+      tenantId: claims.tenantId,
+      userId: user.id,
+    });
     const role =
       claims.role === "driver" || claims.role === "owner"
         ? claims.role
@@ -841,8 +916,9 @@ export class MobileAuthService {
       timezone: tenant.timezone ?? "UTC",
       branchIds: access.branchIds,
       role,
-      roles: access.roles.filter((candidate): candidate is MobileRole =>
-        candidate === "driver" || candidate === "owner",
+      roles: access.roles.filter(
+        (candidate): candidate is MobileRole =>
+          candidate === "driver" || candidate === "owner",
       ),
       permissions: access.permissions,
       accessTokenExpiresAt: claims.expiresAt.toISOString(),

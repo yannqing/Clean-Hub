@@ -124,24 +124,25 @@ export class AuthRepository {
   async findLoginUser(identifier: string): Promise<AuthenticatedUser | null> {
     const normalizedIdentifier = identifier.trim().toLowerCase();
 
-    const rows = await this.db
-      .select({
-        ...getTableColumns(users),
-      })
-      .from(users)
-      .where(
-        and(
-          isNull(users.deletedAt),
-          eq(users.normalizedEmail, normalizedIdentifier),
-        ),
-      )
-      .limit(2);
+    const rows =
+      /* tenant-scope: system login identifier lookup */ await this.db
+        .select({
+          ...getTableColumns(users),
+        })
+        .from(users)
+        .where(
+          and(
+            isNull(users.deletedAt),
+            eq(users.normalizedEmail, normalizedIdentifier),
+          ),
+        )
+        .limit(2);
 
     return rows.length === 1 ? rows[0]! : null;
   }
 
   async findUserById(userId: string): Promise<AuthenticatedUser | null> {
-    const rows = await this.db
+    const rows = /* tenant-scope: system user ULID lookup */ await this.db
       .select({
         ...getTableColumns(users),
       })
@@ -183,11 +184,25 @@ export class AuthRepository {
       })
       .from(userRoles)
       .innerJoin(roles, eq(userRoles.roleId, roles.id))
-      .leftJoin(rolePermissions, eq(rolePermissions.roleId, roles.id))
+      .leftJoin(
+        rolePermissions,
+        and(
+          user.tenantId
+            ? eq(rolePermissions.tenantId, user.tenantId)
+            : isNull(rolePermissions.tenantId),
+          eq(rolePermissions.roleId, roles.id),
+        ),
+      )
       .leftJoin(permissions, eq(rolePermissions.permissionId, permissions.id))
       .where(
         and(
           eq(userRoles.userId, user.id),
+          user.tenantId
+            ? eq(userRoles.tenantId, user.tenantId)
+            : isNull(userRoles.tenantId),
+          user.tenantId
+            ? eq(roles.tenantId, user.tenantId)
+            : isNull(roles.tenantId),
           isNull(userRoles.revokedAt),
           eq(roles.status, "active"),
           isNull(roles.deletedAt),
@@ -207,7 +222,14 @@ export class AuthRepository {
         timezone: userProfiles.timezone,
       })
       .from(userProfiles)
-      .where(eq(userProfiles.userId, user.id))
+      .where(
+        and(
+          user.tenantId
+            ? eq(userProfiles.tenantId, user.tenantId)
+            : isNull(userProfiles.tenantId),
+          eq(userProfiles.userId, user.id),
+        ),
+      )
       .limit(1);
 
     const tenantSettingsRows = user.tenantId
@@ -274,13 +296,11 @@ export class AuthRepository {
       displayName,
       language: resolveTenantLanguage(
         tenantSettingsRows[0]?.defaultLanguage ??
-        profileRows[0]?.language ??
-        "en",
+          profileRows[0]?.language ??
+          "en",
       ),
       timezone:
-        tenantSettingsRows[0]?.timezone ??
-        profileRows[0]?.timezone ??
-        "UTC",
+        tenantSettingsRows[0]?.timezone ?? profileRows[0]?.timezone ?? "UTC",
       identityConsistent:
         consistentRows.length === rows.length &&
         validBranchRows.length === branchRows.length,
@@ -473,18 +493,29 @@ export class AuthRepository {
     return rows[0] ?? null;
   }
 
-  async lockPosTerminalById(terminalId: string): Promise<boolean> {
+  async lockPosTerminalById(input: {
+    tenantId: string;
+    terminalId: string;
+  }): Promise<boolean> {
     const rows = await this.db
       .select({ id: posTerminalSettings.id })
       .from(posTerminalSettings)
-      .where(eq(posTerminalSettings.id, terminalId))
+      .where(
+        and(
+          eq(posTerminalSettings.tenantId, input.tenantId),
+          eq(posTerminalSettings.id, input.terminalId),
+        ),
+      )
       .for("update")
       .limit(1);
 
     return Boolean(rows[0]);
   }
 
-  async markPosTerminalCredentialUsed(terminalId: string): Promise<void> {
+  async markPosTerminalCredentialUsed(input: {
+    tenantId: string;
+    terminalId: string;
+  }): Promise<void> {
     const now = new Date();
     await this.db
       .update(posTerminalSettings)
@@ -493,7 +524,12 @@ export class AuthRepository {
         lastSeenAt: now,
         updatedAt: now,
       })
-      .where(eq(posTerminalSettings.id, terminalId));
+      .where(
+        and(
+          eq(posTerminalSettings.tenantId, input.tenantId),
+          eq(posTerminalSettings.id, input.terminalId),
+        ),
+      );
   }
 
   async findPosPinLoginCandidates({
@@ -583,14 +619,24 @@ export class AuthRepository {
       .map((candidate) => candidate.user);
   }
 
-  async updateLastLoginAt(userId: string): Promise<void> {
+  async updateLastLoginAt(input: {
+    tenantId: string | null;
+    userId: string;
+  }): Promise<void> {
     await this.db
       .update(users)
       .set({
         lastLoginAt: new Date(),
         updatedAt: new Date(),
       })
-      .where(eq(users.id, userId));
+      .where(
+        and(
+          input.tenantId
+            ? eq(users.tenantId, input.tenantId)
+            : isNull(users.tenantId),
+          eq(users.id, input.userId),
+        ),
+      );
   }
 
   async createRefreshToken({
@@ -751,9 +797,11 @@ export class AuthRepository {
   }
 
   async revokeRefreshToken({
+    tenantId,
     tokenId,
     replacedByTokenId,
   }: {
+    tenantId: string | null;
     tokenId: string;
     replacedByTokenId?: string;
   }): Promise<void> {
@@ -763,25 +811,52 @@ export class AuthRepository {
         revokedAt: new Date(),
         replacedByTokenId,
       })
-      .where(eq(authRefreshTokens.id, tokenId));
+      .where(
+        and(
+          tenantId
+            ? eq(authRefreshTokens.tenantId, tenantId)
+            : isNull(authRefreshTokens.tenantId),
+          eq(authRefreshTokens.id, tokenId),
+        ),
+      );
   }
 
-  async revokeRefreshTokenFamily(familyId: string): Promise<void> {
+  async revokeRefreshTokenFamily(input: {
+    tenantId: string | null;
+    familyId: string;
+  }): Promise<void> {
     await this.db
       .update(authRefreshTokens)
       .set({
         revokedAt: new Date(),
       })
-      .where(eq(authRefreshTokens.familyId, familyId));
+      .where(
+        and(
+          input.tenantId
+            ? eq(authRefreshTokens.tenantId, input.tenantId)
+            : isNull(authRefreshTokens.tenantId),
+          eq(authRefreshTokens.familyId, input.familyId),
+        ),
+      );
   }
 
-  async revokeRefreshTokenByRawHash(tokenHash: string): Promise<void> {
+  async revokeRefreshTokenByRawHash(input: {
+    tenantId: string | null;
+    tokenHash: string;
+  }): Promise<void> {
     await this.db
       .update(authRefreshTokens)
       .set({
         revokedAt: new Date(),
       })
-      .where(eq(authRefreshTokens.tokenHash, tokenHash));
+      .where(
+        and(
+          input.tenantId
+            ? eq(authRefreshTokens.tenantId, input.tenantId)
+            : isNull(authRefreshTokens.tenantId),
+          eq(authRefreshTokens.tokenHash, input.tokenHash),
+        ),
+      );
   }
 
   async writeAuditLog({

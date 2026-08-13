@@ -91,7 +91,9 @@ function toTransaction(
   };
 }
 
-function toRefundRequest(row: typeof refundRequests.$inferSelect): RefundRequest {
+function toRefundRequest(
+  row: typeof refundRequests.$inferSelect,
+): RefundRequest {
   return {
     id: row.id,
     tenantId: row.tenantId,
@@ -265,6 +267,7 @@ export class PaymentRepository {
   }
 
   async findTransactionByExternalId(input: {
+    tenantId: string;
     gateway: PaymentGatewayName;
     externalId: string;
   }): Promise<CustomerPaymentTransaction | null> {
@@ -273,6 +276,7 @@ export class PaymentRepository {
       .from(paymentTransactions)
       .where(
         and(
+          eq(paymentTransactions.tenantId, input.tenantId),
           eq(paymentTransactions.gateway, input.gateway),
           eq(paymentTransactions.externalId, input.externalId),
           isNull(paymentTransactions.deletedAt),
@@ -291,7 +295,10 @@ export class PaymentRepository {
     amount: string;
     currency: string;
     idempotencyKey: string;
-  }): Promise<{ transaction: CustomerPaymentTransaction; idempotent: boolean }> {
+  }): Promise<{
+    transaction: CustomerPaymentTransaction;
+    idempotent: boolean;
+  }> {
     const [inserted] = await this.db
       .insert(paymentTransactions)
       .values({
@@ -332,6 +339,7 @@ export class PaymentRepository {
   }
 
   async attachGatewayPayment(input: {
+    tenantId: string;
     transactionId: string;
     gateway: PaymentGatewayName;
     externalId: string;
@@ -345,7 +353,12 @@ export class PaymentRepository {
         updatedAt: now,
         version: sql`${paymentTransactions.version} + 1`,
       })
-      .where(eq(paymentTransactions.id, input.transactionId))
+      .where(
+        and(
+          eq(paymentTransactions.tenantId, input.tenantId),
+          eq(paymentTransactions.id, input.transactionId),
+        ),
+      )
       .returning({ ...getTableColumns(paymentTransactions) });
 
     if (!updated) {
@@ -394,6 +407,9 @@ export class PaymentRepository {
       .from(paymentCallbacks)
       .where(
         and(
+          input.tenantId
+            ? eq(paymentCallbacks.tenantId, input.tenantId)
+            : isNull(paymentCallbacks.tenantId),
           eq(paymentCallbacks.gateway, input.gateway),
           eq(paymentCallbacks.externalId, input.externalId),
           eq(paymentCallbacks.event, input.event),
@@ -410,6 +426,7 @@ export class PaymentRepository {
   }
 
   async markCallback(input: {
+    tenantId: string | null;
     callbackId: string;
     status: "processed" | "rejected" | "failed";
     failureReason?: string | null;
@@ -421,7 +438,14 @@ export class PaymentRepository {
         failureReason: input.failureReason,
         processedAt: new Date(),
       })
-      .where(eq(paymentCallbacks.id, input.callbackId));
+      .where(
+        and(
+          input.tenantId
+            ? eq(paymentCallbacks.tenantId, input.tenantId)
+            : isNull(paymentCallbacks.tenantId),
+          eq(paymentCallbacks.id, input.callbackId),
+        ),
+      );
   }
 
   async reconcilePaymentCallback(input: {
@@ -436,12 +460,14 @@ export class PaymentRepository {
             transactionId: input.verification.transactionId,
           })
         : await repository.findTransactionByExternalId({
+            tenantId: input.verification.tenantId,
             gateway: input.verification.gateway,
             externalId: input.verification.externalId,
           });
 
       if (!transaction) {
         await repository.markCallback({
+          tenantId: input.verification.tenantId,
           callbackId: input.callbackId,
           status: "failed",
           failureReason: "Payment transaction was not found.",
@@ -454,6 +480,7 @@ export class PaymentRepository {
         compareAmounts(transaction.amount, input.verification.amount) !== 0
       ) {
         await repository.markCallback({
+          tenantId: input.verification.tenantId,
           callbackId: input.callbackId,
           status: "failed",
           failureReason: "Payment callback did not match the transaction.",
@@ -463,6 +490,7 @@ export class PaymentRepository {
 
       if (transaction.paymentStatus === input.verification.status) {
         await repository.markCallback({
+          tenantId: input.verification.tenantId,
           callbackId: input.callbackId,
           status: "processed",
         });
@@ -474,6 +502,7 @@ export class PaymentRepository {
         input.verification.status !== "refunded"
       ) {
         await repository.markCallback({
+          tenantId: input.verification.tenantId,
           callbackId: input.callbackId,
           status: "processed",
         });
@@ -501,6 +530,7 @@ export class PaymentRepository {
 
       if (!updatedTransaction) {
         await repository.markCallback({
+          tenantId: input.verification.tenantId,
           callbackId: input.callbackId,
           status: "failed",
           failureReason: "Payment transaction update failed.",
@@ -523,10 +553,16 @@ export class PaymentRepository {
             updatedAt: now,
             version: sql`${paymentTransactions.version} + 1`,
           })
-          .where(eq(paymentTransactions.id, transaction.id));
+          .where(
+            and(
+              eq(paymentTransactions.tenantId, transaction.tenantId),
+              eq(paymentTransactions.id, transaction.id),
+            ),
+          );
       }
 
       await repository.markCallback({
+        tenantId: input.verification.tenantId,
         callbackId: input.callbackId,
         status: "processed",
       });
@@ -797,12 +833,14 @@ export class PaymentRepository {
             refundRequestId: input.verification.refundRequestId,
           })
         : await repository.findRefundRequestByExternalId({
+            tenantId: input.verification.tenantId,
             gateway: input.verification.gateway,
             externalId: input.verification.externalId,
           });
 
       if (!refundRequest) {
         await repository.markCallback({
+          tenantId: input.verification.tenantId,
           callbackId: input.callbackId,
           status: "failed",
           failureReason: "Refund request was not found.",
@@ -815,6 +853,7 @@ export class PaymentRepository {
         compareAmounts(refundRequest.amount, input.verification.amount) !== 0
       ) {
         await repository.markCallback({
+          tenantId: input.verification.tenantId,
           callbackId: input.callbackId,
           status: "failed",
           failureReason: "Refund callback did not match the request.",
@@ -824,6 +863,7 @@ export class PaymentRepository {
 
       if (refundRequest.status === "refunded") {
         await repository.markCallback({
+          tenantId: input.verification.tenantId,
           callbackId: input.callbackId,
           status: "processed",
         });
@@ -841,7 +881,7 @@ export class PaymentRepository {
             nextStatus === "refunded" ? input.verification.occurredAt : null,
           failedReason:
             nextStatus === "failed"
-              ? input.verification.failureReason ?? "Refund failed."
+              ? (input.verification.failureReason ?? "Refund failed.")
               : null,
           updatedAt: now,
           version: sql`${refundRequests.version} + 1`,
@@ -857,6 +897,7 @@ export class PaymentRepository {
 
       if (!updatedRefund) {
         await repository.markCallback({
+          tenantId: input.verification.tenantId,
           callbackId: input.callbackId,
           status: "failed",
           failureReason: "Refund request update failed.",
@@ -873,6 +914,7 @@ export class PaymentRepository {
 
         if (refundRequest.paymentTransactionId) {
           await repository.markTransactionRefundedIfCovered({
+            tenantId: refundRequest.tenantId,
             transactionId: refundRequest.paymentTransactionId,
             refundAmount: refundRequest.amount,
           });
@@ -880,6 +922,7 @@ export class PaymentRepository {
       }
 
       await repository.markCallback({
+        tenantId: input.verification.tenantId,
         callbackId: input.callbackId,
         status: "processed",
       });
@@ -997,7 +1040,9 @@ export class PaymentRepository {
         updatedAt: now,
         version: sql`${orders.version} + 1`,
       })
-      .where(eq(orders.id, input.orderId));
+      .where(
+        and(eq(orders.tenantId, input.tenantId), eq(orders.id, input.orderId)),
+      );
   }
 
   private async updateOrderAfterRefund(input: {
@@ -1052,10 +1097,13 @@ export class PaymentRepository {
         updatedAt: now,
         version: sql`${orders.version} + 1`,
       })
-      .where(eq(orders.id, input.orderId));
+      .where(
+        and(eq(orders.tenantId, input.tenantId), eq(orders.id, input.orderId)),
+      );
   }
 
   private async markTransactionRefundedIfCovered(input: {
+    tenantId: string;
     transactionId: string;
     refundAmount: string;
   }): Promise<void> {
@@ -1065,7 +1113,12 @@ export class PaymentRepository {
         amount: paymentTransactions.amount,
       })
       .from(paymentTransactions)
-      .where(eq(paymentTransactions.id, input.transactionId))
+      .where(
+        and(
+          eq(paymentTransactions.tenantId, input.tenantId),
+          eq(paymentTransactions.id, input.transactionId),
+        ),
+      )
       .limit(1);
 
     if (!transaction) {
@@ -1083,10 +1136,16 @@ export class PaymentRepository {
         updatedAt: new Date(),
         version: sql`${paymentTransactions.version} + 1`,
       })
-      .where(eq(paymentTransactions.id, input.transactionId));
+      .where(
+        and(
+          eq(paymentTransactions.tenantId, input.tenantId),
+          eq(paymentTransactions.id, input.transactionId),
+        ),
+      );
   }
 
   private async findRefundRequestByExternalId(input: {
+    tenantId: string;
     gateway: PaymentGatewayName;
     externalId: string;
   }): Promise<RefundRequest | null> {
@@ -1095,6 +1154,7 @@ export class PaymentRepository {
       .from(refundRequests)
       .where(
         and(
+          eq(refundRequests.tenantId, input.tenantId),
           eq(refundRequests.gateway, input.gateway),
           eq(refundRequests.externalId, input.externalId),
           isNull(refundRequests.deletedAt),

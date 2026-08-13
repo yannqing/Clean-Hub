@@ -56,7 +56,13 @@ export async function findTenantSelfProfile(
     })
     .from(users)
     .innerJoin(tenants, eq(tenants.id, users.tenantId))
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .leftJoin(
+      userProfiles,
+      and(
+        eq(userProfiles.userId, users.id),
+        eq(userProfiles.tenantId, input.tenantId),
+      ),
+    )
     .where(
       and(
         eq(users.id, input.userId),
@@ -189,6 +195,7 @@ export async function updateTenantSelfProfileRecord(
       .insert(userProfiles)
       .values({
         userId: input.userId,
+        tenantId: input.tenantId,
         displayName: input.fields.displayName.trim(),
         language: input.fields.language,
         updatedAt: now,
@@ -196,6 +203,7 @@ export async function updateTenantSelfProfileRecord(
       .onConflictDoUpdate({
         target: userProfiles.userId,
         set: {
+          tenantId: input.tenantId,
           displayName: input.fields.displayName.trim(),
           language: input.fields.language,
           updatedAt: now,

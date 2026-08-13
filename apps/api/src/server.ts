@@ -1,5 +1,10 @@
 import { serve } from "@hono/node-server";
-import { closeDbConnection, warmUpDbConnection } from "@cleanhub/db";
+import {
+  assertTenantRlsConfiguration,
+  closeDbConnection,
+  inspectTenantRlsConfiguration,
+  warmUpDbConnection,
+} from "@cleanhub/db";
 
 import { createApiApp } from "./app.js";
 
@@ -13,6 +18,40 @@ export async function startApiServer() {
     logger.warn(
       { err: error },
       "Database warm-up failed; starting API without a warm pool",
+    );
+  }
+
+  try {
+    const rls = env.databaseRequireRls
+      ? await assertTenantRlsConfiguration()
+      : await inspectTenantRlsConfiguration();
+
+    if (rls.ready) {
+      logger.info(
+        {
+          databaseRole: rls.role.name,
+          protectedTableCount: rls.protectedTableCount,
+        },
+        "Tenant row-level security verified",
+      );
+    } else {
+      logger.warn(
+        {
+          databaseRole: rls.role,
+          missingForcedRlsTables: rls.missingForcedRlsTables,
+          missingPolicyTables: rls.missingPolicyTables,
+        },
+        "Tenant row-level security is not enforced for this development database",
+      );
+    }
+  } catch (error) {
+    if (env.databaseRequireRls) {
+      throw error;
+    }
+
+    logger.warn(
+      { err: error },
+      "Tenant row-level security inspection failed in development",
     );
   }
 

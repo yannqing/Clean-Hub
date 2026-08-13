@@ -639,7 +639,13 @@ export async function findPosChannelDevices(
         version: posTerminalSettings.version,
       })
       .from(posTerminalSettings)
-      .innerJoin(branches, eq(branches.id, posTerminalSettings.branchId))
+      .innerJoin(
+        branches,
+        and(
+          eq(branches.id, posTerminalSettings.branchId),
+          eq(branches.tenantId, posTerminalSettings.tenantId),
+        ),
+      )
       .leftJoin(
         posStaffShifts,
         and(
@@ -647,7 +653,13 @@ export async function findPosChannelDevices(
           ne(posStaffShifts.status, "closed"),
         ),
       )
-      .leftJoin(userProfiles, eq(userProfiles.userId, posStaffShifts.staffId))
+      .leftJoin(
+        userProfiles,
+        and(
+          eq(userProfiles.userId, posStaffShifts.staffId),
+          eq(userProfiles.tenantId, posStaffShifts.tenantId),
+        ),
+      )
       .where(and(...filtered))
       .orderBy(
         asc(posTerminalSettings.status),
@@ -877,7 +889,13 @@ export async function findPosChannelRegisterSessions(
           eq(users.tenantId, posStaffShifts.tenantId),
         ),
       )
-      .leftJoin(userProfiles, eq(userProfiles.userId, posStaffShifts.staffId))
+      .leftJoin(
+        userProfiles,
+        and(
+          eq(userProfiles.userId, posStaffShifts.staffId),
+          eq(userProfiles.tenantId, posStaffShifts.tenantId),
+        ),
+      )
       .leftJoin(
         posZReports,
         and(
@@ -917,7 +935,13 @@ export async function findPosChannelRegisterSessions(
           eq(users.tenantId, posStaffShifts.tenantId),
         ),
       )
-      .leftJoin(userProfiles, eq(userProfiles.userId, posStaffShifts.staffId))
+      .leftJoin(
+        userProfiles,
+        and(
+          eq(userProfiles.userId, posStaffShifts.staffId),
+          eq(userProfiles.tenantId, posStaffShifts.tenantId),
+        ),
+      )
       .where(and(...filtered)),
     db
       .select({

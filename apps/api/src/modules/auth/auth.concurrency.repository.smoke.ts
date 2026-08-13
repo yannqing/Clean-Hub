@@ -446,7 +446,9 @@ export async function runAuthConcurrencyRepositorySmoke(): Promise<void> {
   const budgetIpAddress = `budget-ip-${createId()}`;
   const interruptIpAddress = `interrupt-ip-${createId()}`;
   const legacyIpAddress = `legacy-ip-${createId()}`;
-  const pin = "123456";
+  // Keep this distinct from the stable seed cashier PIN so the ambiguity test
+  // remains deterministic after development seeds are applied.
+  const pin = "739184";
   const pinHash = await hashPin(pin);
   const refreshCredential = generateTerminalCredential();
   let pinCredential = generateTerminalCredential();

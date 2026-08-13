@@ -1,5 +1,7 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
-import { Pool, type PoolConfig } from "pg";
+import { Pool, type PoolClient, type PoolConfig } from "pg";
 
 import * as schema from "./schema.js";
 
@@ -8,6 +10,15 @@ export type Database = NodePgDatabase<typeof schema>;
 export type DbConnection = {
   db: Database;
   pool: Pool;
+};
+
+export type DatabaseScope =
+  | { kind: "system" }
+  | { kind: "tenant"; tenantId: string };
+
+type ScopedDatabaseContext = {
+  db: Database;
+  scope: DatabaseScope;
 };
 
 export type DbPoolOptions = {
@@ -30,7 +41,10 @@ const DEFAULT_WARM_UP_DELAY_MS = 500;
 
 declare global {
   var __cleanHubDbConnection: DbConnection | undefined;
+  var __cleanHubContextAwareDb: Database | undefined;
 }
+
+const scopedDatabaseStorage = new AsyncLocalStorage<ScopedDatabaseContext>();
 
 function readPositiveInteger(
   value: string | undefined,
@@ -133,7 +147,131 @@ export function getDbConnection(): DbConnection {
 }
 
 export function getDb(): Database {
-  return getDbConnection().db;
+  const scoped = scopedDatabaseStorage.getStore();
+  if (scoped) {
+    return scoped.db;
+  }
+
+  if (!globalThis.__cleanHubContextAwareDb) {
+    globalThis.__cleanHubContextAwareDb = new Proxy({} as Database, {
+      get(_target, property) {
+        const activeDb =
+          scopedDatabaseStorage.getStore()?.db ?? getDbConnection().db;
+        const value = Reflect.get(activeDb, property, activeDb) as unknown;
+
+        return typeof value === "function" ? value.bind(activeDb) : value;
+      },
+    });
+  }
+
+  return globalThis.__cleanHubContextAwareDb;
+}
+
+function scopesMatch(left: DatabaseScope, right: DatabaseScope): boolean {
+  return (
+    left.kind === right.kind &&
+    (left.kind === "system" ||
+      (right.kind === "tenant" && left.tenantId === right.tenantId))
+  );
+}
+
+async function configureDatabaseScope(
+  client: PoolClient,
+  scope: DatabaseScope,
+): Promise<void> {
+  await client.query("select set_config('app.current_tenant_id', $1, false)", [
+    scope.kind === "tenant" ? scope.tenantId : "",
+  ]);
+  await client.query("select set_config('app.rls_bypass', $1, false)", [
+    scope.kind === "system" ? "on" : "off",
+  ]);
+}
+
+async function resetDatabaseScope(client: PoolClient): Promise<void> {
+  await client.query("reset app.current_tenant_id");
+  await client.query("reset app.rls_bypass");
+}
+
+function createSerializedPoolClient(client: PoolClient): PoolClient {
+  let queryQueue: Promise<void> = Promise.resolve();
+
+  return new Proxy(client, {
+    get(target, property) {
+      if (property !== "query") {
+        const value = Reflect.get(target, property, target) as unknown;
+        return typeof value === "function" ? value.bind(target) : value;
+      }
+
+      return (...args: unknown[]) => {
+        const queryResult = queryQueue.then(
+          () => Reflect.apply(target.query, target, args) as Promise<unknown>,
+        );
+        queryQueue = queryResult.then(
+          () => undefined,
+          () => undefined,
+        );
+        return queryResult;
+      };
+    },
+  }) as PoolClient;
+}
+
+async function runWithDatabaseScope<T>(
+  scope: DatabaseScope,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const existing = scopedDatabaseStorage.getStore();
+  if (existing && scopesMatch(existing.scope, scope)) {
+    return operation();
+  }
+
+  const client = await getDbConnection().pool.connect();
+  let destroyClient = false;
+
+  try {
+    await configureDatabaseScope(client, scope);
+    // Repositories often use Promise.all. A PoolClient must execute those
+    // statements serially so pg never receives overlapping query() calls on
+    // the same request-scoped session (and every statement keeps the same RLS
+    // settings).
+    const db = drizzle(createSerializedPoolClient(client), { schema });
+
+    return await scopedDatabaseStorage.run({ db, scope }, operation);
+  } finally {
+    try {
+      await resetDatabaseScope(client);
+    } catch {
+      destroyClient = true;
+    }
+    client.release(destroyClient);
+  }
+}
+
+export function runWithSystemDatabaseContext<T>(
+  operation: () => Promise<T>,
+): Promise<T> {
+  return runWithDatabaseScope({ kind: "system" }, operation);
+}
+
+export function runWithTenantDatabaseContext<T>(
+  tenantId: string,
+  operation: () => Promise<T>,
+): Promise<T> {
+  const normalizedTenantId = tenantId.trim();
+  if (!normalizedTenantId) {
+    return Promise.reject(
+      new Error("tenantId is required to establish a tenant database context."),
+    );
+  }
+
+  return runWithDatabaseScope(
+    { kind: "tenant", tenantId: normalizedTenantId },
+    operation,
+  );
+}
+
+export function getDatabaseScope(): DatabaseScope | null {
+  return scopedDatabaseStorage.getStore()?.scope ?? null;
 }
 
 export async function closeDbConnection(): Promise<void> {
@@ -143,6 +281,7 @@ export async function closeDbConnection(): Promise<void> {
 
   await globalThis.__cleanHubDbConnection.pool.end();
   globalThis.__cleanHubDbConnection = undefined;
+  globalThis.__cleanHubContextAwareDb = undefined;
 }
 
 export type WarmUpDbOptions = {

@@ -8,6 +8,7 @@ import {
   getDb,
   deliveryProofs,
   mediaObjects,
+  runWithSystemDatabaseContext,
 } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
 import {
@@ -65,7 +66,7 @@ function parseDataUrl(value: string): {
   };
 }
 
-async function main(): Promise<void> {
+async function runBackfill(): Promise<void> {
   const db = getDb();
   const options = readOptions();
   const storageConfig = loadStorageConfig();
@@ -96,7 +97,8 @@ async function main(): Promise<void> {
 
       const objectKey = buildTenantObjectKey({
         tenantId: row.tenantId,
-        purpose: row.type === "signature" ? "delivery_signature" : "delivery_proof",
+        purpose:
+          row.type === "signature" ? "delivery_signature" : "delivery_proof",
         segments: [row.taskId],
         fileName: `${createId()}.${getExtensionForContentType(parsed.contentType)}`,
       });
@@ -116,7 +118,8 @@ async function main(): Promise<void> {
           contentType: parsed.contentType,
           sizeBytes: parsed.bytes.length,
           status: "committed",
-          purpose: row.type === "signature" ? "delivery_signature" : "delivery_proof",
+          purpose:
+            row.type === "signature" ? "delivery_signature" : "delivery_proof",
           createdBy: row.createdBy,
           committedAt: new Date(),
           expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
@@ -148,6 +151,10 @@ async function main(): Promise<void> {
       2,
     ),
   );
+}
+
+async function main(): Promise<void> {
+  await runWithSystemDatabaseContext(runBackfill);
 }
 
 if (process.argv[1]?.endsWith("backfill-delivery-proof-media.ts")) {

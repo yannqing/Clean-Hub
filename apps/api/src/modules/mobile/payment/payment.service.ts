@@ -14,7 +14,10 @@ import {
   subtractAmounts,
 } from "./payment-money.js";
 import { loadPaymentConfig } from "./payment.config.js";
-import { PaymentRepository, type PaymentOrderRecord } from "./payment.repository.js";
+import {
+  PaymentRepository,
+  type PaymentOrderRecord,
+} from "./payment.repository.js";
 import type {
   ApproveRefundRequestInput,
   CreatePaymentInput,
@@ -127,14 +130,19 @@ function refundNotFound(): PaymentError {
 function assertCustomerContext(
   authContext: MobileAuthContext,
 ): CustomerPaymentContext {
-  if (authContext.subjectType !== "customer" || authContext.role !== "customer") {
+  if (
+    authContext.subjectType !== "customer" ||
+    authContext.role !== "customer"
+  ) {
     throw forbidden();
   }
 
   return authContext as CustomerPaymentContext;
 }
 
-function assertOwnerContext(authContext: MobileAuthContext): OwnerPaymentContext {
+function assertOwnerContext(
+  authContext: MobileAuthContext,
+): OwnerPaymentContext {
   if (authContext.subjectType !== "staff" || authContext.role !== "owner") {
     throw forbidden();
   }
@@ -142,13 +150,21 @@ function assertOwnerContext(authContext: MobileAuthContext): OwnerPaymentContext
   return authContext as OwnerPaymentContext;
 }
 
-function assertBranchAccess(authContext: OwnerPaymentContext, branchId: string): void {
-  if (authContext.branchIds.length > 0 && !authContext.branchIds.includes(branchId)) {
+function assertBranchAccess(
+  authContext: OwnerPaymentContext,
+  branchId: string,
+): void {
+  if (
+    authContext.branchIds.length > 0 &&
+    !authContext.branchIds.includes(branchId)
+  ) {
     throw forbidden();
   }
 }
 
-function calculateBalance(order: Pick<PaymentOrderRecord, "totalAmount" | "paidAmount">): string {
+function calculateBalance(
+  order: Pick<PaymentOrderRecord, "totalAmount" | "paidAmount">,
+): string {
   const balance = subtractAmounts(order.totalAmount, order.paidAmount);
 
   return compareAmounts(balance, "0.00") < 0 ? "0.00" : balance;
@@ -197,7 +213,9 @@ export class PaymentService {
       createLogger({ name: "payment", service: "cleanhub-api" });
   }
 
-  async createPayment(input: CreatePaymentInput): Promise<PaymentInitiationResult> {
+  async createPayment(
+    input: CreatePaymentInput,
+  ): Promise<PaymentInitiationResult> {
     const customer = assertCustomerContext(input.authContext);
 
     if (!isPositiveAmount(input.amount)) {
@@ -296,6 +314,7 @@ export class PaymentService {
       transaction.gateway && transaction.externalId
         ? transaction
         : await this.repository.attachGatewayPayment({
+            tenantId: customer.tenantId,
             transactionId: transaction.id,
             gateway: gateway.gateway,
             externalId: gateway.externalId,
@@ -379,7 +398,9 @@ export class PaymentService {
     });
   }
 
-  async handleWebhook(input: PaymentWebhookInput): Promise<PaymentWebhookResult> {
+  async handleWebhook(
+    input: PaymentWebhookInput,
+  ): Promise<PaymentWebhookResult> {
     const gateway = this.assertGateway(input.gateway);
     const verification = await gateway.verifyCallback({
       payload: input.payload,
@@ -410,6 +431,7 @@ export class PaymentService {
 
     if (!verification.ok) {
       await this.repository.markCallback({
+        tenantId: callback.callback.tenantId,
         callbackId: callback.callback.id,
         status: "rejected",
         failureReason: verification.failureReason,
@@ -486,10 +508,12 @@ export class PaymentService {
       });
     }
 
-    const paidTransactions = await this.repository.listPaidTransactionsForOrder({
-      tenantId: customer.tenantId,
-      orderId: order.id,
-    });
+    const paidTransactions = await this.repository.listPaidTransactionsForOrder(
+      {
+        tenantId: customer.tenantId,
+        orderId: order.id,
+      },
+    );
     const paymentTransaction = paidTransactions[0] ?? null;
 
     const refundRequest = await this.repository.createRefundRequest({
@@ -505,9 +529,12 @@ export class PaymentService {
     });
 
     if (!refundRequest) {
-      throw conflict("An active refund request already exists for this order.", {
-        orderId: order.id,
-      });
+      throw conflict(
+        "An active refund request already exists for this order.",
+        {
+          orderId: order.id,
+        },
+      );
     }
 
     return refundRequest;
@@ -613,7 +640,9 @@ export class PaymentService {
     const paymentTransactionId = refundRequest.paymentTransactionId;
 
     if (!paymentTransactionId) {
-      throw validationError("Refund request is not linked to a paid transaction.");
+      throw validationError(
+        "Refund request is not linked to a paid transaction.",
+      );
     }
 
     const processing = await this.repository.startRefundProcessing({
@@ -738,20 +767,19 @@ export class PaymentService {
     return this.gateway;
   }
 
-  private async publishPaymentNotification(
-    verification: {
-      status: string;
-      tenantId: string;
-      externalId: string;
-      transactionId?: string;
-      amount: string;
-    },
-  ): Promise<void> {
+  private async publishPaymentNotification(verification: {
+    status: string;
+    tenantId: string;
+    externalId: string;
+    transactionId?: string;
+    amount: string;
+  }): Promise<void> {
     if (!this.notificationPublisher || verification.status !== "paid") {
       return;
     }
 
     const transaction = await this.repository.findTransactionByExternalId({
+      tenantId: verification.tenantId,
       gateway: this.gateway.name,
       externalId: verification.externalId,
     });
@@ -777,13 +805,19 @@ export class PaymentService {
       });
     } catch (error) {
       this.logger.error(
-        { error, tenantId: transaction.tenantId, transactionId: transaction.id },
+        {
+          error,
+          tenantId: transaction.tenantId,
+          transactionId: transaction.id,
+        },
         "Payment notification event failed",
       );
     }
   }
 
-  private async publishRefundApproved(refundRequest: RefundRequest): Promise<void> {
+  private async publishRefundApproved(
+    refundRequest: RefundRequest,
+  ): Promise<void> {
     if (!this.notificationPublisher) {
       return;
     }
@@ -813,7 +847,9 @@ export class PaymentService {
     }
   }
 
-  private async publishRefundRejected(refundRequest: RefundRequest): Promise<void> {
+  private async publishRefundRejected(
+    refundRequest: RefundRequest,
+  ): Promise<void> {
     if (!this.notificationPublisher) {
       return;
     }

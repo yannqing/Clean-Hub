@@ -166,7 +166,7 @@ export class MediaRepository {
         return [];
       }
 
-      const claimedRows = await tx
+      const claimedRows = /* tenant-scope: system cleanup lease */ await tx
         .update(mediaObjects)
         .set({
           status: "deleting",

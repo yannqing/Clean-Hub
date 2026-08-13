@@ -56,21 +56,26 @@ export const users = pgTable(
   ],
 );
 
-export const userProfiles = pgTable("user_profiles", {
-  userId: ulidColumn("user_id")
-    .primaryKey()
-    .references(() => users.id, { onDelete: "cascade" }),
-  displayName: varchar("display_name", { length: 120 }).notNull(),
-  firstName: varchar("first_name", { length: 80 }),
-  lastName: varchar("last_name", { length: 80 }),
-  avatarUrl: text("avatar_url"),
-  language: varchar("language", { length: 16 }).notNull().default("en"),
-  timezone: varchar("timezone", { length: 64 }).notNull().default("UTC"),
-  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const userProfiles = pgTable(
+  "user_profiles",
+  {
+    userId: ulidColumn("user_id")
+      .primaryKey()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tenantId: ulidColumn("tenant_id").references(() => tenants.id),
+    displayName: varchar("display_name", { length: 120 }).notNull(),
+    firstName: varchar("first_name", { length: 80 }),
+    lastName: varchar("last_name", { length: 80 }),
+    avatarUrl: text("avatar_url"),
+    language: varchar("language", { length: 16 }).notNull().default("en"),
+    timezone: varchar("timezone", { length: 64 }).notNull().default("UTC"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("user_profiles_tenant_id_idx").on(table.tenantId)],
+);

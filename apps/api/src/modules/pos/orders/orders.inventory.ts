@@ -86,7 +86,12 @@ export async function reserveProductOrderItem(
       updatedBy: input.actorUserId,
       version: sql`${inventoryBalances.version} + 1`,
     })
-    .where(eq(inventoryBalances.id, balance.id));
+    .where(
+      and(
+        eq(inventoryBalances.id, balance.id),
+        eq(inventoryBalances.tenantId, input.tenantId),
+      ),
+    );
 
   await db.insert(inventoryReservations).values({
     id: createId(),

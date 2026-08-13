@@ -8,6 +8,7 @@ export type ApiEnv = {
   port: number;
   corsOrigins: string[];
   corsEnforceSameOrigin: boolean;
+  databaseRequireRls: boolean;
   nodeEnv: string;
 };
 
@@ -52,6 +53,11 @@ export function loadApiEnv(env: NodeJS.ProcessEnv = process.env): ApiEnv {
       env.CORS_ENFORCE_SAME_ORIGIN,
       nodeEnv === "production",
       "CORS_ENFORCE_SAME_ORIGIN",
+    ),
+    databaseRequireRls: readBoolean(
+      env.DATABASE_REQUIRE_RLS,
+      nodeEnv === "production",
+      "DATABASE_REQUIRE_RLS",
     ),
     nodeEnv,
   };

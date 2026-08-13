@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 
+import { createMobileTenantDatabaseContextMiddleware } from "../../http/database-context.middleware.js";
 import type { AppBindings } from "../../http/types.js";
 import { createMobileAuthMiddleware } from "../../http/mobile-auth.middleware.js";
 import { createMobileAuthRoutes } from "./auth/auth.routes.js";
@@ -31,7 +32,8 @@ export function createMobileRoutes({
   notificationPublisher,
 }: CreateMobileRoutesOptions) {
   const routes = new Hono<AppBindings>();
-  const notificationsService = notificationPublisher ?? new NotificationsService();
+  const notificationsService =
+    notificationPublisher ?? new NotificationsService();
 
   routes.route("/auth", createMobileAuthRoutes({ mobileAuthService }));
   const paymentService = new PaymentService({
@@ -40,6 +42,7 @@ export function createMobileRoutes({
 
   routes.route("/payment", createPaymentWebhookRoutes({ paymentService }));
   routes.use("/*", createMobileAuthMiddleware(mobileAuthService));
+  routes.use("/*", createMobileTenantDatabaseContextMiddleware());
   const ownerService = new OwnerService({
     notificationPublisher: notificationsService,
   });

@@ -931,7 +931,12 @@ async function replaceDiscountRelations(
         deletedAt: new Date(),
         deletedBy: input.actorUserId,
       })
-      .where(eq(discountCodes.id, existingCode.id));
+      .where(
+        and(
+          eq(discountCodes.id, existingCode.id),
+          eq(discountCodes.tenantId, input.tenantId),
+        ),
+      );
   }
   if (input.method === "code" && input.code && !keepExistingCode) {
     await db.insert(discountCodes).values({

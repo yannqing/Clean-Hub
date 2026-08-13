@@ -228,11 +228,13 @@ export async function findServiceTickets(
       itemCount: sql<number>`(
         select count(*)::int from ${ticketItems}
         where ${ticketItems.ticketId} = ${serviceTickets.id}
+          and ${ticketItems.tenantId} = ${serviceTickets.tenantId}
           and ${ticketItems.deletedAt} is null
       )`,
       totalAmount: sql<string>`coalesce((
         select sum(${ticketItems.lineAmount}) from ${ticketItems}
         where ${ticketItems.ticketId} = ${serviceTickets.id}
+          and ${ticketItems.tenantId} = ${serviceTickets.tenantId}
           and ${ticketItems.deletedAt} is null
       ), 0)`,
     })
@@ -242,7 +244,13 @@ export async function findServiceTickets(
       customerAccounts,
       eq(customerAccounts.id, customers.customerAccountId),
     )
-    .leftJoin(userProfiles, eq(userProfiles.userId, serviceTickets.assistantId))
+    .leftJoin(
+      userProfiles,
+      and(
+        eq(userProfiles.userId, serviceTickets.assistantId),
+        eq(userProfiles.tenantId, input.tenantId),
+      ),
+    )
     .where(and(...filters))
     .orderBy(desc(serviceTickets.createdAt))
     .limit(input.limit)
@@ -342,7 +350,10 @@ function buildServiceTicketFilters(input: ServiceTicketListInput): SQL[] {
 
   if (input.expectedPickupBefore) {
     filters.push(
-      lte(serviceTickets.expectedPickupAt, new Date(input.expectedPickupBefore)),
+      lte(
+        serviceTickets.expectedPickupAt,
+        new Date(input.expectedPickupBefore),
+      ),
     );
   }
 
@@ -369,11 +380,13 @@ export async function findServiceTicketById(
       itemCount: sql<number>`(
         select count(*)::int from ${ticketItems}
         where ${ticketItems.ticketId} = ${serviceTickets.id}
+          and ${ticketItems.tenantId} = ${serviceTickets.tenantId}
           and ${ticketItems.deletedAt} is null
       )`,
       totalAmount: sql<string>`coalesce((
         select sum(${ticketItems.lineAmount}) from ${ticketItems}
         where ${ticketItems.ticketId} = ${serviceTickets.id}
+          and ${ticketItems.tenantId} = ${serviceTickets.tenantId}
           and ${ticketItems.deletedAt} is null
       ), 0)`,
     })
@@ -383,7 +396,13 @@ export async function findServiceTicketById(
       customerAccounts,
       eq(customerAccounts.id, customers.customerAccountId),
     )
-    .leftJoin(userProfiles, eq(userProfiles.userId, serviceTickets.assistantId))
+    .leftJoin(
+      userProfiles,
+      and(
+        eq(userProfiles.userId, serviceTickets.assistantId),
+        eq(userProfiles.tenantId, input.tenantId),
+      ),
+    )
     .where(
       and(
         eq(serviceTickets.id, input.ticketId),
@@ -423,7 +442,12 @@ export async function findServiceTicketDetail(
   const ticketRows = await db
     .select({ remark: serviceTickets.remark })
     .from(serviceTickets)
-    .where(eq(serviceTickets.id, input.ticketId))
+    .where(
+      and(
+        eq(serviceTickets.id, input.ticketId),
+        eq(serviceTickets.tenantId, input.tenantId),
+      ),
+    )
     .limit(1);
 
   return {
@@ -436,7 +460,7 @@ export async function findServiceTicketDetail(
 export async function findServiceTicketRaw(
   db: Database,
   input: { tenantId: string; ticketId: string },
-): Promise<(typeof serviceTickets.$inferSelect) | null> {
+): Promise<typeof serviceTickets.$inferSelect | null> {
   const rows = await db
     .select()
     .from(serviceTickets)
@@ -546,7 +570,7 @@ export async function updateServiceTicketRecord(
             ? new Date(input.expectedPickupAt)
             : null,
       remark:
-        input.remark === undefined ? existing.remark : input.remark ?? null,
+        input.remark === undefined ? existing.remark : (input.remark ?? null),
       updatedAt: new Date(),
       updatedBy: input.actorUserId,
       version: sql`${serviceTickets.version} + 1`,
@@ -576,14 +600,8 @@ export async function changeServiceTicketStatusRecord(
     .update(serviceTickets)
     .set({
       ticketStatus: input.to,
-      completedAt:
-        input.to === "picked_up"
-          ? new Date()
-          : sql`completed_at`,
-      cancelledAt:
-        input.to === "cancelled"
-          ? new Date()
-          : sql`cancelled_at`,
+      completedAt: input.to === "picked_up" ? new Date() : sql`completed_at`,
+      cancelledAt: input.to === "cancelled" ? new Date() : sql`cancelled_at`,
       updatedAt: new Date(),
       updatedBy: input.actorUserId,
       version: sql`${serviceTickets.version} + 1`,
@@ -783,7 +801,9 @@ export async function findServiceTicketOverview(
   const todayCreatedRows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(serviceTickets)
-    .where(and(...baseFilters, sql`${serviceTickets.createdAt} >= ${todayStart}`));
+    .where(
+      and(...baseFilters, sql`${serviceTickets.createdAt} >= ${todayStart}`),
+    );
 
   const todayPickedUpRows = await db
     .select({ count: sql<number>`count(*)::int` })

@@ -47,7 +47,15 @@ const fakeDb = {
   insert() {
     return {
       values() {
-        return undefined;
+        return {
+          onConflictDoUpdate() {
+            return {
+              returning() {
+                return [];
+              },
+            };
+          },
+        };
       },
     };
   },
@@ -100,7 +108,9 @@ async function assertRejectsAuth(
   throw new Error(`expected action to reject with ${code}`);
 }
 
-function makeCustomer(overrides?: Partial<MobileCustomerAccount>): MobileCustomerAccount {
+function makeCustomer(
+  overrides?: Partial<MobileCustomerAccount>,
+): MobileCustomerAccount {
   return {
     id: "customer_account_1",
     tenantId: "tenant_1",
@@ -129,7 +139,10 @@ function makeStaffUser(
 
 class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
   private readonly customers = new Map<string, MobileCustomerAccount>();
-  private readonly customerCredentials = new Map<string, MobileCustomerCredential>();
+  private readonly customerCredentials = new Map<
+    string,
+    MobileCustomerCredential
+  >();
   private readonly staffUsers = new Map<string, MobileStaffUser>();
   private readonly staffAccess = new Map<
     string,
@@ -217,7 +230,8 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
   }): Promise<MobileCustomerAccount | null> {
     return (
       [...this.customers.values()].find(
-        (customer) => customer.tenantId === tenantId && customer.phone === phone,
+        (customer) =>
+          customer.tenantId === tenantId && customer.phone === phone,
       ) ?? null
     );
   }
@@ -254,10 +268,12 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
     return customer;
   }
 
-  async findCustomerCredential(
-    customerAccountId: string,
-  ): Promise<MobileCustomerCredential | null> {
-    return this.customerCredentials.get(customerAccountId) ?? null;
+  async findCustomerCredential(input: {
+    tenantId: string;
+    customerAccountId: string;
+  }): Promise<MobileCustomerCredential | null> {
+    const credential = this.customerCredentials.get(input.customerAccountId);
+    return credential?.tenantId === input.tenantId ? credential : null;
   }
 
   async createCustomerOtp({
@@ -305,16 +321,28 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
     );
   }
 
-  async incrementCustomerOtpAttempts(otpId: string): Promise<void> {
-    const otp = this.otps.find((candidate) => candidate.id === otpId);
+  async incrementCustomerOtpAttempts(input: {
+    tenantId: string;
+    otpId: string;
+  }): Promise<void> {
+    const otp = this.otps.find(
+      (candidate) =>
+        candidate.tenantId === input.tenantId && candidate.id === input.otpId,
+    );
 
     if (otp) {
       otp.attempts += 1;
     }
   }
 
-  async consumeCustomerOtp(otpId: string): Promise<void> {
-    const otp = this.otps.find((candidate) => candidate.id === otpId);
+  async consumeCustomerOtp(input: {
+    tenantId: string;
+    otpId: string;
+  }): Promise<void> {
+    const otp = this.otps.find(
+      (candidate) =>
+        candidate.tenantId === input.tenantId && candidate.id === input.otpId,
+    );
 
     if (otp) {
       otp.consumedAt = new Date();
@@ -323,15 +351,18 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
 
   async recordCustomerPasswordFailure({
     credentialId,
+    tenantId,
     failedAttempts,
     lockedUntil,
   }: {
     credentialId: string;
+    tenantId: string;
     failedAttempts: number;
     lockedUntil: Date | null;
   }): Promise<void> {
     const credential = [...this.customerCredentials.values()].find(
-      (candidate) => candidate.id === credentialId,
+      (candidate) =>
+        candidate.tenantId === tenantId && candidate.id === credentialId,
     );
 
     if (credential) {
@@ -340,9 +371,14 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
     }
   }
 
-  async clearCustomerPasswordFailures(credentialId: string): Promise<void> {
+  async clearCustomerPasswordFailures(input: {
+    tenantId: string;
+    credentialId: string;
+  }): Promise<void> {
     const credential = [...this.customerCredentials.values()].find(
-      (candidate) => candidate.id === credentialId,
+      (candidate) =>
+        candidate.tenantId === input.tenantId &&
+        candidate.id === input.credentialId,
     );
 
     if (credential) {
@@ -387,13 +423,16 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
 
   async revokeCustomerRefreshToken({
     tokenId,
+    tenantId,
     replacedByTokenId,
   }: {
     tokenId: string;
+    tenantId: string;
     replacedByTokenId?: string;
   }): Promise<void> {
     const token = [...this.customerRefreshTokens.values()].find(
-      (candidate) => candidate.id === tokenId,
+      (candidate) =>
+        candidate.tenantId === tenantId && candidate.id === tokenId,
     );
 
     if (token) {
@@ -402,18 +441,27 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
     }
   }
 
-  async revokeCustomerRefreshTokenFamily(familyId: string): Promise<void> {
+  async revokeCustomerRefreshTokenFamily(input: {
+    tenantId: string;
+    familyId: string;
+  }): Promise<void> {
     for (const token of this.customerRefreshTokens.values()) {
-      if (token.familyId === familyId) {
+      if (
+        token.tenantId === input.tenantId &&
+        token.familyId === input.familyId
+      ) {
         token.revokedAt = new Date();
       }
     }
   }
 
-  async revokeCustomerRefreshTokenByHash(tokenHash: string): Promise<void> {
-    const token = this.customerRefreshTokens.get(tokenHash);
+  async revokeCustomerRefreshTokenByHash(input: {
+    tenantId: string;
+    tokenHash: string;
+  }): Promise<void> {
+    const token = this.customerRefreshTokens.get(input.tokenHash);
 
-    if (token) {
+    if (token?.tenantId === input.tenantId) {
       token.revokedAt = new Date();
     }
   }
@@ -442,19 +490,23 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
     return null;
   }
 
-  async findStaffUserById(userId: string): Promise<MobileStaffUser | null> {
-    return this.staffUsers.get(userId) ?? null;
+  async findStaffUserById(input: {
+    tenantId: string;
+    userId: string;
+  }): Promise<MobileStaffUser | null> {
+    const user = this.staffUsers.get(input.userId);
+    return user?.tenantId === input.tenantId ? user : null;
   }
 
-  async getStaffAccess(userId: string): Promise<{
+  async getStaffAccess(input: { tenantId: string; userId: string }): Promise<{
     displayName: string;
     roles: string[];
     permissions: string[];
     branchIds: string[];
   }> {
     return (
-      this.staffAccess.get(userId) ?? {
-        displayName: userId,
+      this.staffAccess.get(input.userId) ?? {
+        displayName: input.userId,
         roles: [],
         permissions: [],
         branchIds: [],
@@ -502,13 +554,16 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
 
   async revokeStaffRefreshToken({
     tokenId,
+    tenantId,
     replacedByTokenId,
   }: {
     tokenId: string;
+    tenantId: string;
     replacedByTokenId?: string;
   }): Promise<void> {
     const token = [...this.staffRefreshTokens.values()].find(
-      (candidate) => candidate.id === tokenId,
+      (candidate) =>
+        candidate.tenantId === tenantId && candidate.id === tokenId,
     );
 
     if (token) {
@@ -517,18 +572,27 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
     }
   }
 
-  async revokeStaffRefreshTokenFamily(familyId: string): Promise<void> {
+  async revokeStaffRefreshTokenFamily(input: {
+    tenantId: string;
+    familyId: string;
+  }): Promise<void> {
     for (const token of this.staffRefreshTokens.values()) {
-      if (token.familyId === familyId) {
+      if (
+        token.tenantId === input.tenantId &&
+        token.familyId === input.familyId
+      ) {
         token.revokedAt = new Date();
       }
     }
   }
 
-  async revokeStaffRefreshTokenByHash(tokenHash: string): Promise<void> {
-    const token = this.staffRefreshTokens.get(tokenHash);
+  async revokeStaffRefreshTokenByHash(input: {
+    tenantId: string;
+    tokenHash: string;
+  }): Promise<void> {
+    const token = this.staffRefreshTokens.get(input.tokenHash);
 
-    if (token) {
+    if (token?.tenantId === input.tenantId) {
       token.revokedAt = new Date();
     }
   }
@@ -602,7 +666,10 @@ async function assertCustomerOtpSuccess(): Promise<void> {
     throw new Error("test OTP should expose latest code");
   }
 
-  assert(testOtp.code === requestedOtp.code, "test OTP should expose latest code");
+  assert(
+    testOtp.code === requestedOtp.code,
+    "test OTP should expose latest code",
+  );
 
   const login = await service.verifyCustomerOtp({
     tenantCode: "CLEAN-001",
@@ -613,14 +680,23 @@ async function assertCustomerOtpSuccess(): Promise<void> {
 
   assert(login.authContext.subjectType === "customer", "OTP login is customer");
   assert(login.authContext.role === "customer", "OTP login role is customer");
-  assert(login.authContext.currency === "XOF", "OTP login includes tenant currency");
-  assert(login.tokens.refreshToken.startsWith("cust_"), "customer refresh is wrapped");
+  assert(
+    login.authContext.currency === "XOF",
+    "OTP login includes tenant currency",
+  );
+  assert(
+    login.tokens.refreshToken.startsWith("cust_"),
+    "customer refresh is wrapped",
+  );
 
   const context = await service.getMobileAuthContext(login.tokens.accessToken);
 
   assert(context.subjectId === "customer_account_1", "customer token resolves");
   assert(context.currency === "XOF", "customer token resolves tenant currency");
-  assert(context.roles.length === 1 && context.roles[0] === "customer", "customer role is isolated");
+  assert(
+    context.roles.length === 1 && context.roles[0] === "customer",
+    "customer role is isolated",
+  );
 }
 
 async function assertCustomerOtpAttemptLimit(): Promise<void> {
@@ -704,9 +780,18 @@ async function assertStaffRoleIsolation(): Promise<void> {
 
   assert(driver.authContext.subjectType === "staff", "driver is staff");
   assert(driver.authContext.role === "driver", "driver role is selected");
-  assert(driver.authContext.currency === "XOF", "driver login includes tenant currency");
-  assert(driver.authContext.branchIds[0] === "branch_1", "driver branch is included");
-  assert(driver.tokens.refreshToken.startsWith("staff_"), "staff refresh is wrapped");
+  assert(
+    driver.authContext.currency === "XOF",
+    "driver login includes tenant currency",
+  );
+  assert(
+    driver.authContext.branchIds[0] === "branch_1",
+    "driver branch is included",
+  );
+  assert(
+    driver.tokens.refreshToken.startsWith("staff_"),
+    "staff refresh is wrapped",
+  );
 
   const owner = await service.loginStaff({
     tenantCode: "CLEAN-001",
@@ -716,7 +801,10 @@ async function assertStaffRoleIsolation(): Promise<void> {
   });
 
   assert(owner.authContext.role === "owner", "owner role is selected");
-  assert(owner.authContext.branchIds.length === 0, "owner login is not branch bound");
+  assert(
+    owner.authContext.branchIds.length === 0,
+    "owner login is not branch bound",
+  );
 
   await assertRejectsAuth(
     () =>
@@ -811,7 +899,10 @@ async function assertRefreshAndLogout(): Promise<void> {
     deviceId: "device_1",
   });
 
-  assert(refreshed.authContext.role === "customer", "refresh keeps customer role");
+  assert(
+    refreshed.authContext.role === "customer",
+    "refresh keeps customer role",
+  );
   assert(
     refreshed.tokens.refreshToken !== login.tokens.refreshToken,
     "refresh rotates token",
@@ -832,7 +923,10 @@ async function assertRefreshAndLogout(): Promise<void> {
     refreshToken: staffLogin.tokens.refreshToken,
   });
 
-  assert(staffRefresh.authContext.role === "driver", "staff refresh keeps role");
+  assert(
+    staffRefresh.authContext.role === "driver",
+    "staff refresh keeps role",
+  );
 
   await service.logout({ refreshToken: staffRefresh.tokens.refreshToken });
   await assertRejectsAuth(

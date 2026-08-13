@@ -109,7 +109,13 @@ export async function findTenantOrderTimelineRows(
           createdAt: auditLogs.createdAt,
         })
         .from(auditLogs)
-        .leftJoin(userProfiles, eq(userProfiles.userId, auditLogs.actorUserId))
+        .leftJoin(
+          userProfiles,
+          and(
+            eq(userProfiles.userId, auditLogs.actorUserId),
+            eq(userProfiles.tenantId, input.tenantId),
+          ),
+        )
         .where(
           and(
             eq(auditLogs.tenantId, input.tenantId),
@@ -138,7 +144,10 @@ export async function findTenantOrderTimelineRows(
         .from(orderComments)
         .leftJoin(
           userProfiles,
-          eq(userProfiles.userId, orderComments.authorUserId),
+          and(
+            eq(userProfiles.userId, orderComments.authorUserId),
+            eq(userProfiles.tenantId, input.tenantId),
+          ),
         )
         .where(
           and(
@@ -169,7 +178,10 @@ export async function findTenantOrderTimelineRows(
         )
         .leftJoin(
           userProfiles,
-          eq(userProfiles.userId, deliveryTaskEvents.createdBy),
+          and(
+            eq(userProfiles.userId, deliveryTaskEvents.createdBy),
+            eq(userProfiles.tenantId, input.tenantId),
+          ),
         )
         .where(
           and(
@@ -211,7 +223,10 @@ export async function findTenantOrderTimelineRows(
           .from(orderCommentMentions)
           .innerJoin(
             userProfiles,
-            eq(userProfiles.userId, orderCommentMentions.mentionedUserId),
+            and(
+              eq(userProfiles.userId, orderCommentMentions.mentionedUserId),
+              eq(userProfiles.tenantId, input.tenantId),
+            ),
           )
           .where(
             and(
@@ -306,7 +321,9 @@ export async function bindTenantOrderCommentAttachments(
     return [];
   }
 
-  const objectKeys = input.attachments.map((attachment) => attachment.objectKey);
+  const objectKeys = input.attachments.map(
+    (attachment) => attachment.objectKey,
+  );
   if (new Set(objectKeys).size !== objectKeys.length) {
     throw new TenantOrdersError(
       "COMMENT_ATTACHMENT_INVALID",
@@ -472,7 +489,13 @@ export async function findActiveTenantMentionUsers(
       language: userProfiles.language,
     })
     .from(users)
-    .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .innerJoin(
+      userProfiles,
+      and(
+        eq(userProfiles.userId, users.id),
+        eq(userProfiles.tenantId, input.tenantId),
+      ),
+    )
     .where(
       and(
         eq(users.tenantId, input.tenantId),

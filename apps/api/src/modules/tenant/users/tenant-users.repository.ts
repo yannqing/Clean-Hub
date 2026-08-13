@@ -179,7 +179,9 @@ async function findTenantUserRoleRecords(
   db: Database,
   tenantId: string,
   userIds: string[],
-): Promise<Array<{ userId: string; roleCode: string; branchId: string | null }>> {
+): Promise<
+  Array<{ userId: string; roleCode: string; branchId: string | null }>
+> {
   if (userIds.length === 0) return [];
   return db
     .select({
@@ -222,7 +224,11 @@ async function findTenantUserBranchRows(
 }
 
 function aggregateAccess(
-  roleRows: Array<{ userId: string; roleCode: string; branchId: string | null }>,
+  roleRows: Array<{
+    userId: string;
+    roleCode: string;
+    branchId: string | null;
+  }>,
   branchRows: Array<{ userId: string; branchId: string }>,
 ) {
   const rolesByUserId = new Map<string, TenantUserRoleCode[]>();
@@ -293,7 +299,9 @@ export async function findOtherUserByNormalizedEmail(
   const rows = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(eq(users.normalizedEmail, normalizedEmail), ne(users.id, userId)))
+    .where(
+      and(eq(users.normalizedEmail, normalizedEmail), ne(users.id, userId)),
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -320,7 +328,13 @@ export async function findTenantUsers(
       createdAt: users.createdAt,
     })
     .from(users)
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .leftJoin(
+      userProfiles,
+      and(
+        eq(userProfiles.userId, users.id),
+        eq(userProfiles.tenantId, tenantId),
+      ),
+    )
     .where(
       and(
         eq(users.tenantId, tenantId),
@@ -328,8 +342,12 @@ export async function findTenantUsers(
         isNull(users.deletedAt),
         activeRoleCondition(tenantId),
         query.status ? eq(users.status, query.status) : undefined,
-        query.roleCode ? roleFilterCondition(tenantId, query.roleCode) : undefined,
-        query.branchId ? branchFilterCondition(tenantId, query.branchId) : undefined,
+        query.roleCode
+          ? roleFilterCondition(tenantId, query.roleCode)
+          : undefined,
+        query.branchId
+          ? branchFilterCondition(tenantId, query.branchId)
+          : undefined,
         input.managerBranchId
           ? or(
               eq(users.id, input.viewerUserId),
@@ -400,7 +418,13 @@ export async function findTenantUserById(
       profileUpdatedAt: userProfiles.updatedAt,
     })
     .from(users)
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .leftJoin(
+      userProfiles,
+      and(
+        eq(userProfiles.userId, users.id),
+        eq(userProfiles.tenantId, tenantId),
+      ),
+    )
     .where(
       and(
         eq(users.id, userId),
@@ -437,7 +461,10 @@ export async function findTenantUserById(
     timezone: user.timezone ?? "UTC",
     lastLoginAt: toIsoString(user.lastLoginAt),
     createdAt: user.createdAt.toISOString(),
-    updatedAt: getLatestDate(user.userUpdatedAt, user.profileUpdatedAt).toISOString(),
+    updatedAt: getLatestDate(
+      user.userUpdatedAt,
+      user.profileUpdatedAt,
+    ).toISOString(),
   };
 }
 
@@ -555,6 +582,7 @@ export async function insertTenantUserRecord(
 
   await db.insert(userProfiles).values({
     userId,
+    tenantId: input.tenantId,
     displayName: input.displayName,
     language: input.language,
   });
@@ -621,7 +649,8 @@ export async function updateTenantUserRecord(
     userUpdates.normalizedEmail = normalizeEmail(input.email);
   }
   if (input.phone !== undefined) userUpdates.phone = input.phone;
-  if (input.displayName !== undefined) profileUpdates.displayName = input.displayName;
+  if (input.displayName !== undefined)
+    profileUpdates.displayName = input.displayName;
   if (input.language !== undefined) profileUpdates.language = input.language;
   if (input.timezone !== undefined) profileUpdates.timezone = input.timezone;
 
@@ -658,7 +687,12 @@ export async function updateTenantUserRecord(
     await db
       .update(userProfiles)
       .set(profileUpdates)
-      .where(eq(userProfiles.userId, input.userId));
+      .where(
+        and(
+          eq(userProfiles.userId, input.userId),
+          eq(userProfiles.tenantId, input.tenantId),
+        ),
+      );
   }
 
   if (input.roleCode !== undefined && input.branchId !== undefined) {

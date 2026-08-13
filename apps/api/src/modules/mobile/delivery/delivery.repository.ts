@@ -70,7 +70,12 @@ function resolveAssigneeName(input: {
   assigneeEmail?: string | null;
   assigneeUserId?: string | null;
 }): string | null {
-  return input.assigneeDisplayName ?? input.assigneeEmail ?? input.assigneeUserId ?? null;
+  return (
+    input.assigneeDisplayName ??
+    input.assigneeEmail ??
+    input.assigneeUserId ??
+    null
+  );
 }
 
 function toTaskDetail(
@@ -188,9 +193,7 @@ export class DeliveryRepository {
       )
       .orderBy(asc(deliveryTasks.expectedAt), asc(deliveryTasks.createdAt));
 
-    return rows.map((row) =>
-      toTaskListItem(row, resolveAssigneeName(row)),
-    );
+    return rows.map((row) => toTaskListItem(row, resolveAssigneeName(row)));
   }
 
   async findOwnedTaskById({
@@ -333,9 +336,11 @@ export class DeliveryRepository {
   }
 
   async findTaskEventByIdempotencyKey({
+    tenantId,
     taskId,
     idempotencyKey,
   }: {
+    tenantId: string;
     taskId: string;
     idempotencyKey: string;
   }): Promise<DeliveryTaskEvent | null> {
@@ -344,6 +349,7 @@ export class DeliveryRepository {
       .from(deliveryTaskEvents)
       .where(
         and(
+          eq(deliveryTaskEvents.tenantId, tenantId),
           eq(deliveryTaskEvents.taskId, taskId),
           eq(deliveryTaskEvents.idempotencyKey, idempotencyKey),
         ),
@@ -354,9 +360,11 @@ export class DeliveryRepository {
   }
 
   async findProofByIdempotencyKey({
+    tenantId,
     taskId,
     idempotencyKey,
   }: {
+    tenantId: string;
     taskId: string;
     idempotencyKey: string;
   }): Promise<DeliveryProof | null> {
@@ -365,6 +373,7 @@ export class DeliveryRepository {
       .from(deliveryProofs)
       .where(
         and(
+          eq(deliveryProofs.tenantId, tenantId),
           eq(deliveryProofs.taskId, taskId),
           eq(deliveryProofs.idempotencyKey, idempotencyKey),
         ),
@@ -402,10 +411,7 @@ export class DeliveryRepository {
         createdBy: input.createdBy,
       })
       .onConflictDoNothing({
-        target: [
-          deliveryTaskEvents.taskId,
-          deliveryTaskEvents.idempotencyKey,
-        ],
+        target: [deliveryTaskEvents.taskId, deliveryTaskEvents.idempotencyKey],
       })
       .returning({ ...getTableColumns(deliveryTaskEvents) });
 
@@ -414,6 +420,7 @@ export class DeliveryRepository {
     }
 
     const existing = await this.findTaskEventByIdempotencyKey({
+      tenantId: input.tenantId,
       taskId: input.taskId,
       idempotencyKey: input.idempotencyKey,
     });
@@ -458,6 +465,7 @@ export class DeliveryRepository {
     }
 
     const existing = await this.findProofByIdempotencyKey({
+      tenantId: input.tenantId,
       taskId: input.taskId,
       idempotencyKey: input.idempotencyKey,
     });
@@ -688,9 +696,7 @@ export class DeliveryRepository {
       )
       .orderBy(asc(deliveryTasks.expectedAt), desc(deliveryTasks.updatedAt));
 
-    return rows.map((row) =>
-      toTaskListItem(row, resolveAssigneeName(row)),
-    );
+    return rows.map((row) => toTaskListItem(row, resolveAssigneeName(row)));
   }
 
   async dispatchTask(input: {
@@ -737,9 +743,7 @@ export class DeliveryRepository {
         fromStatus: "pending_dispatch",
         toStatus: "pending_dispatch",
         idempotencyKey: input.idempotencyKey,
-        note:
-          input.note ??
-          `Dispatched to ${input.assigneeUserId}`,
+        note: input.note ?? `Dispatched to ${input.assigneeUserId}`,
         createdBy: input.operatorUserId,
       });
     });
@@ -791,9 +795,7 @@ export class DeliveryRepository {
         fromStatus: input.fromStatus,
         toStatus: input.fromStatus,
         idempotencyKey: input.idempotencyKey,
-        note:
-          input.note ??
-          `Reassigned to ${input.assigneeUserId}`,
+        note: input.note ?? `Reassigned to ${input.assigneeUserId}`,
         createdBy: input.operatorUserId,
       });
     });

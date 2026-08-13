@@ -169,13 +169,7 @@ export async function bindPosDevice(
       requirePosBranchAccess(input.authContext, existing.branchId);
     }
 
-    if (
-      !(await lockActiveTenantBranch(
-        tx,
-        tenantId,
-        input.data.branchId,
-      ))
-    ) {
+    if (!(await lockActiveTenantBranch(tx, tenantId, input.data.branchId))) {
       throw new PosTerminalAuthError(
         "POS_TERMINAL_BRANCH_INACTIVE",
         "The terminal branch does not exist or is inactive.",
@@ -347,7 +341,7 @@ export async function updatePosDevice(
     const before = toPosDevice(lockedCurrent);
     const after = toPosDevice(saved);
     if (securityContextChanged) {
-      await revokePosTerminalRefreshTokens(tx, after.id);
+      await revokePosTerminalRefreshTokens(tx, tenantId, after.id);
     }
     const statusChanged = lockedCurrent.status !== saved.status;
     const savedBranchChanged = lockedCurrent.branchId !== saved.branchId;
@@ -420,7 +414,7 @@ export async function revokePosDevice(
 
     const before = toPosDevice(lockedCurrent);
     const after = toPosDevice(saved);
-    await revokePosTerminalRefreshTokens(tx, after.id);
+    await revokePosTerminalRefreshTokens(tx, tenantId, after.id);
     await writeAuditLog(tx, {
       actorUserId: input.authContext.userId,
       tenantId,
@@ -480,13 +474,7 @@ export async function rotatePosDeviceCredential(
     // This keeps the global terminal -> branch/tenant lock order and prevents
     // a credential rotation from committing after either resource was
     // concurrently disabled.
-    if (
-      !(await lockActiveTenantBranch(
-        tx,
-        tenantId,
-        lockedCurrent.branchId,
-      ))
-    ) {
+    if (!(await lockActiveTenantBranch(tx, tenantId, lockedCurrent.branchId))) {
       throw new PosTerminalAuthError(
         "POS_TERMINAL_BRANCH_INACTIVE",
         "The terminal branch does not exist or is inactive.",
@@ -503,7 +491,7 @@ export async function rotatePosDeviceCredential(
 
     const before = toPosDevice(lockedCurrent);
     const after = toPosDevice(saved);
-    await revokePosTerminalRefreshTokens(tx, after.id);
+    await revokePosTerminalRefreshTokens(tx, tenantId, after.id);
     await writeAuditLog(tx, {
       actorUserId: input.authContext.userId,
       tenantId,

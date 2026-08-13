@@ -209,6 +209,7 @@ export async function createTenantOwnerUser(
 
   await db.insert(userProfiles).values({
     userId,
+    tenantId: input.tenantId,
     displayName: input.displayName,
   });
 

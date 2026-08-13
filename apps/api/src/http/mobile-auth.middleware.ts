@@ -1,5 +1,7 @@
 import type { MiddlewareHandler } from "hono";
 
+import { runWithSystemDatabaseContext } from "@cleanhub/db";
+
 import { AuthError } from "../modules/auth/auth.errors.js";
 import type { MobileAuthService } from "../modules/mobile/auth/auth.service.js";
 import type { AppBindings } from "./types.js";
@@ -22,7 +24,9 @@ export function createMobileAuthMiddleware(
 
     c.set(
       "mobileAuthContext",
-      await mobileAuthService.getMobileAuthContext(accessToken),
+      await runWithSystemDatabaseContext(() =>
+        mobileAuthService.getMobileAuthContext(accessToken),
+      ),
     );
 
     await next();

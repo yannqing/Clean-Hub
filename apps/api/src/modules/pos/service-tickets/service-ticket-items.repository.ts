@@ -1,10 +1,6 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 
-import {
-  serviceTickets,
-  ticketItems,
-  type Database,
-} from "@cleanhub/db";
+import { serviceTickets, ticketItems, type Database } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
 
 import { ServiceTicketError } from "./service-tickets.errors.js";
@@ -93,11 +89,7 @@ export async function createServiceTicketItemRecord(
   db: Database,
   input: Omit<
     CreateServiceTicketItemRequest,
-    | "bagCount"
-    | "chargedUnitAmount"
-    | "overrideReason"
-    | "quantity"
-    | "weight"
+    "bagCount" | "chargedUnitAmount" | "overrideReason" | "quantity" | "weight"
   > & {
     tenantId: string;
     ticketId: string;
@@ -176,7 +168,12 @@ export async function createServiceTicketItemRecord(
       updatedBy: input.actorUserId,
       version: sql`${serviceTickets.version} + 1`,
     })
-    .where(eq(serviceTickets.id, input.ticketId));
+    .where(
+      and(
+        eq(serviceTickets.id, input.ticketId),
+        eq(serviceTickets.tenantId, input.tenantId),
+      ),
+    );
 
   return item;
 }
@@ -251,13 +248,13 @@ export async function updateServiceTicketItemRecord(
       defectNotes:
         input.defectNotes === undefined
           ? existing.defectNotes
-          : input.defectNotes ?? null,
+          : (input.defectNotes ?? null),
       specialRequest:
         input.specialRequest === undefined
           ? existing.specialRequest
-          : input.specialRequest ?? null,
+          : (input.specialRequest ?? null),
       remark:
-        input.remark === undefined ? existing.remark : input.remark ?? null,
+        input.remark === undefined ? existing.remark : (input.remark ?? null),
       sortOrder: input.sortOrder ?? existing.sortOrder,
       updatedAt: new Date(),
       updatedBy: input.actorUserId,
@@ -348,7 +345,12 @@ export async function softDeleteServiceTicketItemRecord(
         updatedBy: input.actorUserId,
         version: sql`${serviceTickets.version} + 1`,
       })
-      .where(eq(serviceTickets.id, input.ticketId));
+      .where(
+        and(
+          eq(serviceTickets.id, input.ticketId),
+          eq(serviceTickets.tenantId, input.tenantId),
+        ),
+      );
     return true;
   }
 

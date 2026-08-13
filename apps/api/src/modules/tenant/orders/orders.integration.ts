@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 
 import {
   auditLogs,
+  branchProductSettings,
   branches,
   closeDbConnection,
   customerAccounts,
@@ -14,6 +15,9 @@ import {
   orders,
   paymentTransactions,
   prices,
+  productPrices,
+  productSkus,
+  products,
   serviceCategories,
   services,
   tenantFeatureFlags,
@@ -67,6 +71,10 @@ function createFixtureIds() {
     firstPriceId: createId(),
     secondPriceId: createId(),
     retailPriceId: createId(),
+    retailProductId: createId(),
+    retailProductSkuId: createId(),
+    retailProductPriceId: createId(),
+    retailProductBranchSettingId: createId(),
     orderId: createId(),
     guestOrderId: createId(),
     unavailableBranchOrderId: createId(),
@@ -114,6 +122,7 @@ async function insertFixtures(db: Database, ids: FixtureIds): Promise<void> {
   });
   await db.insert(userProfiles).values({
     userId: ids.userId,
+    tenantId: ids.tenantId,
     displayName: "Tenant order integration owner",
     language: "en",
     timezone: "UTC",
@@ -232,6 +241,40 @@ async function insertFixtures(db: Database, ids: FixtureIds): Promise<void> {
       createdBy: ids.userId,
     },
   ]);
+  await db.insert(products).values({
+    id: ids.retailProductId,
+    tenantId: ids.tenantId,
+    name: "Integration retail product",
+    status: "active",
+    createdBy: ids.userId,
+  });
+  await db.insert(productSkus).values({
+    id: ids.retailProductSkuId,
+    tenantId: ids.tenantId,
+    productId: ids.retailProductId,
+    skuCode: `TEST-${ids.retailProductSkuId}`,
+    unitOfMeasure: "piece",
+    trackInventory: false,
+    status: "active",
+    createdBy: ids.userId,
+  });
+  await db.insert(productPrices).values({
+    id: ids.retailProductPriceId,
+    tenantId: ids.tenantId,
+    productSkuId: ids.retailProductSkuId,
+    amount: "9.00",
+    currency: "CNY",
+    status: "active",
+    createdBy: ids.userId,
+  });
+  await db.insert(branchProductSettings).values({
+    id: ids.retailProductBranchSettingId,
+    tenantId: ids.tenantId,
+    branchId: ids.branchId,
+    productSkuId: ids.retailProductSkuId,
+    isAvailable: true,
+    createdBy: ids.userId,
+  });
 }
 
 function isPosOrderError(code: PosOrderError["code"]) {
@@ -283,7 +326,7 @@ async function runOrderLifecycleAssertions(
         id: ids.guestOrderId,
         orderType: "manual",
         branchId: ids.branchId,
-        items: [{ serviceId: ids.retailServiceId, quantity: "2" }],
+        items: [{ productSkuId: ids.retailProductSkuId, quantity: "2" }],
       },
     },
     db,
@@ -291,7 +334,7 @@ async function runOrderLifecycleAssertions(
   assert.equal(guestOrder.customerId, null);
   assert.equal(guestOrder.customerName, null);
   assert.equal(guestOrder.totalAmount, "18.00");
-  assert.equal(guestOrder.items[0]?.serviceId, ids.retailServiceId);
+  assert.equal(guestOrder.items[0]?.productSkuId, ids.retailProductSkuId);
 
   const paidGuestOrder = await createTenantOrderPayment(
     authContext,

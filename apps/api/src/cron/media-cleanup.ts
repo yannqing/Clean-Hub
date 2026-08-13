@@ -1,4 +1,5 @@
 import { createLogger } from "@cleanhub/logger";
+import { runWithSystemDatabaseContext } from "@cleanhub/db";
 
 import { MediaService } from "../modules/media/index.js";
 
@@ -26,15 +27,17 @@ function isDisabled(value: string | undefined): boolean {
 export async function runMediaCleanupOnce(
   service = new MediaService(),
 ): Promise<void> {
-  const batchSize = readPositiveInteger(
-    process.env.MEDIA_CLEANUP_BATCH_SIZE,
-    100,
-  );
-  const result = await service.cleanupExpiredPending({
-    limit: batchSize,
-  });
+  await runWithSystemDatabaseContext(async () => {
+    const batchSize = readPositiveInteger(
+      process.env.MEDIA_CLEANUP_BATCH_SIZE,
+      100,
+    );
+    const result = await service.cleanupExpiredPending({
+      limit: batchSize,
+    });
 
-  logger.info(result, "Media cleanup completed");
+    logger.info(result, "Media cleanup completed");
+  });
 }
 
 async function main(): Promise<void> {

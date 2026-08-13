@@ -116,7 +116,7 @@ export async function clearLoginLockout(
   db: Database,
   lockKey: string,
 ): Promise<void> {
-  await db
+  /* tenant-scope: system authentication lockout */ await db
     .delete(authLoginLockouts)
     .where(eq(authLoginLockouts.lockKey, lockKey));
 }

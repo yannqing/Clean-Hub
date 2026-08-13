@@ -81,7 +81,9 @@ function toTemplate(
   };
 }
 
-function toNotification(row: typeof notifications.$inferSelect): NotificationRecord {
+function toNotification(
+  row: typeof notifications.$inferSelect,
+): NotificationRecord {
   return {
     id: row.id,
     tenantId: row.tenantId ?? "",
@@ -188,7 +190,10 @@ export class NotificationsRepository {
         ),
       );
 
-    return selectPreferredTemplate(rows.map(toTemplate), input.localeCandidates);
+    return selectPreferredTemplate(
+      rows.map(toTemplate),
+      input.localeCandidates,
+    );
   }
 
   async createNotificationWithDelivery(input: {
@@ -541,6 +546,7 @@ export class NotificationsRepository {
   }
 
   async softDeletePushTokens(input: {
+    tenantId: string;
     tokenIds: string[];
     now: Date;
   }): Promise<void> {
@@ -556,6 +562,7 @@ export class NotificationsRepository {
       })
       .where(
         and(
+          eq(mobilePushTokens.tenantId, input.tenantId),
           inArray(mobilePushTokens.id, input.tokenIds),
           isNull(mobilePushTokens.deletedAt),
         ),
@@ -606,7 +613,7 @@ export class NotificationsRepository {
         return [];
       }
 
-      await tx
+      /* tenant-scope: system delivery lease */ await tx
         .update(notificationDeliveries)
         .set({
           nextRetryAt: input.leaseUntil,
@@ -653,12 +660,14 @@ export class NotificationsRepository {
   }
 
   async markDeliverySent(input: {
+    tenantId: string;
     deliveryId: string;
     externalId: string;
     now: Date;
   }): Promise<void> {
     await this.updateDeliveryStatus({
       deliveryId: input.deliveryId,
+      tenantId: input.tenantId,
       status: "sent",
       now: input.now,
       externalId: input.externalId,
@@ -676,6 +685,7 @@ export class NotificationsRepository {
     now: Date;
   }): Promise<void> {
     await this.updateDeliveryStatus({
+      tenantId: input.delivery.tenantId,
       deliveryId: input.delivery.id,
       status: "failed",
       now: input.now,
@@ -686,12 +696,14 @@ export class NotificationsRepository {
   }
 
   async skipDelivery(input: {
+    tenantId: string;
     deliveryId: string;
     reason: string;
     now: Date;
   }): Promise<void> {
     await this.updateDeliveryStatus({
       deliveryId: input.deliveryId,
+      tenantId: input.tenantId,
       status: "cancelled",
       now: input.now,
       failedReason: input.reason,
@@ -731,6 +743,7 @@ export class NotificationsRepository {
   }
 
   private async updateDeliveryStatus(input: {
+    tenantId: string;
     deliveryId: string;
     status: NotificationDeliveryStatus;
     now: Date;
@@ -753,7 +766,12 @@ export class NotificationsRepository {
           : undefined,
         updatedAt: input.now,
       })
-      .where(eq(notificationDeliveries.id, input.deliveryId));
+      .where(
+        and(
+          eq(notificationDeliveries.tenantId, input.tenantId),
+          eq(notificationDeliveries.id, input.deliveryId),
+        ),
+      );
   }
 }
 

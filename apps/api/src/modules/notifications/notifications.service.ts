@@ -135,11 +135,13 @@ export class NotificationsService implements NotificationPublisher {
     return result;
   }
 
-  async processEmailDeliveries(input: {
-    now?: Date;
-    limit?: number;
-    leaseSeconds?: number;
-  } = {}): Promise<NotificationDeliveryRunResult> {
+  async processEmailDeliveries(
+    input: {
+      now?: Date;
+      limit?: number;
+      leaseSeconds?: number;
+    } = {},
+  ): Promise<NotificationDeliveryRunResult> {
     const now = input.now ?? new Date();
     const leaseUntil = new Date(
       now.getTime() + (input.leaseSeconds ?? 5 * 60) * 1000,
@@ -165,11 +167,13 @@ export class NotificationsService implements NotificationPublisher {
     return result;
   }
 
-  async processPushDeliveries(input: {
-    now?: Date;
-    limit?: number;
-    leaseSeconds?: number;
-  } = {}): Promise<NotificationDeliveryRunResult> {
+  async processPushDeliveries(
+    input: {
+      now?: Date;
+      limit?: number;
+      leaseSeconds?: number;
+    } = {},
+  ): Promise<NotificationDeliveryRunResult> {
     const now = input.now ?? new Date();
     const leaseUntil = new Date(
       now.getTime() + (input.leaseSeconds ?? 5 * 60) * 1000,
@@ -195,10 +199,12 @@ export class NotificationsService implements NotificationPublisher {
     return result;
   }
 
-  async publishOverdueTicketEvents(input: {
-    now?: Date;
-    limit?: number;
-  } = {}): Promise<NotificationPublishResult> {
+  async publishOverdueTicketEvents(
+    input: {
+      now?: Date;
+      limit?: number;
+    } = {},
+  ): Promise<NotificationPublishResult> {
     const now = input.now ?? new Date();
     const sources = await this.repository.listOverdueTicketEventSources({
       now,
@@ -326,6 +332,7 @@ export class NotificationsService implements NotificationPublisher {
 
     if (!validation.ok) {
       await this.repository.skipDelivery({
+        tenantId: item.delivery.tenantId,
         deliveryId: item.delivery.id,
         reason: validation.reason,
         now,
@@ -350,6 +357,7 @@ export class NotificationsService implements NotificationPublisher {
       });
 
       await this.repository.markDeliverySent({
+        tenantId: item.delivery.tenantId,
         deliveryId: item.delivery.id,
         externalId: sendResult.externalId,
         now,
@@ -377,6 +385,7 @@ export class NotificationsService implements NotificationPublisher {
 
     if (!validation.ok) {
       await this.repository.skipDelivery({
+        tenantId: item.delivery.tenantId,
         deliveryId: item.delivery.id,
         reason: validation.reason,
         now,
@@ -431,6 +440,7 @@ export class NotificationsService implements NotificationPublisher {
 
     if (invalidTokenIds.length > 0) {
       await this.repository.softDeletePushTokens({
+        tenantId: item.delivery.tenantId,
         tokenIds: invalidTokenIds,
         now,
       });
@@ -446,6 +456,7 @@ export class NotificationsService implements NotificationPublisher {
 
     if (sentExternalId) {
       await this.repository.markDeliverySent({
+        tenantId: item.delivery.tenantId,
         deliveryId: item.delivery.id,
         externalId: sentExternalId,
         now,
@@ -474,6 +485,7 @@ export class NotificationsService implements NotificationPublisher {
     }
 
     await this.repository.skipDelivery({
+      tenantId: item.delivery.tenantId,
       deliveryId: item.delivery.id,
       reason: "push_tokens_invalid",
       now,
@@ -494,7 +506,11 @@ export class NotificationsService implements NotificationPublisher {
   ): Promise<
     { ok: true; tokens: PushTokenRecord[] } | { ok: false; reason: string }
   > {
-    if (!(await this.repository.isTenantNotificationsEnabled(item.delivery.tenantId))) {
+    if (
+      !(await this.repository.isTenantNotificationsEnabled(
+        item.delivery.tenantId,
+      ))
+    ) {
       return { ok: false, reason: "tenant_notifications_disabled" };
     }
 
@@ -563,7 +579,11 @@ export class NotificationsService implements NotificationPublisher {
     item: DeliveryWorkItem,
     now: Date,
   ): Promise<{ ok: true; to: string } | { ok: false; reason: string }> {
-    if (!(await this.repository.isTenantNotificationsEnabled(item.delivery.tenantId))) {
+    if (
+      !(await this.repository.isTenantNotificationsEnabled(
+        item.delivery.tenantId,
+      ))
+    ) {
       return { ok: false, reason: "tenant_notifications_disabled" };
     }
 
@@ -624,7 +644,10 @@ export class NotificationsService implements NotificationPublisher {
   private async resolveRecipientEmail(
     item: DeliveryWorkItem,
   ): Promise<string | null> {
-    if (item.delivery.recipientType === "customer" && item.delivery.recipientId) {
+    if (
+      item.delivery.recipientType === "customer" &&
+      item.delivery.recipientId
+    ) {
       return this.repository.findCustomerEmail({
         tenantId: item.delivery.tenantId,
         customerId: item.delivery.recipientId,
@@ -788,7 +811,9 @@ function isChannelDisabledBySettings(
  * Builds the FCM data payload used by the mobile client for deep-linking.
  * FCM only accepts string values.
  */
-function buildPushData(notification: NotificationRecord): Record<string, string> {
+function buildPushData(
+  notification: NotificationRecord,
+): Record<string, string> {
   const data: Record<string, string> = {
     notificationId: notification.id,
   };

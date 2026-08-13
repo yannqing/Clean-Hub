@@ -291,7 +291,10 @@ export class AuthService {
       throw new AuthError("TOKEN_INVALID", "Failed to create refresh token.");
     }
 
-    await this.repository.updateLastLoginAt(user.id);
+    await this.repository.updateLastLoginAt({
+      tenantId: user.tenantId,
+      userId: user.id,
+    });
     await this.repository.writeAuditLog({
       tenantId: user.tenantId,
       actorUserId: user.id,
@@ -363,8 +366,14 @@ export class AuthService {
       throw new AuthError("TOKEN_INVALID", "Failed to create refresh token.");
     }
 
-    await repository.markPosTerminalCredentialUsed(terminal.id);
-    await repository.updateLastLoginAt(currentUser.id);
+    await repository.markPosTerminalCredentialUsed({
+      tenantId: terminal.tenantId,
+      terminalId: terminal.id,
+    });
+    await repository.updateLastLoginAt({
+      tenantId: currentUser.tenantId,
+      userId: currentUser.id,
+    });
     await repository.writeAuditLog({
       tenantId: currentUser.tenantId,
       actorUserId: currentUser.id,
@@ -686,7 +695,10 @@ export class AuthService {
           }
 
           const user = matchedUsers[0]!;
-          await repository.lockPosTerminalById(terminal.id);
+          await repository.lockPosTerminalById({
+            tenantId: terminal.tenantId,
+            terminalId: terminal.id,
+          });
 
           let signingTerminal: PosTerminalLoginContext;
           try {
@@ -770,7 +782,19 @@ export class AuthService {
         // its refresh tokens. Refresh follows the same order so neither path
         // can insert a live successor after a disable/rebind/revoke commit.
         if (tokenHint.terminalId) {
-          await repository.lockPosTerminalById(tokenHint.terminalId);
+          if (!tokenHint.tenantId) {
+            return {
+              ok: false as const,
+              error: new AuthError(
+                "TOKEN_INVALID",
+                "Refresh token is invalid.",
+              ),
+            };
+          }
+          await repository.lockPosTerminalById({
+            tenantId: tokenHint.tenantId,
+            terminalId: tokenHint.terminalId,
+          });
         }
 
         const storedToken =
@@ -792,7 +816,10 @@ export class AuthService {
             REFRESH_TOKEN_ROTATION_GRACE_MS;
 
         if (storedToken.revokedAt && !isConcurrentRotationRetry) {
-          await repository.revokeRefreshTokenFamily(storedToken.familyId);
+          await repository.revokeRefreshTokenFamily({
+            tenantId: storedToken.tenantId,
+            familyId: storedToken.familyId,
+          });
           await repository.writeAuditLog({
             tenantId: storedToken.tenantId,
             actorUserId: storedToken.userId,
@@ -812,6 +839,7 @@ export class AuthService {
 
         if (storedToken.expiresAt.getTime() <= now) {
           await repository.revokeRefreshToken({
+            tenantId: storedToken.tenantId,
             tokenId: storedToken.id,
           });
           return {
@@ -836,7 +864,10 @@ export class AuthService {
         await this.assertUserIdentityAvailable(user, true, repository);
 
         if (storedToken.tenantId !== user.tenantId) {
-          await repository.revokeRefreshTokenFamily(storedToken.familyId);
+          await repository.revokeRefreshTokenFamily({
+            tenantId: storedToken.tenantId,
+            familyId: storedToken.familyId,
+          });
           return {
             ok: false as const,
             error: new AuthError(
@@ -861,7 +892,10 @@ export class AuthService {
             terminal.tenantId !== storedToken.tenantId ||
             terminal.deviceId !== storedToken.deviceId)
         ) {
-          await repository.revokeRefreshTokenFamily(storedToken.familyId);
+          await repository.revokeRefreshTokenFamily({
+            tenantId: storedToken.tenantId,
+            familyId: storedToken.familyId,
+          });
           return {
             ok: false as const,
             error: new AuthError(
@@ -908,7 +942,10 @@ export class AuthService {
             successor.tokenHash === hashOpaqueToken(derivedRefreshToken);
 
           if (!successorMatches || successor.revokedAt) {
-            await repository.revokeRefreshTokenFamily(storedToken.familyId);
+            await repository.revokeRefreshTokenFamily({
+              tenantId: storedToken.tenantId,
+              familyId: storedToken.familyId,
+            });
             return {
               ok: false as const,
               error: new AuthError(
@@ -920,6 +957,7 @@ export class AuthService {
 
           if (successor.expiresAt.getTime() <= now) {
             await repository.revokeRefreshToken({
+              tenantId: successor.tenantId,
               tokenId: successor.id,
             });
             return {
@@ -969,6 +1007,7 @@ export class AuthService {
           }
 
           await repository.revokeRefreshToken({
+            tenantId: storedToken.tenantId,
             tokenId: storedToken.id,
             replacedByTokenId: newRefreshTokenId,
           });
@@ -1002,14 +1041,21 @@ export class AuthService {
       if (tokenHint) {
         await this.repository.runInTransaction(async (repository) => {
           if (tokenHint.terminalId) {
-            await repository.lockPosTerminalById(tokenHint.terminalId);
+            if (!tokenHint.tenantId) return;
+            await repository.lockPosTerminalById({
+              tenantId: tokenHint.tenantId,
+              terminalId: tokenHint.terminalId,
+            });
           }
 
           const storedToken =
             await repository.findRefreshTokenByHashForUpdate(tokenHash);
           if (!storedToken) return;
 
-          await repository.revokeRefreshTokenFamily(storedToken.familyId);
+          await repository.revokeRefreshTokenFamily({
+            tenantId: storedToken.tenantId,
+            familyId: storedToken.familyId,
+          });
           await repository.writeAuditLog({
             tenantId: storedToken.tenantId,
             actorUserId: storedToken.userId,

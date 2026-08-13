@@ -13,6 +13,10 @@ import { createRequirePosTerminalMiddleware } from "./http/pos-terminal.middlewa
 import { createRequestContextMiddleware } from "./http/request-context.middleware.js";
 import type { AppBindings } from "./http/types.js";
 import { requireNonTerminalWebSession } from "./http/web-session.middleware.js";
+import {
+  createSystemDatabaseContextMiddleware,
+  createTenantDatabaseContextMiddleware,
+} from "./http/database-context.middleware.js";
 import { createAuthServiceFromEnv } from "./modules/auth/auth.factory.js";
 import { createAuthRoutes } from "./modules/auth/auth.routes.js";
 import { resolveAuthCookieSecure } from "./modules/auth/cookie.service.js";
@@ -134,7 +138,13 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
     }),
   );
 
+  app.use("/auth/*", createSystemDatabaseContextMiddleware());
   app.route("/auth", createAuthRoutes({ authService }));
+  app.use("/mobile/auth/*", createSystemDatabaseContextMiddleware());
+  app.use(
+    "/mobile/payment/webhooks/*",
+    createSystemDatabaseContextMiddleware(),
+  );
   app.route(
     "/mobile",
     createMobileRoutes({
@@ -145,10 +155,13 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
 
   app.use("/saas/*", createRequireAuthMiddleware(authService));
   app.use("/saas/*", requireNonTerminalWebSession());
+  app.use("/saas/*", createSystemDatabaseContextMiddleware());
   app.use("/tenant/*", createRequireAuthMiddleware(authService));
   app.use("/tenant/*", requireNonTerminalWebSession());
+  app.use("/tenant/*", createTenantDatabaseContextMiddleware());
   app.use("/pos/*", createRequireAuthMiddleware(authService));
   app.use("/pos/*", createRequirePosTerminalMiddleware());
+  app.use("/pos/*", createTenantDatabaseContextMiddleware());
 
   // SaaS 平台 - 公共模块
   app.route("/saas/overview", createSaasOverviewRoutes());
