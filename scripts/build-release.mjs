@@ -76,7 +76,7 @@ FROM base AS api
 COPY api ./api
 EXPOSE 4000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \\
-  CMD node -e "fetch('http://127.0.0.1:4000/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:4000/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "api/index.js"]
 
 FROM base AS migrate
@@ -184,6 +184,96 @@ async function writeReleaseCompose() {
     networks:
       - cleanhub
 
+  postgres-backup:
+    image: postgres:16-alpine
+    container_name: cleanhub-postgres-backup
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: \${POSTGRES_DB:-cleanhub}
+      POSTGRES_USER: \${POSTGRES_USER:-cleanhub_admin}
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      BACKUP_DIRECTORY: /backups
+      BACKUP_INTERVAL_SECONDS: \${BACKUP_INTERVAL_SECONDS:-900}
+      BACKUP_LOCAL_RETENTION_DAYS: \${BACKUP_LOCAL_RETENTION_DAYS:-7}
+    entrypoint:
+      - /bin/sh
+      - /opt/cleanhub/postgres/backup-loop.sh
+    volumes:
+      - ./postgres/backup-loop.sh:/opt/cleanhub/postgres/backup-loop.sh:ro
+      - cleanhub-postgres-backups:/backups
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'test -n "$${composeDollar}(find /backups/.last-success -mmin -30 -print -quit 2>/dev/null)"'
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - cleanhub
+
+  postgres-backup-cloud:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    container_name: cleanhub-postgres-backup-cloud
+    restart: unless-stopped
+    environment:
+      BACKUP_DIRECTORY: /backups
+      BACKUP_S3_ENDPOINT: \${BACKUP_S3_ENDPOINT:?External BACKUP_S3_ENDPOINT is required}
+      BACKUP_S3_ACCESS_KEY: \${BACKUP_S3_ACCESS_KEY:?BACKUP_S3_ACCESS_KEY is required}
+      BACKUP_S3_SECRET_KEY: \${BACKUP_S3_SECRET_KEY:?BACKUP_S3_SECRET_KEY is required}
+      BACKUP_S3_BUCKET: \${BACKUP_S3_BUCKET:-cleanhub-backups}
+      BACKUP_S3_PREFIX: \${BACKUP_S3_PREFIX:-postgres}
+      BACKUP_S3_ALLOW_INSECURE: \${BACKUP_S3_ALLOW_INSECURE:-false}
+      BACKUP_CLOUD_SYNC_INTERVAL_SECONDS: \${BACKUP_CLOUD_SYNC_INTERVAL_SECONDS:-60}
+    entrypoint:
+      - /bin/sh
+      - /opt/cleanhub/postgres/cloud-backup-loop.sh
+    volumes:
+      - ./postgres/cloud-backup-loop.sh:/opt/cleanhub/postgres/cloud-backup-loop.sh:ro
+      - cleanhub-postgres-backups:/backups:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'test -n "$${composeDollar}(find /tmp/.last-cloud-success -mmin -5 -print -quit 2>/dev/null)"'
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10m
+    depends_on:
+      postgres-backup:
+        condition: service_started
+    networks:
+      - cleanhub
+
+  postgres-restore-drill:
+    image: postgres:16-alpine
+    profiles:
+      - tools
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: \${POSTGRES_USER:-cleanhub_admin}
+      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      BACKUP_DIRECTORY: /backups
+    entrypoint:
+      - /bin/sh
+      - /opt/cleanhub/postgres/restore-drill.sh
+    volumes:
+      - ./postgres/restore-drill.sh:/opt/cleanhub/postgres/restore-drill.sh:ro
+      - cleanhub-postgres-backups:/backups:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-backup:
+        condition: service_started
+    networks:
+      - cleanhub
+
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: cleanhub-minio
@@ -221,6 +311,40 @@ async function writeReleaseCompose() {
         mc alias set cleanhub http://minio:9000 "${composeDollar}${composeDollar}MINIO_ROOT_USER" "${composeDollar}${composeDollar}MINIO_ROOT_PASSWORD"
         mc mb --ignore-existing "cleanhub/${composeDollar}${composeDollar}OBJECT_STORAGE_BUCKET"
         mc anonymous set none "cleanhub/${composeDollar}${composeDollar}OBJECT_STORAGE_BUCKET"
+    networks:
+      - cleanhub
+
+  object-storage-backup-cloud:
+    image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+    container_name: cleanhub-object-storage-backup-cloud
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: \${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: \${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      OBJECT_STORAGE_BUCKET: \${OBJECT_STORAGE_BUCKET:-cleanhub-media}
+      BACKUP_S3_ENDPOINT: \${BACKUP_S3_ENDPOINT:?External BACKUP_S3_ENDPOINT is required}
+      BACKUP_S3_ACCESS_KEY: \${BACKUP_S3_ACCESS_KEY:?BACKUP_S3_ACCESS_KEY is required}
+      BACKUP_S3_SECRET_KEY: \${BACKUP_S3_SECRET_KEY:?BACKUP_S3_SECRET_KEY is required}
+      BACKUP_S3_BUCKET: \${BACKUP_S3_BUCKET:-cleanhub-backups}
+      BACKUP_MEDIA_S3_PREFIX: \${BACKUP_MEDIA_S3_PREFIX:-object-storage}
+      BACKUP_S3_ALLOW_INSECURE: \${BACKUP_S3_ALLOW_INSECURE:-false}
+      BACKUP_MEDIA_SYNC_INTERVAL_SECONDS: \${BACKUP_MEDIA_SYNC_INTERVAL_SECONDS:-300}
+    entrypoint:
+      - /bin/sh
+      - /opt/cleanhub/postgres/cloud-object-storage-loop.sh
+    volumes:
+      - ./postgres/cloud-object-storage-loop.sh:/opt/cleanhub/postgres/cloud-object-storage-loop.sh:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'test -n "$${composeDollar}(find /tmp/.last-media-cloud-success -mmin -15 -print -quit 2>/dev/null)"'
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 10m
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
     networks:
       - cleanhub
 
@@ -289,7 +413,6 @@ async function writeReleaseCompose() {
       # (fetch http://127.0.0.1:3000/login) fail. Bind all interfaces instead.
       HOSTNAME: 0.0.0.0
       CLEANHUB_API_BASE_URL: \${CLEANHUB_API_BASE_URL:-http://api:4000}
-      NEXT_PUBLIC_API_BASE_URL: \${NEXT_PUBLIC_API_BASE_URL:-/api}
     ports:
       - "127.0.0.1:\${WEB_ADMIN_HOST_PORT:-3010}:3000"
     depends_on:
@@ -311,7 +434,6 @@ async function writeReleaseCompose() {
       PORT: 3001
       HOSTNAME: 0.0.0.0
       CLEANHUB_API_BASE_URL: \${CLEANHUB_API_BASE_URL:-http://api:4000}
-      NEXT_PUBLIC_API_BASE_URL: \${NEXT_PUBLIC_API_BASE_URL:-/api}
     ports:
       - "127.0.0.1:\${POS_WEB_HOST_PORT:-3011}:3001"
     depends_on:
@@ -325,6 +447,7 @@ async function writeReleaseCompose() {
     container_name: cleanhub-gateway
     restart: unless-stopped
     environment:
+      WEB_ADMIN_PUBLIC_HOST: \${WEB_ADMIN_PUBLIC_HOST:?WEB_ADMIN_PUBLIC_HOST is required}
       POS_PUBLIC_HOST: \${POS_PUBLIC_HOST:?POS_PUBLIC_HOST is required}
     ports:
       - "80:80"
@@ -338,6 +461,8 @@ async function writeReleaseCompose() {
       api:
         condition: service_healthy
       pos-web:
+        condition: service_healthy
+      web-admin:
         condition: service_healthy
     networks:
       - cleanhub
@@ -393,6 +518,8 @@ networks:
 volumes:
   cleanhub-postgres-data:
     name: cleanhub-postgres-data
+  cleanhub-postgres-backups:
+    name: cleanhub-postgres-backups
   cleanhub-minio-data:
     name: cleanhub-minio-data
   cleanhub-caddy-data:
@@ -737,6 +864,10 @@ async function writeManifest() {
     "pos-web/apps/pos-web/server.js",
     "env/production.env.example",
     "postgres/ensure-app-role.sh",
+    "postgres/backup-loop.sh",
+    "postgres/cloud-backup-loop.sh",
+    "postgres/cloud-object-storage-loop.sh",
+    "postgres/restore-drill.sh",
     "caddy/Caddyfile",
     "nginx/cleanhub.conf.example",
   ];
@@ -811,6 +942,17 @@ async function main() {
     join(rootDir, "deploy", "postgres", "ensure-app-role.sh"),
     join(artifactDir, "postgres", "ensure-app-role.sh"),
   );
+  for (const fileName of [
+    "backup-loop.sh",
+    "cloud-backup-loop.sh",
+    "cloud-object-storage-loop.sh",
+    "restore-drill.sh",
+  ]) {
+    await cp(
+      join(rootDir, "deploy", "postgres", fileName),
+      join(artifactDir, "postgres", fileName),
+    );
+  }
   await cp(
     join(rootDir, "deploy", "caddy", "Caddyfile"),
     join(artifactDir, "caddy", "Caddyfile"),
