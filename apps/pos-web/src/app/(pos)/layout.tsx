@@ -3,10 +3,11 @@ import { PosRuntimeConfigProvider } from "@/components/runtime/pos-runtime-confi
 import { getMyBranchQuery } from "@/features/branches/queries";
 import { getNotificationsOverviewQuery } from "@/features/notifications/queries";
 import { OfflineSyncProvider } from "@/features/offline/components";
+import { PosTerminalRealtimeProvider } from "@/features/realtime/components";
+import { PosHardwareCacheWarmer } from "@/features/hardware/components/pos-hardware-cache-warmer";
 import { getTerminalSettingsQuery } from "@/features/settings/queries/get-terminal-settings.query";
 import {
   PosIdleLock,
-  PosTerminalHeartbeatReporter,
   PosTerminalSessionGuard,
 } from "@/features/terminal-setup/components";
 import { getCurrentUser } from "@/lib/auth";
@@ -44,8 +45,12 @@ export default async function PosLayout({
       terminalCredentialVersion={user?.terminalCredentialVersion}
       currency={branch?.defaultCurrency}
       timeZone={user?.timezone}
+      role={user?.role}
+      autoPrintReceipt={terminalSettings?.autoPrintReceipt}
+      printCopies={terminalSettings?.printCopies}
     >
       <PosTerminalSessionGuard />
+      <PosHardwareCacheWarmer />
       <OfflineSyncProvider
         tenantId={user?.tenantId}
         branchId={runtimeBranchId}
@@ -53,19 +58,20 @@ export default async function PosLayout({
         userId={user?.userId}
         terminalCredentialVersion={user?.terminalCredentialVersion}
       >
-        <PosTerminalHeartbeatReporter enabled={Boolean(user?.terminalId)} />
-        <PosIdleLock
-          lockTimeoutSeconds={
-            user ? (terminalSettings?.lockTimeoutSeconds ?? null) : null
-          }
-        />
-        <PosShell
-          branchName={branch?.name ?? "—"}
-          notificationUnreadCount={notificationsOverview?.unreadCount ?? 0}
-          profile={profile}
-        >
-          {children}
-        </PosShell>
+        <PosTerminalRealtimeProvider enabled={Boolean(user?.terminalId)}>
+          <PosIdleLock
+            lockTimeoutSeconds={
+              user ? (terminalSettings?.lockTimeoutSeconds ?? null) : null
+            }
+          />
+          <PosShell
+            branchName={branch?.name ?? "—"}
+            notificationUnreadCount={notificationsOverview?.unreadCount ?? 0}
+            profile={profile}
+          >
+            {children}
+          </PosShell>
+        </PosTerminalRealtimeProvider>
       </OfflineSyncProvider>
     </PosRuntimeConfigProvider>
   );

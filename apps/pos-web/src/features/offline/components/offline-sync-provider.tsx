@@ -22,6 +22,7 @@ import {
 
 import { getPosOfflineStorage } from "@/features/hardware/lib/desktop-bridge";
 import { replayCurrentPosOfflineQueueItem } from "@/features/offline/lib/replay-pos-offline-queue-item";
+import { summarizePosOfflineQueueItems } from "@/features/offline/lib/pos-offline-operations";
 import { verifyPosTerminalSession } from "@/features/terminal-setup/session-health";
 import {
   isPosTerminalSessionInvalidated,
@@ -41,6 +42,8 @@ type OfflineSyncContextValue = {
   queue: OfflineQueue | null;
   status: OfflineSyncStatus;
   pendingCount: number;
+  pendingSalesCount: number;
+  oldestPendingAt: string | null;
   error: string | null;
   retry(): Promise<void>;
   refresh(): Promise<void>;
@@ -59,6 +62,24 @@ function getQuarantineWarning(pendingCount: number): string | null {
   }
 
   return `检测到 ${pendingCount} 条待同步记录属于其他门店、其他用户或不同的终端凭证版本。为避免数据错归，系统已将其隔离且不会自动重放，请联系管理员处理。`;
+}
+
+async function runWithOfflineReplayLock(
+  queueKey: string,
+  operation: () => Promise<void>,
+): Promise<void> {
+  if (typeof navigator === "undefined" || !navigator.locks) {
+    await operation();
+    return;
+  }
+
+  await navigator.locks.request(
+    `cleanhub:offline-replay:${queueKey}`,
+    { mode: "exclusive", ifAvailable: true },
+    async (lock) => {
+      if (lock) await operation();
+    },
+  );
 }
 
 type ScopedRuntimeQueue = {
@@ -88,6 +109,8 @@ export function OfflineSyncProvider({
   const activeScopeKeyRef = useRef<string | null>(null);
   const [online, setOnline] = useState(true);
   const [currentPendingCount, setCurrentPendingCount] = useState(0);
+  const [pendingSalesCount, setPendingSalesCount] = useState(0);
+  const [oldestPendingAt, setOldestPendingAt] = useState<string | null>(null);
   const [quarantinedPendingCount, setQuarantinedPendingCount] = useState(0);
   const [replaying, setReplaying] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -128,6 +151,8 @@ export function OfflineSyncProvider({
   const refresh = useCallback(async () => {
     if (!runtimeQueue) {
       setCurrentPendingCount(0);
+      setPendingSalesCount(0);
+      setOldestPendingAt(null);
       setSyncError("The enrolled terminal scope is unavailable.");
       return;
     }
@@ -140,6 +165,9 @@ export function OfflineSyncProvider({
       setCurrentPendingCount(
         items.filter((item) => item.status === "pending").length,
       );
+      const summary = summarizePosOfflineQueueItems(items);
+      setPendingSalesCount(summary.pendingSalesCount);
+      setOldestPendingAt(summary.oldestPendingAt);
       const failed = items.find(
         (item) => item.status === "pending" && Boolean(item.lastError),
       );
@@ -266,7 +294,10 @@ export function OfflineSyncProvider({
       }
     };
 
-    const replayPromise = replay().finally(() => {
+    const replayPromise = runWithOfflineReplayLock(
+      runtimeQueue.queueKey,
+      replay,
+    ).finally(() => {
       if (
         replayPromisesRef.current.get(runtimeQueue.queueKey) === replayPromise
       ) {
@@ -283,6 +314,8 @@ export function OfflineSyncProvider({
     const initialRefresh = window.setTimeout(() => {
       setOnline(navigator.onLine);
       setCurrentPendingCount(0);
+      setPendingSalesCount(0);
+      setOldestPendingAt(null);
       setQuarantinedPendingCount(0);
       setQuarantineWarning(null);
       setSyncError(null);
@@ -351,6 +384,8 @@ export function OfflineSyncProvider({
       queue,
       status,
       pendingCount,
+      pendingSalesCount,
+      oldestPendingAt,
       error,
       retry: replayQueue,
       refresh,
@@ -359,6 +394,8 @@ export function OfflineSyncProvider({
     [
       error,
       pendingCount,
+      pendingSalesCount,
+      oldestPendingAt,
       queue,
       refresh,
       registerReplayHandler,

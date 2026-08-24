@@ -37,6 +37,15 @@ export type PosTerminalSettingsSummary = {
   lockTimeoutSeconds: number;
   status: PosTerminalSettingsStatus;
   lastSeenAt: string | null;
+  lastRealtimeSeenAt: string | null;
+  connectionLeaseUntil: string | null;
+  lastDisconnectedAt: string | null;
+  lastDisconnectReason: string | null;
+  pendingSalesCount: number | null;
+  pendingOperationsCount: number | null;
+  oldestPendingAt: string | null;
+  statusRevision: number;
+  realtimeProtocolVersion: number | null;
   syncStatus: PosTerminalSyncStatus;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
@@ -76,6 +85,9 @@ export type PosTerminalHeartbeatRequest = {
   syncStatus?: PosTerminalSyncStatus;
   lastSyncedAt?: string | null;
   lastSyncError?: string | null;
+  pendingSalesCount?: number;
+  pendingOperationsCount?: number;
+  oldestPendingAt?: string | null;
 };
 
 export type PosTerminalSettingsInput<TData> = {

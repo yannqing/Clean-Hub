@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useEffect, useRef, useTransition } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
 import { useTenantI18n } from "@/i18n";
@@ -42,6 +42,7 @@ import {
   type PointOfSaleDatePresetId,
 } from "../date-presets";
 import type { PointOfSaleOverview, PointOfSaleOverviewQuery } from "../types";
+import { useTenantPosRealtime } from "./tenant-pos-realtime-provider";
 
 type PointOfSaleOverviewViewProps = {
   defaultCurrency: string;
@@ -120,8 +121,42 @@ export function PointOfSaleOverviewView({
   const pathname = usePathname();
   const router = useRouter();
   const { locale, m } = useTenantI18n();
+  const { connectionState, serviceHealth, subscribe } = useTenantPosRealtime();
   const [isPending, startTransition] = useTransition();
+  const refreshTimerRef = useRef<number | null>(null);
   const currency = summary?.currency ?? query.currency ?? defaultCurrency;
+
+  useEffect(
+    () =>
+      subscribe(() => {
+        if (refreshTimerRef.current !== null) {
+          window.clearTimeout(refreshTimerRef.current);
+        }
+        refreshTimerRef.current = window.setTimeout(() => {
+          refreshTimerRef.current = null;
+          router.refresh();
+        }, 500);
+      }),
+    [router, subscribe],
+  );
+
+  useEffect(() => {
+    if (connectionState === "connected") {
+      router.refresh();
+      return;
+    }
+    const fallback = window.setInterval(() => router.refresh(), 30_000);
+    return () => window.clearInterval(fallback);
+  }, [connectionState, router]);
+
+  useEffect(
+    () => () => {
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current);
+      }
+    },
+    [],
+  );
 
   function navigate(changes: Partial<PointOfSaleOverviewQuery>) {
     const values = { ...query, ...changes };
@@ -209,12 +244,30 @@ export function PointOfSaleOverviewView({
               </p>
             </div>
           </div>
-          {summary ? (
-            <span className="shrink-0 text-[10px] text-background/50">
-              {m.pointOfSale.updatedAt}{" "}
-              {formatTenantTime(summary.generatedAt, locale, summary.timezone)}
-            </span>
-          ) : null}
+          <div className="shrink-0 text-right text-[10px] text-background/50">
+            <span
+              className={cn(
+                "mb-1 ml-auto block size-1.5 rounded-full",
+                connectionState === "connected" && serviceHealth === "healthy"
+                  ? "bg-emerald-400"
+                  : connectionState === "connected"
+                    ? "bg-destructive"
+                    : connectionState === "connecting"
+                      ? "animate-pulse bg-blue-400"
+                      : "bg-amber-400",
+              )}
+            />
+            {summary ? (
+              <span>
+                {m.pointOfSale.updatedAt}{" "}
+                {formatTenantTime(
+                  summary.generatedAt,
+                  locale,
+                  summary.timezone,
+                )}
+              </span>
+            ) : null}
+          </div>
         </div>
       </section>
 

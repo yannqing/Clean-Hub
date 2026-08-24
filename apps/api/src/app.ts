@@ -1,5 +1,10 @@
+import {
+  getDbConnection,
+  runWithSystemDatabaseContext,
+  runWithTenantDatabaseContext,
+} from "@cleanhub/db";
 import { createLogger } from "@cleanhub/logger";
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 
 import { loadApiEnv } from "./config/env.js";
@@ -56,6 +61,15 @@ import { createTenantServiceRoutes } from "./modules/tenant/services/services.ro
 import { createTenantSettingsRoutes } from "./modules/tenant/settings/settings.routes.js";
 import { createTenantUsersRoutes } from "./modules/tenant/users/tenant-users.routes.js";
 import { createPosRoutes } from "./modules/pos/pos.routes.js";
+import {
+  createRealtimeRoutes,
+  persistRealtimeConnected,
+  persistRealtimeDisconnected,
+  persistRealtimeLease,
+  reconcileExpiredRealtimeLeases,
+  REALTIME_LEASE_DURATION_MS,
+  RealtimeHub,
+} from "./realtime/index.js";
 
 export type CreateApiAppOptions = {
   env?: NodeJS.ProcessEnv;
@@ -71,6 +85,53 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   const authCookieSecure = resolveAuthCookieSecure(env);
   const mobileAuthService = createMobileAuthServiceFromEnv({ env });
   const notificationsService = new NotificationsService({ env });
+  const realtimeHub = new RealtimeHub({
+    logger,
+    onFirstPosConnection: async (identity) => {
+      try {
+        const state = await runWithTenantDatabaseContext(
+          identity.tenantId,
+          () => persistRealtimeConnected(identity, REALTIME_LEASE_DURATION_MS),
+        );
+        realtimeHub.markServiceHealthy();
+        if (state) realtimeHub.broadcastDeviceState(identity.tenantId, state);
+        return Boolean(state);
+      } catch (error) {
+        realtimeHub.markServiceDegraded();
+        throw error;
+      }
+    },
+    onPosLeaseRefresh: async (identity) => {
+      try {
+        const state = await runWithTenantDatabaseContext(
+          identity.tenantId,
+          () => persistRealtimeLease(identity, REALTIME_LEASE_DURATION_MS),
+        );
+        realtimeHub.markServiceHealthy();
+        return Boolean(state);
+      } catch (error) {
+        realtimeHub.markServiceDegraded();
+        throw error;
+      }
+    },
+    onLastPosDisconnection: async (identity, reason) => {
+      try {
+        const state = await runWithTenantDatabaseContext(
+          identity.tenantId,
+          () => persistRealtimeDisconnected(identity, reason),
+        );
+        realtimeHub.markServiceHealthy();
+        if (state) realtimeHub.broadcastDeviceState(identity.tenantId, state);
+      } catch (error) {
+        realtimeHub.markServiceDegraded();
+        throw error;
+      }
+    },
+    onExpiredPosLeaseSweep: (activeTerminalIds) =>
+      runWithSystemDatabaseContext(() =>
+        reconcileExpiredRealtimeLeases(activeTerminalIds),
+      ),
+  });
   const app = new Hono<AppBindings>();
 
   app.use("*", async (c, next) => {
@@ -131,11 +192,36 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
     }),
   );
 
-  app.get("/health", (c) =>
-    c.json({
-      status: "ok",
+  app.get("/health/live", (c) =>
+    c.json({ status: "ok", service: "cleanhub-api" }),
+  );
+
+  const readiness = async (c: Context<AppBindings>) => {
+    let database: "healthy" | "unavailable" = "healthy";
+    try {
+      await getDbConnection().pool.query("select 1");
+      realtimeHub.markServiceHealthy();
+    } catch (error) {
+      database = "unavailable";
+      realtimeHub.markServiceDegraded();
+      logger.warn({ err: error }, "API readiness database probe failed");
+    }
+    const realtime = realtimeHub.getHealth();
+    const ready = database === "healthy" && realtime.started;
+    const body = {
+      status: ready ? "ok" : "not_ready",
       service: "cleanhub-api",
-    }),
+      checks: { database, realtime },
+    };
+    return ready ? c.json(body, 200) : c.json(body, 503);
+  };
+
+  app.get("/health", readiness);
+  app.get("/health/ready", readiness);
+
+  app.route(
+    "/realtime",
+    createRealtimeRoutes({ authService, env: apiEnv, hub: realtimeHub }),
   );
 
   app.use("/auth/*", createSystemDatabaseContextMiddleware());
@@ -229,5 +315,6 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
     app,
     env: apiEnv,
     logger,
+    realtimeHub,
   };
 }

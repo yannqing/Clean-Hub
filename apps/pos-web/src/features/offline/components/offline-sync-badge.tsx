@@ -5,7 +5,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 
 import { Icon } from "@/components/app-shell/icons";
 
-import { useOfflineSync } from "./offline-sync-provider";
+import { usePosTerminalRealtime } from "@/features/realtime/components";
 
 type OfflineSyncBadgeProps = {
   className?: string;
@@ -17,20 +17,46 @@ export function OfflineSyncBadge({
   variant = "default",
 }: OfflineSyncBadgeProps = {}) {
   const { t } = useTranslation();
-  const { status, pendingCount, error, retry } = useOfflineSync();
-  const retryable = status === "error" || status === "pending";
-  const label =
-    status === "synced"
-      ? t("pos.shell.synced")
-      : status === "offline"
-        ? t("pos.shell.offline")
-        : status === "replaying"
-          ? t("pos.shell.syncReplaying")
-          : status === "error"
-            ? t("pos.shell.syncError")
-            : t("pos.shell.syncPending", { count: pendingCount });
-  const visibleLabel =
-    status === "error" && error ? `${label}: ${error}` : label;
+  const {
+    operationalStatus: status,
+    pendingSalesCount,
+    pendingOperationsCount,
+    error,
+    retry,
+  } = usePosTerminalRealtime();
+  const retryable = [
+    "sync_error",
+    "degraded",
+    "offline_pending",
+    "offline",
+  ].includes(status);
+  const visibleLabel = (() => {
+    switch (status) {
+      case "online":
+        return t("pos.shell.online");
+      case "connecting":
+      case "unknown":
+        return t("pos.shell.connecting");
+      case "degraded":
+        return t("pos.shell.connectionDegraded");
+      case "synchronizing":
+        return t("pos.shell.synchronizing");
+      case "offline_pending":
+        return pendingSalesCount > 0
+          ? t("pos.shell.offlinePendingSales", { count: pendingSalesCount })
+          : t("pos.shell.offlinePendingOperations", {
+              count: pendingOperationsCount,
+            });
+      case "sync_error":
+        return t("pos.shell.syncErrorSupport");
+      case "disabled":
+        return t("pos.shell.deviceDisabled");
+      case "never_seen":
+        return t("pos.shell.neverConnected");
+      default:
+        return t("pos.shell.offline");
+    }
+  })();
 
   const badgeClassName = cn(
     "items-center justify-center gap-2 rounded-xl text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2",
@@ -38,15 +64,23 @@ export function OfflineSyncBadge({
       ? "flex size-9 px-0 text-white/75 hover:bg-white/10 hover:text-white focus-visible:ring-white/60"
       : "flex min-h-9 min-w-0 px-3 py-2 text-left",
     variant === "default" &&
-      status === "synced" &&
+      status === "online" &&
       "bg-emerald-50 text-emerald-700",
     variant === "default" &&
-      status === "offline" &&
+      (status === "offline" ||
+        status === "unknown" ||
+        status === "disabled" ||
+        status === "never_seen") &&
       "bg-muted text-muted-foreground",
     variant === "default" &&
-      (status === "pending" || status === "replaying") &&
+      (status === "degraded" || status === "offline_pending") &&
       "bg-amber-50 text-amber-700",
-    variant === "default" && status === "error" && "bg-red-50 text-red-700",
+    variant === "default" &&
+      (status === "connecting" || status === "synchronizing") &&
+      "bg-blue-50 text-blue-700",
+    variant === "default" &&
+      status === "sync_error" &&
+      "bg-red-50 text-red-700",
     variant === "default" && "focus-visible:ring-ring",
     className,
   );
@@ -62,7 +96,7 @@ export function OfflineSyncBadge({
       >
         <Icon
           className="h-4 w-4"
-          name={status === "error" ? "alert" : "rotate-ccw"}
+          name={status === "sync_error" ? "alert" : "rotate-ccw"}
         />
         {variant === "default" ? (
           <span className="min-w-0 truncate">{visibleLabel}</span>
@@ -78,13 +112,19 @@ export function OfflineSyncBadge({
       className={badgeClassName}
       title={error ?? visibleLabel}
     >
-      {status === "replaying" ? (
+      {status === "synchronizing" || status === "connecting" ? (
         <Icon className="h-4 w-4 animate-spin" name="rotate-ccw" />
       ) : (
         <span
           className={cn(
             "h-2 w-2 rounded-full",
-            status === "synced" ? "bg-emerald-500" : "bg-muted-foreground",
+            status === "online"
+              ? "bg-emerald-500"
+              : status === "sync_error"
+                ? "bg-red-500"
+                : status === "offline_pending" || status === "degraded"
+                  ? "bg-amber-500"
+                  : "bg-muted-foreground",
           )}
         />
       )}

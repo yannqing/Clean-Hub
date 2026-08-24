@@ -1,4 +1,5 @@
 import {
+  buildWebSocketUrl,
   createCleanHubApiClient,
   type ApiRequestOptions,
 } from "@cleanhub/api-client";
@@ -13,7 +14,7 @@ import { POS_AUTH_CLIENT_HEADERS } from "@/lib/auth-client";
 const DEFAULT_API_BASE_URL = "http://localhost:4000";
 let refreshRequest: Promise<unknown> | null = null;
 
-function getApiBaseUrl(): string {
+export function getPosApiBaseUrl(): string {
   if (typeof window === "undefined") {
     return (
       process.env.CLEANHUB_API_BASE_URL ??
@@ -26,7 +27,7 @@ function getApiBaseUrl(): string {
 }
 
 export const posApi = createCleanHubApiClient({
-  baseUrl: getApiBaseUrl(),
+  baseUrl: getPosApiBaseUrl(),
   credentials: "include",
   defaultHeaders: POS_AUTH_CLIENT_HEADERS,
   timeoutMs: 30_000,
@@ -57,6 +58,10 @@ export const posApi = createCleanHubApiClient({
     }
   },
 });
+
+export function getPosRealtimeUrl(path = "/realtime/pos"): string {
+  return buildWebSocketUrl(getPosApiBaseUrl(), path);
+}
 
 export async function apiClient<TResponse = unknown>(
   path: string,

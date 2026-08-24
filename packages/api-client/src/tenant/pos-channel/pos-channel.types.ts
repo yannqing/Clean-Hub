@@ -1,3 +1,9 @@
+import type {
+  PosTerminalConnectionState,
+  PosTerminalOperationalStatus,
+  PosTerminalServiceHealth,
+} from "@cleanhub/domain/pos-terminal-status";
+
 export type PosChannelPaymentMethod = "cash" | "card" | "app";
 export type PosChannelRoundingRule = "none" | "round_yuan" | "round_jiao";
 export type PosChannelDeviceStatus = "active" | "inactive";
@@ -84,12 +90,24 @@ export type PosChannelDeviceSummary = {
   branchName: string;
   status: PosChannelDeviceStatus;
   connectivity: PosChannelDeviceConnectivity;
+  operationalStatus: PosTerminalOperationalStatus;
+  connectionState: PosTerminalConnectionState;
+  serviceHealth: PosTerminalServiceHealth;
   deviceType: PosChannelDeviceType;
   platform: string | null;
   platformVersion: string | null;
   appVersion: string | null;
   syncStatus: PosChannelSyncStatus;
   lastSeenAt: string | null;
+  lastRealtimeSeenAt: string | null;
+  connectionLeaseUntil: string | null;
+  lastDisconnectedAt: string | null;
+  lastDisconnectReason: string | null;
+  pendingSalesCount: number | null;
+  pendingOperationsCount: number | null;
+  oldestPendingAt: string | null;
+  statusRevision: number;
+  realtimeProtocolVersion: number | null;
   lastSyncedAt: string | null;
   lastSyncError: string | null;
   credentialVersion: number;

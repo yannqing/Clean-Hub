@@ -1617,6 +1617,27 @@ export type TenantMessages = {
         error: string;
         never: string;
       };
+      realtime: {
+        connectingTitle: string;
+        connectionLostTitle: string;
+        connectionLostDescription: string;
+        serviceDegradedTitle: string;
+        serviceDegradedDescription: string;
+        retry: string;
+        pendingSales: string;
+        operationalStatuses: {
+          unknown: string;
+          connecting: string;
+          online: string;
+          degraded: string;
+          synchronizing: string;
+          offline_pending: string;
+          offline: string;
+          sync_error: string;
+          disabled: string;
+          never_seen: string;
+        };
+      };
       noCurrentSession: string;
       neverSeen: string;
       empty: string;

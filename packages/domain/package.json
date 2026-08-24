@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./order-codes": "./src/order-codes.ts",
     "./pin": "./src/pin.ts",
+    "./pos-terminal-status": "./src/pos-terminal-status.ts",
     "./timezone": "./src/timezone.ts"
   }
 }

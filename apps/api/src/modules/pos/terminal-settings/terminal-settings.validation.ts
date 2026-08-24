@@ -47,5 +47,10 @@ export const terminalHeartbeatBodySchema = z
       .union([z.string().datetime({ offset: true }), z.null()])
       .optional(),
     lastSyncError: nullableTrimmedString(2000).optional(),
+    pendingSalesCount: z.number().int().min(0).max(1_000_000).optional(),
+    pendingOperationsCount: z.number().int().min(0).max(10_000_000).optional(),
+    oldestPendingAt: z
+      .union([z.string().datetime({ offset: true }), z.null()])
+      .optional(),
   })
   .strict();

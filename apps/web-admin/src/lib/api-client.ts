@@ -1,4 +1,5 @@
 import {
+  buildWebSocketUrl,
   createCleanHubApiClient,
   isApiHttpError,
   type ApiRequestOptions,
@@ -19,7 +20,7 @@ let loginRedirectPending = false;
 const TENANT_ACCESS_DENIED_MESSAGE =
   "User cannot access tenant resources.";
 
-function getApiBaseUrl(): string {
+export function getWebAdminApiBaseUrl(): string {
   if (typeof window === "undefined") {
     return (
       process.env.CLEANHUB_API_BASE_URL ??
@@ -63,7 +64,7 @@ function isTenantAccessDeniedError(error: unknown): boolean {
 }
 
 export const webAdminApi = createCleanHubApiClient({
-  baseUrl: getApiBaseUrl(),
+  baseUrl: getWebAdminApiBaseUrl(),
   credentials: "include",
   defaultHeaders: (): Record<string, string> =>
     typeof window === "undefined"
@@ -97,6 +98,10 @@ export const webAdminApi = createCleanHubApiClient({
     }
   },
 });
+
+export function getTenantRealtimeUrl(path = "/realtime/tenant"): string {
+  return buildWebSocketUrl(getWebAdminApiBaseUrl(), path);
+}
 
 export async function apiClient<TResponse = unknown>(
   path: string,

@@ -34,6 +34,12 @@ import {
   users,
   type Database,
 } from "@cleanhub/db";
+import {
+  derivePosTerminalOperationalStatus,
+  type PosTerminalConnectionState,
+  type PosTerminalRuntimeSyncState,
+  type PosTerminalServiceHealth,
+} from "@cleanhub/domain/pos-terminal-status";
 import { createId } from "@cleanhub/id";
 
 import type {
@@ -218,12 +224,69 @@ function applyDateRange(
   );
 }
 
-function createConnectivityExpression(offlineAt: Date): SQL {
+function createConnectivityExpression(offlineAt: Date, generatedAt: Date): SQL {
   return sql`case
     when ${posTerminalSettings.lastSeenAt} is null then 'never'
+    when ${posTerminalSettings.realtimeProtocolVersion} is not null
+      and ${posTerminalSettings.connectionLeaseUntil} >= ${generatedAt}
+      then 'online'
+    when ${posTerminalSettings.realtimeProtocolVersion} is not null then 'offline'
     when ${posTerminalSettings.lastSeenAt} >= ${offlineAt} then 'online'
     else 'offline'
   end`;
+}
+
+function toRuntimeSyncState(
+  status: "never" | "syncing" | "synced" | "error",
+): PosTerminalRuntimeSyncState {
+  if (status === "synced") return "idle";
+  if (status === "syncing") return "syncing";
+  return status;
+}
+
+function deriveDeviceRuntimeState(
+  row: {
+    status: "active" | "inactive";
+    syncStatus: "never" | "syncing" | "synced" | "error";
+    lastSeenAt: Date | null;
+    connectionLeaseUntil: Date | null;
+    pendingSalesCount: number | null;
+    pendingOperationsCount: number | null;
+  },
+  generatedAt: Date,
+  offlineAt: Date,
+) {
+  const leaseFresh = Boolean(
+    row.connectionLeaseUntil &&
+      row.connectionLeaseUntil.getTime() >= generatedAt.getTime(),
+  );
+  const httpFresh = Boolean(
+    row.lastSeenAt && row.lastSeenAt.getTime() >= offlineAt.getTime(),
+  );
+  const connectionState: PosTerminalConnectionState = leaseFresh
+    ? "connected"
+    : "disconnected";
+  const serviceHealth: PosTerminalServiceHealth = leaseFresh
+    ? "healthy"
+    : httpFresh
+      ? "healthy"
+      : "unavailable";
+  const syncState = toRuntimeSyncState(row.syncStatus);
+  const facts = {
+    administrativeStatus: row.status,
+    connectionState,
+    serviceHealth,
+    syncState,
+    pendingSalesCount: row.pendingSalesCount,
+    pendingOperationsCount: row.pendingOperationsCount,
+    hasEverConnected: Boolean(row.lastSeenAt),
+  } as const;
+
+  return {
+    connectionState,
+    serviceHealth,
+    operationalStatus: derivePosTerminalOperationalStatus(facts),
+  };
 }
 
 function createDeviceScopeFilters(
@@ -237,7 +300,7 @@ function createDeviceScopeFilters(
   const offlineAt = new Date(
     input.generatedAt.getTime() - input.deviceOfflineAfterSeconds * 1000,
   );
-  const connectivity = createConnectivityExpression(offlineAt);
+  const connectivity = createConnectivityExpression(offlineAt, input.generatedAt);
   const filters: SQL[] = [
     eq(posTerminalSettings.tenantId, input.tenantId),
     inArray(posTerminalSettings.branchId, input.branchIds),
@@ -247,8 +310,7 @@ function createDeviceScopeFilters(
     filters.push(
       or(
         eq(posTerminalSettings.status, "inactive"),
-        isNull(posTerminalSettings.lastSeenAt),
-        sql`${posTerminalSettings.lastSeenAt} < ${offlineAt}`,
+        sql`${connectivity} <> 'online'`,
         eq(posTerminalSettings.syncStatus, "error"),
       )!,
     );
@@ -596,7 +658,7 @@ export async function findPosChannelDevices(
   const offlineAt = new Date(
     input.generatedAt.getTime() - input.deviceOfflineAfterSeconds * 1000,
   );
-  const connectivity = createConnectivityExpression(offlineAt);
+  const connectivity = createConnectivityExpression(offlineAt, input.generatedAt);
   const filtered = createDeviceScopeFilters(input, true);
   const scoped = createDeviceScopeFilters(
     { ...input, attentionOnly: false },
@@ -618,6 +680,15 @@ export async function findPosChannelDevices(
         appVersion: posTerminalSettings.appVersion,
         syncStatus: posTerminalSettings.syncStatus,
         lastSeenAt: posTerminalSettings.lastSeenAt,
+        lastRealtimeSeenAt: posTerminalSettings.lastRealtimeSeenAt,
+        connectionLeaseUntil: posTerminalSettings.connectionLeaseUntil,
+        lastDisconnectedAt: posTerminalSettings.lastDisconnectedAt,
+        lastDisconnectReason: posTerminalSettings.lastDisconnectReason,
+        pendingSalesCount: posTerminalSettings.pendingSalesCount,
+        pendingOperationsCount: posTerminalSettings.pendingOperationsCount,
+        oldestPendingAt: posTerminalSettings.oldestPendingAt,
+        statusRevision: posTerminalSettings.statusRevision,
+        realtimeProtocolVersion: posTerminalSettings.realtimeProtocolVersion,
         lastSyncedAt: posTerminalSettings.lastSyncedAt,
         lastSyncError: posTerminalSettings.lastSyncError,
         credentialVersion: posTerminalSettings.credentialVersion,
@@ -684,13 +755,13 @@ export async function findPosChannelDevices(
           where ${posTerminalSettings.status} = 'inactive'
         )::int`,
         online: sql<number>`count(*) filter (
-          where ${posTerminalSettings.lastSeenAt} >= ${offlineAt}
+          where ${connectivity} = 'online'
         )::int`,
         offline: sql<number>`count(*) filter (
-          where ${posTerminalSettings.lastSeenAt} < ${offlineAt}
+          where ${connectivity} = 'offline'
         )::int`,
         never: sql<number>`count(*) filter (
-          where ${posTerminalSettings.lastSeenAt} is null
+          where ${connectivity} = 'never'
         )::int`,
         syncIssues: sql<number>`count(*) filter (
           where ${posTerminalSettings.syncStatus} = 'error'
@@ -703,6 +774,7 @@ export async function findPosChannelDevices(
 
   return {
     data: rows.map((row) => ({
+      ...deriveDeviceRuntimeState(row, input.generatedAt, offlineAt),
       id: row.id,
       deviceId: row.deviceId,
       label: row.label,
@@ -716,6 +788,15 @@ export async function findPosChannelDevices(
       appVersion: row.appVersion,
       syncStatus: row.syncStatus,
       lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
+      lastRealtimeSeenAt: row.lastRealtimeSeenAt?.toISOString() ?? null,
+      connectionLeaseUntil: row.connectionLeaseUntil?.toISOString() ?? null,
+      lastDisconnectedAt: row.lastDisconnectedAt?.toISOString() ?? null,
+      lastDisconnectReason: row.lastDisconnectReason,
+      pendingSalesCount: row.pendingSalesCount,
+      pendingOperationsCount: row.pendingOperationsCount,
+      oldestPendingAt: row.oldestPendingAt?.toISOString() ?? null,
+      statusRevision: row.statusRevision,
+      realtimeProtocolVersion: row.realtimeProtocolVersion,
       lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
       lastSyncError: row.lastSyncError,
       credentialVersion: row.credentialVersion,
@@ -1198,6 +1279,10 @@ export async function findPosChannelOverviewMetrics(
   const offlineAt = new Date(
     input.generatedAt.getTime() - input.deviceOfflineAfterSeconds * 1000,
   );
+  const overviewDeviceConnectivity = createConnectivityExpression(
+    offlineAt,
+    input.generatedAt,
+  );
 
   const [
     orderRows,
@@ -1317,13 +1402,13 @@ export async function findPosChannelOverviewMetrics(
           where ${posTerminalSettings.status} = 'inactive'
         )::int`,
         onlineDevices: sql<number>`count(*) filter (
-          where ${posTerminalSettings.lastSeenAt} >= ${offlineAt}
+          where ${overviewDeviceConnectivity} = 'online'
         )::int`,
         offlineDevices: sql<number>`count(*) filter (
-          where ${posTerminalSettings.lastSeenAt} < ${offlineAt}
+          where ${overviewDeviceConnectivity} = 'offline'
         )::int`,
         neverSeenDevices: sql<number>`count(*) filter (
-          where ${posTerminalSettings.lastSeenAt} is null
+          where ${overviewDeviceConnectivity} = 'never'
         )::int`,
         syncIssues: sql<number>`count(*) filter (
           where ${posTerminalSettings.syncStatus} = 'error'

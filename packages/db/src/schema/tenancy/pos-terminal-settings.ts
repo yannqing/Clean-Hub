@@ -1,5 +1,6 @@
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -11,6 +12,7 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
@@ -89,6 +91,21 @@ export const posTerminalSettings = pgTable(
       withTimezone: true,
     }),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    lastRealtimeSeenAt: timestamp("last_realtime_seen_at", {
+      withTimezone: true,
+    }),
+    connectionLeaseUntil: timestamp("connection_lease_until", {
+      withTimezone: true,
+    }),
+    lastDisconnectedAt: timestamp("last_disconnected_at", {
+      withTimezone: true,
+    }),
+    lastDisconnectReason: varchar("last_disconnect_reason", { length: 64 }),
+    pendingSalesCount: integer("pending_sales_count"),
+    pendingOperationsCount: integer("pending_operations_count"),
+    oldestPendingAt: timestamp("oldest_pending_at", { withTimezone: true }),
+    statusRevision: integer("status_revision").notNull().default(0),
+    realtimeProtocolVersion: smallint("realtime_protocol_version"),
     syncStatus: posTerminalSyncStatusEnum("sync_status")
       .notNull()
       .default("never"),
@@ -118,9 +135,25 @@ export const posTerminalSettings = pgTable(
       table.tenantId,
       table.lastSeenAt,
     ),
+    index("pos_terminal_settings_tenant_connection_lease_idx").on(
+      table.tenantId,
+      table.connectionLeaseUntil,
+    ),
     index("pos_terminal_settings_tenant_sync_status_idx").on(
       table.tenantId,
       table.syncStatus,
+    ),
+    check(
+      "pos_terminal_settings_pending_sales_check",
+      sql`${table.pendingSalesCount} is null or ${table.pendingSalesCount} >= 0`,
+    ),
+    check(
+      "pos_terminal_settings_pending_operations_check",
+      sql`${table.pendingOperationsCount} is null or ${table.pendingOperationsCount} >= 0`,
+    ),
+    check(
+      "pos_terminal_settings_status_revision_check",
+      sql`${table.statusRevision} >= 0`,
     ),
   ],
 );

@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 import {
   posChannelSettings,
@@ -42,6 +42,15 @@ function toSummary(
     lockTimeoutSeconds: row.lockTimeoutSeconds,
     status: row.status,
     lastSeenAt: row.lastSeenAt ? row.lastSeenAt.toISOString() : null,
+    lastRealtimeSeenAt: row.lastRealtimeSeenAt?.toISOString() ?? null,
+    connectionLeaseUntil: row.connectionLeaseUntil?.toISOString() ?? null,
+    lastDisconnectedAt: row.lastDisconnectedAt?.toISOString() ?? null,
+    lastDisconnectReason: row.lastDisconnectReason,
+    pendingSalesCount: row.pendingSalesCount,
+    pendingOperationsCount: row.pendingOperationsCount,
+    oldestPendingAt: row.oldestPendingAt?.toISOString() ?? null,
+    statusRevision: row.statusRevision,
+    realtimeProtocolVersion: row.realtimeProtocolVersion,
     syncStatus: row.syncStatus,
     lastSyncedAt: row.lastSyncedAt?.toISOString() ?? null,
     lastSyncError: row.lastSyncError,
@@ -245,8 +254,9 @@ export async function updateTerminalHeartbeat(
     data: PosTerminalHeartbeatRequest;
   },
 ): Promise<PosTerminalSettingsSummary | null> {
-  const setValues: Partial<typeof posTerminalSettings.$inferInsert> = {
+  const setValues: Record<string, unknown> = {
     lastSeenAt: new Date(),
+    statusRevision: sql`${posTerminalSettings.statusRevision} + 1`,
   };
 
   if (input.data.deviceType !== undefined) {
@@ -271,6 +281,17 @@ export async function updateTerminalHeartbeat(
   }
   if (input.data.lastSyncError !== undefined) {
     setValues.lastSyncError = input.data.lastSyncError;
+  }
+  if (input.data.pendingSalesCount !== undefined) {
+    setValues.pendingSalesCount = input.data.pendingSalesCount;
+  }
+  if (input.data.pendingOperationsCount !== undefined) {
+    setValues.pendingOperationsCount = input.data.pendingOperationsCount;
+  }
+  if (input.data.oldestPendingAt !== undefined) {
+    setValues.oldestPendingAt = input.data.oldestPendingAt
+      ? new Date(input.data.oldestPendingAt)
+      : null;
   }
 
   const rows = await db

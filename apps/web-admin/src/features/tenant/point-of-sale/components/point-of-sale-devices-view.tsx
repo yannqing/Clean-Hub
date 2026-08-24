@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  type PosTerminalOperationalStatus,
+  type TenantDeviceRealtimeState,
+} from "@cleanhub/domain/pos-terminal-status";
+import {
   Badge,
   Button,
   Dialog,
@@ -34,7 +38,14 @@ import {
   SquareTerminal,
 } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
-import { type FormEvent, useState, useTransition } from "react";
+import {
+  type FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 import { Pagination } from "@/components/pagination";
 import { interpolate, useTenantI18n } from "@/i18n";
@@ -43,8 +54,10 @@ import type {
   PointOfSaleDeviceList,
   PointOfSaleDeviceQuery,
   PointOfSaleDeviceConnectivity,
+  PointOfSaleDevice,
   PointOfSaleDeviceStatus,
 } from "../types";
+import { useTenantPosRealtime } from "./tenant-pos-realtime-provider";
 
 type PointOfSaleDevicesViewProps = {
   error?: string;
@@ -61,6 +74,62 @@ function formatCount(value: number, locale: string): string {
   }).format(value);
 }
 
+function applyRealtimeState(
+  device: PointOfSaleDevice,
+  state: TenantDeviceRealtimeState,
+): PointOfSaleDevice {
+  if (state.statusRevision < device.statusRevision) return device;
+
+  return {
+    ...device,
+    status: state.administrativeStatus,
+    connectivity:
+      state.connectionState === "connected"
+        ? "online"
+        : state.lastSeenAt
+          ? "offline"
+          : "never",
+    operationalStatus: state.operationalStatus,
+    connectionState: state.connectionState,
+    serviceHealth: state.serviceHealth,
+    syncStatus:
+      state.syncState === "error"
+        ? "error"
+        : state.syncState === "never"
+          ? "never"
+          : state.syncState === "idle"
+            ? "synced"
+            : "syncing",
+    lastSeenAt: state.lastSeenAt,
+    lastRealtimeSeenAt: state.lastRealtimeSeenAt,
+    pendingSalesCount: state.pendingSalesCount,
+    pendingOperationsCount: state.pendingOperationsCount,
+    oldestPendingAt: state.oldestPendingAt,
+    lastSyncedAt: state.lastSyncedAt,
+    lastSyncError: state.lastSyncError,
+    statusRevision: state.statusRevision,
+  };
+}
+
+function operationalStatusDotClass(
+  status: PosTerminalOperationalStatus,
+): string {
+  switch (status) {
+    case "online":
+      return "bg-emerald-500";
+    case "connecting":
+    case "synchronizing":
+      return "animate-pulse bg-blue-500";
+    case "degraded":
+    case "offline_pending":
+      return "bg-amber-500";
+    case "sync_error":
+      return "bg-destructive";
+    default:
+      return "bg-muted-foreground/50";
+  }
+}
+
 export function PointOfSaleDevicesView({
   error,
   query,
@@ -69,9 +138,80 @@ export function PointOfSaleDevicesView({
   const pathname = usePathname();
   const router = useRouter();
   const { formatDateTime, locale, m } = useTenantI18n();
+  const {
+    connectionState: realtimeConnectionState,
+    serviceHealth: realtimeServiceHealth,
+    retry: retryRealtime,
+    subscribe: subscribeRealtime,
+  } = useTenantPosRealtime();
+  const realtimeServiceDegraded =
+    realtimeConnectionState === "connected" &&
+    realtimeServiceHealth !== "healthy";
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState(query.q ?? "");
   const [setupOpen, setSetupOpen] = useState(false);
+  const [deviceOverrides, setDeviceOverrides] = useState<
+    Record<string, TenantDeviceRealtimeState>
+  >({});
+  const refreshTimerRef = useRef<number | null>(null);
+
+  const displayResult = useMemo<PointOfSaleDeviceList | undefined>(() => {
+    if (!result) return undefined;
+    return {
+      ...result,
+      data: result.data.map((device) => {
+        const state = deviceOverrides[device.id];
+        return state ? applyRealtimeState(device, state) : device;
+      }),
+    };
+  }, [deviceOverrides, result]);
+
+  useEffect(
+    () =>
+      subscribeRealtime((event) => {
+        setDeviceOverrides((current) => {
+          const previous = current[event.state.terminalId];
+          if (
+            previous &&
+            previous.statusRevision >= event.state.statusRevision
+          ) {
+            return current;
+          }
+          return {
+            ...current,
+            [event.state.terminalId]: event.state,
+          };
+        });
+
+        if (refreshTimerRef.current !== null) {
+          window.clearTimeout(refreshTimerRef.current);
+        }
+        refreshTimerRef.current = window.setTimeout(() => {
+          refreshTimerRef.current = null;
+          router.refresh();
+        }, 750);
+      }),
+    [router, subscribeRealtime],
+  );
+
+  useEffect(() => {
+    if (realtimeConnectionState === "connected") {
+      router.refresh();
+      return;
+    }
+
+    const fallback = window.setInterval(() => router.refresh(), 30_000);
+    return () => window.clearInterval(fallback);
+  }, [realtimeConnectionState, router]);
+
+  useEffect(
+    () => () => {
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current);
+      }
+    },
+    [],
+  );
 
   function navigate(
     changes: Partial<PointOfSaleDeviceQuery>,
@@ -105,22 +245,22 @@ export function PointOfSaleDevicesView({
     {
       icon: HardDrive,
       label: m.pointOfSale.devices.metrics.total,
-      value: result?.metrics.total ?? null,
+      value: displayResult?.metrics.total ?? null,
     },
     {
       icon: ShieldCheck,
       label: m.pointOfSale.devices.metrics.active,
-      value: result?.metrics.active ?? null,
+      value: displayResult?.metrics.active ?? null,
     },
     {
       icon: MonitorCheck,
       label: m.pointOfSale.devices.metrics.online,
-      value: result?.metrics.online ?? null,
+      value: displayResult?.metrics.online ?? null,
     },
     {
       icon: CircleAlert,
       label: m.pointOfSale.devices.metrics.syncIssues,
-      value: result?.metrics.syncIssues ?? null,
+      value: displayResult?.metrics.syncIssues ?? null,
     },
   ];
 
@@ -158,6 +298,50 @@ export function PointOfSaleDevicesView({
           </DialogHeader>
         </DialogContent>
       </Dialog>
+
+      {realtimeConnectionState !== "connected" || realtimeServiceDegraded ? (
+        <div
+          className={cn(
+            "flex flex-col justify-between gap-3 rounded-lg border px-4 py-3 sm:flex-row sm:items-center",
+            realtimeServiceDegraded
+              ? "border-destructive/25 bg-destructive/5"
+              : realtimeConnectionState === "connecting" ||
+                  realtimeConnectionState === "unknown"
+                ? "border-blue-500/20 bg-blue-500/5"
+                : "border-amber-500/25 bg-amber-500/5",
+          )}
+          role="status"
+        >
+          <div>
+            <p className="text-xs font-medium">
+              {realtimeServiceDegraded
+                ? m.pointOfSale.devices.realtime.serviceDegradedTitle
+                : realtimeConnectionState === "connecting" ||
+                    realtimeConnectionState === "unknown"
+                  ? m.pointOfSale.devices.realtime.connectingTitle
+                  : m.pointOfSale.devices.realtime.connectionLostTitle}
+            </p>
+            {realtimeConnectionState === "disconnected" ||
+            realtimeServiceDegraded ? (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                {realtimeServiceDegraded
+                  ? m.pointOfSale.devices.realtime.serviceDegradedDescription
+                  : m.pointOfSale.devices.realtime.connectionLostDescription}
+              </p>
+            ) : null}
+          </div>
+          {realtimeConnectionState === "disconnected" ? (
+            <Button
+              onClick={retryRealtime}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {m.pointOfSale.devices.realtime.retry}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <section className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         {metrics.map((metric) => (
@@ -220,7 +404,7 @@ export function PointOfSaleDevicesView({
 
           <div className="flex flex-wrap gap-2">
             <Select
-              disabled={isPending || !result}
+              disabled={isPending || !displayResult}
               onValueChange={(value) =>
                 navigate(
                   {
@@ -244,7 +428,7 @@ export function PointOfSaleDevicesView({
                 <SelectItem value={ALL_VALUE}>
                   {m.pointOfSale.filters.allBranches}
                 </SelectItem>
-                {result?.availableBranches.map((branch) => (
+                {displayResult?.availableBranches.map((branch) => (
                   <SelectItem key={branch.id} value={branch.id}>
                     {branch.name}
                   </SelectItem>
@@ -325,7 +509,7 @@ export function PointOfSaleDevicesView({
           </div>
         </div>
 
-        {result && result.data.length > 0 ? (
+        {displayResult && displayResult.data.length > 0 ? (
           <>
             <div className="overflow-x-auto">
               <DataTable>
@@ -361,7 +545,7 @@ export function PointOfSaleDevicesView({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {result.data.map((device) => (
+                  {displayResult.data.map((device) => (
                     <TableRow key={device.id}>
                       <TableCell className="py-3 text-xs">
                         <div className="flex items-center gap-2">
@@ -406,19 +590,25 @@ export function PointOfSaleDevicesView({
                           <span
                             className={cn(
                               "size-1.5 rounded-full",
-                              device.connectivity === "online" &&
-                                "bg-emerald-500",
-                              device.connectivity === "offline" &&
-                                "bg-muted-foreground/50",
-                              device.connectivity === "never" && "bg-amber-500",
+                              operationalStatusDotClass(
+                                device.operationalStatus,
+                              ),
                             )}
                           />
                           {
-                            m.pointOfSale.devices.heartbeatStatuses[
-                              device.connectivity
+                            m.pointOfSale.devices.realtime.operationalStatuses[
+                              device.operationalStatus
                             ]
                           }
                         </span>
+                        {device.pendingSalesCount ? (
+                          <span className="mt-0.5 block text-[10px] text-amber-700 dark:text-amber-300">
+                            {interpolate(
+                              m.pointOfSale.devices.realtime.pendingSales,
+                              { count: String(device.pendingSalesCount) },
+                            )}
+                          </span>
+                        ) : null}
                       </TableCell>
                       <TableCell className="whitespace-nowrap py-3 text-[11px] text-muted-foreground">
                         {device.lastSeenAt
@@ -462,7 +652,7 @@ export function PointOfSaleDevicesView({
               </DataTable>
             </div>
             <Pagination
-              currentPageCount={result.data.length}
+              currentPageCount={displayResult.data.length}
               formatCountLabel={({ from, to, total }) =>
                 interpolate(m.pointOfSale.devices.count, {
                   from: String(from),
@@ -475,7 +665,7 @@ export function PointOfSaleDevicesView({
               onOffsetChange={(offset) => navigate({ offset })}
               pageSize={PAGE_SIZE}
               previousLabel={m.pointOfSale.devices.previous}
-              total={result.total}
+              total={displayResult.total}
             />
           </>
         ) : (

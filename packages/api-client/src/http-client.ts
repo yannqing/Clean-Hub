@@ -97,6 +97,21 @@ export function buildApiUrl(baseUrl: string, path: string, query?: QueryParams):
   return url.toString();
 }
 
+/**
+ * Builds a WebSocket URL through the same public API prefix as HTTP requests.
+ * For example, a browser API base of `/api` resolves the realtime endpoint to
+ * `wss://example.com/api/realtime/pos`, allowing the reverse proxy to strip the
+ * `/api` prefix before forwarding the upgrade to the API service.
+ */
+export function buildWebSocketUrl(baseUrl: string, path: string): string {
+  const url = new URL(buildApiUrl(baseUrl, path));
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new Error("WebSocket API base URL must use HTTP or HTTPS.");
+  }
+  url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+  return url.toString();
+}
+
 function isBodyInit(body: ApiRequestBody): body is BodyInit {
   return (
     typeof body === "string" ||
