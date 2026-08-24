@@ -24,6 +24,7 @@ import {
 import type { PosPaymentTransaction } from "./orders.types.js";
 import {
   createPosOrderBodySchema,
+  createPosCheckoutBodySchema,
   createPosOrderItemBodySchema,
   createPosPaymentBodySchema,
 } from "./orders.validation.js";
@@ -50,9 +51,32 @@ assert.equal(
   false,
   "cash payments must require an idempotency key",
 );
+assert.equal(
+  createPosCheckoutBodySchema.safeParse({
+    order: {
+      id: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+      orderType: "manual",
+      branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      items: [
+        {
+          productSkuId: "01ARZ3NDEKTSV4RRFFQ69G5FB3",
+          quantity: "1",
+        },
+      ],
+    },
+    payment: {
+      paymentMethod: "cash",
+      idempotencyKey: "01ARZ3NDEKTSV4RRFFQ69G5FB4",
+    },
+  }).success,
+  true,
+  "atomic checkout must accept stable order and payment identifiers",
+);
 
 const serviceId = "01ARZ3NDEKTSV4RRFFQ69G5FB2";
 const productSkuId = "01ARZ3NDEKTSV4RRFFQ69G5FB3";
+const ticketId = "01ARZ3NDEKTSV4RRFFQ69G5FB4";
+const ticketItemId = "01ARZ3NDEKTSV4RRFFQ69G5FB5";
 assert.equal(
   posCatalogQuerySchema.safeParse({
     businessLine: "laundry",
@@ -91,6 +115,26 @@ assert.equal(
   }).success,
   false,
   "an order item must not mix service and product references",
+);
+assert.equal(
+  createPosOrderBodySchema.safeParse({
+    orderType: "manual",
+    branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+    customerId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+    items: [
+      { productSkuId, quantity: "2" },
+      { ticketId, ticketItemId },
+    ],
+  }).success,
+  true,
+  "cart orders should accept products and existing ticket items together",
+);
+assert.equal(
+  createPosOrderItemBodySchema.safeParse({
+    ticketId,
+  }).success,
+  false,
+  "ticket item references must include both the ticket and item ids",
 );
 assert.equal(
   createPosOrderItemBodySchema.safeParse({

@@ -5,6 +5,7 @@ import type { NotificationPublisher } from "../notifications/index.js";
 import { createPosAuthRoutes } from "./auth/auth.routes.js";
 import { getMyPosBranchController } from "./branches/pos.controller.js";
 import { createPosCatalogRoutes } from "./catalog/catalog.routes.js";
+import { createPosCartsRoutes } from "./carts/carts.routes.js";
 import {
   createPosAccountsRoutes,
   createPosCustomersRoutes,
@@ -44,6 +45,7 @@ export function createPosRoutes({
   );
   routes.route("/customers", createPosCustomersRoutes());
   routes.route("/catalog", createPosCatalogRoutes());
+  routes.route("/carts", createPosCartsRoutes());
   routes.route("/service-tickets", createPosServiceTicketsRoutes());
   routes.route("/accounts", createPosAccountsRoutes());
   routes.route("/orders", createPosOrdersRoutes({ notificationPublisher }));

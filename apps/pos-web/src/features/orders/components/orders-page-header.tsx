@@ -1,11 +1,8 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
 import { useTransition } from "react";
-import type {
-  PosCatalogProduct,
-  PosCatalogService,
-} from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Button,
@@ -17,16 +14,9 @@ import {
 
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
+import { posRoutes } from "@/config";
 
 import { ORDER_FILTER_KEYS, type OrderDateFilter } from "../constants";
-import { OrderCreateDialog } from "./order-create-dialog";
-
-type OrdersPageHeaderProps = {
-  canManageSensitiveOperations?: boolean;
-  catalog?: PosCatalogService[];
-  products?: PosCatalogProduct[];
-  defaultBranchId?: string;
-};
 
 const DATE_OPTIONS: ReadonlyArray<{
   value: OrderDateFilter;
@@ -38,13 +28,8 @@ const DATE_OPTIONS: ReadonlyArray<{
   { value: "month", label: "本月" },
 ];
 
-export function OrdersPageHeader({
-  canManageSensitiveOperations = false,
-  catalog = [],
-  products = [],
-  defaultBranchId,
-}: OrdersPageHeaderProps) {
-  const { locale } = useTranslation();
+export function OrdersPageHeader() {
+  const { locale, t } = useTranslation();
   const router = useRouter();
   const params = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -118,13 +103,12 @@ export function OrdersPageHeader({
           </PopoverContent>
         </Popover>
 
-        <OrderCreateDialog
-          canManageSensitiveOperations={canManageSensitiveOperations}
-          catalog={catalog}
-          defaultBranchId={defaultBranchId}
-          products={products}
-          triggerClassName="flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        />
+        <Button asChild className="h-8 gap-1.5 px-3 text-xs" size="sm">
+          <Link href={posRoutes.sale}>
+            <Icon className="size-3.5" name="shopping-cart" />
+            {t("pos.cart.title")}
+          </Link>
+        </Button>
       </div>
     </header>
   );

@@ -1,11 +1,14 @@
 "use client";
 
 import {
+  ApiHttpError,
   ApiNetworkError,
+  ApiParseError,
   ApiTimeoutError,
   type ChangePosOrderStatusRequest,
   type ChangeServiceTicketStatusRequest,
   type CreatePosAccountRequest,
+  type CreatePosCheckoutRequest,
   type CreatePosProfileRequest,
   type CreatePosOrderRequest,
   type CreatePosPaymentRequest,
@@ -23,6 +26,7 @@ import {
   createCustomerAccountOfflineMutation,
   createCustomerProfileOfflineMutation,
   createOrderOfflineMutation,
+  createOrderCheckoutOfflineMutation,
   createOrderPaymentOfflineMutation,
   createOrderStatusOfflineMutation,
   createTicketStatusOfflineMutation,
@@ -36,6 +40,7 @@ import {
   type PosOfflineCustomerProfileResult,
   type PosOfflineMutation,
   type PosOfflineOrderPaymentResult,
+  type PosOfflineCheckoutResult,
   type PosOfflineOrderResult,
   type PosOfflineOrderStatusResult,
   type PosOfflinePayload,
@@ -53,6 +58,22 @@ export type PosOfflinePayOrderWrite = (
 export type PosOfflineOrderWriteOptions = {
   allowOffline?: boolean;
 };
+
+function isUncertainWriteOutcome(error: unknown): boolean {
+  if (
+    error instanceof ApiNetworkError ||
+    error instanceof ApiTimeoutError ||
+    error instanceof ApiParseError
+  ) {
+    return true;
+  }
+
+  return (
+    error instanceof ApiHttpError &&
+    (error.status === 408 || error.status === 425 || error.status === 429 ||
+      error.status >= 500)
+  );
+}
 
 export function usePosOfflineWrites() {
   const { pendingCount, queue, refresh } = useOfflineSync();
@@ -74,26 +95,13 @@ export function usePosOfflineWrites() {
         throw new Error("The enrolled terminal scope is unavailable.");
       }
 
-      const enqueue = async () => {
-        if (options.allowOffline === false) {
-          throw new Error(
-            "该订单包含不允许离线销售的商品，请恢复网络后再提交。",
-          );
-        }
-        if (isPosTerminalSessionInvalidated()) {
-          throw new Error(
-            "The enrolled terminal session is no longer active.",
-          );
-        }
-
-        const item = await queue.enqueue(mutation as EnqueueInput<TPayload>);
-        await refresh();
-        return {
-          queued: true as const,
-          entityId: mutation.entityId,
-          operationId: item.id,
-        };
-      };
+      const isOffline =
+        typeof navigator !== "undefined" && !navigator.onLine;
+      if (isOffline && options.allowOffline === false) {
+        throw new Error(
+          "该订单包含不允许离线销售的商品，请恢复网络后再提交。",
+        );
+      }
 
       const dependencyState = resolvePosOfflineDependencyState(
         await queue.list(),
@@ -106,23 +114,60 @@ export function usePosOfflineWrites() {
             : "上游离线数据尚未正确同步，请先处理同步队列后再继续。",
         );
       }
-      if (dependencyState.pendingOperationIds.length > 0) {
-        return enqueue();
+
+      // Write-ahead invariant: the complete command and its stable
+      // idempotency key reach SQLite/IndexedDB before any server request.
+      // If power disappears after the server commits but before the response,
+      // startup replay safely asks the backend for the same result.
+      const item = await queue.enqueue(mutation as EnqueueInput<TPayload>);
+      await refresh();
+
+      const queuedResult = () => {
+        if (isPosTerminalSessionInvalidated()) {
+          throw new Error(
+            "The enrolled terminal session is no longer active.",
+          );
+        }
+        return {
+          queued: true as const,
+          entityId: mutation.entityId,
+          operationId: item.id,
+        };
+      };
+
+      if (item.id !== mutation.id) {
+        // The same idempotency key is already durable (for example after a
+        // reboot during checkout). Never send a newly reconstructed body under
+        // that key; recovery must replay the original persisted intent.
+        return queuedResult();
       }
 
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
-        return enqueue();
+      if (dependencyState.pendingOperationIds.length > 0) {
+        return queuedResult();
+      }
+
+      if (isOffline) {
+        return queuedResult();
       }
 
       try {
-        return { queued: false, data: await write() };
+        const data = await write();
+        await queue.markSynced(item.id);
+        await refresh();
+        return { queued: false, data };
       } catch (error) {
-        if (
-          error instanceof ApiNetworkError ||
-          error instanceof ApiTimeoutError
-        ) {
-          return enqueue();
+        if (isUncertainWriteOutcome(error)) {
+          // A timeout, malformed success response, rate limit, or 5xx can be
+          // observed after the server has already committed. Keep the durable
+          // journal entry so recovery asks the idempotent endpoint instead of
+          // silently losing the sale.
+          return queuedResult();
         }
+        // A definitive validation/authorization response means the command did
+        // not commit. Remove its journal entry so startup recovery does not
+        // retry a rejected business operation forever.
+        await queue.markSynced(item.id);
+        await refresh();
         throw error;
       }
     },
@@ -176,6 +221,38 @@ export function usePosOfflineWrites() {
     [execute, queue],
   );
 
+  const checkoutOrder = useCallback(
+    async (
+      input: CreatePosCheckoutRequest,
+      options: PosOfflineOrderWriteOptions = {},
+    ): Promise<PosOfflineCheckoutResult> => {
+      const items = queue ? await queue.list() : [];
+      const customerDependency =
+        input.order.orderType === "manual" && input.order.customerId
+          ? findQueuedPosCreateDependency(
+              items,
+              POS_OFFLINE_ENTITIES.customerProfileCreate,
+              input.order.customerId,
+            )
+          : undefined;
+      assertDependencyUsable(customerDependency);
+      const mutation = createOrderCheckoutOfflineMutation(
+        input,
+        customerDependency ? [customerDependency.operationId] : [],
+      );
+      return execute(
+        mutation,
+        () =>
+          posApi.pos.orders.checkout(mutation.payload.input, {
+            idempotencyKey: mutation.idempotencyKey,
+            requestId: mutation.id,
+          }),
+        options,
+      );
+    },
+    [execute, queue],
+  );
+
   const payOrder = useCallback(
     async (
       orderId: string,
@@ -183,6 +260,19 @@ export function usePosOfflineWrites() {
       write?: PosOfflinePayOrderWrite,
     ): Promise<PosOfflineOrderPaymentResult> => {
       const items = queue ? await queue.list() : [];
+      const pendingPayment = items.find(
+        (item) =>
+          item.status === "pending" &&
+          item.entity === POS_OFFLINE_ENTITIES.orderPaymentCreate &&
+          item.metadata?.entityId === orderId,
+      );
+      if (pendingPayment) {
+        return {
+          queued: true,
+          entityId: orderId,
+          operationId: pendingPayment.id,
+        };
+      }
       // Payments for offline-created orders must wait for the order create
       // operation, otherwise replay would target a not-yet-synced order id.
       const orderDependency = findQueuedPosCreateDependency(
@@ -299,6 +389,7 @@ export function usePosOfflineWrites() {
   return {
     createCustomerAccount,
     createCustomerProfile,
+    checkoutOrder,
     createOrder,
     listQueuedCustomerAccounts,
     listQueuedCustomerProfiles,

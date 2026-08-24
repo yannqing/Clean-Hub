@@ -9,6 +9,7 @@ import {
   isNull,
   lt,
   lte,
+  ne,
   or,
   sql,
   type SQL,
@@ -654,18 +655,58 @@ export async function softDeleteServiceTicketRecord(
 // ---------------------------------------------------------------------------
 
 /**
- * Whether all orders linked to the ticket are settled.
+ * Whether every active ticket item is linked to a non-cancelled order and all
+ * of those orders are settled.
  *
  * A linked order is any `orders` row whose `order_items` reference this ticket
  * (the `order_items.ticket_id` back-pointer). The milestone rule: a ticket may
- * only move to `picked_up` once every linked order is paid (`payment_status`
- * in `paid`/`refunded`). If no orders are linked yet, the ticket is considered
- * settled (no outstanding obligation).
+ * only move to `picked_up` once every item has been billed and every linked
+ * order is paid. Cancelled orders do not reserve ticket items and therefore do
+ * not count as billed or settled.
  */
 export async function areLinkedOrdersSettled(
   db: Database,
   input: { tenantId: string; ticketId: string },
 ): Promise<boolean> {
+  const itemCoverageRows = await db
+    .select({
+      itemCount: sql<number>`count(distinct ${ticketItems.id})::int`,
+      billedItemCount: sql<number>`count(distinct ${ticketItems.id}) filter (
+        where ${orders.id} is not null
+      )::int`,
+    })
+    .from(ticketItems)
+    .leftJoin(
+      orderItems,
+      and(
+        eq(orderItems.tenantId, input.tenantId),
+        eq(orderItems.ticketId, input.ticketId),
+        eq(orderItems.sourceType, "ticket_item"),
+        eq(orderItems.sourceId, ticketItems.id),
+        isNull(orderItems.deletedAt),
+      ),
+    )
+    .leftJoin(
+      orders,
+      and(
+        eq(orders.id, orderItems.orderId),
+        eq(orders.tenantId, input.tenantId),
+        ne(orders.status, "cancelled"),
+        isNull(orders.deletedAt),
+      ),
+    )
+    .where(
+      and(
+        eq(ticketItems.tenantId, input.tenantId),
+        eq(ticketItems.ticketId, input.ticketId),
+        isNull(ticketItems.deletedAt),
+      ),
+    );
+  const coverage = itemCoverageRows[0];
+  if (!coverage) {
+    return false;
+  }
+
   const rows = await db
     .select({
       paymentStatus: orders.paymentStatus,
@@ -675,17 +716,33 @@ export async function areLinkedOrdersSettled(
     .where(
       and(
         eq(orders.tenantId, input.tenantId),
+        eq(orderItems.tenantId, input.tenantId),
         eq(orderItems.ticketId, input.ticketId),
+        ne(orders.status, "cancelled"),
+        isNull(orderItems.deletedAt),
         isNull(orders.deletedAt),
       ),
     )
     .groupBy(orders.id, orders.paymentStatus);
 
-  if (rows.length === 0) {
-    return true;
-  }
+  return isTicketSettlementComplete({
+    itemCount: coverage.itemCount,
+    billedItemCount: coverage.billedItemCount,
+    paymentStatuses: rows.map((row) => row.paymentStatus),
+  });
+}
 
-  return rows.every((row) => row.paymentStatus === "paid");
+export function isTicketSettlementComplete(input: {
+  itemCount: number;
+  billedItemCount: number;
+  paymentStatuses: string[];
+}): boolean {
+  return (
+    input.itemCount > 0 &&
+    input.billedItemCount === input.itemCount &&
+    input.paymentStatuses.length > 0 &&
+    input.paymentStatuses.every((status) => status === "paid")
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -699,6 +756,13 @@ export async function findRelatedOrders(
   const rows = await db
     .select({
       id: orders.id,
+      ticketItemIds: sql<string[]>`coalesce(
+        array_agg(distinct ${orderItems.sourceId}) filter (
+          where ${orderItems.sourceType} = 'ticket_item'
+            and ${orderItems.deletedAt} is null
+        ),
+        array[]::varchar[]
+      )`,
       currency: orders.currency,
       orderType: orders.orderType,
       status: orders.status,
@@ -712,7 +776,9 @@ export async function findRelatedOrders(
     .where(
       and(
         eq(orders.tenantId, input.tenantId),
+        eq(orderItems.tenantId, input.tenantId),
         eq(orderItems.ticketId, input.ticketId),
+        isNull(orderItems.deletedAt),
         isNull(orders.deletedAt),
       ),
     )
@@ -721,6 +787,7 @@ export async function findRelatedOrders(
 
   return rows.map((row) => ({
     id: row.id,
+    ticketItemIds: row.ticketItemIds,
     currency: row.currency,
     orderType: row.orderType,
     status: row.status,

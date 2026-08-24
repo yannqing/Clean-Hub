@@ -2,6 +2,8 @@ import {
   type ApiRequestOptions,
   type ChangePosOrderStatusRequest,
   type ChangeServiceTicketStatusRequest,
+  type CreatePosCheckoutRequest,
+  type CreatePosCheckoutResponse,
   type CreatePosAccountRequest,
   type CreatePosProfileRequest,
   type CreatePosOrderRequest,
@@ -20,14 +22,61 @@ export const POS_OFFLINE_ENTITIES = {
   customerAccountCreate: "pos.customer-account.create",
   customerProfileCreate: "pos.customer-profile.create",
   orderCreate: "pos.order.create",
+  orderCheckout: "pos.order.checkout",
   orderPaymentCreate: "pos.order.payment.create",
   orderStatusChange: "pos.order.status-change",
   ticketStatusChange: "pos.service-ticket.status-change",
 } as const;
 
+export type PosOfflineQueueSummary = {
+  pendingOperationsCount: number;
+  pendingSalesCount: number;
+  oldestPendingAt: string | null;
+};
+
+export function summarizePosOfflineQueueItems(
+  items: readonly OfflineQueueItem[],
+): PosOfflineQueueSummary {
+  const pendingItems = items.filter((item) => item.status === "pending");
+  const saleIds = new Set<string>();
+
+  for (const item of pendingItems) {
+    if (
+      item.entity !== POS_OFFLINE_ENTITIES.orderCreate &&
+      item.entity !== POS_OFFLINE_ENTITIES.orderCheckout &&
+      item.entity !== POS_OFFLINE_ENTITIES.orderPaymentCreate
+    ) {
+      continue;
+    }
+
+    const entityId = item.metadata?.entityId;
+    if (typeof entityId === "string" && entityId) saleIds.add(entityId);
+  }
+
+  const oldestPendingAt = pendingItems.reduce<string | null>(
+    (oldest, item) =>
+      !oldest || Date.parse(item.createdAt) < Date.parse(oldest)
+        ? item.createdAt
+        : oldest,
+    null,
+  );
+
+  return {
+    pendingOperationsCount: pendingItems.length,
+    pendingSalesCount: saleIds.size,
+    oldestPendingAt,
+  };
+}
+
 type StableCreatePosAccountRequest = CreatePosAccountRequest & { id: string };
 type StableCreatePosProfileRequest = CreatePosProfileRequest & { id: string };
 type StableCreatePosOrderRequest = CreatePosOrderRequest & { id: string };
+type StableCreatePosCheckoutRequest = Omit<
+  CreatePosCheckoutRequest,
+  "order"
+> & {
+  order: StableCreatePosOrderRequest;
+};
 
 type CustomerAccountCreatePayload = {
   input: StableCreatePosAccountRequest;
@@ -57,6 +106,10 @@ type OrderCreatePayload = {
   input: StableCreatePosOrderRequest;
 };
 
+type OrderCheckoutPayload = {
+  input: StableCreatePosCheckoutRequest;
+};
+
 // The payment body keeps its own idempotencyKey; it is generated once at
 // enqueue time and must be replayed unchanged so the backend can dedupe.
 export type OrderPaymentCreatePayload = {
@@ -78,6 +131,7 @@ export type PosOfflinePayload =
   | CustomerAccountCreatePayload
   | CustomerProfileCreatePayload
   | OrderCreatePayload
+  | OrderCheckoutPayload
   | OrderPaymentCreatePayload
   | OrderStatusChangePayload
   | TicketStatusChangePayload;
@@ -112,6 +166,10 @@ export type PosOfflineReplayApi = {
   ): Promise<unknown>;
   createOrder(
     input: StableCreatePosOrderRequest,
+    options: ReplayRequestOptions,
+  ): Promise<unknown>;
+  checkoutOrder(
+    input: StableCreatePosCheckoutRequest,
     options: ReplayRequestOptions,
   ): Promise<unknown>;
   payOrder(
@@ -171,6 +229,25 @@ export function createOrderOfflineMutation(
       input: { ...input, id: entityId },
     },
     dependsOnOperationIds,
+  );
+}
+
+export function createOrderCheckoutOfflineMutation(
+  input: CreatePosCheckoutRequest,
+  dependsOnOperationIds: readonly string[] = [],
+): PosOfflineMutation<OrderCheckoutPayload> {
+  const entityId = input.order.id ?? createId();
+  return createMutation(
+    POS_OFFLINE_ENTITIES.orderCheckout,
+    entityId,
+    {
+      input: {
+        ...input,
+        order: { ...input.order, id: entityId },
+      },
+    },
+    dependsOnOperationIds,
+    input.payment?.idempotencyKey ?? entityId,
   );
 }
 
@@ -242,6 +319,11 @@ export async function replayPosOfflineQueueItem(
       await api.createOrder(payload.input, options);
       return;
     }
+    case POS_OFFLINE_ENTITIES.orderCheckout: {
+      const payload = item.payload as OrderCheckoutPayload;
+      await api.checkoutOrder(payload.input, options);
+      return;
+    }
     case POS_OFFLINE_ENTITIES.orderPaymentCreate: {
       if (!isPosOrderPaymentCreateQueueItem(item)) {
         throw new Error(
@@ -278,6 +360,10 @@ export type PosOfflineCustomerProfileResult =
 
 export type PosOfflineOrderResult =
   | { queued: false; data: PosOrderDetail }
+  | { queued: true; entityId: string; operationId: string };
+
+export type PosOfflineCheckoutResult =
+  | { queued: false; data: CreatePosCheckoutResponse }
   | { queued: true; entityId: string; operationId: string };
 
 export type PosOfflineOrderPaymentResult =
@@ -359,7 +445,8 @@ export function findQueuedPosCreateDependency(
   entity: (typeof POS_OFFLINE_ENTITIES)[
     | "customerAccountCreate"
     | "customerProfileCreate"
-    | "orderCreate"],
+    | "orderCreate"
+    | "orderCheckout"],
   entityId: string,
 ): PosOfflineCreateDependency | undefined {
   const item = items.find(

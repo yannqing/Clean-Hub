@@ -6,4 +6,5 @@ export * from "./customer-comments.js";
 export * from "./discounts.js";
 export * from "./order-comments.js";
 export * from "./orders.js";
+export * from "./pos-carts.js";
 export * from "./product-returns.js";

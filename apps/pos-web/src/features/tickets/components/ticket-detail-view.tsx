@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { customerDetailPath, posRoutes } from "@/config";
-import { OrderCreateDialog } from "@/features/orders/components/order-create-dialog";
+import { AddTicketToCartButton } from "@/features/cart/components";
 import { PrintJobControl } from "@/features/hardware/components";
 
 import {
@@ -136,18 +136,9 @@ export function TicketDetailView({
               initialLabel="打印标签"
               title={ticketCode}
             />
-            <OrderCreateDialog
-              initialTicket={ticket}
-              orderDetailHref={(orderId) =>
-                buildOrderDetailHref(orderId, {
-                  intakeQuery,
-                  ticketFrom: from,
-                  ticketId: ticket.id,
-                })
-              }
-              triggerClassName="flex h-11 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:bg-foreground/90"
-              triggerIcon="receipt"
-              triggerLabel="创建订单"
+            <AddTicketToCartButton
+              relatedOrders={relatedOrders}
+              ticket={ticket}
             />
             <button
               className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground hover:bg-accent"

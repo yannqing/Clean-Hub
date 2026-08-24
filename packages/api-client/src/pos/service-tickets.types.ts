@@ -194,6 +194,7 @@ export type ChangeServiceTicketItemStatusRequest = {
 
 export type RelatedOrderSummary = {
   id: string;
+  ticketItemIds: string[];
   currency: string;
   orderType: string;
   status: string;

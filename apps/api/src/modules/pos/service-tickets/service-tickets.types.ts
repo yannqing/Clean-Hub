@@ -206,6 +206,7 @@ export type ServiceTicketOverview = {
 
 export type RelatedOrderSummary = {
   id: string;
+  ticketItemIds: string[];
   currency: string;
   orderType: string;
   status: string;

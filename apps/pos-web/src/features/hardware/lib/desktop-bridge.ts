@@ -14,6 +14,8 @@ import {
   type AsyncKeyValueStorage,
 } from "@cleanhub/offline";
 
+import { createPosIndexedDbStorage } from "./indexed-db-storage";
+
 export type CleanHubDesktopBridge = {
   hardware: {
     getCapabilities(): Promise<PosHardwareCapabilities>;
@@ -43,6 +45,8 @@ export function getDesktopBridge(): CleanHubDesktopBridge | null {
   return window.cleanHubDesktop ?? null;
 }
 
+let browserOfflineStorage: AsyncKeyValueStorage | null = null;
+
 export function getPosOfflineStorage(): AsyncKeyValueStorage {
   const desktopStorage = getDesktopBridge()?.offlineStorage;
   if (desktopStorage) {
@@ -51,5 +55,8 @@ export function getPosOfflineStorage(): AsyncKeyValueStorage {
   if (typeof window === "undefined") {
     return createMemoryStorage();
   }
-  return createWebStorageAdapter(window.localStorage);
+  browserOfflineStorage ??= createPosIndexedDbStorage(
+    createWebStorageAdapter(window.localStorage),
+  );
+  return browserOfflineStorage;
 }

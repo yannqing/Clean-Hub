@@ -11,6 +11,7 @@ import { getRequestMeta } from "../request-meta.helper.js";
 import { PosOrderError } from "./orders.errors.js";
 import {
   changePosOrderStatus,
+  checkoutPosOrder,
   confirmPosManualPayment,
   createPosOrder,
   createPosOrderItem,
@@ -27,6 +28,7 @@ import {
 } from "./orders.service.js";
 import {
   changePosOrderStatusBodySchema,
+  createPosCheckoutBodySchema,
   createPosOrderBodySchema,
   createPosOrderItemBodySchema,
   createPosPaymentBodySchema,
@@ -125,6 +127,49 @@ export function createPosOrderController({
       }
 
       return c.json(order, 201);
+    } catch (error) {
+      if (error instanceof PosOrderError) {
+        return createErrorResponse(c, error);
+      }
+      throw error;
+    }
+  };
+}
+
+export function createPosOrderCheckoutController({
+  notificationPublisher,
+}: CreatePosOrderControllerOptions = {}) {
+  return async (c: Context<AppBindings>) => {
+    const rawBody = await c.req.json().catch(() => ({}));
+    const data = createPosCheckoutBodySchema.parse(rawBody);
+
+    try {
+      const result = await checkoutPosOrder(
+        c.get("authContext"),
+        data,
+        getRequestMeta(c),
+      );
+      const tenantId = c.get("authContext").tenantId;
+      if (tenantId && result.order.customerId && !result.idempotent) {
+        try {
+          await notificationPublisher?.publish(
+            orderCreatedEvent({
+              tenantId,
+              branchId: result.order.branchId,
+              customerId: result.order.customerId,
+              orderId: result.order.id,
+              totalAmount: result.order.totalAmount,
+            }),
+          );
+        } catch (publishError) {
+          logger.error(
+            { error: publishError, tenantId, orderId: result.order.id },
+            "POS checkout notification event failed",
+          );
+        }
+      }
+
+      return c.json(result, result.idempotent ? 200 : 201);
     } catch (error) {
       if (error instanceof PosOrderError) {
         return createErrorResponse(c, error);

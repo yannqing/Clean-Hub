@@ -40,7 +40,7 @@ export function TicketRelatedOrders({
   orderDetailHref,
   orders,
 }: TicketRelatedOrdersProps) {
-  const { locale } = useTranslation();
+  const { locale, t } = useTranslation();
   const { timeZone } = usePosRuntimeConfig();
 
   return (
@@ -67,6 +67,10 @@ export function TicketRelatedOrders({
                   </div>
                   <div className="mt-1 text-xs text-muted-foreground">
                     {formatTicketDateTime(order.createdAt, locale, timeZone)}
+                    {" · "}
+                    {t("pos.cart.itemCount", {
+                      count: order.ticketItemIds.length,
+                    })}
                   </div>
                 </div>
                 <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">

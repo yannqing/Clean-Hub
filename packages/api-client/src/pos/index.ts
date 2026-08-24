@@ -3,6 +3,7 @@ import { createPosTerminalAuthApi } from "./auth";
 import { createPosAccountsApi } from "./accounts";
 import { createPosBranchesApi } from "./branches";
 import { createPosCatalogApi } from "./catalog";
+import { createPosCartsApi } from "./carts";
 import { createPosCustomersApi } from "./customers";
 import { createPosNotificationsApi } from "./notifications";
 import { createPosOrdersApi } from "./orders";
@@ -25,6 +26,8 @@ export * from "./branches";
 export * from "./branches.types";
 export * from "./catalog";
 export * from "./catalog.types";
+export * from "./carts";
+export * from "./carts.types";
 export * from "./customers";
 export * from "./customers.types";
 export * from "./notifications";
@@ -56,6 +59,7 @@ export function createPosApi(client: ApiClient) {
   return {
     branches: createPosBranchesApi(client),
     catalog: createPosCatalogApi(client),
+    carts: createPosCartsApi(client),
     customers: createPosCustomersApi(client),
     serviceTickets: createPosServiceTicketsApi(client),
     accounts: createPosAccountsApi(client),

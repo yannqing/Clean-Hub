@@ -19,6 +19,8 @@ export type PreferencesLikeStorage = {
 
 export type OfflineQueueItem<TPayload = unknown> = {
   id: string;
+  /** Monotonic sequence within one scoped queue, used for ordered replay. */
+  sequence: number;
   entity: string;
   operation: OfflineOperation;
   payload: TPayload;
@@ -745,8 +747,13 @@ export class OfflineQueue {
       }
 
       const now = new Date().toISOString();
+      const sequence = queue.reduce(
+        (highest, queuedItem) => Math.max(highest, queuedItem.sequence),
+        0,
+      ) + 1;
       const item: OfflineQueueItem<TPayload> = {
         id: input.id ?? createId(),
+        sequence,
         entity: input.entity,
         operation: input.operation,
         payload: input.payload,
@@ -978,7 +985,17 @@ export class OfflineQueue {
     }
 
     const parsed = JSON.parse(rawValue) as OfflineQueueItem<TPayload>[];
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+
+    // v1/v2 queues had timestamps but no explicit sequence. Preserve their
+    // array order during the one-time in-memory upgrade.
+    return parsed.map((item, index) => ({
+      ...item,
+      sequence:
+        Number.isSafeInteger(item.sequence) && item.sequence > 0
+          ? item.sequence
+          : index + 1,
+    }));
   }
 
   private async writeQueue(queue: OfflineQueueItem[]): Promise<void> {

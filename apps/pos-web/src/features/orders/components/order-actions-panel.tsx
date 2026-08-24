@@ -26,7 +26,12 @@ import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { usePosOfflineWrites } from "@/features/offline/lib";
 import { getDesktopBridge } from "@/features/hardware/lib/desktop-bridge";
-import { openCashDrawerForPayment } from "@/features/hardware/lib/cash-drawer";
+import {
+  openCashDrawerForPayment,
+  openCashDrawerForPaymentOnce,
+} from "@/features/hardware/lib/cash-drawer";
+import { loadPosHardwareDevices } from "@/features/hardware/lib/hardware-device-cache";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 
@@ -58,6 +63,7 @@ export function OrderActionsPanel({
 }) {
   const { locale } = useTranslation();
   const router = useRouter();
+  const runtime = usePosRuntimeConfig();
   const text = (value: string) => translatePosText(value, locale);
   const { changeOrderStatus, payOrder } = usePosOfflineWrites();
   const [amount, setAmount] = useState(getOutstandingAmount(order));
@@ -143,6 +149,31 @@ export function OrderActionsPanel({
       }
 
       if (result.queued) {
+        if (
+          paymentOption === "cash" &&
+          runtime.tenantId &&
+          runtime.branchId &&
+          runtime.terminalId
+        ) {
+          const drawerOutcome = await openCashDrawerForPaymentOnce({
+            paymentId: idempotencyKey,
+            scope: {
+              tenantId: runtime.tenantId,
+              branchId: runtime.branchId,
+              terminalId: runtime.terminalId,
+            },
+            loadDevices: () =>
+              loadPosHardwareDevices({
+                tenantId: runtime.tenantId!,
+                branchId: runtime.branchId!,
+                terminalId: runtime.terminalId!,
+              }),
+            hardware: getDesktopBridge()?.hardware ?? null,
+            reportResult: (drawerResult) =>
+              posApi.pos.hardware.recordCashPaymentDrawerResult(drawerResult),
+          });
+          if (!drawerOutcome.opened) toast.warning(drawerOutcome.message);
+        }
         toast.success("网络不可用，收款已保存，将在联网后自动提交。");
         idempotencyKeyRef.current = null;
         setExternalReference("");
@@ -158,13 +189,33 @@ export function OrderActionsPanel({
           paymentResult.payment.paymentStatus === "paid" &&
           !paymentResult.idempotent
         ) {
-          const drawerOutcome = await openCashDrawerForPayment({
+          const drawerInput: Parameters<
+            typeof openCashDrawerForPayment
+          >[0] = {
             paymentId: paymentResult.payment.id,
-            loadDevices: async () => (await posApi.pos.hardware.list()).data,
+            loadDevices: async () =>
+              runtime.tenantId && runtime.branchId && runtime.terminalId
+                ? loadPosHardwareDevices({
+                    tenantId: runtime.tenantId,
+                    branchId: runtime.branchId,
+                    terminalId: runtime.terminalId,
+                  })
+                : (await posApi.pos.hardware.list()).data,
             hardware: getDesktopBridge()?.hardware ?? null,
             reportResult: (drawerResult) =>
               posApi.pos.hardware.recordCashPaymentDrawerResult(drawerResult),
-          });
+          };
+          const drawerOutcome =
+            runtime.tenantId && runtime.branchId && runtime.terminalId
+              ? await openCashDrawerForPaymentOnce({
+                  ...drawerInput,
+                  scope: {
+                    tenantId: runtime.tenantId,
+                    branchId: runtime.branchId,
+                    terminalId: runtime.terminalId,
+                  },
+                })
+              : await openCashDrawerForPayment(drawerInput);
 
           if (drawerOutcome.opened) {
             toast.success("钱箱已自动打开。");

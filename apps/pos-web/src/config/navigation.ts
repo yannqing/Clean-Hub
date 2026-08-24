@@ -21,6 +21,11 @@ export const posSidebarNavigation: PosNavItem[] = [
     icon: "home",
   },
   {
+    labelKey: "pos.nav.sale",
+    href: posRoutes.sale,
+    icon: "shopping-cart",
+  },
+  {
     labelKey: "pos.nav.newIntake",
     href: posRoutes.newIntake,
     icon: "user-plus",
@@ -69,8 +74,8 @@ export const posSidebarNavigation: PosNavItem[] = [
 
 const POS_MOBILE_PRIMARY_HREFS = new Set<string>([
   posRoutes.workspace,
+  posRoutes.sale,
   posRoutes.newIntake,
-  posRoutes.scan,
   posRoutes.tickets,
 ]);
 

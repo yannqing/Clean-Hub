@@ -1,25 +1,42 @@
-import { createHash, randomUUID } from "node:crypto";
-import {
-  access,
-  mkdir,
-  readFile,
-  rename,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { access, chmod, readFile, rm, stat } from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 
-const offlineStorageKeyPrefix = "cleanhub.pos.offline.";
+const require = createRequire(import.meta.url);
+
+type SqliteStatement = {
+  all(...values: unknown[]): unknown[];
+  get(...values: unknown[]): unknown;
+  run(...values: unknown[]): unknown;
+};
+
+type SqliteDatabase = {
+  exec(sql: string): void;
+  prepare(sql: string): SqliteStatement;
+};
+
+type SqliteDatabaseConstructor = new (fileName: string) => SqliteDatabase;
+
+const { DatabaseSync } = require("node:sqlite") as {
+  DatabaseSync: SqliteDatabaseConstructor;
+};
+
+const allowedStorageKeyPattern = /^cleanhub(?:\.|:)/;
 const defaultMaxValueBytes = 5 * 1024 * 1024;
 const maxIndexBytes = 1024 * 1024;
 
+/** Legacy v1 file index retained only for automatic migration. */
 export const desktopOfflineStorageIndexFileName = "key-index.v1.json";
+export const desktopOfflineStorageDatabaseFileName = "offline-storage.v2.sqlite";
 
 type OfflineStorageIndex = {
   version: 1;
   keys: string[];
 };
+
+type SqliteValueRow = { value: string };
+type SqliteKeyRow = { key: string };
 
 export type DesktopOfflineStorage = {
   getItem(key: string): Promise<string | null>;
@@ -28,53 +45,13 @@ export type DesktopOfflineStorage = {
   keys(): Promise<string[]>;
 };
 
-class AsyncMutex {
-  private tail = Promise.resolve();
-
-  async runExclusive<TResult>(
-    operation: () => Promise<TResult>,
-  ): Promise<TResult> {
-    const previous = this.tail;
-    let release: () => void = () => undefined;
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-
-    this.tail = previous.then(
-      () => gate,
-      () => gate,
-    );
-    await previous.catch(() => undefined);
-
-    try {
-      return await operation();
-    } finally {
-      release();
-    }
-  }
-}
-
-const directoryMutexes = new Map<string, AsyncMutex>();
-
-function getDirectoryMutex(directory: string): AsyncMutex {
-  const normalizedDirectory = path.resolve(directory);
-  const existing = directoryMutexes.get(normalizedDirectory);
-  if (existing) {
-    return existing;
-  }
-
-  const mutex = new AsyncMutex();
-  directoryMutexes.set(normalizedDirectory, mutex);
-  return mutex;
-}
-
 function validateOfflineStorageKey(key: string): void {
-  if (!key.startsWith(offlineStorageKeyPrefix)) {
+  if (!allowedStorageKeyPattern.test(key)) {
     throw new Error("Invalid offline storage key.");
   }
 }
 
-function getValueFileName(key: string): string {
+function getLegacyValueFileName(key: string): string {
   return `${createHash("sha256").update(key).digest("hex")}.json`;
 }
 
@@ -84,25 +61,6 @@ async function pathExists(filePath: string): Promise<boolean> {
     return true;
   } catch {
     return false;
-  }
-}
-
-async function writeFileAtomically(
-  filePath: string,
-  value: string,
-): Promise<void> {
-  await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
-  const temporaryPath = path.join(
-    path.dirname(filePath),
-    `.${path.basename(filePath)}.${process.pid}.${randomUUID()}.tmp`,
-  );
-
-  try {
-    await writeFile(temporaryPath, value, { encoding: "utf8", mode: 0o600 });
-    await rename(temporaryPath, filePath);
-  } catch (error) {
-    await rm(temporaryPath, { force: true }).catch(() => undefined);
-    throw error;
   }
 }
 
@@ -129,129 +87,144 @@ function parseIndex(value: string): OfflineStorageIndex | null {
   return {
     version: 1,
     keys: [
-      ...new Set(
-        parsed.keys.filter((key) => key.startsWith(offlineStorageKeyPrefix)),
-      ),
+      ...new Set(parsed.keys.filter((key) => allowedStorageKeyPattern.test(key))),
     ].sort(),
   };
 }
 
+function readSqliteValue(database: SqliteDatabase, key: string): string | null {
+  const row = database
+    .prepare("select value from offline_kv where key = ?")
+    .get(key) as SqliteValueRow | undefined;
+  return row?.value ?? null;
+}
+
+function writeSqliteValue(
+  database: SqliteDatabase,
+  key: string,
+  value: string,
+): void {
+  database
+    .prepare(
+      `insert into offline_kv (key, value, updated_at)
+       values (?, ?, ?)
+       on conflict(key) do update set
+         value = excluded.value,
+         updated_at = excluded.updated_at`,
+    )
+    .run(key, value, new Date().toISOString());
+}
+
+/**
+ * Durable POS storage backed by SQLite in WAL mode.
+ *
+ * Every replacement is one SQLite statement with synchronous=FULL, so sudden
+ * process or power loss leaves either the previous value or the complete next
+ * value. The v1 hash-file store is copied into SQLite on first use.
+ */
 export function createDesktopOfflineStorage(
   directory: string,
   options: { maxValueBytes?: number } = {},
 ): DesktopOfflineStorage {
   const storageDirectory = path.resolve(directory);
-  const indexPath = path.join(
+  const databasePath = path.join(
+    storageDirectory,
+    desktopOfflineStorageDatabaseFileName,
+  );
+  const legacyIndexPath = path.join(
     storageDirectory,
     desktopOfflineStorageIndexFileName,
   );
   const maxValueBytes = options.maxValueBytes ?? defaultMaxValueBytes;
-  const mutex = getDirectoryMutex(storageDirectory);
 
-  const getValuePath = (key: string) =>
-    path.join(storageDirectory, getValueFileName(key));
+  require("node:fs").mkdirSync(storageDirectory, {
+    recursive: true,
+    mode: 0o700,
+  });
+  const database = new DatabaseSync(databasePath);
+  database.exec("pragma journal_mode = WAL");
+  database.exec("pragma synchronous = FULL");
+  database.exec("pragma busy_timeout = 5000");
+  database.exec("pragma foreign_keys = ON");
+  database.exec(`
+    create table if not exists offline_kv (
+      key text primary key not null,
+      value text not null,
+      updated_at text not null
+    ) without rowid;
+  `);
+  void chmod(databasePath, 0o600).catch(() => undefined);
 
-  const readIndex = async (): Promise<OfflineStorageIndex | null> => {
+  let migrationPromise: Promise<void> | null = null;
+
+  const readLegacyValue = async (key: string): Promise<string | null> => {
+    const filePath = path.join(storageDirectory, getLegacyValueFileName(key));
     try {
-      const metadata = await stat(indexPath);
-      if (!metadata.isFile() || metadata.size > maxIndexBytes) {
-        return null;
-      }
-      return parseIndex(await readFile(indexPath, "utf8"));
+      const metadata = await stat(filePath);
+      if (!metadata.isFile() || metadata.size > maxValueBytes) return null;
+      return await readFile(filePath, "utf8");
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return { version: 1, keys: [] };
-      }
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw error;
     }
   };
 
-  const writeIndex = async (keys: string[]): Promise<void> => {
-    const index: OfflineStorageIndex = {
-      version: 1,
-      keys: [...new Set(keys)].sort(),
-    };
-    const serializedIndex = JSON.stringify(index);
-    if (Buffer.byteLength(serializedIndex, "utf8") > maxIndexBytes) {
-      throw new Error("Offline storage key index limit exceeded.");
+  const migrateLegacyStorage = async (): Promise<void> => {
+    if (!(await pathExists(legacyIndexPath))) return;
+    const metadata = await stat(legacyIndexPath);
+    if (!metadata.isFile() || metadata.size > maxIndexBytes) return;
+    const index = parseIndex(await readFile(legacyIndexPath, "utf8"));
+    if (!index) return;
+
+    for (const key of index.keys) {
+      if (readSqliteValue(database, key) !== null) continue;
+      const value = await readLegacyValue(key);
+      if (value !== null) writeSqliteValue(database, key, value);
     }
-    await writeFileAtomically(indexPath, serializedIndex);
+  };
+
+  const ensureMigrated = (): Promise<void> => {
+    migrationPromise ??= migrateLegacyStorage();
+    return migrationPromise;
   };
 
   return {
     async getItem(key) {
       validateOfflineStorageKey(key);
-      return mutex.runExclusive(async () => {
-        try {
-          return await readFile(getValuePath(key), "utf8");
-        } catch (error) {
-          if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-            return null;
-          }
-          throw error;
-        }
-      });
+      await ensureMigrated();
+      const stored = readSqliteValue(database, key);
+      if (stored !== null) return stored;
+
+      // Exact scoped keys remain recoverable even if a legacy index was lost.
+      const legacy = await readLegacyValue(key);
+      if (legacy !== null) writeSqliteValue(database, key, legacy);
+      return legacy;
     },
 
     async setItem(key, value) {
       validateOfflineStorageKey(key);
       if (Buffer.byteLength(value, "utf8") > maxValueBytes) {
-        throw new Error("Offline queue storage limit exceeded.");
+        throw new Error("Offline storage value limit exceeded.");
       }
-
-      await mutex.runExclusive(async () => {
-        const index = await readIndex();
-
-        // A damaged/missing legacy index cannot be reconstructed from hashed
-        // value filenames. Register this known key without guessing other keys.
-        const registeredKeys = index?.keys ?? [];
-        if (!registeredKeys.includes(key)) {
-          await writeIndex([...registeredKeys, key]);
-        }
-        // Persist the index first. If the process stops between the two atomic
-        // renames, enumeration may temporarily see a key without a value and
-        // safely omit it. Writing the value first could instead leave durable
-        // queue data that can never be enumerated after an epoch change.
-        await writeFileAtomically(getValuePath(key), value);
-      });
+      await ensureMigrated();
+      writeSqliteValue(database, key, value);
     },
 
     async removeItem(key) {
       validateOfflineStorageKey(key);
-      await mutex.runExclusive(async () => {
-        await rm(getValuePath(key), { force: true });
-        const index = await readIndex();
-        if (index?.keys.includes(key)) {
-          await writeIndex(
-            index.keys.filter((registeredKey) => registeredKey !== key),
-          );
-        }
+      await ensureMigrated();
+      database.prepare("delete from offline_kv where key = ?").run(key);
+      await rm(path.join(storageDirectory, getLegacyValueFileName(key)), {
+        force: true,
       });
     },
 
     async keys() {
-      return mutex.runExclusive(async () => {
-        const index = await readIndex();
-        if (!index) {
-          return [];
-        }
-
-        // Only explicitly indexed application keys are enumerable. Old
-        // sha256-only files remain directly readable when their key is known,
-        // but there is intentionally no unsafe attempt to reverse those hashes.
-        const existingKeys: string[] = [];
-        for (const key of index.keys) {
-          if (await pathExists(getValuePath(key))) {
-            existingKeys.push(key);
-          }
-        }
-
-        if (existingKeys.length !== index.keys.length) {
-          await writeIndex(existingKeys);
-        }
-
-        return existingKeys;
-      });
+      await ensureMigrated();
+      const rows = database
+        .prepare("select key from offline_kv order by key")
+        .all() as SqliteKeyRow[];
+      return rows.map((row) => row.key);
     },
   };
 }

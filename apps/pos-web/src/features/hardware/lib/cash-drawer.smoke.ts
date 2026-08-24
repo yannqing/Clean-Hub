@@ -5,9 +5,11 @@ import type {
   RecordCashPaymentDrawerResultRequest,
 } from "@cleanhub/api-client";
 import type { PosDrawerOpenRequest } from "@cleanhub/hardware";
+import { createMemoryStorage } from "@cleanhub/offline";
 
 import {
   openCashDrawerForPayment,
+  openCashDrawerForPaymentOnce,
   resolveCashDrawerConfiguration,
 } from "./cash-drawer";
 
@@ -66,6 +68,59 @@ async function runCashDrawerSmoke(): Promise<void> {
     paymentId: "payment_1",
   });
   assert.equal(reported[0]?.status, "opened");
+
+  const durableStorage = createMemoryStorage();
+  openedRequests.length = 0;
+  const onceInput = {
+    paymentId: "payment_exactly_once",
+    scope: {
+      tenantId: "tenant_1",
+      branchId: "branch_1",
+      terminalId: "terminal_1",
+    },
+    storage: durableStorage,
+    loadDevices: async () => [drawer],
+    hardware: {
+      async getCapabilities() {
+        return {
+          scanner: false,
+          printer: true,
+          cashDrawer: true,
+          secureTerminalCredential: true,
+        };
+      },
+      async openCashDrawer(request: PosDrawerOpenRequest) {
+        openedRequests.push(request);
+      },
+    },
+    async reportResult() {},
+  };
+  assert.equal((await openCashDrawerForPaymentOnce(onceInput)).opened, true);
+  assert.equal((await openCashDrawerForPaymentOnce(onceInput)).opened, false);
+  assert.equal(
+    openedRequests.length,
+    1,
+    "a durable cash payment marker must suppress repeated drawer pulses",
+  );
+
+  const uncertainStorage = createMemoryStorage();
+  await uncertainStorage.setItem(
+    [
+      "cleanhub.pos.offline.drawer.v1",
+      "tenant_1",
+      "branch_1",
+      "terminal_1",
+      "payment_uncertain",
+    ].join(":"),
+    "opening",
+  );
+  const uncertain = await openCashDrawerForPaymentOnce({
+    ...onceInput,
+    paymentId: "payment_uncertain",
+    storage: uncertainStorage,
+  });
+  assert.equal(uncertain.opened, false);
+  assert.match(uncertain.opened ? "" : uncertain.message, /不确定/);
 
   reported.length = 0;
   const missingBridge = await openCashDrawerForPayment({

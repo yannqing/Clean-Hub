@@ -35,6 +35,7 @@ import {
   insertManualOrderItems,
   insertOrderItemsFromTicketItems,
   listPaymentTransactions,
+  lockPosCheckoutIdempotencyKey,
   recalculateOrderPaymentState,
   resolveManualPaymentTransaction,
   softDeleteOrderItemRecord,
@@ -49,7 +50,10 @@ import {
   findPosCatalogServiceById,
 } from "../catalog/catalog.repository.js";
 import { releaseActivePosOrderDiscounts } from "../discounts/discounts.repository.js";
-import { repricePosOrderDiscounts } from "../discounts/discounts.service.js";
+import {
+  repricePosOrderDiscounts,
+  resolveRequestedPosDiscountRule,
+} from "../discounts/discounts.service.js";
 import { moneyToMinor } from "../discounts/pricing-engine.js";
 import {
   consumeProductInventoryForPaidOrder,
@@ -58,6 +62,9 @@ import {
 } from "./orders.inventory.js";
 import type {
   ChangePosOrderStatusRequest,
+  CreatePosCheckoutRequest,
+  CreatePosCheckoutResponse,
+  CreateManualOrderItemRequest,
   CreatePosOrderInput,
   CreatePosOrderItemRequest,
   CreatePosOrderRequest,
@@ -215,7 +222,13 @@ export function assertGuestOrderItemAllowed(
   }
 }
 
-async function resolveOrderItemPricing(
+function isTicketItemReference(
+  item: CreateManualOrderItemRequest,
+): item is Extract<CreateManualOrderItemRequest, { ticketId: string }> {
+  return item.ticketId !== undefined;
+}
+
+export async function resolveOrderItemPricing(
   db: Database,
   input: {
     authContext: AuthContext;
@@ -300,7 +313,10 @@ async function resolveOrderItemPricing(
     return {
       itemKind: "product",
       businessLine: null,
+      serviceCategoryId: null,
       serviceId: null,
+      productId: product.productId,
+      productCategoryId: product.categoryId,
       productSkuId,
       productPriceId: product.productPriceId,
       itemName: product.variantName
@@ -402,7 +418,10 @@ async function resolveOrderItemPricing(
     return {
       itemKind: "service",
       businessLine: service.businessLine,
+      serviceCategoryId: service.categoryId,
       serviceId: resolvedServiceId,
+      productId: null,
+      productCategoryId: null,
       productSkuId: null,
       productPriceId: null,
       itemName: service.name,
@@ -439,7 +458,10 @@ async function resolveOrderItemPricing(
   return {
     itemKind: "service",
     businessLine: service.businessLine,
+    serviceCategoryId: service.categoryId,
     serviceId: resolvedServiceId,
+    productId: null,
+    productCategoryId: null,
     productSkuId: null,
     productPriceId: null,
     itemName: service.name,
@@ -691,10 +713,13 @@ async function createManualOrder(
   },
 ): Promise<PosOrderDetail> {
   requirePosBranchAccess(input.authContext, input.data.branchId);
-  const customerId = input.data.customerId ?? null;
-  if (customerId) {
-    await requireCustomerActive(db, { tenantId, customerId });
-  }
+  const discountReason = input.data.discountCode
+    ? authorizePosSensitiveOperation(
+        input.authContext,
+        "discount",
+        input.data.discountReason,
+      )
+    : undefined;
   const branch = await findBranchById(db, {
     tenantId,
     branchId: input.data.branchId,
@@ -704,10 +729,109 @@ async function createManualOrder(
     throw new PosOrderError("BRANCH_NOT_ALLOWED", "Branch was not found.", 404);
   }
 
+  let customerId = input.data.customerId ?? null;
+  const ticketReferences = input.data.items.filter(isTicketItemReference);
+  const referencedTicketItemIds = ticketReferences.map(
+    (item) => item.ticketItemId,
+  );
+  if (
+    new Set(referencedTicketItemIds).size !== referencedTicketItemIds.length
+  ) {
+    throw new PosOrderError(
+      "VALIDATION_ERROR",
+      "A ticket item cannot be added to the same cart more than once.",
+      422,
+    );
+  }
+
+  const referencesByTicket = new Map<string, string[]>();
+  for (const reference of ticketReferences) {
+    const current = referencesByTicket.get(reference.ticketId) ?? [];
+    current.push(reference.ticketItemId);
+    referencesByTicket.set(reference.ticketId, current);
+  }
+
+  const ticketGroups: Array<{
+    ticketId: string;
+    customerId: string;
+    items: Awaited<ReturnType<typeof findTicketItemsForOrder>>;
+  }> = [];
+  for (const [ticketId, ticketItemIds] of referencesByTicket) {
+    const ticket = await findServiceTicketForOrder(db, { tenantId, ticketId });
+    if (!ticket) {
+      throw new PosOrderError(
+        "SERVICE_TICKET_NOT_FOUND",
+        "Service ticket was not found.",
+        404,
+      );
+    }
+    requirePosBranchAccess(input.authContext, ticket.branchId);
+    if (ticket.branchId !== input.data.branchId) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "All cart items must belong to the selected branch.",
+        422,
+      );
+    }
+    if (ticket.currency !== branch.defaultCurrency) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "All cart items must use the branch currency.",
+        422,
+      );
+    }
+    if (customerId && customerId !== ticket.customerId) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "All service ticket items in a cart must belong to the same customer.",
+        422,
+      );
+    }
+    customerId ??= ticket.customerId;
+
+    const items = await findTicketItemsForOrder(db, {
+      tenantId,
+      ticketId,
+      ticketItemIds,
+    });
+    if (items.length !== ticketItemIds.length) {
+      throw new PosOrderError(
+        "SERVICE_TICKET_EMPTY",
+        "One or more selected ticket items were not found.",
+        422,
+      );
+    }
+    ticketGroups.push({
+      ticketId,
+      customerId: ticket.customerId,
+      items,
+    });
+  }
+
+  if (referencedTicketItemIds.length > 0) {
+    const alreadyOrdered = await countAlreadyOrderedTicketItems(db, {
+      tenantId,
+      ticketItemIds: referencedTicketItemIds,
+    });
+    if (alreadyOrdered > 0) {
+      throw new PosOrderError(
+        "TICKET_ITEM_ALREADY_ORDERED",
+        "One or more ticket items are already linked to an order.",
+        409,
+      );
+    }
+  }
+  if (customerId) {
+    await requireCustomerActive(db, { tenantId, customerId });
+  }
+
   const resolvedItems: Array<
     ResolvedPosOrderItemInput & { overrideReason?: string }
   > = [];
   for (const item of input.data.items) {
+    if (isTicketItemReference(item)) {
+      continue;
+    }
     const resolved = await resolveOrderItemPricing(db, {
       authContext: input.authContext,
       tenantId,
@@ -719,9 +843,12 @@ async function createManualOrder(
     resolvedItems.push(resolved);
   }
   const totalAmount = sumOrderItemAmounts(
-    resolvedItems.map((item) => ({
-      lineAmount: calculatePosOrderItemLineAmount(item),
-    })),
+    [
+      ...resolvedItems.map((item) => ({
+        lineAmount: calculatePosOrderItemLineAmount(item),
+      })),
+      ...ticketGroups.flatMap((group) => group.items),
+    ],
   );
   const orderId = await createOrderRecord(db, {
     id: input.data.id,
@@ -737,14 +864,28 @@ async function createManualOrder(
     actorUserId: input.authContext.userId,
   });
 
-  const insertedItems = await insertManualOrderItems(db, {
-    tenantId,
-    branchId: input.data.branchId,
-    customerId,
-    orderId,
-    items: resolvedItems,
-    actorUserId: input.authContext.userId,
-  });
+  const insertedItems =
+    resolvedItems.length > 0
+      ? await insertManualOrderItems(db, {
+          tenantId,
+          branchId: input.data.branchId,
+          customerId,
+          orderId,
+          items: resolvedItems,
+          actorUserId: input.authContext.userId,
+        })
+      : [];
+  for (const group of ticketGroups) {
+    await insertOrderItemsFromTicketItems(db, {
+      tenantId,
+      branchId: input.data.branchId,
+      customerId: group.customerId,
+      orderId,
+      ticketId: group.ticketId,
+      items: group.items,
+      actorUserId: input.authContext.userId,
+    });
+  }
   for (const item of insertedItems) {
     await reserveProductOrderItem(db, {
       tenantId,
@@ -758,9 +899,26 @@ async function createManualOrder(
   if (!createdOrder) {
     throw new Error("Created order could not be loaded for pricing.");
   }
+  const requestedDiscountRule = input.data.discountCode
+    ? await resolveRequestedPosDiscountRule(db, {
+        tenantId,
+        branchId: input.data.branchId,
+        customerId,
+        orderId,
+        now: new Date(),
+        request: {
+          code: input.data.discountCode,
+          reason: discountReason!,
+          version: createdOrder.version,
+          idempotencyKey: input.data.discountIdempotencyKey!,
+        },
+      })
+    : undefined;
   await repricePosOrderDiscounts(db, {
     order: createdOrder,
     actorUserId: input.authContext.userId,
+    requestedRule: requestedDiscountRule,
+    idempotencyKey: input.data.discountIdempotencyKey,
   });
 
   const detail = await findPosOrderDetail(db, { tenantId, orderId });
@@ -773,10 +931,12 @@ async function createManualOrder(
     eventType: "pos.order.created",
     entityId: detail.id,
     reason:
-      resolvedItems
-        .map((item) => item.overrideReason)
-        .filter((reason): reason is string => Boolean(reason))
-        .join(" | ") || undefined,
+      [
+        ...resolvedItems
+          .map((item) => item.overrideReason)
+          .filter((reason): reason is string => Boolean(reason)),
+        ...(discountReason ? [discountReason] : []),
+      ].join(" | ") || undefined,
     after: detail,
     metadata: {
       priceOverrides: resolvedItems
@@ -789,6 +949,7 @@ async function createManualOrder(
           chargedUnitAmount: item.chargedUnitAmount,
           reason: item.overrideReason,
         })),
+      discountCode: input.data.discountCode,
     },
   });
 
@@ -1271,6 +1432,59 @@ export async function createPosOrderPayment(
     });
 
     return { order: detail, payment, idempotent: false };
+  });
+}
+
+/**
+ * Creates the sale and its initial payment under one PostgreSQL transaction.
+ * External mobile-money confirmation remains asynchronous, but recording its
+ * reference and the order can no longer be split by a power/network failure.
+ */
+export async function checkoutPosOrder(
+  authContext: AuthContext,
+  data: CreatePosCheckoutRequest,
+  requestMeta: AuthRequestMeta = {},
+  db: Database = getDb(),
+): Promise<CreatePosCheckoutResponse> {
+  if (!data.order.id) {
+    throw new PosOrderError(
+      "VALIDATION_ERROR",
+      "A stable client-generated order id is required for checkout recovery.",
+      422,
+    );
+  }
+
+  const tenantId = requirePosTenantId(authContext);
+  return db.transaction(async (tx) => {
+    await lockPosCheckoutIdempotencyKey(tx, {
+      tenantId,
+      orderId: data.order.id!,
+    });
+    const existedBefore = await findPosOrderDetail(tx, {
+      tenantId,
+      orderId: data.order.id!,
+    });
+    const order = await createPosOrder(
+      { authContext, data: data.order, requestMeta },
+      tx,
+    );
+
+    if (!data.payment || moneyToMinor(order.totalAmount) === BigInt(0)) {
+      return {
+        order,
+        payment: null,
+        idempotent: Boolean(existedBefore),
+      };
+    }
+
+    const paymentResult = await createPosOrderPayment(
+      authContext,
+      order.id,
+      { ...data.payment, amount: order.totalAmount },
+      requestMeta,
+      tx,
+    );
+    return paymentResult;
   });
 }
 

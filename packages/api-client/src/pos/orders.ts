@@ -2,6 +2,8 @@ import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   ApplyPosOrderDiscountRequest,
   ChangePosOrderStatusRequest,
+  CreatePosCheckoutRequest,
+  CreatePosCheckoutResponse,
   CreatePosOrderItemRequest,
   CreatePosOrderRequest,
   CreatePosPaymentRequest,
@@ -35,6 +37,12 @@ export function createPosOrdersApi(client: ApiClient) {
       client.get<PosOrderDetail>(`/pos/orders/${orderId}`, options),
     create: (input: CreatePosOrderRequest, options?: RequestOptions) =>
       client.post<PosOrderDetail>("/pos/orders", input, options),
+    checkout: (input: CreatePosCheckoutRequest, options?: RequestOptions) =>
+      client.post<CreatePosCheckoutResponse>(
+        "/pos/orders/checkout",
+        input,
+        options,
+      ),
     update: (
       orderId: string,
       input: UpdatePosOrderRequest,

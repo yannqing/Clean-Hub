@@ -3,6 +3,7 @@ export const posRoutes = {
   login: "/login",
   setup: "/setup",
   workspace: "/",
+  sale: "/sale",
   newIntake: "/new-intake",
   scan: "/scan",
   customers: "/customers",

@@ -30,7 +30,10 @@ import { createId } from "@cleanhub/id";
 
 import type { AuthContext } from "../../auth/auth.types.js";
 import { PosOrderError } from "../../pos/orders/orders.errors.js";
-import { createPosOrder } from "../../pos/orders/orders.service.js";
+import {
+  checkoutPosOrder,
+  createPosOrder,
+} from "../../pos/orders/orders.service.js";
 import { updateTenantService } from "../services/services.service.js";
 import {
   createTenantOrderItem,
@@ -77,6 +80,7 @@ function createFixtureIds() {
     retailProductBranchSettingId: createId(),
     orderId: createId(),
     guestOrderId: createId(),
+    checkoutOrderId: createId(),
     unavailableBranchOrderId: createId(),
     rejectedGuestServiceOrderId: createId(),
   };
@@ -316,6 +320,47 @@ async function runOrderLifecycleAssertions(
   assert.equal(
     branchScopedService.branchSettings[0]?.priceOverrideAmount,
     "9.00",
+  );
+
+  const checkoutInput = {
+    order: {
+      id: ids.checkoutOrderId,
+      orderType: "manual" as const,
+      branchId: ids.branchId,
+      items: [{ productSkuId: ids.retailProductSkuId, quantity: "2" }],
+    },
+    payment: {
+      paymentMethod: "cash" as const,
+      idempotencyKey: ids.checkoutOrderId,
+    },
+  };
+  const checkout = await checkoutPosOrder(
+    authContext,
+    checkoutInput,
+    requestMeta,
+    db,
+  );
+  assert.equal(checkout.order.totalAmount, "18.00");
+  assert.equal(checkout.order.paymentStatus, "paid");
+  assert.equal(checkout.payment?.paymentStatus, "paid");
+  assert.equal(checkout.idempotent, false);
+
+  const retriedCheckout = await checkoutPosOrder(
+    authContext,
+    checkoutInput,
+    requestMeta,
+    db,
+  );
+  assert.equal(retriedCheckout.order.id, ids.checkoutOrderId);
+  assert.equal(retriedCheckout.idempotent, true);
+  const checkoutPayments = await db
+    .select({ id: paymentTransactions.id })
+    .from(paymentTransactions)
+    .where(eq(paymentTransactions.orderId, ids.checkoutOrderId));
+  assert.equal(
+    checkoutPayments.length,
+    1,
+    "power-loss replay must not create a second checkout payment",
   );
 
   const guestOrder = await createPosOrder(
@@ -700,6 +745,14 @@ export async function runTenantOrderIntegrationTest(): Promise<void> {
       .where(eq(orders.id, ids.guestOrderId)),
     [],
     "the guest integration order must be rolled back",
+  );
+  assert.deepEqual(
+    await db
+      .select({ id: orders.id })
+      .from(orders)
+      .where(eq(orders.id, ids.checkoutOrderId)),
+    [],
+    "the checkout integration order must be rolled back",
   );
 }
 

@@ -80,6 +80,26 @@ const POS_API_ERROR_MESSAGES: Record<string, Record<PosErrorLocale, string>> = {
     en: "Validation failed. Check the form and try again.",
     fr: "La validation a échoué. Vérifiez le formulaire puis réessayez.",
   },
+  TICKET_ITEM_ALREADY_ORDERED: {
+    "zh-CN": "一个或多个工单项目已经生成过订单，请刷新工单后重试。",
+    en: "One or more ticket items are already linked to an order. Refresh the ticket and try again.",
+    fr: "Un ou plusieurs articles du ticket sont déjà liés à une commande. Actualisez le ticket puis réessayez.",
+  },
+  SERVICE_TICKET_NOT_FOUND: {
+    "zh-CN": "工单不存在、已删除或不属于当前租户。",
+    en: "The ticket was not found, was deleted, or belongs to another tenant.",
+    fr: "Le ticket est introuvable, a été supprimé ou appartient à un autre tenant.",
+  },
+  CUSTOMER_REQUIRED: {
+    "zh-CN": "服务项目必须关联客户档案。",
+    en: "Service items must be linked to a customer profile.",
+    fr: "Les services doivent être liés à un profil client.",
+  },
+  INSUFFICIENT_STOCK: {
+    "zh-CN": "商品库存不足，请调整购物车数量。",
+    en: "There is not enough stock. Adjust the cart quantity.",
+    fr: "Le stock est insuffisant. Modifiez la quantité dans le panier.",
+  },
 };
 
 const POS_ACCOUNT_LOCKED_UNTIL_MESSAGES: Record<

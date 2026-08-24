@@ -82,6 +82,11 @@ export type PosDiscountPricingResult = {
   allocations: PosDiscountPricingAllocation[];
 };
 
+export type PosDiscountPreviewSelection = {
+  rule: PosDiscountRule;
+  result: PosDiscountPricingResult;
+};
+
 export type PosOrderDiscountAllocation = {
   id: string;
   orderItemId: string;

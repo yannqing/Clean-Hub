@@ -9,6 +9,7 @@ import {
 import {
   changePosOrderStatusController,
   confirmPosManualPaymentController,
+  createPosOrderCheckoutController,
   createPosOrderController,
   createPosOrderItemController,
   createPosOrderPaymentController,
@@ -41,6 +42,10 @@ export function createPosOrdersRoutes({
   routes.get("/", listPosOrdersController);
   routes.post("/", createPosOrderController({ notificationPublisher }));
   routes.get("/overview", getPosOrderOverviewController);
+  routes.post(
+    "/checkout",
+    createPosOrderCheckoutController({ notificationPublisher }),
+  );
 
   routes.get("/:orderId/payments", listPosOrderPaymentsController);
   routes.post("/:orderId/payments", createPosOrderPaymentController);

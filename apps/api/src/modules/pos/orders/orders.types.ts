@@ -186,11 +186,21 @@ export type CreateManualOrderItemRequest =
   | (CreateManualOrderItemBaseRequest & {
       serviceId: string;
       productSkuId?: never;
+      ticketId?: never;
+      ticketItemId?: never;
     })
   | (CreateManualOrderItemBaseRequest & {
       serviceId?: never;
       productSkuId: string;
-    });
+      ticketId?: never;
+      ticketItemId?: never;
+    })
+  | {
+      serviceId?: never;
+      productSkuId?: never;
+      ticketId: string;
+      ticketItemId: string;
+    };
 
 export type CreateManualOrderRequest = {
   id?: string;
@@ -200,6 +210,9 @@ export type CreateManualOrderRequest = {
   items: CreateManualOrderItemRequest[];
   expireAt?: string | null;
   notes?: string | null;
+  discountCode?: string;
+  discountReason?: string;
+  discountIdempotencyKey?: string;
 };
 
 export type CreatePosOrderRequest =
@@ -244,11 +257,38 @@ export type CreatePosPaymentResponse = {
   idempotent: boolean;
 };
 
+export type CreatePosCheckoutPaymentRequest =
+  | {
+      paymentMethod: "cash";
+      idempotencyKey: string;
+    }
+  | {
+      paymentMethod: "app";
+      provider: PosMobileMoneyProvider;
+      externalReference: string;
+      idempotencyKey: string;
+    };
+
+export type CreatePosCheckoutRequest = {
+  order: CreatePosOrderRequest;
+  /** Omit to create an unpaid/pay-later order. */
+  payment?: CreatePosCheckoutPaymentRequest;
+};
+
+export type CreatePosCheckoutResponse = {
+  order: PosOrderDetail;
+  payment: PosPaymentTransaction | null;
+  idempotent: boolean;
+};
+
 export type ResolvePosPaymentRequest = {
   reason?: string;
 };
 
-export type CreatePosOrderItemRequest = CreateManualOrderItemRequest;
+export type CreatePosOrderItemRequest = Exclude<
+  CreateManualOrderItemRequest,
+  { ticketId: string }
+>;
 
 export type UpdatePosOrderItemRequest = {
   serviceId?: string;

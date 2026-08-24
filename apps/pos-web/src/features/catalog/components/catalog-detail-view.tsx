@@ -11,12 +11,15 @@ import {
   type TranslationKey,
 } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
-import { Badge, cn } from "@cleanhub/ui";
+import { Badge, Button, cn } from "@cleanhub/ui";
 import Image from "next/image";
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { posRoutes } from "@/config";
+import { usePosCart } from "@/features/cart/lib";
+import { posToast as toast } from "@/lib/pos-toast";
 
 import {
   formatCatalogMoney,
@@ -90,6 +93,16 @@ export function CatalogDetailView(props: CatalogDetailViewProps) {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {props.kind === "product" ? (
+              <ProductCartButton product={props.item} />
+            ) : (
+              <Button asChild className="h-8 gap-1.5 px-3 text-xs">
+                <Link href={posRoutes.newIntake}>
+                  <Icon className="size-3.5" name="user-plus" />
+                  {t("pos.cart.intakeService")}
+                </Link>
+              </Button>
+            )}
             <Badge variant="secondary">{t("pos.catalog.readOnly")}</Badge>
             <Badge variant="outline">
               {props.kind === "product"
@@ -120,6 +133,29 @@ export function CatalogDetailView(props: CatalogDetailViewProps) {
         <ServiceDetail item={props.item} locale={locale} />
       )}
     </section>
+  );
+}
+
+function ProductCartButton({ product }: { product: PosCatalogProduct }) {
+  const { t } = useTranslation();
+  const { addProduct, loaded } = usePosCart();
+
+  return (
+    <Button
+      className="h-8 gap-1.5 px-3 text-xs"
+      disabled={!loaded}
+      onClick={() => {
+        const result = addProduct(product);
+        if (result.changed) {
+          toast.success(t("pos.cart.added"));
+        } else {
+          toast.error(result.message ?? t("pos.cart.unavailable"));
+        }
+      }}
+    >
+      <Icon className="size-3.5" name="shopping-cart" />
+      {t("pos.cart.addProduct")}
+    </Button>
   );
 }
 

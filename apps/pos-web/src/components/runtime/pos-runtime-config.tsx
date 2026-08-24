@@ -13,6 +13,9 @@ type PosRuntimeConfig = {
   terminalCredentialVersion: number | null;
   currency: string;
   timeZone: string;
+  role: string | null;
+  autoPrintReceipt: boolean;
+  printCopies: number;
 };
 
 const PosRuntimeConfigContext = createContext<PosRuntimeConfig>({
@@ -23,6 +26,9 @@ const PosRuntimeConfigContext = createContext<PosRuntimeConfig>({
   terminalCredentialVersion: null,
   currency: DEFAULT_POS_CURRENCY,
   timeZone: "UTC",
+  role: null,
+  autoPrintReceipt: true,
+  printCopies: 1,
 });
 
 export function PosRuntimeConfigProvider({
@@ -33,6 +39,9 @@ export function PosRuntimeConfigProvider({
   terminalCredentialVersion,
   currency,
   timeZone,
+  role,
+  autoPrintReceipt,
+  printCopies,
   children,
 }: {
   tenantId?: string | null;
@@ -42,6 +51,9 @@ export function PosRuntimeConfigProvider({
   terminalCredentialVersion?: number | null;
   currency?: string | null;
   timeZone?: string | null;
+  role?: string | null;
+  autoPrintReceipt?: boolean | null;
+  printCopies?: number | null;
   children: React.ReactNode;
 }) {
   const value = useMemo<PosRuntimeConfig>(
@@ -53,6 +65,9 @@ export function PosRuntimeConfigProvider({
       terminalCredentialVersion: terminalCredentialVersion ?? null,
       currency: normalizeCurrencyCode(currency),
       timeZone: resolveTimeZone(timeZone),
+      role: role ?? null,
+      autoPrintReceipt: autoPrintReceipt ?? true,
+      printCopies: printCopies ?? 1,
     }),
     [
       branchId,
@@ -61,6 +76,9 @@ export function PosRuntimeConfigProvider({
       terminalCredentialVersion,
       terminalId,
       timeZone,
+      role,
+      autoPrintReceipt,
+      printCopies,
       userId,
     ],
   );

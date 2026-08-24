@@ -13,6 +13,8 @@ const replayApi: PosOfflineReplayApi = {
   createCustomerProfile: (accountId, input, options) =>
     posApi.pos.accounts.createProfile(accountId, input, options),
   createOrder: (input, options) => posApi.pos.orders.create(input, options),
+  checkoutOrder: (input, options) =>
+    posApi.pos.orders.checkout(input, options),
   payOrder: (orderId, input, options) =>
     posApi.pos.orders.pay(orderId, input, options),
   changeOrderStatus: (orderId, input, options) =>

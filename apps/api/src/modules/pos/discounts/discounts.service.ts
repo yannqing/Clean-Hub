@@ -42,6 +42,8 @@ import type {
   PosDiscountIdempotencyReceiptRecord,
   PosDiscountOrderRecord,
   PosDiscountPricingResult,
+  PosDiscountPricingLine,
+  PosDiscountPreviewSelection,
   PosDiscountRule,
   PosOrderDiscountRequestInput,
   RemovePosOrderDiscountRequest,
@@ -112,6 +114,101 @@ function applyAllocations(
   }
 }
 
+/**
+ * Non-mutating cart price preview. Usage counters are deliberately not
+ * reserved here; checkout acquires discount locks and recalculates before the
+ * order is committed.
+ */
+export async function previewPosDiscountPricing(
+  db: Database,
+  input: {
+    tenantId: string;
+    branchId: string;
+    customerId: string | null;
+    currency: string;
+    lines: PosDiscountPricingLine[];
+    code?: string;
+  },
+): Promise<PosDiscountPreviewSelection[]> {
+  const now = new Date();
+  const previewOrderId = "__pos_cart_preview__";
+  const requestedRules = input.code
+    ? await findPosDiscountRules(db, {
+        tenantId: input.tenantId,
+        branchId: input.branchId,
+        customerId: input.customerId,
+        orderId: previewOrderId,
+        now,
+        method: "code",
+        code: input.code,
+      })
+    : [];
+  if (input.code && requestedRules.length === 0) {
+    throw new PosOrderError(
+      "DISCOUNT_NOT_FOUND",
+      "The discount code was not found or is not active for this cart.",
+      404,
+    );
+  }
+  const automaticRules = await findPosDiscountRules(db, {
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    customerId: input.customerId,
+    orderId: previewOrderId,
+    now,
+    method: "automatic",
+  });
+  const remaining = new Map(
+    input.lines.map((line) => [line.id, moneyToMinor(line.lineAmount)]),
+  );
+  const context = {
+    currency: input.currency,
+    lines: input.lines,
+    remainingByLine: remaining,
+  };
+  const selected: PosDiscountPreviewSelection[] = [];
+  const requestedRule = requestedRules[0];
+  if (requestedRule) {
+    const result = pricePosDiscount(context, requestedRule);
+    if (!result) {
+      throw new PosOrderError(
+        "DISCOUNT_NOT_APPLICABLE",
+        "This discount code does not meet the cart requirements.",
+        422,
+      );
+    }
+    selected.push({ rule: requestedRule, result });
+    applyAllocations(remaining, result);
+  }
+
+  const automaticCandidates = uniqueRules(automaticRules)
+    .filter((rule) => !selected.some((item) => item.rule.id === rule.id))
+    .map((rule) => ({ rule, result: pricePosDiscount(context, rule) }))
+    .filter(
+      (
+        candidate,
+      ): candidate is {
+        rule: PosDiscountRule;
+        result: PosDiscountPricingResult;
+      } => candidate.result !== null,
+    )
+    .sort((left, right) =>
+      left.result.amountMinor === right.result.amountMinor
+        ? left.rule.id.localeCompare(right.rule.id)
+        : left.result.amountMinor > right.result.amountMinor
+          ? -1
+          : 1,
+    );
+  for (const candidate of automaticCandidates) {
+    if (!isCombinable(selected, candidate.rule)) continue;
+    const result = pricePosDiscount(context, candidate.rule);
+    if (!result) continue;
+    selected.push({ rule: candidate.rule, result });
+    applyAllocations(remaining, result);
+  }
+  return selected;
+}
+
 function isCombinable(
   selected: SelectedDiscount[],
   candidate: PosDiscountRule,
@@ -146,7 +243,7 @@ function discountReceiptMatches(
   );
 }
 
-async function resolveRequestedRule(
+export async function resolveRequestedPosDiscountRule(
   db: Database,
   input: {
     tenantId: string;
@@ -523,7 +620,7 @@ export async function applyPosOrderDiscount(
 
     assertDiscountMutable(order);
     assertOrderVersion(order, input.data.version);
-    const rule = await resolveRequestedRule(tx, {
+    const rule = await resolveRequestedPosDiscountRule(tx, {
       tenantId,
       branchId: order.branchId,
       customerId: order.customerId,

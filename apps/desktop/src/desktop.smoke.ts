@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -17,6 +17,7 @@ import {
 } from "./cash-drawer.js";
 import {
   createDesktopOfflineStorage,
+  desktopOfflineStorageDatabaseFileName,
   desktopOfflineStorageIndexFileName,
 } from "./offline-storage.js";
 import { isUrlFromPosOrigin, resolvePosOrigin } from "./pos-origin.js";
@@ -189,9 +190,16 @@ try {
   );
 
   await firstStorage.setItem(secondKey, "[2]");
+  const cartKey = "cleanhub:pos-cart:v2:test";
+  await firstStorage.setItem(cartKey, '{"lines":[]}');
+  assert(
+    (await firstStorage.getItem(cartKey)) === '{"lines":[]}',
+    "SQLite storage must accept scoped cart snapshots as well as queues",
+  );
   await firstStorage.removeItem(firstKey);
   assert(
-    (await firstStorage.keys()).join(",") === secondKey,
+    (await firstStorage.keys()).includes(secondKey) &&
+      !(await firstStorage.keys()).includes(firstKey),
     "removeItem must remove the offline key from the index",
   );
 
@@ -219,7 +227,13 @@ try {
   const restartedStorage = createDesktopOfflineStorage(offlineStorageDirectory);
   assert(
     (await restartedStorage.keys()).includes(secondKey),
-    "a restarted desktop storage instance must load the persisted key index",
+    "a restarted desktop storage instance must load persisted SQLite values",
+  );
+  await access(
+    path.join(
+      offlineStorageDirectory,
+      desktopOfflineStorageDatabaseFileName,
+    ),
   );
 
   const legacyKey = "cleanhub.pos.offline.queue.legacy-unindexed";
@@ -249,8 +263,8 @@ try {
     offlineStorageDirectory,
   );
   assert(
-    (await storageAfterIndexDamage.keys()).length === 0,
-    "a damaged key index must fail closed without enumerating guessed keys",
+    (await storageAfterIndexDamage.keys()).includes(secondKey),
+    "legacy index damage must not affect SQLite enumeration",
   );
   assert(
     (await storageAfterIndexDamage.getItem(secondKey)) === "[2]",
@@ -260,14 +274,8 @@ try {
   const postDamageKey = "cleanhub.pos.offline.queue.post-damage";
   await storageAfterIndexDamage.setItem(postDamageKey, "[]");
   assert(
-    (await storageAfterIndexDamage.keys()).join(",") === postDamageKey,
-    "new writes must safely establish a fresh index after index damage",
-  );
-  assert(
-    !(await readdir(offlineStorageDirectory)).some((fileName) =>
-      fileName.endsWith(".tmp"),
-    ),
-    "atomic storage writes must not leave temporary files behind",
+    (await storageAfterIndexDamage.keys()).includes(postDamageKey),
+    "new writes must remain durable after legacy index damage",
   );
 } finally {
   await rm(offlineStorageDirectory, { force: true, recursive: true });

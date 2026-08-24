@@ -46,6 +46,10 @@ assert(
 
 assert(first.idempotencyKey.length === 26, "idempotency key should be a ULID");
 assert(
+  first.sequence === 1 && second.sequence === 2,
+  "offline operations must receive a monotonic local sequence",
+);
+assert(
   (await queue.peek())?.id === first.id,
   "peek should return the first item",
 );

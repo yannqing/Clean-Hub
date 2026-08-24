@@ -8,6 +8,7 @@ import {
   createCustomerAccountOfflineMutation,
   createCustomerProfileOfflineMutation,
   createOrderOfflineMutation,
+  createOrderCheckoutOfflineMutation,
   createOrderPaymentOfflineMutation,
   createOrderStatusOfflineMutation,
   createTicketStatusOfflineMutation,
@@ -68,6 +69,18 @@ async function main() {
     version: 1,
   });
   const paymentIdempotencyKey = createId();
+  const checkoutPaymentIdempotencyKey = createId();
+  const checkoutMutation = createOrderCheckoutOfflineMutation({
+    order: {
+      orderType: "manual",
+      branchId: createId(),
+      items: [{ productSkuId: createId(), quantity: "1" }],
+    },
+    payment: {
+      paymentMethod: "cash",
+      idempotencyKey: checkoutPaymentIdempotencyKey,
+    },
+  });
   const paymentMutation = createOrderPaymentOfflineMutation(
     manualOrderMutation.entityId,
     {
@@ -86,6 +99,7 @@ async function main() {
     orderStatusMutation,
     ticketStatusMutation,
     paymentMutation,
+    checkoutMutation,
   ]) {
     assert(mutation.id.length === 26, "offline operation id must be a ULID");
     assert(
@@ -96,6 +110,11 @@ async function main() {
   assert(
     accountMutation.payload.input.id === accountMutation.entityId,
     "customer replay must retain its stable entity id",
+  );
+  assert(
+    checkoutMutation.payload.input.order.id === checkoutMutation.entityId &&
+      checkoutMutation.idempotencyKey === checkoutPaymentIdempotencyKey,
+    "atomic checkout must persist stable order and payment identifiers together",
   );
   assert(
     profileMutation.payload.input.id === profileMutation.entityId,
@@ -145,6 +164,7 @@ async function main() {
     orderStatusMutation,
     ticketStatusMutation,
     paymentMutation,
+    checkoutMutation,
   ]) {
     await queue.enqueue(mutation as import("@cleanhub/offline").EnqueueInput);
   }
@@ -267,6 +287,14 @@ async function main() {
         idempotencyKey: options.idempotencyKey,
       });
     },
+    async checkoutOrder(input, options) {
+      calls.push({
+        kind: "checkout",
+        entityId: input.order.id,
+        operationId: options.requestId,
+        idempotencyKey: options.idempotencyKey,
+      });
+    },
     async payOrder(replayedOrderId, input, options) {
       calls.push({
         kind: `order-payment:${input.idempotencyKey}`,
@@ -298,7 +326,7 @@ async function main() {
   );
   assert(!replay.failed, "all eligible POS writes should replay");
   assert(
-    calls.length === 7,
+    calls.length === 8,
     "every eligible POS write should use an API method",
   );
   assert(

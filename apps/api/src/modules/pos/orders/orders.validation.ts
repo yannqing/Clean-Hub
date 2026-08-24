@@ -104,16 +104,30 @@ const manualOrderItemFields = {
   itemIdentifier: z.string().trim().max(64).optional(),
 };
 
-const createManualOrderItemBodySchema = z.union([
+const createCatalogOrderItemBodySchema = z.union([
   z.object({
     ...manualOrderItemFields,
     serviceId: ulidSchema,
     productSkuId: z.never().optional(),
+    ticketId: z.never().optional(),
+    ticketItemId: z.never().optional(),
   }),
   z.object({
     ...manualOrderItemFields,
     serviceId: z.never().optional(),
     productSkuId: ulidSchema,
+    ticketId: z.never().optional(),
+    ticketItemId: z.never().optional(),
+  }),
+]);
+
+export const createManualOrderItemBodySchema = z.union([
+  createCatalogOrderItemBodySchema,
+  z.object({
+    serviceId: z.never().optional(),
+    productSkuId: z.never().optional(),
+    ticketId: ulidSchema,
+    ticketItemId: ulidSchema,
   }),
 ]);
 
@@ -126,15 +140,25 @@ export const createPosOrderBodySchema = z.discriminatedUnion("orderType", [
     expireAt: isoTimestampSchema.nullable().optional(),
     notes: z.string().trim().max(2000).nullable().optional(),
   }),
-  z.object({
-    id: ulidSchema.optional(),
-    orderType: z.literal("manual"),
-    branchId: ulidSchema,
-    customerId: ulidSchema.optional(),
-    items: z.array(createManualOrderItemBodySchema).min(1).max(100),
-    expireAt: isoTimestampSchema.nullable().optional(),
-    notes: z.string().trim().max(2000).nullable().optional(),
-  }),
+  z
+    .object({
+      id: ulidSchema.optional(),
+      orderType: z.literal("manual"),
+      branchId: ulidSchema,
+      customerId: ulidSchema.optional(),
+      items: z.array(createManualOrderItemBodySchema).min(1).max(100),
+      expireAt: isoTimestampSchema.nullable().optional(),
+      notes: z.string().trim().max(2000).nullable().optional(),
+      discountCode: z.string().trim().min(1).max(120).optional(),
+      discountReason: z.string().trim().min(1).max(500).optional(),
+      discountIdempotencyKey: z.string().trim().min(1).max(120).optional(),
+    })
+    .refine(
+      (value) =>
+        !value.discountCode ||
+        Boolean(value.discountReason && value.discountIdempotencyKey),
+      "A reason and idempotency key are required when applying a discount code.",
+    ),
 ]);
 
 export const updatePosOrderBodySchema = z
@@ -185,6 +209,27 @@ export const createPosPaymentBodySchema = z.discriminatedUnion(
   ],
 );
 
+const createPosCheckoutPaymentBodySchema = z.discriminatedUnion(
+  "paymentMethod",
+  [
+    z.object({
+      paymentMethod: z.literal("cash"),
+      idempotencyKey: idempotencyKeySchema,
+    }),
+    z.object({
+      paymentMethod: z.literal("app"),
+      provider: posMobileMoneyProviderSchema,
+      externalReference: z.string().trim().min(3).max(120),
+      idempotencyKey: idempotencyKeySchema,
+    }),
+  ],
+);
+
+export const createPosCheckoutBodySchema = z.object({
+  order: createPosOrderBodySchema,
+  payment: createPosCheckoutPaymentBodySchema.optional(),
+});
+
 export const resolvePosPaymentBodySchema = z.object({
   reason: z.string().trim().min(3).max(500).optional(),
 });
@@ -197,7 +242,7 @@ export const posPaymentParamsSchema = posOrderParamsSchema.extend({
   paymentId: ulidSchema,
 });
 
-export const createPosOrderItemBodySchema = createManualOrderItemBodySchema;
+export const createPosOrderItemBodySchema = createCatalogOrderItemBodySchema;
 
 export const updatePosOrderItemBodySchema = z
   .object({

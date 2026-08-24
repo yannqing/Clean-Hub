@@ -67,6 +67,14 @@ type OfflineOrderReceipt = {
   title: string;
 };
 
+type ManualOrderRequestItem = CreateManualOrderRequest["items"][number];
+
+function isTicketItemOrderReference(
+  item: ManualOrderRequestItem,
+): item is Extract<ManualOrderRequestItem, { ticketItemId: string }> {
+  return typeof item.ticketItemId === "string";
+}
+
 function emptyItem(): ManualItemForm {
   return {
     key: `${Date.now()}-${Math.random()}`,
@@ -277,7 +285,10 @@ export function OrderCreateDialog({
         const allowOffline =
           payload.orderType === "ticket" ||
           payload.items.every((item) => {
-            if (!("productSkuId" in item)) {
+            if (isTicketItemOrderReference(item)) {
+              return false;
+            }
+            if (!item.productSkuId) {
               return true;
             }
             const product = products.find(
@@ -645,6 +656,15 @@ function buildOfflineManualReceiptItems(
   currency: string,
 ) {
   return payload.items.map((item) => {
+    if (isTicketItemOrderReference(item)) {
+      return {
+        name: `Ticket item ${item.ticketItemId.slice(-8).toUpperCase()}`,
+        quantity: 1,
+        unitAmountMinor: 0,
+        totalAmountMinor: 0,
+        note: undefined,
+      };
+    }
     const catalogItem = resolveManualCatalogItem(item, catalog, products);
     const quantity = item.weight
       ? Number(item.weight)
@@ -680,7 +700,10 @@ function resolveManualCatalogItem(
   if (!item) {
     return undefined;
   }
-  return "productSkuId" in item
+  if (isTicketItemOrderReference(item)) {
+    return undefined;
+  }
+  return item.productSkuId
     ? products.find((product) => product.productSkuId === item.productSkuId)
     : catalog.find((service) => service.id === item.serviceId);
 }

@@ -7,6 +7,7 @@ import {
   inArray,
   isNull,
   lt,
+  ne,
   or,
   sql,
   type SQL,
@@ -56,7 +57,10 @@ import { projectPosOrderPaymentState } from "./order-payment-state.js";
 export type ResolvedPosOrderItemInput = {
   itemKind: "service" | "product";
   businessLine: "laundry" | "car_wash" | "retail" | "delivery" | null;
+  serviceCategoryId: string | null;
   serviceId: string | null;
+  productId: string | null;
+  productCategoryId: string | null;
   productSkuId: string | null;
   productPriceId: string | null;
   itemName: string;
@@ -78,6 +82,22 @@ export type ResolvedPosOrderItemInput = {
   specialRequest?: string | null;
   itemIdentifier?: string | null;
 };
+
+/**
+ * Serializes checkout attempts for the same tenant-scoped client order id.
+ * This closes the race where two reconnect/retry requests both observe that
+ * the order does not exist before either transaction inserts it.
+ */
+export async function lockPosCheckoutIdempotencyKey(
+  db: Database,
+  input: { tenantId: string; orderId: string },
+): Promise<void> {
+  await db.execute(
+    sql`select pg_advisory_xact_lock(
+      hashtextextended(${input.tenantId} || ':' || ${input.orderId}, 0)
+    )`,
+  );
+}
 
 function normalizeNullable(value: string | null | undefined): string | null {
   const trimmed = value?.trim();
@@ -547,6 +567,7 @@ export async function countAlreadyOrderedTicketItems(
         eq(orderItems.sourceType, "ticket_item"),
         inArray(orderItems.sourceId, input.ticketItemIds),
         isNull(orderItems.deletedAt),
+        ne(orders.status, "cancelled"),
         isNull(orders.deletedAt),
       ),
     );

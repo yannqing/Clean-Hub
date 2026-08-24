@@ -16,8 +16,8 @@ assert.deepEqual(
   posMobilePrimaryNavigation.map((item) => item.href),
   [
     posRoutes.workspace,
+    posRoutes.sale,
     posRoutes.newIntake,
-    posRoutes.scan,
     posRoutes.tickets,
   ],
 );

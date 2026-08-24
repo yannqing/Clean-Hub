@@ -6,15 +6,17 @@ import type {
   PosCashDrawerPulse,
   PosDrawerOpenRequest,
 } from "@cleanhub/hardware";
+import type { AsyncKeyValueStorage } from "@cleanhub/offline";
 
 import type { CleanHubDesktopBridge } from "./desktop-bridge";
+import { getPosOfflineStorage } from "./desktop-bridge";
 
 type DrawerHardware = Pick<
   CleanHubDesktopBridge["hardware"],
   "getCapabilities" | "openCashDrawer"
 >;
 
-type CashPaymentDrawerOutcome =
+export type CashPaymentDrawerOutcome =
   | {
       opened: true;
       printerId?: string;
@@ -171,4 +173,47 @@ export async function openCashDrawerForPayment(input: {
     });
     return { opened: false, message, printerId, auditWarning };
   }
+}
+
+export async function openCashDrawerForPaymentOnce(
+  input: Parameters<typeof openCashDrawerForPayment>[0] & {
+    scope: { tenantId: string; branchId: string; terminalId: string };
+    storage?: AsyncKeyValueStorage;
+  },
+): Promise<CashPaymentDrawerOutcome> {
+  const storage = input.storage ?? getPosOfflineStorage();
+  const key = [
+    "cleanhub.pos.offline.drawer.v1",
+    input.scope.tenantId,
+    input.scope.branchId,
+    input.scope.terminalId,
+    input.paymentId,
+  ].join(":");
+  const previous = await storage.getItem(key);
+  if (previous === "opened") {
+    return {
+      opened: false,
+      message: "该现金交易的钱箱已打开，本次不会重复开箱。",
+    };
+  }
+  if (previous === "opening") {
+    return {
+      opened: false,
+      message:
+        "上次开箱时发生中断，物理结果不确定；为避免重复开箱，请人工核对。",
+    };
+  }
+  if (previous === "failed") {
+    return {
+      opened: false,
+      message: "该现金交易的自动开箱曾失败，请授权后人工开箱。",
+    };
+  }
+
+  // Persist the uncertain state before the physical pulse. A sudden power loss
+  // must never cause startup recovery to emit the pulse a second time.
+  await storage.setItem(key, "opening");
+  const result = await openCashDrawerForPayment(input);
+  await storage.setItem(key, result.opened ? "opened" : "failed");
+  return result;
 }
