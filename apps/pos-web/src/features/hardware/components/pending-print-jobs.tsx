@@ -194,31 +194,38 @@ function PendingPrintJobsTrigger({
   if (variant === "task") {
     return (
       <button
-        className="group grid w-full grid-cols-[minmax(0,1fr)_auto] gap-4 border-y border-border bg-background p-4 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="group flex min-h-20 w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:gap-4"
         onClick={onClick}
         type="button"
       >
-        <span className="flex min-w-0 items-start gap-3">
-          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-300">
-            <Icon className="h-5 w-5" name="printer" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold text-foreground">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-300">
+          <Icon className="h-5 w-5" name="printer" />
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-foreground">
               打印任务
             </span>
-            <span className="mt-1 block text-xs leading-5 text-muted-foreground">
-              {summary}
+            <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-300">
+              待处理
             </span>
           </span>
+          <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+            {summary}
+          </span>
         </span>
-        <span className="flex items-center gap-2 self-center">
-          <span className="inline-flex min-w-9 items-center justify-center rounded-md bg-amber-50 px-2.5 py-1 text-sm font-bold text-amber-700 dark:bg-amber-950/35 dark:text-amber-300">
+
+        <span className="flex shrink-0 items-center gap-2 sm:gap-3">
+          <span className="inline-flex min-w-14 items-center justify-center rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-bold tabular-nums text-amber-700 dark:bg-amber-950/35 dark:text-amber-300">
             {counts.total}
           </span>
-          <Icon
-            className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-            name="chevron-right"
-          />
+          <span className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors group-hover:bg-background group-hover:text-foreground">
+            <Icon
+              className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+              name="chevron-right"
+            />
+          </span>
         </span>
       </button>
     );

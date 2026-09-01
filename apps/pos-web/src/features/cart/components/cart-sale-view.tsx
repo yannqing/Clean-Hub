@@ -9,8 +9,11 @@ import type {
   PosCartPricePreview,
   PosCustomerProfileWithAccount,
   PosMobileMoneyProvider,
-  PosPaymentTransaction,
+  PosPaymentMethod,
+  ShiftRecord,
 } from "@cleanhub/api-client";
+import type { PosHardwareCapabilities } from "@cleanhub/hardware";
+import { isApiHttpError } from "@cleanhub/api-client";
 import { createId } from "@cleanhub/id";
 import { useTranslation } from "@cleanhub/i18n/react";
 import {
@@ -54,6 +57,7 @@ import {
   queuePosOrderReceipt,
 } from "@/features/hardware/lib/order-receipt-print";
 import { usePosOfflineWrites } from "@/features/offline/lib";
+import { OfflineCashExceptionPanel } from "@/features/offline/components";
 import { MOBILE_MONEY_PROVIDER_LABELS } from "@/features/orders/constants";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
@@ -72,6 +76,7 @@ type CatalogFilter = "all" | "products" | "services";
 type CartSaleViewProps = {
   branch: PosBranchSummary | null;
   canManageSensitiveOperations: boolean;
+  currentShift: ShiftRecord | null;
   products: PosCatalogProduct[];
   services: PosCatalogService[];
 };
@@ -79,6 +84,7 @@ type CartSaleViewProps = {
 export function CartSaleView({
   branch,
   canManageSensitiveOperations,
+  currentShift,
   products,
   services,
 }: CartSaleViewProps) {
@@ -91,7 +97,10 @@ export function CartSaleView({
     cart,
     clear,
     cloudSyncState,
+    claimParked,
+    listParked,
     loaded,
+    park,
     removeLine,
     scope,
     setCustomer,
@@ -113,9 +122,7 @@ export function CartSaleView({
               product.categoryName,
               product.sku,
               product.barcode,
-            ].some((value) =>
-              value?.toLowerCase().includes(normalizedQuery),
-            ),
+            ].some((value) => value?.toLowerCase().includes(normalizedQuery)),
           ),
     [filter, normalizedQuery, products],
   );
@@ -171,8 +178,12 @@ export function CartSaleView({
       loaded={loaded}
       canManageSensitiveOperations={canManageSensitiveOperations}
       cloudSyncState={cloudSyncState}
+      currentShift={currentShift}
       onCheckoutComplete={() => setCartOpen(false)}
+      onClaimParked={claimParked}
       onClear={clear}
+      onListParked={listParked}
+      onPark={park}
       onRemoveLine={removeLine}
       onSelectCustomer={setCustomer}
       onSetDiscount={setDiscount}
@@ -195,6 +206,8 @@ export function CartSaleView({
         icon="shopping-cart"
         title={t("pos.cart.title")}
       />
+
+      {canManageSensitiveOperations ? <OfflineCashExceptionPanel /> : null}
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-4">
@@ -340,8 +353,8 @@ function ProductCard({
   product: PosCatalogProduct;
 }) {
   const { t } = useTranslation();
-  const cover = product.media.find((media) => media.isPrimary) ??
-    product.media[0];
+  const cover =
+    product.media.find((media) => media.isPrimary) ?? product.media[0];
   const unavailable =
     product.trackInventory &&
     !product.allowNegativeStock &&
@@ -402,8 +415,8 @@ function ServiceCard({
   service: PosCatalogService;
 }) {
   const { t } = useTranslation();
-  const cover = service.media.find((media) => media.isPrimary) ??
-    service.media[0];
+  const cover =
+    service.media.find((media) => media.isPrimary) ?? service.media[0];
 
   return (
     <div className="flex min-w-0 gap-3 rounded-lg border bg-background p-3">
@@ -446,7 +459,24 @@ function ServiceCard({
   );
 }
 
-type CheckoutPaymentOption = "later" | "cash" | PosMobileMoneyProvider;
+type CheckoutTender = {
+  id: string;
+  paymentMethod: PosPaymentMethod;
+  amount: string;
+  tenderedAmount: string;
+  provider: PosMobileMoneyProvider;
+  externalReference: string;
+};
+
+type ReceiptDeliveryChoice = "print" | "email" | "sms" | "none";
+
+const NO_HARDWARE_CAPABILITIES: PosHardwareCapabilities = {
+  scanner: false,
+  printer: false,
+  cashDrawer: false,
+  cardTerminal: false,
+  secureTerminalCredential: false,
+};
 
 function CartPanel({
   branch,
@@ -454,9 +484,13 @@ function CartPanel({
   canManageSensitiveOperations,
   cart,
   cloudSyncState,
+  currentShift,
   loaded,
   onCheckoutComplete,
+  onClaimParked,
   onClear,
+  onListParked,
+  onPark,
   onRemoveLine,
   onSelectCustomer,
   onSetDiscount,
@@ -469,13 +503,24 @@ function CartPanel({
   canManageSensitiveOperations: boolean;
   cart: PosCartSnapshot;
   cloudSyncState: PosCartCloudSyncState;
+  currentShift: ShiftRecord | null;
   loaded: boolean;
   onCheckoutComplete: () => void;
+  onClaimParked: (
+    cartId: string,
+    handoffNote?: string,
+  ) => Promise<import("@cleanhub/api-client").PosSavedCart>;
   onClear: () => Promise<void>;
+  onListParked: () => Promise<import("@cleanhub/api-client").PosSavedCart[]>;
+  onPark: (
+    name: string,
+    handoffNote?: string,
+  ) => Promise<import("@cleanhub/api-client").PosSavedCart>;
   onRemoveLine: (lineId: string) => { changed: boolean; message?: string };
-  onSelectCustomer: (
-    customer: PosCustomerProfileWithAccount | null,
-  ) => { changed: boolean; message?: string };
+  onSelectCustomer: (customer: PosCustomerProfileWithAccount | null) => {
+    changed: boolean;
+    message?: string;
+  };
   onSetDiscount: (code: string, reason: string) => void;
   onSetNotes: (notes: string) => void;
   onSetProductQuantity: (
@@ -494,28 +539,53 @@ function CartPanel({
   const [previewUpdatedAt, setPreviewUpdatedAt] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [paymentOption, setPaymentOption] =
-    useState<CheckoutPaymentOption>("cash");
-  const [externalReference, setExternalReference] = useState("");
+  const [tenders, setTenders] = useState<CheckoutTender[]>([]);
+  const [payLater, setPayLater] = useState(false);
+  const [receiptDelivery, setReceiptDelivery] =
+    useState<ReceiptDeliveryChoice>("print");
+  const [receiptDestination, setReceiptDestination] = useState("");
+  const [taxExemptionReason, setTaxExemptionReason] = useState("");
+  const [hardwareCapabilities, setHardwareCapabilities] =
+    useState<PosHardwareCapabilities>(NO_HARDWARE_CAPABILITIES);
+  const [parkedOpen, setParkedOpen] = useState(false);
+  const [parkName, setParkName] = useState("");
+  const [parkNote, setParkNote] = useState("");
+  const [parkedCarts, setParkedCarts] = useState<
+    import("@cleanhub/api-client").PosSavedCart[]
+  >([]);
+  const [parkedLoading, setParkedLoading] = useState(false);
   const hasTicketLines = cart.lines.some((line) => line.kind === "ticket_item");
   const productLines = cart.lines.filter((line) => line.kind === "product");
-  const localTotal = calculatePosCartTotal(cart);
-  const effectivePreview =
-    previewUpdatedAt === cart.updatedAt ? preview : null;
+  const localTotal = calculateLocalFinancialTotal(
+    calculatePosCartTotal(cart),
+    runtime,
+  );
+  const effectivePreview = previewUpdatedAt === cart.updatedAt ? preview : null;
   const total = effectivePreview?.totalAmount ?? localTotal;
   const offlineProductEligible = productLines.every(
     (line) =>
       line.allowOfflineSale &&
       (!line.trackInventory ||
         line.allowNegativeStock ||
-        Number(line.availableQuantity ?? 0) -
-          Number(line.offlineStockBuffer) >=
+        Number(line.availableQuantity ?? 0) - Number(line.offlineStockBuffer) >=
           line.quantity),
   );
   const offlineCheckoutBlocked =
     !isOnline &&
     (hasTicketLines || Boolean(cart.discountCode) || !offlineProductEligible);
+  const onlinePriceUnconfirmed =
+    isOnline && cart.lines.length > 0 && effectivePreview === null;
+  const cashShiftAvailable = currentShift?.status === "open";
+  const paidNowAmount = tenders.reduce(
+    (sum, tender) => sum + Math.max(0, Number(tender.amount) || 0),
+    0,
+  );
+  const outstandingAmount = Math.max(0, Number(total) - paidNowAmount);
+  const externalTenderExists = tenders.some(
+    (tender) => tender.paymentMethod !== "cash",
+  );
   const productAmount = cart.lines.reduce(
     (sum, line) =>
       line.kind === "product"
@@ -541,6 +611,19 @@ function CartPanel({
   }, []);
 
   useEffect(() => {
+    let active = true;
+    void getDesktopBridge()
+      ?.hardware.getCapabilities()
+      .then((capabilities) => {
+        if (active) setHardwareCapabilities(capabilities);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!branchId || cart.lines.length === 0 || !isOnline) {
       const resetTimer = window.setTimeout(() => {
         setPreview(null);
@@ -562,6 +645,7 @@ function CartPanel({
             customerId: cart.customer?.id,
             items: toOrderItems(cart),
             discountCode: cart.discountCode.trim() || undefined,
+            taxExemptionReason: taxExemptionReason.trim() || undefined,
           },
           { signal: controller.signal },
         )
@@ -586,7 +670,7 @@ function CartPanel({
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [branchId, cart, isOnline]);
+  }, [branchId, cart, isOnline, previewRefreshKey, taxExemptionReason]);
 
   function openCheckout() {
     if (!scopeReady || cart.lines.length === 0) return;
@@ -594,9 +678,54 @@ function CartPanel({
       toast.error(t("pos.cart.offlineCheckoutBlocked"));
       return;
     }
-    setPaymentOption(isOnline ? "cash" : "later");
-    setExternalReference("");
+    if (onlinePriceUnconfirmed) {
+      toast.error(t("pos.cart.priceConfirmationRequired"));
+      return;
+    }
+    const configuredDefault = runtime.paymentMethodsEnabled.includes(
+      runtime.defaultPaymentMethod,
+    )
+      ? runtime.defaultPaymentMethod
+      : runtime.paymentMethodsEnabled[0];
+    const availableDefault =
+      configuredDefault === "cash" && !cashShiftAvailable
+        ? runtime.paymentMethodsEnabled.find(
+            (method) =>
+              method !== "cash" &&
+              (method !== "card" || hardwareCapabilities.cardTerminal),
+          )
+        : configuredDefault === "card" && !hardwareCapabilities.cardTerminal
+          ? runtime.paymentMethodsEnabled.find(
+              (method) => method !== "card" && (method !== "cash" || cashShiftAvailable),
+            )
+          : configuredDefault;
+    setTenders(
+      availableDefault
+        ? [createCheckoutTender(availableDefault, total)]
+        : [],
+    );
+    setPayLater(!availableDefault);
+    setReceiptDelivery(runtime.autoPrintReceipt ? "print" : "none");
+    setReceiptDestination("");
     setCheckoutOpen(true);
+  }
+
+  function addTender(paymentMethod: PosPaymentMethod) {
+    if (paymentMethod !== "cash" && externalTenderExists) return;
+    if (tenders.some((tender) => tender.paymentMethod === paymentMethod)) return;
+    setPayLater(false);
+    setTenders((current) => [
+      ...current,
+      createCheckoutTender(paymentMethod, toMoney(outstandingAmount)),
+    ]);
+  }
+
+  function updateTender(id: string, patch: Partial<CheckoutTender>) {
+    setTenders((current) =>
+      current.map((tender) =>
+        tender.id === id ? { ...tender, ...patch } : tender,
+      ),
+    );
   }
 
   function submitCheckout() {
@@ -610,34 +739,97 @@ function CartPanel({
       toast.error(t("pos.cart.discountReasonRequired"));
       return;
     }
+    const activeTenders = tenders.filter(
+      (tender) => Number(tender.amount) > 0,
+    );
+    if (paidNowAmount > Number(total) + 0.0001) {
+      toast.error("支付金额合计不能超过订单应收金额。");
+      return;
+    }
+    for (const tender of activeTenders) {
+      if (tender.paymentMethod === "cash") {
+        if (!cashShiftAvailable || !currentShift) {
+          toast.error(t("pos.cart.cashShiftRequired"));
+          return;
+        }
+        if (Number(tender.tenderedAmount) < Number(tender.amount)) {
+          toast.error(t("pos.cart.cashTenderInsufficient"));
+          return;
+        }
+      }
+      if (
+        tender.paymentMethod === "app" &&
+        tender.externalReference.trim().length < 3
+      ) {
+        toast.error(t("pos.cart.paymentReferenceRequired"));
+        return;
+      }
+      if (
+        tender.paymentMethod === "card" &&
+        !hardwareCapabilities.cardTerminal
+      ) {
+        toast.error("当前终端未连接可用的 TPE 刷卡设备。");
+        return;
+      }
+    }
     if (
-      paymentOption !== "later" &&
-      paymentOption !== "cash" &&
-      externalReference.trim().length < 3
+      taxExemptionReason.trim() &&
+      (!canManageSensitiveOperations || taxExemptionReason.trim().length < 3)
     ) {
-      toast.error(t("pos.cart.paymentReferenceRequired"));
+      toast.error("税务豁免必须由经理填写至少 3 个字符的原因。");
+      return;
+    }
+    if (
+      (receiptDelivery === "email" || receiptDelivery === "sms") &&
+      receiptDestination.trim().length < 3
+    ) {
+      toast.error("请填写有效的小票接收地址或手机号。");
+      return;
+    }
+
+    const offlineTenderEligible =
+      activeTenders.length === 0 ||
+      (activeTenders.length === 1 &&
+        activeTenders[0]?.paymentMethod === "cash" &&
+        Math.abs(Number(activeTenders[0].amount) - Number(total)) < 0.0001);
+    if (!isOnline && !offlineTenderEligible) {
+      toast.error("离线状态仅支持全额现金或记账；混合与部分支付需要联网。");
       return;
     }
 
     startTransition(async () => {
       try {
         const orderId = cart.checkoutId;
-        const payment: CreatePosCheckoutPaymentRequest | undefined =
-          paymentOption === "later"
-              ? undefined
-              : paymentOption === "cash"
-              ? {
-                  paymentMethod: "cash",
-                  idempotencyKey: cart.checkoutId,
-                }
-              : {
-                  paymentMethod: "app",
-                  provider: paymentOption,
-                  externalReference: externalReference.trim(),
-                  idempotencyKey: cart.checkoutId,
-                };
+        const occurredAt = new Date().toISOString();
+        const payments: CreatePosCheckoutPaymentRequest[] = activeTenders.map(
+          (tender) => {
+            const common = {
+              amount: toMoney(tender.amount),
+              idempotencyKey: `${cart.checkoutId}:${tender.id}`,
+            };
+            if (tender.paymentMethod === "cash") {
+              return {
+                ...common,
+                paymentMethod: "cash" as const,
+                tenderedAmount: toMoney(tender.tenderedAmount),
+                shiftId: currentShift!.id,
+                occurredAt,
+              };
+            }
+            if (tender.paymentMethod === "card") {
+              return { ...common, paymentMethod: "card" as const };
+            }
+            return {
+              ...common,
+              paymentMethod: "app" as const,
+              provider: tender.provider,
+              externalReference: tender.externalReference.trim(),
+            };
+          },
+        );
         const checkoutResult = await checkoutOrder(
           {
+            expectedTotalAmount: toMoney(total),
             order: {
               id: orderId,
               orderType: "manual",
@@ -653,18 +845,25 @@ function CartPanel({
                   }
                 : {}),
             },
-            ...(payment ? { payment } : {}),
+            ...(payments.length > 0 ? { payments } : {}),
+            ...(taxExemptionReason.trim()
+              ? { taxExemptionReason: taxExemptionReason.trim() }
+              : {}),
           },
           {
             allowOffline:
               !hasTicketLines &&
               !cart.discountCode &&
+              !taxExemptionReason.trim() &&
               offlineProductEligible &&
-              (paymentOption === "later" || paymentOption === "cash"),
+              offlineTenderEligible,
           },
         );
         if (checkoutResult.queued) {
-          if (paymentOption === "cash") {
+          const cashTender = activeTenders.find(
+            (tender) => tender.paymentMethod === "cash",
+          );
+          if (cashTender) {
             const drawer = await openCashDrawerForPaymentOnce({
               paymentId: cart.checkoutId,
               scope: { tenantId, branchId, terminalId },
@@ -676,17 +875,33 @@ function CartPanel({
             });
             if (!drawer.opened) toast.warning(drawer.message);
           }
-          const offlinePrintStatus = await queuePosOfflineCartReceipt({
-            autoPrint: runtime.autoPrintReceipt,
-            branch,
-            cart,
-            copies: runtime.printCopies,
-            locale,
-            paymentMethod: paymentOption === "cash" ? "cash" : "later",
-            scope: { tenantId, branchId, terminalId },
-          });
-          if (offlinePrintStatus === "failed") {
-            toast.warning(t("pos.cart.receiptQueued"));
+          if (receiptDelivery === "print") {
+            const offlinePrintStatus = await queuePosOfflineCartReceipt({
+              autoPrint: true,
+              branch,
+              cart,
+              copies: runtime.printCopies,
+              locale,
+              paymentMethod: cashTender ? "cash" : "later",
+              cashTendered: cashTender
+                ? toMoney(cashTender.tenderedAmount)
+                : undefined,
+              changeAmount: cashTender
+                ? toMoney(
+                    Math.max(
+                      0,
+                      Number(cashTender.tenderedAmount) -
+                        Number(cashTender.amount),
+                    ),
+                  )
+                : undefined,
+              scope: { tenantId, branchId, terminalId },
+            });
+            if (offlinePrintStatus === "failed") {
+              toast.warning(t("pos.cart.receiptQueued"));
+            }
+          } else if (receiptDelivery !== "none") {
+            toast.warning("离线订单将在同步后才能发送电子小票。");
           }
           await onClear();
           setCheckoutOpen(false);
@@ -696,17 +911,16 @@ function CartPanel({
           return;
         }
 
-        const finalOrder = checkoutResult.data.order;
-        const payments: PosPaymentTransaction[] = checkoutResult.data.payment
-          ? [checkoutResult.data.payment]
-          : [];
-        if (
-          paymentOption === "cash" &&
-          checkoutResult.data.payment?.paymentStatus === "paid" &&
-          !checkoutResult.data.idempotent
-        ) {
+        let finalOrder = checkoutResult.data.order;
+        let finalPayments = checkoutResult.data.payments;
+        for (const payment of finalPayments.filter(
+          (candidate) =>
+            candidate.paymentMethod === "cash" &&
+            candidate.paymentStatus === "paid",
+        )) {
+          if (checkoutResult.data.idempotent) break;
           const drawer = await openCashDrawerForPaymentOnce({
-            paymentId: checkoutResult.data.payment.id,
+            paymentId: payment.id,
             scope: { tenantId, branchId, terminalId },
             loadDevices: () =>
               loadPosHardwareDevices({ tenantId, branchId, terminalId }),
@@ -717,21 +931,104 @@ function CartPanel({
           if (!drawer.opened) toast.warning(drawer.message);
         }
 
-        const printStatus = await queuePosOrderReceipt({
-          autoPrint: runtime.autoPrintReceipt,
-          branch,
-          copies: runtime.printCopies,
-          locale,
-          order: finalOrder,
-          payments,
-          scope: {
-            tenantId,
-            branchId,
-            terminalId,
-          },
-        });
-        if (printStatus === "failed") {
-          toast.warning(t("pos.cart.receiptQueued"));
+        const cardPayment = finalPayments.find(
+          (payment) =>
+            payment.paymentMethod === "card" &&
+            (payment.providerStatus === "initiated" ||
+              payment.providerStatus === "pending"),
+        );
+        if (cardPayment) {
+          const bridge = getDesktopBridge();
+          try {
+            if (!bridge) throw new Error("TPE 桌面桥接不可用。");
+            const result = await bridge.hardware.processCardPayment({
+              paymentId: cardPayment.id,
+              orderId: finalOrder.id,
+              amount: cardPayment.amount,
+              currency: cardPayment.currency,
+              timeoutMs: 90_000,
+            });
+            finalOrder = await posApi.pos.orders.recordCardOutcome(
+              finalOrder.id,
+              cardPayment.id,
+              {
+                outcome: result.status,
+                externalReference: result.externalReference,
+                authorizationCode: result.authorizationCode,
+                failureCode: result.failureCode,
+                failureReason: result.message,
+                providerPayload: result.providerPayload,
+              },
+            );
+            if (result.status !== "succeeded") {
+              toast.warning(
+                result.message ?? `刷卡结果：${cardOutcomeLabel(result.status)}`,
+              );
+            }
+          } catch (error) {
+            finalOrder = await posApi.pos.orders.recordCardOutcome(
+              finalOrder.id,
+              cardPayment.id,
+              {
+                outcome: "failed",
+                failureCode: "TPE_BRIDGE_ERROR",
+                failureReason:
+                  error instanceof Error ? error.message : "TPE 刷卡失败。",
+              },
+            );
+            toast.warning(
+              error instanceof Error ? error.message : "TPE 刷卡失败。",
+            );
+          }
+          finalPayments = (
+            await posApi.pos.orders.listPayments(finalOrder.id)
+          ).data;
+        }
+
+        let printStatus: "queued" | "printed" | "failed" | null = null;
+        if (receiptDelivery === "print") {
+          printStatus = await queuePosOrderReceipt({
+            autoPrint: true,
+            branch,
+            copies: runtime.printCopies,
+            locale,
+            order: finalOrder,
+            payments: finalPayments,
+            scope: { tenantId, branchId, terminalId },
+          });
+          if (printStatus === "failed") {
+            toast.warning(t("pos.cart.receiptQueued"));
+          }
+        }
+        try {
+          const delivery = await posApi.pos.orders.deliverReceipt(
+            finalOrder.id,
+            {
+              channel: receiptDelivery,
+              destination:
+                receiptDelivery === "email" || receiptDelivery === "sms"
+                  ? receiptDestination.trim()
+                  : undefined,
+              idempotencyKey: `receipt:${finalOrder.id}:${receiptDelivery}:initial`,
+              printStatus:
+                receiptDelivery === "print"
+                  ? printStatus === "printed"
+                    ? "sent"
+                    : "failed"
+                  : undefined,
+              failureReason:
+                receiptDelivery === "print" && printStatus !== "printed"
+                  ? "The local print job was queued or failed."
+                  : undefined,
+            },
+          );
+          if (delivery.status === "failed") {
+            toast.warning(
+              delivery.failureReason ?? "电子小票发送失败，可在订单页重试。",
+            );
+          }
+        } catch (error) {
+          toast.warning(`小票交付记录失败：${getPosApiErrorMessage(error)}`);
         }
         await onClear();
         setCheckoutOpen(false);
@@ -739,6 +1036,50 @@ function CartPanel({
         toast.success(t("pos.cart.checkoutComplete"));
         router.push(posRoutes.orderDetail(finalOrder.id));
         router.refresh();
+      } catch (error) {
+        if (isApiHttpError(error) && error.code === "PRICE_CHANGED") {
+          setPreview(null);
+          setPreviewUpdatedAt(null);
+          setPreviewRefreshKey((value) => value + 1);
+          setTenders([]);
+        }
+        toast.error(getPosApiErrorMessage(error));
+      }
+    });
+  }
+
+  function openParkedCarts() {
+    setParkedOpen(true);
+    setParkedLoading(true);
+    void onListParked()
+      .then(setParkedCarts)
+      .catch((error) => toast.error(getPosApiErrorMessage(error)))
+      .finally(() => setParkedLoading(false));
+  }
+
+  function submitParkCart() {
+    if (!parkName.trim()) {
+      toast.error("请为挂单填写名称，方便其他员工识别。");
+      return;
+    }
+    startTransition(async () => {
+      try {
+        await onPark(parkName, parkNote);
+        setParkName("");
+        setParkNote("");
+        toast.success("购物车已挂起，可由本门店其他员工认领。");
+      } catch (error) {
+        toast.error(getPosApiErrorMessage(error));
+      }
+    });
+  }
+
+  function claimCart(cartId: string) {
+    startTransition(async () => {
+      try {
+        await onClaimParked(cartId, "POS 端认领");
+        setParkedOpen(false);
+        toast.success("挂单已认领到当前购物车。");
       } catch (error) {
         toast.error(getPosApiErrorMessage(error));
       }
@@ -757,22 +1098,52 @@ function CartPanel({
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between border-b px-4 py-3">
         <div>
-          <h2 className="font-semibold text-foreground">{t("pos.cart.cart")}</h2>
+          <h2 className="font-semibold text-foreground">
+            {t("pos.cart.cart")}
+          </h2>
           <p className="text-xs text-muted-foreground">
-            {t("pos.cart.itemCount", { count: cart.lines.length })} · {t(`pos.cart.cloud.${cloudSyncState}`)}
+            {t("pos.cart.itemCount", { count: cart.lines.length })} ·{" "}
+            {t(`pos.cart.cloud.${cloudSyncState}`)}
           </p>
         </div>
-        {cart.lines.length > 0 ? (
+        <div className="flex items-center gap-3">
           <button
-            className="text-xs font-semibold text-destructive"
-            onClick={() => {
-              if (window.confirm(`${t("pos.cart.clear")}?`)) void onClear();
-            }}
+            className="text-xs font-semibold text-foreground"
+            onClick={openParkedCarts}
             type="button"
           >
-            {t("pos.cart.clear")}
+            挂单列表
           </button>
-        ) : null}
+          {cart.lines.length > 0 ? (
+            <>
+              <button
+                className="text-xs font-semibold text-foreground"
+                onClick={() => {
+                  setParkName(
+                    cart.customer?.name ??
+                      `挂单 ${new Date().toLocaleTimeString(locale, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}`,
+                  );
+                  setParkedOpen(true);
+                }}
+                type="button"
+              >
+                挂起
+              </button>
+              <button
+                className="text-xs font-semibold text-destructive"
+                onClick={() => {
+                  if (window.confirm(`${t("pos.cart.clear")}?`)) void onClear();
+                }}
+                type="button"
+              >
+                {t("pos.cart.clear")}
+              </button>
+            </>
+          ) : null}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
@@ -787,7 +1158,10 @@ function CartPanel({
 
         {cart.lines.length === 0 ? (
           <div className="px-6 py-14 text-center">
-            <Icon className="mx-auto size-9 text-muted-foreground" name="shopping-cart" />
+            <Icon
+              className="mx-auto size-9 text-muted-foreground"
+              name="shopping-cart"
+            />
             <h3 className="mt-3 text-sm font-semibold text-foreground">
               {t("pos.cart.empty")}
             </h3>
@@ -804,7 +1178,8 @@ function CartPanel({
                 locale={locale}
                 onQuantityChange={(quantity) => {
                   const result = onSetProductQuantity(line.id, quantity);
-                  if (!result.changed && result.message) toast.error(result.message);
+                  if (!result.changed && result.message)
+                    toast.error(result.message);
                 }}
                 onRemove={() => onRemoveLine(line.id)}
               />
@@ -872,103 +1247,450 @@ function CartPanel({
             {productAmount > 0 ? (
               <div className="flex justify-between text-muted-foreground">
                 <span>{t("pos.cart.productAmount")}</span>
-                <span>{formatPosMoney(productAmount, cart.currency, locale)}</span>
+                <span>
+                  {formatPosMoney(productAmount, cart.currency, locale)}
+                </span>
               </div>
             ) : null}
             {serviceAmount > 0 ? (
               <div className="flex justify-between text-muted-foreground">
                 <span>{t("pos.cart.serviceAmount")}</span>
-                <span>{formatPosMoney(serviceAmount, cart.currency, locale)}</span>
+                <span>
+                  {formatPosMoney(serviceAmount, cart.currency, locale)}
+                </span>
               </div>
             ) : null}
             {effectivePreview?.discounts.map((discount) => (
-              <div className="flex justify-between text-emerald-700" key={discount.discountId}>
+              <div
+                className="flex justify-between text-emerald-700"
+                key={discount.discountId}
+              >
                 <span>{discount.title}</span>
-                <span>−{formatPosMoney(discount.amount, cart.currency, locale)}</span>
+                <span>
+                  −{formatPosMoney(discount.amount, cart.currency, locale)}
+                </span>
               </div>
             ))}
           </div>
         ) : null}
         <div className="mb-3 flex items-center justify-between">
           <span className="text-sm text-muted-foreground">
-            {effectivePreview?.discounts.length ? t("pos.cart.total") : t("pos.cart.subtotal")}
+            {effectivePreview?.discounts.length
+              ? t("pos.cart.total")
+              : t("pos.cart.subtotal")}
           </span>
           <span className="text-xl font-bold text-foreground">
             {formatPosMoney(total, cart.currency, locale)}
           </span>
         </div>
         {previewLoading ? (
-          <p className="mb-3 text-[11px] text-muted-foreground">{t("pos.cart.pricing")}</p>
+          <p className="mb-3 text-[11px] text-muted-foreground">
+            {t("pos.cart.pricing")}
+          </p>
         ) : previewError ? (
-          <p className="mb-3 text-[11px] leading-4 text-destructive">{previewError}</p>
+          <p className="mb-3 text-[11px] leading-4 text-destructive">
+            {previewError}
+          </p>
         ) : cart.lines.length > 0 ? (
           <p className="mb-3 text-[11px] leading-4 text-muted-foreground">
-            {effectivePreview ? t("pos.cart.priceConfirmed") : t("pos.cart.discountHint")}
+            {effectivePreview
+              ? t("pos.cart.priceConfirmed")
+              : t("pos.cart.discountHint")}
           </p>
         ) : null}
         <Button
           className="h-12 w-full text-sm font-semibold"
-          disabled={isPending || !scopeReady || cart.lines.length === 0 || offlineCheckoutBlocked}
+          disabled={
+            isPending ||
+            !scopeReady ||
+            cart.lines.length === 0 ||
+            offlineCheckoutBlocked ||
+            onlinePriceUnconfirmed
+          }
           onClick={openCheckout}
         >
           {isPending ? t("pos.cart.loading") : t("pos.cart.checkout")}
         </Button>
       </div>
 
-      <Dialog onOpenChange={setCheckoutOpen} open={checkoutOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog
+        onOpenChange={(open) => {
+          setParkedOpen(open);
+          if (!open) {
+            setParkName("");
+            setParkNote("");
+          }
+        }}
+        open={parkedOpen}
+      >
+        <DialogContent className="max-h-[88dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{t("pos.cart.confirmCheckout")}</DialogTitle>
-            <DialogDescription>{t("pos.cart.confirmCheckoutDescription")}</DialogDescription>
+            <DialogTitle>{parkName ? "挂起当前购物车" : "门店挂单"}</DialogTitle>
+            <DialogDescription>
+              挂单会保留名称、原员工和过期时间；同门店员工可认领，但同一挂单只能成功认领一次。
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-y py-3">
-              <span className="text-sm text-muted-foreground">{t("pos.cart.amountDue")}</span>
-              <span className="text-2xl font-bold">{formatPosMoney(total, cart.currency, locale)}</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              {(["cash", "wave", "orange_money", "later"] as const).map((option) => (
-                <button
-                  className={cn(
-                    "h-11 rounded-md border px-3 text-sm font-semibold",
-                    paymentOption === option ? "border-foreground bg-foreground text-background" : "bg-background",
-                  )}
-                  disabled={
-                    !isOnline && option !== "later" && option !== "cash"
-                  }
-                  key={option}
+          {parkName ? (
+            <div className="space-y-3">
+              <label className="block text-xs font-semibold text-muted-foreground">
+                挂单名称
+                <Input
+                  className="mt-1.5 h-10"
+                  maxLength={120}
+                  onChange={(event) => setParkName(event.target.value)}
+                  value={parkName}
+                />
+              </label>
+              <label className="block text-xs font-semibold text-muted-foreground">
+                交接备注（可选）
+                <Input
+                  className="mt-1.5 h-10"
+                  maxLength={500}
+                  onChange={(event) => setParkNote(event.target.value)}
+                  value={parkNote}
+                />
+              </label>
+              <DialogFooter>
+                <Button
                   onClick={() => {
-                    setPaymentOption(option);
-                    setExternalReference("");
+                    setParkName("");
+                    openParkedCarts();
                   }}
                   type="button"
+                  variant="outline"
                 >
-                  {option === "cash"
-                    ? t("pos.cart.cash")
-                    : option === "later"
-                      ? t("pos.cart.payLater")
-                      : MOBILE_MONEY_PROVIDER_LABELS[option]}
-                </button>
-              ))}
+                  查看列表
+                </Button>
+                <Button disabled={isPending} onClick={submitParkCart} type="button">
+                  确认挂单
+                </Button>
+              </DialogFooter>
             </div>
-            {paymentOption !== "cash" && paymentOption !== "later" ? (
-              <Input
-                className="h-11"
-                maxLength={120}
-                onChange={(event) => setExternalReference(event.target.value)}
-                placeholder={t("pos.cart.paymentReference")}
-                value={externalReference}
-              />
+          ) : parkedLoading ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              正在读取挂单…
+            </p>
+          ) : parkedCarts.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              当前门店没有未过期的挂单。
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {parkedCarts.map((saved) => (
+                <div className="rounded-md border p-3" key={saved.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">
+                        {saved.name ?? "未命名挂单"}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {saved.ownerName ?? "未知员工"} · {saved.cart.lines.length} 项 ·
+                        过期 {new Date(saved.expiresAt).toLocaleString(locale)}
+                      </p>
+                      {saved.handoffNote ? (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {saved.handoffNote}
+                        </p>
+                      ) : null}
+                    </div>
+                    <Button
+                      disabled={isPending || cart.lines.length > 0}
+                      onClick={() => claimCart(saved.id)}
+                      type="button"
+                    >
+                      认领
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {cart.lines.length > 0 ? (
+                <p className="text-xs text-amber-700">
+                  当前购物车非空，请先挂起或清空后再认领。
+                </p>
+              ) : null}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog onOpenChange={setCheckoutOpen} open={checkoutOpen}>
+        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{t("pos.cart.confirmCheckout")}</DialogTitle>
+            <DialogDescription>
+              {t("pos.cart.confirmCheckoutDescription")}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-5">
+            <div className="space-y-2 border-y py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  {t("pos.cart.amountDue")}
+                </span>
+                <span className="text-2xl font-bold">
+                  {formatPosMoney(total, cart.currency, locale)}
+                </span>
+              </div>
+              {effectivePreview && Number(effectivePreview.taxAmount) !== 0 ? (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>
+                    VAT {Number(effectivePreview.taxRate) * 100}%
+                    {effectivePreview.pricesIncludeTax ? "（含税）" : ""}
+                  </span>
+                  <span>
+                    {formatPosMoney(
+                      effectivePreview.taxAmount,
+                      cart.currency,
+                      locale,
+                    )}
+                  </span>
+                </div>
+              ) : null}
+              {effectivePreview &&
+              Number(effectivePreview.roundingAdjustmentAmount) !== 0 ? (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>舍入调整（{runtime.roundingRule}）</span>
+                  <span>
+                    {formatPosMoney(
+                      effectivePreview.roundingAdjustmentAmount,
+                      cart.currency,
+                      locale,
+                    )}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            <section className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold">本次收款</h3>
+                <span className="text-xs text-muted-foreground">
+                  未收 {formatPosMoney(outstandingAmount, cart.currency, locale)}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {runtime.paymentMethodsEnabled.map((method) => {
+                  const disabled =
+                    (!isOnline && method !== "cash") ||
+                    (method === "cash" && !cashShiftAvailable) ||
+                    (method === "card" && !hardwareCapabilities.cardTerminal) ||
+                    tenders.some((tender) => tender.paymentMethod === method) ||
+                    (method !== "cash" && externalTenderExists) ||
+                    outstandingAmount <= 0;
+                  return (
+                    <Button
+                      disabled={disabled}
+                      key={method}
+                      onClick={() => addTender(method)}
+                      type="button"
+                      variant="outline"
+                    >
+                      + {paymentMethodLabel(method)}
+                    </Button>
+                  );
+                })}
+                <Button
+                  disabled={tenders.length > 0}
+                  onClick={() => {
+                    setTenders([]);
+                    setPayLater(true);
+                  }}
+                  type="button"
+                  variant={payLater ? "default" : "outline"}
+                >
+                  {t("pos.cart.payLater")}
+                </Button>
+              </div>
+
+              {tenders.map((tender) => {
+                const change =
+                  tender.paymentMethod === "cash"
+                    ? Math.max(
+                        0,
+                        Number(tender.tenderedAmount) - Number(tender.amount),
+                      )
+                    : 0;
+                return (
+                  <div className="space-y-3 rounded-md border p-3" key={tender.id}>
+                    <div className="flex items-center justify-between gap-3">
+                      <strong className="text-sm">
+                        {paymentMethodLabel(tender.paymentMethod)}
+                      </strong>
+                      <button
+                        className="text-xs font-semibold text-destructive"
+                        onClick={() =>
+                          setTenders((current) =>
+                            current.filter((entry) => entry.id !== tender.id),
+                          )
+                        }
+                        type="button"
+                      >
+                        移除
+                      </button>
+                    </div>
+                    <label className="block text-xs font-semibold text-muted-foreground">
+                      支付金额
+                      <Input
+                        className="mt-1.5 h-10"
+                        inputMode="decimal"
+                        min={0.01}
+                        onChange={(event) =>
+                          updateTender(tender.id, { amount: event.target.value })
+                        }
+                        step="0.01"
+                        type="number"
+                        value={tender.amount}
+                      />
+                    </label>
+                    {tender.paymentMethod === "cash" ? (
+                      <>
+                        <label className="block text-xs font-semibold text-muted-foreground">
+                          {t("pos.cart.cashTendered")}
+                          <Input
+                            className="mt-1.5 h-10"
+                            inputMode="decimal"
+                            min={0}
+                            onChange={(event) =>
+                              updateTender(tender.id, {
+                                tenderedAmount: event.target.value,
+                              })
+                            }
+                            step="0.01"
+                            type="number"
+                            value={tender.tenderedAmount}
+                          />
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {buildCashTenderPresets(
+                            tender.amount,
+                            cart.currency,
+                          ).map((amount) => (
+                            <Button
+                              className="h-8 px-2.5 text-xs"
+                              key={amount}
+                              onClick={() =>
+                                updateTender(tender.id, {
+                                  tenderedAmount: toMoney(amount),
+                                })
+                              }
+                              type="button"
+                              variant="outline"
+                            >
+                              {formatPosMoney(amount, cart.currency, locale)}
+                            </Button>
+                          ))}
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {t("pos.cart.cashChange")}
+                          </span>
+                          <strong>
+                            {formatPosMoney(change, cart.currency, locale)}
+                          </strong>
+                        </div>
+                      </>
+                    ) : null}
+                    {tender.paymentMethod === "app" ? (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(["wave", "orange_money"] as const).map((provider) => (
+                            <Button
+                              key={provider}
+                              onClick={() => updateTender(tender.id, { provider })}
+                              type="button"
+                              variant={
+                                tender.provider === provider ? "default" : "outline"
+                              }
+                            >
+                              {MOBILE_MONEY_PROVIDER_LABELS[provider]}
+                            </Button>
+                          ))}
+                        </div>
+                        <Input
+                          className="h-10"
+                          maxLength={120}
+                          onChange={(event) =>
+                            updateTender(tender.id, {
+                              externalReference: event.target.value,
+                            })
+                          }
+                          placeholder={t("pos.cart.paymentReference")}
+                          value={tender.externalReference}
+                        />
+                      </>
+                    ) : null}
+                    {tender.paymentMethod === "card" ? (
+                      <p className="text-xs leading-5 text-muted-foreground">
+                        下单后 POS 会向 TPE 发起交易，并等待成功、失败、取消或超时结果。
+                      </p>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </section>
+
+            {canManageSensitiveOperations && effectivePreview?.taxRate !== "0.000000" ? (
+              <label className="block text-xs font-semibold text-muted-foreground">
+                税务豁免原因（留空则正常计税）
+                <Input
+                  className="mt-1.5 h-10"
+                  maxLength={500}
+                  onChange={(event) => setTaxExemptionReason(event.target.value)}
+                  value={taxExemptionReason}
+                />
+              </label>
+            ) : null}
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold">小票交付</h3>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {(["print", "email", "sms", "none"] as const).map((choice) => (
+                  <Button
+                    key={choice}
+                    onClick={() => setReceiptDelivery(choice)}
+                    type="button"
+                    variant={receiptDelivery === choice ? "default" : "outline"}
+                  >
+                    {receiptDeliveryLabel(choice)}
+                  </Button>
+                ))}
+              </div>
+              {receiptDelivery === "email" || receiptDelivery === "sms" ? (
+                <Input
+                  className="h-10"
+                  inputMode={receiptDelivery === "email" ? "email" : "tel"}
+                  onChange={(event) => setReceiptDestination(event.target.value)}
+                  placeholder={
+                    receiptDelivery === "email" ? "客户邮箱" : "客户手机号"
+                  }
+                  value={receiptDestination}
+                />
+              ) : null}
+            </section>
+
+            {!cashShiftAvailable ? (
+              <p className="text-xs leading-5 text-amber-700">
+                {t("pos.cart.cashShiftRequired")}
+              </p>
             ) : null}
             {!isOnline ? (
-              <p className="text-xs leading-5 text-amber-700">{t("pos.cart.offlinePayLater")}</p>
+              <p className="text-xs leading-5 text-amber-700">
+                {t("pos.cart.offlinePayLater")}
+              </p>
             ) : null}
           </div>
           <DialogFooter>
-            <Button disabled={isPending} onClick={() => setCheckoutOpen(false)} variant="outline">
+            <Button
+              disabled={isPending}
+              onClick={() => setCheckoutOpen(false)}
+              variant="outline"
+            >
               {t("common.cancel")}
             </Button>
-            <Button disabled={isPending} onClick={submitCheckout}>
+            <Button
+              disabled={isPending || paidNowAmount > Number(total) + 0.0001}
+              onClick={submitCheckout}
+            >
               {isPending ? t("pos.cart.loading") : t("pos.cart.placeOrder")}
             </Button>
           </DialogFooter>
@@ -985,6 +1707,93 @@ function toOrderItems(
     line.kind === "product"
       ? { productSkuId: line.productSkuId, quantity: String(line.quantity) }
       : { ticketId: line.ticketId, ticketItemId: line.ticketItemId },
+  );
+}
+
+function toMoney(value: string | number): string {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
+}
+
+function createCheckoutTender(
+  paymentMethod: PosPaymentMethod,
+  amount: string,
+): CheckoutTender {
+  return {
+    id: createId(),
+    paymentMethod,
+    amount: toMoney(amount),
+    tenderedAmount: toMoney(amount),
+    provider: "wave",
+    externalReference: "",
+  };
+}
+
+function paymentMethodLabel(method: PosPaymentMethod): string {
+  return method === "cash" ? "现金" : method === "card" ? "TPE 刷卡" : "移动支付";
+}
+
+function receiptDeliveryLabel(choice: ReceiptDeliveryChoice): string {
+  return {
+    print: "打印",
+    email: "邮件",
+    sms: "短信",
+    none: "不出小票",
+  }[choice];
+}
+
+function cardOutcomeLabel(
+  outcome: "succeeded" | "failed" | "cancelled" | "timed_out",
+): string {
+  return {
+    succeeded: "成功",
+    failed: "失败",
+    cancelled: "已取消",
+    timed_out: "已超时",
+  }[outcome];
+}
+
+function calculateLocalFinancialTotal(
+  subtotal: string,
+  rules: Pick<
+    ReturnType<typeof usePosRuntimeConfig>,
+    "taxEnabled" | "defaultTaxRate" | "pricesIncludeTax" | "roundingRule"
+  >,
+): string {
+  const subtotalMinor = Math.round(Number(subtotal) * 100);
+  const rate = rules.taxEnabled ? Math.max(0, Number(rules.defaultTaxRate)) : 0;
+  const taxMinor =
+    rate === 0
+      ? 0
+      : rules.pricesIncludeTax
+        ? Math.round((subtotalMinor * rate) / (1 + rate))
+        : Math.round(subtotalMinor * rate);
+  const beforeRounding = rules.pricesIncludeTax
+    ? subtotalMinor
+    : subtotalMinor + taxMinor;
+  const increment =
+    rules.roundingRule === "round_yuan"
+      ? 100
+      : rules.roundingRule === "round_jiao"
+        ? 10
+        : 1;
+  return toMoney(Math.round(beforeRounding / increment) * increment / 100);
+}
+
+function buildCashTenderPresets(total: string, currency: string): number[] {
+  const amount = Math.max(0, Number(total));
+  const fractionDigits = new Intl.NumberFormat("en", {
+    style: "currency",
+    currency,
+  }).resolvedOptions().maximumFractionDigits;
+  const steps = fractionDigits === 0 ? [500, 1000, 5000] : [1, 5, 10, 20, 50];
+  const candidates = [
+    amount,
+    ...steps.map((step) => Math.ceil(amount / step) * step),
+  ];
+  return [...new Set(candidates.filter((value) => value >= amount))].slice(
+    0,
+    4,
   );
 }
 

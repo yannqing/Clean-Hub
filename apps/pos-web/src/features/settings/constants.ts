@@ -26,6 +26,7 @@ export const ROUNDING_RULE_OPTIONS = [
 export const TERMINAL_SETTINGS_DEFAULTS = {
   label: "",
   defaultPaymentMethod: "cash" as const,
+  paymentMethodsEnabled: ["cash", "app"] as ("cash" | "card" | "app")[],
   roundingRule: "none" as const,
   autoPrintReceipt: true,
   printCopies: 1,

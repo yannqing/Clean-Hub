@@ -70,7 +70,10 @@ async function main() {
   });
   const paymentIdempotencyKey = createId();
   const checkoutPaymentIdempotencyKey = createId();
+  const shiftId = createId();
+  const occurredAt = new Date().toISOString();
   const checkoutMutation = createOrderCheckoutOfflineMutation({
+    expectedTotalAmount: "1500.00",
     order: {
       orderType: "manual",
       branchId: createId(),
@@ -78,6 +81,9 @@ async function main() {
     },
     payment: {
       paymentMethod: "cash",
+      tenderedAmount: "2000.00",
+      shiftId,
+      occurredAt,
       idempotencyKey: checkoutPaymentIdempotencyKey,
     },
   });
@@ -86,6 +92,9 @@ async function main() {
     {
       paymentMethod: "cash",
       amount: "1500.00",
+      tenderedAmount: "2000.00",
+      shiftId,
+      occurredAt,
       idempotencyKey: paymentIdempotencyKey,
     },
     [manualOrderMutation.id],
@@ -330,7 +339,9 @@ async function main() {
     "every eligible POS write should use an API method",
   );
   assert(
-    calls.some((call) => call.kind === `order-payment:${paymentIdempotencyKey}`),
+    calls.some(
+      (call) => call.kind === `order-payment:${paymentIdempotencyKey}`,
+    ),
     "replay must resend the enqueued payment idempotency key unchanged",
   );
   assert(

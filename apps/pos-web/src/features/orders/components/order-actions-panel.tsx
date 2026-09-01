@@ -10,6 +10,7 @@ import {
   type PosOrderDetail,
   type PosOrderStatus,
   type PosPaymentTransaction,
+  type ShiftRecord,
 } from "@cleanhub/api-client";
 import { createId } from "@cleanhub/id";
 import { useTranslation } from "@cleanhub/i18n/react";
@@ -56,10 +57,12 @@ export function OrderActionsPanel({
   canManageSensitiveOperations,
   order,
   payments,
+  currentShift,
 }: {
   canManageSensitiveOperations: boolean;
   order: PosOrderDetail;
   payments: PosPaymentTransaction[];
+  currentShift: ShiftRecord | null;
 }) {
   const { locale } = useTranslation();
   const router = useRouter();
@@ -67,6 +70,7 @@ export function OrderActionsPanel({
   const text = (value: string) => translatePosText(value, locale);
   const { changeOrderStatus, payOrder } = usePosOfflineWrites();
   const [amount, setAmount] = useState(getOutstandingAmount(order));
+  const [cashTendered, setCashTendered] = useState(getOutstandingAmount(order));
   const [paymentOption, setPaymentOption] = useState<PaymentOption>("cash");
   const [externalReference, setExternalReference] = useState("");
   const [sensitiveAction, setSensitiveAction] = useState<
@@ -108,6 +112,16 @@ export function OrderActionsPanel({
       toast.error("请输入 Wave / Orange Money 交易流水号。");
       return;
     }
+    if (paymentOption === "cash") {
+      if (currentShift?.status !== "open") {
+        toast.error("现金收款需要当前员工处于已开班且未休息状态。");
+        return;
+      }
+      if (Number(cashTendered) < Number(amount)) {
+        toast.error("实收现金不能少于本次收款金额。");
+        return;
+      }
+    }
 
     startTransition(async () => {
       // 幂等键在入队/提交前生成，离线入队时随 payload 持久化，重放复用同一个键。
@@ -116,7 +130,14 @@ export function OrderActionsPanel({
         (idempotencyKeyRef.current = createPaymentIdempotencyKey());
       const request: CreatePosPaymentRequest =
         paymentOption === "cash"
-          ? { paymentMethod: "cash", amount, idempotencyKey }
+          ? {
+              paymentMethod: "cash",
+              amount,
+              tenderedAmount: Number(cashTendered).toFixed(2),
+              shiftId: currentShift!.id,
+              occurredAt: new Date().toISOString(),
+              idempotencyKey,
+            }
           : {
               paymentMethod: "app",
               amount,
@@ -189,9 +210,7 @@ export function OrderActionsPanel({
           paymentResult.payment.paymentStatus === "paid" &&
           !paymentResult.idempotent
         ) {
-          const drawerInput: Parameters<
-            typeof openCashDrawerForPayment
-          >[0] = {
+          const drawerInput: Parameters<typeof openCashDrawerForPayment>[0] = {
             paymentId: paymentResult.payment.id,
             loadDevices: async () =>
               runtime.tenantId && runtime.branchId && runtime.terminalId
@@ -320,6 +339,37 @@ export function OrderActionsPanel({
               {formatOrderMoney(order.discountAmount, order.currency, locale)}
             </span>
           </div>
+          {Number(order.taxAmount) !== 0 ? (
+            <div className="flex items-center justify-between gap-3 text-muted-foreground">
+              <span>
+                VAT {Number(order.taxRateSnapshot) * 100}%
+                {order.pricesIncludeTax ? "（含税）" : ""}
+              </span>
+              <span className="font-semibold text-foreground">
+                {formatOrderMoney(order.taxAmount, order.currency, locale)}
+              </span>
+            </div>
+          ) : null}
+          {order.taxExemptionReason ? (
+            <div className="flex items-center justify-between gap-3 text-muted-foreground">
+              <span>税务豁免</span>
+              <span className="max-w-40 truncate font-semibold text-foreground">
+                {order.taxExemptionReason}
+              </span>
+            </div>
+          ) : null}
+          {Number(order.roundingAdjustmentAmount) !== 0 ? (
+            <div className="flex items-center justify-between gap-3 text-muted-foreground">
+              <span>舍入调整</span>
+              <span className="font-semibold text-foreground">
+                {formatOrderMoney(
+                  order.roundingAdjustmentAmount,
+                  order.currency,
+                  locale,
+                )}
+              </span>
+            </div>
+          ) : null}
           <div className="flex items-center justify-between gap-3 text-foreground">
             <span className="font-semibold">{text("应付总额")}</span>
             <span className="text-sm font-semibold text-foreground">
@@ -342,11 +392,16 @@ export function OrderActionsPanel({
                     ? "border-foreground bg-foreground text-background"
                     : "bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
                 }`}
-                disabled={!canPay || isPending}
+                disabled={
+                  !canPay ||
+                  isPending ||
+                  (option === "cash" && currentShift?.status !== "open")
+                }
                 key={option}
                 onClick={() => {
                   setPaymentOption(option);
                   setExternalReference("");
+                  if (option === "cash") setCashTendered(amount);
                   idempotencyKeyRef.current = null;
                 }}
                 type="button"
@@ -404,7 +459,20 @@ export function OrderActionsPanel({
               value={externalReference}
             />
           ) : (
-            <div className="hidden sm:block" />
+            <input
+              className="h-11 min-w-0 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              disabled={!canPay || isPending || currentShift?.status !== "open"}
+              inputMode="decimal"
+              min={0}
+              onChange={(event) => {
+                setCashTendered(event.target.value);
+                idempotencyKeyRef.current = null;
+              }}
+              placeholder="实收现金"
+              step="0.01"
+              type="number"
+              value={cashTendered}
+            />
           )}
           <button
             className={`flex h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -416,6 +484,9 @@ export function OrderActionsPanel({
               !canPay ||
               isPending ||
               Number(amount) <= 0 ||
+              (paymentOption === "cash" &&
+                (currentShift?.status !== "open" ||
+                  Number(cashTendered) < Number(amount))) ||
               (paymentOption !== "cash" && externalReference.trim().length < 3)
             }
             onClick={pay}
@@ -427,6 +498,27 @@ export function OrderActionsPanel({
               : `记录 ${MOBILE_MONEY_PROVIDER_LABELS[paymentOption]}`}
           </button>
         </div>
+        {paymentOption === "cash" ? (
+          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+            <span>
+              {currentShift?.status === "open"
+                ? "现金找零"
+                : "请先开班后再进行现金收款"}
+            </span>
+            {currentShift?.status === "open" ? (
+              <strong className="text-foreground">
+                {formatOrderMoney(
+                  Math.max(
+                    0,
+                    Number(cashTendered || 0) - Number(amount),
+                  ).toFixed(2),
+                  order.currency,
+                  locale,
+                )}
+              </strong>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <div className="mt-5 grid gap-2">

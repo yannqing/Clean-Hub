@@ -3,6 +3,7 @@
 import type {
   PosCatalogProduct,
   PosCustomerProfileWithAccount,
+  PosSavedCart,
   ServiceTicketDetail,
 } from "@cleanhub/api-client";
 import {
@@ -295,6 +296,52 @@ export function usePosCart() {
     await saveCloud(empty);
   }, [currency, replaceCart, saveCloud]);
 
+  const listParked = useCallback(async (): Promise<PosSavedCart[]> => {
+    const result = await posApi.pos.carts.listParked();
+    return result.data;
+  }, []);
+
+  const park = useCallback(
+    async (name: string, handoffNote?: string): Promise<PosSavedCart> => {
+      if (!scope?.userId || typeof navigator === "undefined" || !navigator.onLine) {
+        throw new Error("挂单需要连接门店服务器。");
+      }
+      if (cartRef.current.lines.length === 0) {
+        throw new Error("空购物车不能挂单。");
+      }
+      if (cloudTimerRef.current) {
+        clearTimeout(cloudTimerRef.current);
+        cloudTimerRef.current = null;
+      }
+      setCloudSyncState("syncing");
+      await posApi.pos.carts.saveCurrent({ cart: cartRef.current });
+      const parked = await posApi.pos.carts.parkCurrent({
+        name: name.trim(),
+        handoffNote: handoffNote?.trim() || null,
+      });
+      await replaceCart(createEmptyPosCart(currency));
+      setCloudSyncState("synced");
+      return parked;
+    },
+    [currency, replaceCart, scope?.userId],
+  );
+
+  const claimParked = useCallback(
+    async (cartId: string, handoffNote?: string): Promise<PosSavedCart> => {
+      if (cartRef.current.lines.length > 0) {
+        throw new Error("请先挂起或清空当前购物车，再认领其他挂单。");
+      }
+      setCloudSyncState("syncing");
+      const claimed = await posApi.pos.carts.claim(cartId, {
+        handoffNote: handoffNote?.trim() || null,
+      });
+      await replaceCart(claimed.cart);
+      setCloudSyncState("synced");
+      return claimed;
+    },
+    [replaceCart],
+  );
+
   return {
     addProduct,
     addTicket,
@@ -302,6 +349,9 @@ export function usePosCart() {
     clear,
     cloudSyncState,
     loaded,
+    listParked,
+    park,
+    claimParked,
     removeLine,
     scope,
     setCustomer,

@@ -2,6 +2,8 @@
 
 import type {
   PosDrawerOpenRequest,
+  PosCardPaymentRequest,
+  PosCardPaymentResult,
   PosHardwareCapabilities,
   PosPrinterDevice,
   PosPrintRequest,
@@ -22,6 +24,7 @@ export type CleanHubDesktopBridge = {
     listPrinters(): Promise<PosPrinterDevice[]>;
     print(request: PosPrintRequest): Promise<PosPrintResult>;
     openCashDrawer(request: PosDrawerOpenRequest): Promise<void>;
+    processCardPayment(request: PosCardPaymentRequest): Promise<PosCardPaymentResult>;
     onScan(listener: (event: PosScanEvent) => void): () => void;
   };
   terminalCredential: {

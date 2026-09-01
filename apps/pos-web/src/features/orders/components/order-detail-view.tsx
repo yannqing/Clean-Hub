@@ -15,6 +15,7 @@ import type {
   PosMobileMoneyProvider,
   PosPaymentAdjustment,
   PosPaymentTransaction,
+  ShiftRecord,
 } from "@cleanhub/api-client";
 import { buildPosReceiptText, type PrintLocale } from "@cleanhub/hardware";
 import { useRouter } from "next/navigation";
@@ -46,11 +47,13 @@ import { OrderDiscountsCard } from "./order-discounts-card";
 import { OrderInfoEditor } from "./order-info-editor";
 import { OrderItemsManager } from "./order-items-manager";
 import { OrderPaymentAdjustments } from "./order-payment-adjustments";
+import { ProductReturnDialog } from "./product-return-dialog";
 
 type OrderDetailViewProps = {
   canResolveManualPayments: boolean;
   adjustments: PosPaymentAdjustment[];
   catalog: PosCatalogService[];
+  currentShift: ShiftRecord | null;
   products: PosCatalogProduct[];
   order: PosOrderDetail;
   payments: PosPaymentTransaction[];
@@ -66,6 +69,7 @@ export function OrderDetailView({
   canResolveManualPayments,
   adjustments,
   catalog,
+  currentShift,
   products,
   order,
   payments,
@@ -89,6 +93,15 @@ export function OrderDetailView({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {canResolveManualPayments &&
+          order.items.some((item) => item.itemKind === "product") ? (
+            <ProductReturnDialog
+              adjustments={adjustments}
+              order={order}
+              payments={payments}
+              products={products}
+            />
+          ) : null}
           <PrintJobControl
             canReprint={canResolveManualPayments}
             content={receiptContent}
@@ -138,6 +151,7 @@ export function OrderDetailView({
         </div>
         <OrderActionsPanel
           canManageSensitiveOperations={canResolveManualPayments}
+          currentShift={currentShift}
           key={`${order.id}:${order.version}`}
           order={order}
           payments={payments}
@@ -191,6 +205,10 @@ function buildOrderReceiptContent(
         ),
     ),
   ].join(" / ");
+  const paidCash = payments.filter(
+    (payment) =>
+      payment.paymentMethod === "cash" && payment.paymentStatus === "paid",
+  );
 
   return buildPosReceiptText(
     {
@@ -203,8 +221,35 @@ function buildOrderReceiptContent(
       items,
       subtotalMinor,
       discountMinor,
+      taxableMinor: toMinorUnits(order.taxableAmount, order.currency),
+      taxMinor: toMinorUnits(order.taxAmount, order.currency),
+      taxRate: order.taxRateSnapshot,
+      roundingMinor: toMinorUnits(order.roundingAdjustmentAmount, order.currency),
+      taxRegistrationNumber: order.taxRegistrationNumberSnapshot ?? undefined,
+      taxExemptionReason: order.taxExemptionReason ?? undefined,
       totalMinor,
       paidMinor: toMinorUnits(order.paidAmount, order.currency),
+      cashTenderedMinor:
+        paidCash.length > 0
+          ? paidCash.reduce(
+              (sum, payment) =>
+                sum +
+                toMinorUnits(
+                  payment.tenderedAmount ?? payment.amount,
+                  payment.currency,
+                ),
+              0,
+            )
+          : undefined,
+      changeMinor:
+        paidCash.length > 0
+          ? paidCash.reduce(
+              (sum, payment) =>
+                sum +
+                toMinorUnits(payment.changeAmount ?? "0", payment.currency),
+              0,
+            )
+          : undefined,
       balanceMinor: Math.max(
         0,
         totalMinor - toMinorUnits(order.paidAmount, order.currency),
@@ -426,6 +471,17 @@ function OrderPaymentsCard({
                 {payment.externalReference ? (
                   <div className="mt-1 truncate text-xs text-muted-foreground">
                     流水号：{payment.externalReference}
+                  </div>
+                ) : null}
+                {payment.paymentMethod === "cash" && payment.tenderedAmount ? (
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    实收{" "}
+                    {formatOrderMoney(payment.tenderedAmount, payment.currency)}{" "}
+                    · 找零{" "}
+                    {formatOrderMoney(
+                      payment.changeAmount ?? "0",
+                      payment.currency,
+                    )}
                   </div>
                 ) : null}
                 <div className="mt-1 text-xs text-muted-foreground">

@@ -106,7 +106,7 @@ type OrderCreatePayload = {
   input: StableCreatePosOrderRequest;
 };
 
-type OrderCheckoutPayload = {
+export type OrderCheckoutPayload = {
   input: StableCreatePosCheckoutRequest;
 };
 
@@ -140,14 +140,14 @@ export type PosOfflineMutation<TPayload extends PosOfflinePayload> = Omit<
   EnqueueInput<TPayload>,
   "metadata"
 > & {
-    id: string;
-    idempotencyKey: string;
+  id: string;
+  idempotencyKey: string;
+  entityId: string;
+  metadata: {
     entityId: string;
-    metadata: {
-      entityId: string;
-      dependsOnOperationIds: string[];
-    };
+    dependsOnOperationIds: string[];
   };
+};
 
 type ReplayRequestOptions = Pick<
   ApiRequestOptions,
@@ -464,9 +464,7 @@ export function findQueuedPosCreateDependency(
   return {
     operationId: item.id,
     blocked: Boolean(blockingItem),
-    ...(blockingItem?.lastError
-      ? { lastError: blockingItem.lastError }
-      : {}),
+    ...(blockingItem?.lastError ? { lastError: blockingItem.lastError } : {}),
   };
 }
 

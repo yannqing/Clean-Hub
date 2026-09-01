@@ -46,6 +46,13 @@ export default async function PosLayout({
       currency={branch?.defaultCurrency}
       timeZone={user?.timezone}
       role={user?.role}
+      defaultPaymentMethod={terminalSettings?.defaultPaymentMethod}
+      paymentMethodsEnabled={terminalSettings?.paymentMethodsEnabled}
+      roundingRule={terminalSettings?.roundingRule}
+      taxEnabled={terminalSettings?.taxEnabled}
+      defaultTaxRate={terminalSettings?.defaultTaxRate}
+      pricesIncludeTax={terminalSettings?.pricesIncludeTax}
+      taxRegistrationNumber={terminalSettings?.taxRegistrationNumber}
       autoPrintReceipt={terminalSettings?.autoPrintReceipt}
       printCopies={terminalSettings?.printCopies}
     >

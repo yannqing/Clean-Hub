@@ -1,5 +1,7 @@
 import type {
   PosDrawerOpenRequest,
+  PosCardPaymentRequest,
+  PosCardPaymentResult,
   PosHardwareCapabilities,
   PosPrinterDevice,
   PosPrintRequest,
@@ -12,6 +14,7 @@ export const desktopIpcChannels = {
   printers: "cleanhub:hardware:printers",
   print: "cleanhub:hardware:print",
   drawerOpen: "cleanhub:hardware:drawer-open",
+  cardPayment: "cleanhub:hardware:card-payment",
   scan: "cleanhub:hardware:scan",
   credentialGet: "cleanhub:terminal-credential:get",
   credentialSet: "cleanhub:terminal-credential:set",
@@ -28,6 +31,7 @@ export type CleanHubDesktopBridge = {
     listPrinters(): Promise<PosPrinterDevice[]>;
     print(request: PosPrintRequest): Promise<PosPrintResult>;
     openCashDrawer(request: PosDrawerOpenRequest): Promise<void>;
+    processCardPayment(request: PosCardPaymentRequest): Promise<PosCardPaymentResult>;
     onScan(listener: (event: PosScanEvent) => void): () => void;
   };
   terminalCredential: {

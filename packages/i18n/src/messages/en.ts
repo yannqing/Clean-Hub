@@ -875,6 +875,8 @@ export const enMessages = {
       pricing: "Calculating authoritative prices and discounts…",
       priceConfirmed:
         "Prices and eligible discounts were calculated by the backend and will be checked again at checkout.",
+      priceConfirmationRequired:
+        "The backend has not confirmed this price yet. Wait or try again.",
       offlineCheckoutBlocked:
         "This cart must be checked out online. Restore the connection and try again.",
       confirmCheckout: "Confirm order and payment",
@@ -882,6 +884,11 @@ export const enMessages = {
         "The order will be created, payment handled with the selected method, and the receipt processed using terminal settings.",
       amountDue: "Amount due",
       cash: "Cash",
+      cashTendered: "Cash tendered",
+      cashChange: "Change due",
+      cashTenderInsufficient: "Cash tendered must cover the amount due.",
+      cashShiftRequired:
+        "Cash payments require the current employee to have an open, active shift.",
       payLater: "Pay later",
       paymentReference: "Wave / Orange Money transaction reference",
       paymentReferenceRequired: "Enter a valid mobile payment reference.",
@@ -893,6 +900,16 @@ export const enMessages = {
       receiptQueued:
         "The receipt is in the print queue. Check CleanHub Desktop and the printer.",
       checkoutComplete: "Order and payment completed.",
+      offlineCashExceptions: "Offline cash exceptions",
+      offlineCashExceptionsHint:
+        "Cash was collected for these sales, but the server could not confirm the order or payment. A manager must retry with current pricing or close the exception after returning the cash.",
+      offlineCashAttempts: "Failed {count} times",
+      offlineCashRetryLatest: "Retry current price",
+      offlineCashMarkRefunded: "Cash returned; close",
+      offlineCashReasonPrompt:
+        "Enter the reconciliation reason (it will be written to the audit log):",
+      offlineCashRefunded: "The exception was closed after the cash return.",
+      offlineCashRecovered: "The offline cash sale was recovered and posted.",
     },
     catalog: {
       title: "Products & services",

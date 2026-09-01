@@ -888,6 +888,8 @@ export const frMessages = {
       pricing: "Calcul des prix et réductions par le serveur…",
       priceConfirmed:
         "Les prix et réductions ont été calculés par le serveur et seront revérifiés lors de l’encaissement.",
+      priceConfirmationRequired:
+        "Le serveur n’a pas encore confirmé ce prix. Patientez ou réessayez.",
       offlineCheckoutBlocked:
         "Ce panier doit être encaissé en ligne. Rétablissez la connexion puis réessayez.",
       confirmCheckout: "Confirmer la commande et le paiement",
@@ -895,6 +897,12 @@ export const frMessages = {
         "La commande sera créée, le paiement traité avec le mode choisi et le reçu géré selon les réglages du terminal.",
       amountDue: "Montant à payer",
       cash: "Espèces",
+      cashTendered: "Espèces reçues",
+      cashChange: "Monnaie à rendre",
+      cashTenderInsufficient:
+        "Les espèces reçues doivent couvrir le montant à payer.",
+      cashShiftRequired:
+        "Les paiements en espèces exigent un service ouvert et actif pour l’employé actuel.",
       payLater: "Payer plus tard",
       paymentReference: "Référence Wave / Orange Money",
       paymentReferenceRequired:
@@ -907,6 +915,17 @@ export const frMessages = {
       receiptQueued:
         "Le reçu est dans la file d’impression. Vérifiez CleanHub Desktop et l’imprimante.",
       checkoutComplete: "Commande et paiement terminés.",
+      offlineCashExceptions: "Anomalies d’espèces hors ligne",
+      offlineCashExceptionsHint:
+        "Des espèces ont été encaissées, mais le serveur n’a pas confirmé la commande ou le paiement. Un responsable doit réessayer avec le prix actuel ou clôturer après remboursement.",
+      offlineCashAttempts: "Échec {count} fois",
+      offlineCashRetryLatest: "Réessayer au prix actuel",
+      offlineCashMarkRefunded: "Espèces rendues ; clôturer",
+      offlineCashReasonPrompt:
+        "Saisissez le motif de rapprochement (il sera inscrit dans l’audit) :",
+      offlineCashRefunded: "L’anomalie a été clôturée après remboursement.",
+      offlineCashRecovered:
+        "La vente hors ligne a été récupérée et comptabilisée.",
     },
     catalog: {
       title: "Produits et services",

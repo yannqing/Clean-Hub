@@ -46,10 +46,7 @@ export async function queuePosOrderReceipt(input: {
   if (!input.autoPrint) return "queued";
   try {
     const result = await queue.retry(job.id, (storedJob) =>
-      executePosPrintJob(
-        storedJob,
-        getDesktopBridge()?.hardware ?? null,
-      ),
+      executePosPrintJob(storedJob, getDesktopBridge()?.hardware ?? null),
     );
     notifyPosPrintQueueUpdated();
     return result.status === "printed" ? "printed" : "failed";
@@ -66,6 +63,8 @@ export async function queuePosOfflineCartReceipt(input: {
   copies: number;
   locale: string;
   paymentMethod: "cash" | "later";
+  cashTendered?: string;
+  changeAmount?: string;
   scope: { tenantId: string; branchId: string; terminalId: string };
 }): Promise<"queued" | "printed" | "failed"> {
   const totalMinor = input.cart.lines.reduce(
@@ -108,6 +107,14 @@ export async function queuePosOfflineCartReceipt(input: {
       discountMinor: 0,
       totalMinor,
       paidMinor: input.paymentMethod === "cash" ? totalMinor : 0,
+      cashTenderedMinor:
+        input.paymentMethod === "cash" && input.cashTendered
+          ? toMinorUnits(input.cashTendered, input.cart.currency)
+          : undefined,
+      changeMinor:
+        input.paymentMethod === "cash" && input.changeAmount
+          ? toMinorUnits(input.changeAmount, input.cart.currency)
+          : undefined,
       balanceMinor: input.paymentMethod === "cash" ? 0 : totalMinor,
       paymentMethod: input.paymentMethod === "cash" ? "Cash" : undefined,
       footer: [

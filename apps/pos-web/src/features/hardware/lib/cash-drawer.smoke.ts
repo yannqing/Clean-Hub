@@ -50,6 +50,7 @@ async function runCashDrawerSmoke(): Promise<void> {
           scanner: false,
           printer: true,
           cashDrawer: true,
+          cardTerminal: false,
           secureTerminalCredential: true,
         };
       },
@@ -86,6 +87,7 @@ async function runCashDrawerSmoke(): Promise<void> {
           scanner: false,
           printer: true,
           cashDrawer: true,
+          cardTerminal: false,
           secureTerminalCredential: true,
         };
       },

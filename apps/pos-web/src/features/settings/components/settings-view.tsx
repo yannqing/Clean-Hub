@@ -146,6 +146,7 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
       setFormValues({
         label: settings.label ?? "",
         defaultPaymentMethod: settings.defaultPaymentMethod,
+        paymentMethodsEnabled: settings.paymentMethodsEnabled,
         roundingRule: settings.roundingRule,
         autoPrintReceipt: settings.autoPrintReceipt,
         printCopies: settings.printCopies,
@@ -189,6 +190,7 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
       const result = await updateTerminalSettings({
         label: values.label || undefined,
         defaultPaymentMethod: values.defaultPaymentMethod,
+        paymentMethodsEnabled: values.paymentMethodsEnabled,
         roundingRule: values.roundingRule,
         autoPrintReceipt: values.autoPrintReceipt,
         printCopies: values.printCopies,
@@ -200,6 +202,7 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
       setFormValues({
         label: result.label ?? "",
         defaultPaymentMethod: result.defaultPaymentMethod,
+        paymentMethodsEnabled: result.paymentMethodsEnabled,
         roundingRule: result.roundingRule,
         autoPrintReceipt: result.autoPrintReceipt,
         printCopies: result.printCopies,

@@ -200,30 +200,75 @@ export function TerminalSettingsCard({
 
           {/* 默认支付方式 */}
           {mode === "all" || mode === "checkout" ? (
-            <div className="space-y-1.5 py-2 lg:py-0">
-              <Label className="text-base font-medium lg:text-sm">
-                默认支付方式
-              </Label>
-              <Select
-                onValueChange={(value) =>
-                  updateField(
-                    "defaultPaymentMethod",
-                    value as TerminalSettingsFormValues["defaultPaymentMethod"],
-                  )
-                }
-                value={form.defaultPaymentMethod}
-              >
-                <SelectTrigger className="h-12 w-full rounded-none border-x-0 border-t-0 bg-transparent px-0 text-base shadow-none lg:h-9 lg:rounded-md lg:border lg:px-3 lg:text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_METHOD_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-5 py-2 lg:py-0">
+              <div className="space-y-2">
+                <Label className="text-base font-medium lg:text-sm">
+                  启用的支付方式
+                </Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PAYMENT_METHOD_OPTIONS.map((option) => {
+                    const checked = form.paymentMethodsEnabled.includes(option.value);
+                    return (
+                      <label
+                        className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                        key={option.value}
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(nextChecked) => {
+                            const next = nextChecked
+                              ? [...form.paymentMethodsEnabled, option.value]
+                              : form.paymentMethodsEnabled.filter(
+                                  (method) => method !== option.value,
+                                );
+                            if (next.length === 0) return;
+                            setForm((current) => ({
+                              ...current,
+                              paymentMethodsEnabled: next,
+                              defaultPaymentMethod: next.includes(
+                                current.defaultPaymentMethod,
+                              )
+                                ? current.defaultPaymentMethod
+                                : next[0]!,
+                            }));
+                          }}
+                        />
+                        {option.label}
+                      </label>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  未启用的方式不会出现在结账页；刷卡还要求本机连接 TPE。
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-base font-medium lg:text-sm">
+                  默认支付方式
+                </Label>
+                <Select
+                  onValueChange={(value) =>
+                    updateField(
+                      "defaultPaymentMethod",
+                      value as TerminalSettingsFormValues["defaultPaymentMethod"],
+                    )
+                  }
+                  value={form.defaultPaymentMethod}
+                >
+                  <SelectTrigger className="h-12 w-full rounded-none border-x-0 border-t-0 bg-transparent px-0 text-base shadow-none lg:h-9 lg:rounded-md lg:border lg:px-3 lg:text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHOD_OPTIONS.filter((option) =>
+                      form.paymentMethodsEnabled.includes(option.value),
+                    ).map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           ) : null}
 

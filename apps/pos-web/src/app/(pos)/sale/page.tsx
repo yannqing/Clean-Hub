@@ -2,11 +2,13 @@ import { getCurrentUser } from "@/lib/auth";
 import { getMyBranchQuery } from "@/features/branches/queries";
 import { CartSaleView } from "@/features/cart/components";
 import { getPosCatalogQuery } from "@/features/catalog/queries";
+import { getCurrentShiftQuery } from "@/features/shift-handover/queries";
 
 export default async function SalePage() {
-  const [branch, user] = await Promise.all([
+  const [branch, user, currentShift] = await Promise.all([
     getMyBranchQuery().catch(() => null),
     getCurrentUser(),
+    getCurrentShiftQuery().catch(() => null),
   ]);
   const branchId = user?.terminalBranchId ?? branch?.id;
   const catalog = branchId
@@ -22,6 +24,7 @@ export default async function SalePage() {
       canManageSensitiveOperations={
         user?.role === "owner" || user?.role === "manager"
       }
+      currentShift={currentShift}
       products={catalog.products}
       services={catalog.data}
     />

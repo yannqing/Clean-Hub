@@ -11,6 +11,8 @@ const bridge: CleanHubDesktopBridge = {
     print: (request) => ipcRenderer.invoke(desktopIpcChannels.print, request),
     openCashDrawer: (request) =>
       ipcRenderer.invoke(desktopIpcChannels.drawerOpen, request),
+    processCardPayment: (request) =>
+      ipcRenderer.invoke(desktopIpcChannels.cardPayment, request),
     onScan(listener) {
       const handler = (
         _event: Electron.IpcRendererEvent,

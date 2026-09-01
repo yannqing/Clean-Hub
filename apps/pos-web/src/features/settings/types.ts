@@ -19,6 +19,7 @@ export type SettingsPageState = "idle" | "loading" | "ready" | "error";
 export type TerminalSettingsFormValues = {
   label: string;
   defaultPaymentMethod: PosPaymentMethod;
+  paymentMethodsEnabled: PosPaymentMethod[];
   roundingRule: PosRoundingRule;
   autoPrintReceipt: boolean;
   printCopies: number;

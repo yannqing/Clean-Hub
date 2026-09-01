@@ -100,6 +100,21 @@ const POS_API_ERROR_MESSAGES: Record<string, Record<PosErrorLocale, string>> = {
     en: "There is not enough stock. Adjust the cart quantity.",
     fr: "Le stock est insuffisant. Modifiez la quantité dans le panier.",
   },
+  PRICE_CHANGED: {
+    "zh-CN": "商品价格或折扣已变化，系统已刷新金额，请重新确认收款。",
+    en: "A price or discount changed. Review the refreshed total and confirm again.",
+    fr: "Un prix ou une réduction a changé. Vérifiez le nouveau total et confirmez à nouveau.",
+  },
+  SHIFT_REQUIRED: {
+    "zh-CN": "现金收款必须关联当前员工的有效班次。",
+    en: "A cash payment must belong to the current employee's valid shift.",
+    fr: "Le paiement en espèces doit appartenir au service valide de l’employé actuel.",
+  },
+  CASH_TENDER_INSUFFICIENT: {
+    "zh-CN": "实收现金不能少于应付金额。",
+    en: "Cash tendered must cover the amount due.",
+    fr: "Les espèces reçues doivent couvrir le montant à payer.",
+  },
 };
 
 const POS_ACCOUNT_LOCKED_UNTIL_MESSAGES: Record<

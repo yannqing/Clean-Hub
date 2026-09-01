@@ -221,6 +221,13 @@ function registerIpcHandlers(): void {
       return hardwareRuntime.openCashDrawer(request);
     },
   );
+  ipcMain.handle(
+    desktopIpcChannels.cardPayment,
+    (event, request: import("@cleanhub/hardware").PosCardPaymentRequest) => {
+      assertTrustedIpcSender(event);
+      return hardwareRuntime.processCardPayment(request);
+    },
+  );
   ipcMain.handle(desktopIpcChannels.credentialGet, (event) => {
     assertTrustedIpcSender(event);
     return readTerminalCredential();

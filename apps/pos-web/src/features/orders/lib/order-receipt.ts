@@ -3,10 +3,7 @@ import type {
   PosOrderDetail,
   PosPaymentTransaction,
 } from "@cleanhub/api-client";
-import {
-  buildPosReceiptText,
-  type PrintLocale,
-} from "@cleanhub/hardware";
+import { buildPosReceiptText, type PrintLocale } from "@cleanhub/hardware";
 import { formatPosOrderCode } from "@cleanhub/domain/order-codes";
 
 import {
@@ -53,6 +50,10 @@ export function buildPosOrderReceipt(input: {
         ),
     ),
   ].join(" / ");
+  const paidCash = payments.filter(
+    (payment) =>
+      payment.paymentMethod === "cash" && payment.paymentStatus === "paid",
+  );
   const title = `RC-${order.id.slice(-8).toUpperCase()}`;
   return {
     title,
@@ -68,18 +69,45 @@ export function buildPosOrderReceipt(input: {
         items,
         subtotalMinor: toMinorUnits(order.subtotalAmount, order.currency),
         discountMinor: toMinorUnits(order.discountAmount, order.currency),
+        taxableMinor: toMinorUnits(order.taxableAmount, order.currency),
+        taxMinor: toMinorUnits(order.taxAmount, order.currency),
+        taxRate: order.taxRateSnapshot,
+        roundingMinor: toMinorUnits(
+          order.roundingAdjustmentAmount,
+          order.currency,
+        ),
+        taxRegistrationNumber:
+          order.taxRegistrationNumberSnapshot ?? undefined,
+        taxExemptionReason: order.taxExemptionReason ?? undefined,
         totalMinor,
         paidMinor: toMinorUnits(order.paidAmount, order.currency),
+        cashTenderedMinor:
+          paidCash.length > 0
+            ? paidCash.reduce(
+                (sum, payment) =>
+                  sum +
+                  toMinorUnits(
+                    payment.tenderedAmount ?? payment.amount,
+                    payment.currency,
+                  ),
+                0,
+              )
+            : undefined,
+        changeMinor:
+          paidCash.length > 0
+            ? paidCash.reduce(
+                (sum, payment) =>
+                  sum +
+                  toMinorUnits(payment.changeAmount ?? "0", payment.currency),
+                0,
+              )
+            : undefined,
         balanceMinor: Math.max(
           0,
           totalMinor - toMinorUnits(order.paidAmount, order.currency),
         ),
         paymentMethod: paymentMethod || undefined,
-        footer: [
-          branch?.receiptAddress,
-          branch?.receiptPhone,
-          "Thank you",
-        ]
+        footer: [branch?.receiptAddress, branch?.receiptPhone, "Thank you"]
           .filter(Boolean)
           .join(" · "),
       },

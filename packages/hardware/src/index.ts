@@ -10,6 +10,7 @@ export type PosHardwareCapabilities = {
   scanner: boolean;
   printer: boolean;
   cashDrawer: boolean;
+  cardTerminal: boolean;
   secureTerminalCredential: boolean;
 };
 
@@ -61,11 +62,28 @@ export type PosScanEvent = {
   scannedAt: string;
 };
 
+export type PosCardPaymentRequest = {
+  paymentId: string;
+  orderId: string;
+  amount: string;
+  currency: string;
+  timeoutMs?: number;
+};
+
+export type PosCardPaymentResult = {
+  status: "succeeded" | "failed" | "cancelled" | "timed_out";
+  externalReference?: string;
+  authorizationCode?: string;
+  failureCode?: string;
+  message?: string;
+  providerPayload?: Record<string, unknown>;
+};
+
 export class PosHardwareUnavailableError extends Error {
   readonly code = "POS_HARDWARE_UNAVAILABLE";
 
   constructor(
-    readonly capability: "scanner" | "printer" | "cashDrawer",
+    readonly capability: "scanner" | "printer" | "cashDrawer" | "cardTerminal",
     message: string,
   ) {
     super(message);
@@ -86,6 +104,11 @@ export type PosPrinterAdapter = {
 export type PosCashDrawerAdapter = {
   isAvailable(): boolean | Promise<boolean>;
   open(request: PosDrawerOpenRequest): Promise<void>;
+};
+
+export type PosCardTerminalAdapter = {
+  isAvailable(): boolean | Promise<boolean>;
+  pay(request: PosCardPaymentRequest): Promise<PosCardPaymentResult>;
 };
 
 function requireDrawerRequest(request: PosDrawerOpenRequest): void {
@@ -201,6 +224,7 @@ export type PosHardwareRuntime = {
   listPrinters(): Promise<PosPrinterDevice[]>;
   print(request: PosPrintRequest): Promise<PosPrintResult>;
   openCashDrawer(request: PosDrawerOpenRequest): Promise<void>;
+  processCardPayment(request: PosCardPaymentRequest): Promise<PosCardPaymentResult>;
 };
 
 export function createUnavailablePosScannerAdapter(
@@ -240,36 +264,59 @@ export function createUnavailablePosCashDrawerAdapter(
   };
 }
 
+export function createUnavailablePosCardTerminalAdapter(
+  reason = "No TPE/card-terminal adapter is configured for this terminal.",
+): PosCardTerminalAdapter {
+  return {
+    isAvailable: () => false,
+    async pay() {
+      throw new PosHardwareUnavailableError("cardTerminal", reason);
+    },
+  };
+}
+
 export function createPosHardwareRuntime(input: {
   scanner?: PosScannerAdapter;
   printer?: PosPrinterAdapter;
   cashDrawer?: PosCashDrawerAdapter;
+  cardTerminal?: PosCardTerminalAdapter;
   secureTerminalCredential(): boolean | Promise<boolean>;
 }): PosHardwareRuntime {
   const scanner = input.scanner ?? createUnavailablePosScannerAdapter();
   const printer = input.printer ?? createUnavailablePosPrinterAdapter();
   const cashDrawer =
     input.cashDrawer ?? createUnavailablePosCashDrawerAdapter();
+  const cardTerminal =
+    input.cardTerminal ?? createUnavailablePosCardTerminalAdapter();
 
   return {
     async getCapabilities() {
-      const [scannerAvailable, printerAvailable, cashDrawerAvailable, secure] =
+      const [
+        scannerAvailable,
+        printerAvailable,
+        cashDrawerAvailable,
+        cardTerminalAvailable,
+        secure,
+      ] =
         await Promise.all([
           scanner.isAvailable(),
           printer.isAvailable(),
           cashDrawer.isAvailable(),
+          cardTerminal.isAvailable(),
           input.secureTerminalCredential(),
         ]);
       return {
         scanner: scannerAvailable,
         printer: printerAvailable,
         cashDrawer: cashDrawerAvailable,
+        cardTerminal: cardTerminalAvailable,
         secureTerminalCredential: secure,
       };
     },
     listPrinters: () => printer.listPrinters(),
     print: (request) => printer.print(request),
     openCashDrawer: (request) => cashDrawer.open(request),
+    processCardPayment: (request) => cardTerminal.pay(request),
   };
 }
 
@@ -292,9 +339,17 @@ export type PosReceiptDocument = {
   items: PosReceiptLine[];
   subtotalMinor: number;
   discountMinor?: number;
+  taxableMinor?: number;
+  taxMinor?: number;
+  taxRate?: string;
+  roundingMinor?: number;
+  taxRegistrationNumber?: string;
+  taxExemptionReason?: string;
   totalMinor: number;
   paidMinor: number;
   balanceMinor: number;
+  cashTenderedMinor?: number;
+  changeMinor?: number;
   paymentMethod?: string;
   footer?: string;
 };
@@ -512,8 +567,15 @@ const posReceiptLabels = {
     items: "Items",
     subtotal: "Subtotal",
     discount: "Discount",
+    taxable: "Taxable",
+    tax: "VAT",
+    rounding: "Rounding",
+    taxRegistration: "Tax registration",
+    taxExemption: "Tax exemption",
     total: "Total",
     paid: "Paid",
+    cashTendered: "Cash received",
+    change: "Change",
     balance: "Balance",
     payment: "Payment",
     issued: "Issued",
@@ -526,8 +588,15 @@ const posReceiptLabels = {
     items: "Articles",
     subtotal: "Sous-total",
     discount: "Remise",
+    taxable: "Imposable",
+    tax: "TVA",
+    rounding: "Arrondi",
+    taxRegistration: "N° fiscal",
+    taxExemption: "Exonération",
     total: "Total",
     paid: "Paye",
+    cashTendered: "Espèces reçues",
+    change: "Monnaie",
     balance: "Solde",
     payment: "Paiement",
     issued: "Emis",
@@ -540,8 +609,15 @@ const posReceiptLabels = {
     items: "项目",
     subtotal: "小计",
     discount: "优惠",
+    taxable: "应税金额",
+    tax: "VAT",
+    rounding: "舍入调整",
+    taxRegistration: "税务登记号",
+    taxExemption: "税务豁免",
     total: "合计",
     paid: "已付",
+    cashTendered: "实收现金",
+    change: "找零",
     balance: "余额",
     payment: "支付方式",
     issued: "开具时间",
@@ -741,6 +817,9 @@ function buildPosReceiptLines(
     receipt.customerName
       ? keyValue(labels.customer, receipt.customerName)
       : undefined,
+    receipt.taxRegistrationNumber
+      ? keyValue(labels.taxRegistration, receipt.taxRegistrationNumber)
+      : undefined,
     keyValue(labels.issued, formatDateTime(receipt.issuedAt, locale)),
     rule(width),
     labels.items,
@@ -757,8 +836,29 @@ function buildPosReceiptLines(
     receipt.discountMinor
       ? keyValue(labels.discount, `-${amount(receipt.discountMinor)}`)
       : undefined,
+    receipt.taxableMinor !== undefined
+      ? keyValue(labels.taxable, amount(receipt.taxableMinor))
+      : undefined,
+    receipt.taxMinor
+      ? keyValue(
+          `${labels.tax}${receipt.taxRate ? ` ${Number(receipt.taxRate) * 100}%` : ""}`,
+          amount(receipt.taxMinor),
+        )
+      : undefined,
+    receipt.taxExemptionReason
+      ? keyValue(labels.taxExemption, receipt.taxExemptionReason)
+      : undefined,
+    receipt.roundingMinor
+      ? keyValue(labels.rounding, amount(receipt.roundingMinor))
+      : undefined,
     keyValue(labels.total, amount(receipt.totalMinor)),
     keyValue(labels.paid, amount(receipt.paidMinor)),
+    receipt.cashTenderedMinor !== undefined
+      ? keyValue(labels.cashTendered, amount(receipt.cashTenderedMinor))
+      : undefined,
+    receipt.changeMinor !== undefined
+      ? keyValue(labels.change, amount(receipt.changeMinor))
+      : undefined,
     keyValue(labels.balance, amount(receipt.balanceMinor)),
     receipt.paymentMethod
       ? keyValue(labels.payment, receipt.paymentMethod)
