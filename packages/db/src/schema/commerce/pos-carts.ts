@@ -6,6 +6,7 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  text,
   timestamp,
   uniqueIndex,
   varchar,
@@ -20,6 +21,7 @@ import { orders } from "./orders.js";
 
 export const posCartStatusEnum = pgEnum("pos_cart_status", [
   "active",
+  "parked",
   "converted",
   "abandoned",
 ]);
@@ -47,6 +49,7 @@ export const posCarts = pgTable(
       .references(() => users.id),
     currency: varchar("currency", { length: 3 }).notNull(),
     payload: jsonb("payload").notNull().$type<Record<string, unknown>>(),
+    name: varchar("name", { length: 120 }),
     clientUpdatedAt: timestamp("client_updated_at", { withTimezone: true })
       .notNull(),
     status: posCartStatusEnum("status").notNull().default("active"),
@@ -54,6 +57,11 @@ export const posCarts = pgTable(
       () => orders.id,
     ),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    parkedAt: timestamp("parked_at", { withTimezone: true }),
+    parkedBy: ulidColumn("parked_by").references(() => users.id),
+    claimedAt: timestamp("claimed_at", { withTimezone: true }),
+    claimedBy: ulidColumn("claimed_by").references(() => users.id),
+    handoffNote: text("handoff_note"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -78,6 +86,12 @@ export const posCarts = pgTable(
       table.terminalId,
     ),
     index("pos_carts_expiry_idx").on(table.status, table.expiresAt),
+    index("pos_carts_branch_parked_idx").on(
+      table.tenantId,
+      table.branchId,
+      table.status,
+      table.parkedAt,
+    ),
     index("pos_carts_converted_order_idx").on(table.convertedOrderId),
     check("pos_carts_version_check", sql`${table.version} >= 1`),
   ],

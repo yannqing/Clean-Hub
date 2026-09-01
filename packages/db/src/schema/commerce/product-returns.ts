@@ -51,8 +51,10 @@ export const salesReturns = pgTable(
       .references(() => tenants.id),
     branchId: ulidColumn("branch_id").notNull(),
     orderId: ulidColumn("order_id").notNull(),
+    exchangeOrderId: ulidColumn("exchange_order_id").references(() => orders.id),
     customerId: ulidColumn("customer_id").references(() => customers.id),
     status: salesReturnStatusEnum("status").notNull().default("draft"),
+    idempotencyKey: varchar("idempotency_key", { length: 120 }).notNull(),
     reason: text("reason").notNull(),
     notes: text("notes"),
     refundAmount: numeric("refund_amount", {
@@ -82,6 +84,10 @@ export const salesReturns = pgTable(
       table.tenantId,
       table.id,
     ),
+    uniqueIndex("sales_returns_tenant_idempotency_unique").on(
+      table.tenantId,
+      table.idempotencyKey,
+    ),
     foreignKey({
       name: "sales_returns_tenant_branch_fk",
       columns: [table.tenantId, table.branchId],
@@ -98,6 +104,7 @@ export const salesReturns = pgTable(
       table.status,
     ),
     index("sales_returns_order_id_idx").on(table.orderId),
+    index("sales_returns_exchange_order_id_idx").on(table.exchangeOrderId),
     index("sales_returns_customer_id_idx").on(table.customerId),
     check(
       "sales_returns_refund_amount_nonnegative_check",

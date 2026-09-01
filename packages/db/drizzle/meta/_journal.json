@@ -267,6 +267,20 @@
       "when": 1787038506174,
       "tag": "0037_smiling_slyde",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1788248315922,
+      "tag": "0038_wealthy_black_tarantula",
+      "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1788253499946,
+      "tag": "0039_wide_daredevil",
+      "breakpoints": true
     }
   ]
 }

@@ -19,6 +19,7 @@ import { productPrices, productSkus } from "../catalog/products.js";
 import { pricingUnitEnum, services } from "../catalog/services.js";
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
+import { posStaffShifts } from "../operations/pos-shifts.js";
 import { branches } from "../tenancy/branches.js";
 import { tenants } from "../tenancy/tenants.js";
 import { customerAccounts } from "./customer-accounts.js";
@@ -67,6 +68,16 @@ export const paymentTransactionStatusEnum = pgEnum(
   ["pending", "paid", "refunded", "failed"],
 );
 
+export const paymentProviderStatusEnum = pgEnum("payment_provider_status", [
+  "not_applicable",
+  "initiated",
+  "pending",
+  "succeeded",
+  "failed",
+  "cancelled",
+  "timed_out",
+]);
+
 export const paymentInitiatorTypeEnum = pgEnum("payment_initiator_type", [
   "staff",
   "customer",
@@ -106,6 +117,27 @@ export const orders = pgTable(
     discountAmount: numeric("discount_amount", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
+    taxableAmount: numeric("taxable_amount", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    taxAmount: numeric("tax_amount", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    taxRateSnapshot: numeric("tax_rate_snapshot", {
+      precision: 7,
+      scale: 4,
+    })
+      .notNull()
+      .default("0"),
+    pricesIncludeTax: boolean("prices_include_tax").notNull().default(true),
+    taxExemptionReason: text("tax_exemption_reason"),
+    taxRegistrationNumberSnapshot: text("tax_registration_number_snapshot"),
+    roundingAdjustmentAmount: numeric("rounding_adjustment_amount", {
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
     totalAmount: numeric("total_amount", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
@@ -143,7 +175,14 @@ export const orders = pgTable(
       sql`${table.subtotalAmount} >= 0
         and ${table.discountAmount} >= 0
         and ${table.discountAmount} <= ${table.subtotalAmount}
-        and ${table.totalAmount} = ${table.subtotalAmount} - ${table.discountAmount}`,
+        and ${table.taxableAmount} >= 0
+        and ${table.taxAmount} >= 0
+        and ${table.taxRateSnapshot} >= 0
+        and ${table.taxRateSnapshot} <= 100
+        and ${table.totalAmount} = ${table.subtotalAmount} - ${table.discountAmount}
+          + case when ${table.pricesIncludeTax} then 0 else ${table.taxAmount} end
+          + ${table.roundingAdjustmentAmount}
+        and ${table.totalAmount} >= 0`,
     ),
   ],
 );
@@ -192,6 +231,19 @@ export const orderItems = pgTable(
     bagCount: integer("bag_count"),
     unitAmount: numeric("unit_amount", { precision: 12, scale: 2 }).notNull(),
     lineAmount: numeric("line_amount", { precision: 12, scale: 2 }).notNull(),
+    taxableAmount: numeric("taxable_amount", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    taxAmount: numeric("tax_amount", { precision: 12, scale: 2 })
+      .notNull()
+      .default("0"),
+    taxRateSnapshot: numeric("tax_rate_snapshot", {
+      precision: 7,
+      scale: 4,
+    })
+      .notNull()
+      .default("0"),
+    taxExemptionReason: text("tax_exemption_reason"),
     itemColor: varchar("item_color", { length: 40 }),
     defectNotes: text("defect_notes"),
     specialRequest: text("special_request"),
@@ -266,16 +318,29 @@ export const paymentTransactions = pgTable(
       .references(() => orders.id),
     paymentMethod: paymentMethodEnum("payment_method").notNull(),
     amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    tenderedAmount: numeric("tendered_amount", {
+      precision: 12,
+      scale: 2,
+    }),
+    changeAmount: numeric("change_amount", { precision: 12, scale: 2 }),
+    shiftId: ulidColumn("shift_id").references(() => posStaffShifts.id),
     currency: varchar("currency", { length: 3 }).notNull().default("XOF"),
     paymentStatus: paymentTransactionStatusEnum("payment_status")
       .notNull()
       .default("pending"),
+    providerStatus: paymentProviderStatusEnum("provider_status")
+      .notNull()
+      .default("not_applicable"),
     idempotencyKey: varchar("idempotency_key", { length: 120 }),
     initiatorType: paymentInitiatorTypeEnum("initiator_type")
       .notNull()
       .default("staff"),
     gateway: varchar("gateway", { length: 80 }),
     externalId: varchar("external_id", { length: 120 }),
+    authorizationCode: varchar("authorization_code", { length: 120 }),
+    failureCode: varchar("failure_code", { length: 80 }),
+    failureReason: text("failure_reason"),
+    providerPayload: jsonb("provider_payload").$type<Record<string, unknown>>(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -295,6 +360,7 @@ export const paymentTransactions = pgTable(
       table.idempotencyKey,
     ),
     index("payment_transactions_order_id_idx").on(table.orderId),
+    index("payment_transactions_shift_id_idx").on(table.shiftId),
     uniqueIndex("payment_transactions_tenant_gateway_external_id_unique")
       .on(table.tenantId, table.gateway, table.externalId)
       .where(
@@ -306,6 +372,17 @@ export const paymentTransactions = pgTable(
       table.paidAt,
     ),
     index("payment_transactions_deleted_at_idx").on(table.deletedAt),
+    check(
+      "payment_transactions_cash_tender_check",
+      sql`(
+        ${table.tenderedAmount} is null
+        and ${table.changeAmount} is null
+      ) or (
+        ${table.paymentMethod} = 'cash'
+        and ${table.tenderedAmount} >= ${table.amount}
+        and ${table.changeAmount} = ${table.tenderedAmount} - ${table.amount}
+      )`,
+    ),
   ],
 );
 

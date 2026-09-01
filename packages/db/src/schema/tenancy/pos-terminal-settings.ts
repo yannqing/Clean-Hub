@@ -72,6 +72,10 @@ export const posTerminalSettings = pgTable(
     defaultPaymentMethod: posPaymentMethodEnum("default_payment_method")
       .notNull()
       .default("cash"),
+    paymentMethodsEnabled: posPaymentMethodEnum("payment_methods_enabled")
+      .array()
+      .notNull()
+      .default(sql`ARRAY['cash', 'app']::pos_payment_method[]`),
     roundingRule: posRoundingRuleEnum("rounding_rule")
       .notNull()
       .default("none"),
@@ -150,6 +154,10 @@ export const posTerminalSettings = pgTable(
     check(
       "pos_terminal_settings_pending_operations_check",
       sql`${table.pendingOperationsCount} is null or ${table.pendingOperationsCount} >= 0`,
+    ),
+    check(
+      "pos_terminal_settings_payment_methods_nonempty_check",
+      sql`cardinality(${table.paymentMethodsEnabled}) > 0`,
     ),
     check(
       "pos_terminal_settings_status_revision_check",

@@ -4,8 +4,10 @@ import {
   check,
   index,
   integer,
+  numeric,
   pgTable,
   smallint,
+  text,
   timestamp,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
@@ -48,9 +50,24 @@ export const posChannelSettings = pgTable(
     defaultPaymentMethod: posPaymentMethodEnum("default_payment_method")
       .notNull()
       .default("cash"),
+    defaultPaymentMethodsEnabled: posPaymentMethodEnum(
+      "default_payment_methods_enabled",
+    )
+      .array()
+      .notNull()
+      .default(sql`ARRAY['cash', 'app']::pos_payment_method[]`),
     defaultRoundingRule: posRoundingRuleEnum("default_rounding_rule")
       .notNull()
       .default("none"),
+    taxEnabled: boolean("tax_enabled").notNull().default(false),
+    defaultTaxRate: numeric("default_tax_rate", {
+      precision: 7,
+      scale: 4,
+    })
+      .notNull()
+      .default("0"),
+    pricesIncludeTax: boolean("prices_include_tax").notNull().default(true),
+    taxRegistrationNumber: text("tax_registration_number"),
     defaultAutoPrintReceipt: boolean("default_auto_print_receipt")
       .notNull()
       .default(true),
@@ -86,6 +103,14 @@ export const posChannelSettings = pgTable(
     check(
       "pos_channel_settings_print_copies_check",
       sql`${table.defaultPrintCopies} between 1 and 10`,
+    ),
+    check(
+      "pos_channel_settings_payment_methods_nonempty_check",
+      sql`cardinality(${table.defaultPaymentMethodsEnabled}) > 0`,
+    ),
+    check(
+      "pos_channel_settings_tax_rate_check",
+      sql`${table.defaultTaxRate} >= 0 and ${table.defaultTaxRate} <= 100`,
     ),
     check(
       "pos_channel_settings_lock_timeout_check",
