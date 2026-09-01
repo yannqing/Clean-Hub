@@ -343,6 +343,24 @@ export async function findOpenShiftForUpdate(
   return rows[0] ? toShift(rows[0]) : null;
 }
 
+export async function findShiftByIdForUpdate(
+  db: Database,
+  input: { tenantId: string; shiftId: string },
+): Promise<ShiftRecord | null> {
+  const rows = await db
+    .select()
+    .from(posStaffShifts)
+    .where(
+      and(
+        eq(posStaffShifts.tenantId, input.tenantId),
+        eq(posStaffShifts.id, input.shiftId),
+      ),
+    )
+    .for("update")
+    .limit(1);
+  return rows[0] ? toShift(rows[0]) : null;
+}
+
 export async function createShiftRecord(
   db: Database,
   input: {

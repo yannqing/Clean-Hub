@@ -22,6 +22,7 @@ import { createPosTerminalSettingsRoutes } from "./terminal-settings/terminal-se
 import { createPosHardwareRoutes } from "./hardware/hardware.routes.js";
 import { createPosStatisticsRoutes } from "./statistics/statistics.routes.js";
 import { createPosWorkspaceRoutes } from "./workspace/workspace.routes.js";
+import { createPosOfflineSaleRoutes } from "./offline-sales/offline-sales.routes.js";
 
 export type CreatePosRoutesOptions = {
   notificationPublisher?: NotificationPublisher;
@@ -59,6 +60,7 @@ export function createPosRoutes({
   routes.route("/hardware-devices", createPosHardwareRoutes());
   routes.route("/statistics", createPosStatisticsRoutes());
   routes.route("/workspace", createPosWorkspaceRoutes());
+  routes.route("/offline-sale-exceptions", createPosOfflineSaleRoutes());
 
   return routes;
 }

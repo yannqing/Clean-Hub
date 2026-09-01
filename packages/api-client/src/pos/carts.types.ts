@@ -68,13 +68,33 @@ export type PosSavedCart = {
   branchId: string;
   terminalId: string;
   userId: string;
+  ownerName: string | null;
   currency: string;
   cart: PosSavedCartSnapshot;
-  status: "active" | "converted" | "abandoned";
+  name: string | null;
+  status: "active" | "parked" | "converted" | "abandoned";
   clientUpdatedAt: string;
   expiresAt: string;
+  parkedAt: string | null;
+  parkedBy: string | null;
+  claimedAt: string | null;
+  claimedBy: string | null;
+  handoffNote: string | null;
   updatedAt: string;
   version: number;
+};
+
+export type ParkPosCartRequest = {
+  name: string;
+  handoffNote?: string | null;
+};
+
+export type ClaimPosCartRequest = {
+  handoffNote?: string | null;
+};
+
+export type PosParkedCartListResponse = {
+  data: PosSavedCart[];
 };
 
 export type SavePosCartRequest = {
@@ -91,6 +111,7 @@ export type PreviewPosCartRequest = {
   customerId?: string;
   items: CreateManualOrderItemRequest[];
   discountCode?: string;
+  taxExemptionReason?: string;
 };
 
 export type PosCartPricePreviewLine = {
@@ -118,6 +139,13 @@ export type PosCartPricePreview = {
   discounts: PosCartPricePreviewDiscount[];
   subtotalAmount: string;
   discountAmount: string;
+  taxableAmount: string;
+  taxAmount: string;
+  taxRate: string;
+  pricesIncludeTax: boolean;
+  taxExemptionReason: string | null;
+  taxRegistrationNumber: string | null;
+  roundingAdjustmentAmount: string;
   totalAmount: string;
   calculatedAt: string;
 };

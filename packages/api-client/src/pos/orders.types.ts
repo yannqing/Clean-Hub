@@ -83,6 +83,15 @@ export type PosPaymentTransactionStatus =
   | "refunded"
   | "failed";
 
+export type PosPaymentProviderStatus =
+  | "not_applicable"
+  | "initiated"
+  | "pending"
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "timed_out";
+
 export type PosMobileMoneyProvider = "wave" | "orange_money";
 
 export type PosOrderItem = {
@@ -109,6 +118,10 @@ export type PosOrderItem = {
   bagCount: number | null;
   unitAmount: string;
   lineAmount: string;
+  taxableAmount: string;
+  taxAmount: string;
+  taxRateSnapshot: string;
+  taxExemptionReason: string | null;
   itemColor: string | null;
   defectNotes: string | null;
   specialRequest: string | null;
@@ -123,10 +136,18 @@ export type PosPaymentTransaction = {
   orderId: string;
   paymentMethod: PosPaymentMethod;
   amount: string;
+  tenderedAmount: string | null;
+  changeAmount: string | null;
+  shiftId: string | null;
   currency: string;
   paymentStatus: PosPaymentTransactionStatus;
+  providerStatus: PosPaymentProviderStatus;
   provider: PosMobileMoneyProvider | null;
+  gateway: string | null;
   externalReference: string | null;
+  authorizationCode: string | null;
+  failureCode: string | null;
+  failureReason: string | null;
   paidAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -143,6 +164,13 @@ export type PosOrderSummary = {
   status: PosOrderStatus;
   subtotalAmount: string;
   discountAmount: string;
+  taxableAmount: string;
+  taxAmount: string;
+  taxRateSnapshot: string;
+  pricesIncludeTax: boolean;
+  taxExemptionReason: string | null;
+  taxRegistrationNumberSnapshot: string | null;
+  roundingAdjustmentAmount: string;
   totalAmount: string;
   paymentStatus: PosOrderPaymentStatus;
   paidAmount: string;
@@ -260,6 +288,14 @@ export type CreatePosPaymentRequest =
   | {
       paymentMethod: "cash";
       amount: string;
+      tenderedAmount: string;
+      shiftId: string;
+      occurredAt: string;
+      idempotencyKey: string;
+    }
+  | {
+      paymentMethod: "card";
+      amount: string;
       idempotencyKey: string;
     }
   | {
@@ -279,10 +315,20 @@ export type CreatePosPaymentResponse = {
 export type CreatePosCheckoutPaymentRequest =
   | {
       paymentMethod: "cash";
+      amount?: string;
+      tenderedAmount: string;
+      shiftId: string;
+      occurredAt: string;
+      idempotencyKey: string;
+    }
+  | {
+      paymentMethod: "card";
+      amount?: string;
       idempotencyKey: string;
     }
   | {
       paymentMethod: "app";
+      amount?: string;
       provider: PosMobileMoneyProvider;
       externalReference: string;
       idempotencyKey: string;
@@ -290,13 +336,33 @@ export type CreatePosCheckoutPaymentRequest =
 
 export type CreatePosCheckoutRequest = {
   order: CreatePosOrderRequest;
+  /** Total displayed and explicitly accepted by the operator. */
+  expectedTotalAmount: string;
   payment?: CreatePosCheckoutPaymentRequest;
+  payments?: CreatePosCheckoutPaymentRequest[];
+  taxExemptionReason?: string;
 };
 
 export type CreatePosCheckoutResponse = {
   order: PosOrderDetail;
   payment: PosPaymentTransaction | null;
+  payments: PosPaymentTransaction[];
   idempotent: boolean;
+};
+
+export type PosCardPaymentOutcome =
+  | "succeeded"
+  | "failed"
+  | "cancelled"
+  | "timed_out";
+
+export type RecordPosCardPaymentOutcomeRequest = {
+  outcome: PosCardPaymentOutcome;
+  externalReference?: string;
+  authorizationCode?: string;
+  failureCode?: string;
+  failureReason?: string;
+  providerPayload?: Record<string, unknown>;
 };
 
 export type ResolvePosPaymentRequest = {

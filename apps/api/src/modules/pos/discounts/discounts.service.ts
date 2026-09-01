@@ -9,6 +9,7 @@ import {
   requirePosTenantId,
 } from "../access-control.helper.js";
 import { PosOrderError } from "../orders/orders.errors.js";
+import { applyPosOrderFinancialRules } from "../orders/orders.financial.js";
 import {
   findPosOrderDetail,
   findPosOrderRawForUpdate,
@@ -634,6 +635,12 @@ export async function applyPosOrderDiscount(
       requestedRule: rule,
       idempotencyKey: input.data.idempotencyKey,
     });
+    await applyPosOrderFinancialRules(tx, {
+      authContext: input.authContext,
+      tenantId,
+      orderId: order.id,
+      actorUserId: input.authContext.userId,
+    });
     if (!applicationId) {
       throw new Error("Applied discount application could not be resolved.");
     }
@@ -727,6 +734,12 @@ export async function removePosOrderDiscount(
     };
     await repricePosOrderDiscounts(tx, {
       order: refreshedOrder,
+      actorUserId: input.authContext.userId,
+    });
+    await applyPosOrderFinancialRules(tx, {
+      authContext: input.authContext,
+      tenantId,
+      orderId: order.id,
       actorUserId: input.authContext.userId,
     });
     const detail = await findPosOrderDetail(tx, {

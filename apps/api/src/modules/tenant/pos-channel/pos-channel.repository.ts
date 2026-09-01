@@ -129,7 +129,14 @@ const DEFAULT_POS_CHANNEL_SETTINGS = {
   syncIntervalSeconds: 60,
   deviceOfflineAfterSeconds: 600,
   defaultPaymentMethod: "cash",
+  defaultPaymentMethodsEnabled: ["cash", "app"] as Array<
+    "cash" | "card" | "app"
+  >,
   defaultRoundingRule: "none",
+  taxEnabled: false,
+  defaultTaxRate: "0.0000",
+  pricesIncludeTax: true,
+  taxRegistrationNumber: null,
   defaultAutoPrintReceipt: true,
   defaultPrintCopies: 1,
   defaultLockTimeoutSeconds: 300,
@@ -194,7 +201,12 @@ function toSettingsRecord(
     syncIntervalSeconds: row.syncIntervalSeconds,
     deviceOfflineAfterSeconds: row.deviceOfflineAfterSeconds,
     defaultPaymentMethod: row.defaultPaymentMethod,
+    defaultPaymentMethodsEnabled: row.defaultPaymentMethodsEnabled,
     defaultRoundingRule: row.defaultRoundingRule,
+    taxEnabled: row.taxEnabled,
+    defaultTaxRate: row.defaultTaxRate,
+    pricesIncludeTax: row.pricesIncludeTax,
+    taxRegistrationNumber: row.taxRegistrationNumber,
     defaultAutoPrintReceipt: row.defaultAutoPrintReceipt,
     defaultPrintCopies: row.defaultPrintCopies,
     defaultLockTimeoutSeconds: row.defaultLockTimeoutSeconds,
@@ -435,8 +447,20 @@ export async function updatePosChannelSettingsRecord(
     defaultPaymentMethod:
       requestedValues.defaultPaymentMethod ??
       input.current.defaultPaymentMethod,
+    defaultPaymentMethodsEnabled:
+      requestedValues.defaultPaymentMethodsEnabled ??
+      input.current.defaultPaymentMethodsEnabled,
     defaultRoundingRule:
       requestedValues.defaultRoundingRule ?? input.current.defaultRoundingRule,
+    taxEnabled: requestedValues.taxEnabled ?? input.current.taxEnabled,
+    defaultTaxRate:
+      requestedValues.defaultTaxRate ?? input.current.defaultTaxRate,
+    pricesIncludeTax:
+      requestedValues.pricesIncludeTax ?? input.current.pricesIncludeTax,
+    taxRegistrationNumber:
+      requestedValues.taxRegistrationNumber !== undefined
+        ? requestedValues.taxRegistrationNumber
+        : input.current.taxRegistrationNumber,
     defaultAutoPrintReceipt:
       requestedValues.defaultAutoPrintReceipt ??
       input.current.defaultAutoPrintReceipt,

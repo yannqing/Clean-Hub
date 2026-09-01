@@ -19,6 +19,7 @@ import type {
   PosCatalogService,
   PosCatalogServiceRecord,
 } from "./catalog.types.js";
+import { releaseExpiredProductReservations } from "../orders/orders.inventory.js";
 
 type PosCatalogMediaServiceLike = Pick<
   MediaService,
@@ -113,10 +114,17 @@ export async function listPosCatalogProducts(
     return [];
   }
   requirePosBranchAccess(input.authContext, input.query.branchId);
-  const records = await findPosCatalogProducts(db, {
-    tenantId,
-    ...input.query,
-    branchId: input.query.branchId,
+  const records = await db.transaction(async (tx) => {
+    await releaseExpiredProductReservations(tx, {
+      tenantId,
+      branchId: input.query.branchId!,
+      actorUserId: input.authContext.userId,
+    });
+    return findPosCatalogProducts(tx, {
+      tenantId,
+      ...input.query,
+      branchId: input.query.branchId!,
+    });
   });
   return hydrateProductCatalog(tenantId, records, mediaService);
 }

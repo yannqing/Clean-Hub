@@ -20,13 +20,23 @@ import {
   assertGuestOrderItemAllowed,
   resolveOrderItemPricing,
 } from "../orders/orders.service.js";
+import {
+  calculatePosFinancialTotals,
+  financialTotalsToMoney,
+  resolvePosFinancialRules,
+} from "../orders/orders.financial.js";
 import type { CreateManualOrderItemRequest } from "../orders/orders.types.js";
 import {
   abandonActivePosCart,
+  claimParkedPosCart,
+  expirePosCarts,
   findActivePosCart,
+  findParkedPosCartForUpdate,
   getPosCartRetentionHours,
   insertPosCart,
+  listParkedPosCarts,
   lockPosCartScope,
+  parkActivePosCart,
   updatePosCart,
 } from "./carts.repository.js";
 import type {
@@ -34,6 +44,8 @@ import type {
   PosCartRequestInput,
   PosCartSnapshot,
   PosSavedCart,
+  ClaimPosCartRequest,
+  ParkPosCartRequest,
   PreviewPosCartRequest,
 } from "./carts.types.js";
 
@@ -168,6 +180,114 @@ export async function clearCurrentPosCart(
     };
     await lockPosCartScope(tx, scope);
     await abandonActivePosCart(tx, scope);
+  });
+}
+
+export async function listParkedCarts(
+  authContext: PosCartRequestInput<never>["authContext"],
+  db: Database = getDb(),
+): Promise<{ data: PosSavedCart[] }> {
+  const terminal = requirePosTerminalContext(authContext);
+  const now = new Date();
+  await expirePosCarts(db, {
+    tenantId: terminal.tenantId,
+    branchId: terminal.branchId,
+    now,
+  });
+  return {
+    data: await listParkedPosCarts(db, {
+      tenantId: terminal.tenantId,
+      branchId: terminal.branchId,
+      now,
+    }),
+  };
+}
+
+export async function parkCurrentPosCart(
+  input: PosCartRequestInput<ParkPosCartRequest>,
+  db: Database = getDb(),
+): Promise<PosSavedCart> {
+  const terminal = requirePosTerminalContext(input.authContext);
+  return db.transaction(async (tx) => {
+    const scope = {
+      tenantId: terminal.tenantId,
+      branchId: terminal.branchId,
+      userId: input.authContext.userId,
+    };
+    await lockPosCartScope(tx, scope);
+    const current = await findActivePosCart(tx, scope);
+    if (!current || current.cart.lines.length === 0) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "Only a non-empty active cart can be parked.",
+        422,
+      );
+    }
+    const parked = await parkActivePosCart(tx, {
+      ...scope,
+      name: input.data.name,
+      handoffNote: input.data.handoffNote,
+    });
+    if (!parked) {
+      throw new PosOrderError(
+        "VERSION_CONFLICT",
+        "The active cart changed before it could be parked.",
+        409,
+      );
+    }
+    return parked;
+  });
+}
+
+export async function claimParkedCart(
+  input: PosCartRequestInput<ClaimPosCartRequest> & { cartId: string },
+  db: Database = getDb(),
+): Promise<PosSavedCart> {
+  const terminal = requirePosTerminalContext(input.authContext);
+  return db.transaction(async (tx) => {
+    const scope = {
+      tenantId: terminal.tenantId,
+      branchId: terminal.branchId,
+      userId: input.authContext.userId,
+    };
+    await lockPosCartScope(tx, scope);
+    const parked = await findParkedPosCartForUpdate(tx, {
+      tenantId: terminal.tenantId,
+      branchId: terminal.branchId,
+      cartId: input.cartId,
+    });
+    if (!parked || Date.parse(parked.expiresAt) <= Date.now()) {
+      throw new PosOrderError(
+        "ORDER_NOT_FOUND",
+        "The parked cart was not found or has expired.",
+        404,
+      );
+    }
+    const active = await findActivePosCart(tx, scope);
+    if (active?.cart.lines.length) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "Park or clear the current cart before claiming another cart.",
+        422,
+      );
+    }
+    if (active) await abandonActivePosCart(tx, scope);
+    const claimed = await claimParkedPosCart(tx, {
+      tenantId: terminal.tenantId,
+      branchId: terminal.branchId,
+      cartId: input.cartId,
+      terminalId: terminal.terminalId,
+      userId: input.authContext.userId,
+      handoffNote: input.data.handoffNote,
+    });
+    if (!claimed) {
+      throw new PosOrderError(
+        "VERSION_CONFLICT",
+        "The parked cart was claimed by another operator.",
+        409,
+      );
+    }
+    return claimed;
   });
 }
 
@@ -357,6 +477,19 @@ export async function previewCurrentPosCart(
     (sum, selection) => sum + selection.result.amountMinor,
     BigInt(0),
   );
+  const rules = await resolvePosFinancialRules(
+    db,
+    input.authContext,
+    terminal.tenantId,
+  );
+  const financial = financialTotalsToMoney(
+    calculatePosFinancialTotals({
+      subtotalMinor,
+      discountMinor,
+      rules,
+      taxExemptionReason: input.data.taxExemptionReason,
+    }),
+  );
   return {
     currency: branch.defaultCurrency,
     lines: resolvedLines,
@@ -369,7 +502,7 @@ export async function previewCurrentPosCart(
     })),
     subtotalAmount: minorToMoney(subtotalMinor),
     discountAmount: minorToMoney(discountMinor),
-    totalAmount: minorToMoney(subtotalMinor - discountMinor),
+    ...financial,
     calculatedAt: new Date().toISOString(),
   };
 }

@@ -20,9 +20,15 @@ import {
   getPosOrderOverviewController,
   listPosOrderPaymentsController,
   listPosOrdersController,
+  recordPosCardPaymentOutcomeController,
   updatePosOrderController,
   updatePosOrderItemController,
 } from "./orders.controller.js";
+import { deliverPosOrderReceiptController } from "../receipts/receipts.controller.js";
+import {
+  createPosProductReturnController,
+  getPosProductReturnsController,
+} from "../returns/returns.controller.js";
 
 /**
  * POS order routes.
@@ -48,6 +54,12 @@ export function createPosOrdersRoutes({
   );
 
   routes.get("/:orderId/payments", listPosOrderPaymentsController);
+  routes.post(
+    "/:orderId/receipt-deliveries",
+    deliverPosOrderReceiptController,
+  );
+  routes.get("/:orderId/product-returns", getPosProductReturnsController);
+  routes.post("/:orderId/product-returns", createPosProductReturnController);
   routes.post("/:orderId/payments", createPosOrderPaymentController);
   routes.post(
     "/:orderId/payments/:paymentId/confirm",
@@ -56,6 +68,10 @@ export function createPosOrdersRoutes({
   routes.post(
     "/:orderId/payments/:paymentId/fail",
     failPosManualPaymentController,
+  );
+  routes.post(
+    "/:orderId/payments/:paymentId/card-outcome",
+    recordPosCardPaymentOutcomeController,
   );
   routes.post("/:orderId/status-changes", changePosOrderStatusController);
   routes.post("/:orderId/discounts", applyPosOrderDiscountController);

@@ -37,6 +37,7 @@ import {
   listPaymentTransactions,
   lockPosCheckoutIdempotencyKey,
   recalculateOrderPaymentState,
+  resolveCardPaymentTransaction,
   resolveManualPaymentTransaction,
   softDeleteOrderItemRecord,
   softDeleteOrderRecord,
@@ -54,9 +55,13 @@ import {
   repricePosOrderDiscounts,
   resolveRequestedPosDiscountRule,
 } from "../discounts/discounts.service.js";
-import { moneyToMinor } from "../discounts/pricing-engine.js";
+import { minorToMoney, moneyToMinor } from "../discounts/pricing-engine.js";
+import { findShiftByIdForUpdate } from "../staff/staff.repository.js";
+import { findTerminalSettingsById } from "../terminal-settings/terminal-settings.repository.js";
+import { applyPosOrderFinancialRules } from "./orders.financial.js";
 import {
   consumeProductInventoryForPaidOrder,
+  releaseExpiredProductReservations,
   releaseProductOrderReservations,
   reserveProductOrderItem,
 } from "./orders.inventory.js";
@@ -80,6 +85,7 @@ import type {
   PosOrderOverviewQuery,
   PosOrderStatus,
   PosPaymentTransaction,
+  RecordPosCardPaymentOutcomeRequest,
   ResolvePosPaymentRequest,
   UpdatePosOrderItemRequest,
   UpdatePosOrderRequest,
@@ -104,10 +110,96 @@ export function paymentIntentMatches(
     payment.orderId === orderId &&
     payment.paymentMethod === data.paymentMethod &&
     Number(payment.amount) === Number(data.amount) &&
-    (data.paymentMethod === "cash" ||
-      (payment.provider === data.provider &&
-        payment.externalReference === data.externalReference))
+    (data.paymentMethod === "cash"
+      ? data.tenderedAmount && data.shiftId && data.occurredAt
+        ? payment.shiftId === data.shiftId &&
+          moneyToMinor(payment.tenderedAmount ?? "0") ===
+            moneyToMinor(data.tenderedAmount) &&
+          payment.paidAt === new Date(data.occurredAt).toISOString()
+        : payment.shiftId === null && payment.tenderedAmount === null
+      : data.paymentMethod === "card"
+        ? payment.gateway === "tpe"
+        : payment.provider === data.provider &&
+          payment.externalReference === data.externalReference)
   );
+}
+
+async function assertPaymentMethodEnabled(
+  db: Database,
+  authContext: AuthContext,
+  tenantId: string,
+  paymentMethod: CreatePosPaymentRequest["paymentMethod"],
+): Promise<void> {
+  if (!authContext.terminalId) return;
+  const terminal = await findTerminalSettingsById(
+    db,
+    tenantId,
+    authContext.terminalId,
+  );
+  if (!terminal?.paymentMethodsEnabled.includes(paymentMethod)) {
+    throw new PosOrderError(
+      "PAYMENT_NOT_SUPPORTED",
+      `Payment method ${paymentMethod} is disabled for this terminal.`,
+      422,
+    );
+  }
+}
+
+async function validateCashShift(
+  db: Database,
+  input: {
+    authContext: AuthContext;
+    tenantId: string;
+    branchId: string;
+    shiftId: string;
+    occurredAt: string;
+  },
+): Promise<Date> {
+  const terminalId = input.authContext.terminalId;
+  const terminalBranchId = input.authContext.terminalBranchId;
+  if (!terminalId || !terminalBranchId) {
+    throw new PosOrderError(
+      "SHIFT_REQUIRED",
+      "Cash payments require an enrolled POS terminal and an active shift.",
+      403,
+    );
+  }
+
+  const shift = await findShiftByIdForUpdate(db, {
+    tenantId: input.tenantId,
+    shiftId: input.shiftId,
+  });
+  const occurredAt = new Date(input.occurredAt);
+  const startedAt = shift ? new Date(shift.startedAt) : null;
+  const endedAt = shift?.endedAt ? new Date(shift.endedAt) : null;
+  const futureToleranceMs = 5 * 60 * 1000;
+  const occurredBeforePause =
+    shift?.status !== "on_break" ||
+    occurredAt.getTime() <= new Date(shift.updatedAt).getTime();
+  const canReconcileAnotherStaffShift =
+    input.authContext.role === "owner" || input.authContext.role === "manager";
+
+  if (
+    !shift ||
+    (shift.staffId !== input.authContext.userId &&
+      !canReconcileAnotherStaffShift) ||
+    shift.branchId !== input.branchId ||
+    shift.branchId !== terminalBranchId ||
+    shift.terminalId !== terminalId ||
+    !startedAt ||
+    occurredAt.getTime() < startedAt.getTime() ||
+    occurredAt.getTime() > Date.now() + futureToleranceMs ||
+    (endedAt !== null && occurredAt.getTime() > endedAt.getTime()) ||
+    !occurredBeforePause
+  ) {
+    throw new PosOrderError(
+      "SHIFT_REQUIRED",
+      "The cash payment does not belong to this operator's valid shift window.",
+      409,
+    );
+  }
+
+  return occurredAt;
 }
 
 async function loadIdempotentPaymentResult(
@@ -713,6 +805,11 @@ async function createManualOrder(
   },
 ): Promise<PosOrderDetail> {
   requirePosBranchAccess(input.authContext, input.data.branchId);
+  await releaseExpiredProductReservations(db, {
+    tenantId,
+    branchId: input.data.branchId,
+    actorUserId: input.authContext.userId,
+  });
   const discountReason = input.data.discountCode
     ? authorizePosSensitiveOperation(
         input.authContext,
@@ -1303,6 +1400,8 @@ export async function createPosOrderPayment(
       );
     }
 
+    await assertPaymentMethodEnabled(tx, authContext, tenantId, data.paymentMethod);
+
     if (data.paymentMethod === "app") {
       const existingReference = await findPaymentTransactionByProviderReference(
         tx,
@@ -1329,7 +1428,7 @@ export async function createPosOrderPayment(
     if (pending) {
       throw new PosOrderError(
         "PAYMENT_ALREADY_PENDING",
-        "Resolve the pending mobile payment before recording another payment.",
+        "Resolve the pending mobile or card payment before recording another external payment.",
         409,
       );
     }
@@ -1343,6 +1442,53 @@ export async function createPosOrderPayment(
       );
     }
 
+    let cashDetails:
+      | {
+          tenderedAmount: string;
+          changeAmount: string;
+          shiftId: string;
+          occurredAt: Date;
+        }
+      | undefined;
+    if (data.paymentMethod === "cash") {
+      const hasAllShiftFields = Boolean(
+        data.tenderedAmount && data.shiftId && data.occurredAt,
+      );
+      const hasAnyShiftField = Boolean(
+        data.tenderedAmount || data.shiftId || data.occurredAt,
+      );
+      if (hasAnyShiftField && !hasAllShiftFields) {
+        throw new PosOrderError(
+          "VALIDATION_ERROR",
+          "Cash tender, shift, and occurrence time must be supplied together.",
+          422,
+        );
+      }
+      if (hasAllShiftFields) {
+        const amountMinor = moneyToMinor(data.amount);
+        const tenderedMinor = moneyToMinor(data.tenderedAmount!);
+        if (tenderedMinor < amountMinor) {
+          throw new PosOrderError(
+            "CASH_TENDER_INSUFFICIENT",
+            "Tendered cash is less than the payment amount.",
+            422,
+          );
+        }
+        cashDetails = {
+          tenderedAmount: minorToMoney(tenderedMinor),
+          changeAmount: minorToMoney(tenderedMinor - amountMinor),
+          shiftId: data.shiftId!,
+          occurredAt: await validateCashShift(tx, {
+            authContext,
+            tenantId,
+            branchId: before.branchId,
+            shiftId: data.shiftId!,
+            occurredAt: data.occurredAt!,
+          }),
+        };
+      }
+    }
+
     const createdPayment = await createPaymentTransactionRecord(tx, {
       tenantId,
       branchId: before.branchId,
@@ -1352,7 +1498,9 @@ export async function createPosOrderPayment(
       amount: data.amount,
       currency: before.currency,
       actorUserId: authContext.userId,
+      ...cashDetails,
       provider: data.paymentMethod === "app" ? data.provider : undefined,
+      gateway: data.paymentMethod === "card" ? "tpe" : undefined,
       externalReference:
         data.paymentMethod === "app" ? data.externalReference : undefined,
       idempotencyKey: data.idempotencyKey,
@@ -1411,7 +1559,9 @@ export async function createPosOrderPayment(
       branchId: before.branchId,
       eventType:
         payment.paymentStatus === "pending"
-          ? "pos.order.mobile_payment_recorded"
+          ? payment.paymentMethod === "card"
+            ? "pos.order.card_payment_initiated"
+            : "pos.order.mobile_payment_recorded"
           : "pos.order.payment_created",
       entityId: orderId,
       before: {
@@ -1425,6 +1575,9 @@ export async function createPosOrderPayment(
         status: detail.status,
         paymentId: payment.id,
         paymentMethod: payment.paymentMethod,
+        tenderedAmount: payment.tenderedAmount,
+        changeAmount: payment.changeAmount,
+        shiftId: payment.shiftId,
         provider: payment.provider,
         externalReference: payment.externalReference,
         transactionStatus: payment.paymentStatus,
@@ -1432,6 +1585,106 @@ export async function createPosOrderPayment(
     });
 
     return { order: detail, payment, idempotent: false };
+  });
+}
+
+export async function recordPosCardPaymentOutcome(
+  authContext: AuthContext,
+  orderId: string,
+  paymentId: string,
+  data: RecordPosCardPaymentOutcomeRequest,
+  requestMeta: AuthRequestMeta = {},
+  db: Database = getDb(),
+): Promise<PosOrderDetail> {
+  const tenantId = requirePosTenantId(authContext);
+  return db.transaction(async (tx) => {
+    const before = await lockOrderOrThrow(tx, { tenantId, orderId });
+    requirePosBranchAccess(authContext, before.branchId);
+    const payment = await findPaymentTransactionForUpdate(tx, {
+      tenantId,
+      orderId,
+      paymentId,
+    });
+    if (!payment) {
+      throw new PosOrderError("PAYMENT_NOT_FOUND", "Payment was not found.", 404);
+    }
+    if (payment.paymentMethod !== "card" || payment.gateway !== "tpe") {
+      throw new PosOrderError(
+        "PAYMENT_NOT_SUPPORTED",
+        "Only a TPE card payment can receive a card outcome.",
+        422,
+      );
+    }
+    if (payment.paymentStatus !== "pending") {
+      if (payment.providerStatus === data.outcome) {
+        const idempotent = await findPosOrderDetail(tx, { tenantId, orderId });
+        if (!idempotent) throw new Error("Resolved card order was not found.");
+        return idempotent;
+      }
+      throw new PosOrderError(
+        "PAYMENT_ALREADY_RESOLVED",
+        "The TPE payment already has a final outcome.",
+        409,
+      );
+    }
+    if (
+      data.outcome === "succeeded" &&
+      Number(payment.amount) > Number(before.totalAmount) - Number(before.paidAmount)
+    ) {
+      throw new PosOrderError(
+        "PAYMENT_AMOUNT_EXCEEDED",
+        "The successful card amount exceeds the outstanding balance.",
+        422,
+      );
+    }
+    const resolved = await resolveCardPaymentTransaction(tx, {
+      tenantId,
+      paymentId,
+      ...data,
+      actorUserId: authContext.userId,
+    });
+    if (!resolved) {
+      throw new PosOrderError(
+        "PAYMENT_ALREADY_RESOLVED",
+        "The TPE payment was already resolved.",
+        409,
+      );
+    }
+    if (data.outcome === "succeeded") {
+      await recalculateOrderPaymentState(tx, {
+        tenantId,
+        orderId,
+        actorUserId: authContext.userId,
+      });
+      await consumeProductInventoryForPaidOrder(tx, {
+        tenantId,
+        orderId,
+        actorUserId: authContext.userId,
+      });
+    }
+    const detail = await findPosOrderDetail(tx, { tenantId, orderId });
+    if (!detail) throw new Error("Card payment order could not be loaded.");
+    await writeOrderAudit(tx, authContext, requestMeta, {
+      branchId: before.branchId,
+      eventType: `pos.order.card_payment_${data.outcome}`,
+      entityId: orderId,
+      reason: data.failureReason,
+      before: {
+        paidAmount: before.paidAmount,
+        paymentStatus: before.paymentStatus,
+        paymentId,
+        providerStatus: payment.providerStatus,
+      },
+      after: {
+        paidAmount: detail.paidAmount,
+        paymentStatus: detail.paymentStatus,
+        paymentId,
+        providerStatus: resolved.providerStatus,
+        externalReference: resolved.externalReference,
+        authorizationCode: resolved.authorizationCode,
+      },
+    });
+    return detail;
   });
 }
 
@@ -1464,27 +1717,95 @@ export async function checkoutPosOrder(
       tenantId,
       orderId: data.order.id!,
     });
-    const order = await createPosOrder(
+    let order = await createPosOrder(
       { authContext, data: data.order, requestMeta },
       tx,
     );
+    await applyPosOrderFinancialRules(tx, {
+      authContext,
+      tenantId,
+      orderId: order.id,
+      taxExemptionReason: data.taxExemptionReason,
+      actorUserId: authContext.userId,
+    });
+    const financiallyFinalizedOrder = await findPosOrderDetail(tx, {
+      tenantId,
+      orderId: order.id,
+    });
+    if (!financiallyFinalizedOrder) {
+      throw new Error("Financially finalized order could not be loaded.");
+    }
+    order = financiallyFinalizedOrder;
 
-    if (!data.payment || moneyToMinor(order.totalAmount) === BigInt(0)) {
+    if (
+      moneyToMinor(order.totalAmount) !== moneyToMinor(data.expectedTotalAmount)
+    ) {
+      throw new PosOrderError(
+        "PRICE_CHANGED",
+        `The confirmed total changed from ${data.expectedTotalAmount} to ${order.totalAmount}. Refresh the price and confirm again.`,
+        409,
+      );
+    }
+
+    const requestedPayments = data.payments ?? (data.payment ? [data.payment] : []);
+    if (requestedPayments.length === 0 || moneyToMinor(order.totalAmount) === BigInt(0)) {
       return {
         order,
         payment: null,
+        payments: [],
         idempotent: Boolean(existedBefore),
       };
     }
 
-    const paymentResult = await createPosOrderPayment(
-      authContext,
-      order.id,
-      { ...data.payment, amount: order.totalAmount },
-      requestMeta,
-      tx,
+    const normalizedPayments = requestedPayments.map((payment) => ({
+      ...payment,
+      amount: payment.amount ?? order.totalAmount,
+    })) as CreatePosPaymentRequest[];
+    const requestedMinor = normalizedPayments.reduce(
+      (sum, payment) => sum + moneyToMinor(payment.amount),
+      BigInt(0),
     );
-    return paymentResult;
+    if (requestedMinor > moneyToMinor(order.totalAmount)) {
+      throw new PosOrderError(
+        "PAYMENT_AMOUNT_EXCEEDED",
+        "The combined tender amount exceeds the order total.",
+        422,
+      );
+    }
+    const externalCount = normalizedPayments.filter(
+      (payment) => payment.paymentMethod !== "cash",
+    ).length;
+    if (externalCount > 1) {
+      throw new PosOrderError(
+        "PAYMENT_ALREADY_PENDING",
+        "A checkout can contain at most one pending card or mobile-money tender.",
+        422,
+      );
+    }
+
+    const results: CreatePosPaymentResponse[] = [];
+    for (const payment of [...normalizedPayments].sort((left, right) =>
+      left.paymentMethod === "cash" && right.paymentMethod !== "cash" ? -1 : 1,
+    )) {
+      results.push(
+        await createPosOrderPayment(
+          authContext,
+          order.id,
+          payment,
+          requestMeta,
+          tx,
+        ),
+      );
+    }
+    const finalOrder = results.at(-1)?.order ?? order;
+    const payments = results.map((result) => result.payment);
+    return {
+      order: finalOrder,
+      payment: payments[0] ?? null,
+      payments,
+      idempotent:
+        Boolean(existedBefore) && results.every((result) => result.idempotent),
+    };
   });
 }
 
@@ -1696,6 +2017,13 @@ export async function createPosOrderItem(
       order,
       actorUserId: authContext.userId,
     });
+    await applyPosOrderFinancialRules(tx, {
+      authContext,
+      tenantId,
+      orderId,
+      taxExemptionReason: order.taxExemptionReason,
+      actorUserId: authContext.userId,
+    });
 
     const detail = await findPosOrderDetail(tx, { tenantId, orderId });
     if (!detail) {
@@ -1810,6 +2138,13 @@ export async function updatePosOrderItem(
       order,
       actorUserId: authContext.userId,
     });
+    await applyPosOrderFinancialRules(tx, {
+      authContext,
+      tenantId,
+      orderId,
+      taxExemptionReason: order.taxExemptionReason,
+      actorUserId: authContext.userId,
+    });
 
     const detail = await findPosOrderDetail(tx, { tenantId, orderId });
     if (!detail) {
@@ -1900,6 +2235,13 @@ export async function deletePosOrderItem(
 
     await repricePosOrderDiscounts(tx, {
       order,
+      actorUserId: authContext.userId,
+    });
+    await applyPosOrderFinancialRules(tx, {
+      authContext,
+      tenantId,
+      orderId,
+      taxExemptionReason: order.taxExemptionReason,
       actorUserId: authContext.userId,
     });
 

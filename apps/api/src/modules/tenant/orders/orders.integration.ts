@@ -323,6 +323,7 @@ async function runOrderLifecycleAssertions(
   );
 
   const checkoutInput = {
+    expectedTotalAmount: "18.00",
     order: {
       id: ids.checkoutOrderId,
       orderType: "manual" as const,

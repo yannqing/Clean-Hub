@@ -29,6 +29,20 @@ function requirePosTenantId(authContext: AuthContext): string {
   return authContext.tenantId!;
 }
 
+async function withTenantFinancialDefaults(
+  db: Database,
+  settings: PosTerminalSettingsSummary,
+): Promise<PosTerminalSettingsSummary> {
+  const defaults = await findTenantPosTerminalDefaults(db, settings.tenantId);
+  return {
+    ...settings,
+    taxEnabled: defaults.taxEnabled,
+    defaultTaxRate: defaults.defaultTaxRate,
+    pricesIncludeTax: defaults.pricesIncludeTax,
+    taxRegistrationNumber: defaults.taxRegistrationNumber,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // GET /pos/terminal-settings
 // ---------------------------------------------------------------------------
@@ -53,7 +67,7 @@ export async function getPosTerminalSettings(
     /* ignore */
   });
 
-  return settings;
+  return withTenantFinancialDefaults(db, settings);
 }
 
 // ---------------------------------------------------------------------------
@@ -98,14 +112,25 @@ export async function createPosTerminalSettings(
     }
 
     const defaults = await findTenantPosTerminalDefaults(tx, tenantId);
+    const enabledMethods =
+      data.paymentMethodsEnabled ?? defaults.paymentMethodsEnabled;
+    const defaultMethod =
+      data.defaultPaymentMethod ?? defaults.defaultPaymentMethod;
+    if (!enabledMethods.includes(defaultMethod)) {
+      throw new PosTerminalSettingsError(
+        "VALIDATION_ERROR",
+        "The default payment method must also be enabled for this terminal.",
+        422,
+      );
+    }
     const settings = await insertTerminalSettings(
       tx,
       tenantId,
       authContext.userId,
       {
         ...data,
-        defaultPaymentMethod:
-          data.defaultPaymentMethod ?? defaults.defaultPaymentMethod,
+        defaultPaymentMethod: defaultMethod,
+        paymentMethodsEnabled: enabledMethods,
         roundingRule: data.roundingRule ?? defaults.roundingRule,
         autoPrintReceipt: data.autoPrintReceipt ?? defaults.autoPrintReceipt,
         printCopies: data.printCopies ?? defaults.printCopies,
@@ -127,7 +152,13 @@ export async function createPosTerminalSettings(
       userAgent: requestMeta?.userAgent,
     });
 
-    return settings;
+    return {
+      ...settings,
+      taxEnabled: defaults.taxEnabled,
+      defaultTaxRate: defaults.defaultTaxRate,
+      pricesIncludeTax: defaults.pricesIncludeTax,
+      taxRegistrationNumber: defaults.taxRegistrationNumber,
+    };
   });
 }
 
@@ -151,7 +182,7 @@ export async function heartbeatPosTerminal(
     );
   }
 
-  return settings;
+  return withTenantFinancialDefaults(db, settings);
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +213,18 @@ export async function updatePosTerminalSettings(
       "TERMINAL_SETTINGS_NOT_FOUND",
       "Active settings were not found for the authenticated terminal.",
       404,
+    );
+  }
+
+  const nextEnabledMethods =
+    data.paymentMethodsEnabled ?? current.paymentMethodsEnabled;
+  const nextDefaultMethod =
+    data.defaultPaymentMethod ?? current.defaultPaymentMethod;
+  if (!nextEnabledMethods.includes(nextDefaultMethod)) {
+    throw new PosTerminalSettingsError(
+      "VALIDATION_ERROR",
+      "The default payment method must also be enabled for this terminal.",
+      422,
     );
   }
 
@@ -218,6 +261,6 @@ export async function updatePosTerminalSettings(
       userAgent: requestMeta?.userAgent,
     });
 
-    return updated;
+    return withTenantFinancialDefaults(tx, updated);
   });
 }

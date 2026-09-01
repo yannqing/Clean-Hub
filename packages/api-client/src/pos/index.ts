@@ -17,6 +17,7 @@ import { createPosTerminalSettingsApi } from "./terminal-settings";
 import { createPosHardwareApi } from "./hardware";
 import { createPosStatisticsApi } from "./statistics";
 import { createPosWorkspaceApi } from "./workspace";
+import { createPosOfflineSalesApi } from "./offline-sales";
 
 export * from "./auth";
 export * from "./auth.types";
@@ -34,6 +35,8 @@ export * from "./notifications";
 export * from "./notifications.types";
 export * from "./orders";
 export * from "./orders.types";
+export * from "./receipts.types";
+export * from "./returns.types";
 export * from "./payment-adjustments";
 export * from "./payment-adjustments.types";
 export * from "./overview";
@@ -54,6 +57,8 @@ export * from "./statistics";
 export * from "./statistics.types";
 export * from "./workspace";
 export * from "./workspace.types";
+export * from "./offline-sales";
+export * from "./offline-sales.types";
 
 export function createPosApi(client: ApiClient) {
   return {
@@ -80,5 +85,6 @@ export function createPosApi(client: ApiClient) {
     hardware: createPosHardwareApi(client),
     statistics: createPosStatisticsApi(client),
     workspace: createPosWorkspaceApi(client),
+    offlineSales: createPosOfflineSalesApi(client),
   };
 }

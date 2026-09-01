@@ -317,6 +317,18 @@ export async function updateTenantPosChannelSettings(
         current.deviceOfflineAfterSeconds,
     };
     validateSettingsRelationship(nextRelationship);
+    const enabledMethods =
+      input.data.defaultPaymentMethodsEnabled ??
+      current.defaultPaymentMethodsEnabled;
+    const defaultMethod =
+      input.data.defaultPaymentMethod ?? current.defaultPaymentMethod;
+    if (!enabledMethods.includes(defaultMethod)) {
+      throw new TenantPosChannelError(
+        "POS_CHANNEL_SETTINGS_INVALID",
+        "The default payment method must also be enabled.",
+        422,
+      );
+    }
 
     const updated = await updatePosChannelSettingsRecord(tx, {
       tenantId,

@@ -70,9 +70,23 @@ export const savePosCartBodySchema = z.object({
   cart: posCartSnapshotSchema,
 });
 
+export const parkPosCartBodySchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  handoffNote: z.string().trim().max(500).nullable().optional(),
+});
+
+export const claimPosCartBodySchema = z.object({
+  handoffNote: z.string().trim().max(500).nullable().optional(),
+});
+
+export const posCartParamsSchema = z.object({
+  cartId: ulidSchema,
+});
+
 export const previewPosCartBodySchema = z.object({
   branchId: ulidSchema,
   customerId: ulidSchema.optional(),
   items: z.array(createManualOrderItemBodySchema).min(1).max(100),
   discountCode: z.string().trim().min(1).max(120).optional(),
+  taxExemptionReason: z.string().trim().min(3).max(500).optional(),
 });

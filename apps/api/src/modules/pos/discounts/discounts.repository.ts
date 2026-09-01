@@ -743,6 +743,12 @@ export async function releaseActivePosOrderDiscounts(
       .update(orders)
       .set({
         discountAmount: "0",
+        taxableAmount: sql`${orders.subtotalAmount}`,
+        taxAmount: "0",
+        taxRateSnapshot: "0",
+        taxExemptionReason: null,
+        taxRegistrationNumberSnapshot: null,
+        roundingAdjustmentAmount: "0",
         totalAmount: sql`${orders.subtotalAmount}`,
         paymentStatus: "unpaid",
         paidAt: null,
@@ -789,6 +795,12 @@ export async function updatePosDiscountOrderTotals(
     .set({
       subtotalAmount: minorToMoney(input.subtotalMinor),
       discountAmount: minorToMoney(discount),
+      taxableAmount: nextTotalAmount,
+      taxAmount: "0",
+      taxRateSnapshot: "0",
+      taxExemptionReason: null,
+      taxRegistrationNumberSnapshot: null,
+      roundingAdjustmentAmount: "0",
       totalAmount: nextTotalAmount,
       paymentStatus: payment.paymentStatus,
       paidAt: payment.paidAt,

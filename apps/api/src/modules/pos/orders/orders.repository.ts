@@ -154,6 +154,10 @@ function toOrderItem(row: typeof orderItems.$inferSelect): PosOrderItem {
     bagCount: row.bagCount,
     unitAmount: row.chargedUnitAmount ?? row.unitAmount,
     lineAmount: row.lineAmount,
+    taxableAmount: row.taxableAmount,
+    taxAmount: row.taxAmount,
+    taxRateSnapshot: row.taxRateSnapshot,
+    taxExemptionReason: row.taxExemptionReason,
     itemColor: row.itemColor,
     defectNotes: row.defectNotes,
     specialRequest: row.specialRequest,
@@ -182,6 +186,13 @@ function toOrderSummary(row: OrderJoinedRow): PosOrderSummary {
     status: row.status,
     subtotalAmount: row.subtotalAmount,
     discountAmount: row.discountAmount,
+    taxableAmount: row.taxableAmount,
+    taxAmount: row.taxAmount,
+    taxRateSnapshot: row.taxRateSnapshot,
+    pricesIncludeTax: row.pricesIncludeTax,
+    taxExemptionReason: row.taxExemptionReason,
+    taxRegistrationNumberSnapshot: row.taxRegistrationNumberSnapshot,
+    roundingAdjustmentAmount: row.roundingAdjustmentAmount,
     totalAmount: row.totalAmount,
     paymentStatus: row.paymentStatus,
     paidAmount: row.paidAmount,
@@ -204,13 +215,21 @@ function toPaymentTransaction(
     orderId: row.orderId,
     paymentMethod: row.paymentMethod,
     amount: row.amount,
+    tenderedAmount: row.tenderedAmount,
+    changeAmount: row.changeAmount,
+    shiftId: row.shiftId,
     currency: row.currency,
     paymentStatus: row.paymentStatus,
+    providerStatus: row.providerStatus,
     provider:
       row.gateway === "wave" || row.gateway === "orange_money"
         ? row.gateway
         : null,
+    gateway: row.gateway,
     externalReference: row.externalId,
+    authorizationCode: row.authorizationCode,
+    failureCode: row.failureCode,
+    failureReason: row.failureReason,
     paidAt: row.paidAt ? row.paidAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -860,14 +879,19 @@ export async function createPaymentTransactionRecord(
     amount: string;
     currency: string;
     actorUserId: string;
+    tenderedAmount?: string;
+    changeAmount?: string;
+    shiftId?: string;
+    occurredAt?: Date;
     provider?: PosMobileMoneyProvider;
+    gateway?: string;
     externalReference?: string;
     idempotencyKey: string;
   },
 ): Promise<PosPaymentTransaction | null> {
   const paymentId = createId();
   const isCash = input.paymentMethod === "cash";
-  const paidAt = isCash ? new Date() : null;
+  const paidAt = isCash ? (input.occurredAt ?? new Date()) : null;
 
   const rows = await db
     .insert(paymentTransactions)
@@ -879,9 +903,18 @@ export async function createPaymentTransactionRecord(
       orderId: input.orderId,
       paymentMethod: input.paymentMethod,
       amount: input.amount,
+      tenderedAmount: input.tenderedAmount,
+      changeAmount: input.changeAmount,
+      shiftId: input.shiftId,
       currency: input.currency,
       paymentStatus: isCash ? "paid" : "pending",
-      gateway: input.provider,
+      providerStatus: isCash
+        ? "not_applicable"
+        : input.paymentMethod === "card"
+          ? "initiated"
+          : "pending",
+      gateway:
+        input.paymentMethod === "card" ? "tpe" : input.gateway ?? input.provider,
       externalId: input.externalReference,
       idempotencyKey: input.idempotencyKey,
       paidAt,
@@ -891,6 +924,49 @@ export async function createPaymentTransactionRecord(
     .onConflictDoNothing()
     .returning();
 
+  return rows[0] ? toPaymentTransaction(rows[0]) : null;
+}
+
+export async function resolveCardPaymentTransaction(
+  db: Database,
+  input: {
+    tenantId: string;
+    paymentId: string;
+    outcome: "succeeded" | "failed" | "cancelled" | "timed_out";
+    externalReference?: string;
+    authorizationCode?: string;
+    failureCode?: string;
+    failureReason?: string;
+    providerPayload?: Record<string, unknown>;
+    actorUserId: string;
+  },
+): Promise<PosPaymentTransaction | null> {
+  const now = new Date();
+  const rows = await db
+    .update(paymentTransactions)
+    .set({
+      paymentStatus: input.outcome === "succeeded" ? "paid" : "failed",
+      providerStatus: input.outcome,
+      externalId: input.externalReference,
+      authorizationCode: input.authorizationCode,
+      failureCode: input.failureCode,
+      failureReason: input.failureReason,
+      providerPayload: input.providerPayload,
+      paidAt: input.outcome === "succeeded" ? now : null,
+      updatedAt: now,
+      updatedBy: input.actorUserId,
+      version: sql`${paymentTransactions.version} + 1`,
+    })
+    .where(
+      and(
+        eq(paymentTransactions.id, input.paymentId),
+        eq(paymentTransactions.tenantId, input.tenantId),
+        eq(paymentTransactions.paymentMethod, "card"),
+        eq(paymentTransactions.paymentStatus, "pending"),
+        isNull(paymentTransactions.deletedAt),
+      ),
+    )
+    .returning();
   return rows[0] ? toPaymentTransaction(rows[0]) : null;
 }
 
@@ -948,9 +1024,8 @@ export async function findPendingManualPaymentForOrder(
       and(
         eq(paymentTransactions.tenantId, input.tenantId),
         eq(paymentTransactions.orderId, input.orderId),
-        eq(paymentTransactions.paymentMethod, "app"),
+        inArray(paymentTransactions.paymentMethod, ["app", "card"]),
         eq(paymentTransactions.paymentStatus, "pending"),
-        inArray(paymentTransactions.gateway, ["wave", "orange_money"]),
         isNull(paymentTransactions.deletedAt),
       ),
     )

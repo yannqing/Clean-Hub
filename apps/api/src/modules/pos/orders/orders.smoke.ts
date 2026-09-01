@@ -4,6 +4,7 @@ import {
   orderItems,
   orders,
   paymentTransactions,
+  posOfflineSaleExceptions,
   serviceTickets,
 } from "@cleanhub/db";
 import {
@@ -16,7 +17,10 @@ import { getTableConfig } from "drizzle-orm/pg-core";
 import { posCatalogQuerySchema } from "../catalog/catalog.validation.js";
 import { createServiceTicketBodySchema } from "../service-tickets/service-tickets.validation.js";
 import { calculatePosOrderItemLineAmount } from "./orders.repository.js";
-import { assertProductStockCanBeReserved } from "./orders.inventory.js";
+import {
+  assertProductStockCanBeReserved,
+  getProductReservationExpiresAt,
+} from "./orders.inventory.js";
 import {
   assertGuestOrderItemAllowed,
   paymentIntentMatches,
@@ -29,16 +33,26 @@ import {
   createPosPaymentBodySchema,
 } from "./orders.validation.js";
 
+const cashOccurredAt = new Date().toISOString();
+const cashShiftId = "01ARZ3NDEKTSV4RRFFQ69G5FB0";
 const payment: PosPaymentTransaction = {
   id: "01ARZ3NDEKTSV4RRFFQ69G5FAV",
   orderId: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
   paymentMethod: "cash",
   amount: "100.00",
+  tenderedAmount: "150.00",
+  changeAmount: "50.00",
+  shiftId: cashShiftId,
   currency: "XOF",
   paymentStatus: "paid",
+  providerStatus: "not_applicable",
   provider: null,
+  gateway: null,
   externalReference: null,
-  paidAt: new Date().toISOString(),
+  authorizationCode: null,
+  failureCode: null,
+  failureReason: null,
+  paidAt: cashOccurredAt,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
@@ -53,6 +67,7 @@ assert.equal(
 );
 assert.equal(
   createPosCheckoutBodySchema.safeParse({
+    expectedTotalAmount: "100.00",
     order: {
       id: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
       orderType: "manual",
@@ -66,11 +81,38 @@ assert.equal(
     },
     payment: {
       paymentMethod: "cash",
+      tenderedAmount: "150.00",
+      shiftId: cashShiftId,
+      occurredAt: cashOccurredAt,
       idempotencyKey: "01ARZ3NDEKTSV4RRFFQ69G5FB4",
     },
   }).success,
   true,
   "atomic checkout must accept stable order and payment identifiers",
+);
+assert.equal(
+  createPosCheckoutBodySchema.safeParse({
+    order: {
+      id: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+      orderType: "manual",
+      branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      items: [{ productSkuId: "01ARZ3NDEKTSV4RRFFQ69G5FB3" }],
+    },
+  }).success,
+  false,
+  "checkout must require the operator-confirmed total",
+);
+assert.equal(
+  createPosPaymentBodySchema.safeParse({
+    paymentMethod: "cash",
+    amount: "100.00",
+    tenderedAmount: "99.00",
+    shiftId: cashShiftId,
+    occurredAt: cashOccurredAt,
+    idempotencyKey: "cash-short",
+  }).success,
+  false,
+  "cash tender must cover the recorded payment amount",
 );
 
 const serviceId = "01ARZ3NDEKTSV4RRFFQ69G5FB2";
@@ -277,11 +319,30 @@ assert.equal(
 );
 assert.equal(
   getTableConfig(serviceTickets).checks.some(
-    (constraint) =>
-      constraint.name === "service_tickets_service_type_check",
+    (constraint) => constraint.name === "service_tickets_service_type_check",
   ),
   true,
   "service tickets should enforce service-only workflows",
+);
+assert.equal(
+  getTableConfig(paymentTransactions).columns.some(
+    (column) => column.name === "tendered_amount",
+  ),
+  true,
+  "cash transactions must persist the tendered amount",
+);
+assert.equal(
+  getTableConfig(posOfflineSaleExceptions).indexes.some(
+    (index) =>
+      index.config.name === "pos_offline_sale_exceptions_tenant_command_unique",
+  ),
+  true,
+  "offline cash exception commands must be idempotent",
+);
+assert(
+  getProductReservationExpiresAt(new Date("2026-01-01T00:00:00.000Z")) >
+    new Date("2026-01-01T00:00:00.000Z"),
+  "product reservations must always receive a future expiry",
 );
 assert.equal(
   createPosPaymentBodySchema.safeParse({
@@ -298,6 +359,9 @@ assert.equal(
   paymentIntentMatches(payment, payment.orderId, {
     paymentMethod: "cash",
     amount: "100",
+    tenderedAmount: "150.00",
+    shiftId: cashShiftId,
+    occurredAt: cashOccurredAt,
     idempotencyKey: "cash-retry-1",
   }),
   true,
@@ -307,10 +371,25 @@ assert.equal(
   paymentIntentMatches(payment, payment.orderId, {
     paymentMethod: "cash",
     amount: "99.00",
+    tenderedAmount: "150.00",
+    shiftId: cashShiftId,
+    occurredAt: cashOccurredAt,
     idempotencyKey: "cash-retry-1",
   }),
   false,
   "an idempotency key must not be reused with another amount",
+);
+assert.equal(
+  paymentIntentMatches(payment, payment.orderId, {
+    paymentMethod: "cash",
+    amount: "100.00",
+    tenderedAmount: "200.00",
+    shiftId: cashShiftId,
+    occurredAt: cashOccurredAt,
+    idempotencyKey: "cash-retry-1",
+  }),
+  false,
+  "cash idempotency must include the tendered amount",
 );
 
 const mobilePayment: PosPaymentTransaction = {

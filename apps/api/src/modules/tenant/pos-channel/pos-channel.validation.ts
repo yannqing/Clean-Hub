@@ -113,8 +113,24 @@ export const updatePosChannelSettingsBodySchema = z
       .max(86400)
       .optional(),
     defaultPaymentMethod: z.enum(["cash", "card", "app"]).optional(),
+    defaultPaymentMethodsEnabled: z
+      .array(z.enum(["cash", "card", "app"]))
+      .min(1)
+      .max(3)
+      .optional(),
     defaultRoundingRule: z
       .enum(["none", "round_yuan", "round_jiao"])
+      .optional(),
+    taxEnabled: z.boolean().optional(),
+    defaultTaxRate: z
+      .string()
+      .trim()
+      .regex(/^\d{1,3}(?:\.\d{1,4})?$/)
+      .refine((value) => Number(value) >= 0 && Number(value) <= 100)
+      .optional(),
+    pricesIncludeTax: z.boolean().optional(),
+    taxRegistrationNumber: z
+      .union([z.string().trim().max(200), z.null()])
       .optional(),
     defaultAutoPrintReceipt: z.boolean().optional(),
     defaultPrintCopies: z.coerce.number().int().min(1).max(10).optional(),
@@ -133,4 +149,17 @@ export const updatePosChannelSettingsBodySchema = z
         ([key, value]) => key !== "version" && value !== undefined,
       ),
     "At least one POS channel setting must be provided.",
-  );
+  )
+  .superRefine((data, context) => {
+    if (
+      data.defaultPaymentMethod &&
+      data.defaultPaymentMethodsEnabled &&
+      !data.defaultPaymentMethodsEnabled.includes(data.defaultPaymentMethod)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "The default payment method must be enabled.",
+        path: ["defaultPaymentMethod"],
+      });
+    }
+  });

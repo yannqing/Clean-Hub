@@ -260,7 +260,12 @@ export type PosChannelSettings = {
   syncIntervalSeconds: number;
   deviceOfflineAfterSeconds: number;
   defaultPaymentMethod: PosChannelPaymentMethod;
+  defaultPaymentMethodsEnabled: PosChannelPaymentMethod[];
   defaultRoundingRule: PosChannelRoundingRule;
+  taxEnabled: boolean;
+  defaultTaxRate: string;
+  pricesIncludeTax: boolean;
+  taxRegistrationNumber: string | null;
   defaultAutoPrintReceipt: boolean;
   defaultPrintCopies: number;
   defaultLockTimeoutSeconds: number;
@@ -282,7 +287,12 @@ export type UpdatePosChannelSettingsRequest = {
   syncIntervalSeconds?: number;
   deviceOfflineAfterSeconds?: number;
   defaultPaymentMethod?: PosChannelPaymentMethod;
+  defaultPaymentMethodsEnabled?: PosChannelPaymentMethod[];
   defaultRoundingRule?: PosChannelRoundingRule;
+  taxEnabled?: boolean;
+  defaultTaxRate?: string;
+  pricesIncludeTax?: boolean;
+  taxRegistrationNumber?: string | null;
   defaultAutoPrintReceipt?: boolean;
   defaultPrintCopies?: number;
   defaultLockTimeoutSeconds?: number;

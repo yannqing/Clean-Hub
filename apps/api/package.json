@@ -25,6 +25,7 @@
     "smoke:pos-carts": "tsx src/modules/pos/carts/carts.smoke.ts",
     "smoke:pos-discounts": "tsx src/modules/pos/discounts/pricing-engine.smoke.ts && tsx src/modules/pos/discounts/discount-lifecycle.smoke.ts",
     "smoke:pos-payment-adjustments": "tsx src/modules/pos/payment-adjustments/payment-adjustments.smoke.ts",
+    "smoke:pos-offline-sales": "tsx src/modules/pos/offline-sales/offline-sales.smoke.ts",
     "smoke:pos-orders": "tsx src/modules/pos/orders/orders.smoke.ts",
     "smoke:pos-service-tickets": "tsx src/modules/pos/service-tickets/service-tickets.smoke.ts",
     "smoke:pos-realtime": "tsx src/realtime/realtime.smoke.ts",

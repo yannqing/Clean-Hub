@@ -19,6 +19,7 @@ export type PosSensitiveOperation =
   | "delete"
   | "discount"
   | "manual_drawer_open"
+  | "offline_cash_reconciliation"
   | "payment_correction"
   | "price_override"
   | "privileged_reprint"

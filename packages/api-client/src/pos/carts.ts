@@ -1,6 +1,9 @@
 import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   PosCartPricePreview,
+  ClaimPosCartRequest,
+  ParkPosCartRequest,
+  PosParkedCartListResponse,
   PosSavedCart,
   PreviewPosCartRequest,
   SavePosCartRequest,
@@ -20,6 +23,15 @@ export function createPosCartsApi(client: ApiClient) {
         parseAs: "void",
         ...options,
       }),
+    listParked: (options?: RequestOptions) =>
+      client.get<PosParkedCartListResponse>("/pos/carts/parked", options),
+    parkCurrent: (input: ParkPosCartRequest, options?: RequestOptions) =>
+      client.post<PosSavedCart>("/pos/carts/current/park", input, options),
+    claim: (
+      cartId: string,
+      input: ClaimPosCartRequest = {},
+      options?: RequestOptions,
+    ) => client.post<PosSavedCart>(`/pos/carts/${cartId}/claim`, input, options),
     preview: (input: PreviewPosCartRequest, options?: RequestOptions) =>
       client.post<PosCartPricePreview>("/pos/carts/preview", input, options),
   };

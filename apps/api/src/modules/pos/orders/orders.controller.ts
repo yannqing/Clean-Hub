@@ -23,6 +23,7 @@ import {
   getPosOrderOverview,
   listPosOrderPayments,
   listPosOrders,
+  recordPosCardPaymentOutcome,
   updatePosOrder,
   updatePosOrderItem,
 } from "./orders.service.js";
@@ -40,6 +41,7 @@ import {
   posOrderOverviewQuerySchema,
   posOrderParamsSchema,
   posPaymentParamsSchema,
+  recordPosCardPaymentOutcomeBodySchema,
   resolvePosPaymentBodySchema,
   updatePosOrderBodySchema,
   updatePosOrderItemBodySchema,
@@ -318,6 +320,32 @@ export async function failPosManualPaymentController(c: Context<AppBindings>) {
       getRequestMeta(c),
     );
     return c.json(order);
+  } catch (error) {
+    if (error instanceof PosOrderError) {
+      return createErrorResponse(c, error);
+    }
+    throw error;
+  }
+}
+
+export async function recordPosCardPaymentOutcomeController(
+  c: Context<AppBindings>,
+) {
+  const params = posPaymentParamsSchema.parse(c.req.param());
+  const data = recordPosCardPaymentOutcomeBodySchema.parse(
+    await c.req.json().catch(() => ({})),
+  );
+
+  try {
+    return c.json(
+      await recordPosCardPaymentOutcome(
+        c.get("authContext"),
+        params.orderId,
+        params.paymentId,
+        data,
+        getRequestMeta(c),
+      ),
+    );
   } catch (error) {
     if (error instanceof PosOrderError) {
       return createErrorResponse(c, error);

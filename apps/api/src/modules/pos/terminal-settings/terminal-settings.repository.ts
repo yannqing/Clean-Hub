@@ -36,7 +36,12 @@ function toSummary(
     platformVersion: row.platformVersion,
     appVersion: row.appVersion,
     defaultPaymentMethod: row.defaultPaymentMethod,
+    paymentMethodsEnabled: row.paymentMethodsEnabled,
     roundingRule: row.roundingRule,
+    taxEnabled: false,
+    defaultTaxRate: "0.0000",
+    pricesIncludeTax: true,
+    taxRegistrationNumber: null,
     autoPrintReceipt: row.autoPrintReceipt,
     printCopies: row.printCopies,
     lockTimeoutSeconds: row.lockTimeoutSeconds,
@@ -68,18 +73,28 @@ export async function findTenantPosTerminalDefaults(
   tenantId: string,
 ): Promise<{
   defaultPaymentMethod: "cash" | "card" | "app";
+  paymentMethodsEnabled: Array<"cash" | "card" | "app">;
   roundingRule: "none" | "round_yuan" | "round_jiao";
   autoPrintReceipt: boolean;
   printCopies: number;
   lockTimeoutSeconds: number;
+  taxEnabled: boolean;
+  defaultTaxRate: string;
+  pricesIncludeTax: boolean;
+  taxRegistrationNumber: string | null;
 }> {
   const rows = await db
     .select({
       defaultPaymentMethod: posChannelSettings.defaultPaymentMethod,
+      paymentMethodsEnabled: posChannelSettings.defaultPaymentMethodsEnabled,
       roundingRule: posChannelSettings.defaultRoundingRule,
       autoPrintReceipt: posChannelSettings.defaultAutoPrintReceipt,
       printCopies: posChannelSettings.defaultPrintCopies,
       lockTimeoutSeconds: posChannelSettings.defaultLockTimeoutSeconds,
+      taxEnabled: posChannelSettings.taxEnabled,
+      defaultTaxRate: posChannelSettings.defaultTaxRate,
+      pricesIncludeTax: posChannelSettings.pricesIncludeTax,
+      taxRegistrationNumber: posChannelSettings.taxRegistrationNumber,
     })
     .from(posChannelSettings)
     .where(eq(posChannelSettings.tenantId, tenantId))
@@ -88,10 +103,15 @@ export async function findTenantPosTerminalDefaults(
   return (
     rows[0] ?? {
       defaultPaymentMethod: "cash",
+      paymentMethodsEnabled: ["cash", "app"],
       roundingRule: "none",
       autoPrintReceipt: true,
       printCopies: 1,
       lockTimeoutSeconds: 300,
+      taxEnabled: false,
+      defaultTaxRate: "0.0000",
+      pricesIncludeTax: true,
+      taxRegistrationNumber: null,
     }
   );
 }
@@ -172,6 +192,7 @@ export async function insertTerminalSettings(
       deviceId: input.deviceId,
       label: input.label ?? null,
       defaultPaymentMethod: input.defaultPaymentMethod ?? "cash",
+      paymentMethodsEnabled: input.paymentMethodsEnabled ?? ["cash", "app"],
       roundingRule: input.roundingRule ?? "none",
       autoPrintReceipt: input.autoPrintReceipt ?? true,
       printCopies: input.printCopies ?? 1,
@@ -200,6 +221,8 @@ export async function updateTerminalSettingsRecord(
   if (input.label !== undefined) setValues.label = input.label;
   if (input.defaultPaymentMethod !== undefined)
     setValues.defaultPaymentMethod = input.defaultPaymentMethod;
+  if (input.paymentMethodsEnabled !== undefined)
+    setValues.paymentMethodsEnabled = input.paymentMethodsEnabled;
   if (input.roundingRule !== undefined)
     setValues.roundingRule = input.roundingRule;
   if (input.autoPrintReceipt !== undefined)

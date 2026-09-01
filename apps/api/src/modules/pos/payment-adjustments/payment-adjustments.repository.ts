@@ -12,6 +12,7 @@ import type {
   PosPaymentAdjustmentDirection,
   PosPaymentAdjustmentType,
 } from "./payment-adjustments.types.js";
+import { projectPosOrderPaymentState } from "../orders/order-payment-state.js";
 
 export type PosAdjustmentOrder = {
   id: string;
@@ -226,25 +227,27 @@ export async function recalculateOrderAfterAdjustment(
   const debit = Number(adjustmentRows[0]?.debit ?? "0");
   const credit = Number(adjustmentRows[0]?.credit ?? "0");
   const paid = Math.max(0, grossPaid - debit + credit);
-  const total = Number(input.order.totalAmount);
+  const projected = projectPosOrderPaymentState({
+    current: {
+      ...input.order,
+      paidAt: null,
+    },
+    nextTotalAmount: input.order.totalAmount,
+    nextPaidAmount: paid.toFixed(2),
+  });
   const paymentStatus =
-    paid <= 0 && grossPaid > 0
-      ? "refunded"
-      : paid <= 0
-        ? "unpaid"
-        : paid < total
-          ? "partial"
-          : "paid";
+    paid <= 0 && grossPaid > 0 ? "refunded" : projected.paymentStatus;
   const nextOrderStatus =
-    input.order.status === "paid" && paymentStatus !== "paid"
+    paymentStatus === "refunded" && input.order.status === "paid"
       ? "received"
-      : input.order.status;
+      : projected.status;
 
   await db
     .update(orders)
     .set({
       paidAmount: paid.toFixed(2),
       paymentStatus,
+      paidAt: paymentStatus === "paid" ? projected.paidAt : null,
       status: nextOrderStatus,
       updatedAt: new Date(),
       updatedBy: input.actorUserId,

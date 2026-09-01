@@ -20,7 +20,12 @@ export type PosTerminalSettings = {
   platformVersion: string | null;
   appVersion: string | null;
   defaultPaymentMethod: PosPaymentMethod;
+  paymentMethodsEnabled: PosPaymentMethod[];
   roundingRule: PosRoundingRule;
+  taxEnabled: boolean;
+  defaultTaxRate: string;
+  pricesIncludeTax: boolean;
+  taxRegistrationNumber: string | null;
   autoPrintReceipt: boolean;
   printCopies: number;
   lockTimeoutSeconds: number;
@@ -49,6 +54,7 @@ export type PosTerminalSettings = {
 export type UpdatePosTerminalSettingsRequest = {
   label?: string;
   defaultPaymentMethod?: PosPaymentMethod;
+  paymentMethodsEnabled?: PosPaymentMethod[];
   roundingRule?: PosRoundingRule;
   autoPrintReceipt?: boolean;
   printCopies?: number;

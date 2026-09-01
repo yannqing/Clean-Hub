@@ -44,6 +44,11 @@ const amountSchema = z
   .regex(/^\d+(\.\d{1,2})?$/, "Amount must be a decimal with up to 2 places.")
   .refine((value) => Number(value) > 0, "Amount must be greater than zero.");
 
+const nonnegativeAmountSchema = z
+  .string()
+  .trim()
+  .regex(/^\d+(\.\d{1,2})?$/, "Amount must be a decimal with up to 2 places.");
+
 const quantitySchema = z
   .string()
   .trim()
@@ -191,11 +196,18 @@ export const deletePosOrderBodySchema = z.object({
 
 const idempotencyKeySchema = z.string().trim().min(1).max(120);
 
-export const createPosPaymentBodySchema = z.discriminatedUnion(
-  "paymentMethod",
-  [
+export const createPosPaymentBodySchema = z
+  .discriminatedUnion("paymentMethod", [
     z.object({
       paymentMethod: z.literal("cash"),
+      amount: amountSchema,
+      tenderedAmount: amountSchema,
+      shiftId: ulidSchema,
+      occurredAt: isoTimestampSchema,
+      idempotencyKey: idempotencyKeySchema,
+    }),
+    z.object({
+      paymentMethod: z.literal("card"),
       amount: amountSchema,
       idempotencyKey: idempotencyKeySchema,
     }),
@@ -206,18 +218,39 @@ export const createPosPaymentBodySchema = z.discriminatedUnion(
       externalReference: z.string().trim().min(3).max(120),
       idempotencyKey: idempotencyKeySchema,
     }),
-  ],
-);
+  ])
+  .superRefine((value, context) => {
+    if (
+      value.paymentMethod === "cash" &&
+      Number(value.tenderedAmount) < Number(value.amount)
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Tendered cash must cover the payment amount.",
+        path: ["tenderedAmount"],
+      });
+    }
+  });
 
 const createPosCheckoutPaymentBodySchema = z.discriminatedUnion(
   "paymentMethod",
   [
     z.object({
       paymentMethod: z.literal("cash"),
+      amount: amountSchema.optional(),
+      tenderedAmount: amountSchema,
+      shiftId: ulidSchema,
+      occurredAt: isoTimestampSchema,
+      idempotencyKey: idempotencyKeySchema,
+    }),
+    z.object({
+      paymentMethod: z.literal("card"),
+      amount: amountSchema.optional(),
       idempotencyKey: idempotencyKeySchema,
     }),
     z.object({
       paymentMethod: z.literal("app"),
+      amount: amountSchema.optional(),
       provider: posMobileMoneyProviderSchema,
       externalReference: z.string().trim().min(3).max(120),
       idempotencyKey: idempotencyKeySchema,
@@ -225,10 +258,66 @@ const createPosCheckoutPaymentBodySchema = z.discriminatedUnion(
   ],
 );
 
-export const createPosCheckoutBodySchema = z.object({
-  order: createPosOrderBodySchema,
-  payment: createPosCheckoutPaymentBodySchema.optional(),
-});
+export const createPosCheckoutBodySchema = z
+  .object({
+    order: createPosOrderBodySchema,
+    expectedTotalAmount: nonnegativeAmountSchema,
+    payment: createPosCheckoutPaymentBodySchema.optional(),
+    payments: z.array(createPosCheckoutPaymentBodySchema).min(1).max(4).optional(),
+    taxExemptionReason: z.string().trim().min(3).max(500).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.payment && value.payments) {
+      context.addIssue({
+        code: "custom",
+        message: "Use either payment or payments, not both.",
+        path: ["payments"],
+      });
+    }
+    if (value.payments?.some((payment) => payment.amount === undefined)) {
+      context.addIssue({
+        code: "custom",
+        message: "Every payment in a mixed tender must include an amount.",
+        path: ["payments"],
+      });
+    }
+    const keys = (value.payments ?? (value.payment ? [value.payment] : [])).map(
+      (payment) => payment.idempotencyKey,
+    );
+    if (new Set(keys).size !== keys.length) {
+      context.addIssue({
+        code: "custom",
+        message: "Payment idempotency keys must be unique within checkout.",
+        path: ["payments"],
+      });
+    }
+  });
+
+export const recordPosCardPaymentOutcomeBodySchema = z
+  .object({
+    outcome: z.enum(["succeeded", "failed", "cancelled", "timed_out"]),
+    externalReference: z.string().trim().min(1).max(120).optional(),
+    authorizationCode: z.string().trim().min(1).max(120).optional(),
+    failureCode: z.string().trim().min(1).max(80).optional(),
+    failureReason: z.string().trim().min(1).max(500).optional(),
+    providerPayload: z.record(z.string(), z.unknown()).optional(),
+  })
+  .superRefine((value, context) => {
+    if (value.outcome === "succeeded" && !value.externalReference) {
+      context.addIssue({
+        code: "custom",
+        message: "A successful card payment requires the TPE reference.",
+        path: ["externalReference"],
+      });
+    }
+    if (value.outcome !== "succeeded" && !value.failureReason) {
+      context.addIssue({
+        code: "custom",
+        message: "A non-successful card result requires a reason.",
+        path: ["failureReason"],
+      });
+    }
+  });
 
 export const resolvePosPaymentBodySchema = z.object({
   reason: z.string().trim().min(3).max(500).optional(),

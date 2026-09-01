@@ -17,10 +17,20 @@ import type {
   PosOrderOverviewQuery,
   PosOrderPaymentsResponse,
   RemovePosOrderDiscountRequest,
+  RecordPosCardPaymentOutcomeRequest,
   ResolvePosPaymentRequest,
   UpdatePosOrderItemRequest,
   UpdatePosOrderRequest,
 } from "./orders.types";
+import type {
+  DeliverPosReceiptRequest,
+  PosReceiptDelivery,
+} from "./receipts.types";
+import type {
+  CreatePosProductReturnRequest,
+  CreatePosProductReturnResponse,
+  PosProductReturnsOverview,
+} from "./returns.types";
 
 type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
 
@@ -122,6 +132,42 @@ export function createPosOrdersApi(client: ApiClient) {
     ) =>
       client.post<PosOrderDetail>(
         `/pos/orders/${orderId}/payments/${paymentId}/fail`,
+        input,
+        options,
+      ),
+    recordCardOutcome: (
+      orderId: string,
+      paymentId: string,
+      input: RecordPosCardPaymentOutcomeRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<PosOrderDetail>(
+        `/pos/orders/${orderId}/payments/${paymentId}/card-outcome`,
+        input,
+        options,
+      ),
+    deliverReceipt: (
+      orderId: string,
+      input: DeliverPosReceiptRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<PosReceiptDelivery>(
+        `/pos/orders/${orderId}/receipt-deliveries`,
+        input,
+        options,
+      ),
+    listProductReturns: (orderId: string, options?: RequestOptions) =>
+      client.get<PosProductReturnsOverview>(
+        `/pos/orders/${orderId}/product-returns`,
+        options,
+      ),
+    createProductReturn: (
+      orderId: string,
+      input: CreatePosProductReturnRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<CreatePosProductReturnResponse>(
+        `/pos/orders/${orderId}/product-returns`,
         input,
         options,
       ),

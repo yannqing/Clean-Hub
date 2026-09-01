@@ -1,0 +1,189 @@
+import { getDb, type Database } from "@cleanhub/db";
+import { createId } from "@cleanhub/id";
+
+import { EmailAdapter } from "../../notifications/email.adapter.js";
+import { loadEmailConfig } from "../../notifications/email-config.js";
+import type { AuthContext } from "../../auth/auth.types.js";
+import { requirePosTenantId } from "../access-control.helper.js";
+import { getPosOrder } from "../orders/orders.service.js";
+import type { PosOrderDetail } from "../orders/orders.types.js";
+import {
+  findReceiptDeliveryByIdempotencyKey,
+  insertReceiptDelivery,
+  updateReceiptDeliveryResult,
+} from "./receipts.repository.js";
+import type {
+  DeliverPosReceiptRequest,
+  PosReceiptDelivery,
+} from "./receipts.types.js";
+
+function buildFiscalReceipt(order: PosOrderDetail): { title: string; content: string } {
+  const lines = [
+    `CleanHub receipt ${order.id}`,
+    `Date: ${order.createdAt}`,
+    ...(order.taxRegistrationNumberSnapshot
+      ? [`Tax registration: ${order.taxRegistrationNumberSnapshot}`]
+      : []),
+    "",
+    ...order.items.map(
+      (item) =>
+        `${item.itemName} x ${item.quantity}  ${item.lineAmount} ${order.currency}` +
+        (Number(item.taxAmount) !== 0
+          ? `  VAT ${Number(item.taxRateSnapshot) * 100}%: ${item.taxAmount}`
+          : ""),
+    ),
+    "",
+    `Subtotal: ${order.subtotalAmount} ${order.currency}`,
+    `Discount: ${order.discountAmount} ${order.currency}`,
+    `Taxable: ${order.taxableAmount} ${order.currency}`,
+    `VAT: ${order.taxAmount} ${order.currency}`,
+    ...(order.taxExemptionReason
+      ? [`Tax exemption: ${order.taxExemptionReason}`]
+      : []),
+    `Rounding: ${order.roundingAdjustmentAmount} ${order.currency}`,
+    `Total: ${order.totalAmount} ${order.currency}`,
+    `Payment status: ${order.paymentStatus}`,
+  ];
+  return { title: `CleanHub receipt ${order.id}`, content: lines.join("\n") };
+}
+
+async function sendSms(input: {
+  deliveryId: string;
+  to: string;
+  content: string;
+}): Promise<{ externalId?: string; payload: Record<string, unknown> }> {
+  const url = process.env.SMS_WEBHOOK_URL;
+  if (!url) throw new Error("SMS_WEBHOOK_URL is not configured.");
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...(process.env.SMS_WEBHOOK_TOKEN
+        ? { authorization: `Bearer ${process.env.SMS_WEBHOOK_TOKEN}` }
+        : {}),
+    },
+    body: JSON.stringify({
+      idempotencyKey: input.deliveryId,
+      to: input.to,
+      message: input.content,
+    }),
+    signal: AbortSignal.timeout(15_000),
+  });
+  const payload = (await response.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+  if (!response.ok) {
+    throw new Error(
+      typeof payload.message === "string"
+        ? payload.message
+        : `SMS provider returned HTTP ${response.status}.`,
+    );
+  }
+  return {
+    externalId:
+      typeof payload.id === "string"
+        ? payload.id
+        : typeof payload.messageId === "string"
+          ? payload.messageId
+          : undefined,
+    payload,
+  };
+}
+
+export async function deliverPosOrderReceipt(input: {
+  authContext: AuthContext;
+  orderId: string;
+  data: DeliverPosReceiptRequest;
+}, db: Database = getDb()): Promise<PosReceiptDelivery> {
+  const tenantId = requirePosTenantId(input.authContext);
+  const existing = await findReceiptDeliveryByIdempotencyKey(db, {
+    tenantId,
+    idempotencyKey: input.data.idempotencyKey,
+  });
+  if (existing) return existing;
+
+  const order = await getPosOrder({
+    authContext: input.authContext,
+    orderId: input.orderId,
+  }, db);
+  const receipt = buildFiscalReceipt(order);
+  const created = await insertReceiptDelivery(db, {
+    id: createId(),
+    tenantId,
+    branchId: order.branchId,
+    orderId: order.id,
+    channel: input.data.channel,
+    destination: input.data.destination,
+    idempotencyKey: input.data.idempotencyKey,
+    receiptTitle: receipt.title,
+    receiptContent: receipt.content,
+    createdBy: input.authContext.userId,
+  });
+  if (!created) {
+    const concurrent = await findReceiptDeliveryByIdempotencyKey(db, {
+      tenantId,
+      idempotencyKey: input.data.idempotencyKey,
+    });
+    if (concurrent) return concurrent;
+    throw new Error("Receipt delivery could not be created.");
+  }
+
+  if (input.data.channel === "none") {
+    return updateReceiptDeliveryResult(db, {
+      tenantId,
+      id: created.id,
+      status: "skipped",
+      provider: "operator_choice",
+    });
+  }
+  if (input.data.channel === "print") {
+    return updateReceiptDeliveryResult(db, {
+      tenantId,
+      id: created.id,
+      status: input.data.printStatus === "sent" ? "sent" : "failed",
+      provider: "pos_local_printer",
+      failureReason: input.data.failureReason,
+    });
+  }
+
+  try {
+    if (input.data.channel === "email") {
+      const result = await new EmailAdapter(loadEmailConfig()).send({
+        deliveryId: created.id,
+        to: input.data.destination!,
+        subject: receipt.title,
+        text: receipt.content,
+      });
+      return updateReceiptDeliveryResult(db, {
+        tenantId,
+        id: created.id,
+        status: "sent",
+        provider: "smtp",
+        externalId: result.externalId,
+      });
+    }
+    const result = await sendSms({
+      deliveryId: created.id,
+      to: input.data.destination!,
+      content: receipt.content,
+    });
+    return updateReceiptDeliveryResult(db, {
+      tenantId,
+      id: created.id,
+      status: "sent",
+      provider: "sms_webhook",
+      externalId: result.externalId,
+      providerPayload: result.payload,
+    });
+  } catch (error) {
+    return updateReceiptDeliveryResult(db, {
+      tenantId,
+      id: created.id,
+      status: "failed",
+      provider: input.data.channel === "email" ? "smtp" : "sms_webhook",
+      failureReason:
+        error instanceof Error ? error.message : "Receipt delivery failed.",
+    });
+  }
+}
