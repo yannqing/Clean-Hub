@@ -63,7 +63,12 @@ function toFormValues(
     syncIntervalSeconds: settings.syncIntervalSeconds,
     deviceOfflineAfterSeconds: settings.deviceOfflineAfterSeconds,
     defaultPaymentMethod: settings.defaultPaymentMethod,
+    defaultPaymentMethodsEnabled: settings.defaultPaymentMethodsEnabled,
     defaultRoundingRule: settings.defaultRoundingRule,
+    taxEnabled: settings.taxEnabled,
+    defaultTaxRate: settings.defaultTaxRate,
+    pricesIncludeTax: settings.pricesIncludeTax,
+    taxRegistrationNumber: settings.taxRegistrationNumber,
     defaultAutoPrintReceipt: settings.defaultAutoPrintReceipt,
     defaultPrintCopies: settings.defaultPrintCopies,
     defaultLockTimeoutSeconds: settings.defaultLockTimeoutSeconds,
@@ -272,6 +277,47 @@ export function PointOfSaleSettingsView({
             </div>
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-2 sm:col-span-2">
+              <Label>新终端默认启用的支付方式</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {(["cash", "card", "app"] as const).map((method) => {
+                  const checked = form.defaultPaymentMethodsEnabled.includes(method);
+                  return (
+                    <label
+                      className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-xs"
+                      key={method}
+                    >
+                      <Checkbox
+                        checked={checked}
+                        disabled={disabled}
+                        onCheckedChange={(value) => {
+                          const next = value === true
+                            ? [...form.defaultPaymentMethodsEnabled, method]
+                            : form.defaultPaymentMethodsEnabled.filter(
+                                (candidate) => candidate !== method,
+                              );
+                          if (next.length === 0) return;
+                          setForm((current) =>
+                            current
+                              ? {
+                                  ...current,
+                                  defaultPaymentMethodsEnabled: next,
+                                  defaultPaymentMethod: next.includes(
+                                    current.defaultPaymentMethod,
+                                  )
+                                    ? current.defaultPaymentMethod
+                                    : next[0]!,
+                                }
+                              : current,
+                          );
+                        }}
+                      />
+                      {m.pointOfSale.settings.paymentMethods[method]}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="pos-cart-retention">
                 {m.pointOfSale.settings.fields.recentCartRetentionHours}
@@ -419,11 +465,15 @@ export function PointOfSaleSettingsView({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(["cash", "card", "app"] as const).map((method) => (
+                  {(["cash", "card", "app"] as const)
+                    .filter((method) =>
+                      form.defaultPaymentMethodsEnabled.includes(method),
+                    )
+                    .map((method) => (
                     <SelectItem key={method} value={method}>
                       {m.pointOfSale.settings.paymentMethods[method]}
                     </SelectItem>
-                  ))}
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -520,6 +570,70 @@ export function PointOfSaleSettingsView({
                   {m.pointOfSale.settings.seconds}
                 </span>
               </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-xl">
+        <CardContent className="p-5">
+          <div className="flex items-start gap-3">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
+              <Icon icon={Banknote} size={15} />
+            </span>
+            <div>
+              <h3 className="text-sm font-semibold">VAT / 税务设置</h3>
+              <p className="mt-1 text-[11px] leading-4 text-muted-foreground">
+                下单时固化税率、含税方式和税号；历史订单不会随设置变化。
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <BooleanSetting
+              checked={form.taxEnabled}
+              disabled={disabled}
+              hint="启用后，POS 价格预览和结账都会计算并保存 VAT。"
+              id="pos-tax-enabled"
+              label="启用 VAT"
+              onCheckedChange={(value) => update("taxEnabled", value)}
+            />
+            <BooleanSetting
+              checked={form.pricesIncludeTax}
+              disabled={disabled || !form.taxEnabled}
+              hint="开启表示商品标价已含税；关闭表示税额在小计之外增加。"
+              id="pos-prices-include-tax"
+              label="标价含税"
+              onCheckedChange={(value) => update("pricesIncludeTax", value)}
+            />
+            <div className="grid gap-2">
+              <Label htmlFor="pos-tax-rate">默认 VAT 税率（%）</Label>
+              <Input
+                disabled={disabled || !form.taxEnabled}
+                id="pos-tax-rate"
+                max={100}
+                min={0}
+                onChange={(event) =>
+                  update(
+                    "defaultTaxRate",
+                    String(Number(event.target.value || 0) / 100),
+                  )
+                }
+                step="0.01"
+                type="number"
+                value={Number(form.defaultTaxRate) * 100}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="pos-tax-registration">税务登记号</Label>
+              <Input
+                disabled={disabled || !form.taxEnabled}
+                id="pos-tax-registration"
+                maxLength={120}
+                onChange={(event) =>
+                  update("taxRegistrationNumber", event.target.value || null)
+                }
+                value={form.taxRegistrationNumber ?? ""}
+              />
             </div>
           </div>
         </CardContent>
