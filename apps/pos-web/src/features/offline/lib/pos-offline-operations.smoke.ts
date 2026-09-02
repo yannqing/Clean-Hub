@@ -74,6 +74,7 @@ async function main() {
   const occurredAt = new Date().toISOString();
   const checkoutMutation = createOrderCheckoutOfflineMutation({
     expectedTotalAmount: "1500.00",
+    settlementIntent: "pay_now",
     order: {
       orderType: "manual",
       branchId: createId(),

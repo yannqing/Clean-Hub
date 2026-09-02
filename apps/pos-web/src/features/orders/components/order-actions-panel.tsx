@@ -107,16 +107,16 @@ export function OrderActionsPanel({
     ["draft", "received", "cancelled"].includes(order.status);
 
   function pay() {
+    if (currentShift?.status !== "open") {
+      toast.error("请先开班并结束休息，再记录任何支付。");
+      return;
+    }
     const reference = externalReference.trim();
     if (paymentOption !== "cash" && reference.length < 3) {
       toast.error("请输入 Wave / Orange Money 交易流水号。");
       return;
     }
     if (paymentOption === "cash") {
-      if (currentShift?.status !== "open") {
-        toast.error("现金收款需要当前员工处于已开班且未休息状态。");
-        return;
-      }
       if (Number(cashTendered) < Number(amount)) {
         toast.error("实收现金不能少于本次收款金额。");
         return;

@@ -3,8 +3,6 @@
 import type {
   PosCatalogProduct,
   PosOrderDetail,
-  PosPaymentAdjustment,
-  PosPaymentTransaction,
   PosProductReturnsOverview,
   PosReturnDisposition,
   PosReturnItemCondition,
@@ -37,20 +35,20 @@ type SelectedReturnItem = {
 };
 
 export function ProductReturnDialog({
-  adjustments,
   order,
-  payments,
   products,
 }: {
-  adjustments: PosPaymentAdjustment[];
   order: PosOrderDetail;
-  payments: PosPaymentTransaction[];
   products: PosCatalogProduct[];
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [overview, setOverview] = useState<PosProductReturnsOverview | null>(null);
-  const [selected, setSelected] = useState<Record<string, SelectedReturnItem>>({});
+  const [overview, setOverview] = useState<PosProductReturnsOverview | null>(
+    null,
+  );
+  const [selected, setSelected] = useState<Record<string, SelectedReturnItem>>(
+    {},
+  );
   const [reason, setReason] = useState("");
   const [notes, setNotes] = useState("");
   const [exchangeSkuId, setExchangeSkuId] = useState("");
@@ -86,6 +84,24 @@ export function ProductReturnDialog({
         : 0,
     );
   }, [order, selectedItems]);
+  const estimatedExchangeAmount = useMemo(
+    () =>
+      exchangeItems.reduce((sum, item) => {
+        const product = products.find(
+          (entry) => entry.productSkuId === item.productSkuId,
+        );
+        return sum + Number(product?.amount ?? 0) * Number(item.quantity);
+      }, 0),
+    [exchangeItems, products],
+  );
+  const estimatedCashOut = Math.max(
+    0,
+    estimatedRefund - estimatedExchangeAmount,
+  );
+  const estimatedAdditionalDue = Math.max(
+    0,
+    estimatedExchangeAmount - estimatedRefund,
+  );
 
   function load() {
     setLoading(true);
@@ -120,13 +136,17 @@ export function ProductReturnDialog({
   }
 
   function addExchangeItem() {
-    const product = products.find((entry) => entry.productSkuId === exchangeSkuId);
+    const product = products.find(
+      (entry) => entry.productSkuId === exchangeSkuId,
+    );
     if (!product || Number(exchangeQuantity) <= 0) return;
     setExchangeItems((current) => [
       ...current.filter((item) => item.productSkuId !== product.productSkuId),
       {
         productSkuId: product.productSkuId,
-        quantity: Number(exchangeQuantity).toFixed(3).replace(/\.?0+$/, ""),
+        quantity: Number(exchangeQuantity)
+          .toFixed(3)
+          .replace(/\.?0+$/, ""),
         name: product.variantName
           ? `${product.name} · ${product.variantName}`
           : product.name,
@@ -134,32 +154,6 @@ export function ProductReturnDialog({
     ]);
     setExchangeSkuId("");
     setExchangeQuantity("1");
-  }
-
-  function buildRefundAllocations(amount: number) {
-    let remaining = Math.round(amount * 100) / 100;
-    return payments
-      .filter((payment) => payment.paymentStatus === "paid")
-      .map((payment) => {
-        const refunded = adjustments
-          .filter(
-            (adjustment) =>
-              adjustment.originalPaymentId === payment.id &&
-              adjustment.adjustmentType === "refund" &&
-              adjustment.direction === "debit",
-          )
-          .reduce((sum, adjustment) => sum + Number(adjustment.amount), 0);
-        const available = Math.max(0, Number(payment.amount) - refunded);
-        const allocated = Math.min(available, remaining);
-        remaining = Math.max(0, remaining - allocated);
-        return allocated > 0
-          ? { originalPaymentId: payment.id, amount: allocated.toFixed(2) }
-          : null;
-      })
-      .filter(
-        (allocation): allocation is { originalPaymentId: string; amount: string } =>
-          allocation !== null,
-      );
   }
 
   function submit() {
@@ -183,7 +177,6 @@ export function ProductReturnDialog({
             condition: selection.condition,
             disposition: selection.disposition,
           })),
-          refundAllocations: buildRefundAllocations(estimatedRefund),
           exchangeItems:
             exchangeItems.length > 0
               ? exchangeItems.map(({ productSkuId, quantity }) => ({
@@ -192,11 +185,17 @@ export function ProductReturnDialog({
                 }))
               : undefined,
         });
-        toast.success(
-          result.exchangeOrder
-            ? "退货、回库和换货抵扣已完成。"
-            : "商品退货与退款记录已完成。",
-        );
+        if (result.salesReturn.status === "received") {
+          toast.warning(
+            "退货已入库，非现金退款仍待渠道确认，请在原订单完成退款核销。",
+          );
+        } else {
+          toast.success(
+            result.exchangeOrder
+              ? "退货与换货抵扣已完成。"
+              : "商品退货与退款已完成。",
+          );
+        }
         setOpen(false);
         if (result.exchangeOrder) {
           router.push(posRoutes.orderDetail(result.exchangeOrder.id));
@@ -245,11 +244,15 @@ export function ProductReturnDialog({
                       : ("discarded" as const),
                   };
                   return (
-                    <div className="grid gap-3 rounded-md border p-3 sm:grid-cols-[1fr_105px_125px_125px]" key={item.orderItemId}>
+                    <div
+                      className="grid gap-3 rounded-md border p-3 sm:grid-cols-[1fr_105px_125px_125px]"
+                      key={item.orderItemId}
+                    >
                       <div>
                         <p className="text-sm font-semibold">{item.itemName}</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          可退 {item.returnableQuantity} / 已购 {item.purchasedQuantity}
+                          可退 {item.returnableQuantity} / 已购{" "}
+                          {item.purchasedQuantity}
                         </p>
                       </div>
                       <Input
@@ -268,7 +271,8 @@ export function ProductReturnDialog({
                         className="h-10 rounded-md border bg-background px-2 text-sm"
                         onChange={(event) =>
                           updateSelection(item.orderItemId, {
-                            condition: event.target.value as PosReturnItemCondition,
+                            condition: event.target
+                              .value as PosReturnItemCondition,
                           })
                         }
                         value={selection.condition}
@@ -283,12 +287,15 @@ export function ProductReturnDialog({
                         className="h-10 rounded-md border bg-background px-2 text-sm"
                         onChange={(event) =>
                           updateSelection(item.orderItemId, {
-                            disposition: event.target.value as PosReturnDisposition,
+                            disposition: event.target
+                              .value as PosReturnDisposition,
                           })
                         }
                         value={selection.disposition}
                       >
-                        {item.trackInventory ? <option value="restock">回库</option> : null}
+                        {item.trackInventory ? (
+                          <option value="restock">回库</option>
+                        ) : null}
                         <option value="damaged">损坏区</option>
                         <option value="discarded">报废</option>
                         <option value="exchange">换货留存</option>
@@ -302,7 +309,11 @@ export function ProductReturnDialog({
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold">换购商品（可选）</h3>
                   <span className="text-xs text-muted-foreground">
-                    退货额度 {formatOrderMoney(estimatedRefund.toFixed(2), order.currency)}
+                    退货额度{" "}
+                    {formatOrderMoney(
+                      estimatedRefund.toFixed(2),
+                      order.currency,
+                    )}
                   </span>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-[1fr_100px_auto]">
@@ -313,30 +324,48 @@ export function ProductReturnDialog({
                   >
                     <option value="">选择替换商品</option>
                     {products.map((product) => (
-                      <option key={product.productSkuId} value={product.productSkuId}>
-                        {product.name} {product.variantName ?? ""} · {product.amount}
+                      <option
+                        key={product.productSkuId}
+                        value={product.productSkuId}
+                      >
+                        {product.name} {product.variantName ?? ""} ·{" "}
+                        {product.amount}
                       </option>
                     ))}
                   </select>
                   <Input
                     min={0.001}
-                    onChange={(event) => setExchangeQuantity(event.target.value)}
+                    onChange={(event) =>
+                      setExchangeQuantity(event.target.value)
+                    }
                     step="0.001"
                     type="number"
                     value={exchangeQuantity}
                   />
-                  <Button disabled={!exchangeSkuId} onClick={addExchangeItem} type="button" variant="outline">
+                  <Button
+                    disabled={!exchangeSkuId}
+                    onClick={addExchangeItem}
+                    type="button"
+                    variant="outline"
+                  >
                     添加
                   </Button>
                 </div>
                 {exchangeItems.map((item) => (
-                  <div className="flex justify-between text-xs" key={item.productSkuId}>
-                    <span>{item.name} × {item.quantity}</span>
+                  <div
+                    className="flex justify-between text-xs"
+                    key={item.productSkuId}
+                  >
+                    <span>
+                      {item.name} × {item.quantity}
+                    </span>
                     <button
                       className="text-destructive"
                       onClick={() =>
                         setExchangeItems((current) =>
-                          current.filter((entry) => entry.productSkuId !== item.productSkuId),
+                          current.filter(
+                            (entry) => entry.productSkuId !== item.productSkuId,
+                          ),
                         )
                       }
                       type="button"
@@ -345,6 +374,25 @@ export function ProductReturnDialog({
                     </button>
                   </div>
                 ))}
+                <div className="grid gap-1 rounded-md bg-muted/50 p-3 text-xs text-muted-foreground sm:grid-cols-2">
+                  <span>
+                    预计原路退款：
+                    {formatOrderMoney(
+                      estimatedCashOut.toFixed(2),
+                      order.currency,
+                    )}
+                  </span>
+                  <span>
+                    预计换货补款：
+                    {formatOrderMoney(
+                      estimatedAdditionalDue.toFixed(2),
+                      order.currency,
+                    )}
+                  </span>
+                  <span className="sm:col-span-2">
+                    最终金额以服务端重新计价为准；换货抵扣后只退差额，不会重复退款。
+                  </span>
+                </div>
               </section>
 
               <label className="block text-xs font-semibold text-muted-foreground">
@@ -367,17 +415,30 @@ export function ProductReturnDialog({
               </label>
               {overview.data.length > 0 ? (
                 <p className="text-xs text-muted-foreground">
-                  该订单已有 {overview.data.length} 笔已完成退换货记录。
+                  该订单已有 {overview.data.length}{" "}
+                  笔退换货记录（含待渠道退款）。
                 </p>
               ) : null}
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => setOpen(false)} type="button" variant="outline">
+            <Button
+              onClick={() => setOpen(false)}
+              type="button"
+              variant="outline"
+            >
               取消
             </Button>
-            <Button disabled={isPending || loading} onClick={submit} type="button">
-              {isPending ? "处理中…" : exchangeItems.length ? "确认换货" : "确认退货"}
+            <Button
+              disabled={isPending || loading}
+              onClick={submit}
+              type="button"
+            >
+              {isPending
+                ? "处理中…"
+                : exchangeItems.length
+                  ? "确认换货"
+                  : "确认退货"}
             </Button>
           </DialogFooter>
         </DialogContent>

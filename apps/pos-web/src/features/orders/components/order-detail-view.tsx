@@ -39,6 +39,7 @@ import {
 import {
   confirmManualPaymentAction,
   failManualPaymentAction,
+  recordCardOutcomeAction,
 } from "../actions";
 import { posToast as toast } from "@/lib/pos-toast";
 import { OrderActionsPanel } from "./order-actions-panel";
@@ -48,6 +49,7 @@ import { OrderInfoEditor } from "./order-info-editor";
 import { OrderItemsManager } from "./order-items-manager";
 import { OrderPaymentAdjustments } from "./order-payment-adjustments";
 import { ProductReturnDialog } from "./product-return-dialog";
+import { ReceiptDeliveryHistory } from "./receipt-delivery-history";
 
 type OrderDetailViewProps = {
   canResolveManualPayments: boolean;
@@ -95,12 +97,7 @@ export function OrderDetailView({
         <div className="flex flex-wrap items-center gap-2">
           {canResolveManualPayments &&
           order.items.some((item) => item.itemKind === "product") ? (
-            <ProductReturnDialog
-              adjustments={adjustments}
-              order={order}
-              payments={payments}
-              products={products}
-            />
+            <ProductReturnDialog order={order} products={products} />
           ) : null}
           <PrintJobControl
             canReprint={canResolveManualPayments}
@@ -142,6 +139,7 @@ export function OrderDetailView({
             orderId={order.id}
             payments={payments}
           />
+          <ReceiptDeliveryHistory orderId={order.id} />
           <OrderPaymentAdjustments
             adjustments={adjustments}
             canManage={canResolveManualPayments}
@@ -224,7 +222,10 @@ function buildOrderReceiptContent(
       taxableMinor: toMinorUnits(order.taxableAmount, order.currency),
       taxMinor: toMinorUnits(order.taxAmount, order.currency),
       taxRate: order.taxRateSnapshot,
-      roundingMinor: toMinorUnits(order.roundingAdjustmentAmount, order.currency),
+      roundingMinor: toMinorUnits(
+        order.roundingAdjustmentAmount,
+        order.currency,
+      ),
       taxRegistrationNumber: order.taxRegistrationNumberSnapshot ?? undefined,
       taxExemptionReason: order.taxExemptionReason ?? undefined,
       totalMinor,
@@ -393,12 +394,16 @@ function OrderPaymentsCard({
     action: "confirm" | "fail";
   } | null>(null);
   const [reason, setReason] = useState("");
+  const [tpeReference, setTpeReference] = useState("");
+  const [authorizationCode, setAuthorizationCode] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function closeResolutionDialog() {
     if (isPending) return;
     setResolution(null);
     setReason("");
+    setTpeReference("");
+    setAuthorizationCode("");
   }
 
   function submitResolution() {
@@ -408,16 +413,39 @@ function OrderPaymentsCard({
       toast.error("标记失败时必须填写原因。");
       return;
     }
+    if (
+      resolution.payment.paymentMethod === "card" &&
+      resolution.action === "confirm" &&
+      !tpeReference.trim()
+    ) {
+      toast.error("确认刷卡成功必须填写 TPE 交易流水号。");
+      return;
+    }
 
     startTransition(async () => {
       const result =
-        resolution.action === "confirm"
-          ? await confirmManualPaymentAction(orderId, resolution.payment.id, {
-              reason: trimmedReason || undefined,
+        resolution.payment.paymentMethod === "card"
+          ? await recordCardOutcomeAction(orderId, resolution.payment.id, {
+              outcome: resolution.action === "confirm" ? "succeeded" : "failed",
+              externalReference:
+                resolution.action === "confirm"
+                  ? tpeReference.trim()
+                  : undefined,
+              authorizationCode: authorizationCode.trim() || undefined,
+              providerPayload:
+                trimmedReason && resolution.action === "confirm"
+                  ? { reconciliationNote: trimmedReason }
+                  : undefined,
+              failureReason:
+                resolution.action === "fail" ? trimmedReason : undefined,
             })
-          : await failManualPaymentAction(orderId, resolution.payment.id, {
-              reason: trimmedReason,
-            });
+          : resolution.action === "confirm"
+            ? await confirmManualPaymentAction(orderId, resolution.payment.id, {
+                reason: trimmedReason || undefined,
+              })
+            : await failManualPaymentAction(orderId, resolution.payment.id, {
+                reason: trimmedReason,
+              });
 
       if (!result.ok) {
         toast.error(result.message);
@@ -426,11 +454,15 @@ function OrderPaymentsCard({
 
       toast.success(
         resolution.action === "confirm"
-          ? "移动支付已确认到账。"
-          : "移动支付已标记为失败。",
+          ? resolution.payment.paymentMethod === "card"
+            ? "TPE 刷卡已核销成功。"
+            : "移动支付已确认到账。"
+          : "支付已标记为失败。",
       );
       setResolution(null);
       setReason("");
+      setTpeReference("");
+      setAuthorizationCode("");
       router.refresh();
     });
   }
@@ -506,7 +538,9 @@ function OrderPaymentsCard({
                         }
                         type="button"
                       >
-                        确认到账
+                        {payment.paymentMethod === "card"
+                          ? "核销成功"
+                          : "确认到账"}
                       </button>
                       <button
                         className="h-9 rounded-md border border-destructive/30 px-3 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10"
@@ -539,11 +573,14 @@ function OrderPaymentsCard({
           <DialogHeader>
             <DialogTitle>
               {resolution?.action === "confirm"
-                ? "确认移动支付到账"
-                : "标记移动支付失败"}
+                ? resolution.payment.paymentMethod === "card"
+                  ? "核销 TPE 刷卡结果"
+                  : "确认移动支付到账"
+                : "标记支付失败"}
             </DialogTitle>
             <DialogDescription>
-              请先在对应商户应用中核对金额与交易流水号。本操作会记录操作者和时间。
+              请先在对应 TPE
+              或商户应用中核对金额与交易流水号。本操作会记录操作者和时间。
             </DialogDescription>
           </DialogHeader>
           {resolution ? (
@@ -564,6 +601,31 @@ function OrderPaymentsCard({
                   流水号：{resolution.payment.externalReference ?? "—"}
                 </div>
               </div>
+              {resolution.payment.paymentMethod === "card" &&
+              resolution.action === "confirm" ? (
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="grid gap-2 text-sm font-medium">
+                    TPE 交易流水号
+                    <input
+                      className="h-11 rounded-md border bg-background px-3 font-normal"
+                      maxLength={120}
+                      onChange={(event) => setTpeReference(event.target.value)}
+                      value={tpeReference}
+                    />
+                  </label>
+                  <label className="grid gap-2 text-sm font-medium">
+                    授权码（可选）
+                    <input
+                      className="h-11 rounded-md border bg-background px-3 font-normal"
+                      maxLength={120}
+                      onChange={(event) =>
+                        setAuthorizationCode(event.target.value)
+                      }
+                      value={authorizationCode}
+                    />
+                  </label>
+                </div>
+              ) : null}
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 {resolution.action === "fail" ? "失败原因" : "确认备注（可选）"}
                 <textarea

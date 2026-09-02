@@ -83,6 +83,31 @@ export function OrderInfoEditor({ order }: { order: PosOrderDetail }) {
           label="过期时间"
           value={formatOrderDateTime(order.expireAt, locale, timeZone)}
         />
+        {order.settlementIntent !== "pay_now" ? (
+          <>
+            <SummaryItem
+              label="未收余额"
+              value={formatOrderMoney(
+                Math.max(
+                  0,
+                  Number(order.totalAmount) - Number(order.paidAmount),
+                ).toFixed(2),
+                order.currency,
+              )}
+            />
+            <SummaryItem
+              label="最晚付款时间"
+              value={formatOrderDateTime(order.balanceDueAt, locale, timeZone)}
+            />
+            <SummaryItem
+              label="结算方式"
+              value={
+                order.settlementIntent === "partial" ? "部分付款" : "稍后付款"
+              }
+            />
+            <SummaryItem label="欠款原因" value={order.unpaidReason ?? "-"} />
+          </>
+        ) : null}
       </div>
 
       {editing ? (

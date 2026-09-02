@@ -543,6 +543,8 @@ function CartPanel({
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [tenders, setTenders] = useState<CheckoutTender[]>([]);
   const [payLater, setPayLater] = useState(false);
+  const [unpaidReason, setUnpaidReason] = useState("");
+  const [balanceDueAt, setBalanceDueAt] = useState("");
   const [receiptDelivery, setReceiptDelivery] =
     useState<ReceiptDeliveryChoice>("print");
   const [receiptDestination, setReceiptDestination] = useState("");
@@ -674,6 +676,10 @@ function CartPanel({
 
   function openCheckout() {
     if (!scopeReady || cart.lines.length === 0) return;
+    if (!cashShiftAvailable) {
+      toast.error("请先在交接班页面开班，再进行销售结算。");
+      return;
+    }
     if (offlineCheckoutBlocked) {
       toast.error(t("pos.cart.offlineCheckoutBlocked"));
       return;
@@ -696,15 +702,16 @@ function CartPanel({
           )
         : configuredDefault === "card" && !hardwareCapabilities.cardTerminal
           ? runtime.paymentMethodsEnabled.find(
-              (method) => method !== "card" && (method !== "cash" || cashShiftAvailable),
+              (method) =>
+                method !== "card" && (method !== "cash" || cashShiftAvailable),
             )
           : configuredDefault;
     setTenders(
-      availableDefault
-        ? [createCheckoutTender(availableDefault, total)]
-        : [],
+      availableDefault ? [createCheckoutTender(availableDefault, total)] : [],
     );
     setPayLater(!availableDefault);
+    setUnpaidReason("");
+    setBalanceDueAt(defaultBalanceDueDate());
     setReceiptDelivery(runtime.autoPrintReceipt ? "print" : "none");
     setReceiptDestination("");
     setCheckoutOpen(true);
@@ -712,8 +719,8 @@ function CartPanel({
 
   function addTender(paymentMethod: PosPaymentMethod) {
     if (paymentMethod !== "cash" && externalTenderExists) return;
-    if (tenders.some((tender) => tender.paymentMethod === paymentMethod)) return;
-    setPayLater(false);
+    if (tenders.some((tender) => tender.paymentMethod === paymentMethod))
+      return;
     setTenders((current) => [
       ...current,
       createCheckoutTender(paymentMethod, toMoney(outstandingAmount)),
@@ -739,9 +746,7 @@ function CartPanel({
       toast.error(t("pos.cart.discountReasonRequired"));
       return;
     }
-    const activeTenders = tenders.filter(
-      (tender) => Number(tender.amount) > 0,
-    );
+    const activeTenders = tenders.filter((tender) => Number(tender.amount) > 0);
     if (paidNowAmount > Number(total) + 0.0001) {
       toast.error("支付金额合计不能超过订单应收金额。");
       return;
@@ -786,6 +791,25 @@ function CartPanel({
       toast.error("请填写有效的小票接收地址或手机号。");
       return;
     }
+    const hasOutstandingBalance = outstandingAmount > 0.0001;
+    if (hasOutstandingBalance) {
+      if (!payLater) {
+        toast.error("仍有未收余额，请明确选择保留欠款后再完成订单。");
+        return;
+      }
+      if (!cart.customer) {
+        toast.error("部分付款或稍后付款必须绑定客户。");
+        return;
+      }
+      if (
+        unpaidReason.trim().length < 3 ||
+        !balanceDueAt ||
+        Date.parse(balanceDueAt) <= Date.now()
+      ) {
+        toast.error("请填写欠款原因和未来的最晚付款时间。");
+        return;
+      }
+    }
 
     const offlineTenderEligible =
       activeTenders.length === 0 ||
@@ -827,9 +851,22 @@ function CartPanel({
             };
           },
         );
+        const settlementIntent =
+          paidNowAmount <= 0.0001
+            ? "pay_later"
+            : outstandingAmount > 0.0001
+              ? "partial"
+              : "pay_now";
         const checkoutResult = await checkoutOrder(
           {
             expectedTotalAmount: toMoney(total),
+            settlementIntent,
+            ...(settlementIntent !== "pay_now"
+              ? {
+                  balanceDueAt: new Date(balanceDueAt).toISOString(),
+                  unpaidReason: unpaidReason.trim(),
+                }
+              : {}),
             order: {
               id: orderId,
               orderType: "manual",
@@ -855,6 +892,7 @@ function CartPanel({
               !hasTicketLines &&
               !cart.discountCode &&
               !taxExemptionReason.trim() &&
+              settlementIntent === "pay_now" &&
               offlineProductEligible &&
               offlineTenderEligible,
           },
@@ -962,27 +1000,66 @@ function CartPanel({
             );
             if (result.status !== "succeeded") {
               toast.warning(
-                result.message ?? `刷卡结果：${cardOutcomeLabel(result.status)}`,
+                result.message ??
+                  `刷卡结果：${cardOutcomeLabel(result.status)}`,
               );
+              if (result.status === "timed_out") {
+                await onClear();
+                setCheckoutOpen(false);
+                router.push(posRoutes.orderDetail(finalOrder.id));
+                router.refresh();
+                return;
+              }
+              setTenders((current) =>
+                current.filter((tender) => tender.paymentMethod !== "card"),
+              );
+              return;
             }
           } catch (error) {
             finalOrder = await posApi.pos.orders.recordCardOutcome(
               finalOrder.id,
               cardPayment.id,
               {
-                outcome: "failed",
+                outcome: "timed_out",
                 failureCode: "TPE_BRIDGE_ERROR",
                 failureReason:
                   error instanceof Error ? error.message : "TPE 刷卡失败。",
               },
             );
             toast.warning(
-              error instanceof Error ? error.message : "TPE 刷卡失败。",
+              `${error instanceof Error ? error.message : "TPE 状态未知。"} 请先核对终端交易记录，勿重复收款。`,
             );
+            await onClear();
+            setCheckoutOpen(false);
+            router.push(posRoutes.orderDetail(finalOrder.id));
+            router.refresh();
+            return;
           }
-          finalPayments = (
-            await posApi.pos.orders.listPayments(finalOrder.id)
-          ).data;
+          finalPayments = (await posApi.pos.orders.listPayments(finalOrder.id))
+            .data;
+        }
+
+        const pendingExternalPayment = finalPayments.find(
+          (payment) =>
+            payment.paymentStatus === "pending" &&
+            payment.paymentMethod !== "cash",
+        );
+        if (pendingExternalPayment) {
+          await onClear();
+          setCheckoutOpen(false);
+          toast.warning(
+            "订单已保存，但外部支付仍待确认。确认到账前不要交付商品，也不会生成正式已付款小票。",
+          );
+          router.push(posRoutes.orderDetail(finalOrder.id));
+          router.refresh();
+          return;
+        }
+        if (
+          settlementIntent === "pay_now" &&
+          finalOrder.paymentStatus !== "paid"
+        ) {
+          toast.error("支付尚未完成，请重试或更换支付方式。");
+          return;
         }
 
         let printStatus: "queued" | "printed" | "failed" | null = null;
@@ -1325,7 +1402,9 @@ function CartPanel({
       >
         <DialogContent className="max-h-[88dvh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>{parkName ? "挂起当前购物车" : "门店挂单"}</DialogTitle>
+            <DialogTitle>
+              {parkName ? "挂起当前购物车" : "门店挂单"}
+            </DialogTitle>
             <DialogDescription>
               挂单会保留名称、原员工和过期时间；同门店员工可认领，但同一挂单只能成功认领一次。
             </DialogDescription>
@@ -1361,7 +1440,11 @@ function CartPanel({
                 >
                   查看列表
                 </Button>
-                <Button disabled={isPending} onClick={submitParkCart} type="button">
+                <Button
+                  disabled={isPending}
+                  onClick={submitParkCart}
+                  type="button"
+                >
                   确认挂单
                 </Button>
               </DialogFooter>
@@ -1384,8 +1467,9 @@ function CartPanel({
                         {saved.name ?? "未命名挂单"}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {saved.ownerName ?? "未知员工"} · {saved.cart.lines.length} 项 ·
-                        过期 {new Date(saved.expiresAt).toLocaleString(locale)}
+                        {saved.ownerName ?? "未知员工"} ·{" "}
+                        {saved.cart.lines.length} 项 · 过期{" "}
+                        {new Date(saved.expiresAt).toLocaleString(locale)}
                       </p>
                       {saved.handoffNote ? (
                         <p className="mt-1 text-xs text-muted-foreground">
@@ -1465,7 +1549,8 @@ function CartPanel({
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">本次收款</h3>
                 <span className="text-xs text-muted-foreground">
-                  未收 {formatPosMoney(outstandingAmount, cart.currency, locale)}
+                  未收{" "}
+                  {formatPosMoney(outstandingAmount, cart.currency, locale)}
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1490,17 +1575,36 @@ function CartPanel({
                   );
                 })}
                 <Button
-                  disabled={tenders.length > 0}
+                  disabled={
+                    outstandingAmount <= 0 ||
+                    !cart.customer ||
+                    !canManageSensitiveOperations
+                  }
                   onClick={() => {
-                    setTenders([]);
                     setPayLater(true);
                   }}
                   type="button"
                   variant={payLater ? "default" : "outline"}
                 >
-                  {t("pos.cart.payLater")}
+                  {tenders.length > 0 ? "保留未收余额" : t("pos.cart.payLater")}
                 </Button>
               </div>
+
+              {outstandingAmount > 0 && payLater ? (
+                <div className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
+                  <Input
+                    min={new Date().toISOString().slice(0, 16)}
+                    onChange={(event) => setBalanceDueAt(event.target.value)}
+                    type="datetime-local"
+                    value={balanceDueAt}
+                  />
+                  <Input
+                    onChange={(event) => setUnpaidReason(event.target.value)}
+                    placeholder="欠款原因，例如：客户取件时支付"
+                    value={unpaidReason}
+                  />
+                </div>
+              ) : null}
 
               {tenders.map((tender) => {
                 const change =
@@ -1511,7 +1615,10 @@ function CartPanel({
                       )
                     : 0;
                 return (
-                  <div className="space-y-3 rounded-md border p-3" key={tender.id}>
+                  <div
+                    className="space-y-3 rounded-md border p-3"
+                    key={tender.id}
+                  >
                     <div className="flex items-center justify-between gap-3">
                       <strong className="text-sm">
                         {paymentMethodLabel(tender.paymentMethod)}
@@ -1535,7 +1642,9 @@ function CartPanel({
                         inputMode="decimal"
                         min={0.01}
                         onChange={(event) =>
-                          updateTender(tender.id, { amount: event.target.value })
+                          updateTender(tender.id, {
+                            amount: event.target.value,
+                          })
                         }
                         step="0.01"
                         type="number"
@@ -1593,18 +1702,24 @@ function CartPanel({
                     {tender.paymentMethod === "app" ? (
                       <>
                         <div className="grid grid-cols-2 gap-2">
-                          {(["wave", "orange_money"] as const).map((provider) => (
-                            <Button
-                              key={provider}
-                              onClick={() => updateTender(tender.id, { provider })}
-                              type="button"
-                              variant={
-                                tender.provider === provider ? "default" : "outline"
-                              }
-                            >
-                              {MOBILE_MONEY_PROVIDER_LABELS[provider]}
-                            </Button>
-                          ))}
+                          {(["wave", "orange_money"] as const).map(
+                            (provider) => (
+                              <Button
+                                key={provider}
+                                onClick={() =>
+                                  updateTender(tender.id, { provider })
+                                }
+                                type="button"
+                                variant={
+                                  tender.provider === provider
+                                    ? "default"
+                                    : "outline"
+                                }
+                              >
+                                {MOBILE_MONEY_PROVIDER_LABELS[provider]}
+                              </Button>
+                            ),
+                          )}
                         </div>
                         <Input
                           className="h-10"
@@ -1621,7 +1736,8 @@ function CartPanel({
                     ) : null}
                     {tender.paymentMethod === "card" ? (
                       <p className="text-xs leading-5 text-muted-foreground">
-                        下单后 POS 会向 TPE 发起交易，并等待成功、失败、取消或超时结果。
+                        下单后 POS 会向 TPE
+                        发起交易，并等待成功、失败、取消或超时结果。
                       </p>
                     ) : null}
                   </div>
@@ -1629,13 +1745,16 @@ function CartPanel({
               })}
             </section>
 
-            {canManageSensitiveOperations && effectivePreview?.taxRate !== "0.000000" ? (
+            {canManageSensitiveOperations &&
+            effectivePreview?.taxRate !== "0.000000" ? (
               <label className="block text-xs font-semibold text-muted-foreground">
                 税务豁免原因（留空则正常计税）
                 <Input
                   className="mt-1.5 h-10"
                   maxLength={500}
-                  onChange={(event) => setTaxExemptionReason(event.target.value)}
+                  onChange={(event) =>
+                    setTaxExemptionReason(event.target.value)
+                  }
                   value={taxExemptionReason}
                 />
               </label>
@@ -1659,7 +1778,9 @@ function CartPanel({
                 <Input
                   className="h-10"
                   inputMode={receiptDelivery === "email" ? "email" : "tel"}
-                  onChange={(event) => setReceiptDestination(event.target.value)}
+                  onChange={(event) =>
+                    setReceiptDestination(event.target.value)
+                  }
                   placeholder={
                     receiptDelivery === "email" ? "客户邮箱" : "客户手机号"
                   }
@@ -1715,6 +1836,12 @@ function toMoney(value: string | number): string {
   return Number.isFinite(amount) ? amount.toFixed(2) : "0.00";
 }
 
+function defaultBalanceDueDate(): string {
+  const due = new Date(Date.now() + 7 * 24 * 60 * 60_000);
+  const local = new Date(due.getTime() - due.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 function createCheckoutTender(
   paymentMethod: PosPaymentMethod,
   amount: string,
@@ -1730,7 +1857,11 @@ function createCheckoutTender(
 }
 
 function paymentMethodLabel(method: PosPaymentMethod): string {
-  return method === "cash" ? "现金" : method === "card" ? "TPE 刷卡" : "移动支付";
+  return method === "cash"
+    ? "现金"
+    : method === "card"
+      ? "TPE 刷卡"
+      : "移动支付";
 }
 
 function receiptDeliveryLabel(choice: ReceiptDeliveryChoice): string {
@@ -1777,7 +1908,7 @@ function calculateLocalFinancialTotal(
       : rules.roundingRule === "round_jiao"
         ? 10
         : 1;
-  return toMoney(Math.round(beforeRounding / increment) * increment / 100);
+  return toMoney((Math.round(beforeRounding / increment) * increment) / 100);
 }
 
 function buildCashTenderPresets(total: string, currency: string): number[] {

@@ -23,7 +23,11 @@ import { Icon } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posToast as toast } from "@/lib/pos-toast";
 
-import { createPaymentCorrectionAction, createRefundAction } from "../actions";
+import {
+  createPaymentCorrectionAction,
+  createRefundAction,
+  resolveRefundAction,
+} from "../actions";
 import { formatOrderDateTime, formatOrderMoney } from "../constants";
 
 type AdjustmentMode = "refund" | "correction";
@@ -49,6 +53,13 @@ export function OrderPaymentAdjustments({
     useState<PosPaymentAdjustmentDirection>("debit");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  const [resolutionAdjustment, setResolutionAdjustment] =
+    useState<PosPaymentAdjustment | null>(null);
+  const [resolutionOutcome, setResolutionOutcome] = useState<
+    "succeeded" | "failed"
+  >("succeeded");
+  const [settlementReference, setSettlementReference] = useState("");
+  const [resolutionReason, setResolutionReason] = useState("");
   const [isPending, startTransition] = useTransition();
 
   const refundablePayments = useMemo(() => {
@@ -59,7 +70,8 @@ export function OrderPaymentAdjustments({
           .filter(
             (adjustment) =>
               adjustment.adjustmentType === "refund" &&
-              adjustment.originalPaymentId === payment.id,
+              adjustment.originalPaymentId === payment.id &&
+              adjustment.status !== "failed",
           )
           .reduce((sum, adjustment) => sum + Number(adjustment.amount), 0);
         return {
@@ -156,11 +168,62 @@ export function OrderPaymentAdjustments({
         return;
       }
 
-      toast.success(mode === "refund" ? "退款已记录。" : "支付修正已记录。");
+      if (mode === "refund" && result.data?.adjustment.status === "pending") {
+        toast.warning(
+          "退款申请已记录，订单实收暂未扣减；请等待渠道退款后再核销。",
+        );
+      } else {
+        toast.success(mode === "refund" ? "退款已完成。" : "支付修正已记录。");
+      }
       setMode(null);
       setAmount("");
       setReason("");
       resetIntent();
+      router.refresh();
+    });
+  }
+
+  function submitRefundResolution(): void {
+    if (!resolutionAdjustment || resolutionReason.trim().length < 3) {
+      toast.error("请填写至少 3 个字符的核销原因。");
+      return;
+    }
+    const originalPayment = payments.find(
+      (payment) => payment.id === resolutionAdjustment.originalPaymentId,
+    );
+    if (
+      resolutionOutcome === "succeeded" &&
+      originalPayment?.paymentMethod !== "cash" &&
+      !settlementReference.trim()
+    ) {
+      toast.error("非现金退款核销必须填写渠道退款流水号。");
+      return;
+    }
+    startTransition(async () => {
+      const result = await resolveRefundAction(
+        resolutionAdjustment.id,
+        order.id,
+        {
+          outcome: resolutionOutcome,
+          settlementReference:
+            resolutionOutcome === "succeeded"
+              ? settlementReference.trim() || undefined
+              : undefined,
+          reason: resolutionReason.trim(),
+        },
+      );
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+      toast.success(
+        resolutionOutcome === "succeeded"
+          ? "渠道退款已核销，订单实收已更新。"
+          : "渠道退款失败已记录，可在确认资金退回后重新核销。",
+      );
+      setResolutionAdjustment(null);
+      setSettlementReference("");
+      setResolutionReason("");
       router.refresh();
     });
   }
@@ -223,6 +286,44 @@ export function OrderPaymentAdjustments({
                 <div className="mt-1 text-xs text-muted-foreground">
                   {formatOrderDateTime(adjustment.occurredAt, locale, timeZone)}
                 </div>
+                {adjustment.adjustmentType === "refund" ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                    <span
+                      className={
+                        adjustment.status === "succeeded"
+                          ? "text-emerald-700"
+                          : adjustment.status === "failed"
+                            ? "text-red-600"
+                            : "text-amber-700"
+                      }
+                    >
+                      {adjustment.status === "succeeded"
+                        ? "资金已退回"
+                        : adjustment.status === "failed"
+                          ? "退款失败"
+                          : "等待渠道确认"}
+                    </span>
+                    {adjustment.settlementReference ? (
+                      <span className="text-muted-foreground">
+                        渠道流水 {adjustment.settlementReference}
+                      </span>
+                    ) : null}
+                    {canManage && adjustment.status !== "succeeded" ? (
+                      <button
+                        className="font-semibold text-primary underline-offset-2 hover:underline"
+                        onClick={() => {
+                          setResolutionAdjustment(adjustment);
+                          setResolutionOutcome("succeeded");
+                          setSettlementReference("");
+                          setResolutionReason("");
+                        }}
+                        type="button"
+                      >
+                        核销退款结果
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
               <div
                 className={`font-semibold ${
@@ -373,6 +474,80 @@ export function OrderPaymentAdjustments({
               type="button"
             >
               {isPending ? "提交中…" : "确认提交"}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(openState) => {
+          if (!openState && !isPending) setResolutionAdjustment(null);
+        }}
+        open={resolutionAdjustment !== null}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>核销渠道退款</DialogTitle>
+            <DialogDescription>
+              只有在支付渠道或终端明确返回结果后才能核销。成功核销会扣减订单实收；失败不会改变订单余额。
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 rounded-md border bg-muted/50 p-1">
+            {(["succeeded", "failed"] as const).map((outcome) => (
+              <button
+                className={`h-11 rounded-md text-sm font-semibold ${
+                  resolutionOutcome === outcome
+                    ? "bg-background ring-1 ring-border"
+                    : "text-muted-foreground"
+                }`}
+                disabled={isPending}
+                key={outcome}
+                onClick={() => setResolutionOutcome(outcome)}
+                type="button"
+              >
+                {outcome === "succeeded" ? "资金已退回" : "退款失败"}
+              </button>
+            ))}
+          </div>
+          {resolutionOutcome === "succeeded" ? (
+            <label className="grid gap-2 text-sm font-medium">
+              渠道退款流水号
+              <input
+                className="h-11 rounded-md border bg-background px-3 font-normal"
+                disabled={isPending}
+                maxLength={160}
+                onChange={(event) => setSettlementReference(event.target.value)}
+                placeholder="现金退款可留空"
+                value={settlementReference}
+              />
+            </label>
+          ) : null}
+          <label className="grid gap-2 text-sm font-medium">
+            核销原因 / 证据说明
+            <textarea
+              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal"
+              disabled={isPending}
+              maxLength={500}
+              onChange={(event) => setResolutionReason(event.target.value)}
+              value={resolutionReason}
+            />
+          </label>
+          <DialogFooter>
+            <button
+              className="h-11 rounded-md border px-4 text-sm font-semibold"
+              disabled={isPending}
+              onClick={() => setResolutionAdjustment(null)}
+              type="button"
+            >
+              取消
+            </button>
+            <button
+              className="h-11 rounded-md bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-50"
+              disabled={isPending || resolutionReason.trim().length < 3}
+              onClick={submitRefundResolution}
+              type="button"
+            >
+              {isPending ? "核销中…" : "确认核销"}
             </button>
           </DialogFooter>
         </DialogContent>
