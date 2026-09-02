@@ -324,6 +324,7 @@ async function runOrderLifecycleAssertions(
 
   const checkoutInput = {
     expectedTotalAmount: "18.00",
+    settlementIntent: "pay_now" as const,
     order: {
       id: ids.checkoutOrderId,
       orderType: "manual" as const,
