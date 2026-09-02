@@ -51,13 +51,33 @@ export const salesReturns = pgTable(
       .references(() => tenants.id),
     branchId: ulidColumn("branch_id").notNull(),
     orderId: ulidColumn("order_id").notNull(),
-    exchangeOrderId: ulidColumn("exchange_order_id").references(() => orders.id),
+    exchangeOrderId: ulidColumn("exchange_order_id").references(
+      () => orders.id,
+    ),
     customerId: ulidColumn("customer_id").references(() => customers.id),
     status: salesReturnStatusEnum("status").notNull().default("draft"),
     idempotencyKey: varchar("idempotency_key", { length: 120 }).notNull(),
     reason: text("reason").notNull(),
     notes: text("notes"),
     refundAmount: numeric("refund_amount", {
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    returnValueAmount: numeric("return_value_amount", {
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    exchangeCreditAmount: numeric("exchange_credit_amount", {
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    additionalDueAmount: numeric("additional_due_amount", {
       precision: 12,
       scale: 2,
     })
@@ -109,6 +129,18 @@ export const salesReturns = pgTable(
     check(
       "sales_returns_refund_amount_nonnegative_check",
       sql`${table.refundAmount} >= 0`,
+    ),
+    check(
+      "sales_returns_return_value_amount_nonnegative_check",
+      sql`${table.returnValueAmount} >= 0`,
+    ),
+    check(
+      "sales_returns_exchange_credit_amount_nonnegative_check",
+      sql`${table.exchangeCreditAmount} >= 0`,
+    ),
+    check(
+      "sales_returns_additional_due_amount_nonnegative_check",
+      sql`${table.additionalDueAmount} >= 0`,
     ),
   ],
 );

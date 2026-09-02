@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
@@ -53,6 +54,8 @@ export const receiptDeliveries = pgTable(
     externalId: varchar("external_id", { length: 160 }),
     providerPayload: jsonb("provider_payload").$type<Record<string, unknown>>(),
     failureReason: text("failure_reason"),
+    attemptCount: integer("attempt_count").notNull().default(0),
+    lastAttemptAt: timestamp("last_attempt_at", { withTimezone: true }),
     sentAt: timestamp("sent_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

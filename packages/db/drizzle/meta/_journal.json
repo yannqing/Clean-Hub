@@ -281,6 +281,27 @@
       "when": 1788253499946,
       "tag": "0039_wide_daredevil",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1788256426174,
+      "tag": "0040_minor_randall",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1788256625622,
+      "tag": "0041_quiet_martin_li",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1788256926804,
+      "tag": "0042_lyrical_thing",
+      "breakpoints": true
     }
   ]
 }

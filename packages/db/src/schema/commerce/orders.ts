@@ -42,6 +42,12 @@ export const orderPaymentStatusEnum = pgEnum("order_payment_status", [
   "refunded",
 ]);
 
+export const orderSettlementIntentEnum = pgEnum("order_settlement_intent", [
+  "pay_now",
+  "partial",
+  "pay_later",
+]);
+
 export const orderItemSourceTypeEnum = pgEnum("order_item_source_type", [
   "ticket_item",
   "service",
@@ -148,6 +154,11 @@ export const orders = pgTable(
       .notNull()
       .default("0"),
     paidAt: timestamp("paid_at", { withTimezone: true }),
+    settlementIntent: orderSettlementIntentEnum("settlement_intent")
+      .notNull()
+      .default("pay_now"),
+    balanceDueAt: timestamp("balance_due_at", { withTimezone: true }),
+    unpaidReason: text("unpaid_reason"),
     expireAt: timestamp("expire_at", { withTimezone: true }),
     notes: text("notes"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -183,6 +194,19 @@ export const orders = pgTable(
           + case when ${table.pricesIncludeTax} then 0 else ${table.taxAmount} end
           + ${table.roundingAdjustmentAmount}
         and ${table.totalAmount} >= 0`,
+    ),
+    check(
+      "orders_settlement_terms_check",
+      sql`(
+        ${table.settlementIntent} = 'pay_now'
+        and ${table.balanceDueAt} is null
+        and ${table.unpaidReason} is null
+      ) or (
+        ${table.settlementIntent} <> 'pay_now'
+        and ${table.customerId} is not null
+        and ${table.balanceDueAt} is not null
+        and nullif(btrim(${table.unpaidReason}), '') is not null
+      )`,
     ),
   ],
 );

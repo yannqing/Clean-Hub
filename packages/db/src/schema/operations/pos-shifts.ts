@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -23,6 +24,11 @@ export const posShiftStatusEnum = pgEnum("pos_shift_status", [
   "on_break",
   "closed",
 ]);
+
+export const posShiftCashMovementTypeEnum = pgEnum(
+  "pos_shift_cash_movement_type",
+  ["pay_in", "pay_out"],
+);
 
 export const posZReportCorrectionTypeEnum = pgEnum(
   "pos_z_report_correction_type",
@@ -87,6 +93,51 @@ export const posStaffShifts = pgTable(
       table.startedAt,
     ),
     index("pos_staff_shifts_status_idx").on(table.status),
+  ],
+);
+
+export const posShiftCashMovements = pgTable(
+  "pos_shift_cash_movements",
+  {
+    id: ulidPrimaryKey(),
+    tenantId: ulidColumn("tenant_id")
+      .notNull()
+      .references(() => tenants.id),
+    branchId: ulidColumn("branch_id")
+      .notNull()
+      .references(() => branches.id),
+    terminalId: ulidColumn("terminal_id")
+      .notNull()
+      .references(() => posTerminalSettings.id),
+    shiftId: ulidColumn("shift_id")
+      .notNull()
+      .references(() => posStaffShifts.id),
+    movementType: posShiftCashMovementTypeEnum("movement_type").notNull(),
+    amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull(),
+    reason: text("reason").notNull(),
+    idempotencyKey: varchar("idempotency_key", { length: 120 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    createdBy: ulidColumn("created_by")
+      .notNull()
+      .references(() => users.id),
+  },
+  (table) => [
+    uniqueIndex("pos_shift_cash_movements_tenant_idempotency_unique").on(
+      table.tenantId,
+      table.idempotencyKey,
+    ),
+    index("pos_shift_cash_movements_shift_created_at_idx").on(
+      table.tenantId,
+      table.shiftId,
+      table.createdAt,
+    ),
+    check(
+      "pos_shift_cash_movements_amount_positive_check",
+      sql`${table.amount} > 0`,
+    ),
   ],
 );
 
@@ -176,6 +227,24 @@ export const posZReports = pgTable(
       .notNull()
       .default("0"),
     correctionAmount: numeric("correction_amount", {
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    unsettledPaymentCount: integer("unsettled_payment_count")
+      .notNull()
+      .default(0),
+    unsettledPaymentAmount: numeric("unsettled_payment_amount", {
+      precision: 12,
+      scale: 2,
+    })
+      .notNull()
+      .default("0"),
+    unsettledRefundCount: integer("unsettled_refund_count")
+      .notNull()
+      .default(0),
+    unsettledRefundAmount: numeric("unsettled_refund_amount", {
       precision: 12,
       scale: 2,
     })
