@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import type { PosPendingTask, PosPendingTaskType } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
@@ -21,35 +21,48 @@ type SectionHeaderProps = {
   title: string;
 };
 
-const CHART_COLORS = {
-  high: "var(--chart-5)",
-  medium: "var(--chart-1)",
-  low: "var(--chart-2)",
-  section: "var(--chart-5)",
-} as const;
-
 const TASK_META: Record<
   PosPendingTaskType,
-  { label: string; icon: PosIconName }
+  { icon: PosIconName }
 > = {
   overdue_ticket: {
-    label: "逾期工单",
     icon: "alert",
   },
   unpaid_order: {
-    label: "待收款订单",
     icon: "wallet-cards",
   },
   pending_pickup: {
-    label: "待取件工单",
     icon: "package-check",
   },
 };
 
-const PRIORITY_LABELS: Record<Priority, string> = {
-  high: "高优先级",
-  medium: "中优先级",
-  low: "低优先级",
+const PRIORITY_STYLES: Record<
+  Priority,
+  { badge: string; count: string; icon: string; label: string }
+> = {
+  high: {
+    badge:
+      "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/35 dark:text-red-300",
+    count: "bg-red-50 text-red-700 dark:bg-red-950/35 dark:text-red-300",
+    icon: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/35 dark:text-red-300",
+    label: "高优先级",
+  },
+  medium: {
+    badge:
+      "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-300",
+    count:
+      "bg-amber-50 text-amber-700 dark:bg-amber-950/35 dark:text-amber-300",
+    icon: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-300",
+    label: "中优先级",
+  },
+  low: {
+    badge:
+      "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-300",
+    count:
+      "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-300",
+    icon: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-300",
+    label: "低优先级",
+  },
 };
 
 function formatNumber(value: number, locale: string): string {
@@ -72,12 +85,18 @@ function formatPendingSummary(count: number, locale: string): string {
   return `当前待处理 ${value} 项`;
 }
 
-function iconAccentStyle(color: string): CSSProperties {
-  return {
-    backgroundColor: `color-mix(in oklch, ${color} 12%, white)`,
-    borderColor: `color-mix(in oklch, ${color} 22%, white)`,
-    color,
-  };
+function formatTaskCount(count: number, locale: string): string {
+  const value = formatNumber(count, locale);
+
+  if (locale === "en") {
+    return `${value} items`;
+  }
+
+  if (locale === "fr") {
+    return `${value} éléments`;
+  }
+
+  return `${value} 项`;
 }
 
 function SectionHeader({
@@ -102,11 +121,8 @@ function SectionHeader({
 
 function EmptyTasks() {
   return (
-    <div className="border-y border-dashed border-border bg-background p-8 text-center">
-      <div
-        className="mx-auto flex h-12 w-12 items-center justify-center rounded-lg border"
-        style={iconAccentStyle(CHART_COLORS.low)}
-      >
+    <div className="p-8 text-center">
+      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-300">
         <Icon className="h-6 w-6" name="package-check" />
       </div>
       <p className="mt-3 text-sm font-semibold text-foreground">暂无待办任务</p>
@@ -117,76 +133,57 @@ function EmptyTasks() {
 
 function TaskCard({
   locale,
-  maxCount,
   task,
 }: {
   locale: string;
-  maxCount: number;
   task: PosPendingTask;
 }) {
   const meta = TASK_META[task.type] ?? {
-    label: task.title,
     icon: "clipboard-list" as PosIconName,
   };
-  const priority = task.priority in PRIORITY_LABELS ? task.priority : "low";
-  const color = CHART_COLORS[priority];
-  const width =
-    task.count > 0 ? Math.max((task.count / maxCount) * 100, 10) : 0;
+  const priority = task.priority in PRIORITY_STYLES ? task.priority : "low";
+  const style = PRIORITY_STYLES[priority];
 
   return (
     <Link
-      className="group block border-y border-border bg-background p-4 transition hover:border-border hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group flex min-h-20 items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:gap-4"
       href={task.actionRoute}
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          <span
-            className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border"
-            style={iconAccentStyle(color)}
-          >
-            <Icon className="h-5 w-5" name={meta.icon} />
-          </span>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="truncate text-sm font-semibold text-foreground">
-                {task.title}
-              </h3>
-              <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                {meta.label}
-              </span>
-            </div>
-            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-              {task.description}
-            </p>
-          </div>
-        </div>
+      <span
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${style.icon}`}
+      >
+        <Icon className="h-5 w-5" name={meta.icon} />
+      </span>
 
-        <div className="flex shrink-0 flex-col items-end justify-between gap-3">
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-2">
+          <span className="truncate text-sm font-semibold text-foreground">
+            {task.title}
+          </span>
           <span
-            className="inline-flex min-w-10 items-center justify-center rounded-md px-2.5 py-1 text-sm font-bold"
-            style={iconAccentStyle(color)}
+            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${style.badge}`}
           >
-            {formatNumber(task.count, locale)}
+            {style.label}
           </span>
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground group-hover:text-foreground">
-            处理
-            <Icon className="h-3.5 w-3.5" name="chevron-right" />
-          </span>
-        </div>
-      </div>
+        </span>
+        <span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted-foreground">
+          {task.description}
+        </span>
+      </span>
 
-      <div className="mt-4">
-        <div className="mb-2 flex items-center justify-between gap-3 text-[11px] font-semibold text-muted-foreground">
-          <span>{PRIORITY_LABELS[priority]}</span>
-          <span>待处理事项</span>
-        </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-          <div
-            className="h-full rounded-full transition-[width] duration-500"
-            style={{ backgroundColor: color, width: `${width}%` }}
+      <span className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <span
+          className={`inline-flex min-w-14 items-center justify-center rounded-lg px-2.5 py-1.5 text-xs font-bold tabular-nums ${style.count}`}
+        >
+          {formatTaskCount(task.count, locale)}
+        </span>
+        <span className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors group-hover:bg-background group-hover:text-foreground">
+          <Icon
+            className="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+            name="chevron-right"
           />
-        </div>
-      </div>
+        </span>
+      </span>
     </Link>
   );
 }
@@ -203,7 +200,6 @@ export function PendingTasks({
   const localPrintTaskCount = actionable + syncPending;
   const totalPending =
     tasks.reduce((sum, task) => sum + task.count, 0) + localPrintTaskCount;
-  const maxCount = Math.max(...tasks.map((task) => task.count), 1);
   const hasPendingTasks = tasks.length > 0 || localPrintTaskCount > 0;
 
   return (
@@ -222,15 +218,16 @@ export function PendingTasks({
       />
 
       {!hasPendingTasks ? (
-        <EmptyTasks />
+        <div className="overflow-hidden rounded-xl border border-border bg-background shadow-sm">
+          <EmptyTasks />
+        </div>
       ) : (
-        <div className="space-y-2">
+        <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-background shadow-sm">
           <PendingPrintJobs canReprint={canReprint} variant="task" />
           {tasks.map((task) => (
             <TaskCard
               key={task.id}
               locale={locale}
-              maxCount={maxCount}
               task={task}
             />
           ))}
