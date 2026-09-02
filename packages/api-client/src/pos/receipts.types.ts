@@ -18,6 +18,12 @@ export type PosReceiptDelivery = {
   provider: string | null;
   externalId: string | null;
   failureReason: string | null;
+  attemptCount: number;
+  lastAttemptAt: string | null;
   sentAt: string | null;
   createdAt: string;
+};
+
+export type PosReceiptDeliveryListResponse = {
+  data: PosReceiptDelivery[];
 };

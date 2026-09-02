@@ -1,11 +1,15 @@
 import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   ClockRequest,
+  CreatePosShiftCashMovementRequest,
   CreateHandoverRequest,
   HandoverRecord,
   PosStaffDetail,
+  PosCurrentShiftReconciliation,
   PosStaffListQuery,
   PosStaffListResponse,
+  PosShiftCashMovement,
+  PosShiftCashMovementListResponse,
   PosZReport,
   PosZReportListQuery,
   PosZReportListResponse,
@@ -22,6 +26,25 @@ export function createPosStaffApi(client: ApiClient) {
       client.get<PosStaffDetail>(`/pos/staff/${staffId}`, options),
     currentShift: (options?: RequestOptions) =>
       client.get<ShiftRecord | null>("/pos/staff/current-shift", options),
+    currentShiftReconciliation: (options?: RequestOptions) =>
+      client.get<PosCurrentShiftReconciliation | null>(
+        "/pos/staff/current-shift/reconciliation",
+        options,
+      ),
+    listCurrentShiftCashMovements: (options?: RequestOptions) =>
+      client.get<PosShiftCashMovementListResponse>(
+        "/pos/staff/current-shift/cash-movements",
+        options,
+      ),
+    createShiftCashMovement: (
+      input: CreatePosShiftCashMovementRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<PosShiftCashMovement>(
+        "/pos/staff/current-shift/cash-movements",
+        input,
+        { ...options, idempotencyKey: input.idempotencyKey },
+      ),
     clock: (input: ClockRequest, options?: RequestOptions) =>
       client.post<ShiftRecord>("/pos/staff/clock", input, options),
     createHandover: (input: CreateHandoverRequest, options?: RequestOptions) =>

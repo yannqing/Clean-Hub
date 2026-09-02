@@ -25,6 +25,7 @@ import type {
 import type {
   DeliverPosReceiptRequest,
   PosReceiptDelivery,
+  PosReceiptDeliveryListResponse,
 } from "./receipts.types";
 import type {
   CreatePosProductReturnRequest,
@@ -154,6 +155,21 @@ export function createPosOrdersApi(client: ApiClient) {
       client.post<PosReceiptDelivery>(
         `/pos/orders/${orderId}/receipt-deliveries`,
         input,
+        options,
+      ),
+    listReceiptDeliveries: (orderId: string, options?: RequestOptions) =>
+      client.get<PosReceiptDeliveryListResponse>(
+        `/pos/orders/${orderId}/receipt-deliveries`,
+        options,
+      ),
+    retryReceiptDelivery: (
+      orderId: string,
+      deliveryId: string,
+      options?: RequestOptions,
+    ) =>
+      client.post<PosReceiptDelivery>(
+        `/pos/orders/${orderId}/receipt-deliveries/${deliveryId}/retry`,
+        {},
         options,
       ),
     listProductReturns: (orderId: string, options?: RequestOptions) =>

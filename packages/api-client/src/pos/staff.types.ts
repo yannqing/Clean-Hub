@@ -53,6 +53,29 @@ export type ShiftRecord = {
   version: number;
 };
 
+export type PosShiftCashMovement = {
+  id: string;
+  shiftId: string;
+  movementType: "pay_in" | "pay_out";
+  amount: string;
+  currency: string;
+  reason: string;
+  idempotencyKey: string;
+  createdAt: string;
+  createdBy: string;
+};
+
+export type CreatePosShiftCashMovementRequest = {
+  movementType: "pay_in" | "pay_out";
+  amount: string;
+  reason: string;
+  idempotencyKey: string;
+};
+
+export type PosShiftCashMovementListResponse = {
+  data: PosShiftCashMovement[];
+};
+
 export type PosZReportPaymentBreakdown = {
   method: string;
   provider: string | null;
@@ -60,6 +83,24 @@ export type PosZReportPaymentBreakdown = {
   refundAmount: string;
   netAmount: string;
   transactionCount: number;
+};
+
+export type PosCurrentShiftReconciliation = {
+  currency: string;
+  orderCount: number;
+  grossSales: string;
+  discountAmount: string;
+  refundAmount: string;
+  correctionAmount: string;
+  unsettledPaymentCount: number;
+  unsettledPaymentAmount: string;
+  unsettledRefundCount: number;
+  unsettledRefundAmount: string;
+  netSales: string;
+  expectedCash: string;
+  outstandingOrders: number;
+  outstandingTickets: number;
+  paymentBreakdown: PosZReportPaymentBreakdown[];
 };
 
 export type PosZReport = {
@@ -76,6 +117,10 @@ export type PosZReport = {
   discountAmount: string;
   refundAmount: string;
   correctionAmount: string;
+  unsettledPaymentCount: number;
+  unsettledPaymentAmount: string;
+  unsettledRefundCount: number;
+  unsettledRefundAmount: string;
   netSales: string;
   expectedCash: string;
   countedCash: string;

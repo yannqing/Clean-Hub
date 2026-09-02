@@ -4,6 +4,7 @@ import type {
   CreatePosPaymentCorrectionRequest,
   CreatePosRefundRequest,
   PosPaymentAdjustmentListResponse,
+  ResolvePosRefundRequest,
 } from "./payment-adjustments.types";
 
 type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
@@ -20,6 +21,16 @@ export function createPosPaymentAdjustmentsApi(client: ApiClient) {
         "/pos/payment-adjustments/refunds",
         input,
         { ...options, idempotencyKey: input.idempotencyKey },
+      ),
+    resolveRefund: (
+      adjustmentId: string,
+      input: ResolvePosRefundRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<CreatePosPaymentAdjustmentResponse>(
+        `/pos/payment-adjustments/${adjustmentId}/refund-outcome`,
+        input,
+        options,
       ),
     createCorrection: (
       input: CreatePosPaymentCorrectionRequest,

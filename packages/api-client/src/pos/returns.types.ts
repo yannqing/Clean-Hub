@@ -24,6 +24,7 @@ export type CreatePosProductReturnRequest = {
   refundAllocations?: Array<{
     originalPaymentId: string;
     amount: string;
+    settlementReference?: string;
   }>;
   exchangeItems?: Array<{ productSkuId: string; quantity: string }>;
 };
@@ -43,12 +44,15 @@ export type PosProductReturn = {
   id: string;
   orderId: string;
   exchangeOrderId: string | null;
-  status: "completed";
+  status: "received" | "completed";
   reason: string;
   notes: string | null;
   refundAmount: string;
+  returnValueAmount: string;
+  exchangeCreditAmount: string;
+  additionalDueAmount: string;
   currency: string;
-  completedAt: string;
+  completedAt: string | null;
   createdAt: string;
   createdBy: string;
   items: PosProductReturnItem[];
