@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import type {
   PosBranchSummary,
   PosOrderSummary,
+  PosCurrentShiftReconciliation,
   PosStaffSummary,
   PosZReport,
   ServiceTicketSummary,
@@ -27,6 +28,7 @@ import { posToast as toast } from "@/lib/pos-toast";
 
 import { clockShiftAction, createShiftHandoverAction } from "../actions";
 import type { ShiftHandoverSummary } from "../types";
+import { CashMovementPanel } from "./cash-movement-panel";
 
 const DRAFT_STORAGE_KEY = "cleanhub.pos-web.shift-handover-draft";
 
@@ -41,6 +43,7 @@ type ShiftHandoverViewProps = {
   branch: PosBranchSummary | null;
   currentShift: ShiftRecord | null;
   recentReports: PosZReport[];
+  reconciliation: PosCurrentShiftReconciliation | null;
   staff: PosStaffSummary[];
   summary: ShiftHandoverSummary;
   user: PosSessionUser | null;
@@ -590,6 +593,7 @@ export function ShiftHandoverView({
   branch,
   currentShift,
   recentReports,
+  reconciliation,
   staff,
   summary,
   user,
@@ -606,8 +610,10 @@ export function ShiftHandoverView({
     const cash = summary.orders?.paymentMethods.find(
       (item) => item.method === "cash",
     );
-    return toNumber(currentShift?.openingFloat) + toNumber(cash?.amount);
-  }, [currentShift?.openingFloat, summary.orders]);
+    return reconciliation
+      ? toNumber(reconciliation.expectedCash)
+      : toNumber(currentShift?.openingFloat) + toNumber(cash?.amount);
+  }, [currentShift?.openingFloat, reconciliation, summary.orders]);
   const paidToday = toNumber(summary.orders?.paidAmount);
   const orderCount = summary.orders?.orderCount ?? 0;
   const pendingOrderCount =
@@ -908,6 +914,30 @@ export function ShiftHandoverView({
         />
       </div>
 
+      {reconciliation &&
+      (reconciliation.unsettledPaymentCount > 0 ||
+        reconciliation.unsettledRefundCount > 0) ? (
+        <p className="border-y bg-amber-50 px-5 py-3 text-sm font-semibold text-amber-800">
+          {formatUnsettledProviderSummary(
+            reconciliation,
+            resolvedLocale,
+            locale,
+          )}
+          {resolvedLocale === "zh-CN"
+            ? "。交班前请优先在订单支付流水中核对；如仍未解决，将作为 Z Report 异常保留。"
+            : resolvedLocale === "fr"
+              ? ". Vérifiez les transactions avant la relève ; les écarts restants seront conservés dans le rapport Z."
+              : ". Reconcile these before handover; unresolved items will remain on the Z Report."}
+        </p>
+      ) : null}
+
+      {currentShift ? (
+        <CashMovementPanel
+          canManage={user?.role === "owner" || user?.role === "manager"}
+          currentShift={currentShift}
+        />
+      ) : null}
+
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)]">
         <section className="border-y bg-background p-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1181,6 +1211,16 @@ export function ShiftHandoverView({
                         </p>
                       </div>
                     </div>
+                    {report.unsettledPaymentCount > 0 ||
+                    report.unsettledRefundCount > 0 ? (
+                      <p className="mt-3 rounded-md bg-amber-50 p-2 text-xs font-medium text-amber-800">
+                        {formatUnsettledProviderSummary(
+                          report,
+                          resolvedLocale,
+                          locale,
+                        )}
+                      </p>
+                    ) : null}
                     {report.paymentBreakdown.length > 0 ? (
                       <div className="mt-3 space-y-1.5 border-t pt-3 text-xs">
                         {report.paymentBreakdown.map((payment) => (
@@ -1317,4 +1357,35 @@ export function ShiftHandoverView({
       </div>
     </section>
   );
+}
+
+function formatUnsettledProviderSummary(
+  report: Pick<
+    PosZReport,
+    | "currency"
+    | "unsettledPaymentCount"
+    | "unsettledPaymentAmount"
+    | "unsettledRefundCount"
+    | "unsettledRefundAmount"
+  >,
+  resolvedLocale: "zh-CN" | "en" | "fr",
+  locale: string,
+): string {
+  const payment = `${report.unsettledPaymentCount} / ${formatMoney(
+    toNumber(report.unsettledPaymentAmount),
+    report.currency,
+    locale,
+  )}`;
+  const refund = `${report.unsettledRefundCount} / ${formatMoney(
+    toNumber(report.unsettledRefundAmount),
+    report.currency,
+    locale,
+  )}`;
+  if (resolvedLocale === "fr") {
+    return `Rapprochement fournisseur en attente — paiements : ${payment}, remboursements : ${refund}`;
+  }
+  if (resolvedLocale === "en") {
+    return `Pending provider reconciliation — payments: ${payment}, refunds: ${refund}`;
+  }
+  return `待渠道核销——收款：${payment}，退款：${refund}`;
 }

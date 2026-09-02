@@ -22,6 +22,7 @@ export default async function ShiftHandoverPage() {
       branch={branch}
       currentShift={operations.currentShift}
       recentReports={operations.recentReports}
+      reconciliation={operations.reconciliation}
       staff={operations.staff}
       summary={summary}
       user={user}
