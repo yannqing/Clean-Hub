@@ -9,7 +9,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { posRoutes, posSidebarNavigation } from "@/config";
 import { usePendingPrintJobCounts } from "@/features/hardware/components/pending-print-jobs";
-import { OfflineSyncBadge } from "@/features/offline/components";
 
 import { Icon } from "./icons";
 import { PosGlobalHeader } from "./pos-global-header";
@@ -32,6 +31,7 @@ export type PosShellProfile = {
 type PosShellProps = {
   branchName?: string;
   children: React.ReactNode;
+  merchantName?: string;
   notificationUnreadCount?: number;
   profile?: PosShellProfile;
 };
@@ -108,6 +108,7 @@ function resolveActivePathname(
 export function PosShell({
   branchName = "—",
   children,
+  merchantName = "POS",
   notificationUnreadCount = 0,
   profile,
 }: PosShellProps) {
@@ -146,6 +147,7 @@ export function PosShell({
         <PosGlobalHeader
           canReprint={canReprint}
           displayInitials={displayInitials}
+          merchantName={merchantName}
           notificationUnreadCount={currentUnreadCount}
           onUnreadCountChange={setCurrentUnreadCount}
           pendingPrintTaskCount={pendingPrintTaskCount}
@@ -228,7 +230,6 @@ export function PosShell({
           </nav>
 
           <div className="border-t border-sidebar-border pt-3">
-            <OfflineSyncBadge className="mb-2 w-full justify-start text-xs" />
             <Link
               aria-current={settingsActive ? "page" : undefined}
               className={cn(

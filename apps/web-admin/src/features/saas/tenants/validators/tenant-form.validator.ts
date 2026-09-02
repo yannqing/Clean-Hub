@@ -81,9 +81,9 @@ function validateTenantBasics(input: TenantFormValues): {
   const contactPhone = normalizeOptional(input.contactPhone);
 
   if (!name) {
-    errors.name = "Tenant name is required.";
+    errors.name = "Merchant name is required.";
   } else if (name.length > 160) {
-    errors.name = "Tenant name must be 160 characters or fewer.";
+    errors.name = "Merchant name must be 160 characters or fewer.";
   }
 
   if (!pressingCode) {

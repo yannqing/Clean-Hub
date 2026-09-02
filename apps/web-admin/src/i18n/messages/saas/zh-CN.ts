@@ -167,7 +167,7 @@ export const saasMessagesZhCN: SaasMessages = {
       emptyTitle: "未找到租户",
       loadError: "加载租户失败。",
       columns: {
-        name: "租户名称",
+        name: "商户名称",
         pressingCode: "pressing 编码",
         status: "状态",
         country: "国家",
@@ -257,7 +257,7 @@ export const saasMessagesZhCN: SaasMessages = {
       updatedToast: "租户已更新。",
       createTenant: "创建租户",
       fields: {
-        name: "租户名称",
+        name: "商户名称",
         pressingCode: "pressing 编码",
         country: "国家",
         city: "城市",

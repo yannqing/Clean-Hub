@@ -11,6 +11,7 @@ import { posRoutes } from "@/config";
 import { LogoutButton } from "@/features/auth/components";
 import { GlobalSearchBox } from "@/features/global-search";
 import { HeaderNotificationsMenu } from "@/features/notifications/components";
+import { OfflineSyncBadge } from "@/features/offline/components";
 
 import { Icon } from "./icons";
 
@@ -19,6 +20,7 @@ type HeaderPanel = "notifications" | "account";
 type PosGlobalHeaderProps = {
   canReprint: boolean;
   displayInitials: string;
+  merchantName: string;
   notificationUnreadCount: number;
   onUnreadCountChange: (count: number) => void;
   pendingPrintTaskCount: number;
@@ -30,6 +32,7 @@ type PosGlobalHeaderProps = {
 export function PosGlobalHeader({
   canReprint,
   displayInitials,
+  merchantName,
   notificationUnreadCount,
   onUnreadCountChange,
   pendingPrintTaskCount,
@@ -78,14 +81,14 @@ export function PosGlobalHeader({
       <div className="flex h-full items-center gap-2 px-3 sm:px-4 lg:gap-4 lg:px-0">
         <div className="flex shrink-0 items-center gap-2 lg:w-[240px] lg:px-3">
           <Link
-            aria-label="CleanHub POS"
+            aria-label={`${merchantName} POS`}
             className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             href={posRoutes.workspace}
           >
             <CleanHubBrandMark className="size-10 rounded-lg" priority />
             <span className="hidden min-w-0 items-center gap-2 sm:flex">
               <span className="truncate text-sm font-semibold tracking-tight">
-                CleanHub
+                {merchantName}
               </span>
               <span className="rounded-full border border-white/15 bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/65">
                 POS
@@ -99,6 +102,8 @@ export function PosGlobalHeader({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2 lg:pr-4">
+          <OfflineSyncBadge variant="dark" />
+
           <button
             aria-label={t("pos.shell.openSearch")}
             className="flex size-9 items-center justify-center rounded-xl text-white/75 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60 md:hidden"

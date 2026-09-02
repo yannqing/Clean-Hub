@@ -5,6 +5,7 @@ import {
   requirePosTenantId,
   resolvePosBranchScope,
 } from "../access-control.helper.js";
+import { findPosMerchantName } from "./pos.repository.js";
 import type { PosBranchMeInput, PosBranchSummary } from "./pos.types.js";
 
 /**
@@ -25,8 +26,18 @@ export async function getMyPosBranch(
     return null;
   }
 
-  return findBranchById(db, {
-    tenantId,
-    branchId,
-  });
+  const [branch, merchantName] = await Promise.all([
+    findBranchById(db, {
+      tenantId,
+      branchId,
+    }),
+    findPosMerchantName(db, tenantId),
+  ]);
+
+  return branch
+    ? {
+        ...branch,
+        merchantName: merchantName ?? "",
+      }
+    : null;
 }

@@ -5,7 +5,9 @@ import type { BranchSummary } from "../../tenant/branches/branches.types.js";
  * POS-facing DTOs. The POS terminal is read-mostly for store context, so these
  * mirror the tenant branch summary without the management fields.
  */
-export type PosBranchSummary = BranchSummary;
+export type PosBranchSummary = BranchSummary & {
+  merchantName: string;
+};
 
 export type PosRequestInput<TData> = {
   authContext: AuthContext;

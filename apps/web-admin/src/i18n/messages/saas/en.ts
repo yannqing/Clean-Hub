@@ -168,7 +168,7 @@ export const saasMessagesEn: SaasMessages = {
       emptyTitle: "No tenants found",
       loadError: "Failed to load tenants.",
       columns: {
-        name: "Tenant name",
+        name: "Merchant name",
         pressingCode: "Pressing code",
         status: "Status",
         country: "Country",
@@ -258,7 +258,7 @@ export const saasMessagesEn: SaasMessages = {
       updatedToast: "Tenant updated.",
       createTenant: "Create tenant",
       fields: {
-        name: "Tenant name",
+        name: "Merchant name",
         pressingCode: "Pressing code",
         country: "Country",
         city: "City",

@@ -73,6 +73,7 @@ export default async function PosLayout({
           />
           <PosShell
             branchName={branch?.name ?? "—"}
+            merchantName={branch?.merchantName || "POS"}
             notificationUnreadCount={notificationsOverview?.unreadCount ?? 0}
             profile={profile}
           >
