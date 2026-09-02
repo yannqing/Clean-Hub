@@ -95,6 +95,39 @@ export const serviceParamsSchema = z.object({
   serviceId: z.string().regex(ULID_PATTERN),
 });
 
+export const requestTenantServiceMediaDownloadsBodySchema = z
+  .object({
+    items: z
+      .array(
+        z
+          .object({
+            serviceId: z.string().regex(ULID_PATTERN),
+            mediaId: z.string().regex(ULID_PATTERN),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(10),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const seen = new Set<string>();
+
+    value.items.forEach((item, index) => {
+      const key = `${item.serviceId}:${item.mediaId}`;
+
+      if (seen.has(key)) {
+        context.addIssue({
+          code: "custom",
+          message: "Service media download items must be unique.",
+          path: ["items", index],
+        });
+      }
+
+      seen.add(key);
+    });
+  });
+
 const serviceProfileBodySchema = z.object({
   businessLine: serviceBusinessLineSchema,
   name: z.string().trim().min(1).max(200),

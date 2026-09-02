@@ -74,6 +74,7 @@ type ServiceJoinedRow = {
   costPrice: string | null;
   currency: string;
   status: ServiceSummary["status"];
+  primaryImageId: string | null;
   createdAt: Date;
   updatedAt: Date;
   version: number;
@@ -118,6 +119,22 @@ function buildServiceSelect() {
     costPrice: prices.costAmount,
     currency: prices.currency,
     status: services.status,
+    primaryImageId: sql<string | null>`(
+      select ${serviceMedia.id}
+      from ${serviceMedia}
+      inner join ${mediaObjects}
+        on ${mediaObjects.tenantId} = ${serviceMedia.tenantId}
+        and ${mediaObjects.id} = ${serviceMedia.mediaObjectId}
+        and ${mediaObjects.status} = 'committed'
+        and ${mediaObjects.deletedAt} is null
+      where ${serviceMedia.tenantId} = ${services.tenantId}
+        and ${serviceMedia.serviceId} = ${services.id}
+        and ${serviceMedia.deletedAt} is null
+      order by ${serviceMedia.isPrimary} desc,
+        ${serviceMedia.sortOrder} asc,
+        ${serviceMedia.id} asc
+      limit 1
+    )`,
     createdAt: services.createdAt,
     updatedAt: services.updatedAt,
     version: services.version,
@@ -151,6 +168,7 @@ function toServiceSummary(row: ServiceJoinedRow): ServiceSummary {
     costPrice: row.costPrice,
     currency: row.currency,
     status: row.status,
+    primaryImage: row.primaryImageId ? { id: row.primaryImageId } : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     version: row.version,
@@ -216,6 +234,69 @@ export async function findServiceMediaRecords(
       asc(serviceMedia.sortOrder),
       asc(serviceMedia.id),
     );
+}
+
+export async function findServiceMediaRecordsByItems(
+  db: Database,
+  input: {
+    tenantId: string;
+    items: Array<{
+      serviceId: string;
+      mediaId: string;
+    }>;
+  },
+): Promise<
+  Array<{
+    serviceId: string;
+    mediaId: string;
+    objectKey: string;
+  }>
+> {
+  if (input.items.length === 0) {
+    return [];
+  }
+
+  const serviceIds = [...new Set(input.items.map((item) => item.serviceId))];
+  const mediaIds = [...new Set(input.items.map((item) => item.mediaId))];
+  const requestedPairs = new Set(
+    input.items.map((item) => `${item.serviceId}:${item.mediaId}`),
+  );
+  const rows = await db
+    .select({
+      serviceId: serviceMedia.serviceId,
+      mediaId: serviceMedia.id,
+      objectKey: mediaObjects.objectKey,
+    })
+    .from(serviceMedia)
+    .innerJoin(
+      services,
+      and(
+        eq(services.tenantId, serviceMedia.tenantId),
+        eq(services.id, serviceMedia.serviceId),
+        isNull(services.deletedAt),
+      ),
+    )
+    .innerJoin(
+      mediaObjects,
+      and(
+        eq(mediaObjects.tenantId, serviceMedia.tenantId),
+        eq(mediaObjects.id, serviceMedia.mediaObjectId),
+        eq(mediaObjects.status, "committed"),
+        isNull(mediaObjects.deletedAt),
+      ),
+    )
+    .where(
+      and(
+        eq(serviceMedia.tenantId, input.tenantId),
+        inArray(serviceMedia.serviceId, serviceIds),
+        inArray(serviceMedia.id, mediaIds),
+        isNull(serviceMedia.deletedAt),
+      ),
+    );
+
+  return rows.filter((row) =>
+    requestedPairs.has(`${row.serviceId}:${row.mediaId}`),
+  );
 }
 
 export async function findServiceBranchSettings(

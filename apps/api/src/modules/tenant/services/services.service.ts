@@ -20,6 +20,7 @@ import {
   findServiceAuditSnapshotById,
   findServiceByCode,
   findServiceDetailById,
+  findServiceMediaRecordsByItems,
   findServiceByName,
   findServicePriceAuditSnapshotByServiceId,
   findServices,
@@ -29,6 +30,7 @@ import {
 } from "./services.repository.js";
 import type {
   CreateServiceRequest,
+  RequestTenantServiceMediaDownloads,
   RequestTenantServiceMediaUpload,
   ServiceBusinessLine,
   ServiceBranchSettingInput,
@@ -38,6 +40,7 @@ import type {
   ServiceStatus,
   ServiceSummary,
   ServicePriceAuditSnapshot,
+  TenantServiceMediaDownloadListResponse,
   TenantServiceMediaUploadTicket,
   UpdateServiceRequest,
 } from "./services.types.js";
@@ -347,6 +350,49 @@ export async function getTenantServiceDetail(
   await requireTenantReadyForServices(authContext, db, service.businessLine);
 
   return addServiceMediaDownloadLinks(tenantId, service, mediaService);
+}
+
+export async function requestTenantServiceMediaDownloads(
+  authContext: AuthContext,
+  data: RequestTenantServiceMediaDownloads,
+  db: Database = getDb(),
+  mediaService: TenantServiceMediaDownloadServiceLike = new MediaService(),
+): Promise<TenantServiceMediaDownloadListResponse> {
+  const tenantId = requireTenantContext(authContext);
+
+  await requireTenantReadyForServices(authContext, db);
+
+  const mediaRecords = await findServiceMediaRecordsByItems(db, {
+    tenantId,
+    items: data.items,
+  });
+
+  try {
+    const downloads = await Promise.all(
+      mediaRecords.map(async (media) => {
+        const ticket =
+          await mediaService.createDownloadLinkForKnownCommittedObject({
+            tenantId,
+            objectKey: media.objectKey,
+          });
+
+        return {
+          serviceId: media.serviceId,
+          mediaId: media.mediaId,
+          downloadUrl: ticket.downloadUrl,
+          expiresAt: ticket.expiresAt,
+        };
+      }),
+    );
+
+    return { data: downloads };
+  } catch (error) {
+    if (error instanceof MediaError) {
+      throw mapServiceMediaError(error);
+    }
+
+    throw error;
+  }
 }
 
 export async function createTenantService(

@@ -32,6 +32,10 @@ export type ServiceMedia = {
   sortOrder: number;
 };
 
+export type ServiceSummaryImage = {
+  id: string;
+};
+
 export type ServiceSummary = {
   id: string;
   businessLine: ServiceBusinessLine;
@@ -53,6 +57,7 @@ export type ServiceSummary = {
   costPrice: string | null;
   currency: string;
   status: ServiceStatus;
+  primaryImage: ServiceSummaryImage | null;
   createdAt: string;
   updatedAt: string;
   version: number;
@@ -96,6 +101,24 @@ export type UpdateServiceRequest = Partial<
 export type RequestTenantServiceMediaUploadRequest = {
   contentType: string;
   sizeBytes: number;
+};
+
+export type RequestTenantServiceMediaDownloads = {
+  items: Array<{
+    serviceId: string;
+    mediaId: string;
+  }>;
+};
+
+export type TenantServiceMediaDownload = {
+  serviceId: string;
+  mediaId: string;
+  downloadUrl: string;
+  expiresAt: string;
+};
+
+export type TenantServiceMediaDownloadListResponse = {
+  data: TenantServiceMediaDownload[];
 };
 
 export type TenantServiceMediaUploadTicket = {

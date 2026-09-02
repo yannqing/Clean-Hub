@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 import {
   createServiceBodySchema,
+  requestTenantServiceMediaDownloadsBodySchema,
   requestTenantServiceMediaUploadBodySchema,
   updateServiceBodySchema,
 } from "./services.validation.js";
@@ -171,6 +172,25 @@ export function runTenantServiceValidationSmokeChecks(): void {
     }).success,
     false,
     "unsupported service image formats are rejected",
+  );
+
+  assert.equal(
+    requestTenantServiceMediaDownloadsBodySchema.safeParse({
+      items: [{ serviceId: CATEGORY_ID, mediaId: BRANCH_ID }],
+    }).success,
+    true,
+    "a service cover image can request a download link",
+  );
+
+  assert.equal(
+    requestTenantServiceMediaDownloadsBodySchema.safeParse({
+      items: [
+        { serviceId: CATEGORY_ID, mediaId: BRANCH_ID },
+        { serviceId: CATEGORY_ID, mediaId: BRANCH_ID },
+      ],
+    }).success,
+    false,
+    "duplicate service media download pairs are rejected",
   );
 }
 

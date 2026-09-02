@@ -53,6 +53,7 @@ import {
   SlidersHorizontal,
   Trash2,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -77,6 +78,7 @@ import {
 import {
   getServiceCategoryDatasetQuery,
   getServiceDatasetQuery,
+  getServiceMediaDownloadsQuery,
 } from "../queries";
 import type {
   ServiceBusinessLine,
@@ -89,6 +91,12 @@ import type {
 } from "../types";
 
 const PAGE_SIZE = 10;
+const SERVICE_IMAGE_REFRESH_BUFFER_MS = 30_000;
+const SERVICE_IMAGE_RETRY_DELAY_MS = 60_000;
+
+type ServiceImageSource = {
+  downloadUrl: string;
+};
 type BusinessLineFilter = "all" | ServiceBusinessLine;
 type StatusFilter = "all" | ServiceStatus;
 type ServiceDateFilter =
@@ -227,6 +235,35 @@ function isInteractiveTableTarget(target: EventTarget | null): boolean {
   );
 }
 
+function getServiceImageKey(serviceId: string, mediaId: string): string {
+  return `${serviceId}:${mediaId}`;
+}
+
+function ServiceThumbnail({ imageUrl }: { imageUrl: string | null }) {
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+
+  return (
+    <span
+      aria-hidden
+      className="relative flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted text-muted-foreground"
+    >
+      <Icon aria-hidden icon={ClipboardList} size={14} />
+      {imageUrl && failedImageUrl !== imageUrl ? (
+        <Image
+          alt=""
+          className="absolute inset-0 size-full object-cover"
+          height={32}
+          onError={() => setFailedImageUrl(imageUrl)}
+          sizes="32px"
+          src={imageUrl}
+          unoptimized
+          width={32}
+        />
+      ) : null}
+    </span>
+  );
+}
+
 export function ServiceCatalogView({
   initialSearchQuery = "",
 }: {
@@ -235,6 +272,10 @@ export function ServiceCatalogView({
   const router = useRouter();
   const { formatDateTime, locale, m } = useTenantI18n();
   const [serviceDataset, setServiceDataset] = useState<ServiceSummary[]>([]);
+  const [serviceImageSources, setServiceImageSources] = useState<
+    Record<string, ServiceImageSource>
+  >({});
+  const [imageRefreshVersion, setImageRefreshVersion] = useState(0);
   const [categories, setCategories] = useState<ServiceCategorySummary[]>([]);
   const [page, setPage] = useState(1);
   const [businessLine, setBusinessLine] = useState<BusinessLineFilter>("all");
@@ -495,6 +536,86 @@ export function ServiceCatalogView({
       ),
     [currentPage, filteredServices],
   );
+
+  useEffect(() => {
+    const items = services.flatMap((service) =>
+      service.primaryImage
+        ? [
+            {
+              serviceId: service.id,
+              mediaId: service.primaryImage.id,
+            },
+          ]
+        : [],
+    );
+
+    if (items.length === 0) {
+      return;
+    }
+
+    let current = true;
+    let refreshTimeout: ReturnType<typeof setTimeout> | undefined;
+    const controller = new AbortController();
+
+    getServiceMediaDownloadsQuery({ items }, controller.signal)
+      .then((result) => {
+        if (!current) {
+          return;
+        }
+
+        setServiceImageSources((currentSources) => {
+          const nextSources = { ...currentSources };
+
+          for (const download of result.data) {
+            nextSources[
+              getServiceImageKey(download.serviceId, download.mediaId)
+            ] = {
+              downloadUrl: download.downloadUrl,
+            };
+          }
+
+          return nextSources;
+        });
+
+        const expirationTimes = result.data
+          .map((download) => Date.parse(download.expiresAt))
+          .filter(Number.isFinite);
+
+        if (expirationTimes.length > 0) {
+          const nextExpiration = Math.min(...expirationTimes);
+          const refreshDelay = Math.max(
+            SERVICE_IMAGE_REFRESH_BUFFER_MS,
+            nextExpiration - Date.now() - SERVICE_IMAGE_REFRESH_BUFFER_MS,
+          );
+
+          refreshTimeout = setTimeout(() => {
+            setImageRefreshVersion((version) => version + 1);
+          }, refreshDelay);
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (
+          !current ||
+          (loadError instanceof DOMException && loadError.name === "AbortError")
+        ) {
+          return;
+        }
+
+        refreshTimeout = setTimeout(() => {
+          setImageRefreshVersion((version) => version + 1);
+        }, SERVICE_IMAGE_RETRY_DELAY_MS);
+      });
+
+    return () => {
+      current = false;
+      controller.abort();
+
+      if (refreshTimeout) {
+        clearTimeout(refreshTimeout);
+      }
+    };
+  }, [imageRefreshVersion, services]);
+
   const visibleColumnCount =
     Object.values(visibleColumns).filter(Boolean).length;
 
@@ -1154,19 +1275,35 @@ export function ServiceCatalogView({
                 >
                   {visibleColumns.service ? (
                     <TableCell>
-                      <Link
-                        className="block font-medium hover:underline"
-                        href={webAdminRoutes.tenant.service(service.id)}
-                      >
-                        {service.name}
-                      </Link>
-                      {service.shortName || service.code ? (
-                        <span className="block text-[11px] text-muted-foreground">
-                          {[service.shortName, service.code]
-                            .filter(Boolean)
-                            .join(" · ")}
-                        </span>
-                      ) : null}
+                      <div className="flex min-w-0 items-center gap-2">
+                        <ServiceThumbnail
+                          imageUrl={
+                            service.primaryImage
+                              ? (serviceImageSources[
+                                  getServiceImageKey(
+                                    service.id,
+                                    service.primaryImage.id,
+                                  )
+                                ]?.downloadUrl ?? null)
+                              : null
+                          }
+                        />
+                        <div className="min-w-0">
+                          <Link
+                            className="block truncate font-medium underline-offset-4 hover:underline focus-visible:rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            href={webAdminRoutes.tenant.service(service.id)}
+                          >
+                            {service.name}
+                          </Link>
+                          {service.shortName || service.code ? (
+                            <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
+                              {[service.shortName, service.code]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
                     </TableCell>
                   ) : null}
                   {visibleColumns.category ? (

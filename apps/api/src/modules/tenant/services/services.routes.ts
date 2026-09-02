@@ -6,6 +6,7 @@ import {
   deleteTenantServiceController,
   getTenantServiceController,
   listTenantServicesController,
+  requestTenantServiceMediaDownloadsController,
   requestTenantServiceMediaUploadController,
   updateTenantServiceController,
   updateTenantServiceStatusController,
@@ -15,6 +16,10 @@ export function createTenantServiceRoutes() {
   const routes = new Hono<AppBindings>();
 
   routes.post("/media/uploads", requestTenantServiceMediaUploadController);
+  routes.post(
+    "/media/downloads",
+    requestTenantServiceMediaDownloadsController,
+  );
   routes.get("/", listTenantServicesController);
   routes.post("/", createTenantServiceController);
   routes.patch("/:serviceId/status", updateTenantServiceStatusController);

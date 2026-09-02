@@ -74,6 +74,7 @@ export type ServiceSummary = {
   costPrice: string | null;
   currency: string;
   status: ServiceStatus;
+  primaryImage: { id: string } | null;
   createdAt: string;
   updatedAt: string;
   version: number;

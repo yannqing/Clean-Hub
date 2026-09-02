@@ -7,12 +7,14 @@ import {
   deleteTenantService,
   getTenantServiceDetail,
   listTenantServices,
+  requestTenantServiceMediaDownloads,
   requestTenantServiceMediaUpload,
   updateTenantService,
   updateTenantServiceStatus,
 } from "./services.service.js";
 import {
   createServiceBodySchema,
+  requestTenantServiceMediaDownloadsBodySchema,
   requestTenantServiceMediaUploadBodySchema,
   serviceListQuerySchema,
   serviceParamsSchema,
@@ -93,6 +95,28 @@ export async function requestTenantServiceMediaUploadController(
     if (error instanceof TenantServicesError) {
       return createTenantServicesErrorResponse(c, error);
     }
+    throw error;
+  }
+}
+
+export async function requestTenantServiceMediaDownloadsController(
+  c: Context<AppBindings>,
+) {
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = requestTenantServiceMediaDownloadsBodySchema.parse(rawBody);
+
+  try {
+    const result = await requestTenantServiceMediaDownloads(
+      c.get("authContext"),
+      data,
+    );
+
+    return c.json(result);
+  } catch (error) {
+    if (error instanceof TenantServicesError) {
+      return createTenantServicesErrorResponse(c, error);
+    }
+
     throw error;
   }
 }
