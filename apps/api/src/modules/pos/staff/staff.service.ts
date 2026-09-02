@@ -4,6 +4,7 @@ import { AuthError } from "../../auth/auth.errors.js";
 import type { AuthContext } from "../../auth/auth.types.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import {
+  authorizePosSensitiveOperation,
   createPosAuditMetadata,
   requirePosBranchAccess,
   requirePosTenantId,
@@ -16,20 +17,26 @@ import {
   findActiveBranchCurrency,
   findOpenShift,
   findOpenShiftForUpdate,
+  findShiftCashMovementByIdempotencyKey,
   findPosTerminalForShiftUpdate,
   findStaffForBranch,
   findZReport,
+  insertShiftCashMovement,
+  listShiftCashMovements,
   listZReports,
   transitionShiftRecord,
 } from "./staff.repository.js";
 import type {
   ClockInput,
+  CreatePosShiftCashMovementInput,
   CreateHandoverInput,
   HandoverRecord,
   PosStaffDetail,
   PosStaffDetailInput,
   PosStaffListInput,
   PosStaffSummary,
+  PosCurrentShiftReconciliation,
+  PosShiftCashMovement,
   PosZReport,
   PosZReportListQuery,
   ShiftRecord,
@@ -139,6 +146,137 @@ export async function getCurrentShift(
   });
   if (shift) assertShiftTerminal(shift, terminal);
   return shift;
+}
+
+export async function listCurrentShiftCashMovements(
+  authContext: AuthContext,
+  db: Database = getDb(),
+): Promise<{ data: PosShiftCashMovement[] }> {
+  const tenantId = requirePosTenantId(authContext);
+  const terminal = requireTerminalContext(authContext);
+  const shift = await findOpenShift(db, {
+    tenantId,
+    staffId: authContext.userId,
+  });
+  if (!shift) return { data: [] };
+  assertShiftTerminal(shift, terminal);
+  return {
+    data: await listShiftCashMovements(db, { tenantId, shiftId: shift.id }),
+  };
+}
+
+export async function getCurrentShiftReconciliation(
+  authContext: AuthContext,
+  db: Database = getDb(),
+): Promise<PosCurrentShiftReconciliation | null> {
+  const tenantId = requirePosTenantId(authContext);
+  const terminal = requireTerminalContext(authContext);
+  const shift = await findOpenShift(db, {
+    tenantId,
+    staffId: authContext.userId,
+  });
+  if (!shift) return null;
+  assertShiftTerminal(shift, terminal);
+  return calculateHandoverSnapshot(db, {
+    tenantId,
+    branchId: shift.branchId,
+    shiftId: shift.id,
+    staffId: shift.staffId,
+    currency: shift.currency,
+    startedAt: new Date(shift.startedAt),
+    cutoffAt: new Date(),
+    openingFloat: shift.openingFloat,
+  });
+}
+
+export async function createShiftCashMovement(
+  input: CreatePosShiftCashMovementInput,
+  db: Database = getDb(),
+): Promise<PosShiftCashMovement> {
+  const tenantId = requirePosTenantId(input.authContext);
+  const terminal = requireTerminalContext(input.authContext);
+  const reason = authorizePosSensitiveOperation(
+    input.authContext,
+    "cash_movement",
+    input.data.reason,
+  );
+  return db.transaction(async (tx) => {
+    const shift = await findOpenShiftForUpdate(tx, {
+      tenantId,
+      staffId: input.authContext.userId,
+    });
+    if (!shift) {
+      throw new PosStaffError(
+        "SHIFT_NOT_FOUND",
+        "An open shift is required for a cash movement.",
+        404,
+      );
+    }
+    assertShiftTerminal(shift, terminal);
+    if (shift.status !== "open") {
+      throw new PosStaffError(
+        "INVALID_SHIFT_ACTION",
+        "Cash movements cannot be recorded while the shift is on break.",
+        422,
+      );
+    }
+    const existing = await findShiftCashMovementByIdempotencyKey(tx, {
+      tenantId,
+      idempotencyKey: input.data.idempotencyKey,
+    });
+    if (existing) {
+      if (
+        existing.shiftId !== shift.id ||
+        existing.movementType !== input.data.movementType ||
+        Number(existing.amount) !== Number(input.data.amount) ||
+        existing.reason !== reason
+      ) {
+        throw new PosStaffError(
+          "INVALID_SHIFT_ACTION",
+          "The cash movement idempotency key is already used by another operation.",
+          409,
+        );
+      }
+      return existing;
+    }
+    const movement = await insertShiftCashMovement(tx, {
+      tenantId,
+      branchId: shift.branchId,
+      terminalId: shift.terminalId,
+      shiftId: shift.id,
+      movementType: input.data.movementType,
+      amount: Number(input.data.amount).toFixed(2),
+      currency: shift.currency,
+      reason,
+      idempotencyKey: input.data.idempotencyKey,
+      actorUserId: input.authContext.userId,
+    });
+    if (!movement) {
+      const concurrent = await findShiftCashMovementByIdempotencyKey(tx, {
+        tenantId,
+        idempotencyKey: input.data.idempotencyKey,
+      });
+      if (concurrent) return concurrent;
+      throw new Error("Cash movement could not be recorded.");
+    }
+    await writeAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      tenantId,
+      branchId: shift.branchId,
+      eventCategory: "pos_shift",
+      eventType: `pos.shift.cash_${input.data.movementType}`,
+      entityType: "pos_shift_cash_movement",
+      entityId: movement.id,
+      reason,
+      after: movement,
+      metadata: createPosAuditMetadata(input.authContext, {
+        shiftId: shift.id,
+      }),
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+    return movement;
+  });
 }
 
 export async function clockAction(
@@ -314,6 +452,8 @@ export async function createHandover(
     const snapshot = await calculateHandoverSnapshot(tx, {
       tenantId,
       branchId: terminal.branchId,
+      shiftId: shift.id,
+      staffId: shift.staffId,
       currency: shift.currency,
       startedAt: new Date(shift.startedAt),
       cutoffAt,

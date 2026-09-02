@@ -43,6 +43,7 @@ import {
   softDeleteOrderRecord,
   sumOrderItemAmounts,
   updateManualOrderItemRecord,
+  updatePosOrderSettlementTerms,
   updateOrderRecord,
   type ResolvedPosOrderItemInput,
 } from "./orders.repository.js";
@@ -56,7 +57,10 @@ import {
   resolveRequestedPosDiscountRule,
 } from "../discounts/discounts.service.js";
 import { minorToMoney, moneyToMinor } from "../discounts/pricing-engine.js";
-import { findShiftByIdForUpdate } from "../staff/staff.repository.js";
+import {
+  findOpenShiftForUpdate,
+  findShiftByIdForUpdate,
+} from "../staff/staff.repository.js";
 import { findTerminalSettingsById } from "../terminal-settings/terminal-settings.repository.js";
 import { applyPosOrderFinancialRules } from "./orders.financial.js";
 import {
@@ -200,6 +204,43 @@ async function validateCashShift(
   }
 
   return occurredAt;
+}
+
+async function requireActivePaymentShift(
+  db: Database,
+  input: {
+    authContext: AuthContext;
+    tenantId: string;
+    branchId: string;
+  },
+): Promise<string> {
+  const terminalId = input.authContext.terminalId;
+  const terminalBranchId = input.authContext.terminalBranchId;
+  if (!terminalId || !terminalBranchId) {
+    throw new PosOrderError(
+      "SHIFT_REQUIRED",
+      "Payments require an enrolled POS terminal and an active shift.",
+      403,
+    );
+  }
+  const shift = await findOpenShiftForUpdate(db, {
+    tenantId: input.tenantId,
+    staffId: input.authContext.userId,
+  });
+  if (
+    !shift ||
+    shift.status !== "open" ||
+    shift.branchId !== input.branchId ||
+    shift.branchId !== terminalBranchId ||
+    shift.terminalId !== terminalId
+  ) {
+    throw new PosOrderError(
+      "SHIFT_REQUIRED",
+      "The payment does not belong to this operator's active terminal shift.",
+      409,
+    );
+  }
+  return shift.id;
 }
 
 async function loadIdempotentPaymentResult(
@@ -939,14 +980,12 @@ async function createManualOrder(
     assertGuestOrderItemAllowed(customerId, resolved.itemKind);
     resolvedItems.push(resolved);
   }
-  const totalAmount = sumOrderItemAmounts(
-    [
-      ...resolvedItems.map((item) => ({
-        lineAmount: calculatePosOrderItemLineAmount(item),
-      })),
-      ...ticketGroups.flatMap((group) => group.items),
-    ],
-  );
+  const totalAmount = sumOrderItemAmounts([
+    ...resolvedItems.map((item) => ({
+      lineAmount: calculatePosOrderItemLineAmount(item),
+    })),
+    ...ticketGroups.flatMap((group) => group.items),
+  ]);
   const orderId = await createOrderRecord(db, {
     id: input.data.id,
     tenantId,
@@ -1400,7 +1439,12 @@ export async function createPosOrderPayment(
       );
     }
 
-    await assertPaymentMethodEnabled(tx, authContext, tenantId, data.paymentMethod);
+    await assertPaymentMethodEnabled(
+      tx,
+      authContext,
+      tenantId,
+      data.paymentMethod,
+    );
 
     if (data.paymentMethod === "app") {
       const existingReference = await findPaymentTransactionByProviderReference(
@@ -1489,6 +1533,13 @@ export async function createPosOrderPayment(
       }
     }
 
+    const paymentShiftId =
+      cashDetails?.shiftId ??
+      (await requireActivePaymentShift(tx, {
+        authContext,
+        tenantId,
+        branchId: before.branchId,
+      }));
     const createdPayment = await createPaymentTransactionRecord(tx, {
       tenantId,
       branchId: before.branchId,
@@ -1499,6 +1550,7 @@ export async function createPosOrderPayment(
       currency: before.currency,
       actorUserId: authContext.userId,
       ...cashDetails,
+      shiftId: paymentShiftId,
       provider: data.paymentMethod === "app" ? data.provider : undefined,
       gateway: data.paymentMethod === "card" ? "tpe" : undefined,
       externalReference:
@@ -1606,7 +1658,11 @@ export async function recordPosCardPaymentOutcome(
       paymentId,
     });
     if (!payment) {
-      throw new PosOrderError("PAYMENT_NOT_FOUND", "Payment was not found.", 404);
+      throw new PosOrderError(
+        "PAYMENT_NOT_FOUND",
+        "Payment was not found.",
+        404,
+      );
     }
     if (payment.paymentMethod !== "card" || payment.gateway !== "tpe") {
       throw new PosOrderError(
@@ -1614,6 +1670,15 @@ export async function recordPosCardPaymentOutcome(
         "Only a TPE card payment can receive a card outcome.",
         422,
       );
+    }
+    if (
+      payment.paymentStatus === "pending" &&
+      payment.providerStatus === data.outcome &&
+      data.outcome === "timed_out"
+    ) {
+      const idempotent = await findPosOrderDetail(tx, { tenantId, orderId });
+      if (!idempotent) throw new Error("Pending card order was not found.");
+      return idempotent;
     }
     if (payment.paymentStatus !== "pending") {
       if (payment.providerStatus === data.outcome) {
@@ -1629,7 +1694,8 @@ export async function recordPosCardPaymentOutcome(
     }
     if (
       data.outcome === "succeeded" &&
-      Number(payment.amount) > Number(before.totalAmount) - Number(before.paidAmount)
+      Number(payment.amount) >
+        Number(before.totalAmount) - Number(before.paidAmount)
     ) {
       throw new PosOrderError(
         "PAYMENT_AMOUNT_EXCEEDED",
@@ -1747,8 +1813,80 @@ export async function checkoutPosOrder(
       );
     }
 
-    const requestedPayments = data.payments ?? (data.payment ? [data.payment] : []);
-    if (requestedPayments.length === 0 || moneyToMinor(order.totalAmount) === BigInt(0)) {
+    const requestedPayments =
+      data.payments ?? (data.payment ? [data.payment] : []);
+    const normalizedPayments = requestedPayments.map((payment) => ({
+      ...payment,
+      amount: payment.amount ?? order.totalAmount,
+    })) as CreatePosPaymentRequest[];
+    const totalMinor = moneyToMinor(order.totalAmount);
+    const requestedMinor = normalizedPayments.reduce(
+      (sum, payment) => sum + moneyToMinor(payment.amount),
+      BigInt(0),
+    );
+    if (requestedMinor > totalMinor) {
+      throw new PosOrderError(
+        "PAYMENT_AMOUNT_EXCEEDED",
+        "The combined tender amount exceeds the order total.",
+        422,
+      );
+    }
+    const expectedIntent =
+      totalMinor === BigInt(0) || requestedMinor === totalMinor
+        ? "pay_now"
+        : requestedMinor === BigInt(0)
+          ? "pay_later"
+          : "partial";
+    if (data.settlementIntent !== expectedIntent) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        `Settlement intent ${data.settlementIntent} does not match the tendered amount; expected ${expectedIntent}.`,
+        422,
+      );
+    }
+    let normalizedUnpaidReason: string | undefined;
+    if (expectedIntent !== "pay_now") {
+      if (!order.customerId) {
+        throw new PosOrderError(
+          "CUSTOMER_REQUIRED",
+          "Deferred or partial payment requires an identified customer.",
+          422,
+        );
+      }
+      if (
+        !data.balanceDueAt ||
+        !data.unpaidReason?.trim() ||
+        Date.parse(data.balanceDueAt) <= Date.now()
+      ) {
+        throw new PosOrderError(
+          "VALIDATION_ERROR",
+          "Deferred payment requires a future due date and a reason.",
+          422,
+        );
+      }
+      normalizedUnpaidReason = authorizePosSensitiveOperation(
+        authContext,
+        "deferred_settlement",
+        data.unpaidReason,
+      );
+    }
+    await updatePosOrderSettlementTerms(tx, {
+      tenantId,
+      orderId: order.id,
+      settlementIntent: expectedIntent,
+      balanceDueAt: data.balanceDueAt,
+      unpaidReason: normalizedUnpaidReason,
+      actorUserId: authContext.userId,
+    });
+    const orderWithTerms = await findPosOrderDetail(tx, {
+      tenantId,
+      orderId: order.id,
+    });
+    if (!orderWithTerms)
+      throw new Error("Checkout order terms could not be loaded.");
+    order = orderWithTerms;
+
+    if (requestedPayments.length === 0 || totalMinor === BigInt(0)) {
       return {
         order,
         payment: null,
@@ -1757,21 +1895,6 @@ export async function checkoutPosOrder(
       };
     }
 
-    const normalizedPayments = requestedPayments.map((payment) => ({
-      ...payment,
-      amount: payment.amount ?? order.totalAmount,
-    })) as CreatePosPaymentRequest[];
-    const requestedMinor = normalizedPayments.reduce(
-      (sum, payment) => sum + moneyToMinor(payment.amount),
-      BigInt(0),
-    );
-    if (requestedMinor > moneyToMinor(order.totalAmount)) {
-      throw new PosOrderError(
-        "PAYMENT_AMOUNT_EXCEEDED",
-        "The combined tender amount exceeds the order total.",
-        422,
-      );
-    }
     const externalCount = normalizedPayments.filter(
       (payment) => payment.paymentMethod !== "cash",
     ).length;

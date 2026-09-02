@@ -1,6 +1,12 @@
 import { z } from "zod";
 
 const idempotencyKeySchema = z.string().trim().min(1).max(120);
+const ulidSchema = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+
+export const posReceiptDeliveryParamsSchema = z.object({
+  orderId: ulidSchema,
+  deliveryId: ulidSchema,
+});
 
 export const deliverPosReceiptBodySchema = z
   .object({
@@ -12,7 +18,10 @@ export const deliverPosReceiptBodySchema = z
   })
   .superRefine((value, context) => {
     if (value.channel === "email") {
-      if (!value.destination || !z.string().email().safeParse(value.destination).success) {
+      if (
+        !value.destination ||
+        !z.string().email().safeParse(value.destination).success
+      ) {
         context.addIssue({
           code: "custom",
           path: ["destination"],
@@ -22,7 +31,8 @@ export const deliverPosReceiptBodySchema = z
     }
     if (
       value.channel === "sms" &&
-      (!value.destination || !/^\+?[0-9][0-9 ()-]{5,24}$/.test(value.destination))
+      (!value.destination ||
+        !/^\+?[0-9][0-9 ()-]{5,24}$/.test(value.destination))
     ) {
       context.addIssue({
         code: "custom",

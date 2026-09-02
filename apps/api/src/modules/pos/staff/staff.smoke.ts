@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 
-import { posShiftHandovers, posStaffShifts, posZReports } from "@cleanhub/db";
+import {
+  posShiftCashMovements,
+  posShiftHandovers,
+  posStaffShifts,
+  posZReports,
+} from "@cleanhub/db";
 import { getTableConfig } from "drizzle-orm/pg-core";
 
 import { AuthError } from "../../auth/auth.errors.js";
@@ -18,11 +23,13 @@ import type { ShiftRecord } from "./staff.types.js";
 import {
   clockRequestSchema,
   createHandoverRequestSchema,
+  createShiftCashMovementRequestSchema,
 } from "./staff.validation.js";
 
 const shiftConfig = getTableConfig(posStaffShifts);
 const handoverConfig = getTableConfig(posShiftHandovers);
 const reportConfig = getTableConfig(posZReports);
+const cashMovementConfig = getTableConfig(posShiftCashMovements);
 
 function uniqueIndexNames(config: ReturnType<typeof getTableConfig>): string[] {
   return config.indexes
@@ -53,6 +60,12 @@ assert.ok(
 assert.ok(
   uniqueIndexNames(reportConfig).includes("pos_z_reports_handover_unique"),
   "a handover may produce only one immutable report snapshot",
+);
+assert.ok(
+  uniqueIndexNames(cashMovementConfig).includes(
+    "pos_shift_cash_movements_tenant_idempotency_unique",
+  ),
+  "cash pay-in/out needs a tenant-scoped idempotency guard",
 );
 assert.ok(
   reportConfig.columns.some(
@@ -106,6 +119,16 @@ assert.equal(
   }).success,
   false,
   "handover counted cash cannot be negative",
+);
+assert.equal(
+  createShiftCashMovementRequestSchema.safeParse({
+    movementType: "pay_out",
+    amount: "25.00",
+    reason: "petty cash purchase",
+    idempotencyKey: "cash-movement-1",
+  }).success,
+  true,
+  "a reasoned positive cash pay-out must be accepted",
 );
 
 const adjustments = calculateAdjustmentTotals([

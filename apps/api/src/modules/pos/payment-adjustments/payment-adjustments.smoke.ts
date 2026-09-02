@@ -12,6 +12,7 @@ import {
 import {
   createPosPaymentCorrectionBodySchema,
   createPosRefundBodySchema,
+  resolvePosRefundBodySchema,
 } from "./payment-adjustments.validation.js";
 
 const orderId = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
@@ -38,11 +39,24 @@ const validRefund = {
   reason: "  customer request  ",
 };
 
-assert.equal(createPosRefundBodySchema.parse(validRefund).reason, "customer request");
 assert.equal(
-  createPosRefundBodySchema.safeParse({ ...validRefund, reason: "   " }).success,
+  createPosRefundBodySchema.parse(validRefund).reason,
+  "customer request",
+);
+assert.equal(
+  createPosRefundBodySchema.safeParse({ ...validRefund, reason: "   " })
+    .success,
   false,
   "refunds must require a reason",
+);
+assert.equal(
+  resolvePosRefundBodySchema.safeParse({
+    outcome: "succeeded",
+    settlementReference: "TPE-REFUND-123",
+    reason: "provider receipt checked",
+  }).success,
+  true,
+  "a pending provider refund must support explicit settlement reconciliation",
 );
 
 const adjustment = {
@@ -51,10 +65,15 @@ const adjustment = {
   originalPaymentId: paymentId,
   adjustmentType: "refund" as const,
   direction: "debit" as const,
+  status: "succeeded" as const,
+  salesReturnId: null,
   amount: "100.00",
   currency: "XOF",
   idempotencyKey: validRefund.idempotencyKey,
   reason: "customer request",
+  settlementReference: null,
+  failureReason: null,
+  resolvedAt: new Date().toISOString(),
   occurredAt: new Date().toISOString(),
   createdAt: new Date().toISOString(),
   createdBy: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
@@ -111,8 +130,7 @@ const table = getTableConfig(posPaymentAdjustments);
 assert.equal(
   table.indexes.find(
     (index) =>
-      index.config.name ===
-      "pos_payment_adjustments_tenant_idempotency_unique",
+      index.config.name === "pos_payment_adjustments_tenant_idempotency_unique",
   )?.config.unique,
   true,
   "payment adjustments need a tenant-scoped idempotency guard",

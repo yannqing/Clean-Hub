@@ -1,8 +1,14 @@
 import { z } from "zod";
 
 const ulid = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/);
-const amount = z.string().regex(/^\d+(\.\d{1,2})?$/).refine((value) => Number(value) > 0);
-const quantity = z.string().regex(/^\d+(\.\d{1,3})?$/).refine((value) => Number(value) > 0);
+const amount = z
+  .string()
+  .regex(/^\d+(\.\d{1,2})?$/)
+  .refine((value) => Number(value) > 0);
+const quantity = z
+  .string()
+  .regex(/^\d+(\.\d{1,3})?$/)
+  .refine((value) => Number(value) > 0);
 
 export const createPosProductReturnBodySchema = z.object({
   idempotencyKey: z.string().trim().min(1).max(120),
@@ -13,7 +19,13 @@ export const createPosProductReturnBodySchema = z.object({
       z.object({
         orderItemId: ulid,
         quantity,
-        condition: z.enum(["unopened", "good", "damaged", "defective", "unknown"]),
+        condition: z.enum([
+          "unopened",
+          "good",
+          "damaged",
+          "defective",
+          "unknown",
+        ]),
         disposition: z.enum(["restock", "damaged", "discarded", "exchange"]),
         reason: z.string().trim().max(500).optional(),
       }),
@@ -21,7 +33,13 @@ export const createPosProductReturnBodySchema = z.object({
     .min(1)
     .max(100),
   refundAllocations: z
-    .array(z.object({ originalPaymentId: ulid, amount }))
+    .array(
+      z.object({
+        originalPaymentId: ulid,
+        amount,
+        settlementReference: z.string().trim().min(1).max(160).optional(),
+      }),
+    )
     .max(10)
     .optional(),
   exchangeItems: z

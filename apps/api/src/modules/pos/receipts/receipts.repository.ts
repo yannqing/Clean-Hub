@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import { receiptDeliveries, type Database } from "@cleanhub/db";
 
@@ -17,9 +17,46 @@ function toDelivery(
     provider: row.provider,
     externalId: row.externalId,
     failureReason: row.failureReason,
+    attemptCount: row.attemptCount,
+    lastAttemptAt: row.lastAttemptAt?.toISOString() ?? null,
     sentAt: row.sentAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
   };
+}
+
+export async function findReceiptDeliveryRecord(
+  db: Database,
+  input: { tenantId: string; orderId: string; deliveryId: string },
+) {
+  const [row] = await db
+    .select()
+    .from(receiptDeliveries)
+    .where(
+      and(
+        eq(receiptDeliveries.tenantId, input.tenantId),
+        eq(receiptDeliveries.orderId, input.orderId),
+        eq(receiptDeliveries.id, input.deliveryId),
+      ),
+    )
+    .limit(1);
+  return row ?? null;
+}
+
+export async function listReceiptDeliveries(
+  db: Database,
+  input: { tenantId: string; orderId: string },
+): Promise<PosReceiptDelivery[]> {
+  const rows = await db
+    .select()
+    .from(receiptDeliveries)
+    .where(
+      and(
+        eq(receiptDeliveries.tenantId, input.tenantId),
+        eq(receiptDeliveries.orderId, input.orderId),
+      ),
+    )
+    .orderBy(asc(receiptDeliveries.createdAt));
+  return rows.map(toDelivery);
 }
 
 export async function findReceiptDeliveryByIdempotencyKey(
@@ -72,6 +109,8 @@ export async function updateReceiptDeliveryResult(
       failureReason: input.failureReason,
       providerPayload: input.providerPayload,
       sentAt: input.status === "sent" ? new Date() : null,
+      attemptCount: sql`${receiptDeliveries.attemptCount} + 1`,
+      lastAttemptAt: new Date(),
     })
     .where(
       and(

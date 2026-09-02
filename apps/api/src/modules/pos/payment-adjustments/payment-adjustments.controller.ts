@@ -6,11 +6,14 @@ import {
   createPosPaymentCorrection,
   createPosRefund,
   getPosPaymentAdjustments,
+  resolvePosRefund,
 } from "./payment-adjustments.service.js";
 import {
   createPosPaymentCorrectionBodySchema,
   createPosRefundBodySchema,
   listPosPaymentAdjustmentsQuerySchema,
+  posPaymentAdjustmentParamsSchema,
+  resolvePosRefundBodySchema,
 } from "./payment-adjustments.validation.js";
 
 export async function listPaymentAdjustmentsController(
@@ -42,4 +45,18 @@ export async function createPaymentCorrectionController(
     data,
   });
   return c.json(result, result.idempotent ? 200 : 201);
+}
+
+export async function resolveRefundController(c: Context<AppBindings>) {
+  const { adjustmentId } = posPaymentAdjustmentParamsSchema.parse(
+    c.req.param(),
+  );
+  const data = resolvePosRefundBodySchema.parse(await c.req.json());
+  return c.json(
+    await resolvePosRefund(adjustmentId, {
+      authContext: c.get("authContext"),
+      requestMeta: getRequestMeta(c),
+      data,
+    }),
+  );
 }

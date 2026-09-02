@@ -263,7 +263,14 @@ export const createPosCheckoutBodySchema = z
     order: createPosOrderBodySchema,
     expectedTotalAmount: nonnegativeAmountSchema,
     payment: createPosCheckoutPaymentBodySchema.optional(),
-    payments: z.array(createPosCheckoutPaymentBodySchema).min(1).max(4).optional(),
+    payments: z
+      .array(createPosCheckoutPaymentBodySchema)
+      .min(1)
+      .max(4)
+      .optional(),
+    settlementIntent: z.enum(["pay_now", "partial", "pay_later"]),
+    balanceDueAt: isoTimestampSchema.optional(),
+    unpaidReason: z.string().trim().min(3).max(500).optional(),
     taxExemptionReason: z.string().trim().min(3).max(500).optional(),
   })
   .superRefine((value, context) => {
@@ -290,6 +297,22 @@ export const createPosCheckoutBodySchema = z
         message: "Payment idempotency keys must be unique within checkout.",
         path: ["payments"],
       });
+    }
+    if (value.settlementIntent !== "pay_now") {
+      if (!value.balanceDueAt) {
+        context.addIssue({
+          code: "custom",
+          message: "A balance due date is required for deferred payment.",
+          path: ["balanceDueAt"],
+        });
+      }
+      if (!value.unpaidReason) {
+        context.addIssue({
+          code: "custom",
+          message: "A reason is required for deferred payment.",
+          path: ["unpaidReason"],
+        });
+      }
     }
   });
 

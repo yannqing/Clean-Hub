@@ -2,9 +2,10 @@ import {
   orders,
   paymentTransactions,
   posPaymentAdjustments,
+  salesReturns,
   type Database,
 } from "@cleanhub/db";
-import { and, asc, eq, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { createId } from "@cleanhub/id";
 
 import type {
@@ -34,10 +35,15 @@ function toAdjustment(
     originalPaymentId: row.originalPaymentId,
     adjustmentType: row.adjustmentType,
     direction: row.direction,
+    status: row.status,
+    salesReturnId: row.salesReturnId,
     amount: row.amount,
     currency: row.currency,
     idempotencyKey: row.idempotencyKey,
     reason: row.reason,
+    settlementReference: row.settlementReference,
+    failureReason: row.failureReason,
+    resolvedAt: row.resolvedAt?.toISOString() ?? null,
     occurredAt: row.occurredAt.toISOString(),
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,
@@ -81,6 +87,8 @@ export async function findPaidPayment(
       id: paymentTransactions.id,
       amount: paymentTransactions.amount,
       currency: paymentTransactions.currency,
+      paymentMethod: paymentTransactions.paymentMethod,
+      gateway: paymentTransactions.gateway,
     })
     .from(paymentTransactions)
     .where(
@@ -113,6 +121,23 @@ export async function findAdjustmentByIdempotencyKey(
   return rows[0] ? toAdjustment(rows[0]) : null;
 }
 
+export async function findAdjustmentById(
+  db: Database,
+  input: { tenantId: string; adjustmentId: string },
+): Promise<PosPaymentAdjustment | null> {
+  const [row] = await db
+    .select()
+    .from(posPaymentAdjustments)
+    .where(
+      and(
+        eq(posPaymentAdjustments.tenantId, input.tenantId),
+        eq(posPaymentAdjustments.id, input.adjustmentId),
+      ),
+    )
+    .limit(1);
+  return row ? toAdjustment(row) : null;
+}
+
 export async function sumRefundedForPayment(
   db: Database,
   input: { tenantId: string; paymentId: string },
@@ -128,6 +153,7 @@ export async function sumRefundedForPayment(
         eq(posPaymentAdjustments.originalPaymentId, input.paymentId),
         eq(posPaymentAdjustments.adjustmentType, "refund"),
         eq(posPaymentAdjustments.direction, "debit"),
+        inArray(posPaymentAdjustments.status, ["pending", "succeeded"]),
       ),
     );
   return Number(rows[0]?.total ?? "0");
@@ -143,10 +169,13 @@ export async function insertPaymentAdjustment(
     originalPaymentId?: string;
     adjustmentType: PosPaymentAdjustmentType;
     direction: PosPaymentAdjustmentDirection;
+    status?: "pending" | "succeeded";
+    salesReturnId?: string;
     amount: string;
     currency: string;
     idempotencyKey: string;
     reason: string;
+    settlementReference?: string;
     actorUserId: string;
   },
 ): Promise<PosPaymentAdjustment | null> {
@@ -161,10 +190,15 @@ export async function insertPaymentAdjustment(
       originalPaymentId: input.originalPaymentId,
       adjustmentType: input.adjustmentType,
       direction: input.direction,
+      status: input.status ?? "succeeded",
+      salesReturnId: input.salesReturnId,
       amount: Number(input.amount).toFixed(2),
       currency: input.currency,
       idempotencyKey: input.idempotencyKey,
       reason: input.reason,
+      settlementReference: input.settlementReference,
+      resolvedAt: input.status === "pending" ? null : new Date(),
+      resolvedBy: input.status === "pending" ? null : input.actorUserId,
       createdBy: input.actorUserId,
     })
     .onConflictDoNothing()
@@ -189,6 +223,74 @@ export async function listPaymentAdjustments(
   return rows.map(toAdjustment);
 }
 
+export async function resolvePendingRefundAdjustment(
+  db: Database,
+  input: {
+    tenantId: string;
+    adjustmentId: string;
+    outcome: "succeeded" | "failed";
+    settlementReference?: string;
+    failureReason?: string;
+    actorUserId: string;
+  },
+): Promise<PosPaymentAdjustment | null> {
+  const [row] = await db
+    .update(posPaymentAdjustments)
+    .set({
+      status: input.outcome,
+      settlementReference: input.settlementReference,
+      failureReason: input.outcome === "failed" ? input.failureReason : null,
+      resolvedAt: new Date(),
+      resolvedBy: input.actorUserId,
+    })
+    .where(
+      and(
+        eq(posPaymentAdjustments.tenantId, input.tenantId),
+        eq(posPaymentAdjustments.id, input.adjustmentId),
+        eq(posPaymentAdjustments.adjustmentType, "refund"),
+        inArray(posPaymentAdjustments.status, ["pending", "failed"]),
+      ),
+    )
+    .returning();
+  return row ? toAdjustment(row) : null;
+}
+
+export async function completeSalesReturnWhenRefundsSettle(
+  db: Database,
+  input: { tenantId: string; salesReturnId: string; actorUserId: string },
+): Promise<boolean> {
+  const [unsettled] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(posPaymentAdjustments)
+    .where(
+      and(
+        eq(posPaymentAdjustments.tenantId, input.tenantId),
+        eq(posPaymentAdjustments.salesReturnId, input.salesReturnId),
+        eq(posPaymentAdjustments.adjustmentType, "refund"),
+        inArray(posPaymentAdjustments.status, ["pending", "failed"]),
+      ),
+    );
+  if (Number(unsettled?.count ?? 0) > 0) return false;
+  const rows = await db
+    .update(salesReturns)
+    .set({
+      status: "completed",
+      completedAt: new Date(),
+      updatedAt: new Date(),
+      updatedBy: input.actorUserId,
+      version: sql`${salesReturns.version} + 1`,
+    })
+    .where(
+      and(
+        eq(salesReturns.tenantId, input.tenantId),
+        eq(salesReturns.id, input.salesReturnId),
+        inArray(salesReturns.status, ["approved", "received"]),
+      ),
+    )
+    .returning({ id: salesReturns.id });
+  return rows.length > 0;
+}
+
 export async function recalculateOrderAfterAdjustment(
   db: Database,
   input: {
@@ -196,7 +298,10 @@ export async function recalculateOrderAfterAdjustment(
     order: PosAdjustmentOrder;
     actorUserId: string;
   },
-): Promise<{ paidAmount: string; paymentStatus: "unpaid" | "partial" | "paid" | "refunded" }> {
+): Promise<{
+  paidAmount: string;
+  paymentStatus: "unpaid" | "partial" | "paid" | "refunded";
+}> {
   const paymentRows = await db
     .select({
       total: sql<string>`coalesce(sum(${paymentTransactions.amount}), 0)`,
@@ -220,6 +325,7 @@ export async function recalculateOrderAfterAdjustment(
       and(
         eq(posPaymentAdjustments.tenantId, input.tenantId),
         eq(posPaymentAdjustments.orderId, input.order.id),
+        eq(posPaymentAdjustments.status, "succeeded"),
       ),
     );
 

@@ -10,11 +10,14 @@ import {
 import { PosOrderError } from "../orders/orders.errors.js";
 import {
   findAdjustmentByIdempotencyKey,
+  findAdjustmentById,
   findPaidPayment,
   insertPaymentAdjustment,
   listPaymentAdjustments,
   lockAdjustmentOrder,
   recalculateOrderAfterAdjustment,
+  resolvePendingRefundAdjustment,
+  completeSalesReturnWhenRefundsSettle,
   sumRefundedForPayment,
 } from "./payment-adjustments.repository.js";
 import type { PosAdjustmentOrder } from "./payment-adjustments.repository.js";
@@ -22,6 +25,7 @@ import type {
   CreatePosPaymentAdjustmentResponse,
   CreatePosPaymentCorrectionRequest,
   CreatePosRefundRequest,
+  ResolvePosRefundRequest,
   PosPaymentAdjustment,
   PosPaymentAdjustmentMutationInput,
 } from "./payment-adjustments.types.js";
@@ -125,6 +129,23 @@ async function createAdjustment(
       );
     }
 
+    const adjustmentStatus = refundData
+      ? (refundData.settlementStatus ??
+        (payment.paymentMethod === "cash" ? "succeeded" : "pending"))
+      : "succeeded";
+    if (
+      refundData &&
+      adjustmentStatus === "succeeded" &&
+      payment.paymentMethod !== "cash" &&
+      !refundData.settlementReference?.trim()
+    ) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "A non-cash refund can be completed only with the provider settlement reference.",
+        422,
+      );
+    }
+
     if (refundData) {
       if (Number(refundData.amount) > Number(order.paidAmount)) {
         throw new PosOrderError(
@@ -170,10 +191,13 @@ async function createAdjustment(
       originalPaymentId: input.data.originalPaymentId,
       adjustmentType: kind,
       direction,
+      status: adjustmentStatus,
+      salesReturnId: refundData?.salesReturnId,
       amount: input.data.amount,
       currency: order.currency,
       idempotencyKey: input.data.idempotencyKey,
       reason,
+      settlementReference: refundData?.settlementReference?.trim(),
       actorUserId: input.authContext.userId,
     });
     const adjustment =
@@ -193,11 +217,14 @@ async function createAdjustment(
       assertIdempotentMatch(adjustment, expected);
     }
 
-    const balance = await recalculateOrderAfterAdjustment(tx, {
-      tenantId,
-      order,
-      actorUserId: input.authContext.userId,
-    });
+    const balance =
+      adjustment.status === "succeeded"
+        ? await recalculateOrderAfterAdjustment(tx, {
+            tenantId,
+            order,
+            actorUserId: input.authContext.userId,
+          })
+        : { paidAmount: order.paidAmount, paymentStatus: order.paymentStatus };
     if (created) {
       await writeAuditLog(tx, {
         tenantId,
@@ -206,7 +233,9 @@ async function createAdjustment(
         eventCategory: "pos_order",
         eventType:
           kind === "refund"
-            ? "pos.order.payment_refunded"
+            ? adjustment.status === "succeeded"
+              ? "pos.order.payment_refunded"
+              : "pos.order.refund_pending"
             : "pos.order.payment_corrected",
         entityType: "pos_payment_adjustment",
         entityId: adjustment.id,
@@ -240,6 +269,138 @@ export function createPosRefund(
   db: Database = getDb(),
 ) {
   return createAdjustment(input, "refund", db);
+}
+
+export async function resolvePosRefund(
+  adjustmentId: string,
+  input: PosPaymentAdjustmentMutationInput<ResolvePosRefundRequest>,
+  db: Database = getDb(),
+): Promise<CreatePosPaymentAdjustmentResponse> {
+  const tenantId = requirePosTenantId(input.authContext);
+  const reason = authorizePosSensitiveOperation(
+    input.authContext,
+    "refund",
+    input.data.reason,
+  );
+  return db.transaction(async (tx) => {
+    const adjustment = await findAdjustmentById(tx, { tenantId, adjustmentId });
+    if (!adjustment || adjustment.adjustmentType !== "refund") {
+      throw new PosOrderError(
+        "PAYMENT_NOT_FOUND",
+        "Refund was not found.",
+        404,
+      );
+    }
+    const order = await lockAdjustmentOrder(tx, {
+      tenantId,
+      orderId: adjustment.orderId,
+    });
+    if (!order) {
+      throw new PosOrderError("ORDER_NOT_FOUND", "Order not found.", 404);
+    }
+    requirePosBranchAccess(input.authContext, order.branchId);
+    if (
+      adjustment.status === "succeeded" ||
+      (adjustment.status === "failed" && input.data.outcome === "failed")
+    ) {
+      return {
+        adjustment,
+        idempotent: true,
+        paidAmount: order.paidAmount,
+        paymentStatus: order.paymentStatus,
+      };
+    }
+    const payment = adjustment.originalPaymentId
+      ? await findPaidPayment(tx, {
+          tenantId,
+          orderId: order.id,
+          paymentId: adjustment.originalPaymentId,
+        })
+      : null;
+    if (!payment) {
+      throw new PosOrderError(
+        "PAYMENT_NOT_FOUND",
+        "The original payment is not available.",
+        404,
+      );
+    }
+    if (adjustment.status === "failed" && input.data.outcome === "succeeded") {
+      const alreadyRefunded = await sumRefundedForPayment(tx, {
+        tenantId,
+        paymentId: payment.id,
+      });
+      if (
+        alreadyRefunded + Number(adjustment.amount) >
+        Number(payment.amount)
+      ) {
+        throw new PosOrderError(
+          "PAYMENT_AMOUNT_EXCEEDED",
+          "This failed refund can no longer be completed because the payment's refundable balance was used by another refund.",
+          409,
+        );
+      }
+    }
+    if (
+      input.data.outcome === "succeeded" &&
+      payment.paymentMethod !== "cash" &&
+      !input.data.settlementReference?.trim()
+    ) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "A provider settlement reference is required for a non-cash refund.",
+        422,
+      );
+    }
+    const resolved = await resolvePendingRefundAdjustment(tx, {
+      tenantId,
+      adjustmentId,
+      outcome: input.data.outcome,
+      settlementReference: input.data.settlementReference?.trim(),
+      failureReason: input.data.outcome === "failed" ? reason : undefined,
+      actorUserId: input.authContext.userId,
+    });
+    if (!resolved) {
+      throw new PosOrderError(
+        "VERSION_CONFLICT",
+        "Refund status changed; refresh and try again.",
+        409,
+      );
+    }
+    const balance =
+      resolved.status === "succeeded"
+        ? await recalculateOrderAfterAdjustment(tx, {
+            tenantId,
+            order,
+            actorUserId: input.authContext.userId,
+          })
+        : { paidAmount: order.paidAmount, paymentStatus: order.paymentStatus };
+    if (resolved.salesReturnId && resolved.status === "succeeded") {
+      await completeSalesReturnWhenRefundsSettle(tx, {
+        tenantId,
+        salesReturnId: resolved.salesReturnId,
+        actorUserId: input.authContext.userId,
+      });
+    }
+    await writeAuditLog(tx, {
+      tenantId,
+      branchId: order.branchId,
+      actorUserId: input.authContext.userId,
+      eventCategory: "pos_order",
+      eventType: `pos.order.refund_${resolved.status}`,
+      entityType: "pos_payment_adjustment",
+      entityId: resolved.id,
+      reason,
+      before: adjustment,
+      after: resolved,
+      metadata: createPosAuditMetadata(input.authContext, {
+        orderId: order.id,
+        originalPaymentId: resolved.originalPaymentId,
+      }),
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+    return { adjustment: resolved, idempotent: false, ...balance };
+  });
 }
 
 export function createPosPaymentCorrection(

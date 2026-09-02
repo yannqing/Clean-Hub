@@ -1,5 +1,9 @@
 export type PosReceiptDeliveryChannel = "print" | "email" | "sms" | "none";
-export type PosReceiptDeliveryStatus = "pending" | "sent" | "failed" | "skipped";
+export type PosReceiptDeliveryStatus =
+  | "pending"
+  | "sent"
+  | "failed"
+  | "skipped";
 
 export type DeliverPosReceiptRequest = {
   channel: PosReceiptDeliveryChannel;
@@ -19,6 +23,8 @@ export type PosReceiptDelivery = {
   provider: string | null;
   externalId: string | null;
   failureReason: string | null;
+  attemptCount: number;
+  lastAttemptAt: string | null;
   sentAt: string | null;
   createdAt: string;
 };

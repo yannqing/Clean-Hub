@@ -2,6 +2,7 @@ import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 
 export type PosPaymentAdjustmentType = "refund" | "correction";
 export type PosPaymentAdjustmentDirection = "debit" | "credit";
+export type PosPaymentAdjustmentStatus = "pending" | "succeeded" | "failed";
 
 export type PosPaymentAdjustment = {
   id: string;
@@ -9,10 +10,15 @@ export type PosPaymentAdjustment = {
   originalPaymentId: string | null;
   adjustmentType: PosPaymentAdjustmentType;
   direction: PosPaymentAdjustmentDirection;
+  status: PosPaymentAdjustmentStatus;
+  salesReturnId: string | null;
   amount: string;
   currency: string;
   idempotencyKey: string;
   reason: string;
+  settlementReference: string | null;
+  failureReason: string | null;
+  resolvedAt: string | null;
   occurredAt: string;
   createdAt: string;
   createdBy: string;
@@ -23,6 +29,15 @@ export type CreatePosRefundRequest = {
   originalPaymentId: string;
   amount: string;
   idempotencyKey: string;
+  reason: string;
+  salesReturnId?: string;
+  settlementStatus?: "pending" | "succeeded";
+  settlementReference?: string;
+};
+
+export type ResolvePosRefundRequest = {
+  outcome: "succeeded" | "failed";
+  settlementReference?: string;
   reason: string;
 };
 

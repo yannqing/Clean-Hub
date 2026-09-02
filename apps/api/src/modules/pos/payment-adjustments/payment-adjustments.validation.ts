@@ -15,6 +15,19 @@ export const createPosRefundBodySchema = z.object({
   amount: amountSchema,
   idempotencyKey: z.string().trim().min(1).max(120),
   reason: reasonSchema,
+  salesReturnId: ulidSchema.optional(),
+  settlementStatus: z.enum(["pending", "succeeded"]).optional(),
+  settlementReference: z.string().trim().min(1).max(160).optional(),
+});
+
+export const resolvePosRefundBodySchema = z.object({
+  outcome: z.enum(["succeeded", "failed"]),
+  settlementReference: z.string().trim().min(1).max(160).optional(),
+  reason: reasonSchema,
+});
+
+export const posPaymentAdjustmentParamsSchema = z.object({
+  adjustmentId: ulidSchema,
 });
 
 export const createPosPaymentCorrectionBodySchema = z.object({

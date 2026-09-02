@@ -17,6 +17,7 @@ assert.equal(
       type: "checkout",
       input: {
         expectedTotalAmount: "100.00",
+        settlementIntent: "pay_now",
         order: {
           id: orderId,
           orderType: "manual",

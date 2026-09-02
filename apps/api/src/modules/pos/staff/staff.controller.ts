@@ -6,15 +6,19 @@ import { PosStaffError } from "./staff.errors.js";
 import {
   clockAction,
   createHandover,
+  createShiftCashMovement,
   getCurrentShift,
+  getCurrentShiftReconciliation,
   getPosStaff,
   getPosZReport,
   listPosStaff,
   listPosZReports,
+  listCurrentShiftCashMovements,
 } from "./staff.service.js";
 import {
   clockRequestSchema,
   createHandoverRequestSchema,
+  createShiftCashMovementRequestSchema,
   posStaffListQuerySchema,
   posStaffParamsSchema,
   posZReportListQuerySchema,
@@ -59,6 +63,34 @@ export async function getCurrentShiftController(c: Context<AppBindings>) {
     if (error instanceof PosStaffError) return errorResponse(c, error);
     throw error;
   }
+}
+
+export async function getCurrentShiftReconciliationController(
+  c: Context<AppBindings>,
+) {
+  return c.json(await getCurrentShiftReconciliation(c.get("authContext")));
+}
+
+export async function listCurrentShiftCashMovementsController(
+  c: Context<AppBindings>,
+) {
+  return c.json(await listCurrentShiftCashMovements(c.get("authContext")));
+}
+
+export async function createShiftCashMovementController(
+  c: Context<AppBindings>,
+) {
+  const data = createShiftCashMovementRequestSchema.parse(
+    await c.req.json().catch(() => ({})),
+  );
+  return c.json(
+    await createShiftCashMovement({
+      authContext: c.get("authContext"),
+      requestMeta: getRequestMeta(c),
+      data,
+    }),
+    201,
+  );
 }
 
 export async function clockActionController(c: Context<AppBindings>) {

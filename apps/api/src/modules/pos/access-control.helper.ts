@@ -16,7 +16,9 @@ export type PosTerminalContext = {
 
 export type PosSensitiveOperation =
   | "cancel"
+  | "cash_movement"
   | "delete"
+  | "deferred_settlement"
   | "discount"
   | "manual_drawer_open"
   | "offline_cash_reconciliation"

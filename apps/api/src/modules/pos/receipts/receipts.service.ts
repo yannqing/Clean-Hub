@@ -5,11 +5,14 @@ import { EmailAdapter } from "../../notifications/email.adapter.js";
 import { loadEmailConfig } from "../../notifications/email-config.js";
 import type { AuthContext } from "../../auth/auth.types.js";
 import { requirePosTenantId } from "../access-control.helper.js";
+import { PosOrderError } from "../orders/orders.errors.js";
 import { getPosOrder } from "../orders/orders.service.js";
 import type { PosOrderDetail } from "../orders/orders.types.js";
 import {
   findReceiptDeliveryByIdempotencyKey,
+  findReceiptDeliveryRecord,
   insertReceiptDelivery,
+  listReceiptDeliveries,
   updateReceiptDeliveryResult,
 } from "./receipts.repository.js";
 import type {
@@ -17,7 +20,10 @@ import type {
   PosReceiptDelivery,
 } from "./receipts.types.js";
 
-function buildFiscalReceipt(order: PosOrderDetail): { title: string; content: string } {
+function buildFiscalReceipt(order: PosOrderDetail): {
+  title: string;
+  content: string;
+} {
   const lines = [
     `CleanHub receipt ${order.id}`,
     `Date: ${order.createdAt}`,
@@ -91,11 +97,67 @@ async function sendSms(input: {
   };
 }
 
-export async function deliverPosOrderReceipt(input: {
-  authContext: AuthContext;
-  orderId: string;
-  data: DeliverPosReceiptRequest;
-}, db: Database = getDb()): Promise<PosReceiptDelivery> {
+async function attemptElectronicReceiptDelivery(
+  db: Database,
+  input: {
+    tenantId: string;
+    id: string;
+    attemptNumber: number;
+    channel: "email" | "sms";
+    destination: string;
+    title: string;
+    content: string;
+  },
+): Promise<PosReceiptDelivery> {
+  try {
+    if (input.channel === "email") {
+      const result = await new EmailAdapter(loadEmailConfig()).send({
+        deliveryId: `${input.id}:attempt:${input.attemptNumber}`,
+        to: input.destination,
+        subject: input.title,
+        text: input.content,
+      });
+      return updateReceiptDeliveryResult(db, {
+        tenantId: input.tenantId,
+        id: input.id,
+        status: "sent",
+        provider: "smtp",
+        externalId: result.externalId,
+      });
+    }
+    const result = await sendSms({
+      deliveryId: `${input.id}:attempt:${input.attemptNumber}`,
+      to: input.destination,
+      content: input.content,
+    });
+    return updateReceiptDeliveryResult(db, {
+      tenantId: input.tenantId,
+      id: input.id,
+      status: "sent",
+      provider: "sms_webhook",
+      externalId: result.externalId,
+      providerPayload: result.payload,
+    });
+  } catch (error) {
+    return updateReceiptDeliveryResult(db, {
+      tenantId: input.tenantId,
+      id: input.id,
+      status: "failed",
+      provider: input.channel === "email" ? "smtp" : "sms_webhook",
+      failureReason:
+        error instanceof Error ? error.message : "Receipt delivery failed.",
+    });
+  }
+}
+
+export async function deliverPosOrderReceipt(
+  input: {
+    authContext: AuthContext;
+    orderId: string;
+    data: DeliverPosReceiptRequest;
+  },
+  db: Database = getDb(),
+): Promise<PosReceiptDelivery> {
   const tenantId = requirePosTenantId(input.authContext);
   const existing = await findReceiptDeliveryByIdempotencyKey(db, {
     tenantId,
@@ -103,10 +165,13 @@ export async function deliverPosOrderReceipt(input: {
   });
   if (existing) return existing;
 
-  const order = await getPosOrder({
-    authContext: input.authContext,
-    orderId: input.orderId,
-  }, db);
+  const order = await getPosOrder(
+    {
+      authContext: input.authContext,
+      orderId: input.orderId,
+    },
+    db,
+  );
   const receipt = buildFiscalReceipt(order);
   const created = await insertReceiptDelivery(db, {
     id: createId(),
@@ -147,43 +212,66 @@ export async function deliverPosOrderReceipt(input: {
     });
   }
 
-  try {
-    if (input.data.channel === "email") {
-      const result = await new EmailAdapter(loadEmailConfig()).send({
-        deliveryId: created.id,
-        to: input.data.destination!,
-        subject: receipt.title,
-        text: receipt.content,
-      });
-      return updateReceiptDeliveryResult(db, {
-        tenantId,
-        id: created.id,
-        status: "sent",
-        provider: "smtp",
-        externalId: result.externalId,
-      });
-    }
-    const result = await sendSms({
-      deliveryId: created.id,
-      to: input.data.destination!,
-      content: receipt.content,
-    });
-    return updateReceiptDeliveryResult(db, {
-      tenantId,
-      id: created.id,
-      status: "sent",
-      provider: "sms_webhook",
-      externalId: result.externalId,
-      providerPayload: result.payload,
-    });
-  } catch (error) {
-    return updateReceiptDeliveryResult(db, {
-      tenantId,
-      id: created.id,
-      status: "failed",
-      provider: input.data.channel === "email" ? "smtp" : "sms_webhook",
-      failureReason:
-        error instanceof Error ? error.message : "Receipt delivery failed.",
-    });
+  return attemptElectronicReceiptDelivery(db, {
+    tenantId,
+    id: created.id,
+    attemptNumber: 1,
+    channel: input.data.channel,
+    destination: input.data.destination!,
+    title: receipt.title,
+    content: receipt.content,
+  });
+}
+
+export async function getPosOrderReceiptDeliveries(
+  authContext: AuthContext,
+  orderId: string,
+  db: Database = getDb(),
+) {
+  const tenantId = requirePosTenantId(authContext);
+  await getPosOrder({ authContext, orderId }, db);
+  return { data: await listReceiptDeliveries(db, { tenantId, orderId }) };
+}
+
+export async function retryPosOrderReceiptDelivery(
+  input: { authContext: AuthContext; orderId: string; deliveryId: string },
+  db: Database = getDb(),
+): Promise<PosReceiptDelivery> {
+  const tenantId = requirePosTenantId(input.authContext);
+  await getPosOrder(
+    { authContext: input.authContext, orderId: input.orderId },
+    db,
+  );
+  const delivery = await findReceiptDeliveryRecord(db, {
+    tenantId,
+    orderId: input.orderId,
+    deliveryId: input.deliveryId,
+  });
+  if (!delivery) {
+    throw new PosOrderError(
+      "ORDER_NOT_FOUND",
+      "Receipt delivery was not found.",
+      404,
+    );
   }
+  if (
+    delivery.status !== "failed" ||
+    (delivery.channel !== "email" && delivery.channel !== "sms") ||
+    !delivery.destination
+  ) {
+    throw new PosOrderError(
+      "VALIDATION_ERROR",
+      "Only a failed email or SMS receipt delivery can be retried.",
+      422,
+    );
+  }
+  return attemptElectronicReceiptDelivery(db, {
+    tenantId,
+    id: delivery.id,
+    attemptNumber: delivery.attemptCount + 1,
+    channel: delivery.channel,
+    destination: delivery.destination,
+    title: delivery.receiptTitle,
+    content: delivery.receiptContent,
+  });
 }

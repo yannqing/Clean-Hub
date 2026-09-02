@@ -4,13 +4,14 @@ import {
   inventoryMovements,
   orderItems,
   orders,
+  paymentTransactions,
   productSkus,
   salesReturnItems,
   salesReturns,
   type Database,
 } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
@@ -28,8 +29,11 @@ import {
   insertPaymentAdjustment,
   lockAdjustmentOrder,
   recalculateOrderAfterAdjustment,
+  sumRefundedForPayment,
 } from "../payment-adjustments/payment-adjustments.repository.js";
+import type { PosAdjustmentOrder } from "../payment-adjustments/payment-adjustments.repository.js";
 import { createPosRefund } from "../payment-adjustments/payment-adjustments.service.js";
+import type { CreatePosPaymentAdjustmentResponse } from "../payment-adjustments/payment-adjustments.types.js";
 import type {
   CreatePosProductReturnRequest,
   CreatePosProductReturnResponse,
@@ -40,6 +44,81 @@ import type {
 
 function money(value: number): string {
   return (Math.round(value * 100) / 100).toFixed(2);
+}
+
+export function calculateReturnSettlement(
+  returnValueAmount: number,
+  exchangeTotalAmount: number,
+): {
+  refundAmount: number;
+  exchangeCreditAmount: number;
+  additionalDueAmount: number;
+} {
+  const normalizedReturnValue = Math.max(0, Number(money(returnValueAmount)));
+  const normalizedExchangeTotal = Math.max(
+    0,
+    Number(money(exchangeTotalAmount)),
+  );
+  const exchangeCreditAmount = Math.min(
+    normalizedReturnValue,
+    normalizedExchangeTotal,
+  );
+  return {
+    refundAmount: normalizedReturnValue - exchangeCreditAmount,
+    exchangeCreditAmount,
+    additionalDueAmount: Math.max(
+      0,
+      normalizedExchangeTotal - exchangeCreditAmount,
+    ),
+  };
+}
+
+async function allocateRefundAcrossPaidPayments(
+  db: Database,
+  input: { tenantId: string; orderId: string; amount: number },
+): Promise<Array<{ originalPaymentId: string; amount: string }>> {
+  let remaining = Number(money(input.amount));
+  if (remaining <= 0) return [];
+  const payments = await db
+    .select({
+      id: paymentTransactions.id,
+      amount: paymentTransactions.amount,
+    })
+    .from(paymentTransactions)
+    .where(
+      and(
+        eq(paymentTransactions.tenantId, input.tenantId),
+        eq(paymentTransactions.orderId, input.orderId),
+        eq(paymentTransactions.paymentStatus, "paid"),
+        isNull(paymentTransactions.deletedAt),
+      ),
+    )
+    .orderBy(asc(paymentTransactions.createdAt));
+  const allocations: Array<{ originalPaymentId: string; amount: string }> = [];
+  for (const payment of payments) {
+    const reservedOrRefunded = await sumRefundedForPayment(db, {
+      tenantId: input.tenantId,
+      paymentId: payment.id,
+    });
+    const available = Math.max(0, Number(payment.amount) - reservedOrRefunded);
+    const allocated = Math.min(available, remaining);
+    if (allocated > 0) {
+      allocations.push({
+        originalPaymentId: payment.id,
+        amount: money(allocated),
+      });
+      remaining = Number(money(remaining - allocated));
+    }
+    if (remaining <= 0) break;
+  }
+  if (remaining > 0) {
+    throw new PosOrderError(
+      "PAYMENT_AMOUNT_EXCEEDED",
+      "The order no longer has enough refundable payment balance.",
+      409,
+    );
+  }
+  return allocations;
 }
 
 async function loadProductReturns(
@@ -53,7 +132,7 @@ async function loadProductReturns(
       and(
         eq(salesReturns.tenantId, input.tenantId),
         eq(salesReturns.orderId, input.orderId),
-        eq(salesReturns.status, "completed"),
+        inArray(salesReturns.status, ["received", "completed"]),
       ),
     )
     .orderBy(salesReturns.createdAt);
@@ -74,12 +153,15 @@ async function loadProductReturns(
     id: row.id,
     orderId: row.orderId,
     exchangeOrderId: row.exchangeOrderId,
-    status: "completed",
+    status: row.status as "received" | "completed",
     reason: row.reason,
     notes: row.notes,
     refundAmount: row.refundAmount,
+    returnValueAmount: row.returnValueAmount,
+    exchangeCreditAmount: row.exchangeCreditAmount,
+    additionalDueAmount: row.additionalDueAmount,
     currency: row.currency,
-    completedAt: (row.completedAt ?? row.updatedAt).toISOString(),
+    completedAt: row.completedAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     createdBy: row.createdBy,
     items: itemRows
@@ -139,7 +221,7 @@ async function loadReturnableItems(
       and(
         eq(salesReturns.tenantId, salesReturnItems.tenantId),
         eq(salesReturns.id, salesReturnItems.salesReturnId),
-        eq(salesReturns.status, "completed"),
+        inArray(salesReturns.status, ["received", "completed"]),
       ),
     )
     .where(
@@ -156,9 +238,8 @@ async function loadReturnableItems(
     returnedRows.map((row) => [row.orderItemId, Number(row.quantity)]),
   );
   return rows
-    .filter(
-      (row): row is typeof row & { productSkuId: string } =>
-        Boolean(row.productSkuId),
+    .filter((row): row is typeof row & { productSkuId: string } =>
+      Boolean(row.productSkuId),
     )
     .map((row) => {
       const returnedQuantity = returned.get(row.orderItemId) ?? 0;
@@ -195,7 +276,8 @@ export async function getPosProductReturns(
       ),
     )
     .limit(1);
-  if (!order) throw new PosOrderError("ORDER_NOT_FOUND", "Order not found.", 404);
+  if (!order)
+    throw new PosOrderError("ORDER_NOT_FOUND", "Order not found.", 404);
   requirePosBranchAccess(authContext, order.branchId);
   const [data, returnableItems] = await Promise.all([
     loadProductReturns(db, { tenantId, orderId }),
@@ -204,12 +286,15 @@ export async function getPosProductReturns(
   return { data, returnableItems };
 }
 
-export async function createPosProductReturn(input: {
-  authContext: AuthContext;
-  orderId: string;
-  data: CreatePosProductReturnRequest;
-  requestMeta?: AuthRequestMeta;
-}, db: Database = getDb()): Promise<CreatePosProductReturnResponse> {
+export async function createPosProductReturn(
+  input: {
+    authContext: AuthContext;
+    orderId: string;
+    data: CreatePosProductReturnRequest;
+    requestMeta?: AuthRequestMeta;
+  },
+  db: Database = getDb(),
+): Promise<CreatePosProductReturnResponse> {
   const tenantId = requirePosTenantId(input.authContext);
   const reason = authorizePosSensitiveOperation(
     input.authContext,
@@ -230,7 +315,8 @@ export async function createPosProductReturn(input: {
       )
       .for("update")
       .limit(1);
-    if (!order) throw new PosOrderError("ORDER_NOT_FOUND", "Order not found.", 404);
+    if (!order)
+      throw new PosOrderError("ORDER_NOT_FOUND", "Order not found.", 404);
     requirePosBranchAccess(input.authContext, order.branchId);
     if (order.status === "cancelled" || Number(order.paidAmount) <= 0) {
       throw new PosOrderError(
@@ -262,17 +348,23 @@ export async function createPosProductReturn(input: {
         tenantId,
         orderId: order.id,
       }).then((rows) => rows.filter((row) => row.id === existing.id));
-      if (!salesReturn) throw new Error("Existing product return could not be loaded.");
+      if (!salesReturn)
+        throw new Error("Existing product return could not be loaded.");
       const exchangeOrder = existing.exchangeOrderId
         ? await getPosOrder(
-            { authContext: input.authContext, orderId: existing.exchangeOrderId },
+            {
+              authContext: input.authContext,
+              orderId: existing.exchangeOrderId,
+            },
             tx,
           )
         : null;
       return { salesReturn, exchangeOrder };
     }
 
-    const uniqueItemIds = new Set(input.data.items.map((item) => item.orderItemId));
+    const uniqueItemIds = new Set(
+      input.data.items.map((item) => item.orderItemId),
+    );
     if (uniqueItemIds.size !== input.data.items.length) {
       throw new PosOrderError(
         "VALIDATION_ERROR",
@@ -291,7 +383,10 @@ export async function createPosProductReturn(input: {
     let grossReturned = 0;
     for (const item of input.data.items) {
       const source = returnableById.get(item.orderItemId);
-      if (!source || Number(item.quantity) > Number(source.returnableQuantity)) {
+      if (
+        !source ||
+        Number(item.quantity) > Number(source.returnableQuantity)
+      ) {
         throw new PosOrderError(
           "VALIDATION_ERROR",
           "A returned quantity exceeds the remaining purchased quantity.",
@@ -314,24 +409,12 @@ export async function createPosProductReturn(input: {
       grossSubtotal > 0
         ? (Number(order.totalAmount) * grossReturned) / grossSubtotal
         : 0;
-    const refundAmount = Math.min(
+    const returnValueAmount = Math.min(
       Number(money(pricedReturn)),
       Number(order.paidAmount),
     );
-    const refundAllocations = input.data.refundAllocations ?? [];
-    const allocatedRefund = refundAllocations.reduce(
-      (sum, allocation) => sum + Number(allocation.amount),
-      0,
-    );
-    if (Math.abs(allocatedRefund - refundAmount) > 0.009) {
-      throw new PosOrderError(
-        "VALIDATION_ERROR",
-        `Refund allocations must equal ${money(refundAmount)} ${order.currency}.`,
-        422,
-      );
-    }
-
     let exchangeOrderId: string | null = null;
+    let exchangeOrder: PosAdjustmentOrder | null = null;
     if (input.data.exchangeItems?.length) {
       const exchange = await createPosOrder(
         {
@@ -355,62 +438,98 @@ export async function createPosProductReturn(input: {
         orderId: exchange.id,
         actorUserId: input.authContext.userId,
       });
+      exchangeOrder = await lockAdjustmentOrder(tx, {
+        tenantId,
+        orderId: exchange.id,
+      });
+      if (!exchangeOrder) {
+        throw new Error("Exchange order could not be locked.");
+      }
     }
 
-    for (const [index, allocation] of refundAllocations.entries()) {
-      await createPosRefund(
-        {
-          authContext: input.authContext,
-          requestMeta: input.requestMeta,
-          data: {
-            orderId: order.id,
-            originalPaymentId: allocation.originalPaymentId,
-            amount: money(Number(allocation.amount)),
-            idempotencyKey: `${input.data.idempotencyKey}:refund:${index}`,
-            reason,
-          },
-        },
-        tx,
+    const { additionalDueAmount, exchangeCreditAmount, refundAmount } =
+      calculateReturnSettlement(
+        returnValueAmount,
+        Number(exchangeOrder?.totalAmount ?? 0),
+      );
+    const refundAllocations: NonNullable<
+      CreatePosProductReturnRequest["refundAllocations"]
+    > =
+      input.data.refundAllocations ??
+      (await allocateRefundAcrossPaidPayments(tx, {
+        tenantId,
+        orderId: order.id,
+        amount: refundAmount,
+      }));
+    const allocatedRefund = refundAllocations.reduce(
+      (sum, allocation) => sum + Number(allocation.amount),
+      0,
+    );
+    if (Math.abs(allocatedRefund - refundAmount) > 0.009) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        `Refund allocations must equal the cash-out amount ${money(refundAmount)} ${order.currency} after exchange credit.`,
+        422,
       );
     }
 
-    if (exchangeOrderId && refundAmount > 0) {
-      const exchangeOrder = await lockAdjustmentOrder(tx, {
+    if (exchangeOrder && exchangeCreditAmount > 0) {
+      await insertPaymentAdjustment(tx, {
         tenantId,
-        orderId: exchangeOrderId,
+        branchId: order.branchId,
+        customerId: order.customerId,
+        orderId: exchangeOrder.id,
+        adjustmentType: "correction",
+        direction: "credit",
+        amount: money(exchangeCreditAmount),
+        currency: order.currency,
+        idempotencyKey: `${input.data.idempotencyKey}:exchange-credit`,
+        reason: `Store credit transferred from return on ${order.id}: ${reason}`,
+        actorUserId: input.authContext.userId,
       });
-      if (!exchangeOrder) throw new Error("Exchange order could not be locked.");
-      const creditAmount = Math.min(refundAmount, Number(exchangeOrder.totalAmount));
-      if (creditAmount > 0) {
-        await insertPaymentAdjustment(tx, {
+      const balance = await recalculateOrderAfterAdjustment(tx, {
+        tenantId,
+        order: exchangeOrder,
+        actorUserId: input.authContext.userId,
+      });
+      if (balance.paymentStatus === "paid") {
+        await consumeProductInventoryForPaidOrder(tx, {
           tenantId,
-          branchId: order.branchId,
-          customerId: order.customerId,
           orderId: exchangeOrder.id,
-          adjustmentType: "correction",
-          direction: "credit",
-          amount: money(creditAmount),
-          currency: order.currency,
-          idempotencyKey: `${input.data.idempotencyKey}:exchange-credit`,
-          reason: `Store credit transferred from return on ${order.id}: ${reason}`,
           actorUserId: input.authContext.userId,
         });
-        const balance = await recalculateOrderAfterAdjustment(tx, {
-          tenantId,
-          order: exchangeOrder,
-          actorUserId: input.authContext.userId,
-        });
-        if (balance.paymentStatus === "paid") {
-          await consumeProductInventoryForPaidOrder(tx, {
-            tenantId,
-            orderId: exchangeOrder.id,
-            actorUserId: input.authContext.userId,
-          });
-        }
       }
     }
 
     const returnId = createId();
+    const refundResults: CreatePosPaymentAdjustmentResponse[] = [];
+    for (const [index, allocation] of refundAllocations.entries()) {
+      refundResults.push(
+        await createPosRefund(
+          {
+            authContext: input.authContext,
+            requestMeta: input.requestMeta,
+            data: {
+              orderId: order.id,
+              originalPaymentId: allocation.originalPaymentId,
+              amount: money(Number(allocation.amount)),
+              idempotencyKey: `${input.data.idempotencyKey}:refund:${index}`,
+              reason,
+              salesReturnId: returnId,
+              settlementStatus: allocation.settlementReference
+                ? "succeeded"
+                : undefined,
+              settlementReference: allocation.settlementReference,
+            },
+          },
+          tx,
+        ),
+      );
+    }
+
+    const hasPendingRefund = refundResults.some(
+      (result) => result.adjustment.status === "pending",
+    );
     const now = new Date();
     await tx.insert(salesReturns).values({
       id: returnId,
@@ -419,14 +538,17 @@ export async function createPosProductReturn(input: {
       orderId: order.id,
       exchangeOrderId,
       customerId: order.customerId,
-      status: "completed",
+      status: hasPendingRefund ? "received" : "completed",
       idempotencyKey: input.data.idempotencyKey,
       reason,
       notes: input.data.notes,
       refundAmount: money(refundAmount),
+      returnValueAmount: money(returnValueAmount),
+      exchangeCreditAmount: money(exchangeCreditAmount),
+      additionalDueAmount: money(additionalDueAmount),
       currency: order.currency,
       receivedAt: now,
-      completedAt: now,
+      completedAt: hasPendingRefund ? null : now,
       createdBy: input.authContext.userId,
       updatedBy: input.authContext.userId,
       approvedBy: input.authContext.userId,
@@ -438,13 +560,13 @@ export async function createPosProductReturn(input: {
       const last = index === input.data.items.length - 1;
       const share =
         grossReturned > 0
-          ? (refundAmount *
+          ? (returnValueAmount *
               ((Number(source.lineAmount) * Number(item.quantity)) /
                 Number(source.purchasedQuantity))) /
             grossReturned
           : 0;
       const itemRefund = last
-        ? refundAmount - allocatedItemRefund
+        ? returnValueAmount - allocatedItemRefund
         : Number(money(share));
       allocatedItemRefund += itemRefund;
       await tx.insert(salesReturnItems).values({
@@ -521,7 +643,11 @@ export async function createPosProductReturn(input: {
       after: {
         orderId: order.id,
         exchangeOrderId,
+        status: hasPendingRefund ? "received" : "completed",
         refundAmount: money(refundAmount),
+        returnValueAmount: money(returnValueAmount),
+        exchangeCreditAmount: money(exchangeCreditAmount),
+        additionalDueAmount: money(additionalDueAmount),
         items: input.data.items,
       },
       metadata: createPosAuditMetadata(input.authContext, {
@@ -536,13 +662,14 @@ export async function createPosProductReturn(input: {
       tenantId,
       orderId: order.id,
     }).then((rows) => rows.filter((row) => row.id === returnId));
-    if (!salesReturn) throw new Error("Created product return could not be loaded.");
-    const exchangeOrder = exchangeOrderId
+    if (!salesReturn)
+      throw new Error("Created product return could not be loaded.");
+    const responseExchangeOrder = exchangeOrderId
       ? await getPosOrder(
           { authContext: input.authContext, orderId: exchangeOrderId },
           tx,
         )
       : null;
-    return { salesReturn, exchangeOrder };
+    return { salesReturn, exchangeOrder: responseExchangeOrder };
   });
 }

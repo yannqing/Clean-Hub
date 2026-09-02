@@ -24,7 +24,11 @@ import {
   updatePosOrderController,
   updatePosOrderItemController,
 } from "./orders.controller.js";
-import { deliverPosOrderReceiptController } from "../receipts/receipts.controller.js";
+import {
+  deliverPosOrderReceiptController,
+  listPosOrderReceiptDeliveriesController,
+  retryPosOrderReceiptDeliveryController,
+} from "../receipts/receipts.controller.js";
 import {
   createPosProductReturnController,
   getPosProductReturnsController,
@@ -57,6 +61,14 @@ export function createPosOrdersRoutes({
   routes.post(
     "/:orderId/receipt-deliveries",
     deliverPosOrderReceiptController,
+  );
+  routes.get(
+    "/:orderId/receipt-deliveries",
+    listPosOrderReceiptDeliveriesController,
+  );
+  routes.post(
+    "/:orderId/receipt-deliveries/:deliveryId/retry",
+    retryPosOrderReceiptDeliveryController,
   );
   routes.get("/:orderId/product-returns", getPosProductReturnsController);
   routes.post("/:orderId/product-returns", createPosProductReturnController);

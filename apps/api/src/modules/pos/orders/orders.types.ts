@@ -10,6 +10,7 @@ export type PosOrderStatus =
   | "cancelled";
 
 export type PosOrderPaymentStatus = "unpaid" | "paid" | "partial" | "refunded";
+export type PosOrderSettlementIntent = "pay_now" | "partial" | "pay_later";
 
 export type PosOrderSort =
   | "created_desc"
@@ -156,6 +157,9 @@ export type PosOrderSummary = {
   paymentStatus: PosOrderPaymentStatus;
   paidAmount: string;
   paidAt: string | null;
+  settlementIntent: PosOrderSettlementIntent;
+  balanceDueAt: string | null;
+  unpaidReason: string | null;
   expireAt: string | null;
   notes: string | null;
   itemCount: number;
@@ -325,6 +329,10 @@ export type CreatePosCheckoutRequest = {
   payment?: CreatePosCheckoutPaymentRequest;
   /** Multiple tenders recorded atomically with the order. */
   payments?: CreatePosCheckoutPaymentRequest[];
+  /** Explicit operator intent whenever the order is not fully settled now. */
+  settlementIntent: PosOrderSettlementIntent;
+  balanceDueAt?: string;
+  unpaidReason?: string;
   taxExemptionReason?: string;
 };
 

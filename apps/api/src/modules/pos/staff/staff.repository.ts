@@ -1,5 +1,6 @@
 import {
   and,
+  asc,
   desc,
   eq,
   gte,
@@ -17,6 +18,7 @@ import {
   orders,
   paymentTransactions,
   posPaymentAdjustments,
+  posShiftCashMovements,
   posShiftHandovers,
   posStaffShifts,
   posTerminalSettings,
@@ -38,6 +40,7 @@ import type {
   PosStaffRole,
   PosZReport,
   PosZReportPaymentBreakdown,
+  PosShiftCashMovement,
   ShiftRecord,
 } from "./staff.types.js";
 
@@ -66,6 +69,22 @@ function toShift(row: typeof posStaffShifts.$inferSelect): ShiftRecord {
   };
 }
 
+function toCashMovement(
+  row: typeof posShiftCashMovements.$inferSelect,
+): PosShiftCashMovement {
+  return {
+    id: row.id,
+    shiftId: row.shiftId,
+    movementType: row.movementType,
+    amount: row.amount,
+    currency: row.currency,
+    reason: row.reason,
+    idempotencyKey: row.idempotencyKey,
+    createdAt: row.createdAt.toISOString(),
+    createdBy: row.createdBy,
+  };
+}
+
 function toZReport(row: typeof posZReports.$inferSelect): PosZReport {
   return {
     id: row.id,
@@ -81,6 +100,10 @@ function toZReport(row: typeof posZReports.$inferSelect): PosZReport {
     discountAmount: row.discountAmount,
     refundAmount: row.refundAmount,
     correctionAmount: row.correctionAmount,
+    unsettledPaymentCount: row.unsettledPaymentCount,
+    unsettledPaymentAmount: row.unsettledPaymentAmount,
+    unsettledRefundCount: row.unsettledRefundCount,
+    unsettledRefundAmount: row.unsettledRefundAmount,
     netSales: row.netSales,
     expectedCash: row.expectedCash,
     countedCash: row.countedCash,
@@ -343,6 +366,75 @@ export async function findOpenShiftForUpdate(
   return rows[0] ? toShift(rows[0]) : null;
 }
 
+export async function findShiftCashMovementByIdempotencyKey(
+  db: Database,
+  input: { tenantId: string; idempotencyKey: string },
+): Promise<PosShiftCashMovement | null> {
+  const [row] = await db
+    .select()
+    .from(posShiftCashMovements)
+    .where(
+      and(
+        eq(posShiftCashMovements.tenantId, input.tenantId),
+        eq(posShiftCashMovements.idempotencyKey, input.idempotencyKey),
+      ),
+    )
+    .limit(1);
+  return row ? toCashMovement(row) : null;
+}
+
+export async function insertShiftCashMovement(
+  db: Database,
+  input: {
+    tenantId: string;
+    branchId: string;
+    terminalId: string;
+    shiftId: string;
+    movementType: "pay_in" | "pay_out";
+    amount: string;
+    currency: string;
+    reason: string;
+    idempotencyKey: string;
+    actorUserId: string;
+  },
+): Promise<PosShiftCashMovement | null> {
+  const [row] = await db
+    .insert(posShiftCashMovements)
+    .values({
+      id: createId(),
+      tenantId: input.tenantId,
+      branchId: input.branchId,
+      terminalId: input.terminalId,
+      shiftId: input.shiftId,
+      movementType: input.movementType,
+      amount: input.amount,
+      currency: input.currency,
+      reason: input.reason,
+      idempotencyKey: input.idempotencyKey,
+      createdBy: input.actorUserId,
+    })
+    .onConflictDoNothing()
+    .returning();
+  return row ? toCashMovement(row) : null;
+}
+
+export async function listShiftCashMovements(
+  db: Database,
+  input: { tenantId: string; shiftId: string },
+): Promise<PosShiftCashMovement[]> {
+  const rows = await db
+    .select()
+    .from(posShiftCashMovements)
+    .where(
+      and(
+        eq(posShiftCashMovements.tenantId, input.tenantId),
+        eq(posShiftCashMovements.shiftId, input.shiftId),
+      ),
+    )
+    .orderBy(asc(posShiftCashMovements.createdAt));
+  return rows.map(toCashMovement);
+}
+
 export async function findShiftByIdForUpdate(
   db: Database,
   input: { tenantId: string; shiftId: string },
@@ -447,6 +539,10 @@ export type HandoverSnapshot = {
   discountAmount: string;
   refundAmount: string;
   correctionAmount: string;
+  unsettledPaymentCount: number;
+  unsettledPaymentAmount: string;
+  unsettledRefundCount: number;
+  unsettledRefundAmount: string;
   netSales: string;
   expectedCash: string;
   outstandingOrders: number;
@@ -459,6 +555,8 @@ export async function calculateHandoverSnapshot(
   input: {
     tenantId: string;
     branchId: string;
+    shiftId: string;
+    staffId: string;
     currency: string;
     startedAt: Date;
     cutoffAt: Date;
@@ -467,8 +565,11 @@ export async function calculateHandoverSnapshot(
 ): Promise<HandoverSnapshot> {
   const [
     orderRows,
+    unsettledPaymentRows,
+    unsettledRefundRows,
     paymentRows,
     adjustmentRows,
+    cashMovementRows,
     outstandingOrderRows,
     outstandingTicketRows,
   ] = await Promise.all([
@@ -492,6 +593,43 @@ export async function calculateHandoverSnapshot(
       ),
     db
       .select({
+        count: sql<number>`count(*)::int`,
+        amount: sql<string>`coalesce(sum(${paymentTransactions.amount}), 0)`,
+      })
+      .from(paymentTransactions)
+      .where(
+        and(
+          eq(paymentTransactions.tenantId, input.tenantId),
+          eq(paymentTransactions.branchId, input.branchId),
+          eq(paymentTransactions.shiftId, input.shiftId),
+          eq(paymentTransactions.currency, input.currency),
+          eq(paymentTransactions.paymentStatus, "pending"),
+          inArray(paymentTransactions.paymentMethod, ["card", "app"]),
+          gte(paymentTransactions.createdAt, input.startedAt),
+          lte(paymentTransactions.createdAt, input.cutoffAt),
+          isNull(paymentTransactions.deletedAt),
+        ),
+      ),
+    db
+      .select({
+        count: sql<number>`count(*)::int`,
+        amount: sql<string>`coalesce(sum(${posPaymentAdjustments.amount}), 0)`,
+      })
+      .from(posPaymentAdjustments)
+      .where(
+        and(
+          eq(posPaymentAdjustments.tenantId, input.tenantId),
+          eq(posPaymentAdjustments.branchId, input.branchId),
+          eq(posPaymentAdjustments.createdBy, input.staffId),
+          eq(posPaymentAdjustments.currency, input.currency),
+          eq(posPaymentAdjustments.adjustmentType, "refund"),
+          eq(posPaymentAdjustments.status, "pending"),
+          gte(posPaymentAdjustments.occurredAt, input.startedAt),
+          lte(posPaymentAdjustments.occurredAt, input.cutoffAt),
+        ),
+      ),
+    db
+      .select({
         amount: paymentTransactions.amount,
         method: paymentTransactions.paymentMethod,
         provider: paymentTransactions.gateway,
@@ -501,6 +639,7 @@ export async function calculateHandoverSnapshot(
         and(
           eq(paymentTransactions.tenantId, input.tenantId),
           eq(paymentTransactions.branchId, input.branchId),
+          eq(paymentTransactions.shiftId, input.shiftId),
           eq(paymentTransactions.currency, input.currency),
           eq(paymentTransactions.paymentStatus, "paid"),
           gte(paymentTransactions.paidAt, input.startedAt),
@@ -526,8 +665,30 @@ export async function calculateHandoverSnapshot(
           eq(posPaymentAdjustments.tenantId, input.tenantId),
           eq(posPaymentAdjustments.branchId, input.branchId),
           eq(posPaymentAdjustments.currency, input.currency),
+          eq(posPaymentAdjustments.status, "succeeded"),
+          or(
+            eq(paymentTransactions.shiftId, input.shiftId),
+            and(
+              isNull(posPaymentAdjustments.originalPaymentId),
+              eq(posPaymentAdjustments.createdBy, input.staffId),
+            ),
+          ),
           gte(posPaymentAdjustments.occurredAt, input.startedAt),
           lte(posPaymentAdjustments.occurredAt, input.cutoffAt),
+        ),
+      ),
+    db
+      .select({
+        amount: posShiftCashMovements.amount,
+        movementType: posShiftCashMovements.movementType,
+      })
+      .from(posShiftCashMovements)
+      .where(
+        and(
+          eq(posShiftCashMovements.tenantId, input.tenantId),
+          eq(posShiftCashMovements.shiftId, input.shiftId),
+          eq(posShiftCashMovements.currency, input.currency),
+          lte(posShiftCashMovements.createdAt, input.cutoffAt),
         ),
       ),
     db
@@ -610,6 +771,14 @@ export async function calculateHandoverSnapshot(
     .reduce((total, row) => total + Number(row.amount), 0);
   const grossSales = Number(orderRows[0]?.gross ?? 0);
   const discountAmount = Number(orderRows[0]?.discount ?? 0);
+  const cashMovementNet = cashMovementRows.reduce(
+    (total, movement) =>
+      total +
+      (movement.movementType === "pay_in"
+        ? Number(movement.amount)
+        : -Number(movement.amount)),
+    0,
+  );
 
   return {
     currency: input.currency,
@@ -618,6 +787,10 @@ export async function calculateHandoverSnapshot(
     discountAmount: money(discountAmount),
     refundAmount: money(refundAmount),
     correctionAmount: money(correctionAmount),
+    unsettledPaymentCount: unsettledPaymentRows[0]?.count ?? 0,
+    unsettledPaymentAmount: money(Number(unsettledPaymentRows[0]?.amount ?? 0)),
+    unsettledRefundCount: unsettledRefundRows[0]?.count ?? 0,
+    unsettledRefundAmount: money(Number(unsettledRefundRows[0]?.amount ?? 0)),
     netSales: calculateNetSales(
       grossSales,
       discountAmount,
@@ -625,7 +798,10 @@ export async function calculateHandoverSnapshot(
       correctionAmount,
     ),
     expectedCash: money(
-      Number(input.openingFloat) + cashPayments + cashAdjustment,
+      Number(input.openingFloat) +
+        cashPayments +
+        cashAdjustment +
+        cashMovementNet,
     ),
     outstandingOrders: outstandingOrderRows[0]?.count ?? 0,
     outstandingTickets: outstandingTicketRows[0]?.count ?? 0,
@@ -693,6 +869,10 @@ export async function createHandoverAndZReport(
       discountAmount: input.snapshot.discountAmount,
       refundAmount: input.snapshot.refundAmount,
       correctionAmount: input.snapshot.correctionAmount,
+      unsettledPaymentCount: input.snapshot.unsettledPaymentCount,
+      unsettledPaymentAmount: input.snapshot.unsettledPaymentAmount,
+      unsettledRefundCount: input.snapshot.unsettledRefundCount,
+      unsettledRefundAmount: input.snapshot.unsettledRefundAmount,
       netSales: input.snapshot.netSales,
       expectedCash: input.snapshot.expectedCash,
       countedCash: input.countedCash,

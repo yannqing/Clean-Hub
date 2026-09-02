@@ -31,6 +31,7 @@ import {
   createPosCheckoutBodySchema,
   createPosOrderItemBodySchema,
   createPosPaymentBodySchema,
+  recordPosCardPaymentOutcomeBodySchema,
 } from "./orders.validation.js";
 
 const cashOccurredAt = new Date().toISOString();
@@ -68,6 +69,7 @@ assert.equal(
 assert.equal(
   createPosCheckoutBodySchema.safeParse({
     expectedTotalAmount: "100.00",
+    settlementIntent: "pay_now",
     order: {
       id: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
       orderType: "manual",
@@ -89,6 +91,36 @@ assert.equal(
   }).success,
   true,
   "atomic checkout must accept stable order and payment identifiers",
+);
+assert.equal(
+  createPosCheckoutBodySchema.safeParse({
+    expectedTotalAmount: "100.00",
+    settlementIntent: "pay_later",
+    order: {
+      id: "01ARZ3NDEKTSV4RRFFQ69G5FAW",
+      orderType: "manual",
+      branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAX",
+      customerId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
+      items: [{ productSkuId: "01ARZ3NDEKTSV4RRFFQ69G5FB3" }],
+    },
+  }).success,
+  false,
+  "deferred checkout must include explicit due terms",
+);
+assert.equal(
+  recordPosCardPaymentOutcomeBodySchema.safeParse({
+    outcome: "succeeded",
+  }).success,
+  false,
+  "a successful TPE result must include the provider reference",
+);
+assert.equal(
+  recordPosCardPaymentOutcomeBodySchema.safeParse({
+    outcome: "timed_out",
+    failureReason: "terminal response unknown",
+  }).success,
+  true,
+  "an unknown TPE result must be recordable for later reconciliation",
 );
 assert.equal(
   createPosCheckoutBodySchema.safeParse({

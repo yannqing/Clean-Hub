@@ -44,6 +44,7 @@ import type {
   PosOrderOverviewPeriod,
   PosOrderSort,
   PosOrderSummary,
+  PosOrderSettlementIntent,
   PosOrderType,
   PosMobileMoneyProvider,
   PosPaymentMethod,
@@ -97,6 +98,36 @@ export async function lockPosCheckoutIdempotencyKey(
       hashtextextended(${input.tenantId} || ':' || ${input.orderId}, 0)
     )`,
   );
+}
+
+export async function updatePosOrderSettlementTerms(
+  db: Database,
+  input: {
+    tenantId: string;
+    orderId: string;
+    settlementIntent: PosOrderSettlementIntent;
+    balanceDueAt?: string;
+    unpaidReason?: string;
+    actorUserId: string;
+  },
+): Promise<void> {
+  await db
+    .update(orders)
+    .set({
+      settlementIntent: input.settlementIntent,
+      balanceDueAt: input.balanceDueAt ? new Date(input.balanceDueAt) : null,
+      unpaidReason: input.unpaidReason?.trim() || null,
+      updatedAt: new Date(),
+      updatedBy: input.actorUserId,
+      version: sql`${orders.version} + 1`,
+    })
+    .where(
+      and(
+        eq(orders.tenantId, input.tenantId),
+        eq(orders.id, input.orderId),
+        isNull(orders.deletedAt),
+      ),
+    );
 }
 
 function normalizeNullable(value: string | null | undefined): string | null {
@@ -197,6 +228,9 @@ function toOrderSummary(row: OrderJoinedRow): PosOrderSummary {
     paymentStatus: row.paymentStatus,
     paidAmount: row.paidAmount,
     paidAt: row.paidAt ? row.paidAt.toISOString() : null,
+    settlementIntent: row.settlementIntent,
+    balanceDueAt: row.balanceDueAt ? row.balanceDueAt.toISOString() : null,
+    unpaidReason: row.unpaidReason,
     expireAt: row.expireAt ? row.expireAt.toISOString() : null,
     notes: row.notes,
     itemCount: Number(row.itemCount ?? 0),
@@ -700,40 +734,40 @@ export async function insertManualOrderItems(
   }>
 > {
   const records = input.items.map((item) => ({
-      id: createId(),
-      orderId: input.orderId,
-      ticketId: null,
-      tenantId: input.tenantId,
-      branchId: input.branchId,
-      customerId: input.customerId,
-      itemKind: item.itemKind,
-      sourceType: item.itemKind,
-      sourceId:
-        item.itemKind === "product" ? item.productSkuId! : item.serviceId!,
-      serviceId: item.serviceId,
-      productSkuId: item.productSkuId,
-      productPriceId: item.productPriceId,
-      itemName: item.itemName.trim(),
-      skuSnapshot: item.sku,
-      barcodeSnapshot: item.barcode,
-      variantNameSnapshot: item.variantName,
-      unitOfMeasureSnapshot: item.unitOfMeasure,
-      unitCostAmount: item.unitCostAmount,
-      quantity: item.quantity,
-      pricingUnit: item.pricingUnit,
-      standardUnitAmount: item.standardUnitAmount,
-      chargedUnitAmount: item.chargedUnitAmount,
-      weight: item.weight,
-      bagCount: item.bagCount,
-      unitAmount: item.chargedUnitAmount,
-      lineAmount: calculatePosOrderItemLineAmount(item),
-      itemColor: normalizeNullable(item.itemColor),
-      defectNotes: normalizeNullable(item.defectNotes),
-      specialRequest: normalizeNullable(item.specialRequest),
-      itemIdentifier: normalizeNullable(item.itemIdentifier),
-      createdBy: input.actorUserId,
-      updatedBy: input.actorUserId,
-    }));
+    id: createId(),
+    orderId: input.orderId,
+    ticketId: null,
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    customerId: input.customerId,
+    itemKind: item.itemKind,
+    sourceType: item.itemKind,
+    sourceId:
+      item.itemKind === "product" ? item.productSkuId! : item.serviceId!,
+    serviceId: item.serviceId,
+    productSkuId: item.productSkuId,
+    productPriceId: item.productPriceId,
+    itemName: item.itemName.trim(),
+    skuSnapshot: item.sku,
+    barcodeSnapshot: item.barcode,
+    variantNameSnapshot: item.variantName,
+    unitOfMeasureSnapshot: item.unitOfMeasure,
+    unitCostAmount: item.unitCostAmount,
+    quantity: item.quantity,
+    pricingUnit: item.pricingUnit,
+    standardUnitAmount: item.standardUnitAmount,
+    chargedUnitAmount: item.chargedUnitAmount,
+    weight: item.weight,
+    bagCount: item.bagCount,
+    unitAmount: item.chargedUnitAmount,
+    lineAmount: calculatePosOrderItemLineAmount(item),
+    itemColor: normalizeNullable(item.itemColor),
+    defectNotes: normalizeNullable(item.defectNotes),
+    specialRequest: normalizeNullable(item.specialRequest),
+    itemIdentifier: normalizeNullable(item.itemIdentifier),
+    createdBy: input.actorUserId,
+    updatedBy: input.actorUserId,
+  }));
   await db.insert(orderItems).values(records);
   return input.items.map((item, index) => ({
     orderItemId: records[index]!.id,
@@ -914,7 +948,9 @@ export async function createPaymentTransactionRecord(
           ? "initiated"
           : "pending",
       gateway:
-        input.paymentMethod === "card" ? "tpe" : input.gateway ?? input.provider,
+        input.paymentMethod === "card"
+          ? "tpe"
+          : (input.gateway ?? input.provider),
       externalId: input.externalReference,
       idempotencyKey: input.idempotencyKey,
       paidAt,
@@ -945,7 +981,12 @@ export async function resolveCardPaymentTransaction(
   const rows = await db
     .update(paymentTransactions)
     .set({
-      paymentStatus: input.outcome === "succeeded" ? "paid" : "failed",
+      paymentStatus:
+        input.outcome === "succeeded"
+          ? "paid"
+          : input.outcome === "timed_out"
+            ? "pending"
+            : "failed",
       providerStatus: input.outcome,
       externalId: input.externalReference,
       authorizationCode: input.authorizationCode,

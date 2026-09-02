@@ -7,6 +7,11 @@ const moneySchema = z
   .trim()
   .regex(/^\d+(\.\d{1,2})?$/)
   .refine((value) => Number(value) >= 0);
+const positiveMoneySchema = z
+  .string()
+  .trim()
+  .regex(/^\d+(\.\d{1,2})?$/)
+  .refine((value) => Number(value) > 0);
 
 export const posStaffListQuerySchema = z.object({
   role: z.enum(["owner", "manager", "cashier"]).optional(),
@@ -46,6 +51,13 @@ export const createHandoverRequestSchema = z.object({
   incomingStaffId: ulidSchema,
   countedCash: moneySchema,
   notes: z.string().trim().max(2000).optional(),
+});
+
+export const createShiftCashMovementRequestSchema = z.object({
+  movementType: z.enum(["pay_in", "pay_out"]),
+  amount: positiveMoneySchema,
+  reason: z.string().trim().min(3).max(500),
+  idempotencyKey: z.string().trim().min(1).max(120),
 });
 
 export const posZReportListQuerySchema = z.object({
