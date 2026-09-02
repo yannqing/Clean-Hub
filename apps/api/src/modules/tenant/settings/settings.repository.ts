@@ -25,6 +25,19 @@ export type UpdateTenantSettingsRecordInput = {
 
 const DEFAULT_CURRENCY_FALLBACK = "XOF";
 
+export async function findTenantDefaultLanguage(
+  db: Database,
+  tenantId: string,
+): Promise<TenantSettingsLanguage> {
+  const rows = await db
+    .select({ defaultLanguage: tenantSettings.defaultLanguage })
+    .from(tenantSettings)
+    .where(eq(tenantSettings.tenantId, tenantId))
+    .limit(1);
+
+  return resolveLanguage(rows[0]?.defaultLanguage);
+}
+
 export async function findTenantDefaultCurrency(
   db: Database,
   tenantId: string,

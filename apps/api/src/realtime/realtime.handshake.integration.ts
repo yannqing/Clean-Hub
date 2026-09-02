@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { resolve } from "node:path";
 
 import { config } from "dotenv";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, like } from "drizzle-orm";
 import { WebSocket } from "ws";
 
 import {
@@ -16,6 +16,8 @@ import {
 } from "@cleanhub/db";
 import { POS_REALTIME_PROTOCOL_VERSION } from "@cleanhub/domain/pos-terminal-status";
 
+import { getPosSyncErrorNotificationCopy } from "../modules/notifications/system-notification-copy.js";
+import { findTenantDefaultLanguage } from "../modules/tenant/settings/settings.repository.js";
 import { reconcileExpiredRealtimeLeases } from "./realtime.repository.js";
 
 config({ path: resolve(process.cwd(), "../../.env") });
@@ -189,161 +191,176 @@ function expectUpgradeRejected(
   });
 }
 
-const health = await fetch(`${httpBaseUrl}/health`);
-assert.equal(
-  health.status,
-  200,
-  "API must be running before this integration test",
-);
-await expectUpgradeRejected("");
+let terminalIdForCleanup: string | null = null;
 
-const login = await assertOk(
-  await fetch(`${httpBaseUrl}/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Origin: origin,
-    },
-    body: JSON.stringify({ identifier, password }),
-  }),
-);
-const tenantCookie = cookieHeader(login);
-assert.match(tenantCookie, /cleanhub_access_token=/);
-await expectUpgradeRejected(tenantCookie, "https://invalid-origin.example");
+try {
+  const health = await fetch(`${httpBaseUrl}/health`);
+  assert.equal(
+    health.status,
+    200,
+    "API must be running before this integration test",
+  );
+  await expectUpgradeRejected("");
 
-let enrollment = await fetch(`${httpBaseUrl}/pos/auth/devices`, {
-  method: "POST",
-  headers: {
-    "Content-Type": "application/json",
-    Cookie: tenantCookie,
-    Origin: origin,
-  },
-  body: JSON.stringify({
-    deviceId,
-    label: "Realtime integration terminal",
-    branchId,
-    deviceType: "browser",
-    platform: "integration-test",
-    appVersion: "1.0.0-test",
-  }),
-});
-if (enrollment.status === 409) {
-  enrollment = await fetch(
-    `${httpBaseUrl}/pos/auth/devices/${encodeURIComponent(deviceId)}/credential-rotation`,
-    {
+  const login = await assertOk(
+    await fetch(`${httpBaseUrl}/auth/login`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: tenantCookie,
         Origin: origin,
       },
-      body: JSON.stringify({ reason: "Realtime integration test rotation" }),
-    },
+      body: JSON.stringify({ identifier, password }),
+    }),
   );
-}
-await assertOk(enrollment);
-const terminal = (await enrollment.json()) as { id: string; branchId: string };
-const terminalCredentialCookie = cookieHeader(enrollment);
-assert.match(terminalCredentialCookie, /cleanhub_pos_terminal_credential=/);
+  const tenantCookie = cookieHeader(login);
+  assert.match(tenantCookie, /cleanhub_access_token=/);
+  await expectUpgradeRejected(tenantCookie, "https://invalid-origin.example");
 
-const pinLogin = await assertOk(
-  await fetch(`${httpBaseUrl}/auth/pos-pin-login`, {
+  let enrollment = await fetch(`${httpBaseUrl}/pos/auth/devices`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Cookie: terminalCredentialCookie,
+      Cookie: tenantCookie,
       Origin: origin,
-      "X-CleanHub-Auth-Client": "pos",
     },
-    body: JSON.stringify({ pin: cashierPin, deviceId }),
-  }),
-);
-const posCookie = mergeCookies(
-  terminalCredentialCookie,
-  cookieHeader(pinLogin),
-);
-assert.match(posCookie, /cleanhub_pos_access_token=/);
+    body: JSON.stringify({
+      deviceId,
+      label: "Realtime integration terminal",
+      branchId,
+      deviceType: "browser",
+      platform: "integration-test",
+      appVersion: "1.0.0-test",
+    }),
+  });
+  if (enrollment.status === 409) {
+    enrollment = await fetch(
+      `${httpBaseUrl}/pos/auth/devices/${encodeURIComponent(deviceId)}/credential-rotation`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Cookie: tenantCookie,
+          Origin: origin,
+        },
+        body: JSON.stringify({ reason: "Realtime integration test rotation" }),
+      },
+    );
+  }
+  await assertOk(enrollment);
+  const terminal = (await enrollment.json()) as {
+    id: string;
+    branchId: string;
+  };
+  terminalIdForCleanup = terminal.id;
+  const terminalCredentialCookie = cookieHeader(enrollment);
+  assert.match(terminalCredentialCookie, /cleanhub_pos_terminal_credential=/);
 
-const tenantClient = await RealtimeTestClient.connect(
-  "/realtime/tenant",
-  "cleanhub.tenant.v1",
-  tenantCookie,
-);
-assert.equal(
-  (await tenantClient.next("connection.ack")).serviceHealth,
-  "healthy",
-);
+  const pinLogin = await assertOk(
+    await fetch(`${httpBaseUrl}/auth/pos-pin-login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: terminalCredentialCookie,
+        Origin: origin,
+        "X-CleanHub-Auth-Client": "pos",
+      },
+      body: JSON.stringify({ pin: cashierPin, deviceId }),
+    }),
+  );
+  const posCookie = mergeCookies(
+    terminalCredentialCookie,
+    cookieHeader(pinLogin),
+  );
+  assert.match(posCookie, /cleanhub_pos_access_token=/);
 
-const posClient = await RealtimeTestClient.connect(
-  "/realtime/pos",
-  "cleanhub.pos.v1",
-  posCookie,
-);
-assert.equal((await posClient.next("connection.ack")).serviceHealth, "healthy");
+  const tenantClient = await RealtimeTestClient.connect(
+    "/realtime/tenant",
+    "cleanhub.tenant.v1",
+    tenantCookie,
+  );
+  assert.equal(
+    (await tenantClient.next("connection.ack")).serviceHealth,
+    "healthy",
+  );
 
-await tenantClient.next(
-  (message) =>
-    message.type === "tenant.device.status.changed" &&
-    message.state?.terminalId === terminal.id &&
-    message.state.connectionState === "connected",
-);
+  const posClient = await RealtimeTestClient.connect(
+    "/realtime/pos",
+    "cleanhub.pos.v1",
+    posCookie,
+  );
+  assert.equal(
+    (await posClient.next("connection.ack")).serviceHealth,
+    "healthy",
+  );
 
-const statusReport = {
-  type: "terminal.status.report",
-  protocolVersion: POS_REALTIME_PROTOCOL_VERSION,
-  sequence: 1,
-  clientTime: new Date().toISOString(),
-  syncState: "idle",
-  pendingSalesCount: 0,
-  pendingOperationsCount: 0,
-  oldestPendingAt: null,
-  lastSyncErrorCode: null,
-  lastSyncErrorMessage: null,
-  appVisibility: "foreground",
-} as const;
-posClient.socket.send(JSON.stringify(statusReport));
-const statusAck = await posClient.next("terminal.status.ack");
-assert.ok((statusAck.statusRevision ?? 0) > 0);
+  await tenantClient.next(
+    (message) =>
+      message.type === "tenant.device.status.changed" &&
+      message.state?.terminalId === terminal.id &&
+      message.state.connectionState === "connected",
+  );
 
-posClient.socket.send(JSON.stringify({ ...statusReport, sequence: 2 }));
-const duplicateStatusAck = await posClient.next("terminal.status.ack");
-assert.equal(
-  duplicateStatusAck.statusRevision,
-  statusAck.statusRevision,
-  "An unchanged periodic status report must not increment the revision.",
-);
+  const statusReport = {
+    type: "terminal.status.report",
+    protocolVersion: POS_REALTIME_PROTOCOL_VERSION,
+    sequence: 1,
+    clientTime: new Date().toISOString(),
+    syncState: "idle",
+    pendingSalesCount: 0,
+    pendingOperationsCount: 0,
+    oldestPendingAt: null,
+    lastSyncErrorCode: null,
+    lastSyncErrorMessage: null,
+    appVisibility: "foreground",
+  } as const;
+  posClient.socket.send(JSON.stringify(statusReport));
+  const statusAck = await posClient.next("terminal.status.ack");
+  assert.ok((statusAck.statusRevision ?? 0) > 0);
 
-posClient.socket.send(
-  JSON.stringify({
-    ...statusReport,
-    sequence: 3,
-    syncState: "error",
-    pendingSalesCount: 1,
-    pendingOperationsCount: 1,
-    oldestPendingAt: new Date().toISOString(),
-    lastSyncErrorCode: "INTEGRATION_SYNC_FAILURE",
-    lastSyncErrorMessage: "Integration test synchronization failure.",
-  }),
-);
-const syncErrorAck = await posClient.next("terminal.status.ack");
-assert.ok(
-  (syncErrorAck.statusRevision ?? 0) > (statusAck.statusRevision ?? 0),
-  "A synchronization state transition must increment the revision.",
-);
+  posClient.socket.send(JSON.stringify({ ...statusReport, sequence: 2 }));
+  const duplicateStatusAck = await posClient.next("terminal.status.ack");
+  assert.equal(
+    duplicateStatusAck.statusRevision,
+    statusAck.statusRevision,
+    "An unchanged periodic status report must not increment the revision.",
+  );
 
-posClient.socket.close(1000, "integration_complete");
-await tenantClient.next(
-  (message) =>
-    message.type === "tenant.device.status.changed" &&
-    message.state?.terminalId === terminal.id &&
-    message.state.connectionState === "disconnected",
-);
-tenantClient.socket.close(1000, "integration_complete");
+  posClient.socket.send(
+    JSON.stringify({
+      ...statusReport,
+      sequence: 3,
+      syncState: "error",
+      pendingSalesCount: 1,
+      pendingOperationsCount: 1,
+      oldestPendingAt: new Date().toISOString(),
+      lastSyncErrorCode: "INTEGRATION_SYNC_FAILURE",
+      lastSyncErrorMessage: "Integration test synchronization failure.",
+    }),
+  );
+  const syncErrorAck = await posClient.next("terminal.status.ack");
+  assert.ok(
+    (syncErrorAck.statusRevision ?? 0) > (statusAck.statusRevision ?? 0),
+    "A synchronization state transition must increment the revision.",
+  );
 
-try {
+  posClient.socket.close(1000, "integration_complete");
+  await tenantClient.next(
+    (message) =>
+      message.type === "tenant.device.status.changed" &&
+      message.state?.terminalId === terminal.id &&
+      message.state.connectionState === "disconnected",
+  );
+  tenantClient.socket.close(1000, "integration_complete");
+
   await runWithSystemDatabaseContext(async () => {
     const alertDeliveries = await getDb()
-      .select({ id: notificationDeliveries.id })
+      .select({
+        id: notificationDeliveries.id,
+        tenantId: notifications.tenantId,
+        title: notifications.title,
+        content: notifications.content,
+        locale: notifications.locale,
+      })
       .from(notificationDeliveries)
       .innerJoin(
         notifications,
@@ -360,6 +377,34 @@ try {
     assert.ok(
       alertDeliveries.length > 0,
       "A POS synchronization error must alert an owner or manager.",
+    );
+    const alertTenantId = alertDeliveries[0]?.tenantId;
+    assert.ok(alertTenantId, "The sync alert must remain tenant-scoped.");
+    const tenantLocale = await findTenantDefaultLanguage(
+      getDb(),
+      alertTenantId,
+    );
+    const expectedCopy = getPosSyncErrorNotificationCopy(
+      tenantLocale,
+      terminal.id,
+    );
+    assert.ok(
+      alertDeliveries.every(
+        (delivery) =>
+          delivery.locale === expectedCopy.locale &&
+          delivery.title === expectedCopy.title &&
+          delivery.content === expectedCopy.content,
+      ),
+      "POS synchronization alerts must use the tenant default language.",
+    );
+    assert.ok(
+      alertDeliveries.every(
+        (delivery) =>
+          !delivery.content.includes(
+            "Integration test synchronization failure",
+          ),
+      ),
+      "End-user sync alerts must not expose raw integration error details.",
     );
 
     const expiredAt = new Date(Date.now() - 60_000);
@@ -390,10 +435,30 @@ try {
       .limit(1);
     assert.equal(events[0]?.reason, "lease_expired");
   });
-} finally {
-  await closeDbConnection();
-}
 
-console.log(
-  "Authenticated realtime handshake, deduplication, lease recovery, and broadcast integration passed.",
-);
+  console.log(
+    "Authenticated realtime handshake, deduplication, lease recovery, and broadcast integration passed.",
+  );
+} finally {
+  try {
+    const terminalId = terminalIdForCleanup;
+    if (terminalId) {
+      await runWithSystemDatabaseContext(async () => {
+        await getDb()
+          .delete(notifications)
+          .where(
+            and(
+              eq(notifications.relatedType, "pos_terminal"),
+              eq(notifications.relatedId, terminalId),
+              like(
+                notifications.idempotencyKey,
+                `pos-sync-error:${terminalId}:%`,
+              ),
+            ),
+          );
+      });
+    }
+  } finally {
+    await closeDbConnection();
+  }
+}

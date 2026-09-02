@@ -6,6 +6,11 @@ import {
   requireFeatureEnabled,
 } from "../../auth/permission.helper.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import {
+  getPosSyncErrorNotificationCopy,
+  isPosSyncErrorNotification,
+} from "../../notifications/system-notification-copy.js";
+import { findTenantDefaultLanguage } from "../settings/settings.repository.js";
 import { TenantNotificationError } from "./notifications.errors.js";
 import {
   archiveTenantNotificationDeliveryRecord,
@@ -31,6 +36,23 @@ function requireTenantId(authContext: AuthContext): string {
   return authContext.tenantId!;
 }
 
+function localizeSystemNotification(
+  item: TenantNotificationInboxItem,
+  locale: string,
+): TenantNotificationInboxItem {
+  if (!isPosSyncErrorNotification(item) || !item.relatedId) {
+    return item;
+  }
+
+  const copy = getPosSyncErrorNotificationCopy(locale, item.relatedId);
+
+  return {
+    ...item,
+    title: copy.title,
+    content: copy.content,
+  };
+}
+
 export async function listTenantNotifications(
   input: { authContext: AuthContext; query: TenantNotificationListQuery },
   db: Database = getDb(),
@@ -48,12 +70,16 @@ export async function listTenantNotifications(
     },
   };
 
-  const [data, total] = await Promise.all([
+  const [data, total, locale] = await Promise.all([
     findTenantNotificationInbox(db, listInput),
     countTenantNotificationInbox(db, listInput),
+    findTenantDefaultLanguage(db, tenantId),
   ]);
 
-  return { data, total };
+  return {
+    data: data.map((item) => localizeSystemNotification(item, locale)),
+    total,
+  };
 }
 
 export async function getTenantNotificationsOverview(
@@ -75,8 +101,9 @@ export async function markTenantNotificationRead(
 ): Promise<TenantNotificationInboxItem> {
   const tenantId = requireTenantId(input.authContext);
   await requireFeatureEnabled(input.authContext, "notifications", db);
+  const locale = await findTenantDefaultLanguage(db, tenantId);
 
-  return db.transaction(async (tx) => {
+  const notification = await db.transaction(async (tx) => {
     const before = await loadDeliveryOrThrow(tx, {
       tenantId,
       userId: input.authContext.userId,
@@ -117,6 +144,8 @@ export async function markTenantNotificationRead(
 
     return after;
   });
+
+  return localizeSystemNotification(notification, locale);
 }
 
 export async function archiveTenantNotification(
@@ -125,8 +154,9 @@ export async function archiveTenantNotification(
 ): Promise<TenantNotificationInboxItem> {
   const tenantId = requireTenantId(input.authContext);
   await requireFeatureEnabled(input.authContext, "notifications", db);
+  const locale = await findTenantDefaultLanguage(db, tenantId);
 
-  return db.transaction(async (tx) => {
+  const notification = await db.transaction(async (tx) => {
     const before = await loadDeliveryOrThrow(tx, {
       tenantId,
       userId: input.authContext.userId,
@@ -159,6 +189,8 @@ export async function archiveTenantNotification(
 
     return after;
   });
+
+  return localizeSystemNotification(notification, locale);
 }
 
 export async function markAllTenantNotificationsRead(

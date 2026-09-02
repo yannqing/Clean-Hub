@@ -16,7 +16,6 @@ import {
   posTerminalSettings,
   posTerminalStatusEvents,
   roles,
-  userProfiles,
   userRoles,
   users,
   type Database,
@@ -31,6 +30,8 @@ import {
 } from "@cleanhub/domain/pos-terminal-status";
 import { createId } from "@cleanhub/id";
 
+import { getPosSyncErrorNotificationCopy } from "../modules/notifications/system-notification-copy.js";
+import { findTenantDefaultLanguage } from "../modules/tenant/settings/settings.repository.js";
 import type { PosRealtimeIdentity } from "./realtime.types.js";
 
 type TerminalRuntimeRow = typeof posTerminalSettings.$inferSelect;
@@ -46,79 +47,50 @@ export type ExpiredRealtimeLease = {
   state: TenantDeviceRealtimeState;
 };
 
-function syncErrorCopy(
-  locale: string,
-  terminalId: string,
-  message: string | null,
-) {
-  if (locale.toLowerCase().startsWith("fr")) {
-    return {
-      locale: "fr",
-      title: "Erreur de synchronisation POS",
-      content: `Le terminal ${terminalId} ne peut pas synchroniser ses ventes.${message ? ` Erreur : ${message}` : ""}`,
-    };
-  }
-  if (locale.toLowerCase().startsWith("zh")) {
-    return {
-      locale: "zh-CN",
-      title: "POS 同步错误",
-      content: `终端 ${terminalId} 无法同步销售数据。${message ? `错误：${message}` : ""}`,
-    };
-  }
-  return {
-    locale: "en",
-    title: "POS synchronization error",
-    content: `Terminal ${terminalId} cannot synchronize its sales.${message ? ` Error: ${message}` : ""}`,
-  };
-}
-
 async function createSyncErrorAlerts(
   db: Database,
   input: {
     identity: Pick<PosRealtimeIdentity, "tenantId" | "branchId" | "terminalId">;
     state: TenantDeviceRealtimeState;
-    message: string | null;
+    errorCode: string | null;
+    errorMessage: string | null;
   },
 ): Promise<void> {
-  const recipientRows = await db
-    .select({
-      userId: users.id,
-      locale: userProfiles.language,
-    })
-    .from(userRoles)
-    .innerJoin(roles, eq(roles.id, userRoles.roleId))
-    .innerJoin(users, eq(users.id, userRoles.userId))
-    .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .where(
-      and(
-        eq(userRoles.tenantId, input.identity.tenantId),
-        isNull(userRoles.revokedAt),
-        eq(roles.tenantId, input.identity.tenantId),
-        eq(roles.scope, "tenant"),
-        inArray(roles.code, ["owner", "manager"]),
-        eq(roles.status, "active"),
-        isNull(roles.deletedAt),
-        eq(users.tenantId, input.identity.tenantId),
-        eq(users.status, "active"),
-        isNull(users.deletedAt),
-        or(
-          eq(roles.code, "owner"),
-          isNull(userRoles.branchId),
-          eq(userRoles.branchId, input.identity.branchId),
-        )!,
+  const [recipientRows, locale] = await Promise.all([
+    db
+      .select({ userId: users.id })
+      .from(userRoles)
+      .innerJoin(roles, eq(roles.id, userRoles.roleId))
+      .innerJoin(users, eq(users.id, userRoles.userId))
+      .where(
+        and(
+          eq(userRoles.tenantId, input.identity.tenantId),
+          isNull(userRoles.revokedAt),
+          eq(roles.tenantId, input.identity.tenantId),
+          eq(roles.scope, "tenant"),
+          inArray(roles.code, ["owner", "manager"]),
+          eq(roles.status, "active"),
+          isNull(roles.deletedAt),
+          eq(users.tenantId, input.identity.tenantId),
+          eq(users.status, "active"),
+          isNull(users.deletedAt),
+          or(
+            eq(roles.code, "owner"),
+            isNull(userRoles.branchId),
+            eq(userRoles.branchId, input.identity.branchId),
+          )!,
+        ),
       ),
-    );
-
-  const recipients = new Map(
-    recipientRows.map((row) => [row.userId, row.locale ?? "en"]),
+    findTenantDefaultLanguage(db, input.identity.tenantId),
+  ]);
+  const recipients = new Set(recipientRows.map((row) => row.userId));
+  const copy = getPosSyncErrorNotificationCopy(
+    locale,
+    input.identity.terminalId,
   );
-  for (const [recipientUserId, locale] of recipients) {
+
+  for (const recipientUserId of recipients) {
     const notificationId = createId();
-    const copy = syncErrorCopy(
-      locale,
-      input.identity.terminalId,
-      input.message,
-    );
     const idempotencyKey = `pos-sync-error:${input.identity.terminalId}:${input.state.statusRevision}:${recipientUserId}`;
     const inserted = await db
       .insert(notifications)
@@ -136,6 +108,9 @@ async function createSyncErrorAlerts(
           branchId: input.identity.branchId,
           terminalId: input.identity.terminalId,
           href: "/tenant/point-of-sale/devices",
+          notificationCode: "pos.sync_error",
+          errorCode: input.errorCode,
+          errorMessage: input.errorMessage,
         },
         priority: "critical",
         idempotencyKey,
@@ -306,7 +281,8 @@ async function insertTransitionEvent(
     await createSyncErrorAlerts(db, {
       identity: input.identity,
       state: input.nextState,
-      message: input.report?.lastSyncErrorMessage ?? null,
+      errorCode: input.report?.lastSyncErrorCode ?? null,
+      errorMessage: input.report?.lastSyncErrorMessage ?? null,
     });
   }
 }

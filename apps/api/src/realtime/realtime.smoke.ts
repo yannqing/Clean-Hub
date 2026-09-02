@@ -8,6 +8,10 @@ import {
 } from "@cleanhub/domain/pos-terminal-status";
 import type { AppLogger } from "@cleanhub/logger";
 
+import {
+  getPosSyncErrorNotificationCopy,
+  isPosSyncErrorNotification,
+} from "../modules/notifications/system-notification-copy.js";
 import { RealtimeHub } from "./realtime.hub.js";
 import type {
   PosRealtimeIdentity,
@@ -28,6 +32,25 @@ const baseFacts = {
   pendingOperationsCount: 0,
   hasEverConnected: true,
 };
+
+const zhSyncErrorCopy = getPosSyncErrorNotificationCopy(
+  "zh-CN",
+  "01ARZ3NDEKTSV4RRFFQ69G5FA4",
+);
+assert.equal(zhSyncErrorCopy.title, "POS 同步错误");
+assert.equal(
+  zhSyncErrorCopy.content,
+  "终端 01ARZ3NDEKTSV4RRFFQ69G5FA4 无法同步销售数据，请联系支持人员。",
+);
+assert.equal(
+  isPosSyncErrorNotification({
+    noticeType: "system",
+    relatedType: "pos_terminal",
+    title: "POS synchronization error",
+  }),
+  true,
+  "stored sync-error notifications must be recognized for read-time localization",
+);
 
 assert.equal(
   derivePosTerminalOperationalStatus({
