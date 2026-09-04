@@ -8,6 +8,7 @@ import {
   POS_AUTH_CLIENT_HEADER_VALUE,
   POS_REFRESH_COOKIE_NAME,
 } from "./lib/auth-client";
+import { resolvePosReturnPath } from "./lib/pos-return-path";
 
 const DEFAULT_API_BASE_URL = "http://localhost:4000";
 const API_BASE_URL =
@@ -171,8 +172,12 @@ function createRedirect(
 
 function redirectToLogin(request: NextRequest): NextResponse {
   const url = request.nextUrl.clone();
+  const returnPath = resolvePosReturnPath(
+    `${request.nextUrl.pathname}${request.nextUrl.search}`,
+  );
   url.pathname = LOGIN_PATH;
-  url.searchParams.set("next", request.nextUrl.pathname);
+  url.search = "";
+  url.searchParams.set("next", returnPath);
 
   return NextResponse.redirect(url);
 }

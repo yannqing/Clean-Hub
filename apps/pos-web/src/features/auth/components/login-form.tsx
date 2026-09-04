@@ -8,6 +8,7 @@ import { useRef, useState } from "react";
 
 import { posApi } from "@/lib/api-client";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
+import { resolvePosPostLoginPath } from "@/lib/pos-return-path";
 
 import { getOrCreatePosDeviceId } from "../utils/device-id";
 import {
@@ -23,17 +24,15 @@ const initialState: LoginFormValues = {
 
 const KEYPAD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"] as const;
 
-function isSafeInternalPath(path: string | null): path is string {
-  return Boolean(path) && path!.startsWith("/") && !path!.startsWith("//");
-}
-
-function resolvePostLoginPath(): string {
+function resolvePostLoginPath(authenticatedUserId: string): string {
   if (typeof window === "undefined") {
     return "/";
   }
 
-  const nextPath = new URLSearchParams(window.location.search).get("next");
-  return isSafeInternalPath(nextPath) ? nextPath : "/";
+  return resolvePosPostLoginPath(
+    window.location.search,
+    authenticatedUserId,
+  );
 }
 
 export function LoginForm() {
@@ -71,13 +70,13 @@ export function LoginForm() {
 
     try {
       const deviceId = await getOrCreatePosDeviceId();
-      await posApi.auth.posPinLogin({
+      const result = await posApi.auth.posPinLogin({
         pin,
         deviceId,
       });
 
       toast.success(t("pos.auth.loginSuccess"));
-      router.replace(resolvePostLoginPath());
+      router.replace(resolvePostLoginPath(result.authContext.userId));
       router.refresh();
     } catch (error) {
       const fallback = t("pos.auth.loginFailed");

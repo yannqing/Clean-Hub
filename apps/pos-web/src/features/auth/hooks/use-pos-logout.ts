@@ -3,9 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config/routes";
 import { posApi } from "@/lib/api-client";
 import { posToast as toast } from "@/lib/pos-toast";
+import {
+  buildPosLoginPath,
+  savePosLockReturnState,
+} from "@/lib/pos-return-path";
 
 type PosLogoutMessages = {
   successMessage?: string;
@@ -21,6 +26,7 @@ type PosLogoutMessages = {
  */
 export function usePosLogout() {
   const router = useRouter();
+  const { userId } = usePosRuntimeConfig();
   const [submitting, setSubmitting] = useState(false);
 
   const logout = useCallback(
@@ -28,6 +34,11 @@ export function usePosLogout() {
       successMessage = "已退出登录",
       failureMessage,
     }: PosLogoutMessages = {}) => {
+      const returnPath =
+        typeof window === "undefined"
+          ? posRoutes.home
+          : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      savePosLockReturnState(userId, returnPath);
       setSubmitting(true);
 
       try {
@@ -39,12 +50,12 @@ export function usePosLogout() {
           (error instanceof Error ? error.message : "退出登录失败，请重试。");
         toast.error(message);
       } finally {
-        router.replace(posRoutes.login);
+        router.replace(buildPosLoginPath(returnPath, { locked: true }));
         router.refresh();
         setSubmitting(false);
       }
     },
-    [router],
+    [router, userId],
   );
 
   return { logout, submitting };
