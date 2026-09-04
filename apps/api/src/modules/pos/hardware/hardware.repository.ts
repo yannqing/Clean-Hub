@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import {
   hardwareConfigs,
@@ -22,7 +22,64 @@ function toSummary(
     status: row.status,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    version: row.version,
   };
+}
+
+export async function findActiveHardwareDeviceForTerminal(
+  db: Database,
+  input: { tenantId: string; terminalId: string; hardwareId: string },
+): Promise<PosHardwareDeviceSummary | null> {
+  const rows = await db
+    .select()
+    .from(hardwareConfigs)
+    .where(
+      and(
+        eq(hardwareConfigs.id, input.hardwareId),
+        eq(hardwareConfigs.tenantId, input.tenantId),
+        eq(hardwareConfigs.terminalId, input.terminalId),
+        eq(hardwareConfigs.status, "active"),
+        isNull(hardwareConfigs.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ? toSummary(rows[0]) : null;
+}
+
+export async function updatePosPrinterBindingRecord(
+  db: Database,
+  input: {
+    tenantId: string;
+    terminalId: string;
+    hardwareId: string;
+    config: Record<string, unknown>;
+    version: number;
+    actorUserId: string | null;
+  },
+): Promise<PosHardwareDeviceSummary | null> {
+  const rows = await db
+    .update(hardwareConfigs)
+    .set({
+      config: input.config,
+      updatedAt: new Date(),
+      updatedBy: input.actorUserId,
+      version: sql`${hardwareConfigs.version} + 1`,
+    })
+    .where(
+      and(
+        eq(hardwareConfigs.id, input.hardwareId),
+        eq(hardwareConfigs.tenantId, input.tenantId),
+        eq(hardwareConfigs.terminalId, input.terminalId),
+        eq(hardwareConfigs.deviceType, "printer"),
+        eq(hardwareConfigs.status, "active"),
+        eq(hardwareConfigs.version, input.version),
+        isNull(hardwareConfigs.deletedAt),
+      ),
+    )
+    .returning();
+
+  return rows[0] ? toSummary(rows[0]) : null;
 }
 
 /**

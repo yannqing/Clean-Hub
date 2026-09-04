@@ -24,6 +24,7 @@ export async function queuePosOrderReceipt(input: {
   locale: string;
   order: PosOrderDetail;
   payments: PosPaymentTransaction[];
+  printerId: string;
   scope: { tenantId: string; branchId: string; terminalId: string };
 }): Promise<"queued" | "printed" | "failed"> {
   const receipt = buildPosOrderReceipt(input);
@@ -40,6 +41,7 @@ export async function queuePosOrderReceipt(input: {
       title: receipt.title,
       content: receipt.content,
       copies: input.copies,
+      printerId: input.printerId,
     },
   });
   notifyPosPrintQueueUpdated();
@@ -63,6 +65,7 @@ export async function queuePosOfflineCartReceipt(input: {
   copies: number;
   locale: string;
   paymentMethod: "cash" | "later";
+  printerId: string;
   cashTendered?: string;
   changeAmount?: string;
   scope: { tenantId: string; branchId: string; terminalId: string };
@@ -144,6 +147,7 @@ export async function queuePosOfflineCartReceipt(input: {
       title,
       content,
       copies: input.copies,
+      printerId: input.printerId,
     },
   });
   notifyPosPrintQueueUpdated();

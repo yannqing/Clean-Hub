@@ -2,9 +2,11 @@ import type { ApiClient } from "../types";
 import type {
   AuthorizeManualDrawerOpenRequest,
   AuthorizePrivilegedReprintRequest,
+  BindPosPrinterRequest,
   PosHardwareActionAuthorization,
   PosCashPaymentDrawerAuditResult,
   PosHardwareDeviceListResponse,
+  PosHardwareDeviceSummary,
   PosPrintJobAuditResult,
   RecordPosPrintJobResultRequest,
   RecordCashPaymentDrawerResultRequest,
@@ -13,13 +15,18 @@ import type {
 /**
  * POS hardware device and action authorization API.
  *
- * POS terminals can list peripherals configured for the current terminal
- * and authorize privileged actions, but cannot modify device configuration.
+ * POS terminals can list peripherals configured for the current terminal,
+ * bind a local printer, and authorize privileged actions.
  */
 export function createPosHardwareApi(client: ApiClient) {
   return {
     list: () =>
       client.get<PosHardwareDeviceListResponse>("/pos/hardware-devices"),
+    bindPrinter: (hardwareId: string, input: BindPosPrinterRequest) =>
+      client.put<PosHardwareDeviceSummary>(
+        `/pos/hardware-devices/${hardwareId}/printer-binding`,
+        input,
+      ),
     authorizeManualDrawerOpen: (input: AuthorizeManualDrawerOpenRequest) =>
       client.post<PosHardwareActionAuthorization>(
         "/pos/hardware-devices/actions/manual-drawer-open",

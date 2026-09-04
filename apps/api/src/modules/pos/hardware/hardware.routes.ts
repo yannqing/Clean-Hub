@@ -4,6 +4,7 @@ import type { AppBindings } from "../../../http/types.js";
 import {
   authorizeManualDrawerOpenController,
   authorizePrivilegedReprintController,
+  bindPosPrinterController,
   listHardwareDevicesController,
   recordCashPaymentDrawerResultController,
   recordPosPrintJobResultController,
@@ -13,13 +14,15 @@ import {
  * POS hardware device and action authorization routes.
  *
  * Mounted at `/pos/hardware-devices` (see `pos.routes.ts`).
- * POS terminals can list devices and authorize privileged actions but cannot
- * create, update, or delete device configuration.
+ * POS terminals can list devices and authorize privileged actions. Owners and
+ * managers may bind a configured logical printer to a local OS printer;
+ * creation, relocation and deletion remain admin-only.
  */
 export function createPosHardwareRoutes() {
   const routes = new Hono<AppBindings>();
 
   routes.get("/", listHardwareDevicesController);
+  routes.put("/:hardwareId/printer-binding", bindPosPrinterController);
   routes.post(
     "/actions/manual-drawer-open",
     authorizeManualDrawerOpenController,

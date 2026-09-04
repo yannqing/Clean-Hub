@@ -230,6 +230,7 @@ export function HardwareListView({
                   <TableHead>{m.hardware.columns.connection}</TableHead>
                   <TableHead>{m.hardware.columns.terminal}</TableHead>
                   <TableHead>{m.hardware.columns.status}</TableHead>
+                  <TableHead>{m.hardware.columns.binding}</TableHead>
                   <TableHead>{m.hardware.columns.created}</TableHead>
                   <TableHead />
                 </TableRow>
@@ -282,6 +283,26 @@ export function HardwareListView({
                         status={device.status}
                         label={m.common.statusLabels[device.status] ?? device.status}
                       />
+                    </TableCell>
+                    <TableCell>
+                      {device.deviceType === "printer" ? (
+                        <Badge
+                          title={m.hardware.binding.posChecksConnection}
+                          variant={
+                            typeof device.config.printerId === "string" &&
+                            device.config.printerId.trim()
+                              ? "outline"
+                              : "secondary"
+                          }
+                        >
+                          {typeof device.config.printerId === "string" &&
+                          device.config.printerId.trim()
+                            ? m.hardware.binding.bound
+                            : m.hardware.binding.unbound}
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell>{formatDateTime(device.createdAt)}</TableCell>
                     <TableCell className="space-x-1.5 text-right">

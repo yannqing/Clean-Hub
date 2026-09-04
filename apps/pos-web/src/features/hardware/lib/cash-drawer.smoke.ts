@@ -28,6 +28,7 @@ async function runCashDrawerSmoke(): Promise<void> {
     status: "active",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    version: 1,
   };
 
   assert.deepEqual(resolveCashDrawerConfiguration(drawer.config), {

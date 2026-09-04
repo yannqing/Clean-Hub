@@ -9,16 +9,21 @@ import {
   authorizePosSensitiveOperation,
   createPosAuditMetadata,
   requirePosBranchAccess,
+  requirePosRole,
   requirePosTenantId,
 } from "../access-control.helper.js";
+import { PosHardwareError } from "./hardware.errors.js";
 import {
+  findActiveHardwareDeviceForTerminal,
   findHardwareDevicesByTerminal,
   findPaidCashPaymentForBranch,
+  updatePosPrinterBindingRecord,
 } from "./hardware.repository.js";
 import type {
   AuthorizeManualDrawerOpenRequest,
   AuthorizePosHardwareActionInput,
   AuthorizePrivilegedReprintRequest,
+  BindPosPrinterInput,
   PosHardwareAction,
   PosHardwareActionAuthorization,
   PosHardwareDeviceSummary,
@@ -42,6 +47,101 @@ export async function listPosHardwareDevices(
     terminal.tenantId,
     terminal.terminalId,
   );
+}
+
+/**
+ * Bind the admin-created logical printer to a printer exposed by this POS
+ * terminal's operating system. The tenant and terminal identifiers are always
+ * derived from the HttpOnly terminal session, never from the request body.
+ */
+export async function bindPosPrinter(
+  input: BindPosPrinterInput,
+  db: Database = getDb(),
+): Promise<PosHardwareDeviceSummary> {
+  requirePosRole(input.authContext, ["owner", "manager"]);
+  const terminal = requireHardwareTerminal(input.authContext);
+
+  return db.transaction(async (tx) => {
+    const existing = await findActiveHardwareDeviceForTerminal(tx, {
+      tenantId: terminal.tenantId,
+      terminalId: terminal.terminalId,
+      hardwareId: input.hardwareId,
+    });
+    if (!existing) {
+      throw new PosHardwareError(
+        "POS_HARDWARE_NOT_FOUND",
+        "The active hardware device was not found for this POS terminal.",
+        404,
+      );
+    }
+    if (existing.deviceType !== "printer") {
+      throw new PosHardwareError(
+        "POS_HARDWARE_NOT_PRINTER",
+        "Only printer hardware can be bound to an operating-system printer.",
+        422,
+      );
+    }
+    if (existing.version !== input.data.version) {
+      throw new PosHardwareError(
+        "POS_HARDWARE_VERSION_CONFLICT",
+        "Printer configuration was modified. Refresh and try again.",
+        409,
+      );
+    }
+
+    const boundAt = new Date().toISOString();
+    const updated = await updatePosPrinterBindingRecord(tx, {
+      tenantId: terminal.tenantId,
+      terminalId: terminal.terminalId,
+      hardwareId: existing.id,
+      actorUserId: input.authContext.userId,
+      version: input.data.version,
+      config: {
+        ...existing.config,
+        printerId: input.data.printerId,
+        printerName: input.data.printerName,
+        printerIsDefault: input.data.isDefault ?? false,
+        printerBoundAt: boundAt,
+        printerBindingSource: "pos_terminal",
+      },
+    });
+    if (!updated) {
+      throw new PosHardwareError(
+        "POS_HARDWARE_VERSION_CONFLICT",
+        "Printer configuration was modified. Refresh and try again.",
+        409,
+      );
+    }
+
+    await writeAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      tenantId: terminal.tenantId,
+      branchId: terminal.branchId,
+      eventCategory: "pos_hardware",
+      eventType: "pos_hardware.printer.bound",
+      entityType: "hardware_config",
+      entityId: existing.id,
+      before: {
+        printerId: existing.config.printerId,
+        printerName: existing.config.printerName,
+        version: existing.version,
+      },
+      after: {
+        printerId: input.data.printerId,
+        printerName: input.data.printerName,
+        isDefault: input.data.isDefault ?? false,
+        boundAt,
+        version: updated.version,
+      },
+      metadata: createPosAuditMetadata(input.authContext, {
+        hardwareId: existing.id,
+      }),
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return updated;
+  });
 }
 
 function requireHardwareTerminal(authContext: AuthContext): {

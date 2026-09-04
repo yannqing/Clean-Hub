@@ -3,6 +3,17 @@ import { z } from "zod";
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const reasonSchema = z.string().trim().min(1).max(500);
 
+export const posHardwareDeviceParamsSchema = z.object({
+  hardwareId: z.string().regex(ULID_PATTERN),
+});
+
+export const bindPosPrinterBodySchema = z.object({
+  printerId: z.string().trim().min(1).max(256),
+  printerName: z.string().trim().min(1).max(256),
+  isDefault: z.boolean().optional(),
+  version: z.number().int().positive(),
+}).strict();
+
 export const authorizeManualDrawerOpenBodySchema = z.object({
   reason: reasonSchema,
 });

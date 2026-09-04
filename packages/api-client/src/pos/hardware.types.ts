@@ -1,8 +1,6 @@
 /**
- * POS hardware device — read-only DTOs.
- *
- * POS terminals can list peripherals configured specifically for themselves
- * but cannot create, update, or delete them (that belongs to web-admin).
+ * POS hardware device DTOs. Lifecycle management belongs to web-admin; local
+ * printer binding is performed from the enrolled terminal.
  */
 
 export type PosHardwareDeviceType = "printer" | "scanner" | "cash_drawer";
@@ -26,6 +24,14 @@ export type PosHardwareDeviceSummary = {
   status: PosHardwareDeviceStatus;
   createdAt: string;
   updatedAt: string;
+  version: number;
+};
+
+export type BindPosPrinterRequest = {
+  printerId: string;
+  printerName: string;
+  isDefault?: boolean;
+  version: number;
 };
 
 export type PosHardwareDeviceListResponse = {

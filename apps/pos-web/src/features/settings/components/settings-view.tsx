@@ -36,7 +36,10 @@ import {
   type TerminalSettingsMode,
 } from "./terminal-settings-card";
 
-export type SettingsSection = Exclude<TerminalSettingsMode, "all"> | "store" | "hardware";
+export type SettingsSection =
+  | Exclude<TerminalSettingsMode, "all">
+  | "store"
+  | "hardware";
 
 const SETTINGS_SECTION_TITLES: Record<SettingsSection, string> = {
   terminal: "终端信息",
@@ -121,6 +124,17 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
   const [hardwareLoading, setHardwareLoading] = useState(true);
   const [canManageSensitiveHardware, setCanManageSensitiveHardware] =
     useState(false);
+
+  const handleHardwareDeviceUpdated = useCallback(
+    (updated: PosHardwareDeviceSummary) => {
+      setHardwareDevices((current) =>
+        current.map((device) =>
+          device.id === updated.id ? updated : device,
+        ),
+      );
+    },
+    [],
+  );
 
   // Load all data on mount.
   const loadData = useCallback(async () => {
@@ -241,12 +255,16 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
           canManageSensitiveHardware={canManageSensitiveHardware}
           devices={hardwareDevices}
           loading={hardwareLoading}
+          onDeviceUpdated={handleHardwareDeviceUpdated}
         />
       ) : (
         <TerminalSettingsCard
           key={`terminal-${section}-${terminalSettings?.version ?? "new"}-${isLoading}`}
           initial={formValues}
           loading={isLoading}
+          mobileMoneyAvailable={
+            (terminalSettings?.mobileMoneyProvidersEnabled.length ?? 0) > 0
+          }
           mode={section}
           saving={saving}
           onSave={handleSave}
@@ -308,6 +326,7 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
                 canManageSensitiveHardware={canManageSensitiveHardware}
                 devices={hardwareDevices}
                 loading={hardwareLoading}
+                onDeviceUpdated={handleHardwareDeviceUpdated}
               />
             </div>
           }
@@ -317,6 +336,9 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
             key={`terminal-${terminalSettings?.version ?? "new"}-${isLoading}`}
             initial={formValues}
             loading={isLoading}
+            mobileMoneyAvailable={
+              (terminalSettings?.mobileMoneyProvidersEnabled.length ?? 0) > 0
+            }
             saving={saving}
             onSave={handleSave}
           />

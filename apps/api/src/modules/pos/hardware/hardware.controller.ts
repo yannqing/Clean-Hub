@@ -2,9 +2,11 @@ import type { Context } from "hono";
 
 import type { AppBindings } from "../../../http/types.js";
 import { getRequestMeta } from "../request-meta.helper.js";
+import { PosHardwareError } from "./hardware.errors.js";
 import {
   authorizeManualDrawerOpen,
   authorizePrivilegedReprint,
+  bindPosPrinter,
   listPosHardwareDevices,
   recordCashPaymentDrawerResult,
   recordPosPrintJobResult,
@@ -12,19 +14,57 @@ import {
 import {
   authorizeManualDrawerOpenBodySchema,
   authorizePrivilegedReprintBodySchema,
+  bindPosPrinterBodySchema,
+  posHardwareDeviceParamsSchema,
   recordCashPaymentDrawerResultBodySchema,
   recordPosPrintJobResultBodySchema,
 } from "./hardware.validation.js";
+
+function createPosHardwareErrorResponse(
+  c: Context<AppBindings>,
+  error: PosHardwareError,
+) {
+  return c.json(
+    {
+      message: error.message,
+      code: error.code,
+      requestId: c.get("requestId"),
+    },
+    error.status,
+  );
+}
 
 /**
  * GET /pos/hardware-devices
  *
  * Returns the active peripherals bound to the current POS terminal.
- * Read-only — POS terminals cannot create/update/delete peripherals.
+ * Device lifecycle is admin-only. Local printer binding has a dedicated
+ * Owner/Manager endpoint below.
  */
 export async function listHardwareDevicesController(c: Context<AppBindings>) {
   const devices = await listPosHardwareDevices(c.get("authContext"));
   return c.json({ data: devices });
+}
+
+export async function bindPosPrinterController(c: Context<AppBindings>) {
+  const params = posHardwareDeviceParamsSchema.parse(c.req.param());
+  const data = bindPosPrinterBodySchema.parse(await c.req.json());
+
+  try {
+    return c.json(
+      await bindPosPrinter({
+        authContext: c.get("authContext"),
+        hardwareId: params.hardwareId,
+        requestMeta: getRequestMeta(c),
+        data,
+      }),
+    );
+  } catch (error) {
+    if (error instanceof PosHardwareError) {
+      return createPosHardwareErrorResponse(c, error);
+    }
+    throw error;
+  }
 }
 
 export async function authorizeManualDrawerOpenController(

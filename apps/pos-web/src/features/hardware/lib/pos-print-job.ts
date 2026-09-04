@@ -47,12 +47,15 @@ export async function executePosPrintJob(
   }
 
   const printers = await hardware.listPrinters();
-  const printer =
-    printers.find((candidate) => candidate.id === job.payload.printerId) ??
-    printers.find((candidate) => candidate.isDefault) ??
-    printers[0];
+  const printer = job.payload.printerId
+    ? printers.find((candidate) => candidate.id === job.payload.printerId)
+    : (printers.find((candidate) => candidate.isDefault) ?? printers[0]);
   if (!printer) {
-    throw new Error("没有可用打印机，请先在系统中配置打印机。");
+    throw new Error(
+      job.payload.printerId
+        ? "已绑定的打印机未被当前设备检测到，已保留打印任务。"
+        : "没有可用打印机，请先在系统中配置打印机。",
+    );
   }
 
   const request: PosPrintRequest = {

@@ -8,11 +8,15 @@ import type {
   PosCatalogService,
   PosCartPricePreview,
   PosCustomerProfileWithAccount,
+  PosHardwareDeviceSummary,
   PosMobileMoneyProvider,
   PosPaymentMethod,
   ShiftRecord,
 } from "@cleanhub/api-client";
-import type { PosHardwareCapabilities } from "@cleanhub/hardware";
+import type {
+  PosHardwareCapabilities,
+  PosPrinterDevice,
+} from "@cleanhub/hardware";
 import { isApiHttpError } from "@cleanhub/api-client";
 import { createId } from "@cleanhub/id";
 import { useTranslation } from "@cleanhub/i18n/react";
@@ -52,6 +56,7 @@ import { posRoutes } from "@/config";
 import { openCashDrawerForPaymentOnce } from "@/features/hardware/lib/cash-drawer";
 import { getDesktopBridge } from "@/features/hardware/lib/desktop-bridge";
 import { loadPosHardwareDevices } from "@/features/hardware/lib/hardware-device-cache";
+import { resolvePosPrinterBinding } from "@/features/hardware/lib/printer-binding";
 import {
   queuePosOfflineCartReceipt,
   queuePosOrderReceipt,
@@ -69,7 +74,11 @@ import type {
   PosCartLine,
   PosCartSnapshot,
 } from "../cart.types";
-import { calculatePosCartTotal, usePosCart } from "../lib";
+import {
+  calculatePosCartTotal,
+  splitMixedPaymentTotal,
+  usePosCart,
+} from "../lib";
 
 type CatalogFilter = "all" | "products" | "services";
 
@@ -468,6 +477,8 @@ type CheckoutTender = {
   externalReference: string;
 };
 
+type CheckoutPaymentMode = PosPaymentMethod | "mixed" | "pay_later";
+
 type ReceiptDeliveryChoice = "print" | "email" | "sms" | "none";
 
 const NO_HARDWARE_CAPABILITIES: PosHardwareCapabilities = {
@@ -541,6 +552,7 @@ function CartPanel({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<CheckoutPaymentMode>("cash");
   const [tenders, setTenders] = useState<CheckoutTender[]>([]);
   const [payLater, setPayLater] = useState(false);
   const [unpaidReason, setUnpaidReason] = useState("");
@@ -551,6 +563,10 @@ function CartPanel({
   const [taxExemptionReason, setTaxExemptionReason] = useState("");
   const [hardwareCapabilities, setHardwareCapabilities] =
     useState<PosHardwareCapabilities>(NO_HARDWARE_CAPABILITIES);
+  const [hardwareDevices, setHardwareDevices] = useState<
+    PosHardwareDeviceSummary[]
+  >([]);
+  const [localPrinters, setLocalPrinters] = useState<PosPrinterDevice[]>([]);
   const [parkedOpen, setParkedOpen] = useState(false);
   const [parkName, setParkName] = useState("");
   const [parkNote, setParkNote] = useState("");
@@ -588,6 +604,19 @@ function CartPanel({
   const externalTenderExists = tenders.some(
     (tender) => tender.paymentMethod !== "cash",
   );
+  const mixedExternalMethods = runtime.paymentMethodsEnabled.filter(
+    (method) =>
+      method !== "cash" &&
+      isOnline &&
+      (method !== "card" || hardwareCapabilities.cardTerminal),
+  );
+  const mixedPaymentAvailable =
+    runtime.paymentMethodsEnabled.includes("app") &&
+    runtime.mobileMoneyProvidersEnabled.length > 0 &&
+    cashShiftAvailable &&
+    runtime.paymentMethodsEnabled.includes("cash") &&
+    mixedExternalMethods.length > 0 &&
+    Number(total) >= 0.02;
   const productAmount = cart.lines.reduce(
     (sum, line) =>
       line.kind === "product"
@@ -600,6 +629,11 @@ function CartPanel({
       line.kind === "ticket_item" ? sum + Number(line.lineAmount) : sum,
     0,
   );
+  const printerBinding = useMemo(
+    () => resolvePosPrinterBinding({ devices: hardwareDevices, localPrinters }),
+    [hardwareDevices, localPrinters],
+  );
+  const configuredPrinter = printerBinding.configured;
 
   useEffect(() => {
     const update = () => setIsOnline(navigator.onLine);
@@ -614,16 +648,39 @@ function CartPanel({
 
   useEffect(() => {
     let active = true;
-    void getDesktopBridge()
-      ?.hardware.getCapabilities()
-      .then((capabilities) => {
-        if (active) setHardwareCapabilities(capabilities);
-      })
-      .catch(() => undefined);
+    const hardware = getDesktopBridge()?.hardware;
+    if (hardware) {
+      void hardware
+        .getCapabilities()
+        .then(async (capabilities) => {
+          if (!active) return;
+          setHardwareCapabilities(capabilities);
+          if (capabilities.printer) {
+            const printers = await hardware.listPrinters();
+            if (active) setLocalPrinters(printers);
+          }
+        })
+        .catch(() => undefined);
+    }
     return () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const tenantId = runtime.tenantId;
+    const terminalId = runtime.terminalId;
+    if (!tenantId || !terminalId || !branchId) return;
+    let active = true;
+    void loadPosHardwareDevices({ tenantId, branchId, terminalId }).then(
+      (devices) => {
+        if (active) setHardwareDevices(devices);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [branchId, runtime.tenantId, runtime.terminalId]);
 
   useEffect(() => {
     if (!branchId || cart.lines.length === 0 || !isOnline) {
@@ -707,12 +764,23 @@ function CartPanel({
             )
           : configuredDefault;
     setTenders(
-      availableDefault ? [createCheckoutTender(availableDefault, total)] : [],
+      availableDefault
+        ? [
+            createCheckoutTender(
+              availableDefault,
+              total,
+              runtime.mobileMoneyProvidersEnabled[0],
+            ),
+          ]
+        : [],
     );
+    setPaymentMode(availableDefault ?? "pay_later");
     setPayLater(!availableDefault);
     setUnpaidReason("");
     setBalanceDueAt(defaultBalanceDueDate());
-    setReceiptDelivery(runtime.autoPrintReceipt ? "print" : "none");
+    setReceiptDelivery(
+      runtime.autoPrintReceipt && configuredPrinter ? "print" : "none",
+    );
     setReceiptDestination("");
     setCheckoutOpen(true);
   }
@@ -723,8 +791,53 @@ function CartPanel({
       return;
     setTenders((current) => [
       ...current,
-      createCheckoutTender(paymentMethod, toMoney(outstandingAmount)),
+      createCheckoutTender(
+        paymentMethod,
+        toMoney(outstandingAmount),
+        runtime.mobileMoneyProvidersEnabled[0],
+      ),
     ]);
+  }
+
+  function selectPaymentMode(mode: CheckoutPaymentMode) {
+    if (mode === "pay_later") {
+      if (!cart.customer || !canManageSensitiveOperations) return;
+      setTenders([]);
+      setPaymentMode(mode);
+      setPayLater(true);
+      return;
+    }
+
+    if (mode === "mixed") {
+      const externalMethod = mixedExternalMethods[0];
+      if (!mixedPaymentAvailable || !externalMethod) return;
+
+      const { cashAmount, externalAmount } = splitMixedPaymentTotal(total);
+      setTenders([
+        createCheckoutTender("cash", cashAmount),
+        createCheckoutTender(
+          externalMethod,
+          externalAmount,
+          runtime.mobileMoneyProvidersEnabled[0],
+        ),
+      ]);
+      setPaymentMode(mode);
+      setPayLater(false);
+      return;
+    }
+
+    const disabled =
+      !runtime.paymentMethodsEnabled.includes(mode) ||
+      (!isOnline && mode !== "cash") ||
+      (mode === "cash" && !cashShiftAvailable) ||
+      (mode === "card" && !hardwareCapabilities.cardTerminal);
+    if (disabled) return;
+
+    setTenders([
+      createCheckoutTender(mode, total, runtime.mobileMoneyProvidersEnabled[0]),
+    ]);
+    setPaymentMode(mode);
+    setPayLater(false);
   }
 
   function updateTender(id: string, patch: Partial<CheckoutTender>) {
@@ -789,6 +902,10 @@ function CartPanel({
       receiptDestination.trim().length < 3
     ) {
       toast.error("请填写有效的小票接收地址或手机号。");
+      return;
+    }
+    if (receiptDelivery === "print" && !configuredPrinter) {
+      toast.error("当前终端尚未连接打印机，请先在设置的硬件设备中完成连接。");
       return;
     }
     const hasOutstandingBalance = outstandingAmount > 0.0001;
@@ -933,6 +1050,7 @@ function CartPanel({
                     ),
                   )
                 : undefined,
+              printerId: configuredPrinter!.printerId,
               scope: { tenantId, branchId, terminalId },
             });
             if (offlinePrintStatus === "failed") {
@@ -1071,6 +1189,7 @@ function CartPanel({
             locale,
             order: finalOrder,
             payments: finalPayments,
+            printerId: configuredPrinter!.printerId,
             scope: { tenantId, branchId, terminalId },
           });
           if (printStatus === "failed") {
@@ -1498,7 +1617,7 @@ function CartPanel({
       </Dialog>
 
       <Dialog onOpenChange={setCheckoutOpen} open={checkoutOpen}>
-        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-xl">
+        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{t("pos.cart.confirmCheckout")}</DialogTitle>
             <DialogDescription>
@@ -1553,196 +1672,309 @@ function CartPanel({
                   {formatPosMoney(outstandingAmount, cart.currency, locale)}
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div
+                aria-label="选择支付方式"
+                className="flex flex-wrap gap-2 rounded-xl bg-muted/55 p-1.5"
+                role="tablist"
+              >
                 {runtime.paymentMethodsEnabled.map((method) => {
                   const disabled =
                     (!isOnline && method !== "cash") ||
                     (method === "cash" && !cashShiftAvailable) ||
-                    (method === "card" && !hardwareCapabilities.cardTerminal) ||
-                    tenders.some((tender) => tender.paymentMethod === method) ||
-                    (method !== "cash" && externalTenderExists) ||
-                    outstandingAmount <= 0;
+                    (method === "card" && !hardwareCapabilities.cardTerminal);
                   return (
-                    <Button
+                    <button
+                      aria-controls="checkout-payment-panel"
+                      aria-selected={paymentMode === method}
+                      className={cn(
+                        "min-h-11 min-w-28 flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                        paymentMode === method
+                          ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                          : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
+                        "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
+                      )}
                       disabled={disabled}
                       key={method}
-                      onClick={() => addTender(method)}
+                      onClick={() => selectPaymentMode(method)}
+                      role="tab"
                       type="button"
-                      variant="outline"
                     >
-                      + {paymentMethodLabel(method)}
-                    </Button>
+                      {paymentMethodLabel(method)}
+                    </button>
                   );
                 })}
-                <Button
-                  disabled={
-                    outstandingAmount <= 0 ||
-                    !cart.customer ||
-                    !canManageSensitiveOperations
-                  }
-                  onClick={() => {
-                    setPayLater(true);
-                  }}
+                <button
+                  aria-controls="checkout-payment-panel"
+                  aria-selected={paymentMode === "mixed"}
+                  className={cn(
+                    "min-h-11 min-w-28 flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    paymentMode === "mixed"
+                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
+                    "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
+                  )}
+                  disabled={!mixedPaymentAvailable}
+                  onClick={() => selectPaymentMode("mixed")}
+                  role="tab"
                   type="button"
-                  variant={payLater ? "default" : "outline"}
                 >
-                  {tenders.length > 0 ? "保留未收余额" : t("pos.cart.payLater")}
-                </Button>
+                  混合支付
+                </button>
+                <button
+                  aria-controls="checkout-payment-panel"
+                  aria-selected={paymentMode === "pay_later"}
+                  className={cn(
+                    "min-h-11 min-w-28 flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                    paymentMode === "pay_later"
+                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
+                      : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
+                    "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
+                  )}
+                  disabled={!cart.customer || !canManageSensitiveOperations}
+                  onClick={() => selectPaymentMode("pay_later")}
+                  role="tab"
+                  type="button"
+                >
+                  {t("pos.cart.payLater")}
+                </button>
               </div>
 
-              {outstandingAmount > 0 && payLater ? (
-                <div className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
-                  <Input
-                    min={new Date().toISOString().slice(0, 16)}
-                    onChange={(event) => setBalanceDueAt(event.target.value)}
-                    type="datetime-local"
-                    value={balanceDueAt}
-                  />
-                  <Input
-                    onChange={(event) => setUnpaidReason(event.target.value)}
-                    placeholder="欠款原因，例如：客户取件时支付"
-                    value={unpaidReason}
-                  />
-                </div>
-              ) : null}
-
-              {tenders.map((tender) => {
-                const change =
-                  tender.paymentMethod === "cash"
-                    ? Math.max(
-                        0,
-                        Number(tender.tenderedAmount) - Number(tender.amount),
-                      )
-                    : 0;
-                return (
-                  <div
-                    className="space-y-3 rounded-md border p-3"
-                    key={tender.id}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <strong className="text-sm">
-                        {paymentMethodLabel(tender.paymentMethod)}
-                      </strong>
-                      <button
-                        className="text-xs font-semibold text-destructive"
-                        onClick={() =>
-                          setTenders((current) =>
-                            current.filter((entry) => entry.id !== tender.id),
-                          )
-                        }
-                        type="button"
-                      >
-                        移除
-                      </button>
+              <div
+                aria-label={`${paymentModeLabel(paymentMode)}支付信息`}
+                className="space-y-3"
+                id="checkout-payment-panel"
+                role="tabpanel"
+              >
+                {paymentMode === "mixed" ? (
+                  <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed px-3 py-2.5">
+                    <p className="text-xs leading-5 text-muted-foreground">
+                      可组合现金与一种电子支付；请分别调整每笔支付金额。
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {runtime.paymentMethodsEnabled.map((method) => {
+                        const disabled =
+                          (!isOnline && method !== "cash") ||
+                          (method === "cash" && !cashShiftAvailable) ||
+                          (method === "card" &&
+                            !hardwareCapabilities.cardTerminal) ||
+                          tenders.some(
+                            (tender) => tender.paymentMethod === method,
+                          ) ||
+                          (method !== "cash" && externalTenderExists) ||
+                          outstandingAmount <= 0;
+                        return (
+                          <Button
+                            className="h-8 px-2.5 text-xs"
+                            disabled={disabled}
+                            key={method}
+                            onClick={() => addTender(method)}
+                            type="button"
+                            variant="outline"
+                          >
+                            + {paymentMethodLabel(method)}
+                          </Button>
+                        );
+                      })}
                     </div>
-                    <label className="block text-xs font-semibold text-muted-foreground">
-                      支付金额
-                      <Input
-                        className="mt-1.5 h-10"
-                        inputMode="decimal"
-                        min={0.01}
-                        onChange={(event) =>
-                          updateTender(tender.id, {
-                            amount: event.target.value,
-                          })
-                        }
-                        step="0.01"
-                        type="number"
-                        value={tender.amount}
-                      />
-                    </label>
-                    {tender.paymentMethod === "cash" ? (
-                      <>
-                        <label className="block text-xs font-semibold text-muted-foreground">
-                          {t("pos.cart.cashTendered")}
+                  </div>
+                ) : null}
+
+                {tenders.map((tender) => {
+                  const change =
+                    tender.paymentMethod === "cash"
+                      ? Math.max(
+                          0,
+                          Number(tender.tenderedAmount) - Number(tender.amount),
+                        )
+                      : 0;
+                  return (
+                    <div
+                      className="space-y-3 rounded-md border p-3"
+                      key={tender.id}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <strong className="text-sm">
+                          {paymentMethodLabel(tender.paymentMethod)}
+                        </strong>
+                        {paymentMode === "mixed" ? (
+                          <button
+                            className="text-xs font-semibold text-destructive"
+                            onClick={() =>
+                              setTenders((current) =>
+                                current.filter(
+                                  (entry) => entry.id !== tender.id,
+                                ),
+                              )
+                            }
+                            type="button"
+                          >
+                            移除
+                          </button>
+                        ) : null}
+                      </div>
+                      <label className="block text-xs font-semibold text-muted-foreground">
+                        支付金额
+                        <span className="relative mt-1.5 block">
                           <Input
-                            className="mt-1.5 h-10"
+                            className="h-10 pr-16"
                             inputMode="decimal"
-                            min={0}
+                            min={0.01}
                             onChange={(event) =>
                               updateTender(tender.id, {
-                                tenderedAmount: event.target.value,
+                                amount: event.target.value,
                               })
                             }
                             step="0.01"
                             type="number"
-                            value={tender.tenderedAmount}
+                            value={tender.amount}
                           />
-                        </label>
-                        <div className="flex flex-wrap gap-2">
-                          {buildCashTenderPresets(
-                            tender.amount,
-                            cart.currency,
-                          ).map((amount) => (
-                            <Button
-                              className="h-8 px-2.5 text-xs"
-                              key={amount}
-                              onClick={() =>
-                                updateTender(tender.id, {
-                                  tenderedAmount: toMoney(amount),
-                                })
-                              }
-                              type="button"
-                              variant="outline"
-                            >
-                              {formatPosMoney(amount, cart.currency, locale)}
-                            </Button>
-                          ))}
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">
-                            {t("pos.cart.cashChange")}
+                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center font-mono text-xs font-semibold text-foreground">
+                            {cart.currency}
                           </span>
-                          <strong>
-                            {formatPosMoney(change, cart.currency, locale)}
-                          </strong>
-                        </div>
-                      </>
-                    ) : null}
-                    {tender.paymentMethod === "app" ? (
-                      <>
-                        <div className="grid grid-cols-2 gap-2">
-                          {(["wave", "orange_money"] as const).map(
-                            (provider) => (
+                        </span>
+                      </label>
+                      {tender.paymentMethod === "cash" ? (
+                        <>
+                          <label className="block text-xs font-semibold text-muted-foreground">
+                            {t("pos.cart.cashTendered")}
+                            <span className="relative mt-1.5 block">
+                              <Input
+                                className="h-10 pr-16"
+                                inputMode="decimal"
+                                min={0}
+                                onChange={(event) =>
+                                  updateTender(tender.id, {
+                                    tenderedAmount: event.target.value,
+                                  })
+                                }
+                                step="0.01"
+                                type="number"
+                                value={tender.tenderedAmount}
+                              />
+                              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center font-mono text-xs font-semibold text-foreground">
+                                {cart.currency}
+                              </span>
+                            </span>
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {buildCashTenderPresets(
+                              tender.amount,
+                              cart.currency,
+                            ).map((amount) => (
                               <Button
-                                key={provider}
+                                className="h-8 px-2.5 text-xs"
+                                key={amount}
                                 onClick={() =>
-                                  updateTender(tender.id, { provider })
+                                  updateTender(tender.id, {
+                                    tenderedAmount: toMoney(amount),
+                                  })
                                 }
                                 type="button"
-                                variant={
-                                  tender.provider === provider
-                                    ? "default"
-                                    : "outline"
-                                }
+                                variant="outline"
                               >
-                                {MOBILE_MONEY_PROVIDER_LABELS[provider]}
+                                {formatPosMoney(amount, cart.currency, locale)}
                               </Button>
-                            ),
-                          )}
-                        </div>
-                        <Input
-                          className="h-10"
-                          maxLength={120}
-                          onChange={(event) =>
-                            updateTender(tender.id, {
-                              externalReference: event.target.value,
-                            })
-                          }
-                          placeholder={t("pos.cart.paymentReference")}
-                          value={tender.externalReference}
-                        />
-                      </>
-                    ) : null}
-                    {tender.paymentMethod === "card" ? (
-                      <p className="text-xs leading-5 text-muted-foreground">
-                        下单后 POS 会向 TPE
-                        发起交易，并等待成功、失败、取消或超时结果。
+                            ))}
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">
+                              {t("pos.cart.cashChange")}
+                            </span>
+                            <strong>
+                              {formatPosMoney(change, cart.currency, locale)}
+                            </strong>
+                          </div>
+                        </>
+                      ) : null}
+                      {tender.paymentMethod === "app" ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-2">
+                            {runtime.mobileMoneyProvidersEnabled.map(
+                              (provider) => (
+                                <Button
+                                  key={provider}
+                                  onClick={() =>
+                                    updateTender(tender.id, { provider })
+                                  }
+                                  type="button"
+                                  variant={
+                                    tender.provider === provider
+                                      ? "default"
+                                      : "outline"
+                                  }
+                                >
+                                  {MOBILE_MONEY_PROVIDER_LABELS[provider]}
+                                </Button>
+                              ),
+                            )}
+                          </div>
+                          <Input
+                            className="h-10"
+                            maxLength={120}
+                            onChange={(event) =>
+                              updateTender(tender.id, {
+                                externalReference: event.target.value,
+                              })
+                            }
+                            placeholder={t("pos.cart.paymentReference")}
+                            value={tender.externalReference}
+                          />
+                        </>
+                      ) : null}
+                      {tender.paymentMethod === "card" ? (
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          下单后 POS 会向 TPE
+                          发起交易，并等待成功、失败、取消或超时结果。
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })}
+                {outstandingAmount > 0.0001 && paymentMode !== "pay_later" ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900 dark:bg-amber-950/25">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">
+                        仍有未收余额{" "}
+                        {formatPosMoney(
+                          outstandingAmount,
+                          cart.currency,
+                          locale,
+                        )}
                       </p>
-                    ) : null}
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        保留欠款需要先关联客户，并由店长或管理员确认。
+                      </p>
+                    </div>
+                    <Button
+                      disabled={!cart.customer || !canManageSensitiveOperations}
+                      onClick={() => setPayLater((current) => !current)}
+                      type="button"
+                      variant={payLater ? "default" : "outline"}
+                    >
+                      {payLater ? "取消保留欠款" : "保留未收余额"}
+                    </Button>
                   </div>
-                );
-              })}
+                ) : null}
+
+                {outstandingAmount > 0 && payLater ? (
+                  <div className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
+                    <Input
+                      min={new Date().toISOString().slice(0, 16)}
+                      onChange={(event) => setBalanceDueAt(event.target.value)}
+                      type="datetime-local"
+                      value={balanceDueAt}
+                    />
+                    <Input
+                      onChange={(event) => setUnpaidReason(event.target.value)}
+                      placeholder="欠款原因，例如：客户取件时支付"
+                      value={unpaidReason}
+                    />
+                  </div>
+                ) : null}
+              </div>
             </section>
 
             {canManageSensitiveOperations &&
@@ -1765,6 +1997,7 @@ function CartPanel({
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {(["print", "email", "sms", "none"] as const).map((choice) => (
                   <Button
+                    disabled={choice === "print" && !configuredPrinter}
                     key={choice}
                     onClick={() => setReceiptDelivery(choice)}
                     type="button"
@@ -1774,6 +2007,23 @@ function CartPanel({
                   </Button>
                 ))}
               </div>
+              {printerBinding.state === "not_configured" ? (
+                <p className="text-xs leading-5 text-amber-700">
+                  管理员尚未给当前终端配置打印机，因此不能选择打印。
+                </p>
+              ) : printerBinding.state === "not_bound" ? (
+                <p className="text-xs leading-5 text-amber-700">
+                  打印机尚未连接本机，请由 Owner 或 Manager 在“设置 → 硬件设备”中完成测试和连接。
+                </p>
+              ) : printerBinding.state === "not_detected" ? (
+                <p className="text-xs leading-5 text-amber-700">
+                  已绑定的打印机当前未检测到；仍可结账，打印任务会保留并等待重试。
+                </p>
+              ) : printerBinding.localPrinter ? (
+                <p className="text-xs leading-5 text-emerald-700">
+                  将使用：{printerBinding.localPrinter.name}
+                </p>
+              ) : null}
               {receiptDelivery === "email" || receiptDelivery === "sms" ? (
                 <Input
                   className="h-10"
@@ -1845,13 +2095,14 @@ function defaultBalanceDueDate(): string {
 function createCheckoutTender(
   paymentMethod: PosPaymentMethod,
   amount: string,
+  provider: PosMobileMoneyProvider = "wave",
 ): CheckoutTender {
   return {
     id: createId(),
     paymentMethod,
     amount: toMoney(amount),
     tenderedAmount: toMoney(amount),
-    provider: "wave",
+    provider,
     externalReference: "",
   };
 }
@@ -1862,6 +2113,14 @@ function paymentMethodLabel(method: PosPaymentMethod): string {
     : method === "card"
       ? "TPE 刷卡"
       : "移动支付";
+}
+
+function paymentModeLabel(mode: CheckoutPaymentMode): string {
+  return mode === "mixed"
+    ? "混合"
+    : mode === "pay_later"
+      ? "稍后付款"
+      : paymentMethodLabel(mode);
 }
 
 function receiptDeliveryLabel(choice: ReceiptDeliveryChoice): string {
@@ -2082,26 +2341,50 @@ function CustomerSelector({
 
   return (
     <div className="border-b px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold text-muted-foreground">
+      <button
+        aria-controls="cart-customer-selector-panel"
+        aria-expanded={open && !locked}
+        className={cn(
+          "group flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-left shadow-sm transition-all",
+          "border-primary/35 bg-primary/[0.04] hover:border-primary/65 hover:bg-primary/[0.08] hover:shadow-md",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:ring-offset-2",
+          "disabled:cursor-not-allowed disabled:border-border disabled:bg-muted/40 disabled:opacity-65 disabled:shadow-none",
+          open && !locked && "border-primary/70 bg-primary/[0.08] shadow-md",
+        )}
+        disabled={locked}
+        onClick={() => setOpen((current) => !current)}
+        type="button"
+      >
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary transition-colors group-hover:bg-primary/18">
+          <Icon className="size-5" name={locked ? "lock" : "user-plus"} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-xs font-semibold text-muted-foreground">
             {t("pos.cart.customer")}
-          </p>
-          <p className="truncate text-sm font-semibold text-foreground">
+          </span>
+          <span className="block truncate text-sm font-semibold text-foreground">
             {selected?.name ?? t("pos.cart.walkIn")}
-          </p>
-        </div>
-        <button
-          className="shrink-0 text-xs font-semibold text-foreground disabled:text-muted-foreground"
-          disabled={locked}
-          onClick={() => setOpen((current) => !current)}
-          type="button"
-        >
-          {t("pos.cart.selectCustomer")}
-        </button>
-      </div>
+          </span>
+          {!locked ? (
+            <span className="mt-0.5 block text-xs font-semibold text-primary group-hover:underline">
+              {t("pos.cart.selectCustomer")}
+            </span>
+          ) : null}
+        </span>
+        {!locked ? (
+          <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-primary/20 bg-background text-primary shadow-sm">
+            <Icon
+              className={cn(
+                "size-4 transition-transform",
+                open && "rotate-180",
+              )}
+              name="chevron-down"
+            />
+          </span>
+        ) : null}
+      </button>
       {open && !locked ? (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-2" id="cart-customer-selector-panel">
           <Input
             className="h-10"
             onChange={(event) => setQuery(event.target.value)}

@@ -1,10 +1,9 @@
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 
 /**
- * POS hardware device — read-only DTOs.
- *
- * The POS terminal can list peripherals configured specifically for itself
- * but cannot create, update, or delete them (that belongs to web-admin).
+ * POS hardware device DTOs. Device creation, relocation and deletion remain
+ * admin-only; an authorised terminal manager may bind a logical printer to
+ * the operating-system printer discovered on that terminal.
  */
 
 export type PosHardwareDeviceType = "printer" | "scanner" | "cash_drawer";
@@ -28,6 +27,14 @@ export type PosHardwareDeviceSummary = {
   status: PosHardwareDeviceStatus;
   createdAt: string;
   updatedAt: string;
+  version: number;
+};
+
+export type BindPosPrinterRequest = {
+  printerId: string;
+  printerName: string;
+  isDefault?: boolean;
+  version: number;
 };
 
 export type PosHardwareAction = "manual_drawer_open" | "privileged_reprint";
@@ -95,4 +102,8 @@ export type AuthorizePosHardwareActionInput<TData> = {
   authContext: AuthContext;
   requestMeta?: AuthRequestMeta;
   data: TData;
+};
+
+export type BindPosPrinterInput = AuthorizePosHardwareActionInput<BindPosPrinterRequest> & {
+  hardwareId: string;
 };
