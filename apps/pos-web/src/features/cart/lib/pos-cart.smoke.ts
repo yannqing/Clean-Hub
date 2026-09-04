@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createMemoryStorage } from "@cleanhub/offline";
 
 import type { PosCartScope } from "../cart.types";
+import { splitMixedPaymentTotal } from "./checkout-payment";
 import {
   addProductToPosCart,
   addTicketToPosCart,
@@ -14,6 +15,19 @@ import {
   selectNewestPosCart,
   writePosCart,
 } from "./pos-cart";
+
+assert.deepEqual(splitMixedPaymentTotal("100.00"), {
+  cashAmount: "50.00",
+  externalAmount: "50.00",
+});
+assert.deepEqual(
+  splitMixedPaymentTotal("100.01"),
+  {
+    cashAmount: "50.00",
+    externalAmount: "50.01",
+  },
+  "mixed payment must preserve the exact total for odd minor units",
+);
 
 const scope: PosCartScope = {
   tenantId: "01ARZ3NDEKTSV4RRFFQ69G5FAA",
