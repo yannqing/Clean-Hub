@@ -62,6 +62,7 @@ export function TicketDetailView({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const fromIntake = from === "intake";
   const fromCustomer = from === "customer";
+  const fromHandover = from === "handover";
   const customerDetailHref = buildCustomerDetailHref(
     ticket.customerId,
     from,
@@ -69,7 +70,12 @@ export function TicketDetailView({
   );
   const ticketCode =
     ticket.ticketNo ?? `TK-${ticket.id.slice(-8).toUpperCase()}`;
-  const breadcrumbItems = fromIntake
+  const breadcrumbItems = fromHandover
+    ? [
+        { href: posRoutes.shiftHandover, label: "店员交接" },
+        { label: ticketCode },
+      ]
+    : fromIntake
     ? [
         { href: buildIntakeReturnPath(intakeQuery), label: "客户接待" },
         { href: customerDetailHref, label: ticket.customerName || "客户档案" },
@@ -368,7 +374,11 @@ function buildOrderDetailHref(
     ticketId: context.ticketId,
   });
 
-  if (context.ticketFrom === "intake" || context.ticketFrom === "customer") {
+  if (
+    context.ticketFrom === "intake" ||
+    context.ticketFrom === "customer" ||
+    context.ticketFrom === "handover"
+  ) {
     params.set("ticketFrom", context.ticketFrom);
   }
 

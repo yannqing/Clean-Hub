@@ -325,6 +325,14 @@ function buildOrderBreadcrumbItems(
     ];
   }
 
+  if (source?.ticketFrom === "handover") {
+    return [
+      { href: posRoutes.shiftHandover, label: "店员交接" },
+      { href: ticketHref, label: "工单详情" },
+      { label: displayOrderCode(order.id) },
+    ];
+  }
+
   return [
     { href: posRoutes.tickets, label: "工单管理" },
     { href: ticketHref, label: "工单详情" },
@@ -364,7 +372,11 @@ function buildTicketDetailHref(
   source: OrderDetailViewProps["source"],
 ): string {
   const base = posRoutes.ticketDetail(ticketId);
-  if (source?.ticketFrom !== "intake" && source?.ticketFrom !== "customer") {
+  if (
+    source?.ticketFrom !== "intake" &&
+    source?.ticketFrom !== "customer" &&
+    source?.ticketFrom !== "handover"
+  ) {
     return base;
   }
 

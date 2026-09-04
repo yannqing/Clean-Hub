@@ -74,6 +74,8 @@ type Copy = {
   readyPickup: string;
   cashCardTitle: string;
   cashCardDescription: string;
+  cashRequiresShift: string;
+  cashRequiresAvailableStaff: string;
   cashInputLabel: string;
   incomingStaffLabel: string;
   incomingStaffPlaceholder: string;
@@ -120,7 +122,7 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     active: "进行中",
     onBreak: "休息中",
     noOpenShift: "未上班",
-    openingFloat: "开班备用金",
+    openingFloat: "开班钱箱现金（备用金）",
     clockIn: "上班",
     clockOut: "下班",
     breakStart: "开始休息",
@@ -137,6 +139,10 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     readyPickup: "待取件",
     cashCardTitle: "现金核对",
     cashCardDescription: "按钱箱实点金额填写，系统会自动计算差异。",
+    cashRequiresShift:
+      "现金核对已锁定：请先在上方填写开班备用金并点击“上班”。",
+    cashRequiresAvailableStaff:
+      "暂无可接班店员：接班人必须是当前处于“未上班”状态的其他店员。",
     cashInputLabel: "实点现金金额",
     incomingStaffLabel: "接班店员",
     incomingStaffPlaceholder: "选择接班店员",
@@ -187,7 +193,7 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     active: "Open",
     onBreak: "On break",
     noOpenShift: "Not clocked in",
-    openingFloat: "Opening float",
+    openingFloat: "Opening drawer cash (float)",
     clockIn: "Clock in",
     clockOut: "Clock out",
     breakStart: "Start break",
@@ -205,6 +211,10 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     cashCardTitle: "Cash reconciliation",
     cashCardDescription:
       "Enter the cash counted in the drawer. The variance is calculated automatically.",
+    cashRequiresShift:
+      "Cash reconciliation is locked. Enter the opening float above and clock in first.",
+    cashRequiresAvailableStaff:
+      "No incoming staff is available. The incoming employee must currently be off duty.",
     cashInputLabel: "Counted cash amount",
     incomingStaffLabel: "Incoming staff",
     incomingStaffPlaceholder: "Select incoming staff",
@@ -256,7 +266,7 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     active: "Ouvert",
     onBreak: "En pause",
     noOpenShift: "Service non ouvert",
-    openingFloat: "Fonds de caisse initial",
+    openingFloat: "Espèces initiales du tiroir (fonds de caisse)",
     clockIn: "Prendre le service",
     clockOut: "Terminer le service",
     breakStart: "Commencer la pause",
@@ -274,6 +284,10 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     cashCardTitle: "Rapprochement espèces",
     cashCardDescription:
       "Saisissez le montant compté dans le tiroir. L'écart est calculé automatiquement.",
+    cashRequiresShift:
+      "Le rapprochement est verrouillé. Saisissez le fonds initial ci-dessus et prenez d'abord votre service.",
+    cashRequiresAvailableStaff:
+      "Aucun employé entrant n'est disponible. L'employé entrant doit être hors service.",
     cashInputLabel: "Montant compté",
     incomingStaffLabel: "Employé entrant",
     incomingStaffPlaceholder: "Sélectionner l'employé entrant",
@@ -528,7 +542,7 @@ function TicketRow({
   return (
     <Link
       className="block border-b px-1 py-3 transition-colors hover:bg-accent"
-      href={posRoutes.ticketDetail(ticket.id)}
+      href={`${posRoutes.ticketDetail(ticket.id)}?from=handover`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -829,7 +843,10 @@ export function ShiftHandoverView({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-end gap-3 border-t pt-4">
+        <div
+          className="mt-4 flex flex-wrap items-end gap-3 border-t pt-4"
+          id="shift-controls"
+        >
           {!currentShift ? (
             <label className="block min-w-52">
               <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
@@ -958,12 +975,42 @@ export function ShiftHandoverView({
           </div>
 
           <div className="mt-5 grid gap-4 lg:grid-cols-2">
+            {!currentShift ? (
+              <div
+                className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-amber-900 lg:col-span-2 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-100"
+                id="cash-reconciliation-unavailable"
+                role="status"
+              >
+                <Icon className="mt-0.5 size-4 shrink-0" name="lock" />
+                <p className="min-w-0 flex-1 text-xs font-medium leading-5">
+                  {copy.cashRequiresShift}
+                </p>
+                <a
+                  className="shrink-0 text-xs font-semibold underline underline-offset-4"
+                  href="#shift-controls"
+                >
+                  {copy.clockIn}
+                </a>
+              </div>
+            ) : availableStaff.length === 0 ? (
+              <div
+                className="flex items-start gap-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs font-medium leading-5 text-amber-900 lg:col-span-2 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-100"
+                id="cash-incoming-staff-unavailable"
+                role="status"
+              >
+                <Icon className="mt-0.5 size-4 shrink-0" name="alert" />
+                <p>{copy.cashRequiresAvailableStaff}</p>
+              </div>
+            ) : null}
             <label className="block">
               <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
                 {copy.cashInputLabel}
               </span>
               <input
-                className="h-11 w-full rounded-md border bg-background px-3 text-sm font-semibold text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                aria-describedby={
+                  !currentShift ? "cash-reconciliation-unavailable" : undefined
+                }
+                className="h-11 w-full rounded-md border bg-background px-3 text-sm font-semibold text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted/50 disabled:text-muted-foreground"
                 disabled={!currentShift}
                 inputMode="decimal"
                 onChange={(event) =>
@@ -978,7 +1025,14 @@ export function ShiftHandoverView({
                 {copy.incomingStaffLabel}
               </span>
               <select
-                className="h-11 w-full rounded-md border bg-background px-3 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                aria-describedby={
+                  !currentShift
+                    ? "cash-reconciliation-unavailable"
+                    : availableStaff.length === 0
+                      ? "cash-incoming-staff-unavailable"
+                      : undefined
+                }
+                className="h-11 w-full rounded-md border bg-background px-3 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted/50 disabled:text-muted-foreground"
                 disabled={!currentShift || availableStaff.length === 0}
                 onChange={(event) => setIncomingStaffId(event.target.value)}
                 value={incomingStaffId}
@@ -1002,7 +1056,10 @@ export function ShiftHandoverView({
               {copy.notesLabel}
             </span>
             <textarea
-              className="min-h-24 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              aria-describedby={
+                !currentShift ? "cash-reconciliation-unavailable" : undefined
+              }
+              className="min-h-24 w-full resize-y rounded-md border bg-background px-3 py-2 text-sm text-foreground outline-none transition placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:bg-muted/50 disabled:text-muted-foreground"
               disabled={!currentShift}
               onChange={(event) => setNotes(event.target.value)}
               placeholder={copy.notesPlaceholder}
@@ -1021,8 +1078,13 @@ export function ShiftHandoverView({
                   key={item}
                 >
                   <input
+                    aria-describedby={
+                      !currentShift
+                        ? "cash-reconciliation-unavailable"
+                        : undefined
+                    }
                     checked={checks[index] ?? false}
-                    className="h-4 w-4 rounded border-border text-foreground"
+                    className="h-4 w-4 rounded border-border text-foreground disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={!currentShift}
                     onChange={(event) =>
                       updateCheck(index, event.target.checked)

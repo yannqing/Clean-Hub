@@ -122,7 +122,13 @@ export function CashMovementPanel({
             {submitting ? "记录中…" : "记录"}
           </button>
         </div>
-      ) : null}
+      ) : (
+        <p className="mt-4 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
+          {!canManage
+            ? "只有店长或管理员可以登记非销售现金进出。"
+            : "当前处于休息状态，请先结束休息后再登记现金进出。"}
+        </p>
+      )}
       {movements.length > 0 ? (
         <div className="mt-4 divide-y border-t">
           {movements.map((movement) => (
