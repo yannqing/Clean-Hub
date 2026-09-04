@@ -3,6 +3,7 @@ import { getDb, type Database } from "@cleanhub/db";
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { findBranchById } from "../../tenant/branches/branches.repository.js";
+import { findEnabledTenantPaymentProviders } from "../../tenant/payment-integrations/payment-integrations.repository.js";
 import {
   authorizePosSensitiveOperation,
   requirePosBranchAccess,
@@ -1447,6 +1448,17 @@ export async function createPosOrderPayment(
     );
 
     if (data.paymentMethod === "app") {
+      const enabledProviders = await findEnabledTenantPaymentProviders(
+        tx,
+        tenantId,
+      );
+      if (!enabledProviders.includes(data.provider)) {
+        throw new PosOrderError(
+          "PAYMENT_NOT_SUPPORTED",
+          `${data.provider} is not configured, verified, and enabled for POS payments.`,
+          422,
+        );
+      }
       const existingReference = await findPaymentTransactionByProviderReference(
         tx,
         {

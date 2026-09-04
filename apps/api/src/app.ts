@@ -51,6 +51,7 @@ import { createTenantBranchRoutes } from "./modules/tenant/branches/branches.rou
 import { createTenantNotificationsRoutes } from "./modules/tenant/notifications/notifications.routes.js";
 import { createTenantOrderRoutes } from "./modules/tenant/orders/orders.routes.js";
 import { createTenantOverviewRoutes } from "./modules/tenant/overview/overview.routes.js";
+import { createTenantPaymentIntegrationRoutes } from "./modules/tenant/payment-integrations/payment-integrations.routes.js";
 import { createTenantPosChannelRoutes } from "./modules/tenant/pos-channel/pos-channel.routes.js";
 import { createTenantProfileRoutes } from "./modules/tenant/profile/profile.routes.js";
 import { createTenantProductRoutes } from "./modules/tenant/products/products.routes.js";
@@ -271,6 +272,10 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   // 租户侧
   app.route("/tenant/overview", createTenantOverviewRoutes());
   app.route("/tenant/settings", createTenantSettingsRoutes());
+  app.route(
+    "/tenant/payment-integrations",
+    createTenantPaymentIntegrationRoutes(),
+  );
   app.route("/tenant/branches", createTenantBranchRoutes());
   app.route("/tenant/customers", createTenantCustomerRoutes());
   app.route("/tenant/orders", createTenantOrderRoutes());

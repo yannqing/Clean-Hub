@@ -4,7 +4,7 @@ import type { AuthContext } from "@cleanhub/api-client";
 import { Button, Input, Label, cn } from "@cleanhub/ui";
 import {
   CircleDollarSign,
-  MapPin,
+  CreditCard,
   Printer,
   ScrollText,
   Search,
@@ -33,8 +33,8 @@ import type { TenantSettings } from "../types";
 
 export type TenantSettingsNavigationKey =
   | "general"
-  | "locations"
   | "pricing"
+  | "payments"
   | "pointOfSale"
   | "hardware"
   | "activityLog";
@@ -52,14 +52,14 @@ export const tenantSettingsNavigationItems: TenantSettingsNavigationItem[] = [
     icon: Store,
   },
   {
-    key: "locations",
-    href: webAdminRoutes.tenant.system.settingsSections.locations,
-    icon: MapPin,
-  },
-  {
     key: "pricing",
     href: webAdminRoutes.tenant.system.settingsSections.pricing,
     icon: CircleDollarSign,
+  },
+  {
+    key: "payments",
+    href: webAdminRoutes.tenant.system.settingsSections.payments,
+    icon: CreditCard,
   },
   {
     key: "pointOfSale",

@@ -281,21 +281,30 @@ export function PointOfSaleSettingsView({
               <Label>新终端默认启用的支付方式</Label>
               <div className="grid grid-cols-3 gap-2">
                 {(["cash", "card", "app"] as const).map((method) => {
-                  const checked = form.defaultPaymentMethodsEnabled.includes(method);
+                  const checked =
+                    form.defaultPaymentMethodsEnabled.includes(method);
+                  const unavailable =
+                    method === "app" &&
+                    settings.mobileMoneyProvidersEnabled.length === 0;
                   return (
                     <label
-                      className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-xs"
+                      className={`flex items-center gap-2 rounded-md border px-3 py-2 text-xs ${
+                        unavailable
+                          ? "cursor-not-allowed bg-muted/40 text-muted-foreground"
+                          : "cursor-pointer"
+                      }`}
                       key={method}
                     >
                       <Checkbox
                         checked={checked}
-                        disabled={disabled}
+                        disabled={disabled || unavailable}
                         onCheckedChange={(value) => {
-                          const next = value === true
-                            ? [...form.defaultPaymentMethodsEnabled, method]
-                            : form.defaultPaymentMethodsEnabled.filter(
-                                (candidate) => candidate !== method,
-                              );
+                          const next =
+                            value === true
+                              ? [...form.defaultPaymentMethodsEnabled, method]
+                              : form.defaultPaymentMethodsEnabled.filter(
+                                  (candidate) => candidate !== method,
+                                );
                           if (next.length === 0) return;
                           setForm((current) =>
                             current
@@ -317,6 +326,12 @@ export function PointOfSaleSettingsView({
                   );
                 })}
               </div>
+              {settings.mobileMoneyProvidersEnabled.length === 0 ? (
+                <p className="text-[11px] leading-4 text-amber-700">
+                  请先在“支付”设置中绑定、验证并启用 Wave 或 Orange
+                  Money，之后才能把移动支付设为新终端默认方式。
+                </p>
+              ) : null}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="pos-cart-retention">
@@ -470,9 +485,9 @@ export function PointOfSaleSettingsView({
                       form.defaultPaymentMethodsEnabled.includes(method),
                     )
                     .map((method) => (
-                    <SelectItem key={method} value={method}>
-                      {m.pointOfSale.settings.paymentMethods[method]}
-                    </SelectItem>
+                      <SelectItem key={method} value={method}>
+                        {m.pointOfSale.settings.paymentMethods[method]}
+                      </SelectItem>
                     ))}
                 </SelectContent>
               </Select>

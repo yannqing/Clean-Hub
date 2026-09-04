@@ -1689,8 +1689,14 @@ export const tenantMessagesZhCN: TenantMessages = {
       connection: "连接方式",
       terminal: "收银终端",
       status: "状态",
+      binding: "本机绑定",
       created: "创建时间",
       actions: "操作",
+    },
+    binding: {
+      bound: "已绑定",
+      unbound: "待 POS 连接",
+      posChecksConnection: "实际在线状态由门店 POS 检测",
     },
     create: {
       title: "添加 POS 外设",
@@ -2445,8 +2451,8 @@ export const tenantMessagesZhCN: TenantMessages = {
       },
       items: {
         general: "常规",
-        locations: "门店",
         pricing: "价格",
+        payments: "支付",
         pointOfSale: "销售点",
         hardware: "POS 外设",
         activityLog: "操作日志",
@@ -2469,8 +2475,8 @@ export const tenantMessagesZhCN: TenantMessages = {
       resourcesDescription: "前往对应模块管理门店、价格、销售点和 POS 外设。",
       resourceDescriptions: {
         general: "管理租户默认设置。",
-        locations: "管理门店资料与营业配置。",
         pricing: "维护服务和商品价格。",
+        payments: "绑定并验证 Wave、Orange Money，控制 POS 移动支付。",
         pointOfSale: "配置收银终端、班次与离线策略。",
         hardware: "管理打印机、扫码枪和钱箱。",
         activityLog: "查看租户操作与审计记录。",

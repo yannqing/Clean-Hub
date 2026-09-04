@@ -12,6 +12,7 @@ export type PointOfSaleSettingsFormValues = Omit<
   | "createdBy"
   | "updatedBy"
   | "canManage"
+  | "mobileMoneyProvidersEnabled"
 >;
 
 export type PointOfSaleSettingsValidationResult =

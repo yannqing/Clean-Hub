@@ -1790,8 +1790,14 @@ export const tenantMessagesEn: TenantMessages = {
       connection: "Connection",
       terminal: "POS terminal",
       status: "Status",
+      binding: "Local binding",
       created: "Created",
       actions: "Actions",
+    },
+    binding: {
+      bound: "Bound",
+      unbound: "Connect at POS",
+      posChecksConnection: "The store POS checks the live connection",
     },
     create: {
       title: "Add POS peripheral",
@@ -2589,8 +2595,8 @@ export const tenantMessagesEn: TenantMessages = {
       },
       items: {
         general: "General",
-        locations: "Locations",
         pricing: "Pricing",
+        payments: "Payments",
         pointOfSale: "Point of sale",
         hardware: "POS peripherals",
         activityLog: "Activity log",
@@ -2619,8 +2625,9 @@ export const tenantMessagesEn: TenantMessages = {
         "Open the related area to manage locations, pricing, point of sale, and POS peripherals.",
       resourceDescriptions: {
         general: "Manage tenant defaults.",
-        locations: "Manage location details and operating configuration.",
         pricing: "Maintain service and product prices.",
+        payments:
+          "Connect and verify Wave or Orange Money for POS mobile payments.",
         pointOfSale:
           "Configure terminals, register sessions, and offline behavior.",
         hardware: "Manage printers, scanners, and cash drawers.",

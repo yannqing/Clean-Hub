@@ -252,6 +252,7 @@ export type TenantPosChannelSettings = {
   deviceOfflineAfterSeconds: number;
   defaultPaymentMethod: PosChannelPaymentMethod;
   defaultPaymentMethodsEnabled: PosChannelPaymentMethod[];
+  mobileMoneyProvidersEnabled: TenantPaymentProvider[];
   defaultRoundingRule: PosChannelRoundingRule;
   taxEnabled: boolean;
   defaultTaxRate: string;
@@ -321,3 +322,4 @@ export type TenantPosChannelOverview = {
   cashTracking: PosChannelCashTrackingSummary;
   staffSummary: PosChannelStaffSummary;
 };
+import type { TenantPaymentProvider } from "../payment-integrations/payment-integrations.types";

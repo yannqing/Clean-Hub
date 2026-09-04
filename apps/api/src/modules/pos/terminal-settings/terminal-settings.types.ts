@@ -1,4 +1,5 @@
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
+import type { PosMobileMoneyProvider } from "../orders/orders.types.js";
 
 /**
  * POS terminal settings — DTOs.
@@ -32,6 +33,7 @@ export type PosTerminalSettingsSummary = {
   appVersion: string | null;
   defaultPaymentMethod: PosPaymentMethod;
   paymentMethodsEnabled: PosPaymentMethod[];
+  mobileMoneyProvidersEnabled: PosMobileMoneyProvider[];
   roundingRule: PosRoundingRule;
   taxEnabled: boolean;
   defaultTaxRate: string;

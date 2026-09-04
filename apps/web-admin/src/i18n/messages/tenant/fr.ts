@@ -1822,8 +1822,14 @@ export const tenantMessagesFr: TenantMessages = {
       connection: "Connexion",
       terminal: "Terminal de point de vente",
       status: "Statut",
+      binding: "Connexion locale",
       created: "Créé",
       actions: "Actions",
+    },
+    binding: {
+      bound: "Associée",
+      unbound: "Connecter au PDV",
+      posChecksConnection: "Le terminal du magasin vérifie la connexion réelle",
     },
     create: {
       title: "Ajouter un périphérique POS",
@@ -2638,8 +2644,8 @@ export const tenantMessagesFr: TenantMessages = {
       },
       items: {
         general: "Général",
-        locations: "Emplacements",
         pricing: "Tarifs",
+        payments: "Paiements",
         pointOfSale: "Point de vente",
         hardware: "Périphériques de point de vente",
         activityLog: "Journal d'activité",
@@ -2669,9 +2675,9 @@ export const tenantMessagesFr: TenantMessages = {
         "Ouvrez la zone associée pour gérer les emplacements, les prix, les points de vente et les périphériques de point de vente.",
       resourceDescriptions: {
         general: "Gérez les valeurs par défaut des locataires.",
-        locations:
-          "Gérez les détails de l’emplacement et la configuration opérationnelle.",
         pricing: "Maintenir les prix des services et des produits.",
+        payments:
+          "Connectez et vérifiez Wave ou Orange Money pour les paiements mobiles du point de vente.",
         pointOfSale:
           "Configurez les terminaux, enregistrez les sessions et le comportement hors ligne.",
         hardware: "Gérez les imprimantes, les scanners et les tiroirs-caisses.",

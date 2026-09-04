@@ -4,7 +4,11 @@ import { createContext, useContext, useMemo } from "react";
 import { resolveTimeZone } from "@cleanhub/domain/timezone";
 
 import { DEFAULT_POS_CURRENCY, normalizeCurrencyCode } from "@/lib/money";
-import type { PosPaymentMethod, PosRoundingRule } from "@cleanhub/api-client";
+import type {
+  PosMobileMoneyProvider,
+  PosPaymentMethod,
+  PosRoundingRule,
+} from "@cleanhub/api-client";
 
 type PosRuntimeConfig = {
   tenantId: string | null;
@@ -17,6 +21,7 @@ type PosRuntimeConfig = {
   role: string | null;
   defaultPaymentMethod: PosPaymentMethod;
   paymentMethodsEnabled: PosPaymentMethod[];
+  mobileMoneyProvidersEnabled: PosMobileMoneyProvider[];
   roundingRule: PosRoundingRule;
   taxEnabled: boolean;
   defaultTaxRate: string;
@@ -36,7 +41,8 @@ const PosRuntimeConfigContext = createContext<PosRuntimeConfig>({
   timeZone: "UTC",
   role: null,
   defaultPaymentMethod: "cash",
-  paymentMethodsEnabled: ["cash", "app"],
+  paymentMethodsEnabled: ["cash"],
+  mobileMoneyProvidersEnabled: [],
   roundingRule: "none",
   taxEnabled: false,
   defaultTaxRate: "0.0000",
@@ -57,6 +63,7 @@ export function PosRuntimeConfigProvider({
   role,
   defaultPaymentMethod,
   paymentMethodsEnabled,
+  mobileMoneyProvidersEnabled,
   roundingRule,
   taxEnabled,
   defaultTaxRate,
@@ -76,6 +83,7 @@ export function PosRuntimeConfigProvider({
   role?: string | null;
   defaultPaymentMethod?: PosPaymentMethod | null;
   paymentMethodsEnabled?: PosPaymentMethod[] | null;
+  mobileMoneyProvidersEnabled?: PosMobileMoneyProvider[] | null;
   roundingRule?: PosRoundingRule | null;
   taxEnabled?: boolean | null;
   defaultTaxRate?: string | null;
@@ -96,10 +104,8 @@ export function PosRuntimeConfigProvider({
       timeZone: resolveTimeZone(timeZone),
       role: role ?? null,
       defaultPaymentMethod: defaultPaymentMethod ?? "cash",
-      paymentMethodsEnabled:
-        paymentMethodsEnabled && paymentMethodsEnabled.length > 0
-          ? paymentMethodsEnabled
-          : ["cash", "app"],
+      paymentMethodsEnabled: paymentMethodsEnabled ?? ["cash"],
+      mobileMoneyProvidersEnabled: mobileMoneyProvidersEnabled ?? [],
       roundingRule: roundingRule ?? "none",
       taxEnabled: taxEnabled ?? false,
       defaultTaxRate: defaultTaxRate ?? "0.0000",
@@ -118,6 +124,7 @@ export function PosRuntimeConfigProvider({
       role,
       defaultPaymentMethod,
       paymentMethodsEnabled,
+      mobileMoneyProvidersEnabled,
       roundingRule,
       taxEnabled,
       defaultTaxRate,

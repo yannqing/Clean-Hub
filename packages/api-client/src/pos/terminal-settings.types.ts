@@ -1,3 +1,5 @@
+import type { PosMobileMoneyProvider } from "./orders.types";
+
 export type PosPaymentMethod = "cash" | "card" | "app";
 export type PosRoundingRule = "none" | "round_yuan" | "round_jiao";
 export type PosTerminalSettingsStatus = "active" | "inactive";
@@ -21,6 +23,7 @@ export type PosTerminalSettings = {
   appVersion: string | null;
   defaultPaymentMethod: PosPaymentMethod;
   paymentMethodsEnabled: PosPaymentMethod[];
+  mobileMoneyProvidersEnabled: PosMobileMoneyProvider[];
   roundingRule: PosRoundingRule;
   taxEnabled: boolean;
   defaultTaxRate: string;

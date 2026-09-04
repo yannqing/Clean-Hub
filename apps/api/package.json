@@ -35,6 +35,7 @@
     "smoke:tenant-users": "tsx src/modules/tenant/users/tenant-users.repository.smoke.ts",
     "smoke:tenant-resource-branch-scope": "tsx src/modules/tenant/tenant-resource-branch-scope.smoke.ts",
     "smoke:tenant-timezone": "tsx src/modules/auth/tenant-timezone.smoke.ts",
+    "smoke:tenant-payment-integrations": "tsx src/modules/tenant/payment-integrations/payment-integrations.security.smoke.ts",
     "audit:tenant-scopes": "node ../../scripts/check-tenant-query-scopes.mjs",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",

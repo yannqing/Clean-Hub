@@ -17,6 +17,7 @@ import { createTenantHardwareApi } from "./hardware";
 import { createTenantUsersApi } from "./identity";
 import { createTenantNotificationsApi } from "./notifications";
 import { createTenantOrdersApi } from "./orders";
+import { createTenantPaymentIntegrationsApi } from "./payment-integrations";
 import { createTenantPosChannelApi } from "./pos-channel";
 import { createTenantProfileApi } from "./profile";
 import { createTenantSettingsApi } from "./settings";
@@ -33,6 +34,7 @@ export * from "./hardware";
 export * from "./identity";
 export * from "./notifications";
 export * from "./orders";
+export * from "./payment-integrations";
 export * from "./pos-channel";
 export * from "./profile";
 export * from "./search";
@@ -63,6 +65,7 @@ export function createTenantApi(client: ApiClient) {
   const users = createTenantUsersApi(client);
   const notifications = createTenantNotificationsApi(client);
   const orders = createTenantOrdersApi(client);
+  const paymentIntegrations = createTenantPaymentIntegrationsApi(client);
   const posChannel = createTenantPosChannelApi(client);
   const profile = createTenantProfileApi(client);
   const reports = createTenantReportsApi(client);
@@ -83,6 +86,7 @@ export function createTenantApi(client: ApiClient) {
     users,
     notifications,
     orders,
+    paymentIntegrations,
     posChannel,
     profile,
     reports,

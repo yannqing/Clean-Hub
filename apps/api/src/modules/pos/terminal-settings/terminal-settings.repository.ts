@@ -37,6 +37,7 @@ function toSummary(
     appVersion: row.appVersion,
     defaultPaymentMethod: row.defaultPaymentMethod,
     paymentMethodsEnabled: row.paymentMethodsEnabled,
+    mobileMoneyProvidersEnabled: [],
     roundingRule: row.roundingRule,
     taxEnabled: false,
     defaultTaxRate: "0.0000",

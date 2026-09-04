@@ -10,7 +10,11 @@ export const createTerminalSettingsBodySchema = z.object({
   deviceId: z.string().trim().min(1).max(128),
   label: z.string().trim().max(64).optional(),
   defaultPaymentMethod: posPaymentMethodSchema.optional(),
-  paymentMethodsEnabled: z.array(posPaymentMethodSchema).min(1).max(3).optional(),
+  paymentMethodsEnabled: z
+    .array(posPaymentMethodSchema)
+    .min(1)
+    .max(3)
+    .optional(),
   roundingRule: posRoundingRuleSchema.optional(),
   autoPrintReceipt: z.boolean().optional(),
   printCopies: z.coerce.number().int().min(1).max(10).optional(),
@@ -21,7 +25,11 @@ export const updateTerminalSettingsBodySchema = z
   .object({
     label: z.string().trim().max(64).optional(),
     defaultPaymentMethod: posPaymentMethodSchema.optional(),
-    paymentMethodsEnabled: z.array(posPaymentMethodSchema).min(1).max(3).optional(),
+    paymentMethodsEnabled: z
+      .array(posPaymentMethodSchema)
+      .min(1)
+      .max(3)
+      .optional(),
     roundingRule: posRoundingRuleSchema.optional(),
     autoPrintReceipt: z.boolean().optional(),
     printCopies: z.coerce.number().int().min(1).max(10).optional(),

@@ -8,6 +8,7 @@ import {
   requireTenantRole,
 } from "../../auth/permission.helper.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { findEnabledTenantPaymentProviders } from "../payment-integrations/payment-integrations.repository.js";
 import { TenantPosChannelError } from "./pos-channel.errors.js";
 import {
   findPosChannelContext,
@@ -29,6 +30,29 @@ import type {
   PosChannelSettings,
   UpdatePosChannelSettingsRequest,
 } from "./pos-channel.types.js";
+import type { TenantPaymentProvider } from "../payment-integrations/payment-integrations.types.js";
+
+function withPaymentIntegrationAvailability(
+  settings: Omit<PosChannelSettings, "mobileMoneyProvidersEnabled">,
+  providers: TenantPaymentProvider[],
+): PosChannelSettings {
+  const enabledMethods =
+    providers.length > 0
+      ? settings.defaultPaymentMethodsEnabled
+      : settings.defaultPaymentMethodsEnabled.filter(
+          (method) => method !== "app",
+        );
+  if (enabledMethods.length === 0) enabledMethods.push("cash");
+
+  return {
+    ...settings,
+    defaultPaymentMethod: enabledMethods.includes(settings.defaultPaymentMethod)
+      ? settings.defaultPaymentMethod
+      : enabledMethods[0]!,
+    defaultPaymentMethodsEnabled: enabledMethods,
+    mobileMoneyProvidersEnabled: providers,
+  };
+}
 
 function getTenantId(authContext: AuthContext): string {
   assertTenantContext(authContext);
@@ -290,12 +314,16 @@ export async function getTenantPosChannelSettings(
   authContext: AuthContext,
   db: Database = getDb(),
 ): Promise<PosChannelSettings> {
-  const { context } = await resolvePosChannelAccess(authContext, db);
+  const { tenantId, context } = await resolvePosChannelAccess(authContext, db);
+  const providers = await findEnabledTenantPaymentProviders(db, tenantId);
 
-  return {
-    ...context.settings,
-    canManage: authContext.role === "owner",
-  };
+  return withPaymentIntegrationAvailability(
+    {
+      ...context.settings,
+      canManage: authContext.role === "owner",
+    },
+    providers,
+  );
 }
 
 export async function updateTenantPosChannelSettings(
@@ -309,6 +337,10 @@ export async function updateTenantPosChannelSettings(
 
   return db.transaction(async (tx) => {
     const current = await findPosChannelSettingsRecord(tx, tenantId);
+    const mobileMoneyProvidersEnabled = await findEnabledTenantPaymentProviders(
+      tx,
+      tenantId,
+    );
     const nextRelationship = {
       syncIntervalSeconds:
         input.data.syncIntervalSeconds ?? current.syncIntervalSeconds,
@@ -326,6 +358,17 @@ export async function updateTenantPosChannelSettings(
       throw new TenantPosChannelError(
         "POS_CHANNEL_SETTINGS_INVALID",
         "The default payment method must also be enabled.",
+        422,
+      );
+    }
+    if (
+      (input.data.defaultPaymentMethodsEnabled?.includes("app") ||
+        input.data.defaultPaymentMethod === "app") &&
+      mobileMoneyProvidersEnabled.length === 0
+    ) {
+      throw new TenantPosChannelError(
+        "MOBILE_MONEY_INTEGRATION_REQUIRED",
+        "Configure, verify, and enable Wave or Orange Money before enabling mobile payment defaults.",
         422,
       );
     }
@@ -358,9 +401,9 @@ export async function updateTenantPosChannelSettings(
       userAgent: input.requestMeta?.userAgent,
     });
 
-    return {
-      ...updated,
-      canManage: true,
-    };
+    return withPaymentIntegrationAvailability(
+      { ...updated, canManage: true },
+      mobileMoneyProvidersEnabled,
+    );
   });
 }

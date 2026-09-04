@@ -6,6 +6,7 @@ import {
   requirePosBranchId,
 } from "../../auth/permission.helper.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { findEnabledTenantPaymentProviders } from "../../tenant/payment-integrations/payment-integrations.repository.js";
 import { requirePosTerminalContext } from "../access-control.helper.js";
 import { PosTerminalSettingsError } from "./terminal-settings.errors.js";
 import {
@@ -33,9 +34,25 @@ async function withTenantFinancialDefaults(
   db: Database,
   settings: PosTerminalSettingsSummary,
 ): Promise<PosTerminalSettingsSummary> {
-  const defaults = await findTenantPosTerminalDefaults(db, settings.tenantId);
+  const [defaults, mobileMoneyProvidersEnabled] = await Promise.all([
+    findTenantPosTerminalDefaults(db, settings.tenantId),
+    findEnabledTenantPaymentProviders(db, settings.tenantId),
+  ]);
+  const paymentMethodsEnabled =
+    mobileMoneyProvidersEnabled.length > 0
+      ? [...settings.paymentMethodsEnabled]
+      : settings.paymentMethodsEnabled.filter((method) => method !== "app");
+  if (paymentMethodsEnabled.length === 0) paymentMethodsEnabled.push("cash");
+  const defaultPaymentMethod = paymentMethodsEnabled.includes(
+    settings.defaultPaymentMethod,
+  )
+    ? settings.defaultPaymentMethod
+    : paymentMethodsEnabled[0]!;
   return {
     ...settings,
+    defaultPaymentMethod,
+    paymentMethodsEnabled,
+    mobileMoneyProvidersEnabled,
     taxEnabled: defaults.taxEnabled,
     defaultTaxRate: defaults.defaultTaxRate,
     pricesIncludeTax: defaults.pricesIncludeTax,
@@ -112,10 +129,22 @@ export async function createPosTerminalSettings(
     }
 
     const defaults = await findTenantPosTerminalDefaults(tx, tenantId);
-    const enabledMethods =
+    const mobileMoneyProviders = await findEnabledTenantPaymentProviders(
+      tx,
+      tenantId,
+    );
+    const configuredMethods =
       data.paymentMethodsEnabled ?? defaults.paymentMethodsEnabled;
-    const defaultMethod =
+    const enabledMethods =
+      mobileMoneyProviders.length > 0
+        ? configuredMethods
+        : configuredMethods.filter((method) => method !== "app");
+    if (enabledMethods.length === 0) enabledMethods.push("cash");
+    const configuredDefault =
       data.defaultPaymentMethod ?? defaults.defaultPaymentMethod;
+    const defaultMethod = enabledMethods.includes(configuredDefault)
+      ? configuredDefault
+      : enabledMethods[0]!;
     if (!enabledMethods.includes(defaultMethod)) {
       throw new PosTerminalSettingsError(
         "VALIDATION_ERROR",
@@ -224,6 +253,18 @@ export async function updatePosTerminalSettings(
     throw new PosTerminalSettingsError(
       "VALIDATION_ERROR",
       "The default payment method must also be enabled for this terminal.",
+      422,
+    );
+  }
+  if (
+    (data.paymentMethodsEnabled?.includes("app") ||
+      data.defaultPaymentMethod === "app") &&
+    (await findEnabledTenantPaymentProviders(db, terminal.tenantId)).length ===
+      0
+  ) {
+    throw new PosTerminalSettingsError(
+      "MOBILE_MONEY_INTEGRATION_REQUIRED",
+      "Configure, verify, and enable Wave or Orange Money before enabling mobile payment on this terminal.",
       422,
     );
   }

@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 
-import { webAdminRoutes } from "@/config/routes";
 import { webAdminApi } from "@/lib/api-client";
 
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
@@ -46,10 +45,6 @@ export async function updateBranchAction(
     revalidatePath("/tenant");
     revalidatePath("/tenant/branches");
     revalidatePath(`/tenant/branches/${branchId}`);
-    revalidatePath(webAdminRoutes.tenant.system.settingsSections.locations);
-    revalidatePath(
-      `${webAdminRoutes.tenant.system.settingsSections.locations}/${branchId}`,
-    );
 
     return {
       ok: true,

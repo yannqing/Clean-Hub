@@ -26,6 +26,7 @@ import type { TerminalSettingsFormValues } from "../types";
 type TerminalSettingsCardProps = {
   initial: TerminalSettingsFormValues;
   loading: boolean;
+  mobileMoneyAvailable?: boolean;
   mode?: TerminalSettingsMode;
   saving: boolean;
   onSave: (values: TerminalSettingsFormValues) => void;
@@ -109,6 +110,7 @@ function MobileSettingSwitch({
 export function TerminalSettingsCard({
   initial,
   loading,
+  mobileMoneyAvailable = false,
   mode = "all",
   saving,
   onSave,
@@ -150,7 +152,10 @@ export function TerminalSettingsCard({
         </header>
         <div className="grid gap-4 lg:p-4">
           {[0, 1, 2, 3].map((item) => (
-            <div className="h-12 animate-pulse bg-muted lg:h-9 lg:rounded-md" key={item} />
+            <div
+              className="h-12 animate-pulse bg-muted lg:h-9 lg:rounded-md"
+              key={item}
+            />
           ))}
         </div>
       </section>
@@ -207,14 +212,23 @@ export function TerminalSettingsCard({
                 </Label>
                 <div className="grid grid-cols-3 gap-2">
                   {PAYMENT_METHOD_OPTIONS.map((option) => {
-                    const checked = form.paymentMethodsEnabled.includes(option.value);
+                    const checked = form.paymentMethodsEnabled.includes(
+                      option.value,
+                    );
+                    const disabled =
+                      option.value === "app" && !mobileMoneyAvailable;
                     return (
                       <label
-                        className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                        className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
+                          disabled
+                            ? "cursor-not-allowed bg-muted/40 text-muted-foreground"
+                            : "cursor-pointer"
+                        }`}
                         key={option.value}
                       >
                         <Checkbox
                           checked={checked}
+                          disabled={disabled}
                           onCheckedChange={(nextChecked) => {
                             const next = nextChecked
                               ? [...form.paymentMethodsEnabled, option.value]
@@ -239,7 +253,8 @@ export function TerminalSettingsCard({
                   })}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  未启用的方式不会出现在结账页；刷卡还要求本机连接 TPE。
+                  未启用的方式不会出现在结账页；移动支付必须先由租户 Owner
+                  在后台完成 API 验证并启用，刷卡还要求本机连接 TPE。
                 </p>
               </div>
               <div className="space-y-1.5">

@@ -58,7 +58,10 @@ import type {
   UpdatePosChannelSettingsRequest,
 } from "./pos-channel.types.js";
 
-type PosChannelSettingsRecord = Omit<PosChannelSettings, "canManage">;
+type PosChannelSettingsRecord = Omit<
+  PosChannelSettings,
+  "canManage" | "mobileMoneyProvidersEnabled"
+>;
 
 export type PosChannelContext = {
   timezone: string;
@@ -270,7 +273,7 @@ function deriveDeviceRuntimeState(
 ) {
   const leaseFresh = Boolean(
     row.connectionLeaseUntil &&
-      row.connectionLeaseUntil.getTime() >= generatedAt.getTime(),
+    row.connectionLeaseUntil.getTime() >= generatedAt.getTime(),
   );
   const httpFresh = Boolean(
     row.lastSeenAt && row.lastSeenAt.getTime() >= offlineAt.getTime(),
@@ -312,7 +315,10 @@ function createDeviceScopeFilters(
   const offlineAt = new Date(
     input.generatedAt.getTime() - input.deviceOfflineAfterSeconds * 1000,
   );
-  const connectivity = createConnectivityExpression(offlineAt, input.generatedAt);
+  const connectivity = createConnectivityExpression(
+    offlineAt,
+    input.generatedAt,
+  );
   const filters: SQL[] = [
     eq(posTerminalSettings.tenantId, input.tenantId),
     inArray(posTerminalSettings.branchId, input.branchIds),
@@ -682,7 +688,10 @@ export async function findPosChannelDevices(
   const offlineAt = new Date(
     input.generatedAt.getTime() - input.deviceOfflineAfterSeconds * 1000,
   );
-  const connectivity = createConnectivityExpression(offlineAt, input.generatedAt);
+  const connectivity = createConnectivityExpression(
+    offlineAt,
+    input.generatedAt,
+  );
   const filtered = createDeviceScopeFilters(input, true);
   const scoped = createDeviceScopeFilters(
     { ...input, attentionOnly: false },

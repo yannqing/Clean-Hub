@@ -96,8 +96,8 @@ export const webAdminRoutes = {
       settings: "/tenant/system/settings",
       settingsSections: {
         general: "/tenant/system/settings",
-        locations: "/tenant/system/settings/locations",
         pricing: "/tenant/system/settings/pricing",
+        payments: "/tenant/system/settings/payments",
         pointOfSale: "/tenant/system/settings/point-of-sale",
         hardware: "/tenant/point-of-sale/hardware",
         activityLog: "/tenant/system/settings/activity-log",

@@ -4,6 +4,7 @@ import type {
   PosTerminalOperationalStatus,
   PosTerminalServiceHealth,
 } from "@cleanhub/domain/pos-terminal-status";
+import type { TenantPaymentProvider } from "../payment-integrations/payment-integrations.types.js";
 
 export type PosChannelPaymentMethod = "cash" | "card" | "app";
 export type PosChannelRoundingRule = "none" | "round_yuan" | "round_jiao";
@@ -261,6 +262,7 @@ export type PosChannelSettings = {
   deviceOfflineAfterSeconds: number;
   defaultPaymentMethod: PosChannelPaymentMethod;
   defaultPaymentMethodsEnabled: PosChannelPaymentMethod[];
+  mobileMoneyProvidersEnabled: TenantPaymentProvider[];
   defaultRoundingRule: PosChannelRoundingRule;
   taxEnabled: boolean;
   defaultTaxRate: string;

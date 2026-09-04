@@ -48,6 +48,9 @@ export default async function PosLayout({
       role={user?.role}
       defaultPaymentMethod={terminalSettings?.defaultPaymentMethod}
       paymentMethodsEnabled={terminalSettings?.paymentMethodsEnabled}
+      mobileMoneyProvidersEnabled={
+        terminalSettings?.mobileMoneyProvidersEnabled
+      }
       roundingRule={terminalSettings?.roundingRule}
       taxEnabled={terminalSettings?.taxEnabled}
       defaultTaxRate={terminalSettings?.defaultTaxRate}

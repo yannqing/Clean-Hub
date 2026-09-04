@@ -1434,8 +1434,14 @@ export type TenantMessages = {
       connection: string;
       terminal: string;
       status: string;
+      binding: string;
       created: string;
       actions: string;
+    };
+    binding: {
+      bound: string;
+      unbound: string;
+      posChecksConnection: string;
     };
     create: {
       title: string;
@@ -2175,8 +2181,8 @@ export type TenantMessages = {
       };
       items: {
         general: string;
-        locations: string;
         pricing: string;
+        payments: string;
         pointOfSale: string;
         hardware: string;
         activityLog: string;
@@ -2199,8 +2205,8 @@ export type TenantMessages = {
       resourcesDescription: string;
       resourceDescriptions: {
         general: string;
-        locations: string;
         pricing: string;
+        payments: string;
         pointOfSale: string;
         hardware: string;
         activityLog: string;
