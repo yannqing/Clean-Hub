@@ -10,10 +10,12 @@
     "typecheck": "tsc --noEmit",
     "smoke:login-form": "tsx src/features/auth/validators/login-form.validator.smoke.ts",
     "smoke:terminal-session": "tsx src/lib/pos-terminal-session.smoke.ts",
+    "smoke:return-path": "tsx src/lib/pos-return-path.smoke.ts",
     "smoke:navigation": "tsx src/config/navigation.smoke.ts",
     "smoke:cart": "tsx src/features/cart/lib/pos-cart.smoke.ts",
     "smoke:offline-operations": "tsx src/features/offline/lib/pos-offline-operations.smoke.ts",
-    "smoke:cash-drawer": "tsx src/features/hardware/lib/cash-drawer.smoke.ts"
+    "smoke:cash-drawer": "tsx src/features/hardware/lib/cash-drawer.smoke.ts",
+    "smoke:printer-binding": "tsx src/features/hardware/lib/printer-binding.smoke.ts && tsx src/features/hardware/lib/pos-print-job.smoke.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.1",
