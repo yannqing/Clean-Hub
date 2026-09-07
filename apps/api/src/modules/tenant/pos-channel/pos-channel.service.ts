@@ -8,10 +8,20 @@ import {
   requireTenantRole,
 } from "../../auth/permission.helper.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import {
+  findUnclosedPosTerminalShift,
+  lockActiveTenantBranch,
+  revokePosDeviceRecord,
+  revokePosTerminalRefreshTokens,
+  toPosDevice,
+  updatePosDeviceRecord,
+} from "../../pos/auth/auth.repository.js";
+import { securityForceClosePosTerminalShifts } from "../../pos/terminal-lifecycle/terminal-lifecycle.repository.js";
 import { findEnabledTenantPaymentProviders } from "../payment-integrations/payment-integrations.repository.js";
 import { TenantPosChannelError } from "./pos-channel.errors.js";
 import {
   findPosChannelContext,
+  findPosChannelDeviceRecordForUpdate,
   findPosChannelDevices,
   findPosChannelOverviewMetrics,
   findPosChannelRegisterSessions,
@@ -22,12 +32,15 @@ import {
 import type {
   PosChannelDeviceList,
   PosChannelDeviceListQuery,
+  PosChannelDeviceMutationResult,
   PosChannelOverview,
   PosChannelOverviewQuery,
   PosChannelRegisterSessionList,
   PosChannelRegisterSessionQuery,
   PosChannelRequestInput,
   PosChannelSettings,
+  RemovePosChannelDeviceRequest,
+  UpdatePosChannelDeviceRequest,
   UpdatePosChannelSettingsRequest,
 } from "./pos-channel.types.js";
 import type { TenantPaymentProvider } from "../payment-integrations/payment-integrations.types.js";
@@ -264,6 +277,239 @@ export async function listTenantPosChannelDevices(
     generatedAt: generatedAt.toISOString(),
     deviceOfflineAfterSeconds: context.settings.deviceOfflineAfterSeconds,
   };
+}
+
+function deviceVersionConflict(): TenantPosChannelError {
+  return new TenantPosChannelError(
+    "POS_CHANNEL_DEVICE_VERSION_CONFLICT",
+    "The POS terminal changed during this request. Refresh and try again.",
+    409,
+  );
+}
+
+export async function updateTenantPosChannelDevice(
+  input: PosChannelRequestInput<UpdatePosChannelDeviceRequest> & {
+    terminalId: string;
+  },
+  db: Database = getDb(),
+): Promise<PosChannelDeviceMutationResult> {
+  const { tenantId, context } = await resolvePosChannelAccess(
+    input.authContext,
+    db,
+  );
+  const branchIds = context.availableBranches.map((branch) => branch.id);
+
+  if (
+    input.data.branchId &&
+    !context.availableBranches.some(
+      (branch) =>
+        branch.id === input.data.branchId && branch.status === "active",
+    )
+  ) {
+    throw new TenantPosChannelError(
+      "POS_CHANNEL_DEVICE_BRANCH_INACTIVE",
+      "The target branch does not exist, is inactive, or is outside your access scope.",
+      409,
+    );
+  }
+
+  return db.transaction(async (tx) => {
+    const current = await findPosChannelDeviceRecordForUpdate(tx, {
+      tenantId,
+      terminalId: input.terminalId,
+      branchIds,
+    });
+    if (!current) {
+      throw new TenantPosChannelError(
+        "POS_CHANNEL_DEVICE_NOT_FOUND",
+        "The POS terminal was not found.",
+        404,
+      );
+    }
+    if (current.version !== input.data.version) {
+      throw deviceVersionConflict();
+    }
+
+    const branchChanged =
+      input.data.branchId !== undefined &&
+      input.data.branchId !== current.branchId;
+    const statusChanged =
+      input.data.status !== undefined && input.data.status !== current.status;
+    const securityContextChanged = branchChanged || statusChanged;
+
+    if (
+      input.data.status === "active" &&
+      current.status !== "active" &&
+      !current.credentialDigest
+    ) {
+      throw new TenantPosChannelError(
+        "POS_CHANNEL_DEVICE_CREDENTIAL_REVOKED",
+        "This terminal was securely removed and must be enrolled again before it can be enabled.",
+        409,
+      );
+    }
+
+    if (branchChanged) {
+      const shift = await findUnclosedPosTerminalShift(tx, {
+        tenantId,
+        terminalId: current.id,
+      });
+      if (shift) {
+        throw new TenantPosChannelError(
+          "POS_CHANNEL_DEVICE_SHIFT_OPEN",
+          "Close the terminal's open shift before moving it to another branch.",
+          409,
+        );
+      }
+    }
+
+    if (
+      (branchChanged || input.data.status === "active") &&
+      !(await lockActiveTenantBranch(
+        tx,
+        tenantId,
+        input.data.branchId ?? current.branchId,
+      ))
+    ) {
+      throw new TenantPosChannelError(
+        "POS_CHANNEL_DEVICE_BRANCH_INACTIVE",
+        "The target branch does not exist or is inactive.",
+        409,
+      );
+    }
+
+    if (!branchChanged && input.data.status === "inactive") {
+      await securityForceClosePosTerminalShifts(tx, {
+        tenantId,
+        terminalIds: [current.id],
+        actorUserId: input.authContext.userId,
+        reason: input.data.reason,
+        metadata: {
+          securityTrigger: "terminal_disabled",
+          terminalId: current.id,
+          terminalDeviceId: current.deviceId,
+        },
+        requestMeta: input.requestMeta,
+      });
+    }
+
+    const saved = await updatePosDeviceRecord(tx, current, {
+      actorUserId: input.authContext.userId,
+      data: {
+        ...(input.data.branchId ? { branchId: input.data.branchId } : {}),
+        ...(input.data.label ? { label: input.data.label } : {}),
+        ...(input.data.status ? { status: input.data.status } : {}),
+        reason: input.data.reason,
+      },
+    });
+    if (!saved) throw deviceVersionConflict();
+
+    if (securityContextChanged) {
+      await revokePosTerminalRefreshTokens(tx, tenantId, saved.id);
+    }
+
+    const before = toPosDevice(current);
+    const after = toPosDevice(saved);
+    await writeAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      tenantId,
+      branchId: after.branchId,
+      eventCategory: "pos_terminal_security",
+      eventType:
+        statusChanged && saved.status === "inactive"
+          ? "pos_terminal.disabled"
+          : statusChanged && saved.status === "active"
+            ? "pos_terminal.enabled"
+            : branchChanged
+              ? "pos_terminal.rebound"
+              : "pos_terminal.updated",
+      entityType: "pos_terminal_settings",
+      entityId: saved.id,
+      reason: input.data.reason,
+      before: { ...before },
+      after: { ...after },
+      metadata: {
+        terminalId: saved.id,
+        terminalDeviceId: saved.deviceId,
+      },
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return { id: saved.id, version: saved.version };
+  });
+}
+
+export async function removeTenantPosChannelDevice(
+  input: PosChannelRequestInput<RemovePosChannelDeviceRequest> & {
+    terminalId: string;
+  },
+  db: Database = getDb(),
+): Promise<void> {
+  const { tenantId, context } = await resolvePosChannelAccess(
+    input.authContext,
+    db,
+  );
+  const branchIds = context.availableBranches.map((branch) => branch.id);
+
+  await db.transaction(async (tx) => {
+    const current = await findPosChannelDeviceRecordForUpdate(tx, {
+      tenantId,
+      terminalId: input.terminalId,
+      branchIds,
+    });
+    if (!current) {
+      throw new TenantPosChannelError(
+        "POS_CHANNEL_DEVICE_NOT_FOUND",
+        "The POS terminal was not found.",
+        404,
+      );
+    }
+    if (current.version !== input.data.version) {
+      throw deviceVersionConflict();
+    }
+
+    await securityForceClosePosTerminalShifts(tx, {
+      tenantId,
+      terminalIds: [current.id],
+      actorUserId: input.authContext.userId,
+      reason: input.data.reason,
+      metadata: {
+        securityTrigger: "terminal_removed",
+        terminalId: current.id,
+        terminalDeviceId: current.deviceId,
+      },
+      requestMeta: input.requestMeta,
+    });
+
+    const saved = await revokePosDeviceRecord(tx, current, {
+      actorUserId: input.authContext.userId,
+      reason: input.data.reason,
+    });
+    if (!saved) throw deviceVersionConflict();
+
+    await revokePosTerminalRefreshTokens(tx, tenantId, saved.id);
+    await writeAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      tenantId,
+      branchId: current.branchId,
+      eventCategory: "pos_terminal_security",
+      eventType: "pos_terminal.revoked",
+      entityType: "pos_terminal_settings",
+      entityId: saved.id,
+      reason: input.data.reason,
+      before: { ...toPosDevice(current) },
+      after: { ...toPosDevice(saved) },
+      metadata: {
+        terminalId: saved.id,
+        terminalDeviceId: saved.deviceId,
+        credentialVersion: saved.credentialVersion,
+        removedFromTenantAdmin: true,
+      },
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+  });
 }
 
 export async function listTenantPosChannelRegisterSessions(

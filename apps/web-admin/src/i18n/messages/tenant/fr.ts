@@ -2005,6 +2005,42 @@ export const tenantMessagesFr: TenantMessages = {
         lastSeen: "Dernière connexion",
         syncStatus: "Synchronisation",
         currentSession: "Session en cours",
+        actions: "Actions",
+      },
+      actions: {
+        edit: "Modifier",
+        delete: "Supprimer",
+      },
+      edit: {
+        title: "Modifier le terminal de point de vente",
+        description:
+          "Modifiez le nom, la succursale ou l’état du terminal. Les changements de sécurité révoquent les sessions existantes.",
+        identityTitle: "Informations du terminal",
+        settingsTitle: "Paramètres de gestion",
+        deviceId: "ID de l’appareil",
+        deviceInfo: "Environnement de l’appareil",
+        label: "Nom du terminal",
+        branch: "Succursale",
+        status: "État d’activation",
+        reason: "Motif de la modification",
+        reasonHelp:
+          "Le motif est conservé dans le journal d’audit de sécurité et doit contenir au moins 3 caractères.",
+        save: "Enregistrer",
+        saving: "Enregistrement…",
+        saved: "Terminal de point de vente mis à jour.",
+        cancel: "Annuler",
+        required: "Saisissez un nom de terminal et un motif de modification.",
+      },
+      remove: {
+        title: "Supprimer le terminal de point de vente ?",
+        description:
+          "Les identifiants et sessions seront immédiatement révoqués, et toute session de caisse ouverte sera fermée de manière sécurisée. Les commandes et l’historique d’audit sont conservés. L’appareil devra être réenregistré avant réutilisation.",
+        reason: "Motif de la suppression",
+        reasonPlaceholder: "Par exemple : appareil retiré ou inutilisé",
+        cancel: "Annuler",
+        action: "Supprimer le terminal",
+        removing: "Suppression…",
+        removed: "Terminal de point de vente supprimé en toute sécurité.",
       },
       deviceTypes: {
         desktop: "PDV de bureau",

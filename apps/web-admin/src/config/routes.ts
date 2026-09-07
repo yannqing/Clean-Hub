@@ -64,6 +64,8 @@ export const webAdminRoutes = {
     pointOfSale: {
       home: "/tenant/point-of-sale",
       devices: "/tenant/point-of-sale/devices",
+      device: (terminalId: string) =>
+        `/tenant/point-of-sale/devices/${encodeURIComponent(terminalId)}`,
       hardware: "/tenant/point-of-sale/hardware",
       newHardware: "/tenant/point-of-sale/hardware/new",
       hardwareDevice: (hardwareId: string) =>

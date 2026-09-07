@@ -322,6 +322,7 @@ function createDeviceScopeFilters(
   const filters: SQL[] = [
     eq(posTerminalSettings.tenantId, input.tenantId),
     inArray(posTerminalSettings.branchId, input.branchIds),
+    sql`coalesce(${posTerminalSettings.metadata}->>'lastEnrollmentAction', '') <> 'revoked'`,
   ];
 
   if (input.attentionOnly) {
@@ -870,6 +871,33 @@ export async function findPosChannelDevices(
       syncIssues: metrics?.syncIssues ?? 0,
     },
   };
+}
+
+export async function findPosChannelDeviceRecordForUpdate(
+  db: Database,
+  input: {
+    tenantId: string;
+    terminalId: string;
+    branchIds: string[];
+  },
+): Promise<typeof posTerminalSettings.$inferSelect | null> {
+  if (input.branchIds.length === 0) return null;
+
+  const rows = await db
+    .select()
+    .from(posTerminalSettings)
+    .where(
+      and(
+        eq(posTerminalSettings.id, input.terminalId),
+        eq(posTerminalSettings.tenantId, input.tenantId),
+        inArray(posTerminalSettings.branchId, input.branchIds),
+        sql`coalesce(${posTerminalSettings.metadata}->>'lastEnrollmentAction', '') <> 'revoked'`,
+      ),
+    )
+    .for("update")
+    .limit(1);
+
+  return rows[0] ?? null;
 }
 
 async function findStaffRoles(
@@ -1452,6 +1480,7 @@ export async function findPosChannelOverviewMetrics(
         and(
           eq(posTerminalSettings.tenantId, input.tenantId),
           inArray(posTerminalSettings.branchId, input.branchIds),
+          sql`coalesce(${posTerminalSettings.metadata}->>'lastEnrollmentAction', '') <> 'revoked'`,
         ),
       )
       .groupBy(posTerminalSettings.branchId),

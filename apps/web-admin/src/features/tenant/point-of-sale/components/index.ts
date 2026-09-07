@@ -1,4 +1,5 @@
 export * from "./point-of-sale-devices-view";
+export * from "./point-of-sale-device-form-view";
 export * from "./point-of-sale-overview-view";
 export * from "./point-of-sale-section-layout";
 export * from "./point-of-sale-settings-view";

@@ -24,7 +24,9 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
   cn,
+  toast,
 } from "@cleanhub/ui";
 import { DataTable } from "@cleanhub/ui/data-table";
 import {
@@ -33,10 +35,13 @@ import {
   CircleAlert,
   HardDrive,
   MonitorCheck,
+  Pencil,
   Search,
   ShieldCheck,
   SquareTerminal,
+  Trash2,
 } from "lucide-react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   type FormEvent,
@@ -48,8 +53,10 @@ import {
 } from "react";
 
 import { Pagination } from "@/components/pagination";
+import { webAdminRoutes } from "@/config/routes";
 import { interpolate, useTenantI18n } from "@/i18n";
 
+import { removePointOfSaleDeviceAction } from "../actions";
 import type {
   PointOfSaleDeviceList,
   PointOfSaleDeviceQuery,
@@ -150,6 +157,12 @@ export function PointOfSaleDevicesView({
   const [isPending, startTransition] = useTransition();
   const [search, setSearch] = useState(query.q ?? "");
   const [setupOpen, setSetupOpen] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<PointOfSaleDevice | null>(
+    null,
+  );
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
   const [deviceOverrides, setDeviceOverrides] = useState<
     Record<string, TenantDeviceRealtimeState>
   >({});
@@ -241,6 +254,37 @@ export function PointOfSaleDevicesView({
     );
   }
 
+  async function handleDelete() {
+    if (!pendingDelete || deleteReason.trim().length < 3 || deleting) return;
+
+    setDeleting(true);
+    setMutationError(null);
+    try {
+      const deleteResult = await removePointOfSaleDeviceAction(
+        pendingDelete.id,
+        {
+          reason: deleteReason.trim(),
+          version: pendingDelete.version,
+        },
+      );
+      if (!deleteResult.ok) {
+        setMutationError(deleteResult.error);
+        return;
+      }
+
+      toast.success(m.pointOfSale.devices.remove.removed);
+      setPendingDelete(null);
+      setDeleteReason("");
+      if ((displayResult?.data.length ?? 0) === 1 && (query.offset ?? 0) > 0) {
+        navigate({ offset: Math.max(0, (query.offset ?? 0) - PAGE_SIZE) });
+      } else {
+        router.refresh();
+      }
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const metrics = [
     {
       icon: HardDrive,
@@ -296,6 +340,74 @@ export function PointOfSaleDevicesView({
               {m.pointOfSale.devices.setupNotice}
             </DialogDescription>
           </DialogHeader>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !deleting) {
+            setPendingDelete(null);
+            setDeleteReason("");
+            setMutationError(null);
+          }
+        }}
+        open={pendingDelete !== null}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{m.pointOfSale.devices.remove.title}</DialogTitle>
+            <DialogDescription>
+              {pendingDelete?.label || pendingDelete?.deviceId}
+              {" · "}
+              {m.pointOfSale.devices.remove.description}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2">
+            <label
+              className="text-sm font-medium"
+              htmlFor="remove-terminal-reason"
+            >
+              {m.pointOfSale.devices.remove.reason}
+            </label>
+            <Textarea
+              disabled={deleting}
+              id="remove-terminal-reason"
+              maxLength={500}
+              onChange={(event) => setDeleteReason(event.target.value)}
+              placeholder={m.pointOfSale.devices.remove.reasonPlaceholder}
+              rows={3}
+              value={deleteReason}
+            />
+            {mutationError ? (
+              <p className="text-xs text-destructive" role="alert">
+                {mutationError}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button
+              disabled={deleting}
+              onClick={() => {
+                setPendingDelete(null);
+                setDeleteReason("");
+                setMutationError(null);
+              }}
+              type="button"
+              variant="outline"
+            >
+              {m.pointOfSale.devices.remove.cancel}
+            </Button>
+            <Button
+              disabled={deleting || deleteReason.trim().length < 3}
+              onClick={() => void handleDelete()}
+              type="button"
+              variant="destructive"
+            >
+              {deleting
+                ? m.pointOfSale.devices.remove.removing
+                : m.pointOfSale.devices.remove.action}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -542,11 +654,37 @@ export function PointOfSaleDevicesView({
                     <TableHead className="text-[10px]">
                       {m.pointOfSale.devices.columns.currentSession}
                     </TableHead>
+                    <TableHead className="text-right text-[10px]">
+                      {m.pointOfSale.devices.columns.actions}
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {displayResult.data.map((device) => (
-                    <TableRow key={device.id}>
+                    <TableRow
+                      className="cursor-pointer hover:bg-muted/40"
+                      key={device.id}
+                      onClick={() =>
+                        router.push(
+                          webAdminRoutes.tenant.pointOfSale.device(device.id),
+                        )
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault();
+                          router.push(
+                            webAdminRoutes.tenant.pointOfSale.device(device.id),
+                          );
+                        }
+                      }}
+                      onMouseEnter={() =>
+                        router.prefetch(
+                          webAdminRoutes.tenant.pointOfSale.device(device.id),
+                        )
+                      }
+                      role="link"
+                      tabIndex={0}
+                    >
                       <TableCell className="py-3 text-xs">
                         <div className="flex items-center gap-2">
                           <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
@@ -645,6 +783,43 @@ export function PointOfSaleDevicesView({
                             {m.pointOfSale.devices.noCurrentSession}
                           </span>
                         )}
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap py-3 text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <Button
+                            asChild
+                            aria-label={m.pointOfSale.devices.actions.edit}
+                            className="size-7 p-0"
+                            size="icon"
+                            title={m.pointOfSale.devices.actions.edit}
+                            variant="ghost"
+                          >
+                            <Link
+                              href={webAdminRoutes.tenant.pointOfSale.device(
+                                device.id,
+                              )}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <Icon aria-hidden icon={Pencil} size={13} />
+                            </Link>
+                          </Button>
+                          <Button
+                            aria-label={m.pointOfSale.devices.actions.delete}
+                            className="size-7 p-0 text-destructive hover:text-destructive"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setMutationError(null);
+                              setPendingDelete(device);
+                            }}
+                            onKeyDown={(event) => event.stopPropagation()}
+                            size="icon"
+                            title={m.pointOfSale.devices.actions.delete}
+                            type="button"
+                            variant="ghost"
+                          >
+                            <Icon aria-hidden icon={Trash2} size={13} />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}

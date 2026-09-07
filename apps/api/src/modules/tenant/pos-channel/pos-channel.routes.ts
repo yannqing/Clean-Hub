@@ -6,6 +6,8 @@ import {
   getTenantPosChannelSettingsController,
   listTenantPosChannelDevicesController,
   listTenantPosChannelRegisterSessionsController,
+  removeTenantPosChannelDeviceController,
+  updateTenantPosChannelDeviceController,
   updateTenantPosChannelSettingsController,
 } from "./pos-channel.controller.js";
 
@@ -14,6 +16,8 @@ export function createTenantPosChannelRoutes() {
 
   routes.get("/overview", getTenantPosChannelOverviewController);
   routes.get("/devices", listTenantPosChannelDevicesController);
+  routes.patch("/devices/:terminalId", updateTenantPosChannelDeviceController);
+  routes.delete("/devices/:terminalId", removeTenantPosChannelDeviceController);
   routes.get(
     "/register-sessions",
     listTenantPosChannelRegisterSessionsController,

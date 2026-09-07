@@ -16,6 +16,8 @@ import type {
   TenantPosChannelRegisterSessionList,
   TenantPosChannelRegisterSessionQuery,
   TenantPosChannelSettings,
+  RemoveTenantPosChannelDeviceRequest,
+  UpdateTenantPosChannelDeviceRequest,
   UpdateTenantPosChannelSettingsRequest,
 } from "@cleanhub/api-client";
 
@@ -26,6 +28,8 @@ export type PointOfSaleDevice = PosChannelDeviceSummary;
 export type PointOfSaleDeviceList = TenantPosChannelDeviceList;
 export type PointOfSaleDeviceQuery = TenantPosChannelDeviceListQuery;
 export type PointOfSaleDeviceStatus = PosChannelDeviceStatus;
+export type UpdatePointOfSaleDeviceInput = UpdateTenantPosChannelDeviceRequest;
+export type RemovePointOfSaleDeviceInput = RemoveTenantPosChannelDeviceRequest;
 export type PointOfSaleDeviceConnectivity = PosChannelDeviceConnectivity;
 export type PointOfSaleDeviceType = PosChannelDeviceType;
 export type PointOfSaleSyncStatus = PosChannelSyncStatus;

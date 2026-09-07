@@ -8,12 +8,17 @@ import {
   getTenantPosChannelSettings,
   listTenantPosChannelDevices,
   listTenantPosChannelRegisterSessions,
+  removeTenantPosChannelDevice,
+  updateTenantPosChannelDevice,
   updateTenantPosChannelSettings,
 } from "./pos-channel.service.js";
 import {
+  posChannelDeviceParamsSchema,
   posChannelDeviceListQuerySchema,
   posChannelOverviewQuerySchema,
   posChannelRegisterSessionQuerySchema,
+  removePosChannelDeviceBodySchema,
+  updatePosChannelDeviceBodySchema,
   updatePosChannelSettingsBodySchema,
 } from "./pos-channel.validation.js";
 
@@ -58,6 +63,55 @@ export async function listTenantPosChannelDevicesController(
     return c.json(
       await listTenantPosChannelDevices(c.get("authContext"), query),
     );
+  } catch (error) {
+    if (error instanceof TenantPosChannelError) {
+      return createErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function updateTenantPosChannelDeviceController(
+  c: Context<AppBindings>,
+) {
+  const { terminalId } = posChannelDeviceParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = updatePosChannelDeviceBodySchema.parse(rawBody);
+
+  try {
+    return c.json(
+      await updateTenantPosChannelDevice({
+        authContext: c.get("authContext"),
+        requestMeta: getRequestMeta(c),
+        terminalId,
+        data,
+      }),
+    );
+  } catch (error) {
+    if (error instanceof TenantPosChannelError) {
+      return createErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function removeTenantPosChannelDeviceController(
+  c: Context<AppBindings>,
+) {
+  const { terminalId } = posChannelDeviceParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = removePosChannelDeviceBodySchema.parse(rawBody);
+
+  try {
+    await removeTenantPosChannelDevice({
+      authContext: c.get("authContext"),
+      requestMeta: getRequestMeta(c),
+      terminalId,
+      data,
+    });
+    return c.body(null, 204);
   } catch (error) {
     if (error instanceof TenantPosChannelError) {
       return createErrorResponse(c, error);

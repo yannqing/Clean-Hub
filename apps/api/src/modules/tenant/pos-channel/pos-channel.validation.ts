@@ -82,6 +82,34 @@ export const posChannelDeviceListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+export const posChannelDeviceParamsSchema = z.object({
+  terminalId: z.string().regex(ULID_PATTERN),
+});
+
+export const updatePosChannelDeviceBodySchema = z
+  .object({
+    label: z.string().trim().min(1).max(64).optional(),
+    branchId: z.string().regex(ULID_PATTERN).optional(),
+    status: z.enum(["active", "inactive"]).optional(),
+    reason: z.string().trim().min(3).max(500),
+    version: z.coerce.number().int().min(1),
+  })
+  .strict()
+  .refine(
+    (data) =>
+      data.label !== undefined ||
+      data.branchId !== undefined ||
+      data.status !== undefined,
+    "At least one terminal field must be provided.",
+  );
+
+export const removePosChannelDeviceBodySchema = z
+  .object({
+    reason: z.string().trim().min(3).max(500),
+    version: z.coerce.number().int().min(1),
+  })
+  .strict();
+
 export const posChannelRegisterSessionQuerySchema = dateRangeQuerySchema
   .extend({
     branchId: z.string().regex(ULID_PATTERN).optional(),

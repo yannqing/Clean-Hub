@@ -1967,6 +1967,42 @@ export const tenantMessagesEn: TenantMessages = {
         lastSeen: "Last online",
         syncStatus: "Sync",
         currentSession: "Current session",
+        actions: "Actions",
+      },
+      actions: {
+        edit: "Edit",
+        delete: "Delete",
+      },
+      edit: {
+        title: "Edit POS terminal",
+        description:
+          "Change the terminal name, branch, or enabled state. Security-sensitive changes revoke existing sessions.",
+        identityTitle: "Terminal information",
+        settingsTitle: "Management settings",
+        deviceId: "Device ID",
+        deviceInfo: "Device environment",
+        label: "Terminal name",
+        branch: "Branch",
+        status: "Enabled state",
+        reason: "Reason for change",
+        reasonHelp:
+          "The reason is stored in the security audit log and must be at least 3 characters.",
+        save: "Save changes",
+        saving: "Saving…",
+        saved: "POS terminal updated.",
+        cancel: "Cancel",
+        required: "Enter a terminal name and a reason for the change.",
+      },
+      remove: {
+        title: "Delete POS terminal?",
+        description:
+          "Credentials and sessions will be revoked immediately, and any open shift will be securely closed. Orders and audit history are retained. The device must be enrolled again before reuse.",
+        reason: "Reason for deletion",
+        reasonPlaceholder: "For example: device retired or no longer in use",
+        cancel: "Cancel",
+        action: "Delete terminal",
+        removing: "Deleting…",
+        removed: "POS terminal securely deleted.",
       },
       deviceTypes: {
         desktop: "Desktop POS",

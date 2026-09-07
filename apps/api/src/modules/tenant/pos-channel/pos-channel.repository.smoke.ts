@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import "../../../config/env.js";
 
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 
 import {
   auditLogs,
@@ -27,6 +27,8 @@ import {
   getTenantPosChannelSettings,
   listTenantPosChannelDevices,
   listTenantPosChannelRegisterSessions,
+  removeTenantPosChannelDevice,
+  updateTenantPosChannelDevice,
   updateTenantPosChannelSettings,
 } from "./pos-channel.service.js";
 
@@ -81,6 +83,7 @@ export async function runTenantPosChannelRepositorySmoke(): Promise<void> {
     inactiveBranchId,
   ];
   let terminalId: string | null = null;
+  let deniedTerminalId: string | null = null;
 
   try {
     await db.insert(branches).values([
@@ -168,6 +171,29 @@ export async function runTenantPosChannelRepositorySmoke(): Promise<void> {
       devices.availableBranches.every((branch) => branch.status === "active"),
     );
 
+    const deniedTerminal = await createPosTerminalSettings(owner, {
+      branchId: deniedBranchId,
+      deviceId: `pos-channel-denied-${createId()}`,
+      label: "POS channel denied terminal",
+    });
+    deniedTerminalId = deniedTerminal.id;
+    await assert.rejects(
+      () =>
+        updateTenantPosChannelDevice({
+          authContext: manager,
+          terminalId: deniedTerminal.id,
+          data: {
+            label: "Unauthorized rename",
+            reason: "Verify manager branch scope",
+            version: deniedTerminal.version,
+          },
+        }),
+      (error: unknown) =>
+        error instanceof TenantPosChannelError &&
+        error.code === "POS_CHANNEL_DEVICE_NOT_FOUND" &&
+        error.status === 404,
+    );
+
     const terminal = await createPosTerminalSettings(owner, {
       branchId: allowedBranchId,
       deviceId: `pos-channel-smoke-${createId()}`,
@@ -195,6 +221,7 @@ export async function runTenantPosChannelRepositorySmoke(): Promise<void> {
         terminalId: terminal.id,
         terminalBranchId: allowedBranchId,
         terminalDeviceId: terminal.deviceId,
+        terminalCredentialVersion: 0,
       },
       {
         deviceType: "browser",
@@ -211,6 +238,41 @@ export async function runTenantPosChannelRepositorySmoke(): Promise<void> {
     assert.equal(heartbeat.platform, "smoke");
     assert.ok(heartbeat.lastSeenAt);
 
+    const renamedTerminal = await updateTenantPosChannelDevice({
+      authContext: owner,
+      terminalId: terminal.id,
+      data: {
+        label: "POS channel smoke terminal renamed",
+        reason: "Verify tenant terminal editing",
+        version: heartbeat.version,
+      },
+    });
+    assert.equal(renamedTerminal.version, heartbeat.version + 1);
+
+    const renamedDevices = await listTenantPosChannelDevices(owner, {
+      q: "POS channel smoke terminal renamed",
+      limit: 10,
+      offset: 0,
+    });
+    assert.equal(renamedDevices.data[0]?.id, terminal.id);
+
+    await removeTenantPosChannelDevice({
+      authContext: owner,
+      terminalId: terminal.id,
+      data: {
+        reason: "Verify secure terminal removal",
+        version: renamedTerminal.version,
+      },
+    });
+    const devicesAfterRemoval = await listTenantPosChannelDevices(owner, {
+      q: terminal.deviceId,
+      limit: 10,
+      offset: 0,
+    });
+    assert.ok(
+      !devicesAfterRemoval.data.some((device) => device.id === terminal.id),
+    );
+
     await assert.rejects(
       () =>
         updateTenantPosChannelSettings({
@@ -226,13 +288,19 @@ export async function runTenantPosChannelRepositorySmoke(): Promise<void> {
         error.status === 409,
     );
   } finally {
-    await db
-      .delete(auditLogs)
-      .where(sql`${auditLogs.after}->>'label' = 'POS channel smoke terminal'`);
     if (terminalId) {
+      await db.delete(auditLogs).where(eq(auditLogs.entityId, terminalId));
       await db
         .delete(posTerminalSettings)
         .where(eq(posTerminalSettings.id, terminalId));
+    }
+    if (deniedTerminalId) {
+      await db
+        .delete(auditLogs)
+        .where(eq(auditLogs.entityId, deniedTerminalId));
+      await db
+        .delete(posTerminalSettings)
+        .where(eq(posTerminalSettings.id, deniedTerminalId));
     }
     await db
       .delete(userBranches)

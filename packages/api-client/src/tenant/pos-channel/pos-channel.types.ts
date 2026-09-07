@@ -145,6 +145,24 @@ export type TenantPosChannelDeviceList = {
   deviceOfflineAfterSeconds: number;
 };
 
+export type UpdateTenantPosChannelDeviceRequest = {
+  label?: string;
+  branchId?: string;
+  status?: PosChannelDeviceStatus;
+  reason: string;
+  version: number;
+};
+
+export type RemoveTenantPosChannelDeviceRequest = {
+  reason: string;
+  version: number;
+};
+
+export type TenantPosChannelDeviceMutationResult = {
+  id: string;
+  version: number;
+};
+
 export type PosChannelZReportSummary = {
   id: string;
   cutoffAt: string;

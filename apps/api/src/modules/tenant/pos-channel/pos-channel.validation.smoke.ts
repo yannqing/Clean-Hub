@@ -5,6 +5,8 @@ import {
   posChannelDeviceListQuerySchema,
   posChannelOverviewQuerySchema,
   posChannelRegisterSessionQuerySchema,
+  removePosChannelDeviceBodySchema,
+  updatePosChannelDeviceBodySchema,
   updatePosChannelSettingsBodySchema,
 } from "./pos-channel.validation.js";
 
@@ -35,6 +37,32 @@ assert.deepEqual(posChannelRegisterSessionQuerySchema.parse({}), {
   limit: 10,
   offset: 0,
 });
+
+assert.deepEqual(
+  updatePosChannelDeviceBodySchema.parse({
+    label: " Front register ",
+    reason: "Move to the front counter",
+    version: 2,
+  }),
+  {
+    label: "Front register",
+    reason: "Move to the front counter",
+    version: 2,
+  },
+);
+assert.throws(() =>
+  updatePosChannelDeviceBodySchema.parse({
+    reason: "No changed field",
+    version: 2,
+  }),
+);
+assert.equal(
+  removePosChannelDeviceBodySchema.parse({
+    reason: "Terminal retired",
+    version: 2,
+  }).version,
+  2,
+);
 
 const settings = updatePosChannelSettingsBodySchema.parse({
   deviceOfflineAfterSeconds: 900,

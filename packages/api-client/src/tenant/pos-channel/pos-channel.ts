@@ -2,11 +2,14 @@ import type { ApiClient, ApiRequestOptions } from "../../types";
 import type {
   TenantPosChannelDeviceList,
   TenantPosChannelDeviceListQuery,
+  TenantPosChannelDeviceMutationResult,
   TenantPosChannelOverview,
   TenantPosChannelOverviewQuery,
   TenantPosChannelRegisterSessionList,
   TenantPosChannelRegisterSessionQuery,
   TenantPosChannelSettings,
+  RemoveTenantPosChannelDeviceRequest,
+  UpdateTenantPosChannelDeviceRequest,
   UpdateTenantPosChannelSettingsRequest,
 } from "./pos-channel.types";
 
@@ -33,6 +36,25 @@ export function createTenantPosChannelApi(client: ApiClient) {
         ...options,
         query,
       }),
+    updateDevice: (
+      terminalId: string,
+      input: UpdateTenantPosChannelDeviceRequest,
+      options: TenantPosChannelRequestOptions = {},
+    ) =>
+      client.patch<TenantPosChannelDeviceMutationResult>(
+        `/tenant/pos-channel/devices/${encodeURIComponent(terminalId)}`,
+        input,
+        options,
+      ),
+    removeDevice: (
+      terminalId: string,
+      input: RemoveTenantPosChannelDeviceRequest,
+      options: TenantPosChannelRequestOptions = {},
+    ) =>
+      client.delete<void>(
+        `/tenant/pos-channel/devices/${encodeURIComponent(terminalId)}`,
+        { ...options, body: input },
+      ),
     listRegisterSessions: (
       query?: TenantPosChannelRegisterSessionQuery,
       options: TenantPosChannelRequestOptions = {},

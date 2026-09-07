@@ -1600,6 +1600,39 @@ export type TenantMessages = {
         lastSeen: string;
         syncStatus: string;
         currentSession: string;
+        actions: string;
+      };
+      actions: {
+        edit: string;
+        delete: string;
+      };
+      edit: {
+        title: string;
+        description: string;
+        identityTitle: string;
+        settingsTitle: string;
+        deviceId: string;
+        deviceInfo: string;
+        label: string;
+        branch: string;
+        status: string;
+        reason: string;
+        reasonHelp: string;
+        save: string;
+        saving: string;
+        saved: string;
+        cancel: string;
+        required: string;
+      };
+      remove: {
+        title: string;
+        description: string;
+        reason: string;
+        reasonPlaceholder: string;
+        cancel: string;
+        action: string;
+        removing: string;
+        removed: string;
       };
       deviceTypes: {
         desktop: string;

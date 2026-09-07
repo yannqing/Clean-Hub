@@ -151,6 +151,24 @@ export type PosChannelDeviceList = {
   deviceOfflineAfterSeconds: number;
 };
 
+export type UpdatePosChannelDeviceRequest = {
+  label?: string;
+  branchId?: string;
+  status?: PosChannelDeviceStatus;
+  reason: string;
+  version: number;
+};
+
+export type RemovePosChannelDeviceRequest = {
+  reason: string;
+  version: number;
+};
+
+export type PosChannelDeviceMutationResult = {
+  id: string;
+  version: number;
+};
+
 export type PosChannelZReportSummary = {
   id: string;
   cutoffAt: string;
