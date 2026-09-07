@@ -203,7 +203,7 @@ export function CartSaleView({
   );
 
   return (
-    <section className="space-y-5 pb-28 lg:pb-8">
+    <section className="space-y-4 pb-28 sm:space-y-5 xl:pb-8">
       <PosPageHeader
         actions={
           <Badge className="gap-1.5" variant="outline">
@@ -218,14 +218,14 @@ export function CartSaleView({
 
       {canManageSensitiveOperations ? <OfflineCashExceptionPanel /> : null}
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="min-w-0 space-y-4">
-          <div className="flex flex-col gap-3 border-y bg-background px-3 py-3 sm:flex-row sm:items-center">
-            <div className="flex shrink-0 rounded-md bg-muted p-1">
+          <div className="sticky top-0 z-20 -mx-2 flex flex-col gap-2 border-y bg-background/95 px-2 py-2.5 backdrop-blur sm:static sm:mx-0 sm:gap-3 sm:px-3 sm:py-3 md:flex-row md:items-center">
+            <div className="grid w-full shrink-0 grid-cols-3 rounded-md bg-muted p-1 md:flex md:w-auto">
               {(["all", "products", "services"] as const).map((value) => (
                 <button
                   className={cn(
-                    "h-9 rounded-md px-3 text-sm font-medium",
+                    "h-9 min-w-0 rounded-md px-2 text-xs font-medium sm:px-3 sm:text-sm",
                     filter === value
                       ? "bg-background text-foreground shadow-sm"
                       : "text-muted-foreground",
@@ -254,7 +254,7 @@ export function CartSaleView({
 
           {visibleProducts.length > 0 ? (
             <CatalogSection title={t("pos.cart.products")}>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 2xl:grid-cols-4">
                 {visibleProducts.map((product) => (
                   <ProductCard
                     key={product.productSkuId}
@@ -272,7 +272,7 @@ export function CartSaleView({
               description={t("pos.cart.serviceHint")}
               title={t("pos.cart.services")}
             >
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 2xl:grid-cols-3">
                 {visibleServices.map((service) => (
                   <ServiceCard
                     key={service.id}
@@ -291,7 +291,7 @@ export function CartSaleView({
           ) : null}
         </div>
 
-        <aside className="sticky top-5 hidden h-[calc(100dvh-2.5rem)] overflow-hidden border bg-background lg:block">
+        <aside className="sticky top-5 hidden h-[calc(100dvh-2.5rem)] overflow-hidden border bg-background xl:block">
           {cartPanel}
         </aside>
       </div>
@@ -299,7 +299,7 @@ export function CartSaleView({
       <Sheet onOpenChange={setCartOpen} open={cartOpen}>
         <SheetTrigger asChild>
           <button
-            className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 flex h-14 items-center justify-between rounded-xl bg-foreground px-4 text-background shadow-xl lg:hidden"
+            className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 flex h-14 items-center justify-between rounded-xl bg-foreground px-4 text-background shadow-xl sm:left-1/2 sm:right-auto sm:w-[min(36rem,calc(100vw-2rem))] sm:-translate-x-1/2 lg:bottom-4 xl:hidden"
             type="button"
           >
             <span className="flex items-center gap-2 font-semibold">
@@ -318,7 +318,11 @@ export function CartSaleView({
             </span>
           </button>
         </SheetTrigger>
-        <SheetContent className="h-[88dvh] p-0" side="bottom">
+        <SheetContent
+          className="h-[calc(100dvh-env(safe-area-inset-top))] max-h-dvh gap-0 rounded-none p-0 sm:left-1/2 sm:h-[88dvh] sm:max-h-[760px] sm:w-[min(44rem,calc(100vw-2rem))] sm:-translate-x-1/2 sm:rounded-t-2xl"
+          showHandle={false}
+          side="bottom"
+        >
           <SheetHeader className="sr-only">
             <SheetTitle>{t("pos.cart.cart")}</SheetTitle>
             <SheetDescription>{t("pos.cart.description")}</SheetDescription>
@@ -374,12 +378,12 @@ function ProductCard({
 
   return (
     <button
-      className="group overflow-hidden rounded-lg border bg-background text-left transition hover:border-foreground/25 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-55"
+      className="group min-w-0 overflow-hidden rounded-lg border bg-background text-left transition hover:border-foreground/25 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-55"
       disabled={unavailable}
       onClick={onAdd}
       type="button"
     >
-      <span className="relative block aspect-square overflow-hidden bg-muted">
+      <span className="relative block aspect-[4/3] overflow-hidden bg-muted sm:aspect-square">
         {cover ? (
           <Image
             alt={name}
@@ -396,19 +400,22 @@ function ProductCard({
           />
         )}
       </span>
-      <span className="block space-y-1.5 p-3">
-        <span className="line-clamp-2 block min-h-10 text-sm font-semibold text-foreground">
+      <span className="block space-y-1.5 p-2.5 sm:p-3">
+        <span className="line-clamp-2 block min-h-9 text-[13px] font-semibold leading-[18px] text-foreground sm:min-h-10 sm:text-sm sm:leading-5">
           {name}
         </span>
         <span className="block truncate text-xs text-muted-foreground">
           {product.sku}
         </span>
-        <span className="flex items-center justify-between gap-2">
-          <span className="text-sm font-bold text-foreground">
+        <span className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 sm:gap-2">
+          <span className="truncate text-[13px] font-bold text-foreground sm:text-sm">
             {formatPosMoney(product.amount, product.currency, locale)}
           </span>
-          <span className="rounded-md bg-foreground px-2 py-1 text-[11px] font-semibold text-background">
-            {t("pos.cart.add")}
+          <span className="flex size-7 items-center justify-center rounded-md bg-foreground text-background sm:h-auto sm:w-auto sm:gap-1 sm:px-2 sm:py-1">
+            <Icon className="size-3.5" name="plus" />
+            <span className="sr-only sm:not-sr-only sm:text-[11px] sm:font-semibold">
+              {t("pos.cart.add")}
+            </span>
           </span>
         </span>
       </span>
@@ -1291,9 +1298,9 @@ function CartPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      <div className="flex flex-col gap-2 border-b px-4 py-3 pr-12 sm:flex-row sm:items-center sm:justify-between sm:pr-4">
+        <div className="min-w-0">
           <h2 className="font-semibold text-foreground">
             {t("pos.cart.cart")}
           </h2>
@@ -1302,9 +1309,9 @@ function CartPanel({
             {t(`pos.cart.cloud.${cloudSyncState}`)}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <button
-            className="text-xs font-semibold text-foreground"
+            className="min-h-8 text-xs font-semibold text-foreground"
             onClick={openParkedCarts}
             type="button"
           >
@@ -1313,7 +1320,7 @@ function CartPanel({
           {cart.lines.length > 0 ? (
             <>
               <button
-                className="text-xs font-semibold text-foreground"
+                className="min-h-8 text-xs font-semibold text-foreground"
                 onClick={() => {
                   setParkName(
                     cart.customer?.name ??
@@ -1329,7 +1336,7 @@ function CartPanel({
                 挂起
               </button>
               <button
-                className="text-xs font-semibold text-destructive"
+                className="min-h-8 text-xs font-semibold text-destructive"
                 onClick={() => {
                   if (window.confirm(`${t("pos.cart.clear")}?`)) void onClear();
                 }}
@@ -1342,7 +1349,7 @@ function CartPanel({
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <CustomerSelector
           locked={hasTicketLines}
           onSelect={(customer) => {
@@ -1437,7 +1444,7 @@ function CartPanel({
         ) : null}
       </div>
 
-      <div className="shrink-0 border-t bg-background p-4">
+      <div className="shrink-0 border-t bg-background p-3 sm:p-4">
         {cart.lines.length > 0 ? (
           <div className="mb-3 space-y-1.5 text-xs">
             {productAmount > 0 ? (
@@ -1519,8 +1526,8 @@ function CartPanel({
         }}
         open={parkedOpen}
       >
-        <DialogContent className="max-h-[88dvh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
+        <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain p-4 sm:max-w-lg sm:p-6">
+          <DialogHeader className="pr-7 text-left">
             <DialogTitle>
               {parkName ? "挂起当前购物车" : "门店挂单"}
             </DialogTitle>
@@ -1548,7 +1555,7 @@ function CartPanel({
                   value={parkNote}
                 />
               </label>
-              <DialogFooter>
+              <DialogFooter className="gap-2 [&>button]:w-full sm:[&>button]:w-auto">
                 <Button
                   onClick={() => {
                     setParkName("");
@@ -1580,7 +1587,7 @@ function CartPanel({
             <div className="space-y-2">
               {parkedCarts.map((saved) => (
                 <div className="rounded-md border p-3" key={saved.id}>
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">
                         {saved.name ?? "未命名挂单"}
@@ -1597,6 +1604,7 @@ function CartPanel({
                       ) : null}
                     </div>
                     <Button
+                      className="w-full sm:w-auto"
                       disabled={isPending || cart.lines.length > 0}
                       onClick={() => claimCart(saved.id)}
                       type="button"
@@ -1617,8 +1625,8 @@ function CartPanel({
       </Dialog>
 
       <Dialog onOpenChange={setCheckoutOpen} open={checkoutOpen}>
-        <DialogContent className="max-h-[92dvh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
+        <DialogContent className="left-0 top-0 h-dvh max-h-dvh max-w-none translate-x-0 translate-y-0 gap-4 overflow-y-auto overscroll-contain rounded-none border-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:left-1/2 sm:top-1/2 sm:h-auto sm:max-h-[calc(100dvh-2rem)] sm:max-w-2xl sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-lg sm:border sm:p-6">
+          <DialogHeader className="pr-7 text-left">
             <DialogTitle>{t("pos.cart.confirmCheckout")}</DialogTitle>
             <DialogDescription>
               {t("pos.cart.confirmCheckoutDescription")}
@@ -1674,7 +1682,7 @@ function CartPanel({
               </div>
               <div
                 aria-label="选择支付方式"
-                className="flex flex-wrap gap-2 rounded-xl bg-muted/55 p-1.5"
+                className="grid grid-cols-2 gap-2 rounded-xl bg-muted/55 p-1.5 sm:flex sm:flex-wrap"
                 role="tablist"
               >
                 {runtime.paymentMethodsEnabled.map((method) => {
@@ -1687,7 +1695,7 @@ function CartPanel({
                       aria-controls="checkout-payment-panel"
                       aria-selected={paymentMode === method}
                       className={cn(
-                        "min-h-11 min-w-28 flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                        "min-h-11 min-w-0 rounded-lg px-2 py-2 text-sm font-semibold transition-all sm:min-w-28 sm:flex-1 sm:px-3",
                         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                         paymentMode === method
                           ? "bg-background text-foreground shadow-sm ring-1 ring-border"
@@ -1708,7 +1716,7 @@ function CartPanel({
                   aria-controls="checkout-payment-panel"
                   aria-selected={paymentMode === "mixed"}
                   className={cn(
-                    "min-h-11 min-w-28 flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                    "min-h-11 min-w-0 rounded-lg px-2 py-2 text-sm font-semibold transition-all sm:min-w-28 sm:flex-1 sm:px-3",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                     paymentMode === "mixed"
                       ? "bg-background text-foreground shadow-sm ring-1 ring-border"
@@ -1726,7 +1734,7 @@ function CartPanel({
                   aria-controls="checkout-payment-panel"
                   aria-selected={paymentMode === "pay_later"}
                   className={cn(
-                    "min-h-11 min-w-28 flex-1 rounded-lg px-3 py-2 text-sm font-semibold transition-all",
+                    "min-h-11 min-w-0 rounded-lg px-2 py-2 text-sm font-semibold transition-all sm:min-w-28 sm:flex-1 sm:px-3",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                     paymentMode === "pay_later"
                       ? "bg-background text-foreground shadow-sm ring-1 ring-border"
@@ -2050,7 +2058,7 @@ function CartPanel({
               </p>
             ) : null}
           </div>
-          <DialogFooter>
+          <DialogFooter className="sticky bottom-0 -mx-4 -mb-4 border-t bg-background/95 px-4 py-3 backdrop-blur [&>button]:w-full sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:p-0 sm:[&>button]:w-auto">
             <Button
               disabled={isPending}
               onClick={() => setCheckoutOpen(false)}
@@ -2205,9 +2213,9 @@ function CartLine({
       : Number(line.lineAmount);
 
   return (
-    <div className="flex gap-3 px-4 py-3">
+    <div className="flex gap-2.5 px-3 py-3 sm:gap-3 sm:px-4">
       {line.kind === "product" && line.coverUrl ? (
-        <span className="relative size-12 shrink-0 overflow-hidden rounded-md bg-muted">
+        <span className="relative size-11 shrink-0 overflow-hidden rounded-md bg-muted sm:size-12">
           <Image
             alt={line.name}
             className="object-cover"
@@ -2218,7 +2226,7 @@ function CartLine({
           />
         </span>
       ) : (
-        <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-muted">
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-md bg-muted sm:size-12">
           <Icon
             className="size-5 text-muted-foreground"
             name={line.kind === "product" ? "package-check" : "clipboard-list"}
@@ -2239,7 +2247,7 @@ function CartLine({
           </div>
           <button
             aria-label={t("pos.cart.remove")}
-            className="shrink-0 text-muted-foreground hover:text-destructive"
+            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive"
             onClick={onRemove}
             type="button"
           >
@@ -2248,21 +2256,21 @@ function CartLine({
         </div>
         <div className="mt-2 flex items-center justify-between gap-2">
           {line.kind === "product" ? (
-            <div className="flex h-8 items-center rounded-md border">
+            <div className="flex h-9 items-center rounded-md border">
               <button
                 aria-label="Decrease quantity"
-                className="size-8 text-sm"
+                className="size-9 text-sm"
                 onClick={() => onQuantityChange(line.quantity - 1)}
                 type="button"
               >
                 −
               </button>
-              <span className="min-w-8 text-center text-xs font-semibold">
+              <span className="min-w-7 text-center text-xs font-semibold">
                 {line.quantity}
               </span>
               <button
                 aria-label="Increase quantity"
-                className="size-8 text-sm"
+                className="size-9 text-sm"
                 onClick={() => onQuantityChange(line.quantity + 1)}
                 type="button"
               >
