@@ -79,18 +79,21 @@ export function PosGlobalHeader({
       data-testid="pos-global-header"
     >
       <div className="flex h-full items-center gap-2 px-3 sm:px-4 lg:gap-4 lg:px-0">
-        <div className="flex shrink-0 items-center gap-2 lg:w-[240px] lg:px-3">
+        <div className="flex shrink-0 items-center gap-2 lg:w-[300px] lg:px-3 xl:w-[360px]">
           <Link
             aria-label={`${merchantName} POS`}
-            className="flex min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            className="flex w-full min-w-0 items-center gap-2.5 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             href={posRoutes.workspace}
           >
             <CleanHubBrandMark className="size-10 rounded-lg" priority />
-            <span className="hidden min-w-0 items-center gap-2 sm:flex">
-              <span className="truncate text-sm font-semibold tracking-tight">
+            <span className="hidden min-w-0 flex-1 items-center gap-2 sm:flex">
+              <span
+                className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight"
+                title={merchantName}
+              >
                 {merchantName}
               </span>
-              <span className="rounded-full border border-white/15 bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/65">
+              <span className="shrink-0 rounded-full border border-white/15 bg-white/10 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-white/65">
                 POS
               </span>
             </span>
