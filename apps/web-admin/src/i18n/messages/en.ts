@@ -242,6 +242,7 @@ export const enMessages: WebAdminMessages = {
           { label: "Home", href: webAdminRoutes.tenant.home },
           { label: "Orders", href: webAdminRoutes.tenant.orders },
           { label: "Customers", href: webAdminRoutes.tenant.customers },
+          { label: "Staff", href: webAdminRoutes.tenant.users },
           { label: "Products", href: webAdminRoutes.tenant.products },
           { label: "Discounts", href: webAdminRoutes.tenant.discounts },
           {

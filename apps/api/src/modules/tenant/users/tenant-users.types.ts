@@ -90,6 +90,13 @@ export type UpdateTenantUserStatusInput = TenantUserRequestInput & {
   };
 };
 
+export type DeleteTenantUserInput = TenantUserRequestInput & {
+  userId: string;
+  data: {
+    reason: string;
+  };
+};
+
 export type ResetTenantUserPinInput = TenantUserRequestInput & {
   userId: string;
   data: {

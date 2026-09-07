@@ -11,6 +11,9 @@ import {
   Icon,
   Input,
   Label,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
@@ -25,12 +28,14 @@ import {
 } from "@cleanhub/ui";
 import { DataTable } from "@cleanhub/ui/data-table";
 import {
+  Ellipsis,
   KeyRound,
   Pencil,
   Plus,
   RefreshCw,
   Search,
   ShieldCheck,
+  Trash2,
   UserRoundCog,
   Users,
 } from "lucide-react";
@@ -41,6 +46,7 @@ import { useTenantI18n } from "@/i18n";
 
 import {
   createTenantUserAction,
+  deleteTenantUserAction,
   resetTenantUserPasswordAction,
   resetTenantUserPinAction,
   updateTenantUserAction,
@@ -87,6 +93,7 @@ const COPY = {
     credentials: "Credentials",
     enable: "Enable",
     disable: "Disable",
+    delete: "Delete employee",
     createTitle: "Add employee",
     createDescription:
       "Managers use email and password in the admin, while every employee uses a unique six-digit PIN at POS.",
@@ -106,7 +113,11 @@ const COPY = {
     save: "Save changes",
     statusTitle: "Change employee status",
     statusDescription:
-      "Disabling an employee revokes their active refresh sessions.",
+      "Disabling keeps the employee record but immediately blocks sign-in and authenticated requests.",
+    deleteTitle: "Delete employee",
+    deleteDescription:
+      "The employee will be removed from staff management and lose access immediately. Historical orders, shifts and audit records will be retained.",
+    deleteConfirm: "Delete employee",
     reason: "Reason",
     reasonPlaceholder: "Explain why this change is required",
     confirm: "Confirm",
@@ -120,9 +131,11 @@ const COPY = {
     newPin: "New six-digit PIN",
     reset: "Reset credential",
     protectedOwner: "Owner accounts are protected here.",
+    protectedCurrent: "Use Personal Center to manage your current account.",
     created: "Employee created.",
     updated: "Employee updated.",
     statusUpdated: "Employee status updated.",
+    deleted: "Employee deleted.",
     credentialUpdated: "Credential reset completed.",
     required: "Complete all required fields.",
   },
@@ -153,6 +166,7 @@ const COPY = {
     credentials: "Identifiants",
     enable: "Activer",
     disable: "Désactiver",
+    delete: "Supprimer l’employé",
     createTitle: "Ajouter un employé",
     createDescription:
       "Les responsables utilisent leur e-mail et leur mot de passe dans l’administration. Chaque employé utilise un code PIN unique à six chiffres au point de vente.",
@@ -172,7 +186,11 @@ const COPY = {
     save: "Enregistrer les modifications",
     statusTitle: "Modifier le statut de l’employé",
     statusDescription:
-      "La désactivation d’un employé révoque ses sessions d’actualisation actives.",
+      "La désactivation conserve l’employé, mais bloque immédiatement sa connexion et ses requêtes authentifiées.",
+    deleteTitle: "Supprimer l’employé",
+    deleteDescription:
+      "L’employé sera retiré de la gestion du personnel et perdra immédiatement tout accès. Les commandes, services et journaux d’audit historiques seront conservés.",
+    deleteConfirm: "Supprimer l’employé",
     reason: "Motif",
     reasonPlaceholder: "Expliquez pourquoi cette modification est nécessaire",
     confirm: "Confirmer",
@@ -186,9 +204,12 @@ const COPY = {
     newPin: "Nouveau code PIN à six chiffres",
     reset: "Réinitialiser l’identifiant",
     protectedOwner: "Les comptes propriétaires sont protégés ici.",
+    protectedCurrent:
+      "Utilisez l’espace personnel pour gérer votre compte actuel.",
     created: "Employé créé.",
     updated: "Employé mis à jour.",
     statusUpdated: "Statut de l’employé mis à jour.",
+    deleted: "Employé supprimé.",
     credentialUpdated: "Identifiant réinitialisé.",
     required: "Renseignez tous les champs obligatoires.",
   },
@@ -219,6 +240,7 @@ const COPY = {
     credentials: "重置凭证",
     enable: "启用",
     disable: "停用",
+    delete: "删除员工",
     createTitle: "添加员工",
     createDescription:
       "门店管理员使用邮箱和密码登录管理端；所有员工在 POS 使用门店内唯一的六位数字 PIN。",
@@ -236,7 +258,12 @@ const COPY = {
     editDescription: "修改员工资料、角色以及唯一归属门店。",
     save: "保存修改",
     statusTitle: "修改员工状态",
-    statusDescription: "停用员工后，将撤销该员工现有的刷新会话。",
+    statusDescription:
+      "停用会保留员工记录，但会立即禁止该员工登录和继续发起已认证操作。",
+    deleteTitle: "删除员工",
+    deleteDescription:
+      "删除后，该员工会从员工管理中移除并立即失去访问权限；历史订单、班次与审计记录仍会保留。",
+    deleteConfirm: "确认删除",
     reason: "操作原因",
     reasonPlaceholder: "请说明执行该操作的原因",
     confirm: "确认",
@@ -249,9 +276,11 @@ const COPY = {
     newPin: "新的六位 PIN",
     reset: "确认重置",
     protectedOwner: "租户所有者账号不能在员工管理中修改。",
+    protectedCurrent: "当前登录账号请前往个人中心管理。",
     created: "员工已创建。",
     updated: "员工资料已更新。",
     statusUpdated: "员工状态已更新。",
+    deleted: "员工已删除。",
     credentialUpdated: "登录凭证已重置。",
     required: "请填写所有必填字段。",
   },
@@ -320,7 +349,10 @@ export function TenantUserListView({
   const [editUser, setEditUser] = useState<TenantUserSummary | null>(null);
   const [editForm, setEditForm] = useState<UpdateTenantUserRequest>({});
   const [statusUser, setStatusUser] = useState<TenantUserSummary | null>(null);
+  const [deleteUser, setDeleteUser] = useState<TenantUserSummary | null>(null);
+  const [actionMenuUserId, setActionMenuUserId] = useState<string | null>(null);
   const [statusReason, setStatusReason] = useState("");
+  const [deleteReason, setDeleteReason] = useState("");
   const [credentialUser, setCredentialUser] =
     useState<TenantUserSummary | null>(null);
   const [credentialType, setCredentialType] = useState<"pin" | "password">(
@@ -492,6 +524,30 @@ export function TenantUserListView({
     toast.success(copy.statusUpdated);
     setStatusUser(null);
     setStatusReason("");
+    await loadUsers();
+  }
+
+  async function submitDelete() {
+    if (!deleteUser || !deleteReason.trim()) {
+      toast.error(copy.required);
+      return;
+    }
+    setSaving(true);
+    const result = await deleteTenantUserAction(deleteUser.id, {
+      reason: deleteReason.trim(),
+    });
+    setSaving(false);
+    if (!result.ok) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(copy.deleted);
+    setDeleteUser(null);
+    setDeleteReason("");
+    if (users.length === 1 && offset > 0) {
+      setOffset(Math.max(0, offset - PAGE_SIZE));
+      return;
+    }
     await loadUsers();
   }
 
@@ -701,61 +757,91 @@ export function TenantUserListView({
                         : copy.never}
                     </TableCell>
                     <TableCell className="py-2">
-                      <div className="flex justify-end gap-1">
-                        {protectedUser ? (
-                          <span
-                            className="px-2 text-[11px] text-muted-foreground"
-                            title={copy.protectedOwner}
-                          >
-                            {user.role === "owner" ? copy.protectedOwner : "—"}
-                          </span>
-                        ) : (
-                          <>
+                      <div className="flex justify-end">
+                        <Popover
+                          onOpenChange={(open) =>
+                            setActionMenuUserId(open ? user.id : null)
+                          }
+                          open={actionMenuUserId === user.id}
+                        >
+                          <PopoverTrigger asChild>
                             <Button
-                              aria-label={copy.edit}
-                              onClick={() => openEdit(user)}
-                              size="icon-sm"
-                              title={copy.edit}
-                              variant="ghost"
-                            >
-                              <Icon icon={Pencil} size={14} />
-                            </Button>
-                            <Button
-                              aria-label={copy.credentials}
-                              onClick={() => {
-                                setCredentialUser(user);
-                                setCredentialType("pin");
-                                setCredentialValue("");
-                                setCredentialReason("");
-                              }}
-                              size="icon-sm"
-                              title={copy.credentials}
-                              variant="ghost"
-                            >
-                              <Icon icon={KeyRound} size={14} />
-                            </Button>
-                            <Button
-                              aria-label={
-                                user.status === "disabled"
-                                  ? copy.enable
-                                  : copy.disable
-                              }
-                              onClick={() => {
-                                setStatusUser(user);
-                                setStatusReason("");
-                              }}
+                              aria-label={`${copy.actions}: ${user.displayName}`}
+                              disabled={protectedUser}
                               size="icon-sm"
                               title={
-                                user.status === "disabled"
-                                  ? copy.enable
-                                  : copy.disable
+                                user.role === "owner"
+                                  ? copy.protectedOwner
+                                  : protectedUser
+                                    ? copy.protectedCurrent
+                                    : copy.actions
                               }
+                              type="button"
                               variant="ghost"
                             >
-                              <Icon icon={ShieldCheck} size={14} />
+                              <Icon aria-hidden icon={Ellipsis} size={15} />
                             </Button>
-                          </>
-                        )}
+                          </PopoverTrigger>
+                          <PopoverContent align="end" className="w-44 p-1.5">
+                            <div className="grid gap-1">
+                              <button
+                                className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs transition-colors hover:bg-accent"
+                                onClick={() => {
+                                  setActionMenuUserId(null);
+                                  openEdit(user);
+                                }}
+                                type="button"
+                              >
+                                <Icon aria-hidden icon={Pencil} size={14} />
+                                {copy.edit}
+                              </button>
+                              <button
+                                className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs transition-colors hover:bg-accent"
+                                onClick={() => {
+                                  setActionMenuUserId(null);
+                                  setCredentialUser(user);
+                                  setCredentialType("pin");
+                                  setCredentialValue("");
+                                  setCredentialReason("");
+                                }}
+                                type="button"
+                              >
+                                <Icon aria-hidden icon={KeyRound} size={14} />
+                                {copy.credentials}
+                              </button>
+                              <button
+                                className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs transition-colors hover:bg-accent"
+                                onClick={() => {
+                                  setActionMenuUserId(null);
+                                  setStatusUser(user);
+                                  setStatusReason("");
+                                }}
+                                type="button"
+                              >
+                                <Icon
+                                  aria-hidden
+                                  icon={ShieldCheck}
+                                  size={14}
+                                />
+                                {user.status === "disabled"
+                                  ? copy.enable
+                                  : copy.disable}
+                              </button>
+                              <button
+                                className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-xs text-destructive transition-colors hover:bg-destructive/10"
+                                onClick={() => {
+                                  setActionMenuUserId(null);
+                                  setDeleteUser(user);
+                                  setDeleteReason("");
+                                }}
+                                type="button"
+                              >
+                                <Icon aria-hidden icon={Trash2} size={14} />
+                                {copy.delete}
+                              </button>
+                            </div>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -1147,6 +1233,47 @@ export function TenantUserListView({
               </Button>
               <Button disabled={saving} onClick={() => void submitCredential()}>
                 {saving ? copy.saving : copy.reset}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteUser(null);
+            setDeleteReason("");
+          }
+        }}
+        open={deleteUser !== null}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{copy.deleteTitle}</DialogTitle>
+            <DialogDescription>
+              {deleteUser?.displayName}: {copy.deleteDescription}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4">
+            <div className="grid gap-1.5">
+              <Label>{copy.reason} *</Label>
+              <Input
+                onChange={(event) => setDeleteReason(event.target.value)}
+                placeholder={copy.reasonPlaceholder}
+                value={deleteReason}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => setDeleteUser(null)} variant="outline">
+                {copy.cancel}
+              </Button>
+              <Button
+                disabled={saving}
+                onClick={() => void submitDelete()}
+                variant="destructive"
+              >
+                {saving ? copy.saving : copy.deleteConfirm}
               </Button>
             </div>
           </div>

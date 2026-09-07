@@ -1,6 +1,7 @@
 import type { ApiClient, ApiRequestOptions } from "../../types";
 import type {
   CreateTenantUserRequest,
+  DeleteTenantUserRequest,
   ResetTenantUserPasswordRequest,
   ResetTenantUserPinRequest,
   TenantUserDetail,
@@ -43,6 +44,16 @@ export function createTenantUsersApi(client: ApiClient) {
         input,
         options,
       ),
+    delete: (
+      userId: string,
+      input: DeleteTenantUserRequest,
+      options?: RequestOptions,
+    ) =>
+      client.delete<void>(`/tenant/users/${encodeURIComponent(userId)}`, {
+        ...options,
+        body: input,
+        parseAs: "void",
+      }),
     resetPin: (
       userId: string,
       input: ResetTenantUserPinRequest,

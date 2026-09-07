@@ -97,6 +97,7 @@ export async function securityForceClosePosTerminalShifts(
   input: {
     tenantId: string;
     terminalIds: string[];
+    staffId?: string;
     actorUserId: string;
     reason: string;
     metadata?: Record<string, unknown>;
@@ -121,6 +122,7 @@ export async function securityForceClosePosTerminalShifts(
       and(
         eq(posStaffShifts.tenantId, input.tenantId),
         inArray(posStaffShifts.terminalId, input.terminalIds),
+        input.staffId ? eq(posStaffShifts.staffId, input.staffId) : undefined,
         ne(posStaffShifts.status, "closed"),
       ),
     )
@@ -147,6 +149,7 @@ export async function securityForceClosePosTerminalShifts(
           posStaffShifts.id,
           lockedShifts.map((shift) => shift.id),
         ),
+        input.staffId ? eq(posStaffShifts.staffId, input.staffId) : undefined,
         ne(posStaffShifts.status, "closed"),
       ),
     )

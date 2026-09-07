@@ -89,6 +89,10 @@ export const updateTenantUserStatusBodySchema = z.object({
   reason: z.string().trim().min(1).max(500),
 });
 
+export const deleteTenantUserBodySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+});
+
 export const resetTenantUserPinBodySchema = z.object({
   pin: z.string().regex(PIN_DIGIT_PATTERN, "PIN must be exactly 6 digits."),
   reason: z.string().trim().min(1).max(500),

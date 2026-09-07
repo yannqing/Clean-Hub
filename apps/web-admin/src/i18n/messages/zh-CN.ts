@@ -222,6 +222,7 @@ export const zhCNMessages: WebAdminMessages = {
           { label: "主页", href: webAdminRoutes.tenant.home },
           { label: "订单", href: webAdminRoutes.tenant.orders },
           { label: "顾客", href: webAdminRoutes.tenant.customers },
+          { label: "员工", href: webAdminRoutes.tenant.users },
           { label: "产品", href: webAdminRoutes.tenant.products },
           { label: "折扣", href: webAdminRoutes.tenant.discounts },
           {

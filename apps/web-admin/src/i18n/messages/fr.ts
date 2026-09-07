@@ -133,6 +133,7 @@ export const frMessages: WebAdminMessages = {
           { label: "Accueil", href: webAdminRoutes.tenant.home },
           { label: "Commandes", href: webAdminRoutes.tenant.orders },
           { label: "Clients", href: webAdminRoutes.tenant.customers },
+          { label: "Personnel", href: webAdminRoutes.tenant.users },
           { label: "Produits", href: webAdminRoutes.tenant.products },
           { label: "Remises", href: webAdminRoutes.tenant.discounts },
           {

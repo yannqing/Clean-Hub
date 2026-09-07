@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import type { AppBindings } from "../../../http/types.js";
 import {
   createTenantUserController,
+  deleteTenantUserController,
   getTenantUserController,
   listTenantUsersController,
   resetTenantUserPasswordController,
@@ -21,6 +22,7 @@ export function createTenantUsersRoutes() {
   routes.patch("/:userId/password", resetTenantUserPasswordController);
   routes.get("/:userId", getTenantUserController);
   routes.patch("/:userId", updateTenantUserController);
+  routes.delete("/:userId", deleteTenantUserController);
 
   return routes;
 }

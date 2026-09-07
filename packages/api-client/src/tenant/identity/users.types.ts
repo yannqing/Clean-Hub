@@ -58,6 +58,10 @@ export type UpdateTenantUserStatusRequest = {
   reason: string;
 };
 
+export type DeleteTenantUserRequest = {
+  reason: string;
+};
+
 export type ResetTenantUserPinRequest = {
   pin: string;
   reason: string;

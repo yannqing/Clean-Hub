@@ -4,9 +4,12 @@ import "../../../config/env.js";
 
 import {
   auditLogs,
+  authRefreshTokens,
   branches,
   closeDbConnection,
   getDb,
+  posStaffShifts,
+  posTerminalSettings,
   roles,
   tenants,
   userBranches,
@@ -16,12 +19,20 @@ import {
 import { createId } from "@cleanhub/id";
 import { and, desc, eq, isNull } from "drizzle-orm";
 
+import { AuthError } from "../../auth/auth.errors.js";
+import { AuthRepository } from "../../auth/auth.repository.js";
+import { AuthService } from "../../auth/auth.service.js";
+import { TokenService } from "../../auth/token.service.js";
 import type { AuthContext } from "../../auth/auth.types.js";
 import { verifyPassword } from "../../auth/password.service.js";
 import { TenantUserError } from "./tenant-users.errors.js";
-import { findTenantPinCandidates } from "./tenant-users.repository.js";
+import {
+  findTenantPinCandidates,
+  findTenantUserById,
+} from "./tenant-users.repository.js";
 import {
   createTenantUser,
+  deleteTenantUser,
   resetTenantUserPassword,
   resetTenantUserPin,
   updateTenantUserStatus,
@@ -206,6 +217,21 @@ export async function runTenantUsersRepositorySmoke(): Promise<void> {
 
       await assert.rejects(
         () =>
+          deleteTenantUser(
+            {
+              authContext: ownerAuth,
+              userId: owner.userId,
+              data: { reason: "smoke owner deletion protection" },
+            },
+            tx,
+          ),
+        (error: unknown) =>
+          error instanceof TenantUserError &&
+          error.code === "TENANT_USER_OWNER_PROTECTED",
+      );
+
+      await assert.rejects(
+        () =>
           updateTenantUserStatus(
             {
               authContext: ownerAuth,
@@ -262,6 +288,54 @@ export async function runTenantUsersRepositorySmoke(): Promise<void> {
         true,
       );
 
+      const refreshTokenId = createId();
+      const terminalId = createId();
+      const shiftId = createId();
+      await tx.insert(posTerminalSettings).values({
+        id: terminalId,
+        tenantId: owner.tenantId,
+        branchId,
+        deviceId: `tenant-user-smoke-${createId()}`,
+        status: "active",
+        credentialDigest: `tenant-user-smoke-${createId()}`,
+        credentialVersion: 1,
+        credentialIssuedAt: new Date(),
+        createdBy: owner.userId,
+        updatedBy: owner.userId,
+      });
+      await tx.insert(posStaffShifts).values({
+        id: shiftId,
+        tenantId: owner.tenantId,
+        branchId,
+        terminalId,
+        staffId: cashier.id,
+        currency: "XOF",
+        status: "open",
+        openingFloat: "0",
+        createdBy: cashier.id,
+        updatedBy: cashier.id,
+      });
+      const accessTokenSecret =
+        "tenant-users-smoke-access-token-secret-2026";
+      const existingToken = await new TokenService({
+        secret: accessTokenSecret,
+      }).issueTokenPair({
+        userId: cashier.id,
+        tenantId: owner.tenantId,
+        role: "cashier",
+        roles: ["cashier"],
+        permissions: [],
+        branchIds: [branchId],
+      });
+      await tx.insert(authRefreshTokens).values({
+        id: refreshTokenId,
+        userId: cashier.id,
+        tenantId: owner.tenantId,
+        tokenHash: `tenant-user-smoke-${createId()}`,
+        familyId: createId(),
+        expiresAt: new Date(Date.now() + 60_000),
+      });
+
       const disabled = await updateTenantUserStatus(
         {
           authContext: managerAuth,
@@ -271,6 +345,105 @@ export async function runTenantUsersRepositorySmoke(): Promise<void> {
         tx,
       );
       assert.equal(disabled.status, "disabled");
+
+      const disabledRefreshTokenRows = await tx
+        .select({ revokedAt: authRefreshTokens.revokedAt })
+        .from(authRefreshTokens)
+        .where(eq(authRefreshTokens.id, refreshTokenId))
+        .limit(1);
+      assert.ok(
+        disabledRefreshTokenRows[0]?.revokedAt,
+        "disabling an employee must revoke active refresh tokens",
+      );
+      const closedShiftRows = await tx
+        .select({
+          closingFloat: posStaffShifts.closingFloat,
+          endedAt: posStaffShifts.endedAt,
+          status: posStaffShifts.status,
+          updatedBy: posStaffShifts.updatedBy,
+        })
+        .from(posStaffShifts)
+        .where(eq(posStaffShifts.id, shiftId))
+        .limit(1);
+      assert.equal(closedShiftRows[0]?.status, "closed");
+      assert.ok(closedShiftRows[0]?.endedAt);
+      assert.equal(closedShiftRows[0]?.closingFloat, null);
+      assert.equal(closedShiftRows[0]?.updatedBy, manager.id);
+      await assert.rejects(
+        () =>
+          new AuthService({
+            db: tx,
+            accessTokenSecret,
+            cookieSecure: false,
+          }).getAuthContext(existingToken.accessToken),
+        (error: unknown) =>
+          error instanceof AuthError && error.code === "USER_DISABLED",
+        "an access token issued before disablement must stop authorizing requests",
+      );
+
+      const disabledPinCandidates = await new AuthRepository(
+        tx,
+      ).findPosPinLoginCandidates({
+        tenantId: owner.tenantId,
+        branchId,
+      });
+      assert.equal(
+        disabledPinCandidates.some((candidate) => candidate.id === cashier.id),
+        false,
+        "disabled employees must not be POS PIN login candidates",
+      );
+
+      await deleteTenantUser(
+        {
+          authContext: managerAuth,
+          userId: cashier.id,
+          data: { reason: "smoke employee deletion" },
+        },
+        tx,
+      );
+
+      const deletedUserRows = await tx
+        .select({
+          deletedAt: users.deletedAt,
+          email: users.email,
+          phone: users.phone,
+          status: users.status,
+        })
+        .from(users)
+        .where(eq(users.id, cashier.id))
+        .limit(1);
+      assert.equal(deletedUserRows[0]?.status, "disabled");
+      assert.ok(deletedUserRows[0]?.deletedAt);
+      assert.equal(deletedUserRows[0]?.email, null);
+      assert.equal(deletedUserRows[0]?.phone, null);
+      assert.equal(
+        await findTenantUserById(tx, owner.tenantId, cashier.id),
+        null,
+        "deleted employees must disappear from tenant staff queries",
+      );
+
+      const activeDeletedRoleRows = await tx
+        .select({ id: userRoles.id })
+        .from(userRoles)
+        .where(
+          and(
+            eq(userRoles.tenantId, owner.tenantId),
+            eq(userRoles.userId, cashier.id),
+            isNull(userRoles.revokedAt),
+          ),
+        );
+      assert.equal(activeDeletedRoleRows.length, 0);
+
+      const deletedBranchRows = await tx
+        .select({ branchId: userBranches.branchId })
+        .from(userBranches)
+        .where(
+          and(
+            eq(userBranches.tenantId, owner.tenantId),
+            eq(userBranches.userId, cashier.id),
+          ),
+        );
+      assert.equal(deletedBranchRows.length, 0);
 
       const logs = await tx
         .select({ eventType: auditLogs.eventType, payload: auditLogs.metadata })
@@ -284,6 +457,7 @@ export async function runTenantUsersRepositorySmoke(): Promise<void> {
         .orderBy(desc(auditLogs.createdAt));
       assert.ok(logs.some((log) => log.eventType === "tenant_user.pin_reset"));
       assert.ok(logs.some((log) => log.eventType === "tenant_user.status_updated"));
+      assert.ok(logs.some((log) => log.eventType === "tenant_user.deleted"));
       assert.equal(JSON.stringify(logs).includes(replacementPin), false);
 
       throw ROLLBACK;

@@ -749,6 +749,56 @@ export async function updateTenantUserStatusRecord(
   return findTenantUserById(db, input.tenantId, input.userId);
 }
 
+export async function softDeleteTenantUserRecord(
+  db: Database,
+  input: { tenantId: string; userId: string },
+): Promise<boolean> {
+  const now = new Date();
+  const deleted = await db
+    .update(users)
+    .set({
+      email: null,
+      normalizedEmail: null,
+      phone: null,
+      status: "disabled",
+      deletedAt: now,
+      updatedAt: now,
+      version: sql`${users.version} + 1`,
+    })
+    .where(
+      and(
+        eq(users.id, input.userId),
+        eq(users.tenantId, input.tenantId),
+        eq(users.userType, "tenant"),
+        isNull(users.deletedAt),
+      ),
+    )
+    .returning({ id: users.id });
+
+  if (!deleted[0]) return false;
+
+  await db
+    .update(userRoles)
+    .set({ revokedAt: now })
+    .where(
+      and(
+        eq(userRoles.userId, input.userId),
+        eq(userRoles.tenantId, input.tenantId),
+        isNull(userRoles.revokedAt),
+      ),
+    );
+  await db
+    .delete(userBranches)
+    .where(
+      and(
+        eq(userBranches.userId, input.userId),
+        eq(userBranches.tenantId, input.tenantId),
+      ),
+    );
+
+  return true;
+}
+
 export async function updateTenantUserPinRecord(
   db: Database,
   input: { tenantId: string; userId: string; pinHash: string },
@@ -884,6 +934,33 @@ export async function writeTenantUserStatusChangedAuditLog(
     userAgent: input.userAgent,
     before: { status: input.beforeStatus },
     after: { status: input.afterStatus },
+  });
+}
+
+export async function writeTenantUserDeletedAuditLog(
+  db: Database,
+  input: AuditMeta & {
+    actorUserId: string;
+    tenantId: string;
+    userId: string;
+    before: TenantUserAuditSnapshot;
+    reason: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: input.tenantId,
+    branchId: input.before.branchIds[0],
+    actorUserId: input.actorUserId,
+    eventCategory: "tenant_user",
+    eventType: "tenant_user.deleted",
+    entityType: "user",
+    entityId: input.userId,
+    success: true,
+    reason: input.reason,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    before: input.before,
+    after: { deleted: true, status: "disabled" },
   });
 }
 

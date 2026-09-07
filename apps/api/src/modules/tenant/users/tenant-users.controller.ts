@@ -4,6 +4,7 @@ import type { AppBindings } from "../../../http/types.js";
 import { TenantUserError } from "./tenant-users.errors.js";
 import {
   createTenantUser,
+  deleteTenantUser,
   getTenantUser,
   listTenantUsers,
   resetTenantUserPassword,
@@ -13,6 +14,7 @@ import {
 } from "./tenant-users.service.js";
 import {
   createTenantUserBodySchema,
+  deleteTenantUserBodySchema,
   getTenantUserParamsSchema,
   listTenantUsersQuerySchema,
   resetTenantUserPasswordBodySchema,
@@ -109,6 +111,23 @@ export async function updateTenantUserController(c: Context<AppBindings>) {
     }),
   );
   return result instanceof Response ? result : c.json(result);
+}
+
+export async function deleteTenantUserController(c: Context<AppBindings>) {
+  const { userId } = getTenantUserParamsSchema.parse(c.req.param());
+  const data = deleteTenantUserBodySchema.parse(
+    await c.req.json().catch(() => ({})),
+  );
+  const result = await handleTenantUserError(c, async () => {
+    await deleteTenantUser({
+      authContext: c.get("authContext"),
+      requestMeta: getRequestMeta(c),
+      userId,
+      data,
+    });
+    return null;
+  });
+  return result instanceof Response ? result : c.body(null, 204);
 }
 
 export async function updateTenantUserStatusController(

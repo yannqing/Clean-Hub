@@ -552,6 +552,7 @@ export class AuthRepository {
         and(
           eq(users.tenantId, tenantId),
           eq(users.userType, "tenant"),
+          eq(users.status, "active"),
           isNull(users.deletedAt),
           eq(userRoles.tenantId, tenantId),
           isNull(userRoles.revokedAt),

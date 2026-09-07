@@ -16,6 +16,10 @@ import {
   assertActiveTenant,
   requireTenantRole,
 } from "../../auth/permission.helper.js";
+import {
+  lockPosTerminalsForBranchStatusChange,
+  securityForceClosePosTerminalShifts,
+} from "../../pos/terminal-lifecycle/terminal-lifecycle.repository.js";
 import { resolveEffectiveSecurityPolicy } from "../../saas/security/security-policy.js";
 import { TenantUserError } from "./tenant-users.errors.js";
 import {
@@ -29,17 +33,20 @@ import {
   insertTenantUserRecord,
   lockTenantBranchPinAssignments,
   revokeTenantUserRefreshTokens,
+  softDeleteTenantUserRecord,
   updateTenantUserPasswordRecord,
   updateTenantUserPinRecord,
   updateTenantUserRecord,
   updateTenantUserStatusRecord,
   writeTenantUserCreatedAuditLog,
   writeTenantUserCredentialResetAuditLog,
+  writeTenantUserDeletedAuditLog,
   writeTenantUserStatusChangedAuditLog,
   writeTenantUserUpdatedAuditLog,
 } from "./tenant-users.repository.js";
 import type {
   CreateTenantUserInput,
+  DeleteTenantUserInput,
   GetTenantUserInput,
   ListTenantUsersInput,
   ManagedTenantUserRoleCode,
@@ -177,6 +184,43 @@ async function requireManagedTarget(
     mutation: input.mutation,
   });
   return target;
+}
+
+async function revokeTenantUserPosActivity(
+  db: Database,
+  input: {
+    actorUserId: string;
+    branchIds: string[];
+    reason: string;
+    requestMeta?: { ipAddress?: string; userAgent?: string };
+    tenantId: string;
+    userId: string;
+  },
+): Promise<void> {
+  const terminals: Awaited<
+    ReturnType<typeof lockPosTerminalsForBranchStatusChange>
+  > = [];
+  for (const branchId of [...new Set(input.branchIds)].sort()) {
+    terminals.push(
+      ...(await lockPosTerminalsForBranchStatusChange(db, {
+        tenantId: input.tenantId,
+        branchId,
+      })),
+    );
+  }
+  await securityForceClosePosTerminalShifts(db, {
+    tenantId: input.tenantId,
+    terminalIds: terminals.map((terminal) => terminal.id),
+    staffId: input.userId,
+    actorUserId: input.actorUserId,
+    reason: input.reason,
+    metadata: { trigger: "tenant_user_access_revoked" },
+    requestMeta: input.requestMeta,
+  });
+  await revokeTenantUserRefreshTokens(db, {
+    tenantId: input.tenantId,
+    userId: input.userId,
+  });
 }
 
 async function assertEmailAvailable(
@@ -454,6 +498,16 @@ export async function updateTenantUserStatus(
       userId: input.userId,
       mutation: true,
     });
+    if (input.data.status === "disabled") {
+      await revokeTenantUserPosActivity(tx, {
+        actorUserId: input.authContext.userId,
+        branchIds: existing.branchIds,
+        reason: input.data.reason,
+        requestMeta: input.requestMeta,
+        tenantId: access.tenantId,
+        userId: input.userId,
+      });
+    }
     if (existing.status === input.data.status) return existing;
     const updated = await updateTenantUserStatusRecord(tx, {
       tenantId: access.tenantId,
@@ -467,12 +521,6 @@ export async function updateTenantUserStatus(
         404,
       );
     }
-    if (input.data.status === "disabled") {
-      await revokeTenantUserRefreshTokens(tx, {
-        tenantId: access.tenantId,
-        userId: input.userId,
-      });
-    }
     await writeTenantUserStatusChangedAuditLog(tx, {
       actorUserId: input.authContext.userId,
       tenantId: access.tenantId,
@@ -485,6 +533,62 @@ export async function updateTenantUserStatus(
       userAgent: input.requestMeta?.userAgent,
     });
     return updated;
+  });
+}
+
+export async function deleteTenantUser(
+  input: DeleteTenantUserInput,
+  db: Database = getDb(),
+): Promise<void> {
+  const access = await requireTenantUserManagementAccess(input.authContext, db);
+  await db.transaction(async (tx) => {
+    const existing = await requireManagedTarget(tx, {
+      authContext: input.authContext,
+      ...access,
+      userId: input.userId,
+      mutation: true,
+    });
+    await revokeTenantUserPosActivity(tx, {
+      actorUserId: input.authContext.userId,
+      branchIds: existing.branchIds,
+      reason: input.data.reason,
+      requestMeta: input.requestMeta,
+      tenantId: access.tenantId,
+      userId: input.userId,
+    });
+    const before = await findTenantUserAuditSnapshot(
+      tx,
+      access.tenantId,
+      input.userId,
+    );
+    if (!before) {
+      throw new TenantUserError(
+        "TENANT_USER_NOT_FOUND",
+        "Tenant user was not found.",
+        404,
+      );
+    }
+
+    const deleted = await softDeleteTenantUserRecord(tx, {
+      tenantId: access.tenantId,
+      userId: input.userId,
+    });
+    if (!deleted) {
+      throw new TenantUserError(
+        "TENANT_USER_NOT_FOUND",
+        "Tenant user was not found.",
+        404,
+      );
+    }
+    await writeTenantUserDeletedAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      tenantId: access.tenantId,
+      userId: input.userId,
+      before,
+      reason: input.data.reason,
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
   });
 }
 

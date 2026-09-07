@@ -1,6 +1,7 @@
 export type { AuthContext, BranchSummary } from "@cleanhub/api-client";
 export type {
   CreateTenantUserRequest,
+  DeleteTenantUserRequest,
   ManagedTenantUserRoleCode,
   ResetTenantUserPasswordRequest,
   ResetTenantUserPinRequest,
