@@ -4,14 +4,25 @@ import type { PosGlobalSearchItem } from "@cleanhub/api-client";
 import { isPosOrderLookupQuery } from "@cleanhub/domain/order-codes";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 import { Icon, PosPageHeader } from "@/components/app-shell";
 import { posRoutes } from "@/config";
-import { getDesktopBridge } from "@/features/hardware/lib/desktop-bridge";
+import { getPosHardwareBridge } from "@/features/hardware/lib/desktop-bridge";
 import { posApi } from "@/lib/api-client";
 
 type ScanStatus = "idle" | "searching" | "not-found" | "error";
+
+const subscribeToHardwareRuntime = () => () => undefined;
+const getHardwareRuntimeSnapshot = () =>
+  Boolean(getPosHardwareBridge()?.triggerScanner);
+const getServerHardwareRuntimeSnapshot = () => false;
 
 const copy = {
   "zh-CN": {
@@ -20,6 +31,7 @@ const copy = {
     field: "标签或订单编号",
     placeholder: "TK-... / OD-...",
     search: "查询",
+    trigger: "启动扫码器",
     waiting: "等待扫描",
     searching: "正在查询",
     notFound: "没有找到匹配记录",
@@ -32,6 +44,7 @@ const copy = {
     field: "Label or order code",
     placeholder: "TK-... / OD-...",
     search: "Search",
+    trigger: "Start scanner",
     waiting: "Ready",
     searching: "Searching",
     notFound: "No matching record",
@@ -44,6 +57,7 @@ const copy = {
     field: "Etiquette ou commande",
     placeholder: "TK-... / OD-...",
     search: "Rechercher",
+    trigger: "Lancer le scanner",
     waiting: "Pret",
     searching: "Recherche",
     notFound: "Aucun resultat",
@@ -71,6 +85,11 @@ export default function ScanPage() {
   const [value, setValue] = useState("");
   const [status, setStatus] = useState<ScanStatus>("idle");
   const [recent, setRecent] = useState<string[]>([]);
+  const canTriggerScanner = useSyncExternalStore(
+    subscribeToHardwareRuntime,
+    getHardwareRuntimeSnapshot,
+    getServerHardwareRuntimeSnapshot,
+  );
 
   const resolveScan = useCallback(
     async (rawValue: string) => {
@@ -112,8 +131,8 @@ export default function ScanPage() {
 
   useEffect(() => {
     inputRef.current?.focus();
-    const bridge = getDesktopBridge();
-    return bridge?.hardware.onScan((event) => {
+    const hardware = getPosHardwareBridge();
+    return hardware?.onScan((event) => {
       void resolveScan(event.value);
     });
   }, [resolveScan]);
@@ -172,6 +191,21 @@ export default function ScanPage() {
               <Icon className="h-4 w-4" name="search" />
               {labels.search}
             </button>
+            {canTriggerScanner ? (
+              <button
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-md border bg-background px-5 text-sm font-semibold text-foreground hover:bg-muted min-[360px]:w-auto"
+                onClick={() => {
+                  const trigger = getPosHardwareBridge()?.triggerScanner;
+                  if (!trigger) return;
+                  setStatus("idle");
+                  void trigger().catch(() => setStatus("error"));
+                }}
+                type="button"
+              >
+                <Icon className="h-4 w-4" name="scan-line" />
+                {labels.trigger}
+              </button>
+            ) : null}
           </div>
 
           <div

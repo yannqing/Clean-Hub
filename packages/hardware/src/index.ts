@@ -12,6 +12,11 @@ export type PosHardwareCapabilities = {
   cashDrawer: boolean;
   cardTerminal: boolean;
   secureTerminalCredential: boolean;
+  /** Optional host diagnostics. Boolean fields remain the portable contract. */
+  host?: string;
+  connected?: boolean;
+  printerStatus?: string;
+  printerStatusCode?: number;
 };
 
 export type PosPrinterDevice = {
@@ -30,6 +35,8 @@ export type PosPrintRequest = PrintJob & {
 export type PosPrintResult = {
   jobId: string;
   status: PosPrintJobStatus;
+  /** Stable host error code such as PRINTER_NO_PAPER or DEVICE_DISCONNECTED. */
+  errorCode?: string;
   error?: string;
 };
 

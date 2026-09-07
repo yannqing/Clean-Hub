@@ -135,7 +135,7 @@ async function runCashDrawerSmoke(): Promise<void> {
     },
   });
   assert.equal(missingBridge.opened, false);
-  assert.match(missingBridge.opened ? "" : missingBridge.message, /Desktop/);
+  assert.match(missingBridge.opened ? "" : missingBridge.message, /POS 硬件桥/);
   assert.equal(reported[0]?.status, "failed");
 
   console.log("POS cash-drawer client smoke passed.");

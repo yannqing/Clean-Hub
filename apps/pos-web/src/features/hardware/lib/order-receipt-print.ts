@@ -10,7 +10,7 @@ import { buildPosReceiptText, type PrintLocale } from "@cleanhub/hardware";
 import type { PosCartSnapshot } from "@/features/cart/cart.types";
 import { buildPosOrderReceipt } from "@/features/orders/lib/order-receipt";
 
-import { getDesktopBridge, getPosOfflineStorage } from "./desktop-bridge";
+import { getPosHardwareBridge, getPosOfflineStorage } from "./desktop-bridge";
 import {
   executePosPrintJob,
   notifyPosPrintQueueUpdated,
@@ -40,6 +40,7 @@ export async function queuePosOrderReceipt(input: {
       entityId: input.order.id,
       title: receipt.title,
       content: receipt.content,
+      autoPrint: input.autoPrint,
       copies: input.copies,
       printerId: input.printerId,
     },
@@ -48,7 +49,7 @@ export async function queuePosOrderReceipt(input: {
   if (!input.autoPrint) return "queued";
   try {
     const result = await queue.retry(job.id, (storedJob) =>
-      executePosPrintJob(storedJob, getDesktopBridge()?.hardware ?? null),
+      executePosPrintJob(storedJob, getPosHardwareBridge()),
     );
     notifyPosPrintQueueUpdated();
     return result.status === "printed" ? "printed" : "failed";
@@ -146,6 +147,7 @@ export async function queuePosOfflineCartReceipt(input: {
       entityId: input.cart.checkoutId,
       title,
       content,
+      autoPrint: input.autoPrint,
       copies: input.copies,
       printerId: input.printerId,
     },
@@ -154,7 +156,7 @@ export async function queuePosOfflineCartReceipt(input: {
   if (!input.autoPrint) return "queued";
   try {
     const result = await queue.retry(job.id, (storedJob) =>
-      executePosPrintJob(storedJob, getDesktopBridge()?.hardware ?? null),
+      executePosPrintJob(storedJob, getPosHardwareBridge()),
     );
     notifyPosPrintQueueUpdated();
     return result.status === "printed" ? "printed" : "failed";

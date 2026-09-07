@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Android 11+ package visibility for the POS-T1101 vendor services. -->
+    <queries>
+        <package android:name="net.nyx.printerservice" />
+        <package android:name="net.nyx.scanner" />
+    </queries>
+
     <application
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"

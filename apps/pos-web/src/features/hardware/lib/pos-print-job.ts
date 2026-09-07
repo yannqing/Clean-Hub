@@ -1,7 +1,7 @@
 import type { PosPrintRequest } from "@cleanhub/hardware";
 import type { PersistentPrintJob } from "@cleanhub/offline";
 
-import type { CleanHubDesktopBridge } from "./desktop-bridge";
+import type { PosHardwareBridge } from "./desktop-bridge";
 
 export const POS_PRINT_QUEUE_UPDATED_EVENT =
   "cleanhub:pos-print-queue-updated";
@@ -17,6 +17,8 @@ export type PosPrintJobPayload = {
   entityId: string;
   title: string;
   content: string;
+  /** Resume after restart only when physical printing was explicitly requested. */
+  autoPrint?: boolean;
   copies?: number;
   printerId?: string;
   authorizationId?: string;
@@ -27,7 +29,7 @@ export type PosPrintJobPayload = {
 };
 
 type PosHardwarePrintBridge = Pick<
-  CleanHubDesktopBridge["hardware"],
+  PosHardwareBridge,
   "getCapabilities" | "listPrinters" | "print"
 >;
 
@@ -36,14 +38,12 @@ export async function executePosPrintJob(
   hardware: PosHardwarePrintBridge | null,
 ): Promise<void> {
   if (!hardware) {
-    throw new Error(
-      "未检测到 CleanHub Desktop 硬件桥，请在 Desktop 客户端中重试。",
-    );
+    throw new Error("未检测到可用的 POS 硬件桥，请在 POS 客户端中重试。");
   }
 
   const capabilities = await hardware.getCapabilities();
   if (!capabilities.printer) {
-    throw new Error("当前终端的打印机适配器不可用，请检查 Desktop 打印配置。");
+    throw new Error("当前终端的打印机适配器不可用，请检查 POS 打印配置。");
   }
 
   const printers = await hardware.listPrinters();

@@ -54,7 +54,7 @@ import { Icon, PosPageHeader } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 import { openCashDrawerForPaymentOnce } from "@/features/hardware/lib/cash-drawer";
-import { getDesktopBridge } from "@/features/hardware/lib/desktop-bridge";
+import { getPosHardwareBridge } from "@/features/hardware/lib/desktop-bridge";
 import { loadPosHardwareDevices } from "@/features/hardware/lib/hardware-device-cache";
 import { resolvePosPrinterBinding } from "@/features/hardware/lib/printer-binding";
 import {
@@ -163,8 +163,8 @@ export function CartSaleView({
 
   useEffect(() => {
     if (!loaded) return;
-    const bridge = getDesktopBridge();
-    return bridge?.hardware.onScan((event) => {
+    const hardware = getPosHardwareBridge();
+    return hardware?.onScan((event) => {
       const code = event.value.trim().toLowerCase();
       const product = products.find(
         (entry) =>
@@ -648,7 +648,7 @@ function CartPanel({
 
   useEffect(() => {
     let active = true;
-    const hardware = getDesktopBridge()?.hardware;
+    const hardware = getPosHardwareBridge();
     if (hardware) {
       void hardware
         .getCapabilities()
@@ -1024,7 +1024,7 @@ function CartPanel({
               scope: { tenantId, branchId, terminalId },
               loadDevices: () =>
                 loadPosHardwareDevices({ tenantId, branchId, terminalId }),
-              hardware: getDesktopBridge()?.hardware ?? null,
+              hardware: getPosHardwareBridge(),
               reportResult: (result) =>
                 posApi.pos.hardware.recordCashPaymentDrawerResult(result),
             });
@@ -1080,7 +1080,7 @@ function CartPanel({
             scope: { tenantId, branchId, terminalId },
             loadDevices: () =>
               loadPosHardwareDevices({ tenantId, branchId, terminalId }),
-            hardware: getDesktopBridge()?.hardware ?? null,
+            hardware: getPosHardwareBridge(),
             reportResult: (result) =>
               posApi.pos.hardware.recordCashPaymentDrawerResult(result),
           });
@@ -1094,10 +1094,10 @@ function CartPanel({
               payment.providerStatus === "pending"),
         );
         if (cardPayment) {
-          const bridge = getDesktopBridge();
+          const hardware = getPosHardwareBridge();
           try {
-            if (!bridge) throw new Error("TPE 桌面桥接不可用。");
-            const result = await bridge.hardware.processCardPayment({
+            if (!hardware) throw new Error("银行卡支付终端桥接不可用。");
+            const result = await hardware.processCardPayment({
               paymentId: cardPayment.id,
               orderId: finalOrder.id,
               amount: cardPayment.amount,

@@ -26,7 +26,7 @@ import {
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { usePosOfflineWrites } from "@/features/offline/lib";
-import { getDesktopBridge } from "@/features/hardware/lib/desktop-bridge";
+import { getPosHardwareBridge } from "@/features/hardware/lib/desktop-bridge";
 import {
   openCashDrawerForPayment,
   openCashDrawerForPaymentOnce,
@@ -189,7 +189,7 @@ export function OrderActionsPanel({
                 branchId: runtime.branchId!,
                 terminalId: runtime.terminalId!,
               }),
-            hardware: getDesktopBridge()?.hardware ?? null,
+            hardware: getPosHardwareBridge(),
             reportResult: (drawerResult) =>
               posApi.pos.hardware.recordCashPaymentDrawerResult(drawerResult),
           });
@@ -220,7 +220,7 @@ export function OrderActionsPanel({
                     terminalId: runtime.terminalId,
                   })
                 : (await posApi.pos.hardware.list()).data,
-            hardware: getDesktopBridge()?.hardware ?? null,
+            hardware: getPosHardwareBridge(),
             reportResult: (drawerResult) =>
               posApi.pos.hardware.recordCashPaymentDrawerResult(drawerResult),
           };

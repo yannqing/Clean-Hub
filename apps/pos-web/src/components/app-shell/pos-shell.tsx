@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { posRoutes, posSidebarNavigation } from "@/config";
 import { usePendingPrintJobCounts } from "@/features/hardware/components/pending-print-jobs";
+import { usePrintJobRecovery } from "@/features/hardware/lib/use-print-job-recovery";
 
 import { Icon } from "./icons";
 import { PosGlobalHeader } from "./pos-global-header";
@@ -132,6 +133,7 @@ export function PosShell({
     resolvedProfile.role === "owner" || resolvedProfile.role === "manager";
   const { actionable: pendingPrintTaskCount, syncPending: syncingPrintTaskCount } =
     usePendingPrintJobCounts();
+  usePrintJobRecovery();
   const printTaskAttentionCount =
     pendingPrintTaskCount + syncingPrintTaskCount;
   const hasPrintTaskAttention =

@@ -8,11 +8,11 @@ import type {
 } from "@cleanhub/hardware";
 import type { AsyncKeyValueStorage } from "@cleanhub/offline";
 
-import type { CleanHubDesktopBridge } from "./desktop-bridge";
+import type { PosHardwareBridge } from "./desktop-bridge";
 import { getPosOfflineStorage } from "./desktop-bridge";
 
 type DrawerHardware = Pick<
-  CleanHubDesktopBridge["hardware"],
+  PosHardwareBridge,
   "getCapabilities" | "openCashDrawer"
 >;
 
@@ -137,7 +137,7 @@ export async function openCashDrawerForPayment(input: {
       throw new Error("当前终端未配置启用的钱箱，未执行自动开箱。");
     }
     if (!input.hardware) {
-      throw new Error("未检测到 CleanHub Desktop 硬件桥，未执行自动开箱。");
+      throw new Error("未检测到可用的 POS 硬件桥，未执行自动开箱。");
     }
 
     const capabilities = await input.hardware.getCapabilities();

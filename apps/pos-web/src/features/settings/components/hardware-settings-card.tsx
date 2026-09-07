@@ -17,7 +17,7 @@ import {
 
 import { Icon, type PosIconName } from "@/components/app-shell";
 import { createCashDrawerOpenRequest } from "@/features/hardware/lib/cash-drawer";
-import { getDesktopBridge } from "@/features/hardware/lib/desktop-bridge";
+import { getPosHardwareBridge } from "@/features/hardware/lib/desktop-bridge";
 import { getConfiguredPrinter } from "@/features/hardware/lib/printer-binding";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
@@ -62,6 +62,9 @@ export function HardwareSettingsCard({
   const [printerRuntimeState, setPrinterRuntimeState] = useState<
     "loading" | "ready" | "unavailable" | "error"
   >("loading");
+  const [printerOperationalStatus, setPrinterOperationalStatus] = useState<
+    string | null
+  >(null);
   const [bindingDevice, setBindingDevice] =
     useState<PosHardwareDeviceSummary | null>(null);
   const [selectedPrinterId, setSelectedPrinterId] = useState("");
@@ -73,20 +76,22 @@ export function HardwareSettingsCard({
 
   const discoverPrinters = useCallback(async () => {
     setPrinterRuntimeState("loading");
-    const bridge = getDesktopBridge();
-    if (!bridge) {
+    const hardware = getPosHardwareBridge();
+    if (!hardware) {
       setLocalPrinters([]);
+      setPrinterOperationalStatus(null);
       setPrinterRuntimeState("unavailable");
       return;
     }
     try {
-      const capabilities = await bridge.hardware.getCapabilities();
+      const capabilities = await hardware.getCapabilities();
+      setPrinterOperationalStatus(capabilities.printerStatus ?? null);
       if (!capabilities.printer) {
         setLocalPrinters([]);
         setPrinterRuntimeState("unavailable");
         return;
       }
-      const printers = await bridge.hardware.listPrinters();
+      const printers = await hardware.listPrinters();
       setLocalPrinters(printers);
       setSelectedPrinterId((current) =>
         printers.some((printer) => printer.id === current)
@@ -97,12 +102,13 @@ export function HardwareSettingsCard({
       setPrinterRuntimeState("ready");
     } catch {
       setLocalPrinters([]);
+      setPrinterOperationalStatus(null);
       setPrinterRuntimeState("error");
     }
   }, []);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- hardware discovery resolves asynchronously from the Desktop bridge.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- hardware discovery resolves asynchronously from the POS host bridge.
     void discoverPrinters();
   }, [discoverPrinters]);
 
@@ -128,12 +134,12 @@ export function HardwareSettingsCard({
 
     setBindingPrinter(true);
     try {
-      const bridge = getDesktopBridge();
-      if (!bridge) {
-        throw new Error("未检测到 CleanHub Desktop 硬件桥。");
+      const hardware = getPosHardwareBridge();
+      if (!hardware) {
+        throw new Error("未检测到可用的 POS 硬件桥。");
       }
       const jobId = createId();
-      const result = await bridge.hardware.print({
+      const result = await hardware.print({
         id: jobId,
         printerId: printer.id,
         title: "CleanHub 打印机测试",
@@ -181,13 +187,42 @@ export function HardwareSettingsCard({
     }
     if (printerRuntimeState === "unavailable") {
       return {
-        label: "Desktop 未连接",
+        label: "POS 硬件未连接",
         tone: "text-amber-700 lg:bg-amber-50",
       };
     }
     if (
       localPrinters.some((printer) => printer.id === configured.printerId)
     ) {
+      const operationalIssue: Record<
+        string,
+        { label: string; tone: string }
+      > = {
+        PRINTER_NO_PAPER: {
+          label: "缺纸",
+          tone: "text-red-700 lg:bg-red-50",
+        },
+        PRINTER_COVER_OPEN: {
+          label: "仓盖未关闭",
+          tone: "text-red-700 lg:bg-red-50",
+        },
+        PRINTER_OVERHEATED: {
+          label: "温度过高",
+          tone: "text-red-700 lg:bg-red-50",
+        },
+        PRINTER_BUSY: {
+          label: "打印中",
+          tone: "text-blue-700 lg:bg-blue-50",
+        },
+        PRINTER_LOW_BATTERY: {
+          label: "设备电量低",
+          tone: "text-amber-700 lg:bg-amber-50",
+        },
+      };
+      const issue = printerOperationalStatus
+        ? operationalIssue[printerOperationalStatus]
+        : undefined;
+      if (issue) return issue;
       return { label: "已连接", tone: "text-emerald-700 lg:bg-emerald-50" };
     }
     return { label: "未检测到", tone: "text-red-700 lg:bg-red-50" };
@@ -205,17 +240,17 @@ export function HardwareSettingsCard({
       const authorization = await posApi.pos.hardware.authorizeManualDrawerOpen(
         { reason },
       );
-      const bridge = getDesktopBridge();
-      if (!bridge) {
+      const hardware = getPosHardwareBridge();
+      if (!hardware) {
         throw new Error(
-          "未检测到 CleanHub Desktop 硬件桥，请在 Desktop 客户端中重试。",
+          "未检测到可用的 POS 硬件桥，请在 POS 客户端中重试。",
         );
       }
 
-      const capabilities = await bridge.hardware.getCapabilities();
+      const capabilities = await hardware.getCapabilities();
       if (!capabilities.cashDrawer) {
         throw new Error(
-          "当前终端的钱箱适配器不可用，请检查 Desktop 钱箱配置。",
+          "当前终端的钱箱适配器不可用，请检查 POS 钱箱配置。",
         );
       }
 
@@ -223,7 +258,7 @@ export function HardwareSettingsCard({
         throw new Error("当前收银终端未配置可用钱箱。");
       }
 
-      await bridge.hardware.openCashDrawer(
+      await hardware.openCashDrawer(
         createCashDrawerOpenRequest({
           drawer: configuredDrawer,
           reason: authorization.reason,
@@ -430,7 +465,7 @@ export function HardwareSettingsCard({
           </DialogHeader>
           {printerRuntimeState === "unavailable" ? (
             <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
-              未检测到 CleanHub Desktop 打印能力。请在 Desktop 客户端中打开 POS，并先在操作系统中安装打印机。
+              未检测到 POS 打印能力。T1101 请检查内置打印服务，桌面客户端请先在操作系统中安装打印机。
             </p>
           ) : printerRuntimeState === "error" ? (
             <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">

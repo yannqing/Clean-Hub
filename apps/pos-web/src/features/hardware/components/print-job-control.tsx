@@ -29,7 +29,10 @@ import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 import { posToast as toast } from "@/lib/pos-toast";
 
-import { getDesktopBridge, getPosOfflineStorage } from "../lib/desktop-bridge";
+import {
+  getPosHardwareBridge,
+  getPosOfflineStorage,
+} from "../lib/desktop-bridge";
 import {
   executePosPrintJob,
   notifyPosPrintQueueUpdated,
@@ -201,7 +204,7 @@ export function PrintJobControl({
       setAuditError(null);
       try {
         const result = await queue.retry(job.id, (storedJob) =>
-          executePosPrintJob(storedJob, getDesktopBridge()?.hardware ?? null),
+          executePosPrintJob(storedJob, getPosHardwareBridge()),
         );
         await refresh();
         notifyPosPrintQueueUpdated();
@@ -234,7 +237,7 @@ export function PrintJobControl({
     const job = await queue.enqueue({
       id: createId(),
       idempotencyKey: `pos-print:${documentType}:${entityId}:initial`,
-      payload: { documentType, entityId, title, content },
+      payload: { documentType, entityId, title, content, autoPrint: true },
     });
     await refresh();
     notifyPosPrintQueueUpdated();
@@ -265,6 +268,7 @@ export function PrintJobControl({
           entityId,
           title,
           content,
+          autoPrint: true,
           authorizationId: authorization.authorizationId,
           originalPrintJobId: latestJob.id,
         },
