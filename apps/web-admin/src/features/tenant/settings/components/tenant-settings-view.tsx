@@ -3,6 +3,7 @@
 import {
   Badge,
   Button,
+  Input,
   Label,
   Select,
   SelectContent,
@@ -17,7 +18,10 @@ import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 
 import { useTenantI18n } from "@/i18n";
 
-import { updateTenantSettingsAction } from "../actions";
+import {
+  updateTenantProfileAction,
+  updateTenantSettingsAction,
+} from "../actions";
 import {
   TENANT_SETTINGS_UPDATED_EVENT,
   type TenantSettingsUpdatedEventDetail,
@@ -30,6 +34,7 @@ import type {
   TenantSettings,
   TenantSettingsFormValues,
   TenantSettingsLanguage,
+  TenantProfileFormValues,
 } from "../types";
 import {
   tenantSettingsNavigationItems,
@@ -46,6 +51,48 @@ function toFormValues(settings: TenantSettings): TenantSettingsFormValues {
     defaultLanguage: settings.defaultLanguage,
     timezone: settings.timezone,
   };
+}
+
+function toProfileFormValues(settings: TenantSettings): TenantProfileFormValues {
+  return {
+    tenantName: settings.tenantName,
+    country: settings.country ?? "",
+    city: settings.city ?? "",
+    contactName: settings.contactName ?? "",
+    contactPhone: settings.contactPhone ?? "",
+    contactEmail: settings.contactEmail ?? "",
+    tenantVersion: settings.tenantVersion,
+  };
+}
+
+function normalizeProfileFormValues(
+  values: TenantProfileFormValues,
+): TenantProfileFormValues {
+  return {
+    ...values,
+    tenantName: values.tenantName.trim(),
+    country: values.country.trim(),
+    city: values.city.trim(),
+    contactName: values.contactName.trim(),
+    contactPhone: values.contactPhone.trim(),
+    contactEmail: values.contactEmail.trim(),
+  };
+}
+
+function hasProfileChange(
+  settings: TenantSettings,
+  values: TenantProfileFormValues,
+): boolean {
+  const normalized = normalizeProfileFormValues(values);
+
+  return (
+    normalized.tenantName !== settings.tenantName ||
+    normalized.country !== (settings.country ?? "") ||
+    normalized.city !== (settings.city ?? "") ||
+    normalized.contactName !== (settings.contactName ?? "") ||
+    normalized.contactPhone !== (settings.contactPhone ?? "") ||
+    normalized.contactEmail !== (settings.contactEmail ?? "")
+  );
 }
 
 function normalizeFormValues(
@@ -105,6 +152,14 @@ export function TenantSettingsView() {
   const [form, setForm] = useState<TenantSettingsFormValues>(() =>
     toFormValues(settings),
   );
+  const [profileForm, setProfileForm] = useState<TenantProfileFormValues>(() =>
+    toProfileFormValues(settings),
+  );
+  const [profileErrors, setProfileErrors] = useState<
+    Partial<Record<keyof TenantProfileFormValues, string>>
+  >({});
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaveError, setProfileSaveError] = useState<string | null>(null);
   const [errors, setErrors] = useState<
     Partial<Record<keyof TenantSettingsFormValues, string>>
   >({});
@@ -119,6 +174,17 @@ export function TenantSettingsView() {
     [settings],
   );
   const formDisabled = saving || !authLoaded || !canUpdateSettings;
+  const profileFormDisabled =
+    savingProfile || !authLoaded || !canUpdateSettings;
+
+  function updateProfileForm<K extends keyof TenantProfileFormValues>(
+    key: K,
+    value: TenantProfileFormValues[K],
+  ): void {
+    setProfileForm((current) => ({ ...current, [key]: value }));
+    setProfileErrors((current) => ({ ...current, [key]: undefined }));
+    setProfileSaveError(null);
+  }
 
   function updateForm<K extends keyof TenantSettingsFormValues>(
     key: K,
@@ -191,14 +257,59 @@ export function TenantSettingsView() {
     }
   }
 
+  async function handleProfileSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canUpdateSettings) {
+      setProfileSaveError(m.settings.onlyOwners);
+      toast.error(m.settings.onlyOwners);
+      return;
+    }
+
+    const normalizedForm = normalizeProfileFormValues(profileForm);
+    setProfileForm(normalizedForm);
+
+    if (!hasProfileChange(settings, normalizedForm)) {
+      setProfileErrors({});
+      setProfileSaveError(null);
+      toast.success(m.settings.businessDetailsUpToDate);
+      return;
+    }
+
+    setSavingProfile(true);
+    setProfileSaveError(null);
+
+    try {
+      const result = await updateTenantProfileAction(normalizedForm);
+
+      if (result.ok) {
+        updateSettings(result.data);
+        setProfileForm(toProfileFormValues(result.data));
+        setProfileErrors({});
+        toast.success(m.settings.businessDetailsUpdated);
+      } else {
+        setProfileErrors(result.errors);
+        setProfileSaveError(result.message);
+        toast.error(result.message);
+      }
+    } catch (error) {
+      const message = getErrorMessage(error, m.settings.requestFailed);
+      setProfileErrors({});
+      setProfileSaveError(message);
+      toast.error(message);
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
   return (
     <div className="grid max-w-[800px] gap-4">
       <SettingsSection
         description={m.settings.general.businessDetailsDescription}
         title={m.settings.general.businessDetailsTitle}
       >
-        <div className="p-4 sm:p-5">
-          <div className="flex flex-col gap-4 rounded-lg border border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <form onSubmit={handleProfileSubmit}>
+          <div className="grid gap-5 p-4 sm:p-5">
             <div className="flex min-w-0 items-center gap-3">
               <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
                 <Building2 aria-hidden className="size-5" />
@@ -212,17 +323,187 @@ export function TenantSettingsView() {
                 </span>
               </span>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">
-                {m.settings.pilotStatusLabels[settings.pilotStatus]}
-              </Badge>
-              <Badge variant="outline">v{settings.version}</Badge>
+
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="tenant-name">
+                  {m.settings.labels.tenantName}
+                </Label>
+                <Input
+                  autoComplete="organization"
+                  disabled={profileFormDisabled}
+                  id="tenant-name"
+                  maxLength={160}
+                  onChange={(event) =>
+                    updateProfileForm("tenantName", event.target.value)
+                  }
+                  value={profileForm.tenantName}
+                />
+                {profileErrors.tenantName ? (
+                  <p className="text-xs text-destructive">
+                    {profileErrors.tenantName}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="tenant-code">
+                  {m.settings.labels.pressingCode}
+                </Label>
+                <Input
+                  className="bg-slate-50 text-slate-600"
+                  id="tenant-code"
+                  readOnly
+                  value={settings.pressingCode}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>{m.settings.labels.pilotStatus}</Label>
+                <div className="flex min-h-9 items-center rounded-md border border-input bg-slate-50 px-3">
+                  <Badge variant="secondary">
+                    {m.settings.pilotStatusLabels[settings.pilotStatus]}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="tenant-country">
+                  {m.settings.labels.country}
+                </Label>
+                <Input
+                  autoComplete="country-name"
+                  disabled={profileFormDisabled}
+                  id="tenant-country"
+                  maxLength={80}
+                  onChange={(event) =>
+                    updateProfileForm("country", event.target.value)
+                  }
+                  value={profileForm.country}
+                />
+                {profileErrors.country ? (
+                  <p className="text-xs text-destructive">
+                    {profileErrors.country}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="tenant-city">{m.settings.labels.city}</Label>
+                <Input
+                  autoComplete="address-level2"
+                  disabled={profileFormDisabled}
+                  id="tenant-city"
+                  maxLength={120}
+                  onChange={(event) =>
+                    updateProfileForm("city", event.target.value)
+                  }
+                  value={profileForm.city}
+                />
+                {profileErrors.city ? (
+                  <p className="text-xs text-destructive">
+                    {profileErrors.city}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="tenant-contact-name">
+                  {m.settings.labels.contactName}
+                </Label>
+                <Input
+                  autoComplete="name"
+                  disabled={profileFormDisabled}
+                  id="tenant-contact-name"
+                  maxLength={120}
+                  onChange={(event) =>
+                    updateProfileForm("contactName", event.target.value)
+                  }
+                  value={profileForm.contactName}
+                />
+                {profileErrors.contactName ? (
+                  <p className="text-xs text-destructive">
+                    {profileErrors.contactName}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="tenant-contact-phone">
+                  {m.settings.labels.contactPhone}
+                </Label>
+                <Input
+                  autoComplete="tel"
+                  disabled={profileFormDisabled}
+                  id="tenant-contact-phone"
+                  inputMode="tel"
+                  maxLength={32}
+                  onChange={(event) =>
+                    updateProfileForm("contactPhone", event.target.value)
+                  }
+                  value={profileForm.contactPhone}
+                />
+                {profileErrors.contactPhone ? (
+                  <p className="text-xs text-destructive">
+                    {profileErrors.contactPhone}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2 sm:col-span-2">
+                <Label htmlFor="tenant-contact-email">
+                  {m.settings.labels.contactEmail}
+                </Label>
+                <Input
+                  autoComplete="email"
+                  disabled={profileFormDisabled}
+                  id="tenant-contact-email"
+                  inputMode="email"
+                  maxLength={320}
+                  onChange={(event) =>
+                    updateProfileForm("contactEmail", event.target.value)
+                  }
+                  type="email"
+                  value={profileForm.contactEmail}
+                />
+                {profileErrors.contactEmail ? (
+                  <p className="text-xs text-destructive">
+                    {profileErrors.contactEmail}
+                  </p>
+                ) : null}
+              </div>
             </div>
+
+            <p className="text-xs leading-5 text-slate-500">
+              {m.settings.general.businessDetailsHint}
+            </p>
+
+            {profileSaveError ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                {profileSaveError}
+              </div>
+            ) : null}
           </div>
-          <p className="mt-3 text-xs leading-5 text-slate-500">
-            {m.settings.general.businessDetailsHint}
-          </p>
-        </div>
+
+          <div className="flex flex-col gap-3 border-t border-black/10 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <p className="text-xs text-slate-500">
+              {m.settings.updatedLabel}{" "}
+              {formatDateTime(settings.tenantUpdatedAt) ||
+                m.settings.notUpdated}
+            </p>
+            {canUpdateSettings ? (
+              <Button disabled={profileFormDisabled} size="sm" type="submit">
+                {savingProfile
+                  ? m.common.saving
+                  : m.settings.saveBusinessDetails}
+              </Button>
+            ) : !authLoaded ? (
+              <Badge variant="outline">{m.settings.checkingPermissions}</Badge>
+            ) : (
+              <Badge variant="outline">{m.settings.readOnly}</Badge>
+            )}
+          </div>
+        </form>
       </SettingsSection>
 
       {!canUpdateSettings && authLoaded ? (

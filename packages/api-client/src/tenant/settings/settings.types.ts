@@ -18,6 +18,14 @@ export type TenantSettings = {
   id: string | null;
   tenantId: string;
   tenantName: string;
+  pressingCode: string;
+  country: string | null;
+  city: string | null;
+  contactName: string | null;
+  contactPhone: string | null;
+  contactEmail: string | null;
+  tenantUpdatedAt: string;
+  tenantVersion: number;
   defaultLanguage: TenantSettingsLanguage;
   defaultCurrency: string;
   timezone: string;
@@ -29,6 +37,13 @@ export type TenantSettings = {
 };
 
 export type UpdateTenantSettingsRequest = {
+  tenantName?: string;
+  country?: string | null;
+  city?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  contactEmail?: string | null;
+  tenantVersion?: number;
   defaultLanguage?: TenantSettingsLanguage;
   defaultCurrency?: string;
   timezone?: string;

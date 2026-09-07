@@ -2606,10 +2606,10 @@ export const tenantMessagesEn: TenantMessages = {
       title: "General",
       businessDetailsTitle: "Business details",
       businessDetailsDescription:
-        "The business entity this tenant uses in CleanHub.",
+        "Maintain this tenant's business identity and contact details.",
       entityLabel: "Tenant business entity",
       businessDetailsHint:
-        "The tenant name and pilot status are maintained by a SaaS administrator.",
+        "The tenant name appears in the admin and POS apps. The tenant code and operating status remain managed by a SaaS administrator.",
       readOnlyTitle: "These settings are read-only",
       storeDefaultsTitle: "Store defaults",
       storeDefaultsDescription:
@@ -2674,6 +2674,13 @@ export const tenantMessagesEn: TenantMessages = {
       notificationsEnabled: "Notifications",
     },
     labels: {
+      tenantName: "Tenant name",
+      pressingCode: "Tenant code",
+      country: "Country or region",
+      city: "City",
+      contactName: "Contact name",
+      contactPhone: "Contact phone",
+      contactEmail: "Contact email",
       pilotStatus: "Pilot status",
       defaultLanguage: "Default language",
       defaultCurrency: "Default currency",
@@ -2687,6 +2694,7 @@ export const tenantMessagesEn: TenantMessages = {
       disabled: "Disabled",
     },
     saveSettings: "Save settings",
+    saveBusinessDetails: "Save business details",
     updatedLabel: "Updated",
     permissionUnavailable: "Permission unavailable",
     readOnly: "Read-only",
@@ -2694,9 +2702,11 @@ export const tenantMessagesEn: TenantMessages = {
     unavailable: "Tenant settings are unavailable.",
     settingsUpdated: "Tenant settings updated.",
     settingsUpToDate: "Tenant settings are already up to date.",
+    businessDetailsUpdated: "Tenant business details updated.",
+    businessDetailsUpToDate: "Tenant business details are already up to date.",
     onlyOwners: "Only tenant owners can update tenant settings.",
     onlyOwnersReadonly:
-      "Only tenant owners can update these defaults. Managers can view settings and feature flags.",
+      "Only tenant owners can update business details and defaults. Managers can view settings and feature flags.",
     permissionDenied:
       "Permission could not be verified. Settings remain read-only.",
     requestFailed: "Tenant settings failed to load.",

@@ -10,11 +10,13 @@ import { webAdminApi } from "@/lib/api-client";
 import { getTenantServerApiRequestOptions } from "../../server/api-request-options";
 import type {
   TenantDefaultCurrencyFormValues,
+  TenantProfileFormValues,
   TenantSettings,
   TenantSettingsFormValues,
 } from "../types";
 import {
   validateTenantDefaultCurrencyForm,
+  validateTenantProfileForm,
   validateTenantSettingsForm,
 } from "../validators";
 
@@ -40,6 +42,17 @@ type TenantDefaultCurrencyActionResult =
       message: string;
     };
 
+type TenantProfileActionResult =
+  | {
+      ok: true;
+      data: TenantSettings;
+    }
+  | {
+      ok: false;
+      errors: Partial<Record<keyof TenantProfileFormValues, string>>;
+      message: string;
+    };
+
 const OWNER_ONLY_MESSAGE = "Only tenant owners can update tenant settings.";
 
 function getActionErrorMessage(error: unknown): string {
@@ -60,6 +73,48 @@ function revalidateTenantCurrencyConsumers(): void {
   revalidatePath("/tenant/point-of-sale");
   revalidatePath("/tenant/reports");
   revalidatePath("/tenant", "layout");
+}
+
+export async function updateTenantProfileAction(
+  input: TenantProfileFormValues,
+): Promise<TenantProfileActionResult> {
+  const requestOptions = await getTenantServerApiRequestOptions();
+  const authContext = await getAuthSessionQuery(requestOptions);
+
+  if (!authContext || authContext.role !== "owner" || !authContext.tenantId) {
+    return {
+      ok: false,
+      errors: {},
+      message: OWNER_ONLY_MESSAGE,
+    };
+  }
+
+  const validation = validateTenantProfileForm(input);
+
+  if (!validation.ok) {
+    return {
+      ...validation,
+      message: validation.message ?? "Check the tenant details form.",
+    };
+  }
+
+  try {
+    const settings = await webAdminApi.tenant.settings.update(
+      validation.data,
+      requestOptions,
+    );
+
+    revalidatePath("/tenant/system/settings");
+    revalidatePath("/tenant", "layout");
+
+    return { ok: true, data: settings };
+  } catch (error) {
+    return {
+      ok: false,
+      errors: {},
+      message: getActionErrorMessage(error),
+    };
+  }
 }
 
 export async function updateTenantSettingsAction(

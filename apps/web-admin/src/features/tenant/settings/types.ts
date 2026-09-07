@@ -20,6 +20,16 @@ export type TenantSettingsFormValues = {
   timezone: string;
 };
 
+export type TenantProfileFormValues = {
+  tenantName: string;
+  country: string;
+  city: string;
+  contactName: string;
+  contactPhone: string;
+  contactEmail: string;
+  tenantVersion: number;
+};
+
 export type TenantDefaultCurrencyFormValues = {
   defaultCurrency: string;
 };

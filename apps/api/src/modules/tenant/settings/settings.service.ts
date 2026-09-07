@@ -7,6 +7,7 @@ import {
 import { TenantSettingsError } from "./settings.errors.js";
 import {
   findTenantSettingsByTenantId,
+  updateTenantProfileRecord,
   updateTenantSettingsRecord,
   writeTenantSettingsUpdatedAuditLog,
 } from "./settings.repository.js";
@@ -18,6 +19,17 @@ import type {
 
 function hasUpdateField(data: object): boolean {
   return Object.values(data).some((value) => value !== undefined);
+}
+
+function hasTenantProfileUpdate(data: UpdateTenantSettingsInput["data"]): boolean {
+  return [
+    data.tenantName,
+    data.country,
+    data.city,
+    data.contactName,
+    data.contactPhone,
+    data.contactEmail,
+  ].some((value) => value !== undefined);
 }
 
 export async function getTenantSettings(
@@ -68,6 +80,21 @@ export async function updateTenantSettings(
         "Tenant settings or feature flags were not found.",
         404,
       );
+    }
+
+    if (hasTenantProfileUpdate(input.data)) {
+      const updated = await updateTenantProfileRecord(tx, {
+        tenantId,
+        data: input.data,
+      });
+
+      if (!updated) {
+        throw new TenantSettingsError(
+          "TENANT_PROFILE_VERSION_CONFLICT",
+          "Tenant details changed in another session. Reload and try again.",
+          409,
+        );
+      }
     }
 
     const settings = await updateTenantSettingsRecord(tx, {

@@ -2246,6 +2246,13 @@ export type TenantMessages = {
       notificationsEnabled: string;
     };
     labels: {
+      tenantName: string;
+      pressingCode: string;
+      country: string;
+      city: string;
+      contactName: string;
+      contactPhone: string;
+      contactEmail: string;
       pilotStatus: string;
       defaultLanguage: string;
       defaultCurrency: string;
@@ -2259,6 +2266,7 @@ export type TenantMessages = {
       disabled: string;
     };
     saveSettings: string;
+    saveBusinessDetails: string;
     updatedLabel: string;
     permissionUnavailable: string;
     readOnly: string;
@@ -2266,6 +2274,8 @@ export type TenantMessages = {
     unavailable: string;
     settingsUpdated: string;
     settingsUpToDate: string;
+    businessDetailsUpdated: string;
+    businessDetailsUpToDate: string;
     onlyOwners: string;
     onlyOwnersReadonly: string;
     permissionDenied: string;

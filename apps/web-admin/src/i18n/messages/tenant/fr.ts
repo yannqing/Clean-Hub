@@ -2655,10 +2655,10 @@ export const tenantMessagesFr: TenantMessages = {
       title: "Général",
       businessDetailsTitle: "Détails de l'entreprise",
       businessDetailsDescription:
-        "Entité commerciale que ce locataire utilise dans CleanHub.",
+        "Gérez l'identité commerciale et les coordonnées de ce locataire.",
       entityLabel: "Entité commerciale locataire",
       businessDetailsHint:
-        "Le nom du locataire et le statut du pilote sont gérés par un administrateur SaaS.",
+        "Le nom du locataire apparaît dans l'administration et le PDV. Le code du locataire et le statut opérationnel restent gérés par un administrateur SaaS.",
       readOnlyTitle: "Ces paramètres sont en lecture seule",
       storeDefaultsTitle: "Paramètres par défaut du magasin",
       storeDefaultsDescription:
@@ -2725,6 +2725,13 @@ export const tenantMessagesFr: TenantMessages = {
       notificationsEnabled: "Notifications",
     },
     labels: {
+      tenantName: "Nom du locataire",
+      pressingCode: "Code du locataire",
+      country: "Pays ou région",
+      city: "Ville",
+      contactName: "Nom du contact",
+      contactPhone: "Téléphone du contact",
+      contactEmail: "E-mail du contact",
       pilotStatus: "Statut de pilote",
       defaultLanguage: "Langue par défaut",
       defaultCurrency: "Devise par défaut",
@@ -2738,6 +2745,7 @@ export const tenantMessagesFr: TenantMessages = {
       disabled: "Désactivé",
     },
     saveSettings: "Enregistrer les paramètres",
+    saveBusinessDetails: "Enregistrer les informations",
     updatedLabel: "Mis à jour",
     permissionUnavailable: "Autorisation indisponible",
     readOnly: "Lecture seule",
@@ -2745,10 +2753,13 @@ export const tenantMessagesFr: TenantMessages = {
     unavailable: "Les paramètres du locataire ne sont pas disponibles.",
     settingsUpdated: "Paramètres du locataire mis à jour.",
     settingsUpToDate: "Les paramètres du locataire sont déjà à jour.",
+    businessDetailsUpdated: "Informations du locataire mises à jour.",
+    businessDetailsUpToDate:
+      "Les informations du locataire sont déjà à jour.",
     onlyOwners:
       "Seuls les propriétaires de locataires peuvent mettre à jour les paramètres du locataire.",
     onlyOwnersReadonly:
-      "Seuls les propriétaires locataires peuvent mettre à jour ces valeurs par défaut. Les gestionnaires peuvent afficher les paramètres et les indicateurs de fonctionnalités.",
+      "Seuls les propriétaires locataires peuvent mettre à jour les informations et les valeurs par défaut. Les gestionnaires peuvent afficher les paramètres et les indicateurs de fonctionnalités.",
     permissionDenied:
       "L'autorisation n'a pas pu être vérifiée. Les paramètres restent en lecture seule.",
     requestFailed: "Les paramètres du client n'ont pas pu être chargés.",

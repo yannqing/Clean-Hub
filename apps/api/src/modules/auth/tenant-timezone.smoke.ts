@@ -43,5 +43,37 @@ assert.equal(
     .success,
   false,
 );
+assert.equal(
+  updateTenantSettingsBodySchema.safeParse({
+    tenantName: "CleanHub Dakar",
+    contactEmail: "owner@example.com",
+    tenantVersion: 2,
+  }).success,
+  true,
+);
+assert.equal(
+  updateTenantSettingsBodySchema.safeParse({
+    tenantName: "CleanHub Dakar",
+  }).success,
+  false,
+);
+assert.equal(
+  updateTenantSettingsBodySchema.safeParse({ tenantVersion: 2 }).success,
+  false,
+);
+assert.equal(
+  updateTenantSettingsBodySchema.safeParse({
+    contactEmail: "not-an-email",
+    tenantVersion: 2,
+  }).success,
+  false,
+);
+assert.equal(
+  updateTenantSettingsBodySchema.parse({
+    contactPhone: "   ",
+    tenantVersion: 2,
+  }).contactPhone,
+  null,
+);
 
-console.log("tenant timezone smoke checks passed");
+console.log("tenant timezone and settings validation smoke checks passed");

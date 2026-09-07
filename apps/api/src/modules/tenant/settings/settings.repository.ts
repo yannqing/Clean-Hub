@@ -23,6 +23,11 @@ export type UpdateTenantSettingsRecordInput = {
   currentSettings: TenantSettings;
 };
 
+export type UpdateTenantProfileRecordInput = {
+  tenantId: string;
+  data: UpdateTenantSettingsRequest;
+};
+
 const DEFAULT_CURRENCY_FALLBACK = "XOF";
 
 export async function findTenantDefaultLanguage(
@@ -82,6 +87,14 @@ export async function findTenantSettingsByTenantId(
     .select({
       tenantId: tenants.id,
       tenantName: tenants.name,
+      pressingCode: tenants.pressingCode,
+      country: tenants.country,
+      city: tenants.city,
+      contactName: tenants.contactName,
+      contactPhone: tenants.contactPhone,
+      contactEmail: tenants.contactEmail,
+      tenantUpdatedAt: tenants.updatedAt,
+      tenantVersion: tenants.version,
       settingsId: tenantSettings.id,
       defaultLanguage: tenantSettings.defaultLanguage,
       defaultCurrency: tenantSettings.defaultCurrency,
@@ -116,6 +129,14 @@ export async function findTenantSettingsByTenantId(
     id: row.settingsId,
     tenantId: row.tenantId,
     tenantName: row.tenantName,
+    pressingCode: row.pressingCode,
+    country: row.country,
+    city: row.city,
+    contactName: row.contactName,
+    contactPhone: row.contactPhone,
+    contactEmail: row.contactEmail,
+    tenantUpdatedAt: row.tenantUpdatedAt.toISOString(),
+    tenantVersion: row.tenantVersion,
     defaultLanguage: resolveLanguage(row.defaultLanguage),
     defaultCurrency: row.defaultCurrency ?? DEFAULT_CURRENCY_FALLBACK,
     timezone: row.timezone ?? "UTC",
@@ -138,10 +159,59 @@ export async function findTenantSettingsByTenantId(
   };
 }
 
+export async function updateTenantProfileRecord(
+  db: Database,
+  input: UpdateTenantProfileRecordInput,
+): Promise<boolean> {
+  const updates = {
+    updatedAt: new Date(),
+    version: sql`${tenants.version} + 1`,
+    ...(input.data.tenantName !== undefined
+      ? { name: input.data.tenantName }
+      : {}),
+    ...(input.data.country !== undefined
+      ? { country: input.data.country }
+      : {}),
+    ...(input.data.city !== undefined ? { city: input.data.city } : {}),
+    ...(input.data.contactName !== undefined
+      ? { contactName: input.data.contactName }
+      : {}),
+    ...(input.data.contactPhone !== undefined
+      ? { contactPhone: input.data.contactPhone }
+      : {}),
+    ...(input.data.contactEmail !== undefined
+      ? { contactEmail: input.data.contactEmail }
+      : {}),
+  };
+
+  const updatedRows = await db
+    .update(tenants)
+    .set(updates)
+    .where(
+      and(
+        eq(tenants.id, input.tenantId),
+        eq(tenants.version, input.data.tenantVersion!),
+        isNull(tenants.deletedAt),
+      ),
+    )
+    .returning({ id: tenants.id });
+
+  return updatedRows.length === 1;
+}
+
 export async function updateTenantSettingsRecord(
   db: Database,
   input: UpdateTenantSettingsRecordInput,
 ): Promise<TenantSettings | null> {
+  const hasSettingsUpdate =
+    input.data.defaultLanguage !== undefined ||
+    input.data.defaultCurrency !== undefined ||
+    input.data.timezone !== undefined;
+
+  if (!hasSettingsUpdate) {
+    return findTenantSettingsByTenantId(db, input.tenantId);
+  }
+
   const defaultLanguage =
     input.data.defaultLanguage ?? input.currentSettings.defaultLanguage;
   const defaultCurrency =
@@ -198,11 +268,25 @@ export async function writeTenantSettingsUpdatedAuditLog(
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
     before: {
+      tenantName: input.before.tenantName,
+      country: input.before.country,
+      city: input.before.city,
+      contactName: input.before.contactName,
+      contactPhone: input.before.contactPhone,
+      contactEmail: input.before.contactEmail,
+      tenantVersion: input.before.tenantVersion,
       defaultLanguage: input.before.defaultLanguage,
       defaultCurrency: input.before.defaultCurrency,
       timezone: input.before.timezone,
     },
     after: {
+      tenantName: input.after.tenantName,
+      country: input.after.country,
+      city: input.after.city,
+      contactName: input.after.contactName,
+      contactPhone: input.after.contactPhone,
+      contactEmail: input.after.contactEmail,
+      tenantVersion: input.after.tenantVersion,
       defaultLanguage: input.after.defaultLanguage,
       defaultCurrency: input.after.defaultCurrency,
       timezone: input.after.timezone,
