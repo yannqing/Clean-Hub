@@ -17,6 +17,7 @@ import { Icon, type PosIconName } from "@/components/app-shell";
 
 import {
   LOCK_TIMEOUT_OPTIONS,
+  CASH_HANDLING_MODE_LABELS,
   PAYMENT_METHOD_OPTIONS,
   PRINT_COPIES_OPTIONS,
   ROUNDING_RULE_OPTIONS,
@@ -26,7 +27,6 @@ import type { TerminalSettingsFormValues } from "../types";
 type TerminalSettingsCardProps = {
   initial: TerminalSettingsFormValues;
   loading: boolean;
-  mobileMoneyAvailable?: boolean;
   mode?: TerminalSettingsMode;
   saving: boolean;
   onSave: (values: TerminalSettingsFormValues) => void;
@@ -110,7 +110,6 @@ function MobileSettingSwitch({
 export function TerminalSettingsCard({
   initial,
   loading,
-  mobileMoneyAvailable = false,
   mode = "all",
   saving,
   onSave,
@@ -203,128 +202,29 @@ export function TerminalSettingsCard({
             </div>
           ) : null}
 
-          {/* 默认支付方式 */}
+          {/* 支付与现金策略（门店级，只读） */}
           {mode === "all" || mode === "checkout" ? (
-            <div className="space-y-5 py-2 lg:py-0">
-              <div className="space-y-2">
-                <Label className="text-base font-medium lg:text-sm">
-                  启用的支付方式
-                </Label>
-                <div className="grid grid-cols-3 gap-2">
-                  {PAYMENT_METHOD_OPTIONS.map((option) => {
-                    const checked = form.paymentMethodsEnabled.includes(
-                      option.value,
-                    );
-                    const disabled =
-                      option.value === "app" && !mobileMoneyAvailable;
-                    return (
-                      <label
-                        className={`flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${
-                          disabled
-                            ? "cursor-not-allowed bg-muted/40 text-muted-foreground"
-                            : "cursor-pointer"
-                        }`}
-                        key={option.value}
-                      >
-                        <Checkbox
-                          checked={checked}
-                          disabled={disabled}
-                          onCheckedChange={(nextChecked) => {
-                            const next = nextChecked
-                              ? [...form.paymentMethodsEnabled, option.value]
-                              : form.paymentMethodsEnabled.filter(
-                                  (method) => method !== option.value,
-                                );
-                            if (next.length === 0) return;
-                            setForm((current) => ({
-                              ...current,
-                              paymentMethodsEnabled: next,
-                              defaultPaymentMethod: next.includes(
-                                current.defaultPaymentMethod,
-                              )
-                                ? current.defaultPaymentMethod
-                                : next[0]!,
-                            }));
-                          }}
-                        />
-                        {option.label}
-                      </label>
-                    );
-                  })}
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  未启用的方式不会出现在结账页；移动支付必须先由租户 Owner
-                  在后台完成 API 验证并启用，刷卡还要求本机连接 TPE。
+            <div className="space-y-2 py-2 lg:py-0">
+              <Label className="text-base font-medium lg:text-sm">
+                支付与现金策略
+              </Label>
+              <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm">
+                <p>
+                  已启用：
+                  {PAYMENT_METHOD_OPTIONS.filter((option) =>
+                    initial.paymentMethodsEnabled.includes(option.value),
+                  )
+                    .map((option) => option.label)
+                    .join("、")}
+                </p>
+                <p className="mt-1">
+                  现金处理：{CASH_HANDLING_MODE_LABELS[initial.cashHandlingMode]}
                 </p>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-base font-medium lg:text-sm">
-                  默认支付方式
-                </Label>
-                <Select
-                  onValueChange={(value) =>
-                    updateField(
-                      "defaultPaymentMethod",
-                      value as TerminalSettingsFormValues["defaultPaymentMethod"],
-                    )
-                  }
-                  value={form.defaultPaymentMethod}
-                >
-                  <SelectTrigger className="h-12 w-full rounded-none border-x-0 border-t-0 bg-transparent px-0 text-base shadow-none lg:h-9 lg:rounded-md lg:border lg:px-3 lg:text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PAYMENT_METHOD_OPTIONS.filter((option) =>
-                      form.paymentMethodsEnabled.includes(option.value),
-                    ).map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-base font-medium lg:text-sm">
-                  现金处理方式
-                </Label>
-                <Select
-                  disabled={!form.paymentMethodsEnabled.includes("cash")}
-                  onValueChange={(value) =>
-                    updateField(
-                      "cashHandlingMode",
-                      value as TerminalSettingsFormValues["cashHandlingMode"],
-                    )
-                  }
-                  value={
-                    form.paymentMethodsEnabled.includes("cash")
-                      ? form.cashHandlingMode
-                      : "none"
-                  }
-                >
-                  <SelectTrigger className="h-12 w-full rounded-none border-x-0 border-t-0 bg-transparent px-0 text-base shadow-none lg:h-9 lg:rounded-md lg:border lg:px-3 lg:text-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">不接受现金</SelectItem>
-                    <SelectItem value="untracked">
-                      接受现金但不盘点
-                    </SelectItem>
-                    <SelectItem value="shared_drawer">
-                      多人共用一个钱箱
-                    </SelectItem>
-                    <SelectItem value="assigned_drawer">
-                      钱箱分配给指定收银员
-                    </SelectItem>
-                    <SelectItem value="cash_in_hand">
-                      店员保管随身现金
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  没有实体钱箱时可选择“不盘点”或“随身现金”；电子支付不依赖钱箱。
-                </p>
-              </div>
+              <p className="text-xs text-muted-foreground">
+                支付方式与现金处理由门店统一设置，请在后台「设置 →
+                支付」和「设置 → 现金」中调整。
+              </p>
             </div>
           ) : null}
 

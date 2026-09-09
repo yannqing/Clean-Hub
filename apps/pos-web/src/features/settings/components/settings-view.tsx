@@ -204,9 +204,6 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
 
       const result = await updateTerminalSettings({
         label: values.label || undefined,
-        defaultPaymentMethod: values.defaultPaymentMethod,
-        paymentMethodsEnabled: values.paymentMethodsEnabled,
-        cashHandlingMode: values.cashHandlingMode,
         roundingRule: values.roundingRule,
         autoPrintReceipt: values.autoPrintReceipt,
         printCopies: values.printCopies,
@@ -265,9 +262,6 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
           key={`terminal-${section}-${terminalSettings?.version ?? "new"}-${isLoading}`}
           initial={formValues}
           loading={isLoading}
-          mobileMoneyAvailable={
-            (terminalSettings?.mobileMoneyProvidersEnabled.length ?? 0) > 0
-          }
           mode={section}
           saving={saving}
           onSave={handleSave}
@@ -339,9 +333,6 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
             key={`terminal-${terminalSettings?.version ?? "new"}-${isLoading}`}
             initial={formValues}
             loading={isLoading}
-            mobileMoneyAvailable={
-              (terminalSettings?.mobileMoneyProvidersEnabled.length ?? 0) > 0
-            }
             saving={saving}
             onSave={handleSave}
           />

@@ -65,7 +65,6 @@ const COPY = {
     noCash: "本终端不接受现金，无需配置或核对钱箱。",
     untrackedCash: "本终端接受现金，但当前设置不跟踪钱箱金额。",
     sharedDrawer: "共享钱箱",
-    assignedDrawer: "专人钱箱",
     cashInHand: "随身现金",
     expectedCash: "系统应有现金",
     netSales: "本收银台净销售额",
@@ -107,7 +106,6 @@ const COPY = {
     noCash: "Cash is disabled on this terminal, so no drawer is required.",
     untrackedCash: "Cash is accepted, but drawer totals are not tracked by the current policy.",
     sharedDrawer: "Shared drawer",
-    assignedDrawer: "Assigned drawer",
     cashInHand: "Cash in hand",
     expectedCash: "Expected cash",
     netSales: "Register net sales",
@@ -149,7 +147,6 @@ const COPY = {
     noCash: "Les espèces sont désactivées sur ce terminal ; aucun tiroir n'est requis.",
     untrackedCash: "Les espèces sont acceptées, mais les montants du tiroir ne sont pas suivis.",
     sharedDrawer: "Tiroir partagé",
-    assignedDrawer: "Tiroir attribué",
     cashInHand: "Espèces en main",
     expectedCash: "Espèces attendues",
     netSales: "Ventes nettes de la caisse",
@@ -217,7 +214,7 @@ export function PosOperationsView({
   const [countedCash, setCountedCash] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
-  const trackedCash = ["shared_drawer", "assigned_drawer", "cash_in_hand"].includes(register.cashHandlingMode);
+  const trackedCash = ["shared_drawer", "cash_in_hand"].includes(register.cashHandlingMode);
   const personalCash = register.cashHandlingMode === "cash_in_hand";
   const needsPersonalCashSession = Boolean(
     personalCash && register.registerSession && !register.cashSession,
@@ -225,7 +222,6 @@ export function PosOperationsView({
   const canFinalizeRegister = user?.role === "owner" || user?.role === "manager";
   const modeLabel = useMemo(() => {
     if (register.cashHandlingMode === "shared_drawer") return copy.sharedDrawer;
-    if (register.cashHandlingMode === "assigned_drawer") return copy.assignedDrawer;
     if (register.cashHandlingMode === "cash_in_hand") return copy.cashInHand;
     return null;
   }, [copy, register.cashHandlingMode]);

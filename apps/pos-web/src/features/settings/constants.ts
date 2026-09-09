@@ -13,6 +13,15 @@ export const PAYMENT_METHOD_OPTIONS = [
   { value: "app", label: "移动支付" },
 ] as const;
 
+// ---- 现金处理方式（门店级策略，终端只读展示）----
+
+export const CASH_HANDLING_MODE_LABELS = {
+  none: "不接受现金",
+  untracked: "接受现金但不盘点",
+  shared_drawer: "多人共用一个钱箱",
+  cash_in_hand: "店员保管随身现金",
+} as const;
+
 // ---- 抹零规则选项 ----
 
 export const ROUNDING_RULE_OPTIONS = [
