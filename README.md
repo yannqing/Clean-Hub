@@ -202,15 +202,29 @@ Password: 123456
 PIN:      cashier1=111111, cashier2=222222, cashier3=333333, cashier4=444444
 ```
 
-Required env (set in the repo-root `.env`, already in `.env.example`):
+Select the POS development profile before starting the servers. For local
+browser development, run:
 
-```text
-NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
-CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+```bash
+pnpm pos:config:local
 ```
 
-> Note: `NEXT_PUBLIC_*` values are injected at build/dev start. Restart the
-> POS Web dev server after changing them.
+For Android/iPad development over the local network, run:
+
+```bash
+pnpm pos:config:lan
+```
+
+LAN mode detects the current private IPv4 address and updates the POS Web API
+URL, Next.js development origin, API CORS origin, and Capacitor server URL as
+one profile. Override the detected interface when necessary:
+
+```bash
+pnpm pos:config:lan -- --host 192.168.2.106
+```
+
+Run `pnpm pos:config` to inspect the active profile. Restart the API and POS
+Web after switching; LAN mode also requires another Capacitor sync/install.
 
 ### API
 

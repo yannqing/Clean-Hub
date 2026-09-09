@@ -199,14 +199,28 @@ pnpm db:seed
 PIN：     cashier1=111111，cashier2=222222，cashier3=333333，cashier4=444444
 ```
 
-所需环境变量（配置在仓库根 `.env`，`.env.example` 已包含）：
+启动前先选择 POS 开发配置。只在本机浏览器调试时使用：
 
-```text
-NEXT_PUBLIC_API_BASE_URL=http://localhost:4000
-CORS_ORIGINS=http://localhost:3000,http://localhost:3001
+```bash
+pnpm pos:config:local
 ```
 
-> 注意：`NEXT_PUBLIC_*` 变量在 dev server 启动时注入，修改后需重启 POS Web。
+Android/iPad 真机通过局域网调试时使用：
+
+```bash
+pnpm pos:config:lan
+```
+
+局域网模式会自动识别当前开发电脑的私网 IPv4，并成套更新 POS Web API
+地址、Next 开发来源、API CORS 和 Capacitor 服务地址。电脑存在多个网卡时可以
+明确指定地址：
+
+```bash
+pnpm pos:config:lan -- --host 192.168.2.106
+```
+
+可随时运行 `pnpm pos:config` 查看当前配置。切换后必须重启 API 和 POS Web；
+真机模式还需要重新执行 Capacitor 同步/安装命令。
 
 ### 启动 API
 

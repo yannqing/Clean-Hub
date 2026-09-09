@@ -29,26 +29,24 @@ host-only HttpOnly Cookie 才会同时发送给 Next.js 和 API。不要采用
 需要 Node.js 22、pnpm 10 和完整 Xcode（仅安装 Command Line Tools 不能构建
 iOS 工程）。真机还需要 Apple 开发者签名与 provisioning profile。
 
-先把示例环境变量复制到本应用目录，并将 IP 改成开发电脑的局域网 IP：
+在仓库根目录切换到局域网开发配置：
 
 ```bash
-cp apps/pos-mobile/.env.example apps/pos-mobile/.env
+pnpm pos:config:lan
 ```
 
-不要填写 `localhost`，因为 iPad 上的 `localhost` 是 iPad 自身。
+脚本会自动识别开发电脑的局域网 IPv4，并同步更新根目录 `.env`、
+`apps/pos-web/.env` 和 `apps/pos-mobile/.env`。存在多个网卡或自动识别结果不对时，
+可以明确指定 IP：
 
-根目录 `.env` 也必须让浏览器端 API 指向同一台开发电脑，并允许 POS 页面
-origin。服务端自身仍可通过 localhost 调用 API，例如开发电脑 IP 为
-`192.168.1.100` 时：
-
-```dotenv
-CLEANHUB_API_BASE_URL=http://localhost:4000
-NEXT_PUBLIC_API_BASE_URL=http://192.168.1.100:4000
-CORS_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://192.168.1.100:3001
+```bash
+pnpm pos:config:lan -- --host 192.168.2.106
 ```
 
-`NEXT_PUBLIC_API_BASE_URL` 会进入前端 bundle，改完后必须重启 API 和 POS
-Web。还应确认系统防火墙允许 iPad 访问 3001 与 4000 端口。
+不要为真机填写 `localhost`，因为设备上的 `localhost` 指向设备自身。切换后
+必须重启 API 与 POS Web，并重新同步/安装原生应用。还应确认系统防火墙允许
+设备访问 3001 与 4000 端口。回到纯浏览器调试时运行
+`pnpm pos:config:local`。
 
 分别启动 API 与可从局域网访问的 POS Web：
 
