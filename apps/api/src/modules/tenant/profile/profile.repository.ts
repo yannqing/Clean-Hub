@@ -84,13 +84,14 @@ export async function findTenantSelfProfile(
     eq(branches.tenantId, input.tenantId),
     isNull(branches.deletedAt),
   ];
-  const accessibleBranches =
+  const accessibleBranchRows =
     input.allowedBranchIds?.length === 0
       ? []
       : await db
           .select({
             id: branches.id,
             name: branches.name,
+            defaultLanguage: branches.defaultLanguage,
             status: branches.status,
           })
           .from(branches)
@@ -103,6 +104,10 @@ export async function findTenantSelfProfile(
             ),
           )
           .orderBy(asc(branches.name));
+  const accessibleBranches = accessibleBranchRows.map((branch) => ({
+    ...branch,
+    defaultLanguage: resolveLanguage(branch.defaultLanguage),
+  }));
 
   const roleRows = await db
     .select({

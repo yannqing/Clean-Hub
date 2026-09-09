@@ -60,7 +60,7 @@ function defaultTerminalLabel(branchName: string): string {
 
 export function TerminalSetupView() {
   const router = useRouter();
-  const { locale } = useTranslation();
+  const { locale, setLocale } = useTranslation();
   const copy = getTerminalSetupCopy(locale);
   const mountedRef = useRef(true);
   const [pageState, setPageState] = useState<PageState>({ kind: "loading" });
@@ -382,6 +382,7 @@ export function TerminalSetupView() {
           branchId: selectedBranch.id,
           ...runtimeMetadata,
         });
+        await setLocale(selectedBranch.defaultLanguage).catch(() => undefined);
       }
 
       setStep("complete");

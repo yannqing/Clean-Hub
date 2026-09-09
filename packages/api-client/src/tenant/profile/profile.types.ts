@@ -15,6 +15,7 @@ export type TenantProfileRole = {
 export type TenantProfileBranch = {
   id: string;
   name: string;
+  defaultLanguage: TenantProfileLanguage;
   status: TenantProfileBranchStatus;
 };
 
