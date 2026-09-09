@@ -1,5 +1,7 @@
 import type {
   BranchBusinessHours,
+  BranchCashHandlingMode,
+  BranchPaymentMethod,
   BranchBusinessDayHours,
   BranchDetail,
   BranchLanguage,
@@ -16,6 +18,8 @@ import type {
 
 export type {
   BranchBusinessHours,
+  BranchCashHandlingMode,
+  BranchPaymentMethod,
   BranchBusinessDayHours,
   BranchDetail,
   BranchLanguage,

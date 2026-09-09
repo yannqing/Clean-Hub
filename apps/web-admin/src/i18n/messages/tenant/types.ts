@@ -2241,6 +2241,7 @@ export type TenantMessages = {
         general: string;
         pricing: string;
         payments: string;
+        cash: string;
         pointOfSale: string;
         printing: string;
         hardware: string;
@@ -2266,6 +2267,7 @@ export type TenantMessages = {
         general: string;
         pricing: string;
         payments: string;
+        cash: string;
         pointOfSale: string;
         printing: string;
         hardware: string;

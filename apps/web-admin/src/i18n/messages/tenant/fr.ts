@@ -2713,6 +2713,7 @@ export const tenantMessagesFr: TenantMessages = {
         general: "Général",
         pricing: "Tarifs",
         payments: "Paiements",
+        cash: "Espèces",
         pointOfSale: "Point de vente",
         printing: "Impression",
         hardware: "Périphériques de point de vente",
@@ -2746,6 +2747,8 @@ export const tenantMessagesFr: TenantMessages = {
         pricing: "Maintenir les prix des services et des produits.",
         payments:
           "Connectez et vérifiez Wave ou Orange Money pour les paiements mobiles du point de vente.",
+        cash:
+          "Choisissez comment chaque succursale compte les espèces et qui en est responsable.",
         pointOfSale:
           "Configurez les terminaux, enregistrez les sessions et le comportement hors ligne.",
         printing:

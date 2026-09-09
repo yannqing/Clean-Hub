@@ -2662,6 +2662,7 @@ export const tenantMessagesEn: TenantMessages = {
         general: "General",
         pricing: "Pricing",
         payments: "Payments",
+        cash: "Cash",
         pointOfSale: "Point of sale",
         printing: "Printing",
         hardware: "POS peripherals",
@@ -2694,6 +2695,8 @@ export const tenantMessagesEn: TenantMessages = {
         pricing: "Maintain service and product prices.",
         payments:
           "Connect and verify Wave or Orange Money for POS mobile payments.",
+        cash:
+          "Choose how each branch counts cash and who is responsible for it.",
         pointOfSale:
           "Configure terminals, register sessions, and offline behavior.",
         printing:

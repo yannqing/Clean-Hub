@@ -116,6 +116,9 @@ function toBranchSummary(row: typeof branches.$inferSelect): BranchSummary {
     receiptAddress: row.receiptAddress,
     receiptFields: normalizePosReceiptFields(row.receiptFields),
     ticketLabelFields: normalizePosTicketLabelFields(row.ticketLabelFields),
+    paymentMethodsEnabled: row.paymentMethodsEnabled,
+    defaultPaymentMethod: row.defaultPaymentMethod,
+    cashHandlingMode: row.cashHandlingMode,
     logoObjectKey: isBranchLogoObjectKey(row.logoUrl) ? row.logoUrl : null,
     logoUrl: isBranchLogoObjectKey(row.logoUrl) ? null : row.logoUrl,
     status: row.status,
@@ -214,6 +217,9 @@ export async function createBranchRecord(
     ticketLabelFields: input.ticketLabelFields ?? [
       ...DEFAULT_POS_TICKET_LABEL_FIELDS,
     ],
+    paymentMethodsEnabled: input.paymentMethodsEnabled ?? ["cash", "app"],
+    defaultPaymentMethod: input.defaultPaymentMethod ?? "cash",
+    cashHandlingMode: input.cashHandlingMode ?? "shared_drawer",
     logoUrl: normalizeNullable(input.logoObjectKey),
     status: input.status ?? "active",
     createdBy: input.actorUserId,
@@ -288,6 +294,12 @@ export async function updateBranchRecord(
         input.data.ticketLabelFields === undefined
           ? input.current.ticketLabelFields
           : normalizePosTicketLabelFields(input.data.ticketLabelFields),
+      paymentMethodsEnabled:
+        input.data.paymentMethodsEnabled ?? input.current.paymentMethodsEnabled,
+      defaultPaymentMethod:
+        input.data.defaultPaymentMethod ?? input.current.defaultPaymentMethod,
+      cashHandlingMode:
+        input.data.cashHandlingMode ?? input.current.cashHandlingMode,
       logoUrl:
         input.data.logoObjectKey === undefined
           ? (input.current.logoObjectKey ?? input.current.logoUrl)

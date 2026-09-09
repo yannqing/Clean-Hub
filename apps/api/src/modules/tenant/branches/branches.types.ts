@@ -22,6 +22,14 @@ export type BranchBusinessHours = Partial<
   Record<BranchWeekday, BranchBusinessDayHours>
 >;
 
+export type BranchPaymentMethod = "cash" | "card" | "app";
+
+export type BranchCashHandlingMode =
+  | "none"
+  | "untracked"
+  | "shared_drawer"
+  | "cash_in_hand";
+
 export type BranchSummary = {
   id: string;
   name: string;
@@ -35,6 +43,9 @@ export type BranchSummary = {
   receiptAddress: string | null;
   receiptFields: PosReceiptField[];
   ticketLabelFields: PosTicketLabelField[];
+  paymentMethodsEnabled: BranchPaymentMethod[];
+  defaultPaymentMethod: BranchPaymentMethod;
+  cashHandlingMode: BranchCashHandlingMode;
   logoObjectKey: string | null;
   logoUrl: string | null;
   status: BranchStatus;
@@ -60,6 +71,9 @@ export type CreateBranchRequest = {
   receiptAddress?: string | null;
   receiptFields?: PosReceiptField[];
   ticketLabelFields?: PosTicketLabelField[];
+  paymentMethodsEnabled?: BranchPaymentMethod[];
+  defaultPaymentMethod?: BranchPaymentMethod;
+  cashHandlingMode?: BranchCashHandlingMode;
   logoObjectKey?: string | null;
   status?: BranchStatus;
 };

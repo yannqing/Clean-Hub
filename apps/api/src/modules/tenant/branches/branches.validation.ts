@@ -68,6 +68,19 @@ const ticketLabelFieldsSchema = z
     { message: "Ticket number and item name are required on every label." },
   );
 
+const branchPaymentMethodSchema = z.enum(["cash", "card", "app"]);
+const paymentMethodsEnabledSchema = z
+  .array(branchPaymentMethodSchema)
+  .min(1)
+  .max(3)
+  .transform((methods) => Array.from(new Set(methods)));
+const cashHandlingModeSchema = z.enum([
+  "none",
+  "untracked",
+  "shared_drawer",
+  "cash_in_hand",
+]);
+
 export const branchListQuerySchema = z.object({
   q: z.string().trim().min(1).max(120).optional(),
   status: branchStatusSchema.optional(),
@@ -79,7 +92,7 @@ export const branchParamsSchema = z.object({
   branchId: z.string().regex(ULID_PATTERN),
 });
 
-export const createBranchBodySchema = z.object({
+const branchBodyBaseSchema = z.object({
   name: z.string().trim().min(1).max(200),
   address: nullableStringSchema(500),
   phone: nullableStringSchema(32),
@@ -92,11 +105,22 @@ export const createBranchBodySchema = z.object({
   ticketLabelFields: ticketLabelFieldsSchema.default([
     ...DEFAULT_POS_TICKET_LABEL_FIELDS,
   ]),
+  paymentMethodsEnabled: paymentMethodsEnabledSchema.default(["cash", "app"]),
+  defaultPaymentMethod: branchPaymentMethodSchema.default("cash"),
+  cashHandlingMode: cashHandlingModeSchema.default("shared_drawer"),
   logoObjectKey: branchLogoObjectKeySchema.optional(),
   status: branchStatusSchema.default("active"),
 });
 
-export const updateBranchBodySchema = createBranchBodySchema
+export const createBranchBodySchema = branchBodyBaseSchema.refine(
+  (data) => data.paymentMethodsEnabled.includes(data.defaultPaymentMethod),
+  {
+    message: "The default payment method must also be enabled.",
+    path: ["defaultPaymentMethod"],
+  },
+);
+
+export const updateBranchBodySchema = branchBodyBaseSchema
   .omit({ status: true })
   .partial()
   .extend({
@@ -109,6 +133,16 @@ export const updateBranchBodySchema = createBranchBodySchema
         ([key, value]) => key !== "version" && value !== undefined,
       ),
     "At least one branch field must be provided.",
+  )
+  .refine(
+    (data) =>
+      !data.defaultPaymentMethod ||
+      !data.paymentMethodsEnabled ||
+      data.paymentMethodsEnabled.includes(data.defaultPaymentMethod),
+    {
+      message: "The default payment method must also be enabled.",
+      path: ["defaultPaymentMethod"],
+    },
   );
 
 export const updateBranchStatusBodySchema = z.object({

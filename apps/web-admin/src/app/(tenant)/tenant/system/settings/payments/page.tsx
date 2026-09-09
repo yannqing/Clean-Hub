@@ -1,4 +1,6 @@
 import { TenantPaymentSettingsView } from "@/features/tenant/payment-integrations";
+import { BranchPaymentSettingsView } from "@/features/tenant/settings/components";
+import { getBranchListQuery } from "@/features/tenant/branches/queries";
 import { getTenantPaymentIntegrationsQuery } from "@/features/tenant/payment-integrations/queries";
 import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
 
@@ -39,10 +41,24 @@ export default async function TenantPaymentSettingsPage() {
     loadError = error instanceof Error ? error.message : "支付设置加载失败。";
   }
 
+  const branchResult = await getBranchListQuery({}, options)
+    .then((branches) => ({ branches, error: undefined }))
+    .catch((error: unknown) => ({
+      branches: undefined,
+      error: error instanceof Error ? error.message : "门店列表加载失败。",
+    }));
+
   return (
-    <TenantPaymentSettingsView
-      initialIntegrations={integrations}
-      loadError={loadError}
-    />
+    <div className="space-y-4">
+      <BranchPaymentSettingsView
+        initialBranches={branchResult.branches}
+        initialError={branchResult.error}
+        section="payments"
+      />
+      <TenantPaymentSettingsView
+        initialIntegrations={integrations}
+        loadError={loadError}
+      />
+    </div>
   );
 }

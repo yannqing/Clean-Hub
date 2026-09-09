@@ -3,6 +3,7 @@
 import type { AuthContext } from "@cleanhub/api-client";
 import { Button, Input, Label, cn } from "@cleanhub/ui";
 import {
+  Banknote,
   CircleDollarSign,
   CreditCard,
   Printer,
@@ -36,6 +37,7 @@ export type TenantSettingsNavigationKey =
   | "general"
   | "pricing"
   | "payments"
+  | "cash"
   | "pointOfSale"
   | "printing"
   | "hardware"
@@ -62,6 +64,11 @@ export const tenantSettingsNavigationItems: TenantSettingsNavigationItem[] = [
     key: "payments",
     href: webAdminRoutes.tenant.system.settingsSections.payments,
     icon: CreditCard,
+  },
+  {
+    key: "cash",
+    href: webAdminRoutes.tenant.system.settingsSections.cash,
+    icon: Banknote,
   },
   {
     key: "pointOfSale",

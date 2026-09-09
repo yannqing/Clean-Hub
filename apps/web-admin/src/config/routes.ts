@@ -99,6 +99,7 @@ export const webAdminRoutes = {
         general: "/tenant/system/settings",
         pricing: "/tenant/system/settings/pricing",
         payments: "/tenant/system/settings/payments",
+        cash: "/tenant/system/settings/cash",
         pointOfSale: "/tenant/system/settings/point-of-sale",
         printing: "/tenant/system/settings/printing",
         hardware: "/tenant/point-of-sale/hardware",
