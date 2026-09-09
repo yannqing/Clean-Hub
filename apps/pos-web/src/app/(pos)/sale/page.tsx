@@ -2,13 +2,17 @@ import { getCurrentUser } from "@/lib/auth";
 import { getMyBranchQuery } from "@/features/branches/queries";
 import { CartSaleView } from "@/features/cart/components";
 import { getPosCatalogQuery } from "@/features/catalog/queries";
-import { getCurrentShiftQuery } from "@/features/shift-handover/queries";
+import {
+  getCurrentRegisterQuery,
+  getCurrentShiftQuery,
+} from "@/features/shift-handover/queries";
 
 export default async function SalePage() {
-  const [branch, user, currentShift] = await Promise.all([
+  const [branch, user, currentShift, register] = await Promise.all([
     getMyBranchQuery().catch(() => null),
     getCurrentUser(),
     getCurrentShiftQuery().catch(() => null),
+    getCurrentRegisterQuery(),
   ]);
   const branchId = user?.terminalBranchId ?? branch?.id;
   const catalog = branchId
@@ -25,6 +29,7 @@ export default async function SalePage() {
         user?.role === "owner" || user?.role === "manager"
       }
       currentShift={currentShift}
+      register={register}
       products={catalog.products}
       services={catalog.data}
     />

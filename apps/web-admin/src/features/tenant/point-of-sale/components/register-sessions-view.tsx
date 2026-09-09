@@ -24,7 +24,6 @@ import {
   CalendarDays,
   CircleDollarSign,
   Download,
-  PauseCircle,
   PlayCircle,
   Search,
   SquareTerminal,
@@ -210,13 +209,6 @@ export function RegisterSessionsView({
       label: m.pointOfSale.registerSessions.metrics.open,
       value: result
         ? formatCount(result.metrics.open, locale)
-        : m.pointOfSale.registerSessions.unavailable,
-    },
-    {
-      icon: PauseCircle,
-      label: m.pointOfSale.registerSessions.metrics.onBreak,
-      value: result
-        ? formatCount(result.metrics.onBreak, locale)
         : m.pointOfSale.registerSessions.unavailable,
     },
     {
@@ -414,13 +406,9 @@ export function RegisterSessionsView({
                 <SelectItem value={ALL_VALUE}>
                   {m.pointOfSale.filters.allStatuses}
                 </SelectItem>
-                {(["open", "on_break", "closed"] as const).map((status) => (
+                {(["open", "closed"] as const).map((status) => (
                   <SelectItem key={status} value={status}>
-                    {
-                      m.pointOfSale.registerSessions.statuses[
-                        status === "on_break" ? "onBreak" : status
-                      ]
-                    }
+                    {m.pointOfSale.registerSessions.statuses[status]}
                   </SelectItem>
                 ))}
               </SelectContent>

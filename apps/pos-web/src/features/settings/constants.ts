@@ -27,6 +27,7 @@ export const TERMINAL_SETTINGS_DEFAULTS = {
   label: "",
   defaultPaymentMethod: "cash" as const,
   paymentMethodsEnabled: ["cash", "app"] as ("cash" | "card" | "app")[],
+  cashHandlingMode: "shared_drawer" as const,
   roundingRule: "none" as const,
   autoPrintReceipt: true,
   printCopies: 1,

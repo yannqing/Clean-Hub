@@ -809,7 +809,7 @@ export const frMessages = {
       orders: "Commandes",
       statistics: "Statistiques",
       garments: "Articles",
-      shiftHandover: "Passation",
+      shiftHandover: "Services et caisse",
       notifications: "Notifications",
       settings: "Paramètres",
       more: "Plus",
@@ -902,7 +902,7 @@ export const frMessages = {
       cashTenderInsufficient:
         "Les espèces reçues doivent couvrir le montant à payer.",
       cashShiftRequired:
-        "Les paiements en espèces exigent un service ouvert et actif pour l’employé actuel.",
+        "Ouvrez une session d’espèces dans Services et caisse avant d’accepter des espèces.",
       payLater: "Payer plus tard",
       paymentReference: "Référence Wave / Orange Money",
       paymentReferenceRequired:

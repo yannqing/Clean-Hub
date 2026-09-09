@@ -1,5 +1,6 @@
 import type {
   PosChannelAvailableBranch,
+  PosChannelCashHandlingMode,
   PosChannelDeviceConnectivity,
   PosChannelDeviceStatus,
   PosChannelDeviceSummary,
@@ -22,6 +23,7 @@ import type {
 } from "@cleanhub/api-client";
 
 export type PointOfSaleBranchOption = PosChannelAvailableBranch;
+export type PointOfSaleCashHandlingMode = PosChannelCashHandlingMode;
 export type PointOfSaleOverview = TenantPosChannelOverview;
 export type PointOfSaleOverviewQuery = TenantPosChannelOverviewQuery;
 export type PointOfSaleDevice = PosChannelDeviceSummary;

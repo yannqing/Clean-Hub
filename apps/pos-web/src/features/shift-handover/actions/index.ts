@@ -1,1 +1,6 @@
-export { clockShiftAction, createShiftHandoverAction } from "./shift-actions";
+export {
+  clockShiftAction,
+  closeRegisterAction,
+  createShiftHandoverAction,
+  openRegisterAction,
+} from "./shift-actions";

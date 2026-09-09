@@ -40,6 +40,7 @@ type ShiftHandoverDraft = {
 };
 
 type ShiftHandoverViewProps = {
+  activeShiftOnAnotherTerminal: boolean;
   branch: PosBranchSummary | null;
   currentShift: ShiftRecord | null;
   recentReports: PosZReport[];
@@ -57,6 +58,9 @@ type Copy = {
   active: string;
   onBreak: string;
   noOpenShift: string;
+  activeElsewhere: string;
+  activeElsewhereTitle: string;
+  activeElsewhereDescription: string;
   openingFloat: string;
   clockIn: string;
   clockOut: string;
@@ -75,6 +79,7 @@ type Copy = {
   cashCardTitle: string;
   cashCardDescription: string;
   cashRequiresShift: string;
+  cashRequiresOriginalTerminal: string;
   cashRequiresAvailableStaff: string;
   cashInputLabel: string;
   incomingStaffLabel: string;
@@ -122,6 +127,10 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     active: "进行中",
     onBreak: "休息中",
     noOpenShift: "未上班",
+    activeElsewhere: "其他终端上班中",
+    activeElsewhereTitle: "当前班次属于另一台 POS 终端",
+    activeElsewhereDescription:
+      "为避免重复收银，本机不能接管或结束该班次。请先在原终端完成下班或交接；如原终端无法使用，请联系门店管理员处理异常班次。",
     openingFloat: "开班钱箱现金（备用金）",
     clockIn: "上班",
     clockOut: "下班",
@@ -141,6 +150,8 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     cashCardDescription: "按钱箱实点金额填写，系统会自动计算差异。",
     cashRequiresShift:
       "现金核对已锁定：请先在上方填写开班备用金并点击“上班”。",
+    cashRequiresOriginalTerminal:
+      "现金核对已锁定：当前班次只能在开启它的原 POS 终端上处理。",
     cashRequiresAvailableStaff:
       "暂无可接班店员：接班人必须是当前处于“未上班”状态的其他店员。",
     cashInputLabel: "实点现金金额",
@@ -193,6 +204,10 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     active: "Open",
     onBreak: "On break",
     noOpenShift: "Not clocked in",
+    activeElsewhere: "Open on another terminal",
+    activeElsewhereTitle: "This shift belongs to another POS terminal",
+    activeElsewhereDescription:
+      "To prevent duplicate checkout activity, this terminal cannot take over or close that shift. Clock out or hand over on the original terminal, or ask a store manager to resolve the interrupted shift.",
     openingFloat: "Opening drawer cash (float)",
     clockIn: "Clock in",
     clockOut: "Clock out",
@@ -213,6 +228,8 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
       "Enter the cash counted in the drawer. The variance is calculated automatically.",
     cashRequiresShift:
       "Cash reconciliation is locked. Enter the opening float above and clock in first.",
+    cashRequiresOriginalTerminal:
+      "Cash reconciliation is locked. The active shift can only be handled on the POS terminal where it was opened.",
     cashRequiresAvailableStaff:
       "No incoming staff is available. The incoming employee must currently be off duty.",
     cashInputLabel: "Counted cash amount",
@@ -266,6 +283,10 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
     active: "Ouvert",
     onBreak: "En pause",
     noOpenShift: "Service non ouvert",
+    activeElsewhere: "Ouvert sur un autre terminal",
+    activeElsewhereTitle: "Ce service appartient à un autre terminal POS",
+    activeElsewhereDescription:
+      "Pour éviter les encaissements en double, ce terminal ne peut ni reprendre ni clôturer ce service. Terminez-le sur le terminal d’origine ou demandez à un responsable de traiter le service interrompu.",
     openingFloat: "Espèces initiales du tiroir (fonds de caisse)",
     clockIn: "Prendre le service",
     clockOut: "Terminer le service",
@@ -286,6 +307,8 @@ const COPY: Record<"zh-CN" | "en" | "fr", Copy> = {
       "Saisissez le montant compté dans le tiroir. L'écart est calculé automatiquement.",
     cashRequiresShift:
       "Le rapprochement est verrouillé. Saisissez le fonds initial ci-dessus et prenez d'abord votre service.",
+    cashRequiresOriginalTerminal:
+      "Le rapprochement est verrouillé. Le service actif ne peut être traité que sur le terminal POS où il a été ouvert.",
     cashRequiresAvailableStaff:
       "Aucun employé entrant n'est disponible. L'employé entrant doit être hors service.",
     cashInputLabel: "Montant compté",
@@ -604,6 +627,7 @@ function buildSummaryText({
 }
 
 export function ShiftHandoverView({
+  activeShiftOnAnotherTerminal,
   branch,
   currentShift,
   recentReports,
@@ -749,11 +773,7 @@ export function ShiftHandoverView({
       return;
     }
     setIsSubmitting(true);
-    const result = await clockShiftAction({
-      action,
-      openingFloat: action === "clock_in" ? openingFloat : undefined,
-      closingFloat: action === "clock_out" ? countedCash : undefined,
-    });
+    const result = await clockShiftAction({ action });
     if (!result.ok) {
       toast.error(result.message);
       setIsSubmitting(false);
@@ -787,7 +807,9 @@ export function ShiftHandoverView({
         actions={
           <span
             className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold ${
-              currentShift?.status === "open"
+              activeShiftOnAnotherTerminal
+                ? "bg-amber-50 text-amber-700"
+                : currentShift?.status === "open"
                 ? "bg-emerald-50 text-emerald-700"
                 : currentShift?.status === "on_break"
                   ? "bg-amber-50 text-amber-700"
@@ -796,14 +818,18 @@ export function ShiftHandoverView({
           >
             <span
               className={`h-2 w-2 rounded-full ${
-                currentShift?.status === "open"
+                activeShiftOnAnotherTerminal
+                  ? "bg-amber-500"
+                  : currentShift?.status === "open"
                   ? "bg-emerald-500"
                   : currentShift?.status === "on_break"
                     ? "bg-amber-500"
                     : "bg-muted-foreground"
               }`}
             />
-            {currentShift?.status === "open"
+            {activeShiftOnAnotherTerminal
+              ? copy.activeElsewhere
+              : currentShift?.status === "open"
               ? copy.active
               : currentShift?.status === "on_break"
                 ? copy.onBreak
@@ -814,6 +840,21 @@ export function ShiftHandoverView({
         icon="replace"
         title={copy.title}
       />
+
+      {activeShiftOnAnotherTerminal ? (
+        <div
+          className="flex items-start gap-3 border-y border-amber-200 bg-amber-50 px-5 py-4 text-amber-950 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-100"
+          role="alert"
+        >
+          <Icon className="mt-0.5 size-5 shrink-0" name="alert" />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold">{copy.activeElsewhereTitle}</p>
+            <p className="mt-1 text-sm leading-6 text-amber-900 dark:text-amber-200">
+              {copy.activeElsewhereDescription}
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       <div className="border-y bg-background py-4">
         <div className="grid gap-3 lg:grid-cols-3">
@@ -847,7 +888,7 @@ export function ShiftHandoverView({
           className="mt-4 flex flex-wrap items-end gap-3 border-t pt-4"
           id="shift-controls"
         >
-          {!currentShift ? (
+          {!currentShift && !activeShiftOnAnotherTerminal ? (
             <label className="block min-w-52">
               <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
                 {copy.openingFloat}
@@ -863,7 +904,7 @@ export function ShiftHandoverView({
               />
             </label>
           ) : null}
-          {!currentShift ? (
+          {activeShiftOnAnotherTerminal ? null : !currentShift ? (
             <button
               className="inline-flex h-11 items-center gap-2 rounded-md bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
               disabled={isSubmitting || openingFloat.trim().length === 0}
@@ -983,14 +1024,18 @@ export function ShiftHandoverView({
               >
                 <Icon className="mt-0.5 size-4 shrink-0" name="lock" />
                 <p className="min-w-0 flex-1 text-xs font-medium leading-5">
-                  {copy.cashRequiresShift}
+                  {activeShiftOnAnotherTerminal
+                    ? copy.cashRequiresOriginalTerminal
+                    : copy.cashRequiresShift}
                 </p>
-                <a
-                  className="shrink-0 text-xs font-semibold underline underline-offset-4"
-                  href="#shift-controls"
-                >
-                  {copy.clockIn}
-                </a>
+                {!activeShiftOnAnotherTerminal ? (
+                  <a
+                    className="shrink-0 text-xs font-semibold underline underline-offset-4"
+                    href="#shift-controls"
+                  >
+                    {copy.clockIn}
+                  </a>
+                ) : null}
               </div>
             ) : availableStaff.length === 0 ? (
               <div

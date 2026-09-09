@@ -3,6 +3,7 @@
 //   export { getShiftHandoverListQuery } from "./get-shift-handover-list.query";
 export { getShiftHandoverSummaryQuery } from "./get-shift-handover-summary.query";
 export { getCurrentShiftQuery } from "./get-current-shift.query";
+export { getCurrentRegisterQuery } from "./get-current-register.query";
 export {
   getShiftOperationsQuery,
   type ShiftOperations,

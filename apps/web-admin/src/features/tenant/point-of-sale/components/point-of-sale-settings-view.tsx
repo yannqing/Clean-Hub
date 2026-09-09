@@ -55,6 +55,7 @@ function toFormValues(
 ): PointOfSaleSettingsFormValues {
   return {
     cashTrackingEnabled: settings.cashTrackingEnabled,
+    defaultCashHandlingMode: settings.defaultCashHandlingMode,
     requireOpeningFloat: settings.requireOpeningFloat,
     requireClosingCount: settings.requireClosingCount,
     requireReturnReason: settings.requireReturnReason,
@@ -223,6 +224,78 @@ export function PointOfSaleSettingsView({
                 {m.pointOfSale.settings.sections.cashTrackingDescription}
               </p>
             </div>
+          </div>
+          <div className="mt-4 grid gap-2">
+            <Label>{m.pointOfSale.settings.fields.cashHandlingMode}</Label>
+            <Select
+              disabled={disabled}
+              onValueChange={(value) =>
+                update(
+                  "defaultCashHandlingMode",
+                  value as PointOfSaleSettingsFormValues["defaultCashHandlingMode"],
+                )
+              }
+              value={form.defaultCashHandlingMode}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(
+                  [
+                    "none",
+                    "untracked",
+                    "shared_drawer",
+                    "assigned_drawer",
+                    "cash_in_hand",
+                  ] as const
+                ).map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {m.pointOfSale.settings.cashHandlingModes[mode]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] leading-4 text-muted-foreground">
+              {m.pointOfSale.settings.hints.cashHandlingMode}
+            </p>
+          </div>
+          <div className="mt-4 grid gap-2">
+            <Label htmlFor="pos-cash-handling-mode">
+              {m.pointOfSale.settings.fields.cashHandlingMode}
+            </Label>
+            <Select
+              disabled={disabled}
+              onValueChange={(value) =>
+                update(
+                  "defaultCashHandlingMode",
+                  value as PointOfSaleSettingsFormValues["defaultCashHandlingMode"],
+                )
+              }
+              value={form.defaultCashHandlingMode}
+            >
+              <SelectTrigger id="pos-cash-handling-mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(
+                  [
+                    "none",
+                    "untracked",
+                    "shared_drawer",
+                    "assigned_drawer",
+                    "cash_in_hand",
+                  ] as const
+                ).map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {m.pointOfSale.settings.cashHandlingModes[mode]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[11px] leading-4 text-muted-foreground">
+              {m.pointOfSale.settings.hints.cashHandlingMode}
+            </p>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <BooleanSetting

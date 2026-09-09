@@ -284,6 +284,47 @@ export function TerminalSettingsCard({
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <Label className="text-base font-medium lg:text-sm">
+                  现金处理方式
+                </Label>
+                <Select
+                  disabled={!form.paymentMethodsEnabled.includes("cash")}
+                  onValueChange={(value) =>
+                    updateField(
+                      "cashHandlingMode",
+                      value as TerminalSettingsFormValues["cashHandlingMode"],
+                    )
+                  }
+                  value={
+                    form.paymentMethodsEnabled.includes("cash")
+                      ? form.cashHandlingMode
+                      : "none"
+                  }
+                >
+                  <SelectTrigger className="h-12 w-full rounded-none border-x-0 border-t-0 bg-transparent px-0 text-base shadow-none lg:h-9 lg:rounded-md lg:border lg:px-3 lg:text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">不接受现金</SelectItem>
+                    <SelectItem value="untracked">
+                      接受现金但不盘点
+                    </SelectItem>
+                    <SelectItem value="shared_drawer">
+                      多人共用一个钱箱
+                    </SelectItem>
+                    <SelectItem value="assigned_drawer">
+                      钱箱分配给指定收银员
+                    </SelectItem>
+                    <SelectItem value="cash_in_hand">
+                      店员保管随身现金
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  没有实体钱箱时可选择“不盘点”或“随身现金”；电子支付不依赖钱箱。
+                </p>
+              </div>
             </div>
           ) : null}
 

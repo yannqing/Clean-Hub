@@ -2,3 +2,4 @@
 // Add named exports here as you create them, e.g.:
 //   export { ShiftHandoverListView } from "./shift-handover-list-view";
 export { ShiftHandoverView } from "./shift-handover-view";
+export { PosOperationsView } from "./pos-operations-view";

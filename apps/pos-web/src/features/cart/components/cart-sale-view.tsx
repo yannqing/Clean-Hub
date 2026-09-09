@@ -11,6 +11,7 @@ import type {
   PosHardwareDeviceSummary,
   PosMobileMoneyProvider,
   PosPaymentMethod,
+  PosRegisterState,
   ShiftRecord,
 } from "@cleanhub/api-client";
 import type {
@@ -86,6 +87,7 @@ type CartSaleViewProps = {
   branch: PosBranchSummary | null;
   canManageSensitiveOperations: boolean;
   currentShift: ShiftRecord | null;
+  register: PosRegisterState;
   products: PosCatalogProduct[];
   services: PosCatalogService[];
 };
@@ -94,6 +96,7 @@ export function CartSaleView({
   branch,
   canManageSensitiveOperations,
   currentShift,
+  register,
   products,
   services,
 }: CartSaleViewProps) {
@@ -188,6 +191,7 @@ export function CartSaleView({
       canManageSensitiveOperations={canManageSensitiveOperations}
       cloudSyncState={cloudSyncState}
       currentShift={currentShift}
+      register={register}
       onCheckoutComplete={() => setCartOpen(false)}
       onClaimParked={claimParked}
       onClear={clear}
@@ -503,6 +507,7 @@ function CartPanel({
   cart,
   cloudSyncState,
   currentShift,
+  register,
   loaded,
   onCheckoutComplete,
   onClaimParked,
@@ -522,6 +527,7 @@ function CartPanel({
   cart: PosCartSnapshot;
   cloudSyncState: PosCartCloudSyncState;
   currentShift: ShiftRecord | null;
+  register: PosRegisterState;
   loaded: boolean;
   onCheckoutComplete: () => void;
   onClaimParked: (
@@ -602,7 +608,20 @@ function CartPanel({
     (hasTicketLines || Boolean(cart.discountCode) || !offlineProductEligible);
   const onlinePriceUnconfirmed =
     isOnline && cart.lines.length > 0 && effectivePreview === null;
-  const cashShiftAvailable = currentShift?.status === "open";
+  const trackedCashMode = [
+    "shared_drawer",
+    "assigned_drawer",
+    "cash_in_hand",
+  ].includes(register.cashHandlingMode);
+  const cashRegisterAvailable =
+    register.cashHandlingMode !== "none" &&
+    (isOnline
+      ? register.cashHandlingMode === "untracked" ||
+        Boolean(register.cashSession) ||
+        (trackedCashMode && !register.requireOpeningFloat)
+      : Boolean(register.registerSession) &&
+        (register.cashHandlingMode === "untracked" ||
+          Boolean(register.cashSession)));
   const paidNowAmount = tenders.reduce(
     (sum, tender) => sum + Math.max(0, Number(tender.amount) || 0),
     0,
@@ -620,7 +639,7 @@ function CartPanel({
   const mixedPaymentAvailable =
     runtime.paymentMethodsEnabled.includes("app") &&
     runtime.mobileMoneyProvidersEnabled.length > 0 &&
-    cashShiftAvailable &&
+    cashRegisterAvailable &&
     runtime.paymentMethodsEnabled.includes("cash") &&
     mixedExternalMethods.length > 0 &&
     Number(total) >= 0.02;
@@ -740,10 +759,6 @@ function CartPanel({
 
   function openCheckout() {
     if (!scopeReady || cart.lines.length === 0) return;
-    if (!cashShiftAvailable) {
-      toast.error("请先在交接班页面开班，再进行销售结算。");
-      return;
-    }
     if (offlineCheckoutBlocked) {
       toast.error(t("pos.cart.offlineCheckoutBlocked"));
       return;
@@ -758,7 +773,7 @@ function CartPanel({
       ? runtime.defaultPaymentMethod
       : runtime.paymentMethodsEnabled[0];
     const availableDefault =
-      configuredDefault === "cash" && !cashShiftAvailable
+      configuredDefault === "cash" && !cashRegisterAvailable
         ? runtime.paymentMethodsEnabled.find(
             (method) =>
               method !== "cash" &&
@@ -767,7 +782,8 @@ function CartPanel({
         : configuredDefault === "card" && !hardwareCapabilities.cardTerminal
           ? runtime.paymentMethodsEnabled.find(
               (method) =>
-                method !== "card" && (method !== "cash" || cashShiftAvailable),
+                method !== "card" &&
+                (method !== "cash" || cashRegisterAvailable),
             )
           : configuredDefault;
     setTenders(
@@ -836,7 +852,7 @@ function CartPanel({
     const disabled =
       !runtime.paymentMethodsEnabled.includes(mode) ||
       (!isOnline && mode !== "cash") ||
-      (mode === "cash" && !cashShiftAvailable) ||
+      (mode === "cash" && !cashRegisterAvailable) ||
       (mode === "card" && !hardwareCapabilities.cardTerminal);
     if (disabled) return;
 
@@ -873,7 +889,7 @@ function CartPanel({
     }
     for (const tender of activeTenders) {
       if (tender.paymentMethod === "cash") {
-        if (!cashShiftAvailable || !currentShift) {
+        if (!cashRegisterAvailable) {
           toast.error(t("pos.cart.cashShiftRequired"));
           return;
         }
@@ -960,7 +976,9 @@ function CartPanel({
                 ...common,
                 paymentMethod: "cash" as const,
                 tenderedAmount: toMoney(tender.tenderedAmount),
-                shiftId: currentShift!.id,
+                shiftId: currentShift?.id,
+                registerSessionId: register.registerSession?.id,
+                cashDrawerSessionId: register.cashSession?.id,
                 occurredAt,
               };
             }
@@ -1058,6 +1076,8 @@ function CartPanel({
                   )
                 : undefined,
               printerId: configuredPrinter!.printerId,
+              operatorName: runtime.operatorName,
+              terminalName: runtime.terminalName,
               scope: { tenantId, branchId, terminalId },
             });
             if (offlinePrintStatus === "failed") {
@@ -1197,6 +1217,8 @@ function CartPanel({
             order: finalOrder,
             payments: finalPayments,
             printerId: configuredPrinter!.printerId,
+            operatorName: runtime.operatorName,
+            terminalName: runtime.terminalName,
             scope: { tenantId, branchId, terminalId },
           });
           if (printStatus === "failed") {
@@ -1688,7 +1710,7 @@ function CartPanel({
                 {runtime.paymentMethodsEnabled.map((method) => {
                   const disabled =
                     (!isOnline && method !== "cash") ||
-                    (method === "cash" && !cashShiftAvailable) ||
+                    (method === "cash" && !cashRegisterAvailable) ||
                     (method === "card" && !hardwareCapabilities.cardTerminal);
                   return (
                     <button
@@ -1765,7 +1787,7 @@ function CartPanel({
                       {runtime.paymentMethodsEnabled.map((method) => {
                         const disabled =
                           (!isOnline && method !== "cash") ||
-                          (method === "cash" && !cashShiftAvailable) ||
+                          (method === "cash" && !cashRegisterAvailable) ||
                           (method === "card" &&
                             !hardwareCapabilities.cardTerminal) ||
                           tenders.some(
@@ -2047,7 +2069,8 @@ function CartPanel({
               ) : null}
             </section>
 
-            {!cashShiftAvailable ? (
+            {!cashRegisterAvailable &&
+            runtime.paymentMethodsEnabled.includes("cash") ? (
               <p className="text-xs leading-5 text-amber-700">
                 {t("pos.cart.cashShiftRequired")}
               </p>

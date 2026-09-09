@@ -8,6 +8,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import { buildPosReceiptText } from "@cleanhub/hardware";
 import { createId } from "@cleanhub/id";
 import { calendarDateEndToUtc } from "@cleanhub/domain/timezone";
+import type { PosReceiptField } from "@cleanhub/domain/receipt";
 import { createScopedPrintJobQueue } from "@cleanhub/offline";
 import type {
   CreateManualOrderRequest,
@@ -131,9 +132,17 @@ export function OrderCreateDialog({
   const router = useRouter();
   const {
     branchId: runtimeBranchId,
+    branchName: runtimeBranchName,
     currency: runtimeCurrency,
+    merchantName: runtimeMerchantName,
+    operatorName: runtimeOperatorName,
+    receiptAddress: runtimeReceiptAddress,
+    receiptFields: runtimeReceiptFields,
+    receiptName: runtimeReceiptName,
+    receiptPhone: runtimeReceiptPhone,
     tenantId: runtimeTenantId,
     terminalId: runtimeTerminalId,
+    terminalName: runtimeTerminalName,
     timeZone,
   } = usePosRuntimeConfig();
   const { createOrder } = usePosOfflineWrites();
@@ -321,6 +330,15 @@ export function OrderCreateDialog({
             entityId: result.entityId,
             locale,
             payload,
+            receiptConfig: {
+              branchName: runtimeReceiptName || runtimeBranchName,
+              fields: runtimeReceiptFields,
+              merchantName: runtimeMerchantName,
+              operatorName: runtimeOperatorName,
+              receiptAddress: runtimeReceiptAddress,
+              receiptPhone: runtimeReceiptPhone,
+              terminalName: runtimeTerminalName,
+            },
             runtimeCurrency,
             ticket: selectedTicket,
           });
@@ -520,6 +538,15 @@ function buildOfflineOrderReceipt(input: {
   entityId: string;
   locale: SupportedLocale;
   payload: CreatePosOrderRequest;
+  receiptConfig: {
+    branchName: string;
+    fields: PosReceiptField[];
+    merchantName: string;
+    operatorName: string | null;
+    receiptAddress: string | null;
+    receiptPhone: string | null;
+    terminalName: string | null;
+  };
   runtimeCurrency?: string;
   ticket: ServiceTicketSummary | null;
 }): OfflineOrderReceipt {
@@ -575,7 +602,11 @@ function buildOfflineOrderReceipt(input: {
         orderCode: code,
         issuedAt: new Date(),
         currency,
-        merchantName: "CleanHub · Offline",
+        merchantName: input.receiptConfig.merchantName,
+        branchName: input.receiptConfig.branchName,
+        cashierName: input.receiptConfig.operatorName ?? undefined,
+        terminalName: input.receiptConfig.terminalName ?? undefined,
+        fields: input.receiptConfig.fields,
         customerName:
           input.customer?.fullName ??
           input.ticket?.customerName ??
@@ -592,7 +623,9 @@ function buildOfflineOrderReceipt(input: {
         totalMinor,
         paidMinor: 0,
         balanceMinor: totalMinor,
-        footer:
+        receiptAddress: input.receiptConfig.receiptAddress ?? undefined,
+        receiptPhone: input.receiptConfig.receiptPhone ?? undefined,
+        thankYouMessage:
           input.locale === "zh-CN"
             ? "离线暂存单 · 待同步 · 金额以同步成功后的正式订单为准"
             : input.locale === "fr"

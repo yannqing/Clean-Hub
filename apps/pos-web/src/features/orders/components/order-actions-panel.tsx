@@ -10,6 +10,7 @@ import {
   type PosOrderDetail,
   type PosOrderStatus,
   type PosPaymentTransaction,
+  type PosRegisterState,
   type ShiftRecord,
 } from "@cleanhub/api-client";
 import { createId } from "@cleanhub/id";
@@ -58,11 +59,13 @@ export function OrderActionsPanel({
   order,
   payments,
   currentShift,
+  register,
 }: {
   canManageSensitiveOperations: boolean;
   order: PosOrderDetail;
   payments: PosPaymentTransaction[];
   currentShift: ShiftRecord | null;
+  register: PosRegisterState;
 }) {
   const { locale } = useTranslation();
   const router = useRouter();
@@ -79,6 +82,16 @@ export function OrderActionsPanel({
   const [sensitiveReason, setSensitiveReason] = useState("");
   const idempotencyKeyRef = useRef<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const trackedCashMode = [
+    "shared_drawer",
+    "assigned_drawer",
+    "cash_in_hand",
+  ].includes(register.cashHandlingMode);
+  const cashRegisterAvailable =
+    register.cashHandlingMode !== "none" &&
+    (register.cashHandlingMode === "untracked" ||
+      Boolean(register.cashSession) ||
+      (trackedCashMode && !register.requireOpeningFloat));
 
   const outstanding = getOutstandingAmount(order);
   const pendingManualPayment = payments.find(
@@ -107,8 +120,8 @@ export function OrderActionsPanel({
     ["draft", "received", "cancelled"].includes(order.status);
 
   function pay() {
-    if (currentShift?.status !== "open") {
-      toast.error("请先开班并结束休息，再记录任何支付。");
+    if (paymentOption === "cash" && !cashRegisterAvailable) {
+      toast.error("请先在“班次与收银”中开启可用的钱箱会话。");
       return;
     }
     const reference = externalReference.trim();
@@ -134,7 +147,9 @@ export function OrderActionsPanel({
               paymentMethod: "cash",
               amount,
               tenderedAmount: Number(cashTendered).toFixed(2),
-              shiftId: currentShift!.id,
+              shiftId: currentShift?.id,
+              registerSessionId: register.registerSession?.id,
+              cashDrawerSessionId: register.cashSession?.id,
               occurredAt: new Date().toISOString(),
               idempotencyKey,
             }
@@ -395,7 +410,7 @@ export function OrderActionsPanel({
                 disabled={
                   !canPay ||
                   isPending ||
-                  (option === "cash" && currentShift?.status !== "open")
+                  (option === "cash" && !cashRegisterAvailable)
                 }
                 key={option}
                 onClick={() => {
@@ -461,7 +476,7 @@ export function OrderActionsPanel({
           ) : (
             <input
               className="h-11 min-w-0 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              disabled={!canPay || isPending || currentShift?.status !== "open"}
+              disabled={!canPay || isPending || !cashRegisterAvailable}
               inputMode="decimal"
               min={0}
               onChange={(event) => {
@@ -485,7 +500,7 @@ export function OrderActionsPanel({
               isPending ||
               Number(amount) <= 0 ||
               (paymentOption === "cash" &&
-                (currentShift?.status !== "open" ||
+                (!cashRegisterAvailable ||
                   Number(cashTendered) < Number(amount))) ||
               (paymentOption !== "cash" && externalReference.trim().length < 3)
             }
@@ -501,11 +516,11 @@ export function OrderActionsPanel({
         {paymentOption === "cash" ? (
           <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
             <span>
-              {currentShift?.status === "open"
+              {cashRegisterAvailable
                 ? "现金找零"
                 : "请先开班后再进行现金收款"}
             </span>
-            {currentShift?.status === "open" ? (
+            {cashRegisterAvailable ? (
               <strong className="text-foreground">
                 {formatOrderMoney(
                   Math.max(

@@ -797,7 +797,7 @@ export const enMessages = {
       orders: "Orders",
       statistics: "Statistics",
       garments: "Garments",
-      shiftHandover: "Shift handover",
+      shiftHandover: "Shifts & register",
       notifications: "Notifications",
       settings: "Settings",
       more: "More",
@@ -888,7 +888,7 @@ export const enMessages = {
       cashChange: "Change due",
       cashTenderInsufficient: "Cash tendered must cover the amount due.",
       cashShiftRequired:
-        "Cash payments require the current employee to have an open, active shift.",
+        "Open an available cash session under Shifts & register before accepting cash.",
       payLater: "Pay later",
       paymentReference: "Wave / Orange Money transaction reference",
       paymentReferenceRequired: "Enter a valid mobile payment reference.",

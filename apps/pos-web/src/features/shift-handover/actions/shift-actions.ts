@@ -3,7 +3,11 @@
 import type {
   ClockRequest,
   CreateHandoverRequest,
+  ClosePosRegisterRequest,
+  ClosePosRegisterResult,
   HandoverRecord,
+  OpenPosRegisterRequest,
+  PosRegisterState,
   ShiftRecord,
 } from "@cleanhub/api-client";
 import { revalidatePath } from "next/cache";
@@ -46,5 +50,33 @@ export async function createShiftHandoverAction(
     return posApi.pos.staff.createHandover(input, options);
   });
   if (result.ok) revalidatePath("/shift-handover");
+  return result;
+}
+
+export async function openRegisterAction(
+  input: OpenPosRegisterRequest,
+): Promise<ShiftActionResult<PosRegisterState>> {
+  const result = await run(async () => {
+    const options = await getPosServerApiRequestOptions();
+    return posApi.pos.staff.openRegister(input, options);
+  });
+  if (result.ok) {
+    revalidatePath("/shift-handover");
+    revalidatePath("/sale");
+  }
+  return result;
+}
+
+export async function closeRegisterAction(
+  input: ClosePosRegisterRequest,
+): Promise<ShiftActionResult<ClosePosRegisterResult>> {
+  const result = await run(async () => {
+    const options = await getPosServerApiRequestOptions();
+    return posApi.pos.staff.closeRegister(input, options);
+  });
+  if (result.ok) {
+    revalidatePath("/shift-handover");
+    revalidatePath("/sale");
+  }
   return result;
 }

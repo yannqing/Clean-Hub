@@ -1,5 +1,5 @@
 import { getMyBranchQuery } from "@/features/branches/queries";
-import { ShiftHandoverView } from "@/features/shift-handover/components";
+import { PosOperationsView } from "@/features/shift-handover/components";
 import { getShiftHandoverSummaryQuery } from "@/features/shift-handover/queries";
 import { getShiftOperationsQuery } from "@/features/shift-handover/queries";
 import { getCurrentUser } from "@/lib/auth";
@@ -10,20 +10,19 @@ export default async function ShiftHandoverPage() {
     getMyBranchQuery().catch(() => null),
     getShiftOperationsQuery(),
   ]);
-  // The summary window must match the active shift so the on-screen cash
-  // figures agree with the server-side Z Report snapshot.
+  // Align order totals with the active register window used by the Z Report.
   const summary = await getShiftHandoverSummaryQuery({
-    shiftStartedAt: operations.currentShift?.startedAt ?? null,
+    shiftStartedAt: operations.register.registerSession?.openedAt ?? null,
     timeZone: user?.timezone,
   });
 
   return (
-    <ShiftHandoverView
+    <PosOperationsView
       branch={branch}
       currentShift={operations.currentShift}
+      register={operations.register}
       recentReports={operations.recentReports}
       reconciliation={operations.reconciliation}
-      staff={operations.staff}
       summary={summary}
       user={user}
     />

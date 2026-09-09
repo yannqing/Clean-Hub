@@ -7,6 +7,7 @@
 
 import type {
   PosPaymentMethod,
+  PosCashHandlingMode,
   PosRoundingRule,
   PosTerminalSettings,
 } from "@cleanhub/api-client";
@@ -20,6 +21,7 @@ export type TerminalSettingsFormValues = {
   label: string;
   defaultPaymentMethod: PosPaymentMethod;
   paymentMethodsEnabled: PosPaymentMethod[];
+  cashHandlingMode: PosCashHandlingMode;
   roundingRule: PosRoundingRule;
   autoPrintReceipt: boolean;
   printCopies: number;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useTranslation } from "@cleanhub/i18n/react";
+import type { PosReceiptField } from "@cleanhub/domain/receipt";
 import {
   Dialog,
   DialogContent,
@@ -15,6 +16,7 @@ import type {
   PosMobileMoneyProvider,
   PosPaymentAdjustment,
   PosPaymentTransaction,
+  PosRegisterState,
   ShiftRecord,
 } from "@cleanhub/api-client";
 import { buildPosReceiptText, type PrintLocale } from "@cleanhub/hardware";
@@ -50,12 +52,14 @@ import { OrderItemsManager } from "./order-items-manager";
 import { OrderPaymentAdjustments } from "./order-payment-adjustments";
 import { ProductReturnDialog } from "./product-return-dialog";
 import { ReceiptDeliveryHistory } from "./receipt-delivery-history";
+import { getPosReceiptCopy } from "../lib/order-receipt";
 
 type OrderDetailViewProps = {
   canResolveManualPayments: boolean;
   adjustments: PosPaymentAdjustment[];
   catalog: PosCatalogService[];
   currentShift: ShiftRecord | null;
+  register: PosRegisterState;
   products: PosCatalogProduct[];
   order: PosOrderDetail;
   payments: PosPaymentTransaction[];
@@ -72,14 +76,24 @@ export function OrderDetailView({
   adjustments,
   catalog,
   currentShift,
+  register,
   products,
   order,
   payments,
   source,
 }: OrderDetailViewProps) {
   const { locale } = useTranslation();
+  const runtime = usePosRuntimeConfig();
   const breadcrumbItems = buildOrderBreadcrumbItems(order, source);
-  const receiptContent = buildOrderReceiptContent(order, payments, locale);
+  const receiptContent = buildOrderReceiptContent(order, payments, locale, {
+    branchName: runtime.receiptName || runtime.branchName,
+    fields: runtime.receiptFields,
+    merchantName: runtime.merchantName,
+    operatorName: runtime.operatorName,
+    receiptAddress: runtime.receiptAddress,
+    receiptPhone: runtime.receiptPhone,
+    terminalName: runtime.terminalName,
+  });
 
   return (
     <section className="mx-auto w-full max-w-[1080px] space-y-4 pb-12">
@@ -150,6 +164,7 @@ export function OrderDetailView({
         <OrderActionsPanel
           canManageSensitiveOperations={canResolveManualPayments}
           currentShift={currentShift}
+          register={register}
           key={`${order.id}:${order.version}`}
           order={order}
           payments={payments}
@@ -163,7 +178,17 @@ function buildOrderReceiptContent(
   order: PosOrderDetail,
   payments: PosPaymentTransaction[],
   locale: string,
+  config: {
+    branchName: string;
+    fields: PosReceiptField[];
+    merchantName: string;
+    operatorName: string | null;
+    receiptAddress: string | null;
+    receiptPhone: string | null;
+    terminalName: string | null;
+  },
 ): string {
+  const copy = getPosReceiptCopy(locale);
   const items = order.items.map((item) => {
     const quantity =
       item.pricingUnit === "per_kg"
@@ -188,6 +213,8 @@ function buildOrderReceiptContent(
       quantity: Number.isFinite(quantity) ? quantity : 0,
       unitAmountMinor: toMinorUnits(item.chargedUnitAmount, order.currency),
       totalAmountMinor: toMinorUnits(item.lineAmount, order.currency),
+      sku: item.sku ?? undefined,
+      barcode: item.barcode ?? undefined,
       note: details.length > 0 ? details.join("; ") : undefined,
     };
   });
@@ -199,7 +226,9 @@ function buildOrderReceiptContent(
       payments
         .filter((payment) => payment.paymentStatus === "paid")
         .map((payment) =>
-          getPaymentDisplayName(payment.paymentMethod, payment.provider),
+          payment.provider
+            ? MOBILE_MONEY_PROVIDER_LABELS[payment.provider]
+            : copy.paymentMethods[payment.paymentMethod],
         ),
     ),
   ].join(" / ");
@@ -214,8 +243,12 @@ function buildOrderReceiptContent(
       orderCode: displayOrderCode(order.id),
       issuedAt: order.paidAt ?? order.updatedAt,
       currency: order.currency,
-      merchantName: "CleanHub",
-      customerName: order.customerName ?? "散客",
+      merchantName: config.merchantName,
+      branchName: config.branchName,
+      cashierName: config.operatorName ?? undefined,
+      terminalName: config.terminalName ?? undefined,
+      customerName: order.customerName ?? copy.walkInCustomer,
+      fields: config.fields,
       items,
       subtotalMinor,
       discountMinor,
@@ -256,7 +289,9 @@ function buildOrderReceiptContent(
         totalMinor - toMinorUnits(order.paidAmount, order.currency),
       ),
       paymentMethod: paymentMethod || undefined,
-      footer: "Thank you",
+      receiptAddress: config.receiptAddress ?? undefined,
+      receiptPhone: config.receiptPhone ?? undefined,
+      thankYouMessage: copy.thankYou,
     },
     { locale: toPrintLocale(locale) },
   );
@@ -327,7 +362,7 @@ function buildOrderBreadcrumbItems(
 
   if (source?.ticketFrom === "handover") {
     return [
-      { href: posRoutes.shiftHandover, label: "店员交接" },
+      { href: posRoutes.shiftHandover, label: "班次与收银" },
       { href: ticketHref, label: "工单详情" },
       { label: displayOrderCode(order.id) },
     ];

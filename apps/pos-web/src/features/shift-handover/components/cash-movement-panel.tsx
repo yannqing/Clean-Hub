@@ -1,6 +1,10 @@
 "use client";
 
-import type { PosShiftCashMovement, ShiftRecord } from "@cleanhub/api-client";
+import type {
+  PosRegisterState,
+  PosShiftCashMovement,
+  ShiftRecord,
+} from "@cleanhub/api-client";
 import { createId } from "@cleanhub/id";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -22,11 +26,12 @@ function movementNet(movements: PosShiftCashMovement[]): number {
 
 export function CashMovementPanel({
   canManage,
+  register,
   currentShift,
-}: {
-  canManage: boolean;
-  currentShift: ShiftRecord;
-}) {
+}: { canManage: boolean } & (
+  | { register: PosRegisterState; currentShift?: never }
+  | { currentShift: ShiftRecord; register?: never }
+)) {
   const router = useRouter();
   const [movements, setMovements] = useState<PosShiftCashMovement[]>([]);
   const [movementType, setMovementType] = useState<"pay_in" | "pay_out">(
@@ -41,11 +46,17 @@ export function CashMovementPanel({
   }, []);
 
   useEffect(() => {
-    void posApi.pos.staff
-      .listCurrentShiftCashMovements()
+    const request = register
+      ? posApi.pos.staff.listCurrentRegisterCashMovements()
+      : posApi.pos.staff.listCurrentShiftCashMovements();
+    void request
       .then((result) => publish(result.data))
       .catch((error) => toast.error(getPosApiErrorMessage(error)));
-  }, [currentShift.id, publish]);
+  }, [
+    currentShift,
+    publish,
+    register,
+  ]);
 
   async function submit() {
     if (Number(amount) <= 0 || reason.trim().length < 3) {
@@ -54,7 +65,10 @@ export function CashMovementPanel({
     }
     setSubmitting(true);
     try {
-      const created = await posApi.pos.staff.createShiftCashMovement({
+      const create = register
+        ? posApi.pos.staff.createRegisterCashMovement
+        : posApi.pos.staff.createShiftCashMovement;
+      const created = await create({
         movementType,
         amount: Number(amount).toFixed(2),
         reason: reason.trim(),
@@ -84,10 +98,10 @@ export function CashMovementPanel({
           </p>
         </div>
         <span className="text-sm font-semibold">
-          净额 {movementNet(movements).toFixed(2)} {currentShift.currency}
+          净额 {movementNet(movements).toFixed(2)} {register?.cashSession?.currency ?? currentShift?.currency}
         </span>
       </div>
-      {canManage && currentShift.status === "open" ? (
+      {canManage && (register?.cashSession?.status === "open" || currentShift?.status === "open") ? (
         <div className="mt-4 grid gap-3 md:grid-cols-[130px_140px_1fr_auto]">
           <select
             className="h-10 rounded-md border bg-background px-3 text-sm"
@@ -126,7 +140,7 @@ export function CashMovementPanel({
         <p className="mt-4 rounded-md border border-dashed bg-muted/30 px-3 py-2 text-xs font-medium text-muted-foreground">
           {!canManage
             ? "只有店长或管理员可以登记非销售现金进出。"
-            : "当前处于休息状态，请先结束休息后再登记现金进出。"}
+            : "请先开启可跟踪的钱箱会话，再登记现金进出。"}
         </p>
       )}
       {movements.length > 0 ? (
