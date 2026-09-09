@@ -269,7 +269,7 @@ function ProductDetail({
           />
           <DetailField
             label={t("pos.catalog.fields.category")}
-            value={item.categoryName ?? t("common.unavailable")}
+            value={item.categoryName ?? t("common.notSet")}
           />
           <DetailField
             label={t("pos.catalog.fields.brand")}

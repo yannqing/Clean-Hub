@@ -296,7 +296,7 @@ function CatalogTable({
                   </TableCell>
                   <TableCell className="max-w-44 truncate">
                     {product
-                      ? (product.categoryName ?? t("common.unavailable"))
+                      ? (product.categoryName ?? t("common.notSet"))
                       : service?.categoryName}
                   </TableCell>
                   <TableCell className="max-w-56">
@@ -376,7 +376,7 @@ function CatalogMobileCard({
               </div>
               <p className="mt-2 truncate text-xs text-foreground">
                 {product
-                  ? (product.categoryName ?? t("common.unavailable"))
+                  ? (product.categoryName ?? t("common.notSet"))
                   : service?.categoryName}
               </p>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
@@ -547,8 +547,10 @@ export function formatTurnaround(
   minutes: number | null,
   t: ReturnType<typeof useTranslation>["t"],
 ): string {
+  // A service without a turnaround simply has none configured. Saying
+  // "unavailable" here reads as though the service itself were disabled.
   return minutes === null
-    ? t("common.unavailable")
+    ? t("common.notSet")
     : t("pos.catalog.values.minutes", { count: minutes });
 }
 

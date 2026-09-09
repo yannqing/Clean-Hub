@@ -19,6 +19,7 @@ export const enMessages = {
     note: "Note",
     search: "Search",
     notScheduled: "Not scheduled",
+    notSet: "Not set",
     unavailable: "Unavailable",
     mainNavigation: "Main navigation",
     language: "Language",

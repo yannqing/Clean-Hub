@@ -19,6 +19,7 @@ export const zhCNMessages = {
     note: "备注",
     search: "搜索",
     notScheduled: "未计划",
+    notSet: "未设置",
     unavailable: "不可用",
     mainNavigation: "主导航",
     language: "语言",

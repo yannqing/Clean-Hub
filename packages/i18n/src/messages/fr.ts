@@ -19,6 +19,7 @@ export const frMessages = {
     note: "Note",
     search: "Rechercher",
     notScheduled: "Non planifié",
+    notSet: "Non renseigné",
     unavailable: "Indisponible",
     mainNavigation: "Navigation principale",
     language: "Langue",
