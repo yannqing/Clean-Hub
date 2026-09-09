@@ -815,7 +815,7 @@ export const enMessages = {
       add: "Add",
       addProduct: "Add to cart",
       added: "Added to cart.",
-      intakeService: "Create ticket",
+      intakeService: "Start a ticket",
       serviceHint:
         "Services require customer intake first, then can be added from the ticket.",
       noResults: "No matching products or services.",

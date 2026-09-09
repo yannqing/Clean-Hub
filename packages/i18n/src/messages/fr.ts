@@ -827,7 +827,7 @@ export const frMessages = {
       add: "Ajouter",
       addProduct: "Ajouter au panier",
       added: "Ajouté au panier.",
-      intakeService: "Créer un ticket",
+      intakeService: "Démarrer un ticket",
       serviceHint:
         "Les services nécessitent d’abord un accueil client, puis sont ajoutés depuis le ticket.",
       noResults: "Aucun produit ou service correspondant.",

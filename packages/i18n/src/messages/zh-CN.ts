@@ -801,7 +801,7 @@ export const zhCNMessages = {
       add: "加入",
       addProduct: "加入购物车",
       added: "已加入购物车。",
-      intakeService: "创建工单",
+      intakeService: "用此服务开单",
       serviceHint: "服务需先完成客户接待，再从工单加入购物车。",
       noResults: "没有匹配的商品或服务。",
       cart: "购物车",

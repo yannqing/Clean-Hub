@@ -97,7 +97,7 @@ export function CatalogDetailView(props: CatalogDetailViewProps) {
               <ProductCartButton product={props.item} />
             ) : (
               <Button asChild className="h-8 gap-1.5 px-3 text-xs">
-                <Link href={posRoutes.newIntake}>
+                <Link href={posRoutes.newIntakeForService(props.item.id)}>
                   <Icon className="size-3.5" name="user-plus" />
                   {t("pos.cart.intakeService")}
                 </Link>

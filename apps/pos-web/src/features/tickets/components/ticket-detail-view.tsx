@@ -38,6 +38,8 @@ import { TicketStatusDialog } from "./ticket-status-dialog";
 
 type TicketDetailViewProps = {
   canManage: boolean;
+  /** Service the clerk started intake from; prefills the first new item. */
+  prefillServiceId?: string;
   catalog: PosCatalogService[];
   from?: string;
   intakeQuery?: string;
@@ -53,6 +55,7 @@ type TicketDetailViewProps = {
 export function TicketDetailView({
   canManage,
   catalog,
+  prefillServiceId,
   from,
   intakeQuery,
   ticket,
@@ -305,6 +308,7 @@ export function TicketDetailView({
 
           <TicketItemEditor
             canManage={canManage}
+            prefillServiceId={prefillServiceId}
             ticketStatus={ticket.ticketStatus}
             catalog={catalog.filter(
               (service) =>

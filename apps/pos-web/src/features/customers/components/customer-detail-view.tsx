@@ -48,6 +48,8 @@ type CustomerDetailViewProps = {
   customerId: string;
   /** Entry source. `intake` = arrived from 客户接待; otherwise 客户管理. */
   from?: string;
+  /** Service the clerk started from, prefilled into the first ticket item. */
+  serviceId?: string;
   /** Original intake search keyword so returning to 客户接待 can restore results. */
   intakeQuery?: string;
 };
@@ -66,6 +68,7 @@ export function CustomerDetailView({
   customerId,
   from,
   intakeQuery,
+  serviceId,
 }: CustomerDetailViewProps) {
   const router = useRouter();
   const { locale } = useTranslation();
@@ -83,8 +86,9 @@ export function CustomerDetailView({
       buildTicketDetailPath(ticketId, {
         fromIntake,
         intakeQuery,
+        serviceId,
       }),
-    [fromIntake, intakeQuery],
+    [fromIntake, intakeQuery, serviceId],
   );
 
   const [profile, setProfile] = useState<PosCustomerProfileDetail | null>(null);
@@ -513,6 +517,7 @@ function buildTicketDetailPath(
   context: {
     fromIntake: boolean;
     intakeQuery: string | undefined;
+    serviceId?: string;
   },
 ): string {
   const params = new URLSearchParams({
@@ -521,6 +526,9 @@ function buildTicketDetailPath(
   const keyword = context.intakeQuery?.trim();
   if (context.fromIntake && keyword) {
     params.set("q", keyword);
+  }
+  if (context.serviceId) {
+    params.set("serviceId", context.serviceId);
   }
 
   return `${posRoutes.ticketDetail(ticketId)}?${params.toString()}`;

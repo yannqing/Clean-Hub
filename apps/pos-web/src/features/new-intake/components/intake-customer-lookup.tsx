@@ -39,10 +39,16 @@ import { IntakeProfileList } from "./intake-profile-list";
 
 type IntakeCustomerLookupProps = {
   initialQuery?: string;
+  /** Service the clerk started from, carried on to the ticket. */
+  serviceId?: string;
+  /** Display name for that service, shown so the context is visible. */
+  serviceName?: string;
 };
 
 export function IntakeCustomerLookup({
   initialQuery = "",
+  serviceId,
+  serviceName,
 }: IntakeCustomerLookupProps) {
   const { locale } = useTranslation();
   const router = useRouter();
@@ -313,6 +319,9 @@ export function IntakeCustomerLookup({
     if (keyword) {
       params.set("q", keyword);
     }
+    if (serviceId) {
+      params.set("serviceId", serviceId);
+    }
     router.push(`${customerDetailPath(row.id)}?${params.toString()}`);
   }
 
@@ -331,7 +340,11 @@ export function IntakeCustomerLookup({
             {text("新建客户")}
           </button>
         }
-        description={text(NEWINTAKE_PAGE_DESCRIPTION)}
+        description={
+          serviceName
+            ? text("先选择客户，随后将以该服务开单：") + serviceName
+            : text(NEWINTAKE_PAGE_DESCRIPTION)
+        }
         icon="user-plus"
         title={text("查询客户档案")}
       />

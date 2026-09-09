@@ -65,6 +65,8 @@ type TicketItemEditorProps = {
   catalog: PosCatalogService[];
   ticketId: string;
   ticketStatus: ServiceTicketStatus;
+  /** Service the clerk started intake from; prefills the first new item. */
+  prefillServiceId?: string;
   currency: string;
   items: ServiceTicketItem[];
 };
@@ -102,6 +104,7 @@ const EMPTY_ITEM_FORM: TicketItemFormValues = {
 export function TicketItemEditor({
   canManage,
   ticketStatus,
+  prefillServiceId,
   catalog,
   ticketId,
   currency,
@@ -113,7 +116,33 @@ export function TicketItemEditor({
 
   function startCreate() {
     setEditingId(null);
-    setForm(EMPTY_ITEM_FORM);
+    // Carry over the service the clerk came in with, so intake that started
+    // from a service does not ask them to find it again.
+    const preselected = prefillServiceId
+      ? catalog.find((service) => service.id === prefillServiceId)
+      : undefined;
+    // The service picker is filtered by item type, so preselect the type when
+    // the service allows only one. Otherwise the service still rides along:
+    // changeItemType keeps it as soon as the clerk picks a compatible type.
+    const onlyItemType =
+      preselected?.applicableItemTypes.length === 1
+        ? preselected.applicableItemTypes[0]
+        : "";
+    setForm(
+      preselected
+        ? {
+            ...EMPTY_ITEM_FORM,
+            itemType: onlyItemType,
+            serviceId: preselected.id,
+            pricingUnit: preselected.pricingUnit,
+            standardUnitAmount: preselected.amount,
+            chargedUnitAmount: preselected.amount,
+            priceTouched: true,
+            quantity: "1",
+            bagCount: "1",
+          }
+        : EMPTY_ITEM_FORM,
+    );
     setCreating(true);
   }
 

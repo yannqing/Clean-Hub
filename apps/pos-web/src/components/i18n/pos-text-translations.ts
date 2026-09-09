@@ -257,6 +257,10 @@ export const POS_TEXT_TRANSLATIONS: Record<
     en: "Query mobile phone number, email address, account name or file name",
     fr: "Rechercher un numéro de téléphone mobile, une adresse e-mail, un nom de compte ou un nom de fichier",
   },
+  "先选择客户，随后将以该服务开单：": {
+    en: "Pick the customer first; the ticket will start with this service: ",
+    fr: "Choisissez d'abord le client ; le ticket démarrera avec ce service : ",
+  },
   "创建工单，项目与价格将在下一步添加。": {
     en: "Create a work order, items and prices will be added in the next step.",
     fr: "Créez un bon de travail, les articles et les prix seront ajoutés à l'étape suivante.",

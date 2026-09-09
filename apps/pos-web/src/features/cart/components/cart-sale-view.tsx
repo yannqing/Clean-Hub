@@ -481,7 +481,7 @@ function ServiceCard({
             {service.pricingUnit === "per_kg" ? " / kg" : ""}
           </p>
           <Button asChild className="mt-2 h-8 px-2.5 text-xs" variant="outline">
-            <Link href={posRoutes.newIntake}>
+            <Link href={posRoutes.newIntakeForService(service.id)}>
               {t("pos.cart.intakeService")}
             </Link>
           </Button>

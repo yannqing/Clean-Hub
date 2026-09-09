@@ -5,6 +5,13 @@ export const posRoutes = {
   workspace: "/",
   sale: "/sale",
   newIntake: "/new-intake",
+  /**
+   * Intake started from a service. The clerk still has to pick the customer,
+   * but the service they were looking at rides along so they do not have to
+   * find it again once the ticket exists.
+   */
+  newIntakeForService: (serviceId: string) =>
+    `/new-intake?serviceId=${encodeURIComponent(serviceId)}`,
   scan: "/scan",
   customers: "/customers",
   catalog: "/catalog",
