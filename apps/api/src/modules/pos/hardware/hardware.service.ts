@@ -88,6 +88,24 @@ export async function bindPosPrinter(
         409,
       );
     }
+    const terminalDevices = await findHardwareDevicesByTerminal(
+      tx,
+      terminal.tenantId,
+      terminal.terminalId,
+    );
+    const conflictingBinding = terminalDevices.find(
+      (device) =>
+        device.id !== existing.id &&
+        device.deviceType === "printer" &&
+        device.config.printerId === input.data.printerId,
+    );
+    if (conflictingBinding) {
+      throw new PosHardwareError(
+        "POS_HARDWARE_PRINTER_ALREADY_BOUND",
+        "This physical printer is already assigned to another print purpose on this terminal.",
+        409,
+      );
+    }
 
     const boundAt = new Date().toISOString();
     const updated = await updatePosPrinterBindingRecord(tx, {

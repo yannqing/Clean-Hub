@@ -1278,6 +1278,7 @@ export type TenantMessages = {
       displayOrder: string;
       pricing: string;
       labelRule: string;
+      applicableItemTypes: string;
       standardPrice: string;
       compareAtPrice: string;
       costPrice: string;
@@ -1288,6 +1289,12 @@ export type TenantMessages = {
       per_item: string;
       per_order_item: string;
       per_bag: string;
+    };
+    itemTypeLabels: {
+      cloth: string;
+      car: string;
+      shoe: string;
+      carpet: string;
     };
     formButtons: {
       createService: string;
@@ -1325,6 +1332,7 @@ export type TenantMessages = {
       changeDefaultCurrency: string;
       displayOrderHint: string;
       pricingHint: string;
+      applicableItemTypesHint: string;
       existingCurrencyNotice: string;
       categoriesLoadFailed: string;
       currencyLoadFailed: string;
@@ -1363,6 +1371,8 @@ export type TenantMessages = {
       displayOrderInvalid: string;
       pricingUnitInvalid: string;
       labelRuleInvalid: string;
+      applicableItemTypesRequired: string;
+      applicableItemTypesInvalid: string;
       standardPriceInvalid: string;
       compareAtPriceInvalid: string;
       costPriceInvalid: string;
@@ -1452,10 +1462,16 @@ export type TenantMessages = {
         deviceName: string;
         deviceType: string;
         connectionType: string;
+        printerPurpose: string;
       };
+      printerPurposeHint: string;
       adding: string;
       action: string;
       created: string;
+    };
+    printerPurposeLabels: {
+      receipt: string;
+      label: string;
     };
     edit: {
       title: string;
@@ -1762,6 +1778,7 @@ export type TenantMessages = {
       };
       fields: {
         cashTrackingEnabled: string;
+        cashHandlingMode: string;
         openingFloatRequired: string;
         closingCountRequired: string;
         returnReasonRequired: string;
@@ -1777,6 +1794,7 @@ export type TenantMessages = {
       };
       hints: {
         cashTrackingEnabled: string;
+        cashHandlingMode: string;
         openingFloatRequired: string;
         closingCountRequired: string;
         returnReasonRequired: string;
@@ -1790,6 +1808,13 @@ export type TenantMessages = {
         cash: string;
         card: string;
         app: string;
+      };
+      cashHandlingModes: {
+        none: string;
+        untracked: string;
+        shared_drawer: string;
+        assigned_drawer: string;
+        cash_in_hand: string;
       };
       roundingRules: {
         none: string;
@@ -2217,6 +2242,7 @@ export type TenantMessages = {
         pricing: string;
         payments: string;
         pointOfSale: string;
+        printing: string;
         hardware: string;
         activityLog: string;
       };
@@ -2241,6 +2267,7 @@ export type TenantMessages = {
         pricing: string;
         payments: string;
         pointOfSale: string;
+        printing: string;
         hardware: string;
         activityLog: string;
       };

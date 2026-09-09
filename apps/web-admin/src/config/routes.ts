@@ -101,6 +101,7 @@ export const webAdminRoutes = {
         pricing: "/tenant/system/settings/pricing",
         payments: "/tenant/system/settings/payments",
         pointOfSale: "/tenant/system/settings/point-of-sale",
+        printing: "/tenant/system/settings/printing",
         hardware: "/tenant/point-of-sale/hardware",
         activityLog: "/tenant/system/settings/activity-log",
       },

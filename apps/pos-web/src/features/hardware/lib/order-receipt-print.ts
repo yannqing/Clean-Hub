@@ -8,7 +8,10 @@ import { createScopedPrintJobQueue } from "@cleanhub/offline";
 import { buildPosReceiptText, type PrintLocale } from "@cleanhub/hardware";
 
 import type { PosCartSnapshot } from "@/features/cart/cart.types";
-import { buildPosOrderReceipt } from "@/features/orders/lib/order-receipt";
+import {
+  buildPosOrderReceipt,
+  getPosReceiptCopy,
+} from "@/features/orders/lib/order-receipt";
 
 import { getPosHardwareBridge, getPosOfflineStorage } from "./desktop-bridge";
 import {
@@ -25,6 +28,8 @@ export async function queuePosOrderReceipt(input: {
   order: PosOrderDetail;
   payments: PosPaymentTransaction[];
   printerId: string;
+  operatorName?: string | null;
+  terminalName?: string | null;
   scope: { tenantId: string; branchId: string; terminalId: string };
 }): Promise<"queued" | "printed" | "failed"> {
   const receipt = buildPosOrderReceipt(input);
@@ -69,6 +74,8 @@ export async function queuePosOfflineCartReceipt(input: {
   printerId: string;
   cashTendered?: string;
   changeAmount?: string;
+  operatorName?: string | null;
+  terminalName?: string | null;
   scope: { tenantId: string; branchId: string; terminalId: string };
 }): Promise<"queued" | "printed" | "failed"> {
   const totalMinor = input.cart.lines.reduce(
@@ -83,16 +90,19 @@ export async function queuePosOfflineCartReceipt(input: {
     0,
   );
   const title = `OFF-${input.cart.checkoutId.slice(-8).toUpperCase()}`;
+  const copy = getPosReceiptCopy(input.locale);
   const content = buildPosReceiptText(
     {
       receiptNo: title,
       orderCode: title,
       issuedAt: new Date(),
       currency: input.cart.currency,
-      merchantName:
-        input.branch?.receiptName || input.branch?.name || "CleanHub",
-      branchName: input.branch?.name,
-      customerName: input.cart.customer?.name ?? "Walk-in customer",
+      merchantName: input.branch?.merchantName || "CleanHub",
+      branchName: input.branch?.receiptName || input.branch?.name,
+      cashierName: input.operatorName ?? undefined,
+      terminalName: input.terminalName ?? undefined,
+      customerName: input.cart.customer?.name ?? copy.walkInCustomer,
+      fields: input.branch?.receiptFields,
       items: input.cart.lines.map((line) => ({
         name: line.name,
         quantity:
@@ -106,6 +116,9 @@ export async function queuePosOfflineCartReceipt(input: {
             : line.lineAmount,
           input.cart.currency,
         ),
+        sku: line.kind === "product" ? line.sku : undefined,
+        barcode:
+          line.kind === "product" ? (line.barcode ?? undefined) : undefined,
       })),
       subtotalMinor: totalMinor,
       discountMinor: 0,
@@ -120,18 +133,16 @@ export async function queuePosOfflineCartReceipt(input: {
           ? toMinorUnits(input.changeAmount, input.cart.currency)
           : undefined,
       balanceMinor: input.paymentMethod === "cash" ? 0 : totalMinor,
-      paymentMethod: input.paymentMethod === "cash" ? "Cash" : undefined,
-      footer: [
-        input.branch?.receiptAddress,
-        input.branch?.receiptPhone,
+      paymentMethod:
+        input.paymentMethod === "cash" ? copy.paymentMethods.cash : undefined,
+      receiptAddress: input.branch?.receiptAddress ?? undefined,
+      receiptPhone: input.branch?.receiptPhone ?? undefined,
+      thankYouMessage:
         input.locale === "zh-CN"
           ? "离线暂存小票 · 联网后生成正式订单"
           : input.locale === "fr"
             ? "Reçu hors ligne · Commande définitive après synchronisation"
             : "Offline receipt · Final order after synchronization",
-      ]
-        .filter(Boolean)
-        .join(" · "),
     },
     { locale: toPrintLocale(input.locale) },
   );

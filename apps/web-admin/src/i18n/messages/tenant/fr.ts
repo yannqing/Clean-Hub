@@ -1627,6 +1627,7 @@ export const tenantMessagesFr: TenantMessages = {
       displayOrder: "Ordre d'affichage",
       pricing: "Unité de prix",
       labelRule: "Règle d'étiquetage",
+      applicableItemTypes: "Types d'articles applicables",
       standardPrice: "Prix standard",
       compareAtPrice: "Prix de comparaison",
       costPrice: "Coût du service",
@@ -1637,6 +1638,12 @@ export const tenantMessagesFr: TenantMessages = {
       per_item: "Une étiquette par article",
       per_order_item: "Une étiquette par article commandé",
       per_bag: "Une étiquette par sac",
+    },
+    itemTypeLabels: {
+      cloth: "Vêtements",
+      car: "Véhicules",
+      shoe: "Chaussures",
+      carpet: "Tapis",
     },
     formButtons: {
       createService: "Créer un service",
@@ -1687,6 +1694,8 @@ export const tenantMessagesFr: TenantMessages = {
         "Les numéros inférieurs apparaissent plus tôt dans le catalogue de services.",
       pricingHint:
         "Le prix standard utilise la devise par défaut du locataire. Son montant peut être modifié dans le catalogue ; la devise est gérée dans les paramètres.",
+      applicableItemTypesHint:
+        "Le PDV sélectionne d'abord un type d'article puis affiche uniquement les services applicables.",
       existingCurrencyNotice:
         "Ce prix conserve sa devise enregistrée ; modifier la devise par défaut ne convertit pas les montants historiques.",
       categoriesLoadFailed:
@@ -1741,6 +1750,10 @@ export const tenantMessagesFr: TenantMessages = {
       pricingUnitInvalid:
         "Choisissez une unité de tarification prise en charge.",
       labelRuleInvalid: "Choisissez une règle d'étiquette prise en charge.",
+      applicableItemTypesRequired:
+        "Sélectionnez au moins un type d'article applicable.",
+      applicableItemTypesInvalid:
+        "Les types d'articles applicables ne correspondent pas à l'activité.",
       standardPriceInvalid:
         "Le prix standard doit être supérieur à 0, ne pas dépasser 9 999 999 999,99 et utiliser au maximum 2 décimales.",
       compareAtPriceInvalid:
@@ -1841,10 +1854,17 @@ export const tenantMessagesFr: TenantMessages = {
         deviceName: "Nom de l'appareil",
         deviceType: "Type d'appareil",
         connectionType: "Type de connexion",
+        printerPurpose: "Usage d'impression",
       },
+      printerPurposeHint:
+        "Les reçus et les étiquettes de commande utilisent des circuits d'impression distincts. Utilisez des étiquettes imperméables et résistantes à la chaleur pour le linge.",
       adding: "Ajout...",
       action: "Ajouter un périphérique POS",
       created: "Périphérique POS ajouté.",
+    },
+    printerPurposeLabels: {
+      receipt: "Reçus de vente",
+      label: "Étiquettes d'articles de commande",
     },
     edit: {
       title: "Modifier un périphérique PDV",
@@ -2087,7 +2107,7 @@ export const tenantMessagesFr: TenantMessages = {
           never_seen: "Jamais connecté",
         },
       },
-      noCurrentSession: "Pas de séance ouverte",
+      noCurrentSession: "Aucune session de caisse ouverte",
       neverSeen: "Jamais en ligne",
       empty: "Aucun terminal de point de vente ne correspond à ces filtres",
       errorTitle: "Les données du terminal POS n'ont pas pu être chargées",
@@ -2100,7 +2120,7 @@ export const tenantMessagesFr: TenantMessages = {
     registerSessions: {
       title: "Sessions de caisse",
       description:
-        "Examinez les changements de points de vente, les ventes finalisées, la trésorerie de clôture et les écarts de trésorerie.",
+        "Consultez les périodes de vente du terminal, les ventes finalisées, les comptages d'espèces et les rapports Z. La présence du personnel est suivie séparément.",
       exportCsv: "Exporter la page actuelle",
       metrics: {
         total: "Sessions",
@@ -2110,12 +2130,12 @@ export const tenantMessagesFr: TenantMessages = {
         netSales: "Ventes nettes",
         cashVariance: "Écart de caisse",
       },
-      searchPlaceholder: "Session, terminal, personnel ou succursale",
+      searchPlaceholder: "Session, terminal, personne ayant ouvert ou succursale",
       columns: {
         session: "Session",
         branch: "Succursale",
         terminal: "Terminal",
-        staff: "Personnel",
+        staff: "Ouverte par",
         status: "Statut",
         startedAt: "Début",
         endedAt: "Terminé",
@@ -2147,7 +2167,7 @@ export const tenantMessagesFr: TenantMessages = {
         id: "ID de session",
         branch: "Succursale",
         terminal: "Terminal",
-        staff: "Personnel",
+        staff: "Ouverte par",
         status: "Statut",
         startedAt: "Début",
         endedAt: "Terminé à",
@@ -2181,6 +2201,8 @@ export const tenantMessagesFr: TenantMessages = {
       },
       fields: {
         cashTrackingEnabled: "Activer le suivi des espèces",
+        cashHandlingMode:
+          "Gestion des espèces par défaut des nouveaux terminaux",
         openingFloatRequired: "Nécessite un flotteur d'ouverture",
         closingCountRequired: "Exiger un décompte de caisse de clôture",
         returnReasonRequired: "Exiger un motif de retour",
@@ -2197,6 +2219,8 @@ export const tenantMessagesFr: TenantMessages = {
       hints: {
         cashTrackingEnabled:
           "Suivez le fonds de caisse initial, les espèces comptées et les écarts pour chaque session de caisse.",
+        cashHandlingMode:
+          "Choisissez selon la présence d’un tiroir et la personne responsable des espèces.",
         openingFloatRequired:
           "Le personnel doit saisir un montant en espèces d’ouverture avant de commencer une session.",
         closingCountRequired:
@@ -2218,6 +2242,13 @@ export const tenantMessagesFr: TenantMessages = {
         cash: "Espèces",
         card: "Carte",
         app: "Paiement de l'application",
+      },
+      cashHandlingModes: {
+        none: "Espèces non acceptées",
+        untracked: "Espèces acceptées sans comptage",
+        shared_drawer: "Tiroir partagé",
+        assigned_drawer: "Tiroir attribué à un caissier",
+        cash_in_hand: "Espèces conservées par chaque employé",
       },
       roundingRules: {
         none: "Pas d'arrondi",
@@ -2683,6 +2714,7 @@ export const tenantMessagesFr: TenantMessages = {
         pricing: "Tarifs",
         payments: "Paiements",
         pointOfSale: "Point de vente",
+        printing: "Impression",
         hardware: "Périphériques de point de vente",
         activityLog: "Journal d'activité",
       },
@@ -2716,6 +2748,8 @@ export const tenantMessagesFr: TenantMessages = {
           "Connectez et vérifiez Wave ou Orange Money pour les paiements mobiles du point de vente.",
         pointOfSale:
           "Configurez les terminaux, enregistrez les sessions et le comportement hors ligne.",
+        printing:
+          "Gérez le contenu des reçus de vente et des étiquettes de service par succursale.",
         hardware: "Gérez les imprimantes, les scanners et les tiroirs-caisses.",
         activityLog:
           "Examinez les actions des locataires et les enregistrements d’audit.",
@@ -2790,8 +2824,7 @@ export const tenantMessagesFr: TenantMessages = {
     settingsUpdated: "Paramètres du locataire mis à jour.",
     settingsUpToDate: "Les paramètres du locataire sont déjà à jour.",
     businessDetailsUpdated: "Informations du locataire mises à jour.",
-    businessDetailsUpToDate:
-      "Les informations du locataire sont déjà à jour.",
+    businessDetailsUpToDate: "Les informations du locataire sont déjà à jour.",
     onlyOwners:
       "Seuls les propriétaires de locataires peuvent mettre à jour les paramètres du locataire.",
     onlyOwnersReadonly:

@@ -21,7 +21,14 @@ import { DataTable } from "@cleanhub/ui/data-table";
 import { RefreshCw, Search, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 import { Pagination } from "@/components/pagination";
 import { webAdminRoutes } from "@/config/routes";
@@ -42,7 +49,11 @@ function getErrorMessage(error: unknown): string {
 }
 
 function StatusBadge({ status, label }: { status: string; label: string }) {
-  return <Badge variant={status === "active" ? "default" : "secondary"}>{label}</Badge>;
+  return (
+    <Badge variant={status === "active" ? "default" : "secondary"}>
+      {label}
+    </Badge>
+  );
 }
 
 export type HardwareListViewProps = {
@@ -60,7 +71,8 @@ export function HardwareListView({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [pendingDelete, setPendingDelete] = useState<HardwareConfigSummary | null>(null);
+  const [pendingDelete, setPendingDelete] =
+    useState<HardwareConfigSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -100,12 +112,19 @@ export function HardwareListView({
 
     return devices.filter((device) => {
       const deviceType =
-        hardwareDeviceTypeOptions.find((option) => option.value === device.deviceType)?.label ??
-        device.deviceType;
+        hardwareDeviceTypeOptions.find(
+          (option) => option.value === device.deviceType,
+        )?.label ?? device.deviceType;
       const connectionType =
         hardwareConnectionTypeOptions.find(
           (option) => option.value === device.connectionType,
         )?.label ?? device.connectionType;
+      const printerPurpose =
+        device.deviceType === "printer"
+          ? m.hardware.printerPurposeLabels[
+              device.config.printerPurpose === "label" ? "label" : "receipt"
+            ]
+          : "";
 
       return [
         device.name,
@@ -113,12 +132,13 @@ export function HardwareListView({
         device.terminalDeviceId,
         deviceType,
         connectionType,
+        printerPurpose,
       ]
         .join(" ")
         .toLowerCase()
         .includes(normalizedSearchQuery);
     });
-  }, [devices, normalizedSearchQuery]);
+  }, [devices, m.hardware.printerPurposeLabels, normalizedSearchQuery]);
 
   const handleDelete = useCallback(
     async (device: HardwareConfigSummary) => {
@@ -211,7 +231,10 @@ export function HardwareListView({
         {isPending ? (
           <div className="grid gap-2 p-3">
             {[0, 1, 2].map((item) => (
-              <div className="h-10 animate-pulse rounded-md bg-muted" key={item} />
+              <div
+                className="h-10 animate-pulse rounded-md bg-muted"
+                key={item}
+              />
             ))}
           </div>
         ) : visibleDevices.length === 0 ? (
@@ -241,7 +264,9 @@ export function HardwareListView({
                     className="cursor-pointer hover:bg-muted/40"
                     key={device.id}
                     onClick={() =>
-                      router.push(webAdminRoutes.tenant.hardwareDevice(device.id))
+                      router.push(
+                        webAdminRoutes.tenant.hardwareDevice(device.id),
+                      )
                     }
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -252,16 +277,33 @@ export function HardwareListView({
                       }
                     }}
                     onMouseEnter={() =>
-                      router.prefetch(webAdminRoutes.tenant.hardwareDevice(device.id))
+                      router.prefetch(
+                        webAdminRoutes.tenant.hardwareDevice(device.id),
+                      )
                     }
                     role="link"
                     tabIndex={0}
                   >
                     <TableCell className="font-medium">{device.name}</TableCell>
                     <TableCell>
-                      {hardwareDeviceTypeOptions.find(
-                        (option) => option.value === device.deviceType,
-                      )?.label ?? device.deviceType}
+                      <div className="grid gap-0.5">
+                        <span>
+                          {hardwareDeviceTypeOptions.find(
+                            (option) => option.value === device.deviceType,
+                          )?.label ?? device.deviceType}
+                        </span>
+                        {device.deviceType === "printer" ? (
+                          <span className="text-[10px] text-muted-foreground">
+                            {
+                              m.hardware.printerPurposeLabels[
+                                device.config.printerPurpose === "label"
+                                  ? "label"
+                                  : "receipt"
+                              ]
+                            }
+                          </span>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell>
                       {hardwareConnectionTypeOptions.find(
@@ -270,7 +312,9 @@ export function HardwareListView({
                     </TableCell>
                     <TableCell>
                       <div className="grid gap-0.5">
-                        <span>{device.terminalLabel || device.terminalDeviceId}</span>
+                        <span>
+                          {device.terminalLabel || device.terminalDeviceId}
+                        </span>
                         {device.terminalLabel ? (
                           <span className="font-mono text-[10px] text-muted-foreground">
                             {device.terminalDeviceId}
@@ -281,7 +325,9 @@ export function HardwareListView({
                     <TableCell>
                       <StatusBadge
                         status={device.status}
-                        label={m.common.statusLabels[device.status] ?? device.status}
+                        label={
+                          m.common.statusLabels[device.status] ?? device.status
+                        }
                       />
                     </TableCell>
                     <TableCell>
@@ -312,7 +358,9 @@ export function HardwareListView({
                         size="sm"
                         variant="outline"
                       >
-                        <Link href={webAdminRoutes.tenant.hardwareDevice(device.id)}>
+                        <Link
+                          href={webAdminRoutes.tenant.hardwareDevice(device.id)}
+                        >
                           {m.hardware.actions.edit}
                         </Link>
                       </Button>
@@ -359,7 +407,9 @@ export function HardwareListView({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>{m.hardware.delete.title}</DialogTitle>
-            <DialogDescription>{m.hardware.delete.description}</DialogDescription>
+            <DialogDescription>
+              {m.hardware.delete.description}
+            </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-3">
             <Button

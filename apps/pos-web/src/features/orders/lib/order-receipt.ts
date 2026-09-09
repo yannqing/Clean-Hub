@@ -6,18 +6,19 @@ import type {
 import { buildPosReceiptText, type PrintLocale } from "@cleanhub/hardware";
 import { formatPosOrderCode } from "@cleanhub/domain/order-codes";
 
-import {
-  MOBILE_MONEY_PROVIDER_LABELS,
-  PAYMENT_METHOD_LABELS,
-} from "../constants";
+import { MOBILE_MONEY_PROVIDER_LABELS } from "../constants";
 
 export function buildPosOrderReceipt(input: {
   branch: PosBranchSummary | null;
   locale: string;
   order: PosOrderDetail;
   payments: PosPaymentTransaction[];
+  operatorName?: string | null;
+  terminalName?: string | null;
 }): { content: string; title: string } {
   const { branch, order, payments } = input;
+  const locale = toPrintLocale(input.locale);
+  const copy = receiptCopy[locale];
   const items = order.items.map((item) => {
     const quantity =
       item.pricingUnit === "per_kg"
@@ -27,7 +28,7 @@ export function buildPosOrderReceipt(input: {
       item.pricingUnit === "per_kg"
         ? `${item.weight ?? item.quantity} kg${item.bagCount ? ` / ${item.bagCount}` : ""}`
         : `${item.quantity} × ${item.unitOfMeasure ?? "item"}`,
-      item.itemColor ? `Color: ${item.itemColor}` : null,
+      item.itemColor ? `${copy.color}: ${item.itemColor}` : null,
       item.specialRequest ? item.specialRequest : null,
     ].filter((value): value is string => Boolean(value));
     return {
@@ -35,6 +36,8 @@ export function buildPosOrderReceipt(input: {
       quantity: Number.isFinite(quantity) ? quantity : 0,
       unitAmountMinor: toMinorUnits(item.chargedUnitAmount, order.currency),
       totalAmountMinor: toMinorUnits(item.lineAmount, order.currency),
+      sku: item.sku ?? undefined,
+      barcode: item.barcode ?? undefined,
       note: details.length > 0 ? details.join(" · ") : undefined,
     };
   });
@@ -46,7 +49,7 @@ export function buildPosOrderReceipt(input: {
         .map((payment) =>
           payment.provider
             ? MOBILE_MONEY_PROVIDER_LABELS[payment.provider]
-            : PAYMENT_METHOD_LABELS[payment.paymentMethod],
+            : copy.paymentMethods[payment.paymentMethod],
         ),
     ),
   ].join(" / ");
@@ -63,9 +66,12 @@ export function buildPosOrderReceipt(input: {
         orderCode: formatPosOrderCode(order.id),
         issuedAt: order.paidAt ?? order.updatedAt,
         currency: order.currency,
-        merchantName: branch?.receiptName || branch?.name || "CleanHub",
-        branchName: branch?.name,
-        customerName: order.customerName ?? "Walk-in customer",
+        merchantName: branch?.merchantName || "CleanHub",
+        branchName: branch?.receiptName || branch?.name,
+        cashierName: input.operatorName ?? undefined,
+        terminalName: input.terminalName ?? undefined,
+        customerName: order.customerName ?? copy.walkInCustomer,
+        fields: branch?.receiptFields,
         items,
         subtotalMinor: toMinorUnits(order.subtotalAmount, order.currency),
         discountMinor: toMinorUnits(order.discountAmount, order.currency),
@@ -76,8 +82,7 @@ export function buildPosOrderReceipt(input: {
           order.roundingAdjustmentAmount,
           order.currency,
         ),
-        taxRegistrationNumber:
-          order.taxRegistrationNumberSnapshot ?? undefined,
+        taxRegistrationNumber: order.taxRegistrationNumberSnapshot ?? undefined,
         taxExemptionReason: order.taxExemptionReason ?? undefined,
         totalMinor,
         paidMinor: toMinorUnits(order.paidAmount, order.currency),
@@ -107,14 +112,51 @@ export function buildPosOrderReceipt(input: {
           totalMinor - toMinorUnits(order.paidAmount, order.currency),
         ),
         paymentMethod: paymentMethod || undefined,
-        footer: [branch?.receiptAddress, branch?.receiptPhone, "Thank you"]
-          .filter(Boolean)
-          .join(" · "),
+        receiptAddress: branch?.receiptAddress ?? undefined,
+        receiptPhone: branch?.receiptPhone ?? undefined,
+        thankYouMessage: copy.thankYou,
       },
-      { locale: toPrintLocale(input.locale) },
+      { locale },
     ),
   };
 }
+
+export function getPosReceiptCopy(locale: string) {
+  return receiptCopy[toPrintLocale(locale)];
+}
+
+const receiptCopy = {
+  en: {
+    color: "Color",
+    thankYou: "Thank you",
+    walkInCustomer: "Walk-in customer",
+    paymentMethods: { cash: "Cash", card: "Card", app: "Mobile payment" },
+  },
+  fr: {
+    color: "Couleur",
+    thankYou: "Merci",
+    walkInCustomer: "Client de passage",
+    paymentMethods: {
+      cash: "Espèces",
+      card: "Carte",
+      app: "Paiement mobile",
+    },
+  },
+  "zh-CN": {
+    color: "颜色",
+    thankYou: "谢谢惠顾",
+    walkInCustomer: "散客",
+    paymentMethods: { cash: "现金", card: "银行卡", app: "移动支付" },
+  },
+} as const satisfies Record<
+  PrintLocale,
+  {
+    color: string;
+    thankYou: string;
+    walkInCustomer: string;
+    paymentMethods: Record<PosPaymentTransaction["paymentMethod"], string>;
+  }
+>;
 
 function toMinorUnits(value: string, currency: string): number {
   const fractionDigits =

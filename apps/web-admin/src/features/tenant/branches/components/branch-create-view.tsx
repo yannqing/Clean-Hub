@@ -267,37 +267,6 @@ export function BranchCreateView({
 
               <Card className="gap-0 rounded-lg py-0 shadow-none">
                 <CardContent className="grid gap-4 py-5">
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="grid gap-2">
-                      <Label htmlFor="branch-receipt-name">
-                        {m.branches.create.fields.receiptName}
-                      </Label>
-                      <Input
-                        aria-invalid={Boolean(errors.receiptName)}
-                        id="branch-receipt-name"
-                        onChange={(event) =>
-                          updateForm("receiptName", event.target.value)
-                        }
-                        value={formValues.receiptName}
-                      />
-                      <FieldError message={errors.receiptName} />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="branch-receipt-phone">
-                        {m.branches.create.fields.receiptPhone}
-                      </Label>
-                      <Input
-                        aria-invalid={Boolean(errors.receiptPhone)}
-                        id="branch-receipt-phone"
-                        onChange={(event) =>
-                          updateForm("receiptPhone", event.target.value)
-                        }
-                        value={formValues.receiptPhone}
-                      />
-                      <FieldError message={errors.receiptPhone} />
-                    </div>
-                  </div>
-
                   <div className="grid gap-2">
                     <Label htmlFor="branch-address">
                       {m.branches.create.fields.address}
@@ -311,21 +280,6 @@ export function BranchCreateView({
                       value={formValues.address}
                     />
                     <FieldError message={errors.address} />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label htmlFor="branch-receipt-address">
-                      {m.branches.create.fields.receiptAddress}
-                    </Label>
-                    <Textarea
-                      aria-invalid={Boolean(errors.receiptAddress)}
-                      id="branch-receipt-address"
-                      onChange={(event) =>
-                        updateForm("receiptAddress", event.target.value)
-                      }
-                      value={formValues.receiptAddress}
-                    />
-                    <FieldError message={errors.receiptAddress} />
                   </div>
 
                   <BranchBusinessHoursEditor

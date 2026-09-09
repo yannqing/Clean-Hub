@@ -1,4 +1,10 @@
 import { z } from "zod";
+import {
+  DEFAULT_POS_RECEIPT_FIELDS,
+  DEFAULT_POS_TICKET_LABEL_FIELDS,
+  POS_RECEIPT_FIELDS,
+  POS_TICKET_LABEL_FIELDS,
+} from "@cleanhub/domain/receipt";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
@@ -44,6 +50,23 @@ const branchLogoObjectKeySchema = z
   .max(1024)
   .nullable();
 const versionSchema = z.coerce.number().int().min(1);
+const receiptFieldsSchema = z
+  .array(z.enum(POS_RECEIPT_FIELDS))
+  .min(1)
+  .max(POS_RECEIPT_FIELDS.length)
+  .transform((fields) => Array.from(new Set(fields)))
+  .refine((fields) => fields.includes("merchant_name"), {
+    message: "Merchant name is required on every receipt.",
+  });
+const ticketLabelFieldsSchema = z
+  .array(z.enum(POS_TICKET_LABEL_FIELDS))
+  .min(2)
+  .max(POS_TICKET_LABEL_FIELDS.length)
+  .transform((fields) => Array.from(new Set(fields)))
+  .refine(
+    (fields) => fields.includes("ticket_number") && fields.includes("item_name"),
+    { message: "Ticket number and item name are required on every label." },
+  );
 
 export const branchListQuerySchema = z.object({
   q: z.string().trim().min(1).max(120).optional(),
@@ -65,6 +88,10 @@ export const createBranchBodySchema = z.object({
   receiptName: nullableStringSchema(200),
   receiptPhone: nullableStringSchema(32),
   receiptAddress: nullableStringSchema(500),
+  receiptFields: receiptFieldsSchema.default([...DEFAULT_POS_RECEIPT_FIELDS]),
+  ticketLabelFields: ticketLabelFieldsSchema.default([
+    ...DEFAULT_POS_TICKET_LABEL_FIELDS,
+  ]),
   logoObjectKey: branchLogoObjectKeySchema.optional(),
   status: branchStatusSchema.default("active"),
 });

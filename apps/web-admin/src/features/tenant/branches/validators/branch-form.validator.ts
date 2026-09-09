@@ -3,6 +3,10 @@ import type {
   CreateBranchRequest,
   UpdateBranchRequest,
 } from "@cleanhub/api-client";
+import {
+  POS_RECEIPT_FIELDS,
+  REQUIRED_POS_RECEIPT_FIELDS,
+} from "@cleanhub/domain/receipt";
 
 import { branchWeekdays } from "../constants";
 import type { BranchFormValues, BranchLanguage, BranchStatus } from "../types";
@@ -105,6 +109,16 @@ function validateBase(input: BranchFormValues) {
     errors.receiptAddress = "Receipt address must be 500 characters or fewer.";
   }
 
+  if (
+    input.receiptFields.some((field) => !POS_RECEIPT_FIELDS.includes(field)) ||
+    REQUIRED_POS_RECEIPT_FIELDS.some(
+      (field) => !input.receiptFields.includes(field),
+    )
+  ) {
+    errors.receiptFields =
+      "Choose valid receipt fields. Merchant name is required.";
+  }
+
   if (logoObjectKey && logoObjectKey.length > 1024) {
     errors.logoObjectKey = "The uploaded logo reference is invalid.";
   }
@@ -128,6 +142,7 @@ function validateBase(input: BranchFormValues) {
       receiptName: normalizeOptional(input.receiptName),
       receiptPhone: normalizeOptional(input.receiptPhone),
       receiptAddress: normalizeOptional(input.receiptAddress),
+      receiptFields: Array.from(new Set(input.receiptFields)),
       logoObjectKey,
       status: input.status,
     },
@@ -184,6 +199,7 @@ export function validateBranchUpdateForm(
       receiptName: result.data.receiptName,
       receiptPhone: result.data.receiptPhone,
       receiptAddress: result.data.receiptAddress,
+      receiptFields: result.data.receiptFields,
       logoObjectKey: input.removeLogo
         ? null
         : (result.data.logoObjectKey ?? undefined),

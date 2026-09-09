@@ -14,7 +14,13 @@ import {
   SelectValue,
   toast,
 } from "@cleanhub/ui";
-import { Check, ChevronRight, LoaderCircle, SquareTerminal, Wrench } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  LoaderCircle,
+  SquareTerminal,
+  Wrench,
+} from "lucide-react";
 import Link from "next/link";
 import { type FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -22,28 +28,37 @@ import { useRouter } from "next/navigation";
 import { webAdminRoutes } from "@/config/routes";
 import { useTenantI18n } from "@/i18n";
 
-import {
-  bindDeviceAction,
-  updateDeviceAction,
-} from "../actions";
+import { bindDeviceAction, updateDeviceAction } from "../actions";
 import {
   hardwareConnectionTypeOptions,
   hardwareDeviceStatusOptions,
   hardwareDeviceTypeOptions,
 } from "../constants";
-import { validateCreateDeviceForm, validateUpdateDeviceForm } from "../validators";
+import {
+  validateCreateDeviceForm,
+  validateUpdateDeviceForm,
+} from "../validators";
 import type {
   CreateHardwareConfigRequest,
   HardwareConfigSummary,
   HardwareConnectionType,
   HardwareDeviceStatus,
   HardwareDeviceType,
+  HardwarePrinterPurpose,
   UpdateHardwareConfigRequest,
 } from "../types";
 import type { PointOfSaleDevice } from "../../point-of-sale/types";
 
 type DeviceFormErrors = Partial<
-  Record<"terminalId" | "name" | "deviceType" | "connectionType" | "status", string>
+  Record<
+    | "terminalId"
+    | "name"
+    | "deviceType"
+    | "connectionType"
+    | "printerPurpose"
+    | "status",
+    string
+  >
 >;
 
 type HardwareFormViewProps = {
@@ -59,6 +74,12 @@ function FieldError({ message }: { message?: string }) {
       {message}
     </p>
   ) : null;
+}
+
+function getPrinterPurpose(
+  device: HardwareConfigSummary | undefined,
+): HardwarePrinterPurpose {
+  return device?.config.printerPurpose === "label" ? "label" : "receipt";
 }
 
 function TerminalSelect({
@@ -113,10 +134,12 @@ export function HardwareFormView({
   const [deviceType, setDeviceType] = useState<HardwareDeviceType>(
     initialDevice?.deviceType ?? "printer",
   );
-  const [connectionType, setConnectionType] =
-    useState<HardwareConnectionType>(
-      initialDevice?.connectionType ?? "usb",
-    );
+  const [connectionType, setConnectionType] = useState<HardwareConnectionType>(
+    initialDevice?.connectionType ?? "usb",
+  );
+  const [printerPurpose, setPrinterPurpose] = useState<HardwarePrinterPurpose>(
+    getPrinterPurpose(initialDevice),
+  );
   const [status, setStatus] = useState<HardwareDeviceStatus>(
     initialDevice?.status ?? "active",
   );
@@ -138,12 +161,17 @@ export function HardwareFormView({
       return;
     }
 
+    const config =
+      deviceType === "printer"
+        ? { ...(initialDevice?.config ?? {}), printerPurpose }
+        : initialDevice?.config;
     const validation = isEditMode
       ? validateUpdateDeviceForm({
           terminalId,
           connectionType,
           name,
           status,
+          config,
           version: initialDevice?.version ?? 0,
         })
       : validateCreateDeviceForm({
@@ -151,6 +179,7 @@ export function HardwareFormView({
           connectionType,
           deviceType,
           name,
+          config,
         });
 
     if (!validation.ok) {
@@ -163,23 +192,30 @@ export function HardwareFormView({
     setErrors({});
 
     try {
-      const result = isEditMode && initialDevice
-        ? await updateDeviceAction(
-            initialDevice.id,
-            validation.data as UpdateHardwareConfigRequest,
-          )
-        : await bindDeviceAction(validation.data as CreateHardwareConfigRequest);
+      const result =
+        isEditMode && initialDevice
+          ? await updateDeviceAction(
+              initialDevice.id,
+              validation.data as UpdateHardwareConfigRequest,
+            )
+          : await bindDeviceAction(
+              validation.data as CreateHardwareConfigRequest,
+            );
 
       if (!result.ok) {
         toast.error(result.error);
         return;
       }
 
-      toast.success(isEditMode ? m.hardware.edit.updated : m.hardware.create.created);
+      toast.success(
+        isEditMode ? m.hardware.edit.updated : m.hardware.create.created,
+      );
       router.push(webAdminRoutes.tenant.hardware);
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : m.hardware.requestFailed);
+      toast.error(
+        error instanceof Error ? error.message : m.hardware.requestFailed,
+      );
     } finally {
       setSaving(false);
     }
@@ -305,6 +341,37 @@ export function HardwareFormView({
                     </Select>
                     <FieldError message={errors.connectionType} />
                   </div>
+
+                  {deviceType === "printer" ? (
+                    <div className="grid gap-2">
+                      <Label htmlFor="hardware-printer-purpose">
+                        {m.hardware.create.labels.printerPurpose} *
+                      </Label>
+                      <Select
+                        onValueChange={(value) => {
+                          setPrinterPurpose(value as HardwarePrinterPurpose);
+                          clearError("printerPurpose");
+                        }}
+                        value={printerPurpose}
+                      >
+                        <SelectTrigger id="hardware-printer-purpose">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="receipt">
+                            {m.hardware.printerPurposeLabels.receipt}
+                          </SelectItem>
+                          <SelectItem value="label">
+                            {m.hardware.printerPurposeLabels.label}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FieldError message={errors.printerPurpose} />
+                      <p className="text-xs text-muted-foreground">
+                        {m.hardware.create.printerPurposeHint}
+                      </p>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             </div>
@@ -347,7 +414,8 @@ export function HardwareFormView({
                         <SelectContent>
                           {hardwareDeviceStatusOptions.map((option) => (
                             <SelectItem key={option.value} value={option.value}>
-                              {m.common.statusLabels[option.value] ?? option.label}
+                              {m.common.statusLabels[option.value] ??
+                                option.label}
                             </SelectItem>
                           ))}
                         </SelectContent>

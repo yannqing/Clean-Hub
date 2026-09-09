@@ -31,6 +31,21 @@ type HardwareAccess = {
   allowedBranchIds?: string[];
 };
 
+function normalizeHardwareConfig(
+  deviceType: HardwareConfigSummary["deviceType"],
+  config: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+  const normalized = { ...(config ?? {}) };
+  if (
+    deviceType === "printer" &&
+    normalized.printerPurpose !== "receipt" &&
+    normalized.printerPurpose !== "label"
+  ) {
+    normalized.printerPurpose = "receipt";
+  }
+  return normalized;
+}
+
 async function resolveHardwareAccess(
   authContext: ListHardwareConfigsInput["authContext"],
   db: Database,
@@ -68,7 +83,11 @@ export async function createHardwareConfig(
   const tenantId = access.tenantId;
 
   return db.transaction(async (tx) => {
-    const terminal = await findHardwareTerminal(tx, tenantId, input.data.terminalId);
+    const terminal = await findHardwareTerminal(
+      tx,
+      tenantId,
+      input.data.terminalId,
+    );
     if (!terminal) {
       throw new HardwareError(
         "HARDWARE_TERMINAL_NOT_FOUND",
@@ -84,7 +103,7 @@ export async function createHardwareConfig(
       name: input.data.name,
       deviceType: input.data.deviceType,
       connectionType: input.data.connectionType,
-      config: input.data.config ?? {},
+      config: normalizeHardwareConfig(input.data.deviceType, input.data.config),
       actorUserId: input.authContext.userId,
     });
 
@@ -138,7 +157,11 @@ export async function updateHardwareConfig(
     let targetBranchId = existing.branchId;
 
     if (input.data.terminalId) {
-      const terminal = await findHardwareTerminal(tx, tenantId, input.data.terminalId);
+      const terminal = await findHardwareTerminal(
+        tx,
+        tenantId,
+        input.data.terminalId,
+      );
       if (!terminal) {
         throw new HardwareError(
           "HARDWARE_TERMINAL_NOT_FOUND",
@@ -156,7 +179,10 @@ export async function updateHardwareConfig(
       name: input.data.name,
       terminalId: input.data.terminalId,
       connectionType: input.data.connectionType,
-      config: input.data.config,
+      config:
+        input.data.config === undefined
+          ? undefined
+          : normalizeHardwareConfig(existing.deviceType, input.data.config),
       status: input.data.status,
       version: input.data.version,
       actorUserId: input.authContext.userId,

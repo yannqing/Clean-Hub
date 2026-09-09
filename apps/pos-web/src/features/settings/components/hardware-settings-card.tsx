@@ -96,8 +96,8 @@ export function HardwareSettingsCard({
       setSelectedPrinterId((current) =>
         printers.some((printer) => printer.id === current)
           ? current
-          : (printers.find((printer) => printer.isDefault) ?? printers[0])?.id ??
-            "",
+          : ((printers.find((printer) => printer.isDefault) ?? printers[0])
+              ?.id ?? ""),
       );
       setPrinterRuntimeState("ready");
     } catch {
@@ -139,13 +139,17 @@ export function HardwareSettingsCard({
         throw new Error("未检测到可用的 POS 硬件桥。");
       }
       const jobId = createId();
+      const isLabelPrinter = bindingDevice.config.printerPurpose === "label";
       const result = await hardware.print({
         id: jobId,
         printerId: printer.id,
-        title: "CleanHub 打印机测试",
+        title: isLabelPrinter
+          ? "CleanHub 标签打印机测试"
+          : "CleanHub 小票打印机测试",
         content: [
           "CleanHub",
-          "打印机连接测试",
+          isLabelPrinter ? "工单物品标签测试" : "销售小票打印测试",
+          `用途：${isLabelPrinter ? "工单物品标签" : "销售小票"}`,
           `设备：${printer.name}`,
           `时间：${new Date().toLocaleString()}`,
           "",
@@ -191,34 +195,30 @@ export function HardwareSettingsCard({
         tone: "text-amber-700 lg:bg-amber-50",
       };
     }
-    if (
-      localPrinters.some((printer) => printer.id === configured.printerId)
-    ) {
-      const operationalIssue: Record<
-        string,
-        { label: string; tone: string }
-      > = {
-        PRINTER_NO_PAPER: {
-          label: "缺纸",
-          tone: "text-red-700 lg:bg-red-50",
-        },
-        PRINTER_COVER_OPEN: {
-          label: "仓盖未关闭",
-          tone: "text-red-700 lg:bg-red-50",
-        },
-        PRINTER_OVERHEATED: {
-          label: "温度过高",
-          tone: "text-red-700 lg:bg-red-50",
-        },
-        PRINTER_BUSY: {
-          label: "打印中",
-          tone: "text-blue-700 lg:bg-blue-50",
-        },
-        PRINTER_LOW_BATTERY: {
-          label: "设备电量低",
-          tone: "text-amber-700 lg:bg-amber-50",
-        },
-      };
+    if (localPrinters.some((printer) => printer.id === configured.printerId)) {
+      const operationalIssue: Record<string, { label: string; tone: string }> =
+        {
+          PRINTER_NO_PAPER: {
+            label: "缺纸",
+            tone: "text-red-700 lg:bg-red-50",
+          },
+          PRINTER_COVER_OPEN: {
+            label: "仓盖未关闭",
+            tone: "text-red-700 lg:bg-red-50",
+          },
+          PRINTER_OVERHEATED: {
+            label: "温度过高",
+            tone: "text-red-700 lg:bg-red-50",
+          },
+          PRINTER_BUSY: {
+            label: "打印中",
+            tone: "text-blue-700 lg:bg-blue-50",
+          },
+          PRINTER_LOW_BATTERY: {
+            label: "设备电量低",
+            tone: "text-amber-700 lg:bg-amber-50",
+          },
+        };
       const issue = printerOperationalStatus
         ? operationalIssue[printerOperationalStatus]
         : undefined;
@@ -242,16 +242,12 @@ export function HardwareSettingsCard({
       );
       const hardware = getPosHardwareBridge();
       if (!hardware) {
-        throw new Error(
-          "未检测到可用的 POS 硬件桥，请在 POS 客户端中重试。",
-        );
+        throw new Error("未检测到可用的 POS 硬件桥，请在 POS 客户端中重试。");
       }
 
       const capabilities = await hardware.getCapabilities();
       if (!capabilities.cashDrawer) {
-        throw new Error(
-          "当前终端的钱箱适配器不可用，请检查 POS 钱箱配置。",
-        );
+        throw new Error("当前终端的钱箱适配器不可用，请检查 POS 钱箱配置。");
       }
 
       if (!configuredDrawer) {
@@ -316,8 +312,7 @@ export function HardwareSettingsCard({
                 device.deviceType === "printer"
                   ? printerStatus(device)
                   : {
-                      label:
-                        device.status === "active" ? "已配置" : "已停用",
+                      label: device.status === "active" ? "已配置" : "已停用",
                       tone:
                         device.status === "active"
                           ? "text-emerald-700 lg:bg-emerald-50"
@@ -325,52 +320,55 @@ export function HardwareSettingsCard({
                     };
               const configuredPrinter = getConfiguredPrinter(device);
               return (
-              <div
-                className="flex min-h-[76px] items-center justify-between gap-3 py-3 lg:min-h-0 lg:border-b lg:last:border-b-0"
-                key={device.id}
-              >
-                <div className="flex min-w-0 items-center gap-3">
-                  <Icon
-                    className="hidden h-5 w-5 shrink-0 text-muted-foreground lg:block"
-                    name={DEVICE_ICONS[device.deviceType] ?? "settings"}
-                  />
-                  <div className="min-w-0">
-                    <p className="truncate text-base font-medium text-foreground lg:text-sm">
-                      {device.name}
-                    </p>
-                    <p className="mt-0.5 text-sm text-muted-foreground lg:mt-0 lg:text-xs">
-                      {DEVICE_TYPE_LABELS[device.deviceType] ??
-                        device.deviceType}
-                      {" · "}
-                      {CONNECTION_TYPE_LABELS[device.connectionType] ??
-                        device.connectionType}
-                    </p>
-                    {device.deviceType === "printer" && configuredPrinter ? (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {configuredPrinter.printerName}
+                <div
+                  className="flex min-h-[76px] items-center justify-between gap-3 py-3 lg:min-h-0 lg:border-b lg:last:border-b-0"
+                  key={device.id}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Icon
+                      className="hidden h-5 w-5 shrink-0 text-muted-foreground lg:block"
+                      name={DEVICE_ICONS[device.deviceType] ?? "settings"}
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-medium text-foreground lg:text-sm">
+                        {device.name}
                       </p>
+                      <p className="mt-0.5 text-sm text-muted-foreground lg:mt-0 lg:text-xs">
+                        {DEVICE_TYPE_LABELS[device.deviceType] ??
+                          device.deviceType}
+                        {" · "}
+                        {CONNECTION_TYPE_LABELS[device.connectionType] ??
+                          device.connectionType}
+                        {device.deviceType === "printer"
+                          ? ` · ${device.config.printerPurpose === "label" ? "工单标签" : "销售小票"}`
+                          : ""}
+                      </p>
+                      {device.deviceType === "printer" && configuredPrinter ? (
+                        <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                          {configuredPrinter.printerName}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span
+                      className={`text-sm font-medium lg:rounded-full lg:px-2 lg:py-0.5 lg:text-xs ${status.tone}`}
+                    >
+                      {status.label}
+                    </span>
+                    {device.deviceType === "printer" &&
+                    canManageSensitiveHardware ? (
+                      <button
+                        className="h-9 rounded-md border px-3 text-xs font-semibold text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={printerRuntimeState === "loading"}
+                        onClick={() => openPrinterBinding(device)}
+                        type="button"
+                      >
+                        {configuredPrinter ? "测试 / 重连" : "连接"}
+                      </button>
                     ) : null}
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span
-                    className={`text-sm font-medium lg:rounded-full lg:px-2 lg:py-0.5 lg:text-xs ${status.tone}`}
-                  >
-                    {status.label}
-                  </span>
-                  {device.deviceType === "printer" &&
-                  canManageSensitiveHardware ? (
-                    <button
-                      className="h-9 rounded-md border px-3 text-xs font-semibold text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={printerRuntimeState === "loading"}
-                      onClick={() => openPrinterBinding(device)}
-                      type="button"
-                    >
-                      {configuredPrinter ? "测试 / 重连" : "连接"}
-                    </button>
-                  ) : null}
-                </div>
-              </div>
               );
             })}
           </div>
@@ -458,14 +456,24 @@ export function HardwareSettingsCard({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>连接小票打印机</DialogTitle>
+            <DialogTitle>
+              连接
+              {bindingDevice?.config.printerPurpose === "label"
+                ? "标签打印机"
+                : "小票打印机"}
+            </DialogTitle>
             <DialogDescription>
-              请选择当前设备操作系统中已安装的打印机。系统会先打印测试页，成功后才保存绑定。
+              请选择当前设备操作系统中已安装的
+              {bindingDevice?.config.printerPurpose === "label"
+                ? "标签打印机"
+                : "小票打印机"}
+              。系统会先打印测试页，成功后才保存绑定。
             </DialogDescription>
           </DialogHeader>
           {printerRuntimeState === "unavailable" ? (
             <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
-              未检测到 POS 打印能力。T1101 请检查内置打印服务，桌面客户端请先在操作系统中安装打印机。
+              未检测到 POS 打印能力。T1101
+              请检查内置打印服务，桌面客户端请先在操作系统中安装打印机。
             </p>
           ) : printerRuntimeState === "error" ? (
             <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">
@@ -486,7 +494,8 @@ export function HardwareSettingsCard({
               >
                 {localPrinters.map((printer) => (
                   <option key={printer.id} value={printer.id}>
-                    {printer.name}{printer.isDefault ? "（系统默认）" : ""}
+                    {printer.name}
+                    {printer.isDefault ? "（系统默认）" : ""}
                   </option>
                 ))}
               </select>

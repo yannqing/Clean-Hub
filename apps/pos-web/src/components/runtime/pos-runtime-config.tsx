@@ -2,6 +2,12 @@
 
 import { createContext, useContext, useMemo } from "react";
 import { resolveTimeZone } from "@cleanhub/domain/timezone";
+import {
+  DEFAULT_POS_RECEIPT_FIELDS,
+  DEFAULT_POS_TICKET_LABEL_FIELDS,
+  type PosReceiptField,
+  type PosTicketLabelField,
+} from "@cleanhub/domain/receipt";
 
 import { DEFAULT_POS_CURRENCY, normalizeCurrencyCode } from "@/lib/money";
 import type {
@@ -27,6 +33,15 @@ type PosRuntimeConfig = {
   defaultTaxRate: string;
   pricesIncludeTax: boolean;
   taxRegistrationNumber: string | null;
+  merchantName: string;
+  branchName: string;
+  receiptName: string | null;
+  receiptPhone: string | null;
+  receiptAddress: string | null;
+  receiptFields: PosReceiptField[];
+  ticketLabelFields: PosTicketLabelField[];
+  operatorName: string | null;
+  terminalName: string | null;
   autoPrintReceipt: boolean;
   printCopies: number;
 };
@@ -48,6 +63,15 @@ const PosRuntimeConfigContext = createContext<PosRuntimeConfig>({
   defaultTaxRate: "0.0000",
   pricesIncludeTax: true,
   taxRegistrationNumber: null,
+  merchantName: "CleanHub",
+  branchName: "",
+  receiptName: null,
+  receiptPhone: null,
+  receiptAddress: null,
+  receiptFields: [...DEFAULT_POS_RECEIPT_FIELDS],
+  ticketLabelFields: [...DEFAULT_POS_TICKET_LABEL_FIELDS],
+  operatorName: null,
+  terminalName: null,
   autoPrintReceipt: true,
   printCopies: 1,
 });
@@ -69,6 +93,15 @@ export function PosRuntimeConfigProvider({
   defaultTaxRate,
   pricesIncludeTax,
   taxRegistrationNumber,
+  merchantName,
+  branchName,
+  receiptName,
+  receiptPhone,
+  receiptAddress,
+  receiptFields,
+  ticketLabelFields,
+  operatorName,
+  terminalName,
   autoPrintReceipt,
   printCopies,
   children,
@@ -89,6 +122,15 @@ export function PosRuntimeConfigProvider({
   defaultTaxRate?: string | null;
   pricesIncludeTax?: boolean | null;
   taxRegistrationNumber?: string | null;
+  merchantName?: string | null;
+  branchName?: string | null;
+  receiptName?: string | null;
+  receiptPhone?: string | null;
+  receiptAddress?: string | null;
+  receiptFields?: PosReceiptField[] | null;
+  ticketLabelFields?: PosTicketLabelField[] | null;
+  operatorName?: string | null;
+  terminalName?: string | null;
   autoPrintReceipt?: boolean | null;
   printCopies?: number | null;
   children: React.ReactNode;
@@ -111,6 +153,16 @@ export function PosRuntimeConfigProvider({
       defaultTaxRate: defaultTaxRate ?? "0.0000",
       pricesIncludeTax: pricesIncludeTax ?? true,
       taxRegistrationNumber: taxRegistrationNumber ?? null,
+      merchantName: merchantName || "CleanHub",
+      branchName: branchName ?? "",
+      receiptName: receiptName ?? null,
+      receiptPhone: receiptPhone ?? null,
+      receiptAddress: receiptAddress ?? null,
+      receiptFields: receiptFields ?? [...DEFAULT_POS_RECEIPT_FIELDS],
+      ticketLabelFields:
+        ticketLabelFields ?? [...DEFAULT_POS_TICKET_LABEL_FIELDS],
+      operatorName: operatorName ?? null,
+      terminalName: terminalName ?? null,
       autoPrintReceipt: autoPrintReceipt ?? true,
       printCopies: printCopies ?? 1,
     }),
@@ -130,6 +182,15 @@ export function PosRuntimeConfigProvider({
       defaultTaxRate,
       pricesIncludeTax,
       taxRegistrationNumber,
+      merchantName,
+      branchName,
+      receiptName,
+      receiptPhone,
+      receiptAddress,
+      receiptFields,
+      ticketLabelFields,
+      operatorName,
+      terminalName,
       autoPrintReceipt,
       printCopies,
       userId,

@@ -166,7 +166,10 @@ const bindingDb = {
       from() {
         return {
           where() {
-            return { limit: () => Promise.resolve([bindingRow]) };
+            return {
+              limit: () => Promise.resolve([bindingRow]),
+              orderBy: () => Promise.resolve([bindingRow]),
+            };
           },
         };
       },

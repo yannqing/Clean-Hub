@@ -4,6 +4,7 @@ import type {
   BranchLanguage,
   BranchWeekday,
 } from "./types";
+import { DEFAULT_POS_RECEIPT_FIELDS } from "@cleanhub/domain/receipt";
 
 /**
  * 支持的门店默认语言。label 由组件通过 i18n（messages.tenant.common.languageLabels）注入，
@@ -51,6 +52,7 @@ export const emptyBranchFormValues: BranchFormValues = {
   receiptName: "",
   receiptPhone: "",
   receiptAddress: "",
+  receiptFields: [...DEFAULT_POS_RECEIPT_FIELDS],
   logoObjectKey: "",
   removeLogo: false,
   businessHours: createEmptyBranchBusinessHours(),

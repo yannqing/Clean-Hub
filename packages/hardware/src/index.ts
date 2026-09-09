@@ -1,3 +1,8 @@
+import {
+  normalizePosReceiptFields,
+  type PosReceiptField,
+} from "@cleanhub/domain/receipt";
+
 export type PrinterConnection = "usb" | "bluetooth" | "wifi";
 
 export type PrintJob = {
@@ -332,6 +337,8 @@ export type PosReceiptLine = {
   quantity: number;
   unitAmountMinor: number;
   totalAmountMinor: number;
+  sku?: string;
+  barcode?: string;
   note?: string;
 };
 
@@ -342,7 +349,10 @@ export type PosReceiptDocument = {
   currency: string;
   merchantName: string;
   branchName?: string;
+  cashierName?: string;
+  terminalName?: string;
   customerName?: string;
+  fields?: readonly PosReceiptField[];
   items: PosReceiptLine[];
   subtotalMinor: number;
   discountMinor?: number;
@@ -358,6 +368,10 @@ export type PosReceiptDocument = {
   cashTenderedMinor?: number;
   changeMinor?: number;
   paymentMethod?: string;
+  receiptAddress?: string;
+  receiptPhone?: string;
+  thankYouMessage?: string;
+  /** @deprecated Prefer the individually configurable footer fields above. */
   footer?: string;
 };
 
@@ -586,6 +600,12 @@ const posReceiptLabels = {
     balance: "Balance",
     payment: "Payment",
     issued: "Issued",
+    cashier: "Cashier",
+    terminal: "Terminal",
+    unitPrice: "Unit",
+    lineTotal: "Amount",
+    sku: "SKU",
+    barcode: "Barcode",
   },
   fr: {
     title: "RECU",
@@ -607,6 +627,12 @@ const posReceiptLabels = {
     balance: "Solde",
     payment: "Paiement",
     issued: "Emis",
+    cashier: "Caissier",
+    terminal: "Terminal",
+    unitPrice: "Unité",
+    lineTotal: "Montant",
+    sku: "SKU",
+    barcode: "Code-barres",
   },
   "zh-CN": {
     title: "收据",
@@ -628,6 +654,12 @@ const posReceiptLabels = {
     balance: "余额",
     payment: "支付方式",
     issued: "开具时间",
+    cashier: "收银员",
+    terminal: "终端",
+    unitPrice: "单价",
+    lineTotal: "金额",
+    sku: "SKU",
+    barcode: "条形码",
   },
 } as const satisfies Record<PrintLocale, Record<string, string>>;
 
@@ -813,65 +845,124 @@ function buildPosReceiptLines(
   const minorUnitDivisor = 10 ** fractionDigits;
   const amount = (value: number) =>
     amountFormatter.format(value / minorUnitDivisor);
+  const enabled = new Set(normalizePosReceiptFields(receipt.fields));
+  const has = (field: PosReceiptField) => enabled.has(field);
+  const itemFieldsEnabled = [
+    "item_name",
+    "item_quantity",
+    "item_unit_price",
+    "item_line_total",
+    "item_sku",
+    "item_barcode",
+    "item_notes",
+  ].some((field) => has(field as PosReceiptField));
+  const footerParts = [
+    has("receipt_address") ? receipt.receiptAddress : undefined,
+    has("receipt_phone") ? receipt.receiptPhone : undefined,
+    has("thank_you_message") ? receipt.thankYouMessage : undefined,
+  ].filter((value): value is string => Boolean(value));
+  if (
+    receipt.footer &&
+    receipt.fields === undefined &&
+    footerParts.length === 0
+  ) {
+    footerParts.push(receipt.footer);
+  }
 
   return compactLines([
-    center(receipt.merchantName, width),
-    center(labels.title, width),
-    receipt.branchName ? center(receipt.branchName, width) : undefined,
+    has("merchant_name") ? center(receipt.merchantName, width) : undefined,
+    has("receipt_title") ? center(labels.title, width) : undefined,
+    has("branch_name") && receipt.branchName
+      ? center(receipt.branchName, width)
+      : undefined,
     rule(width),
-    keyValue(labels.receipt, receipt.receiptNo),
-    keyValue(labels.order, receipt.orderCode),
-    receipt.customerName
+    has("receipt_number")
+      ? keyValue(labels.receipt, receipt.receiptNo)
+      : undefined,
+    has("order_number") ? keyValue(labels.order, receipt.orderCode) : undefined,
+    has("customer_name") && receipt.customerName
       ? keyValue(labels.customer, receipt.customerName)
       : undefined,
-    receipt.taxRegistrationNumber
+    has("cashier_name") && receipt.cashierName
+      ? keyValue(labels.cashier, receipt.cashierName)
+      : undefined,
+    has("terminal_name") && receipt.terminalName
+      ? keyValue(labels.terminal, receipt.terminalName)
+      : undefined,
+    has("tax_registration_number") && receipt.taxRegistrationNumber
       ? keyValue(labels.taxRegistration, receipt.taxRegistrationNumber)
       : undefined,
-    keyValue(labels.issued, formatDateTime(receipt.issuedAt, locale)),
+    has("issued_at")
+      ? keyValue(labels.issued, formatDateTime(receipt.issuedAt, locale))
+      : undefined,
+    itemFieldsEnabled ? rule(width) : undefined,
+    itemFieldsEnabled ? labels.items : undefined,
+    ...(itemFieldsEnabled
+      ? receipt.items.flatMap((item) => {
+          const parts = [
+            has("item_name") ? item.name : undefined,
+            has("item_quantity") ? `x${item.quantity}` : undefined,
+            has("item_unit_price")
+              ? `${labels.unitPrice} ${amount(item.unitAmountMinor)}`
+              : undefined,
+            has("item_line_total")
+              ? `${labels.lineTotal} ${amount(item.totalAmountMinor)}`
+              : undefined,
+            has("item_sku") && item.sku
+              ? `${labels.sku} ${item.sku}`
+              : undefined,
+            has("item_barcode") && item.barcode
+              ? `${labels.barcode} ${item.barcode}`
+              : undefined,
+            has("item_notes") && item.note ? `(${item.note})` : undefined,
+          ].filter((value): value is string => Boolean(value));
+          return parts.length > 0 ? wrapText(parts.join(" · "), width) : [];
+        })
+      : []),
     rule(width),
-    labels.items,
-    ...receipt.items.flatMap((item) =>
-      wrapText(
-        `${item.name} x${item.quantity} ${amount(item.totalAmountMinor)}${
-          item.note ? ` (${item.note})` : ""
-        }`,
-        width,
-      ),
-    ),
-    rule(width),
-    keyValue(labels.subtotal, amount(receipt.subtotalMinor)),
-    receipt.discountMinor
+    has("subtotal")
+      ? keyValue(labels.subtotal, amount(receipt.subtotalMinor))
+      : undefined,
+    has("discount") && receipt.discountMinor
       ? keyValue(labels.discount, `-${amount(receipt.discountMinor)}`)
       : undefined,
-    receipt.taxableMinor !== undefined
+    has("taxable_amount") && receipt.taxableMinor !== undefined
       ? keyValue(labels.taxable, amount(receipt.taxableMinor))
       : undefined,
-    receipt.taxMinor
+    has("tax") && receipt.taxMinor
       ? keyValue(
           `${labels.tax}${receipt.taxRate ? ` ${Number(receipt.taxRate) * 100}%` : ""}`,
           amount(receipt.taxMinor),
         )
       : undefined,
-    receipt.taxExemptionReason
+    has("tax_exemption_reason") && receipt.taxExemptionReason
       ? keyValue(labels.taxExemption, receipt.taxExemptionReason)
       : undefined,
-    receipt.roundingMinor
+    has("rounding") && receipt.roundingMinor
       ? keyValue(labels.rounding, amount(receipt.roundingMinor))
       : undefined,
-    keyValue(labels.total, amount(receipt.totalMinor)),
-    keyValue(labels.paid, amount(receipt.paidMinor)),
-    receipt.cashTenderedMinor !== undefined
+    has("total")
+      ? keyValue(labels.total, amount(receipt.totalMinor))
+      : undefined,
+    has("paid_amount")
+      ? keyValue(labels.paid, amount(receipt.paidMinor))
+      : undefined,
+    has("cash_tendered") && receipt.cashTenderedMinor !== undefined
       ? keyValue(labels.cashTendered, amount(receipt.cashTenderedMinor))
       : undefined,
-    receipt.changeMinor !== undefined
+    has("change") && receipt.changeMinor !== undefined
       ? keyValue(labels.change, amount(receipt.changeMinor))
       : undefined,
-    keyValue(labels.balance, amount(receipt.balanceMinor)),
-    receipt.paymentMethod
+    has("balance")
+      ? keyValue(labels.balance, amount(receipt.balanceMinor))
+      : undefined,
+    has("payment_method") && receipt.paymentMethod
       ? keyValue(labels.payment, receipt.paymentMethod)
       : undefined,
-    receipt.footer ? rule(width) : undefined,
-    receipt.footer ? center(receipt.footer, width) : undefined,
+    footerParts.length > 0 ? rule(width) : undefined,
+    ...footerParts.flatMap((line) =>
+      wrapText(line, width).map((part) => center(part, width)),
+    ),
   ]);
 }
 

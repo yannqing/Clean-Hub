@@ -19,6 +19,7 @@ const branchFieldMap: Record<string, keyof BranchFormValues> = {
   receiptAddress: "receiptAddress",
   receiptName: "receiptName",
   receiptPhone: "receiptPhone",
+  receiptFields: "receiptFields",
   logoObjectKey: "logoObjectKey",
 };
 
@@ -31,6 +32,7 @@ const branchFormFields = new Set<keyof BranchFormValues>([
   "receiptName",
   "receiptPhone",
   "receiptAddress",
+  "receiptFields",
   "logoObjectKey",
   "removeLogo",
   "businessHours",

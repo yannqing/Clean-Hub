@@ -1605,6 +1605,7 @@ export const tenantMessagesEn: TenantMessages = {
       displayOrder: "Display order",
       pricing: "Pricing unit",
       labelRule: "Label rule",
+      applicableItemTypes: "Applicable item types",
       standardPrice: "Standard price",
       compareAtPrice: "Compare-at price",
       costPrice: "Cost per service",
@@ -1615,6 +1616,12 @@ export const tenantMessagesEn: TenantMessages = {
       per_item: "One label per item",
       per_order_item: "One label per order item",
       per_bag: "One label per bag",
+    },
+    itemTypeLabels: {
+      cloth: "Garments",
+      car: "Vehicles",
+      shoe: "Shoes",
+      carpet: "Carpets",
     },
     formButtons: {
       createService: "Create service",
@@ -1661,6 +1668,8 @@ export const tenantMessagesEn: TenantMessages = {
       displayOrderHint: "Lower numbers appear earlier in the service catalog.",
       pricingHint:
         "The standard price uses the tenant default currency. Its amount can be updated from the service catalog; currency is managed in settings.",
+      applicableItemTypesHint:
+        "The POS selects an item type first and then shows only applicable services.",
       existingCurrencyNotice:
         "This saved price keeps its stored currency; changing the tenant default does not convert historical amounts.",
       categoriesLoadFailed:
@@ -1711,6 +1720,9 @@ export const tenantMessagesEn: TenantMessages = {
         "Display order must be a whole number from 0 to 1,000,000.",
       pricingUnitInvalid: "Choose a supported pricing unit.",
       labelRuleInvalid: "Choose a supported label rule.",
+      applicableItemTypesRequired: "Select at least one applicable item type.",
+      applicableItemTypesInvalid:
+        "The applicable item types do not match the business line.",
       standardPriceInvalid:
         "Standard price must be greater than 0, no more than 9,999,999,999.99, and use at most 2 decimal places.",
       compareAtPriceInvalid:
@@ -1808,10 +1820,17 @@ export const tenantMessagesEn: TenantMessages = {
         deviceName: "Device Name",
         deviceType: "Device Type",
         connectionType: "Connection Type",
+        printerPurpose: "Print purpose",
       },
+      printerPurposeHint:
+        "Receipts and work-order labels use separate print routes. Use waterproof, heat-resistant label media for laundry items.",
       adding: "Adding...",
       action: "Add POS peripheral",
       created: "POS peripheral added.",
+    },
+    printerPurposeLabels: {
+      receipt: "Sales receipts",
+      label: "Work-order item labels",
     },
     edit: {
       title: "Edit POS peripheral",
@@ -2049,7 +2068,7 @@ export const tenantMessagesEn: TenantMessages = {
           never_seen: "Never connected",
         },
       },
-      noCurrentSession: "No open session",
+      noCurrentSession: "No open register session",
       neverSeen: "Never online",
       empty: "No POS terminals match these filters",
       errorTitle: "POS terminal data could not be loaded",
@@ -2062,7 +2081,7 @@ export const tenantMessagesEn: TenantMessages = {
     registerSessions: {
       title: "Register sessions",
       description:
-        "Review POS shifts, finalized sales, closing cash, and cash variances.",
+        "Review terminal sales windows, finalized sales, cash counts, and Z Reports. Staff attendance is tracked separately.",
       exportCsv: "Export current page",
       metrics: {
         total: "Sessions",
@@ -2072,12 +2091,12 @@ export const tenantMessagesEn: TenantMessages = {
         netSales: "Net sales",
         cashVariance: "Cash variance",
       },
-      searchPlaceholder: "Session, terminal, staff, or branch",
+      searchPlaceholder: "Session, terminal, opener, or branch",
       columns: {
         session: "Session",
         branch: "Branch",
         terminal: "Terminal",
-        staff: "Staff",
+        staff: "Opened by",
         status: "Status",
         startedAt: "Started",
         endedAt: "Ended",
@@ -2109,7 +2128,7 @@ export const tenantMessagesEn: TenantMessages = {
         id: "Session ID",
         branch: "Branch",
         terminal: "Terminal",
-        staff: "Staff",
+        staff: "Opened by",
         status: "Status",
         startedAt: "Started at",
         endedAt: "Ended at",
@@ -2143,6 +2162,7 @@ export const tenantMessagesEn: TenantMessages = {
       },
       fields: {
         cashTrackingEnabled: "Enable cash tracking",
+        cashHandlingMode: "Default cash handling for new terminals",
         openingFloatRequired: "Require opening float",
         closingCountRequired: "Require closing cash count",
         returnReasonRequired: "Require a return reason",
@@ -2159,6 +2179,8 @@ export const tenantMessagesEn: TenantMessages = {
       hints: {
         cashTrackingEnabled:
           "Track opening float, counted cash, and variances by register session.",
+        cashHandlingMode:
+          "Choose based on whether the store has a drawer and who owns the cash.",
         openingFloatRequired:
           "Staff must enter an opening cash amount before starting a session.",
         closingCountRequired:
@@ -2180,6 +2202,13 @@ export const tenantMessagesEn: TenantMessages = {
         cash: "Cash",
         card: "Card",
         app: "App payment",
+      },
+      cashHandlingModes: {
+        none: "Cash not accepted",
+        untracked: "Cash accepted without counting",
+        shared_drawer: "Shared cash drawer",
+        assigned_drawer: "Drawer assigned to one cashier",
+        cash_in_hand: "Cash held by each staff member",
       },
       roundingRules: {
         none: "No rounding",
@@ -2634,6 +2663,7 @@ export const tenantMessagesEn: TenantMessages = {
         pricing: "Pricing",
         payments: "Payments",
         pointOfSale: "Point of sale",
+        printing: "Printing",
         hardware: "POS peripherals",
         activityLog: "Activity log",
       },
@@ -2666,6 +2696,8 @@ export const tenantMessagesEn: TenantMessages = {
           "Connect and verify Wave or Orange Money for POS mobile payments.",
         pointOfSale:
           "Configure terminals, register sessions, and offline behavior.",
+        printing:
+          "Manage sales receipt and service item label content by branch.",
         hardware: "Manage printers, scanners, and cash drawers.",
         activityLog: "Review tenant actions and audit records.",
       },

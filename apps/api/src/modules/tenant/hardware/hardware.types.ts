@@ -3,6 +3,7 @@ import type { AuthContext } from "../../auth/auth.types.js";
 export type HardwareDeviceType = "printer" | "scanner" | "cash_drawer";
 export type HardwareConnectionType = "usb" | "bluetooth" | "network" | "other";
 export type HardwareDeviceStatus = "active" | "inactive";
+export type HardwarePrinterPurpose = "receipt" | "label";
 
 export type HardwareConfigSummary = {
   id: string;

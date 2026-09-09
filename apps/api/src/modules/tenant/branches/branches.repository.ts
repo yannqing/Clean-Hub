@@ -1,6 +1,12 @@
 import { and, asc, eq, inArray, isNull, or, sql, type SQL } from "drizzle-orm";
 
 import { branches, type Database, userBranches } from "@cleanhub/db";
+import {
+  DEFAULT_POS_RECEIPT_FIELDS,
+  DEFAULT_POS_TICKET_LABEL_FIELDS,
+  normalizePosReceiptFields,
+  normalizePosTicketLabelFields,
+} from "@cleanhub/domain/receipt";
 import { createId } from "@cleanhub/id";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
@@ -108,6 +114,8 @@ function toBranchSummary(row: typeof branches.$inferSelect): BranchSummary {
     receiptName: row.receiptName,
     receiptPhone: row.receiptPhone,
     receiptAddress: row.receiptAddress,
+    receiptFields: normalizePosReceiptFields(row.receiptFields),
+    ticketLabelFields: normalizePosTicketLabelFields(row.ticketLabelFields),
     logoObjectKey: isBranchLogoObjectKey(row.logoUrl) ? row.logoUrl : null,
     logoUrl: isBranchLogoObjectKey(row.logoUrl) ? null : row.logoUrl,
     status: row.status,
@@ -202,6 +210,10 @@ export async function createBranchRecord(
     receiptName: normalizeNullable(input.receiptName),
     receiptPhone: normalizeNullable(input.receiptPhone),
     receiptAddress: normalizeNullable(input.receiptAddress),
+    receiptFields: input.receiptFields ?? [...DEFAULT_POS_RECEIPT_FIELDS],
+    ticketLabelFields: input.ticketLabelFields ?? [
+      ...DEFAULT_POS_TICKET_LABEL_FIELDS,
+    ],
     logoUrl: normalizeNullable(input.logoObjectKey),
     status: input.status ?? "active",
     createdBy: input.actorUserId,
@@ -268,6 +280,14 @@ export async function updateBranchRecord(
         input.data.receiptAddress === undefined
           ? input.current.receiptAddress
           : normalizeNullable(input.data.receiptAddress),
+      receiptFields:
+        input.data.receiptFields === undefined
+          ? input.current.receiptFields
+          : normalizePosReceiptFields(input.data.receiptFields),
+      ticketLabelFields:
+        input.data.ticketLabelFields === undefined
+          ? input.current.ticketLabelFields
+          : normalizePosTicketLabelFields(input.data.ticketLabelFields),
       logoUrl:
         input.data.logoObjectKey === undefined
           ? (input.current.logoObjectKey ?? input.current.logoUrl)

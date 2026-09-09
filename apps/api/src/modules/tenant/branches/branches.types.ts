@@ -1,4 +1,8 @@
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
+import type {
+  PosReceiptField,
+  PosTicketLabelField,
+} from "@cleanhub/domain/receipt";
 
 export type BranchStatus = "active" | "inactive";
 export type BranchLanguage = "en" | "fr" | "zh-CN";
@@ -29,6 +33,8 @@ export type BranchSummary = {
   receiptName: string | null;
   receiptPhone: string | null;
   receiptAddress: string | null;
+  receiptFields: PosReceiptField[];
+  ticketLabelFields: PosTicketLabelField[];
   logoObjectKey: string | null;
   logoUrl: string | null;
   status: BranchStatus;
@@ -52,6 +58,8 @@ export type CreateBranchRequest = {
   receiptName?: string | null;
   receiptPhone?: string | null;
   receiptAddress?: string | null;
+  receiptFields?: PosReceiptField[];
+  ticketLabelFields?: PosTicketLabelField[];
   logoObjectKey?: string | null;
   status?: BranchStatus;
 };

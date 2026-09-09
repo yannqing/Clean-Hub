@@ -1,10 +1,13 @@
 import type { PosPrintRequest } from "@cleanhub/hardware";
 import type { PersistentPrintJob } from "@cleanhub/offline";
+import type {
+  PosHardwareDeviceSummary,
+  PosPrintDocumentType,
+} from "@cleanhub/api-client";
 
 import type { PosHardwareBridge } from "./desktop-bridge";
 
-export const POS_PRINT_QUEUE_UPDATED_EVENT =
-  "cleanhub:pos-print-queue-updated";
+export const POS_PRINT_QUEUE_UPDATED_EVENT = "cleanhub:pos-print-queue-updated";
 
 export function notifyPosPrintQueueUpdated(): void {
   if (typeof window !== "undefined") {
@@ -33,6 +36,43 @@ type PosHardwarePrintBridge = Pick<
   "getCapabilities" | "listPrinters" | "print"
 >;
 
+export function resolveConfiguredPrinterId(
+  devices: PosHardwareDeviceSummary[],
+  documentType: PosPrintDocumentType,
+): string {
+  const matching = devices.filter(
+    (device) =>
+      device.deviceType === "printer" &&
+      device.status === "active" &&
+      (device.config.printerPurpose === "label" ? "label" : "receipt") ===
+        documentType,
+  );
+  if (matching.length === 0) {
+    throw new Error(
+      documentType === "label"
+        ? "当前终端未配置标签打印机，请先由管理员添加“工单物品标签”打印机。"
+        : "当前终端未配置销售小票打印机，请先由管理员添加“销售小票”打印机。",
+    );
+  }
+
+  const bound = matching.filter(
+    (device) =>
+      typeof device.config.printerId === "string" &&
+      device.config.printerId.trim().length > 0,
+  );
+  const selected =
+    bound.find((device) => device.config.printerIsDefault === true) ?? bound[0];
+  if (!selected) {
+    throw new Error(
+      documentType === "label"
+        ? "标签打印机尚未连接到本机，请在 POS 设置的“硬件设备”中完成连接。"
+        : "销售小票打印机尚未连接到本机，请在 POS 设置的“硬件设备”中完成连接。",
+    );
+  }
+
+  return selected.config.printerId as string;
+}
+
 export async function executePosPrintJob(
   job: PersistentPrintJob<PosPrintJobPayload>,
   hardware: PosHardwarePrintBridge | null,
@@ -47,6 +87,11 @@ export async function executePosPrintJob(
   }
 
   const printers = await hardware.listPrinters();
+  if (job.payload.documentType === "label" && !job.payload.printerId) {
+    throw new Error(
+      "标签任务缺少标签打印机路由，已保留任务以便重新选择打印机。",
+    );
+  }
   const printer = job.payload.printerId
     ? printers.find((candidate) => candidate.id === job.payload.printerId)
     : (printers.find((candidate) => candidate.isDefault) ?? printers[0]);

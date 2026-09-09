@@ -4,6 +4,8 @@ import type {
   BranchDetail,
   BranchLanguage,
   BranchListQuery,
+  PosReceiptField,
+  PosTicketLabelField,
   BranchStatus,
   BranchSummary,
   BranchWeekday,
@@ -21,6 +23,8 @@ export type {
   BranchStatus,
   BranchSummary,
   BranchWeekday,
+  PosReceiptField,
+  PosTicketLabelField,
   CreateBranchRequest,
   UpdateBranchRequest,
   UpdateBranchStatusRequest,
@@ -48,6 +52,7 @@ export type BranchFormValues = {
   receiptName: string;
   receiptPhone: string;
   receiptAddress: string;
+  receiptFields: PosReceiptField[];
   logoObjectKey: string;
   removeLogo: boolean;
   businessHours: BranchBusinessHoursFormValues;

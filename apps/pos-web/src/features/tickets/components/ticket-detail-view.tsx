@@ -2,6 +2,7 @@
 
 import { useTranslation } from "@cleanhub/i18n/react";
 import { useState } from "react";
+import type { PosTicketLabelField } from "@cleanhub/domain/receipt";
 
 import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
@@ -56,7 +57,8 @@ export function TicketDetailView({
   relatedOrders,
 }: TicketDetailViewProps) {
   const { locale } = useTranslation();
-  const { timeZone } = usePosRuntimeConfig();
+  const runtime = usePosRuntimeConfig();
+  const { timeZone } = runtime;
   const [editing, setEditing] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -70,9 +72,12 @@ export function TicketDetailView({
   );
   const ticketCode =
     ticket.ticketNo ?? `TK-${ticket.id.slice(-8).toUpperCase()}`;
+  const labelCopy = getTicketLabelCopy(locale);
+  const includesLabelField = (field: PosTicketLabelField) =>
+    runtime.ticketLabelFields.includes(field);
   const breadcrumbItems = fromHandover
     ? [
-        { href: posRoutes.shiftHandover, label: "店员交接" },
+        { href: posRoutes.shiftHandover, label: "班次与收银" },
         { label: ticketCode },
       ]
     : fromIntake
@@ -94,27 +99,47 @@ export function TicketDetailView({
   const itemLines = (ticket.items ?? []).flatMap((item) => {
     const measurement =
       item.pricingUnit === "per_kg"
-        ? `${item.weight ?? "0"} kg${item.bagCount ? ` / ${item.bagCount} bags` : ""}`
-        : `${item.quantity} items`;
+        ? `${item.weight ?? "0"} kg${item.bagCount ? ` / ${item.bagCount} ${labelCopy.bags}` : ""}`
+        : `${item.quantity} ${labelCopy.items}`;
     return [
-      `${item.itemName} | ${measurement} | ${formatTicketMoney(item.chargedUnitAmount, ticket.currency)}`,
+      [
+        includesLabelField("item_name") ? item.itemName : "",
+        includesLabelField("item_measurement") ? measurement : "",
+        includesLabelField("item_price")
+          ? formatTicketMoney(item.chargedUnitAmount, ticket.currency)
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" | "),
+      includesLabelField("item_price") &&
       item.chargedUnitAmount !== item.standardUnitAmount
-        ? `Standard: ${formatTicketMoney(item.standardUnitAmount, ticket.currency)}`
+        ? `${labelCopy.standard}: ${formatTicketMoney(item.standardUnitAmount, ticket.currency)}`
         : "",
-      item.itemColor ? `Color: ${item.itemColor}` : "",
-      item.defectNotes ? `Defect: ${item.defectNotes}` : "",
-      item.specialRequest ? `Request: ${item.specialRequest}` : "",
-      item.labelCode ? `Label: ${item.labelCode}` : "",
+      includesLabelField("item_color") && item.itemColor
+        ? `${labelCopy.color}: ${item.itemColor}`
+        : "",
+      includesLabelField("item_defect") && item.defectNotes
+        ? `${labelCopy.defect}: ${item.defectNotes}`
+        : "",
+      includesLabelField("item_request") && item.specialRequest
+        ? `${labelCopy.request}: ${item.specialRequest}`
+        : "",
+      includesLabelField("label_code") && item.labelCode
+        ? `${labelCopy.label}: ${item.labelCode}`
+        : "",
     ].filter(Boolean);
   });
   const labelContent = [
-    "CleanHub",
-    ticketCode,
-    ticket.customerName,
-    `${ticket.itemCount} items`,
+    includesLabelField("merchant_name") ? runtime.merchantName : "",
+    includesLabelField("branch_name") ? runtime.branchName : "",
+    includesLabelField("ticket_number") ? ticketCode : "",
+    includesLabelField("customer_name") ? ticket.customerName : "",
+    includesLabelField("item_count")
+      ? `${ticket.itemCount} ${labelCopy.items}`
+      : "",
     ...itemLines,
-    ticket.expectedPickupAt
-      ? formatTicketDateTime(ticket.expectedPickupAt, locale, timeZone)
+    includesLabelField("expected_pickup_at") && ticket.expectedPickupAt
+      ? `${labelCopy.expectedPickup}: ${formatTicketDateTime(ticket.expectedPickupAt, locale, timeZone)}`
       : "",
   ]
     .filter(Boolean)
@@ -331,6 +356,45 @@ export function TicketDetailView({
       />
     </section>
   );
+}
+
+function getTicketLabelCopy(locale: string) {
+  if (locale === "fr") {
+    return {
+      bags: "sacs",
+      items: "articles",
+      standard: "Standard",
+      color: "Couleur",
+      defect: "Défaut",
+      request: "Demande",
+      label: "Étiquette",
+      expectedPickup: "Retrait prévu",
+    };
+  }
+
+  if (locale === "zh-CN") {
+    return {
+      bags: "袋",
+      items: "件",
+      standard: "标准价",
+      color: "颜色",
+      defect: "瑕疵",
+      request: "特殊要求",
+      label: "标签",
+      expectedPickup: "预计取件",
+    };
+  }
+
+  return {
+    bags: "bags",
+    items: "items",
+    standard: "Standard",
+    color: "Color",
+    defect: "Defect",
+    request: "Request",
+    label: "Label",
+    expectedPickup: "Expected pickup",
+  };
 }
 
 function buildIntakeReturnPath(query: string | undefined): string {

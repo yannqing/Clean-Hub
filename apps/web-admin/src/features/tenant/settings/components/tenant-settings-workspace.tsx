@@ -6,6 +6,7 @@ import {
   CircleDollarSign,
   CreditCard,
   Printer,
+  ReceiptText,
   ScrollText,
   Search,
   SquareTerminal,
@@ -36,6 +37,7 @@ export type TenantSettingsNavigationKey =
   | "pricing"
   | "payments"
   | "pointOfSale"
+  | "printing"
   | "hardware"
   | "activityLog";
 
@@ -65,6 +67,11 @@ export const tenantSettingsNavigationItems: TenantSettingsNavigationItem[] = [
     key: "pointOfSale",
     href: webAdminRoutes.tenant.system.settingsSections.pointOfSale,
     icon: SquareTerminal,
+  },
+  {
+    key: "printing",
+    href: webAdminRoutes.tenant.system.settingsSections.printing,
+    icon: ReceiptText,
   },
   {
     key: "hardware",

@@ -36,8 +36,10 @@ import {
 import {
   executePosPrintJob,
   notifyPosPrintQueueUpdated,
+  resolveConfiguredPrinterId,
   type PosPrintJobPayload,
 } from "../lib/pos-print-job";
+import { loadPosHardwareDevices } from "../lib/hardware-device-cache";
 
 type ScopedPrintJob = PersistentPrintJob<PosPrintJobPayload>;
 
@@ -93,6 +95,18 @@ export function PrintJobControl({
       scope: { tenantId, branchId, terminalId },
     });
   }, [branchId, clientReady, tenantId, terminalId]);
+
+  const resolvePrinterId = useCallback(async () => {
+    if (!tenantId || !branchId || !terminalId) {
+      throw new Error("当前终端缺少租户、门店或终端范围，无法选择打印机。");
+    }
+    const devices = await loadPosHardwareDevices({
+      tenantId,
+      branchId,
+      terminalId,
+    });
+    return resolveConfiguredPrinterId(devices, documentType);
+  }, [branchId, documentType, tenantId, terminalId]);
 
   const refresh = useCallback(async () => {
     if (!queue) {
@@ -203,7 +217,16 @@ export function PrintJobControl({
       setBusy(true);
       setAuditError(null);
       try {
-        const result = await queue.retry(job.id, (storedJob) =>
+        let preparedJob = job;
+        if (!job.payload.printerId) {
+          const printerId = await resolvePrinterId();
+          preparedJob =
+            (await queue.updatePayload(job.id, (payload) => ({
+              ...payload,
+              printerId,
+            }))) ?? job;
+        }
+        const result = await queue.retry(preparedJob.id, (storedJob) =>
           executePosPrintJob(storedJob, getPosHardwareBridge()),
         );
         await refresh();
@@ -226,7 +249,7 @@ export function PrintJobControl({
         setBusy(false);
       }
     },
-    [documentType, queue, refresh],
+    [documentType, queue, refresh, resolvePrinterId],
   );
 
   async function startInitialPrint() {
@@ -234,10 +257,24 @@ export function PrintJobControl({
       toast.error("当前终端缺少租户、门店或终端范围，无法保存打印任务。");
       return;
     }
+    let printerId: string;
+    try {
+      printerId = await resolvePrinterId();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "无法选择打印机。");
+      return;
+    }
     const job = await queue.enqueue({
       id: createId(),
       idempotencyKey: `pos-print:${documentType}:${entityId}:initial`,
-      payload: { documentType, entityId, title, content, autoPrint: true },
+      payload: {
+        documentType,
+        entityId,
+        title,
+        content,
+        autoPrint: true,
+        printerId,
+      },
     });
     await refresh();
     notifyPosPrintQueueUpdated();
@@ -253,6 +290,7 @@ export function PrintJobControl({
 
     setBusy(true);
     try {
+      const printerId = await resolvePrinterId();
       const authorization =
         await posApi.pos.hardware.authorizePrivilegedReprint({
           reason,
@@ -269,6 +307,7 @@ export function PrintJobControl({
           title,
           content,
           autoPrint: true,
+          printerId,
           authorizationId: authorization.authorizationId,
           originalPrintJobId: latestJob.id,
         },
