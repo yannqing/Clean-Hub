@@ -4,3 +4,4 @@ export * from "./tenant-default-currency-field";
 export * from "./tenant-settings-surface";
 export * from "./tenant-settings-view";
 export * from "./tenant-settings-workspace";
+export * from "./pricing-settings-view";
