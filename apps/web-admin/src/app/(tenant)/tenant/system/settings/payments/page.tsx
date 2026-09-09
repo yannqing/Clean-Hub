@@ -48,11 +48,19 @@ export default async function TenantPaymentSettingsPage() {
       error: error instanceof Error ? error.message : "门店列表加载失败。",
     }));
 
+  // Mirrors findEnabledTenantPaymentProviders on the API: a provider only
+  // reaches the register once it is verified and switched on for POS.
+  const mobileMoneyReady = integrations.some(
+    (integration) =>
+      integration.verificationStatus === "verified" && integration.posEnabled,
+  );
+
   return (
     <div className="space-y-4">
       <BranchPaymentSettingsView
         initialBranches={branchResult.branches}
         initialError={branchResult.error}
+        mobileMoneyReady={mobileMoneyReady}
         section="payments"
       />
       <TenantPaymentSettingsView

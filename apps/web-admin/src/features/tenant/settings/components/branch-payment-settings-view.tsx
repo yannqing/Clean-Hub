@@ -10,6 +10,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  cn,
   toast,
 } from "@cleanhub/ui";
 import { Save } from "lucide-react";
@@ -48,6 +49,8 @@ type Copy = {
   methodsTitle: string;
   methodsHint: string;
   methods: Record<BranchPaymentMethod, string>;
+  methodNotes: Record<BranchPaymentMethod, string>;
+  mobileMoneyBlocked: string;
   defaultMethod: string;
   defaultMethodHint: string;
   cashModeLabel: string;
@@ -78,6 +81,13 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     methodsHint:
       "Disabled methods never appear at checkout. Mobile money also requires a verified provider under Payments.",
     methods: { cash: "Cash", card: "Card", app: "Mobile money" },
+    methodNotes: {
+      cash: "Counted at the register according to the cash handling mode.",
+      card: "Swiped on your bank's own card terminal; the cashier then confirms the outcome in the POS. There is no automatic reconciliation.",
+      app: "The customer transfers from their phone and the cashier records the transaction reference.",
+    },
+    mobileMoneyBlocked:
+      "Connect and verify Wave or Orange Money below, then enable it for POS, before this method can be used.",
     defaultMethod: "Default payment method",
     defaultMethodHint: "Pre-selected at checkout. It must also be enabled.",
     cashModeLabel: "Cash handling mode",
@@ -119,6 +129,13 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     methodsHint:
       "Les moyens désactivés n'apparaissent jamais à l'encaissement. Le paiement mobile exige aussi un fournisseur vérifié.",
     methods: { cash: "Espèces", card: "Carte", app: "Paiement mobile" },
+    methodNotes: {
+      cash: "Comptées en caisse selon le mode de gestion des espèces.",
+      card: "Carte passée sur le TPE de votre banque ; le caissier confirme ensuite le résultat dans le POS. Aucun rapprochement automatique.",
+      app: "Le client paie depuis son téléphone et le caissier saisit la référence de la transaction.",
+    },
+    mobileMoneyBlocked:
+      "Connectez et vérifiez Wave ou Orange Money ci-dessous, puis activez-le pour le POS, avant de pouvoir utiliser ce moyen.",
     defaultMethod: "Moyen de paiement par défaut",
     defaultMethodHint:
       "Présélectionné à l'encaissement. Il doit aussi être activé.",
@@ -161,6 +178,13 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     methodsHint:
       "未启用的方式不会出现在结账页；移动支付还需要先在「支付」中完成渠道验证。",
     methods: { cash: "现金", card: "刷卡", app: "移动支付" },
+    methodNotes: {
+      cash: "按门店的现金处理方式在收银台盘点。",
+      card: "在银行提供的独立刷卡机（TPE）上刷卡，收银员再回到 POS 确认结果；系统不会自动对账。",
+      app: "顾客用手机转账，收银员在 POS 中录入交易参考号。",
+    },
+    mobileMoneyBlocked:
+      "请先在下方绑定并验证 Wave 或 Orange Money，并开启 POS 使用，之后才能启用移动支付。",
     defaultMethod: "默认支付方式",
     defaultMethodHint: "结账时预选的方式，必须同时处于启用状态。",
     cashModeLabel: "现金处理方式",
@@ -204,10 +228,17 @@ function toEditableSettings(branch: BranchSummary): EditableSettings {
 export function BranchPaymentSettingsView({
   initialBranches,
   initialError,
+  mobileMoneyReady = false,
   section,
 }: {
   initialBranches?: BranchSummary[];
   initialError?: string;
+  /**
+   * True only when a provider is verified and enabled for POS. The API drops
+   * "app" from a terminal's methods otherwise, so offering the checkbox would
+   * promise a method the register can never show.
+   */
+  mobileMoneyReady?: boolean;
   section: BranchPaymentSection;
 }) {
   const { locale } = useTenantI18n();
@@ -399,21 +430,37 @@ export function BranchPaymentSettingsView({
           <div className="space-y-2">
             <Label>{text.methodsTitle}</Label>
             <div className="grid gap-2 sm:grid-cols-3">
-              {PAYMENT_METHODS.map((method) => (
-                <label
-                  className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                  key={method}
-                >
-                  <Checkbox
-                    checked={form.paymentMethodsEnabled.includes(method)}
-                    disabled={!canUpdateSettings || saving}
-                    onCheckedChange={(checked) =>
-                      toggleMethod(method, checked === true)
-                    }
-                  />
-                  {text.methods[method]}
-                </label>
-              ))}
+              {PAYMENT_METHODS.map((method) => {
+                const enabled = form.paymentMethodsEnabled.includes(method);
+                // Block turning mobile money on without a provider, but never
+                // trap a branch that already has it enabled.
+                const blocked = method === "app" && !mobileMoneyReady && !enabled;
+                return (
+                  <label
+                    className={cn(
+                      "flex flex-col gap-1 rounded-md border px-3 py-2 text-sm",
+                      blocked && "bg-muted/40 text-muted-foreground",
+                    )}
+                    key={method}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Checkbox
+                        checked={enabled}
+                        disabled={!canUpdateSettings || saving || blocked}
+                        onCheckedChange={(checked) =>
+                          toggleMethod(method, checked === true)
+                        }
+                      />
+                      {text.methods[method]}
+                    </span>
+                    <span className="text-xs leading-5 text-slate-500">
+                      {method === "app" && !mobileMoneyReady
+                        ? text.mobileMoneyBlocked
+                        : text.methodNotes[method]}
+                    </span>
+                  </label>
+                );
+              })}
             </div>
             <p className="text-xs leading-5 text-slate-500">
               {text.methodsHint}
