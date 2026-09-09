@@ -4,8 +4,6 @@ import type {
   CreatePosShiftCashMovementRequest,
   ClosePosRegisterRequest,
   ClosePosRegisterResult,
-  CreateHandoverRequest,
-  HandoverRecord,
   OpenPosRegisterRequest,
   PosRegisterState,
   PosStaffDetail,
@@ -69,29 +67,8 @@ export function createPosStaffApi(client: ApiClient) {
         input,
         options,
       ),
-    currentShiftReconciliation: (options?: RequestOptions) =>
-      client.get<PosCurrentShiftReconciliation | null>(
-        "/pos/staff/current-shift/reconciliation",
-        options,
-      ),
-    listCurrentShiftCashMovements: (options?: RequestOptions) =>
-      client.get<PosShiftCashMovementListResponse>(
-        "/pos/staff/current-shift/cash-movements",
-        options,
-      ),
-    createShiftCashMovement: (
-      input: CreatePosShiftCashMovementRequest,
-      options?: RequestOptions,
-    ) =>
-      client.post<PosShiftCashMovement>(
-        "/pos/staff/current-shift/cash-movements",
-        input,
-        { ...options, idempotencyKey: input.idempotencyKey },
-      ),
     clock: (input: ClockRequest, options?: RequestOptions) =>
       client.post<ShiftRecord>("/pos/staff/clock", input, options),
-    createHandover: (input: CreateHandoverRequest, options?: RequestOptions) =>
-      client.post<HandoverRecord>("/pos/staff/handovers", input, options),
     listZReports: (query?: PosZReportListQuery, options?: RequestOptions) =>
       client.get<PosZReportListResponse>("/pos/staff/z-reports", {
         query,

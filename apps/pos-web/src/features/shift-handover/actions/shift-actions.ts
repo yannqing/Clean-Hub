@@ -2,10 +2,8 @@
 
 import type {
   ClockRequest,
-  CreateHandoverRequest,
   ClosePosRegisterRequest,
   ClosePosRegisterResult,
-  HandoverRecord,
   OpenPosRegisterRequest,
   PosRegisterState,
   ShiftRecord,
@@ -37,17 +35,6 @@ export async function clockShiftAction(
   const result = await run(async () => {
     const options = await getPosServerApiRequestOptions();
     return posApi.pos.staff.clock(input, options);
-  });
-  if (result.ok) revalidatePath("/shift-handover");
-  return result;
-}
-
-export async function createShiftHandoverAction(
-  input: CreateHandoverRequest,
-): Promise<ShiftActionResult<HandoverRecord>> {
-  const result = await run(async () => {
-    const options = await getPosServerApiRequestOptions();
-    return posApi.pos.staff.createHandover(input, options);
   });
   if (result.ok) revalidatePath("/shift-handover");
   return result;

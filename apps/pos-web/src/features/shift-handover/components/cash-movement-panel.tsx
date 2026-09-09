@@ -3,7 +3,6 @@
 import type {
   PosRegisterState,
   PosShiftCashMovement,
-  ShiftRecord,
 } from "@cleanhub/api-client";
 import { createId } from "@cleanhub/id";
 import { useCallback, useEffect, useState } from "react";
@@ -27,11 +26,10 @@ function movementNet(movements: PosShiftCashMovement[]): number {
 export function CashMovementPanel({
   canManage,
   register,
-  currentShift,
-}: { canManage: boolean } & (
-  | { register: PosRegisterState; currentShift?: never }
-  | { currentShift: ShiftRecord; register?: never }
-)) {
+}: {
+  canManage: boolean;
+  register: PosRegisterState;
+}) {
   const router = useRouter();
   const [movements, setMovements] = useState<PosShiftCashMovement[]>([]);
   const [movementType, setMovementType] = useState<"pay_in" | "pay_out">(
@@ -46,17 +44,11 @@ export function CashMovementPanel({
   }, []);
 
   useEffect(() => {
-    const request = register
-      ? posApi.pos.staff.listCurrentRegisterCashMovements()
-      : posApi.pos.staff.listCurrentShiftCashMovements();
-    void request
+    void posApi.pos.staff
+      .listCurrentRegisterCashMovements()
       .then((result) => publish(result.data))
       .catch((error) => toast.error(getPosApiErrorMessage(error)));
-  }, [
-    currentShift,
-    publish,
-    register,
-  ]);
+  }, [publish, register]);
 
   async function submit() {
     if (Number(amount) <= 0 || reason.trim().length < 3) {
@@ -65,10 +57,7 @@ export function CashMovementPanel({
     }
     setSubmitting(true);
     try {
-      const create = register
-        ? posApi.pos.staff.createRegisterCashMovement
-        : posApi.pos.staff.createShiftCashMovement;
-      const created = await create({
+      const created = await posApi.pos.staff.createRegisterCashMovement({
         movementType,
         amount: Number(amount).toFixed(2),
         reason: reason.trim(),
@@ -98,10 +87,10 @@ export function CashMovementPanel({
           </p>
         </div>
         <span className="text-sm font-semibold">
-          净额 {movementNet(movements).toFixed(2)} {register?.cashSession?.currency ?? currentShift?.currency}
+          净额 {movementNet(movements).toFixed(2)} {register.cashSession?.currency}
         </span>
       </div>
-      {canManage && (register?.cashSession?.status === "open" || currentShift?.status === "open") ? (
+      {canManage && register.cashSession?.status === "open" ? (
         <div className="mt-4 grid gap-3 md:grid-cols-[130px_140px_1fr_auto]">
           <select
             className="h-10 rounded-md border bg-background px-3 text-sm"

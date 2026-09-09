@@ -5,13 +5,9 @@ import {
   clockActionController,
   closeRegisterController,
   createRegisterCashMovementController,
-  createShiftCashMovementController,
-  createHandoverController,
   getCurrentShiftController,
   getCurrentRegisterController,
   getCurrentRegisterReconciliationController,
-  getCurrentShiftReconciliationController,
-  listCurrentShiftCashMovementsController,
   listCurrentRegisterCashMovementsController,
   getPosStaffController,
   getPosZReportController,
@@ -40,20 +36,7 @@ export function createPosStaffRoutes() {
     "/current-register/cash-movements",
     createRegisterCashMovementController,
   );
-  routes.get(
-    "/current-shift/reconciliation",
-    getCurrentShiftReconciliationController,
-  );
-  routes.get(
-    "/current-shift/cash-movements",
-    listCurrentShiftCashMovementsController,
-  );
-  routes.post(
-    "/current-shift/cash-movements",
-    createShiftCashMovementController,
-  );
   routes.post("/clock", clockActionController);
-  routes.post("/handovers", createHandoverController);
   routes.get("/z-reports", listPosZReportsController);
   routes.get("/z-reports/:zReportId", getPosZReportController);
   routes.get("/:staffId", getPosStaffController);

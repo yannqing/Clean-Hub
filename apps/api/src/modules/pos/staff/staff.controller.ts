@@ -5,26 +5,21 @@ import { getRequestMeta } from "../request-meta.helper.js";
 import { PosStaffError } from "./staff.errors.js";
 import {
   clockAction,
-  createHandover,
-  createShiftCashMovement,
   createRegisterCashMovement,
   closePosRegister,
   getCurrentShift,
-  getCurrentShiftReconciliation,
   getCurrentRegisterState,
   getCurrentRegisterReconciliation,
   getPosStaff,
   getPosZReport,
   listPosStaff,
   listPosZReports,
-  listCurrentShiftCashMovements,
   listCurrentRegisterCashMovements,
   openPosRegister,
 } from "./staff.service.js";
 import {
   closeRegisterRequestSchema,
   clockRequestSchema,
-  createHandoverRequestSchema,
   createShiftCashMovementRequestSchema,
   openRegisterRequestSchema,
   posStaffListQuerySchema,
@@ -166,34 +161,6 @@ export async function createRegisterCashMovementController(
   }
 }
 
-export async function getCurrentShiftReconciliationController(
-  c: Context<AppBindings>,
-) {
-  return c.json(await getCurrentShiftReconciliation(c.get("authContext")));
-}
-
-export async function listCurrentShiftCashMovementsController(
-  c: Context<AppBindings>,
-) {
-  return c.json(await listCurrentShiftCashMovements(c.get("authContext")));
-}
-
-export async function createShiftCashMovementController(
-  c: Context<AppBindings>,
-) {
-  const data = createShiftCashMovementRequestSchema.parse(
-    await c.req.json().catch(() => ({})),
-  );
-  return c.json(
-    await createShiftCashMovement({
-      authContext: c.get("authContext"),
-      requestMeta: getRequestMeta(c),
-      data,
-    }),
-    201,
-  );
-}
-
 export async function clockActionController(c: Context<AppBindings>) {
   const data = clockRequestSchema.parse(await c.req.json().catch(() => ({})));
   try {
@@ -203,25 +170,6 @@ export async function clockActionController(c: Context<AppBindings>) {
         requestMeta: getRequestMeta(c),
         data,
       }),
-    );
-  } catch (error) {
-    if (error instanceof PosStaffError) return errorResponse(c, error);
-    throw error;
-  }
-}
-
-export async function createHandoverController(c: Context<AppBindings>) {
-  const data = createHandoverRequestSchema.parse(
-    await c.req.json().catch(() => ({})),
-  );
-  try {
-    return c.json(
-      await createHandover({
-        authContext: c.get("authContext"),
-        requestMeta: getRequestMeta(c),
-        data,
-      }),
-      201,
     );
   } catch (error) {
     if (error instanceof PosStaffError) return errorResponse(c, error);
