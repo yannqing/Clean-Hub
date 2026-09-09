@@ -5,6 +5,7 @@ import {
   POS_RECEIPT_FIELDS,
   POS_TICKET_LABEL_FIELDS,
 } from "@cleanhub/domain/receipt";
+import { SELECTABLE_POS_PAYMENT_METHODS } from "@cleanhub/domain/payment-methods";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
@@ -68,7 +69,8 @@ const ticketLabelFieldsSchema = z
     { message: "Ticket number and item name are required on every label." },
   );
 
-const branchPaymentMethodSchema = z.enum(["cash", "card", "app"]);
+// Card stays out of the selectable set: the terminal cannot accept it.
+const branchPaymentMethodSchema = z.enum(SELECTABLE_POS_PAYMENT_METHODS);
 const paymentMethodsEnabledSchema = z
   .array(branchPaymentMethodSchema)
   .min(1)

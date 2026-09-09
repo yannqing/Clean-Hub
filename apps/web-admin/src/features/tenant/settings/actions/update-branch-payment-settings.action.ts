@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { isLockedPosPaymentMethod } from "@cleanhub/domain/payment-methods";
+
 import { getAuthSessionQuery } from "@/features/auth/queries";
 import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
 import { webAdminApi } from "@/lib/api-client";
@@ -77,6 +79,14 @@ export async function updateBranchPaymentSettingsAction(
     methods.some((method) => !PAYMENT_METHODS.includes(method))
   ) {
     return { ok: false, message: "Enable at least one payment method." };
+  }
+
+  const locked = methods.filter((method) => isLockedPosPaymentMethod(method));
+  if (locked.length > 0) {
+    return {
+      ok: false,
+      message: `${locked.join(", ")} cannot be enabled on this terminal.`,
+    };
   }
 
   if (!methods.includes(input.defaultPaymentMethod)) {

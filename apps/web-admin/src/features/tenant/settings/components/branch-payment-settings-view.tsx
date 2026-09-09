@@ -21,6 +21,8 @@ import type {
   BranchPaymentMethod,
   BranchSummary,
 } from "@/features/tenant/branches/types";
+import { isLockedPosPaymentMethod } from "@cleanhub/domain/payment-methods";
+
 import { useTenantI18n } from "@/i18n";
 
 import { updateBranchPaymentSettingsAction } from "../actions/update-branch-payment-settings.action";
@@ -83,7 +85,7 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     methods: { cash: "Cash", card: "Card", app: "Mobile money" },
     methodNotes: {
       cash: "Counted at the register according to the cash handling mode.",
-      card: "Swiped on your bank's own card terminal; the cashier then confirms the outcome in the POS. There is no automatic reconciliation.",
+      card: "Locked. The in-store terminal has no certified card reader, so card cannot be accepted yet.",
       app: "The customer transfers from their phone and the cashier records the transaction reference.",
     },
     mobileMoneyBlocked:
@@ -131,7 +133,7 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     methods: { cash: "Espèces", card: "Carte", app: "Paiement mobile" },
     methodNotes: {
       cash: "Comptées en caisse selon le mode de gestion des espèces.",
-      card: "Carte passée sur le TPE de votre banque ; le caissier confirme ensuite le résultat dans le POS. Aucun rapprochement automatique.",
+      card: "Verrouillé. Le terminal en magasin n'a pas de lecteur de carte certifié : la carte ne peut pas encore être acceptée.",
       app: "Le client paie depuis son téléphone et le caissier saisit la référence de la transaction.",
     },
     mobileMoneyBlocked:
@@ -180,7 +182,7 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     methods: { cash: "现金", card: "刷卡", app: "移动支付" },
     methodNotes: {
       cash: "按门店的现金处理方式在收银台盘点。",
-      card: "在银行提供的独立刷卡机（TPE）上刷卡，收银员再回到 POS 确认结果；系统不会自动对账。",
+      card: "已锁定。店内终端没有通过认证的读卡设备，暂时无法受理刷卡。",
       app: "顾客用手机转账，收银员在 POS 中录入交易参考号。",
     },
     mobileMoneyBlocked:
@@ -267,6 +269,7 @@ export function BranchPaymentSettingsView({
 
   function toggleMethod(method: BranchPaymentMethod, checked: boolean) {
     if (!form) return;
+    if (checked && isLockedPosPaymentMethod(method)) return;
 
     const selected = checked
       ? [...form.paymentMethodsEnabled, method]
@@ -432,9 +435,11 @@ export function BranchPaymentSettingsView({
             <div className="grid gap-2 sm:grid-cols-3">
               {PAYMENT_METHODS.map((method) => {
                 const enabled = form.paymentMethodsEnabled.includes(method);
+                const locked = isLockedPosPaymentMethod(method);
                 // Block turning mobile money on without a provider, but never
                 // trap a branch that already has it enabled.
-                const blocked = method === "app" && !mobileMoneyReady && !enabled;
+                const blocked =
+                  locked || (method === "app" && !mobileMoneyReady && !enabled);
                 return (
                   <label
                     className={cn(
@@ -454,7 +459,7 @@ export function BranchPaymentSettingsView({
                       {text.methods[method]}
                     </span>
                     <span className="text-xs leading-5 text-slate-500">
-                      {method === "app" && !mobileMoneyReady
+                      {method === "app" && !mobileMoneyReady && !locked
                         ? text.mobileMoneyBlocked
                         : text.methodNotes[method]}
                     </span>

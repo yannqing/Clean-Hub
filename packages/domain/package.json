@@ -8,6 +8,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./order-codes": "./src/order-codes.ts",
+    "./payment-methods": "./src/payment-methods.ts",
     "./pin": "./src/pin.ts",
     "./pos-terminal-status": "./src/pos-terminal-status.ts",
     "./receipt": "./src/receipt.ts",

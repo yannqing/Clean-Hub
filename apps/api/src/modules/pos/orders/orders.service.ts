@@ -3,6 +3,8 @@ import { getDb, type Database } from "@cleanhub/db";
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { findBranchById } from "../../tenant/branches/branches.repository.js";
+import { isLockedPosPaymentMethod } from "@cleanhub/domain/payment-methods";
+
 import { findEnabledTenantPaymentProviders } from "../../tenant/payment-integrations/payment-integrations.repository.js";
 import {
   authorizePosSensitiveOperation,
@@ -137,6 +139,13 @@ async function assertPaymentMethodEnabled(
   tenantId: string,
   paymentMethod: CreatePosPaymentRequest["paymentMethod"],
 ): Promise<void> {
+  if (isLockedPosPaymentMethod(paymentMethod)) {
+    throw new PosOrderError(
+      "PAYMENT_NOT_SUPPORTED",
+      `Payment method ${paymentMethod} is not available.`,
+      422,
+    );
+  }
   if (!authContext.terminalId) return;
   const terminal = await findTerminalSettingsById(
     db,

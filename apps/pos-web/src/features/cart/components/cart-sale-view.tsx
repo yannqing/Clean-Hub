@@ -68,6 +68,8 @@ import { MOBILE_MONEY_PROVIDER_LABELS } from "@/features/orders/constants";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 import { formatPosMoney } from "@/lib/money";
+import { isLockedPosPaymentMethod } from "@cleanhub/domain/payment-methods";
+
 import { posToast as toast } from "@/lib/pos-toast";
 
 import type {
@@ -634,7 +636,7 @@ function CartPanel({
     (method) =>
       method !== "cash" &&
       isOnline &&
-      (method !== "card" || hardwareCapabilities.cardTerminal),
+      !isLockedPosPaymentMethod(method),
   );
   const mixedPaymentAvailable =
     runtime.paymentMethodsEnabled.includes("app") &&
@@ -776,8 +778,7 @@ function CartPanel({
       configuredDefault === "cash" && !cashRegisterAvailable
         ? runtime.paymentMethodsEnabled.find(
             (method) =>
-              method !== "cash" &&
-              (method !== "card" || hardwareCapabilities.cardTerminal),
+              method !== "cash" && !isLockedPosPaymentMethod(method),
           )
         : configuredDefault === "card" && !hardwareCapabilities.cardTerminal
           ? runtime.paymentMethodsEnabled.find(

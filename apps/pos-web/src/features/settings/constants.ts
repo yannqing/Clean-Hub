@@ -9,7 +9,7 @@ export const SETTINGS_PAGE_DESCRIPTION = "配置终端设备、收银偏好和�
 
 export const PAYMENT_METHOD_OPTIONS = [
   { value: "cash", label: "现金" },
-  { value: "card", label: "刷卡" },
+  { value: "card", label: "刷卡（暂不可用）" },
   { value: "app", label: "移动支付" },
 ] as const;
 
