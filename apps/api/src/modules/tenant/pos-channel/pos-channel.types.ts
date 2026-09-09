@@ -7,6 +7,12 @@ import type {
 import type { TenantPaymentProvider } from "../payment-integrations/payment-integrations.types.js";
 
 export type PosChannelPaymentMethod = "cash" | "card" | "app";
+export type PosChannelCashHandlingMode =
+  | "none"
+  | "untracked"
+  | "shared_drawer"
+  | "assigned_drawer"
+  | "cash_in_hand";
 export type PosChannelRoundingRule = "none" | "round_yuan" | "round_jiao";
 export type PosChannelDeviceStatus = "active" | "inactive";
 export type PosChannelDeviceConnectivity = "online" | "offline" | "never";
@@ -121,6 +127,7 @@ export type PosChannelDeviceSummary = {
   credentialRotatedAt: string | null;
   credentialLastUsedAt: string | null;
   defaultPaymentMethod: PosChannelPaymentMethod;
+  cashHandlingMode: PosChannelCashHandlingMode;
   roundingRule: PosChannelRoundingRule;
   autoPrintReceipt: boolean;
   printCopies: number;
@@ -154,6 +161,7 @@ export type PosChannelDeviceList = {
 export type UpdatePosChannelDeviceRequest = {
   label?: string;
   branchId?: string;
+  cashHandlingMode?: PosChannelCashHandlingMode;
   status?: PosChannelDeviceStatus;
   reason: string;
   version: number;
@@ -271,6 +279,7 @@ export type PosChannelSettings = {
   id: string | null;
   tenantId: string;
   cashTrackingEnabled: boolean;
+  defaultCashHandlingMode: PosChannelCashHandlingMode;
   requireOpeningFloat: boolean;
   requireClosingCount: boolean;
   requireReturnReason: boolean;
@@ -299,6 +308,7 @@ export type PosChannelSettings = {
 
 export type UpdatePosChannelSettingsRequest = {
   cashTrackingEnabled?: boolean;
+  defaultCashHandlingMode?: PosChannelCashHandlingMode;
   requireOpeningFloat?: boolean;
   requireClosingCount?: boolean;
   requireReturnReason?: boolean;

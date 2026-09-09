@@ -4,6 +4,13 @@ const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 const posPaymentMethodSchema = z.enum(["cash", "card", "app"]);
 const posRoundingRuleSchema = z.enum(["none", "round_yuan", "round_jiao"]);
+const posCashHandlingModeSchema = z.enum([
+  "none",
+  "untracked",
+  "shared_drawer",
+  "assigned_drawer",
+  "cash_in_hand",
+]);
 
 export const createTerminalSettingsBodySchema = z.object({
   branchId: z.string().regex(ULID_PATTERN),
@@ -15,6 +22,7 @@ export const createTerminalSettingsBodySchema = z.object({
     .min(1)
     .max(3)
     .optional(),
+  cashHandlingMode: posCashHandlingModeSchema.optional(),
   roundingRule: posRoundingRuleSchema.optional(),
   autoPrintReceipt: z.boolean().optional(),
   printCopies: z.coerce.number().int().min(1).max(10).optional(),
@@ -30,6 +38,7 @@ export const updateTerminalSettingsBodySchema = z
       .min(1)
       .max(3)
       .optional(),
+    cashHandlingMode: posCashHandlingModeSchema.optional(),
     roundingRule: posRoundingRuleSchema.optional(),
     autoPrintReceipt: z.boolean().optional(),
     printCopies: z.coerce.number().int().min(1).max(10).optional(),

@@ -9,14 +9,13 @@ import {
 } from "../../auth/permission.helper.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import {
-  findUnclosedPosTerminalShift,
   lockActiveTenantBranch,
   revokePosDeviceRecord,
   revokePosTerminalRefreshTokens,
   toPosDevice,
   updatePosDeviceRecord,
 } from "../../pos/auth/auth.repository.js";
-import { securityForceClosePosTerminalShifts } from "../../pos/terminal-lifecycle/terminal-lifecycle.repository.js";
+import { findOpenRegisterSession } from "../../pos/staff/staff.repository.js";
 import { findEnabledTenantPaymentProviders } from "../payment-integrations/payment-integrations.repository.js";
 import { TenantPosChannelError } from "./pos-channel.errors.js";
 import {
@@ -336,6 +335,9 @@ export async function updateTenantPosChannelDevice(
     const statusChanged =
       input.data.status !== undefined && input.data.status !== current.status;
     const securityContextChanged = branchChanged || statusChanged;
+    const cashHandlingChanged =
+      input.data.cashHandlingMode !== undefined &&
+      input.data.cashHandlingMode !== current.cashHandlingMode;
 
     if (
       input.data.status === "active" &&
@@ -349,15 +351,20 @@ export async function updateTenantPosChannelDevice(
       );
     }
 
-    if (branchChanged) {
-      const shift = await findUnclosedPosTerminalShift(tx, {
+    if (
+      branchChanged ||
+      cashHandlingChanged ||
+      input.data.status === "inactive"
+    ) {
+      const registerSession = await findOpenRegisterSession(tx, {
         tenantId,
         terminalId: current.id,
+        forUpdate: true,
       });
-      if (shift) {
+      if (registerSession) {
         throw new TenantPosChannelError(
-          "POS_CHANNEL_DEVICE_SHIFT_OPEN",
-          "Close the terminal's open shift before moving it to another branch.",
+          "POS_CHANNEL_DEVICE_REGISTER_OPEN",
+          "Close the terminal's register session before changing its branch, cash handling mode, or status.",
           409,
         );
       }
@@ -378,25 +385,13 @@ export async function updateTenantPosChannelDevice(
       );
     }
 
-    if (!branchChanged && input.data.status === "inactive") {
-      await securityForceClosePosTerminalShifts(tx, {
-        tenantId,
-        terminalIds: [current.id],
-        actorUserId: input.authContext.userId,
-        reason: input.data.reason,
-        metadata: {
-          securityTrigger: "terminal_disabled",
-          terminalId: current.id,
-          terminalDeviceId: current.deviceId,
-        },
-        requestMeta: input.requestMeta,
-      });
-    }
-
     const saved = await updatePosDeviceRecord(tx, current, {
       actorUserId: input.authContext.userId,
       data: {
         ...(input.data.branchId ? { branchId: input.data.branchId } : {}),
+        ...(input.data.cashHandlingMode
+          ? { cashHandlingMode: input.data.cashHandlingMode }
+          : {}),
         ...(input.data.label ? { label: input.data.label } : {}),
         ...(input.data.status ? { status: input.data.status } : {}),
         reason: input.data.reason,
@@ -469,18 +464,18 @@ export async function removeTenantPosChannelDevice(
       throw deviceVersionConflict();
     }
 
-    await securityForceClosePosTerminalShifts(tx, {
+    const registerSession = await findOpenRegisterSession(tx, {
       tenantId,
-      terminalIds: [current.id],
-      actorUserId: input.authContext.userId,
-      reason: input.data.reason,
-      metadata: {
-        securityTrigger: "terminal_removed",
-        terminalId: current.id,
-        terminalDeviceId: current.deviceId,
-      },
-      requestMeta: input.requestMeta,
+      terminalId: current.id,
+      forUpdate: true,
     });
+    if (registerSession) {
+      throw new TenantPosChannelError(
+        "POS_CHANNEL_DEVICE_REGISTER_OPEN",
+        "Close the terminal's register session before removing the terminal.",
+        409,
+      );
+    }
 
     const saved = await revokePosDeviceRecord(tx, current, {
       actorUserId: input.authContext.userId,

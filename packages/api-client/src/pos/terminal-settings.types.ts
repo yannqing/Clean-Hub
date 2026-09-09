@@ -1,6 +1,12 @@
 import type { PosMobileMoneyProvider } from "./orders.types";
 
 export type PosPaymentMethod = "cash" | "card" | "app";
+export type PosCashHandlingMode =
+  | "none"
+  | "untracked"
+  | "shared_drawer"
+  | "assigned_drawer"
+  | "cash_in_hand";
 export type PosRoundingRule = "none" | "round_yuan" | "round_jiao";
 export type PosTerminalSettingsStatus = "active" | "inactive";
 export type PosTerminalDeviceType =
@@ -23,6 +29,10 @@ export type PosTerminalSettings = {
   appVersion: string | null;
   defaultPaymentMethod: PosPaymentMethod;
   paymentMethodsEnabled: PosPaymentMethod[];
+  cashHandlingMode: PosCashHandlingMode;
+  cashTrackingEnabled: boolean;
+  requireOpeningFloat: boolean;
+  requireClosingCount: boolean;
   mobileMoneyProvidersEnabled: PosMobileMoneyProvider[];
   roundingRule: PosRoundingRule;
   taxEnabled: boolean;
@@ -58,6 +68,7 @@ export type UpdatePosTerminalSettingsRequest = {
   label?: string;
   defaultPaymentMethod?: PosPaymentMethod;
   paymentMethodsEnabled?: PosPaymentMethod[];
+  cashHandlingMode?: PosCashHandlingMode;
   roundingRule?: PosRoundingRule;
   autoPrintReceipt?: boolean;
   printCopies?: number;

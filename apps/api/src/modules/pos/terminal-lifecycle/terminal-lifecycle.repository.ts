@@ -21,7 +21,7 @@ export type LockedPosTerminal = {
 export type SecurityForcedClosedShift = {
   id: string;
   branchId: string;
-  terminalId: string;
+  terminalId: string | null;
   staffId: string;
   previousStatus: "open" | "on_break";
   previousVersion: number;

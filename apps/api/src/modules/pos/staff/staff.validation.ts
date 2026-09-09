@@ -27,25 +27,21 @@ export const posZReportParamsSchema = z.object({ zReportId: ulidSchema });
 export const clockRequestSchema = z
   .object({
     action: z.enum(["clock_in", "clock_out", "break_start", "break_end"]),
-    openingFloat: moneySchema.optional(),
-    closingFloat: moneySchema.optional(),
   })
-  .superRefine((value, context) => {
-    if (value.action === "clock_in" && value.openingFloat === undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["openingFloat"],
-        message: "Opening float is required for clock-in.",
-      });
-    }
-    if (value.action === "clock_out" && value.closingFloat === undefined) {
-      context.addIssue({
-        code: "custom",
-        path: ["closingFloat"],
-        message: "Closing float is required for clock-out.",
-      });
-    }
-  });
+  .strict();
+
+export const openRegisterRequestSchema = z
+  .object({
+    openingFloat: moneySchema.optional(),
+  })
+  .strict();
+
+export const closeRegisterRequestSchema = z
+  .object({
+    countedCash: moneySchema.optional(),
+    notes: z.string().trim().max(2000).optional(),
+  })
+  .strict();
 
 export const createHandoverRequestSchema = z.object({
   incomingStaffId: ulidSchema,

@@ -44,6 +44,8 @@ const payment: PosPaymentTransaction = {
   tenderedAmount: "150.00",
   changeAmount: "50.00",
   shiftId: cashShiftId,
+  registerSessionId: null,
+  cashDrawerSessionId: null,
   currency: "XOF",
   paymentStatus: "paid",
   providerStatus: "not_applicable",

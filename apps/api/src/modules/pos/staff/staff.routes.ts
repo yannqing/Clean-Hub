@@ -3,15 +3,21 @@ import { Hono } from "hono";
 import type { AppBindings } from "../../../http/types.js";
 import {
   clockActionController,
+  closeRegisterController,
+  createRegisterCashMovementController,
   createShiftCashMovementController,
   createHandoverController,
   getCurrentShiftController,
+  getCurrentRegisterController,
+  getCurrentRegisterReconciliationController,
   getCurrentShiftReconciliationController,
   listCurrentShiftCashMovementsController,
+  listCurrentRegisterCashMovementsController,
   getPosStaffController,
   getPosZReportController,
   listPosStaffController,
   listPosZReportsController,
+  openRegisterController,
 } from "./staff.controller.js";
 
 export function createPosStaffRoutes() {
@@ -19,6 +25,21 @@ export function createPosStaffRoutes() {
 
   routes.get("/", listPosStaffController);
   routes.get("/current-shift", getCurrentShiftController);
+  routes.get("/current-register", getCurrentRegisterController);
+  routes.post("/register-sessions/open", openRegisterController);
+  routes.post("/register-sessions/close", closeRegisterController);
+  routes.get(
+    "/current-register/reconciliation",
+    getCurrentRegisterReconciliationController,
+  );
+  routes.get(
+    "/current-register/cash-movements",
+    listCurrentRegisterCashMovementsController,
+  );
+  routes.post(
+    "/current-register/cash-movements",
+    createRegisterCashMovementController,
+  );
   routes.get(
     "/current-shift/reconciliation",
     getCurrentShiftReconciliationController,

@@ -20,7 +20,9 @@ import {
   orderItems,
   orders,
   posChannelSettings,
+  posCashDrawerSessions,
   posPaymentAdjustments,
+  posRegisterSessions,
   posStaffShifts,
   posTerminalSettings,
   posZReports,
@@ -124,6 +126,7 @@ type BranchOperationalMetrics = {
 
 const DEFAULT_POS_CHANNEL_SETTINGS = {
   cashTrackingEnabled: true,
+  defaultCashHandlingMode: "shared_drawer" as const,
   requireOpeningFloat: true,
   requireClosingCount: true,
   requireReturnReason: true,
@@ -196,6 +199,7 @@ function toSettingsRecord(
     id: row.id,
     tenantId: row.tenantId,
     cashTrackingEnabled: row.cashTrackingEnabled,
+    defaultCashHandlingMode: row.defaultCashHandlingMode,
     requireOpeningFloat: row.requireOpeningFloat,
     requireClosingCount: row.requireClosingCount,
     requireReturnReason: row.requireReturnReason,
@@ -228,6 +232,8 @@ function applyDateRange(
     | typeof refundRequests.refundedAt
     | typeof salesReturns.completedAt
     | typeof posPaymentAdjustments.occurredAt
+    | typeof posRegisterSessions.openedAt
+    | typeof posRegisterSessions.closedAt
     | typeof posStaffShifts.startedAt
     | typeof posStaffShifts.endedAt
     | typeof posZReports.cutoffAt,
@@ -376,21 +382,25 @@ function createSessionFilters(
   }
 
   const filters: SQL[] = [
-    eq(posStaffShifts.tenantId, input.tenantId),
-    inArray(posStaffShifts.branchId, input.branchIds),
+    eq(posRegisterSessions.tenantId, input.tenantId),
+    inArray(posRegisterSessions.branchId, input.branchIds),
   ];
-  applyDateRange(filters, posStaffShifts.startedAt, input);
+  applyDateRange(filters, posRegisterSessions.openedAt, input);
 
   if (!includeQueryFilters) {
     return filters;
   }
 
   if (input.query.branchId) {
-    filters.push(eq(posStaffShifts.branchId, input.query.branchId));
+    filters.push(eq(posRegisterSessions.branchId, input.query.branchId));
   }
 
   if (input.query.status) {
-    filters.push(eq(posStaffShifts.status, input.query.status));
+    filters.push(
+      input.query.status === "on_break"
+        ? sql`false`
+        : eq(posRegisterSessions.status, input.query.status),
+    );
   }
 
   if (input.query.q) {
@@ -435,6 +445,9 @@ export async function updatePosChannelSettingsRecord(
   const values = {
     cashTrackingEnabled:
       requestedValues.cashTrackingEnabled ?? input.current.cashTrackingEnabled,
+    defaultCashHandlingMode:
+      requestedValues.defaultCashHandlingMode ??
+      input.current.defaultCashHandlingMode,
     requireOpeningFloat:
       requestedValues.requireOpeningFloat ?? input.current.requireOpeningFloat,
     requireClosingCount:
@@ -616,12 +629,12 @@ export async function findPosChannelContext(
           ),
         ),
       db
-        .selectDistinct({ currency: posStaffShifts.currency })
-        .from(posStaffShifts)
+        .selectDistinct({ currency: posRegisterSessions.currency })
+        .from(posRegisterSessions)
         .where(
           and(
-            eq(posStaffShifts.tenantId, input.tenantId),
-            inArray(posStaffShifts.branchId, branchIds),
+            eq(posRegisterSessions.tenantId, input.tenantId),
+            inArray(posRegisterSessions.branchId, branchIds),
           ),
         ),
       db
@@ -730,15 +743,16 @@ export async function findPosChannelDevices(
         credentialRotatedAt: posTerminalSettings.credentialRotatedAt,
         credentialLastUsedAt: posTerminalSettings.credentialLastUsedAt,
         defaultPaymentMethod: posTerminalSettings.defaultPaymentMethod,
+        cashHandlingMode: posTerminalSettings.cashHandlingMode,
         roundingRule: posTerminalSettings.roundingRule,
         autoPrintReceipt: posTerminalSettings.autoPrintReceipt,
         printCopies: posTerminalSettings.printCopies,
         lockTimeoutSeconds: posTerminalSettings.lockTimeoutSeconds,
-        currentSessionId: posStaffShifts.id,
-        currentSessionStatus: posStaffShifts.status,
-        currentSessionStaffId: posStaffShifts.staffId,
+        currentSessionId: posRegisterSessions.id,
+        currentSessionStatus: posRegisterSessions.status,
+        currentSessionStaffId: posRegisterSessions.openedBy,
         currentSessionStaffName: userProfiles.displayName,
-        currentSessionStartedAt: posStaffShifts.startedAt,
+        currentSessionStartedAt: posRegisterSessions.openedAt,
         createdAt: posTerminalSettings.createdAt,
         updatedAt: posTerminalSettings.updatedAt,
         version: posTerminalSettings.version,
@@ -752,17 +766,18 @@ export async function findPosChannelDevices(
         ),
       )
       .leftJoin(
-        posStaffShifts,
+        posRegisterSessions,
         and(
-          eq(posStaffShifts.terminalId, posTerminalSettings.id),
-          ne(posStaffShifts.status, "closed"),
+          eq(posRegisterSessions.terminalId, posTerminalSettings.id),
+          eq(posRegisterSessions.tenantId, posTerminalSettings.tenantId),
+          eq(posRegisterSessions.status, "open"),
         ),
       )
       .leftJoin(
         userProfiles,
         and(
-          eq(userProfiles.userId, posStaffShifts.staffId),
-          eq(userProfiles.tenantId, posStaffShifts.tenantId),
+          eq(userProfiles.userId, posRegisterSessions.openedBy),
+          eq(userProfiles.tenantId, posRegisterSessions.tenantId),
         ),
       )
       .where(and(...filtered))
@@ -838,6 +853,7 @@ export async function findPosChannelDevices(
       credentialRotatedAt: row.credentialRotatedAt?.toISOString() ?? null,
       credentialLastUsedAt: row.credentialLastUsedAt?.toISOString() ?? null,
       defaultPaymentMethod: row.defaultPaymentMethod,
+      cashHandlingMode: row.cashHandlingMode,
       roundingRule: row.roundingRule,
       autoPrintReceipt: row.autoPrintReceipt,
       printCopies: row.printCopies,
@@ -846,8 +862,7 @@ export async function findPosChannelDevices(
         row.currentSessionId &&
         row.currentSessionStaffId &&
         row.currentSessionStartedAt &&
-        (row.currentSessionStatus === "open" ||
-          row.currentSessionStatus === "on_break")
+        row.currentSessionStatus === "open"
           ? {
               id: row.currentSessionId,
               status: row.currentSessionStatus,
@@ -978,24 +993,35 @@ export async function findPosChannelRegisterSessions(
   const [rows, countRows, metricRows] = await Promise.all([
     db
       .select({
-        id: posStaffShifts.id,
-        branchId: posStaffShifts.branchId,
+        id: posRegisterSessions.id,
+        branchId: posRegisterSessions.branchId,
         branchName: branches.name,
-        terminalId: posStaffShifts.terminalId,
+        terminalId: posRegisterSessions.terminalId,
         terminalDeviceId: posTerminalSettings.deviceId,
         terminalName: posTerminalSettings.label,
-        staffId: posStaffShifts.staffId,
+        staffId: posRegisterSessions.openedBy,
         staffName: userProfiles.displayName,
         staffEmail: users.email,
-        currency: posStaffShifts.currency,
-        status: posStaffShifts.status,
-        startedAt: posStaffShifts.startedAt,
-        endedAt: posStaffShifts.endedAt,
-        openingFloat: posStaffShifts.openingFloat,
-        closingFloat: posStaffShifts.closingFloat,
-        createdAt: posStaffShifts.createdAt,
-        updatedAt: posStaffShifts.updatedAt,
-        version: posStaffShifts.version,
+        currency: posRegisterSessions.currency,
+        status: posRegisterSessions.status,
+        startedAt: posRegisterSessions.openedAt,
+        endedAt: posRegisterSessions.closedAt,
+        openingFloat: sql<string>`coalesce((
+          select sum(${posCashDrawerSessions.openingFloat})
+          from ${posCashDrawerSessions}
+          where ${posCashDrawerSessions.tenantId} = ${posRegisterSessions.tenantId}
+            and ${posCashDrawerSessions.registerSessionId} = ${posRegisterSessions.id}
+        ), 0)::text`,
+        closingFloat: sql<string | null>`(
+          select sum(${posCashDrawerSessions.countedCash})::text
+          from ${posCashDrawerSessions}
+          where ${posCashDrawerSessions.tenantId} = ${posRegisterSessions.tenantId}
+            and ${posCashDrawerSessions.registerSessionId} = ${posRegisterSessions.id}
+            and ${posCashDrawerSessions.status} = 'closed'
+        )`,
+        createdAt: posRegisterSessions.createdAt,
+        updatedAt: posRegisterSessions.updatedAt,
+        version: posRegisterSessions.version,
         zReportId: posZReports.id,
         zReportCutoffAt: posZReports.cutoffAt,
         zReportOrderCount: posZReports.orderCount,
@@ -1008,106 +1034,114 @@ export async function findPosChannelRegisterSessions(
         zReportVariance: posZReports.variance,
         zReportOutstandingOrders: posZReports.outstandingOrders,
       })
-      .from(posStaffShifts)
+      .from(posRegisterSessions)
       .innerJoin(
         branches,
         and(
-          eq(branches.id, posStaffShifts.branchId),
-          eq(branches.tenantId, posStaffShifts.tenantId),
+          eq(branches.id, posRegisterSessions.branchId),
+          eq(branches.tenantId, posRegisterSessions.tenantId),
         ),
       )
       .innerJoin(
         posTerminalSettings,
         and(
-          eq(posTerminalSettings.id, posStaffShifts.terminalId),
-          eq(posTerminalSettings.tenantId, posStaffShifts.tenantId),
-          eq(posTerminalSettings.branchId, posStaffShifts.branchId),
+          eq(posTerminalSettings.id, posRegisterSessions.terminalId),
+          eq(posTerminalSettings.tenantId, posRegisterSessions.tenantId),
+          eq(posTerminalSettings.branchId, posRegisterSessions.branchId),
         ),
       )
       .innerJoin(
         users,
         and(
-          eq(users.id, posStaffShifts.staffId),
-          eq(users.tenantId, posStaffShifts.tenantId),
+          eq(users.id, posRegisterSessions.openedBy),
+          eq(users.tenantId, posRegisterSessions.tenantId),
         ),
       )
       .leftJoin(
         userProfiles,
         and(
-          eq(userProfiles.userId, posStaffShifts.staffId),
-          eq(userProfiles.tenantId, posStaffShifts.tenantId),
+          eq(userProfiles.userId, posRegisterSessions.openedBy),
+          eq(userProfiles.tenantId, posRegisterSessions.tenantId),
         ),
       )
       .leftJoin(
         posZReports,
         and(
-          eq(posZReports.shiftId, posStaffShifts.id),
-          eq(posZReports.tenantId, posStaffShifts.tenantId),
-          eq(posZReports.branchId, posStaffShifts.branchId),
-          eq(posZReports.terminalId, posStaffShifts.terminalId),
-          eq(posZReports.currency, posStaffShifts.currency),
+          eq(posZReports.registerSessionId, posRegisterSessions.id),
+          eq(posZReports.tenantId, posRegisterSessions.tenantId),
+          eq(posZReports.branchId, posRegisterSessions.branchId),
+          eq(posZReports.terminalId, posRegisterSessions.terminalId),
+          eq(posZReports.currency, posRegisterSessions.currency),
         ),
       )
       .where(and(...filtered))
-      .orderBy(desc(posStaffShifts.startedAt), desc(posStaffShifts.id))
+      .orderBy(desc(posRegisterSessions.openedAt), desc(posRegisterSessions.id))
       .limit(input.query.limit)
       .offset(input.query.offset),
     db
       .select({ count: sql<number>`count(*)::int` })
-      .from(posStaffShifts)
+      .from(posRegisterSessions)
       .innerJoin(
         branches,
         and(
-          eq(branches.id, posStaffShifts.branchId),
-          eq(branches.tenantId, posStaffShifts.tenantId),
+          eq(branches.id, posRegisterSessions.branchId),
+          eq(branches.tenantId, posRegisterSessions.tenantId),
         ),
       )
       .innerJoin(
         posTerminalSettings,
         and(
-          eq(posTerminalSettings.id, posStaffShifts.terminalId),
-          eq(posTerminalSettings.tenantId, posStaffShifts.tenantId),
-          eq(posTerminalSettings.branchId, posStaffShifts.branchId),
+          eq(posTerminalSettings.id, posRegisterSessions.terminalId),
+          eq(posTerminalSettings.tenantId, posRegisterSessions.tenantId),
+          eq(posTerminalSettings.branchId, posRegisterSessions.branchId),
         ),
       )
       .innerJoin(
         users,
         and(
-          eq(users.id, posStaffShifts.staffId),
-          eq(users.tenantId, posStaffShifts.tenantId),
+          eq(users.id, posRegisterSessions.openedBy),
+          eq(users.tenantId, posRegisterSessions.tenantId),
         ),
       )
       .leftJoin(
         userProfiles,
         and(
-          eq(userProfiles.userId, posStaffShifts.staffId),
-          eq(userProfiles.tenantId, posStaffShifts.tenantId),
+          eq(userProfiles.userId, posRegisterSessions.openedBy),
+          eq(userProfiles.tenantId, posRegisterSessions.tenantId),
         ),
       )
       .where(and(...filtered)),
     db
       .select({
-        currency: posStaffShifts.currency,
+        currency: posRegisterSessions.currency,
         total: sql<number>`count(*)::int`,
         open: sql<number>`count(*) filter (
-          where ${posStaffShifts.status} = 'open'
+          where ${posRegisterSessions.status} = 'open'
         )::int`,
-        onBreak: sql<number>`count(*) filter (
-          where ${posStaffShifts.status} = 'on_break'
-        )::int`,
+        onBreak: sql<number>`0::int`,
         closed: sql<number>`count(*) filter (
-          where ${posStaffShifts.status} = 'closed'
+          where ${posRegisterSessions.status} = 'closed'
         )::int`,
-        cashAtOpen: sql<string>`coalesce(sum(${posStaffShifts.openingFloat}), 0)::text`,
+        cashAtOpen: sql<string>`coalesce(sum((
+          select coalesce(sum(${posCashDrawerSessions.openingFloat}), 0)
+          from ${posCashDrawerSessions}
+          where ${posCashDrawerSessions.tenantId} = ${posRegisterSessions.tenantId}
+            and ${posCashDrawerSessions.registerSessionId} = ${posRegisterSessions.id}
+        )), 0)::text`,
         cashActivity: sql<string>`coalesce(sum(
           case when ${posZReports.id} is not null
-            then ${posZReports.expectedCash} - ${posStaffShifts.openingFloat}
+            then ${posZReports.expectedCash} - (
+              select coalesce(sum(${posCashDrawerSessions.openingFloat}), 0)
+              from ${posCashDrawerSessions}
+              where ${posCashDrawerSessions.tenantId} = ${posRegisterSessions.tenantId}
+                and ${posCashDrawerSessions.registerSessionId} = ${posRegisterSessions.id}
+            )
             else 0
           end
         ), 0)::text`,
         cashAtClose: sql<string>`coalesce(sum(
-          case when ${posStaffShifts.status} = 'closed'
-            then coalesce(${posZReports.countedCash}, ${posStaffShifts.closingFloat}, 0)
+          case when ${posRegisterSessions.status} = 'closed'
+            then coalesce(${posZReports.countedCash}, 0)
             else 0
           end
         ), 0)::text`,
@@ -1119,20 +1153,20 @@ export async function findPosChannelRegisterSessions(
           + ${posZReports.correctionAmount}
         ), 0)::text`,
       })
-      .from(posStaffShifts)
+      .from(posRegisterSessions)
       .leftJoin(
         posZReports,
         and(
-          eq(posZReports.shiftId, posStaffShifts.id),
-          eq(posZReports.tenantId, posStaffShifts.tenantId),
-          eq(posZReports.branchId, posStaffShifts.branchId),
-          eq(posZReports.terminalId, posStaffShifts.terminalId),
-          eq(posZReports.currency, posStaffShifts.currency),
+          eq(posZReports.registerSessionId, posRegisterSessions.id),
+          eq(posZReports.tenantId, posRegisterSessions.tenantId),
+          eq(posZReports.branchId, posRegisterSessions.branchId),
+          eq(posZReports.terminalId, posRegisterSessions.terminalId),
+          eq(posZReports.currency, posRegisterSessions.currency),
         ),
       )
       .where(and(...scoped))
-      .groupBy(posStaffShifts.currency)
-      .orderBy(asc(posStaffShifts.currency)),
+      .groupBy(posRegisterSessions.currency)
+      .orderBy(asc(posRegisterSessions.currency)),
   ]);
   const rolesByStaff = await findStaffRoles(db, {
     tenantId: input.tenantId,
@@ -1187,7 +1221,7 @@ export async function findPosChannelRegisterSessions(
         id: row.id,
         branchId: row.branchId,
         branchName: row.branchName,
-        terminalId: row.terminalId,
+        terminalId: row.terminalId!,
         terminalDeviceId: row.terminalDeviceId,
         terminalName: row.terminalName,
         staffId: row.staffId,
@@ -1331,12 +1365,16 @@ export async function findPosChannelOverviewMetrics(
     eq(posZReports.currency, input.currency),
   ];
   applyDateRange(zReportFilters, posZReports.cutoffAt, input);
-  const closedShiftFilters: SQL[] = [
-    eq(posStaffShifts.tenantId, input.tenantId),
-    inArray(posStaffShifts.branchId, input.branchIds),
-    eq(posStaffShifts.status, "closed"),
+  const closedRegisterFilters: SQL[] = [
+    eq(posRegisterSessions.tenantId, input.tenantId),
+    inArray(posRegisterSessions.branchId, input.branchIds),
+    eq(posRegisterSessions.status, "closed"),
   ];
-  applyDateRange(closedShiftFilters, posStaffShifts.endedAt, input);
+  applyDateRange(
+    closedRegisterFilters,
+    posRegisterSessions.closedAt,
+    input,
+  );
   const offlineAt = new Date(
     input.generatedAt.getTime() - input.deviceOfflineAfterSeconds * 1000,
   );
@@ -1486,26 +1524,26 @@ export async function findPosChannelOverviewMetrics(
       .groupBy(posTerminalSettings.branchId),
     db
       .select({
-        branchId: posStaffShifts.branchId,
+        branchId: posRegisterSessions.branchId,
         openSessions: sql<number>`count(*)::int`,
       })
-      .from(posStaffShifts)
+      .from(posRegisterSessions)
       .where(
         and(
-          eq(posStaffShifts.tenantId, input.tenantId),
-          inArray(posStaffShifts.branchId, input.branchIds),
-          ne(posStaffShifts.status, "closed"),
+          eq(posRegisterSessions.tenantId, input.tenantId),
+          inArray(posRegisterSessions.branchId, input.branchIds),
+          eq(posRegisterSessions.status, "open"),
         ),
       )
-      .groupBy(posStaffShifts.branchId),
+      .groupBy(posRegisterSessions.branchId),
     db
       .select({
-        branchId: posStaffShifts.branchId,
+        branchId: posRegisterSessions.branchId,
         closedSessions: sql<number>`count(*)::int`,
       })
-      .from(posStaffShifts)
-      .where(and(...closedShiftFilters))
-      .groupBy(posStaffShifts.branchId),
+      .from(posRegisterSessions)
+      .where(and(...closedRegisterFilters))
+      .groupBy(posRegisterSessions.branchId),
   ]);
 
   const financialByBranch = new Map<string, BranchFinancialMetrics>();

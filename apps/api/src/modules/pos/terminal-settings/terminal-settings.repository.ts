@@ -37,6 +37,10 @@ function toSummary(
     appVersion: row.appVersion,
     defaultPaymentMethod: row.defaultPaymentMethod,
     paymentMethodsEnabled: row.paymentMethodsEnabled,
+    cashHandlingMode: row.cashHandlingMode,
+    cashTrackingEnabled: true,
+    requireOpeningFloat: true,
+    requireClosingCount: true,
     mobileMoneyProvidersEnabled: [],
     roundingRule: row.roundingRule,
     taxEnabled: false,
@@ -75,6 +79,15 @@ export async function findTenantPosTerminalDefaults(
 ): Promise<{
   defaultPaymentMethod: "cash" | "card" | "app";
   paymentMethodsEnabled: Array<"cash" | "card" | "app">;
+  cashHandlingMode:
+    | "none"
+    | "untracked"
+    | "shared_drawer"
+    | "assigned_drawer"
+    | "cash_in_hand";
+  cashTrackingEnabled: boolean;
+  requireOpeningFloat: boolean;
+  requireClosingCount: boolean;
   roundingRule: "none" | "round_yuan" | "round_jiao";
   autoPrintReceipt: boolean;
   printCopies: number;
@@ -88,6 +101,10 @@ export async function findTenantPosTerminalDefaults(
     .select({
       defaultPaymentMethod: posChannelSettings.defaultPaymentMethod,
       paymentMethodsEnabled: posChannelSettings.defaultPaymentMethodsEnabled,
+      cashHandlingMode: posChannelSettings.defaultCashHandlingMode,
+      cashTrackingEnabled: posChannelSettings.cashTrackingEnabled,
+      requireOpeningFloat: posChannelSettings.requireOpeningFloat,
+      requireClosingCount: posChannelSettings.requireClosingCount,
       roundingRule: posChannelSettings.defaultRoundingRule,
       autoPrintReceipt: posChannelSettings.defaultAutoPrintReceipt,
       printCopies: posChannelSettings.defaultPrintCopies,
@@ -105,6 +122,10 @@ export async function findTenantPosTerminalDefaults(
     rows[0] ?? {
       defaultPaymentMethod: "cash",
       paymentMethodsEnabled: ["cash", "app"],
+      cashHandlingMode: "shared_drawer",
+      cashTrackingEnabled: true,
+      requireOpeningFloat: true,
+      requireClosingCount: true,
       roundingRule: "none",
       autoPrintReceipt: true,
       printCopies: 1,
@@ -194,6 +215,7 @@ export async function insertTerminalSettings(
       label: input.label ?? null,
       defaultPaymentMethod: input.defaultPaymentMethod ?? "cash",
       paymentMethodsEnabled: input.paymentMethodsEnabled ?? ["cash", "app"],
+      cashHandlingMode: input.cashHandlingMode ?? "shared_drawer",
       roundingRule: input.roundingRule ?? "none",
       autoPrintReceipt: input.autoPrintReceipt ?? true,
       printCopies: input.printCopies ?? 1,
@@ -224,6 +246,8 @@ export async function updateTerminalSettingsRecord(
     setValues.defaultPaymentMethod = input.defaultPaymentMethod;
   if (input.paymentMethodsEnabled !== undefined)
     setValues.paymentMethodsEnabled = input.paymentMethodsEnabled;
+  if (input.cashHandlingMode !== undefined)
+    setValues.cashHandlingMode = input.cashHandlingMode;
   if (input.roundingRule !== undefined)
     setValues.roundingRule = input.roundingRule;
   if (input.autoPrintReceipt !== undefined)

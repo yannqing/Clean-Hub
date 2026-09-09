@@ -1,6 +1,7 @@
 export type PosStaffRole = "owner" | "manager" | "cashier";
 export type PosStaffStatus = "on_duty" | "off_duty" | "on_break";
 export type PosShiftStatus = "open" | "on_break" | "closed";
+import type { PosCashHandlingMode } from "./terminal-settings.types";
 
 export type PosStaffSummary = {
   id: string;
@@ -32,15 +33,13 @@ export type ClockAction =
   | "break_end";
 export type ClockRequest = {
   action: ClockAction;
-  openingFloat?: string;
-  closingFloat?: string;
 };
 
 export type ShiftRecord = {
   id: string;
   tenantId: string;
   branchId: string;
-  terminalId: string;
+  terminalId: string | null;
   staffId: string;
   currency: string;
   status: PosShiftStatus;
@@ -55,7 +54,9 @@ export type ShiftRecord = {
 
 export type PosShiftCashMovement = {
   id: string;
-  shiftId: string;
+  shiftId: string | null;
+  registerSessionId: string | null;
+  cashDrawerSessionId: string | null;
   movementType: "pay_in" | "pay_out";
   amount: string;
   currency: string;
@@ -103,13 +104,66 @@ export type PosCurrentShiftReconciliation = {
   paymentBreakdown: PosZReportPaymentBreakdown[];
 };
 
+export type PosRegisterSession = {
+  id: string;
+  tenantId: string;
+  branchId: string;
+  terminalId: string;
+  currency: string;
+  status: "open" | "closed";
+  openedAt: string;
+  closedAt: string | null;
+  openedBy: string;
+  closedBy: string | null;
+  closeNotes: string | null;
+  version: number;
+};
+
+export type PosCashDrawerSession = {
+  id: string;
+  registerSessionId: string;
+  handlingMode: Exclude<PosCashHandlingMode, "none" | "untracked">;
+  assignedStaffId: string | null;
+  currency: string;
+  status: "open" | "closed";
+  openingFloat: string;
+  expectedCash: string | null;
+  countedCash: string | null;
+  variance: string | null;
+  openedAt: string;
+  closedAt: string | null;
+  version: number;
+};
+
+export type PosRegisterState = {
+  registerSession: PosRegisterSession | null;
+  cashSession: PosCashDrawerSession | null;
+  cashHandlingMode: PosCashHandlingMode;
+  cashTrackingEnabled: boolean;
+  requireOpeningFloat: boolean;
+  requireClosingCount: boolean;
+};
+
+export type OpenPosRegisterRequest = { openingFloat?: string };
+export type ClosePosRegisterRequest = {
+  countedCash?: string;
+  notes?: string;
+};
+export type ClosePosRegisterResult = {
+  registerSession: PosRegisterSession;
+  cashSession: PosCashDrawerSession | null;
+  zReport: PosZReport | null;
+  registerClosed: boolean;
+};
+
 export type PosZReport = {
   id: string;
   tenantId: string;
   branchId: string;
   terminalId: string;
-  shiftId: string;
-  handoverId: string;
+  shiftId: string | null;
+  handoverId: string | null;
+  registerSessionId: string | null;
   currency: string;
   cutoffAt: string;
   orderCount: number;

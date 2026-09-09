@@ -8,6 +8,7 @@ import {
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { findEnabledTenantPaymentProviders } from "../../tenant/payment-integrations/payment-integrations.repository.js";
 import { requirePosTerminalContext } from "../access-control.helper.js";
+import { findOpenRegisterSession } from "../staff/staff.repository.js";
 import { PosTerminalSettingsError } from "./terminal-settings.errors.js";
 import {
   findAuthenticatedTerminalSettings,
@@ -52,6 +53,14 @@ async function withTenantFinancialDefaults(
     ...settings,
     defaultPaymentMethod,
     paymentMethodsEnabled,
+    cashHandlingMode: !paymentMethodsEnabled.includes("cash")
+      ? "none"
+      : !defaults.cashTrackingEnabled
+        ? "untracked"
+        : settings.cashHandlingMode,
+    cashTrackingEnabled: defaults.cashTrackingEnabled,
+    requireOpeningFloat: defaults.requireOpeningFloat,
+    requireClosingCount: defaults.requireClosingCount,
     mobileMoneyProvidersEnabled,
     taxEnabled: defaults.taxEnabled,
     defaultTaxRate: defaults.defaultTaxRate,
@@ -160,6 +169,11 @@ export async function createPosTerminalSettings(
         ...data,
         defaultPaymentMethod: defaultMethod,
         paymentMethodsEnabled: enabledMethods,
+        cashHandlingMode: !enabledMethods.includes("cash")
+          ? "none"
+          : !defaults.cashTrackingEnabled
+            ? "untracked"
+            : (data.cashHandlingMode ?? defaults.cashHandlingMode),
         roundingRule: data.roundingRule ?? defaults.roundingRule,
         autoPrintReceipt: data.autoPrintReceipt ?? defaults.autoPrintReceipt,
         printCopies: data.printCopies ?? defaults.printCopies,
@@ -187,6 +201,14 @@ export async function createPosTerminalSettings(
       defaultTaxRate: defaults.defaultTaxRate,
       pricesIncludeTax: defaults.pricesIncludeTax,
       taxRegistrationNumber: defaults.taxRegistrationNumber,
+      cashTrackingEnabled: defaults.cashTrackingEnabled,
+      cashHandlingMode: !enabledMethods.includes("cash")
+        ? "none"
+        : !defaults.cashTrackingEnabled
+          ? "untracked"
+          : settings.cashHandlingMode,
+      requireOpeningFloat: defaults.requireOpeningFloat,
+      requireClosingCount: defaults.requireClosingCount,
     };
   });
 }
@@ -245,6 +267,26 @@ export async function updatePosTerminalSettings(
     );
   }
 
+  const changesCashPolicy =
+    (data.cashHandlingMode !== undefined &&
+      data.cashHandlingMode !== current.cashHandlingMode) ||
+    (data.paymentMethodsEnabled !== undefined &&
+      data.paymentMethodsEnabled.includes("cash") !==
+        current.paymentMethodsEnabled.includes("cash"));
+  if (
+    changesCashPolicy &&
+    (await findOpenRegisterSession(db, {
+      tenantId: terminal.tenantId,
+      terminalId: terminal.terminalId,
+    }))
+  ) {
+    throw new PosTerminalSettingsError(
+      "VALIDATION_ERROR",
+      "Close the current register before changing its cash handling policy.",
+      409,
+    );
+  }
+
   const nextEnabledMethods =
     data.paymentMethodsEnabled ?? current.paymentMethodsEnabled;
   const nextDefaultMethod =
@@ -253,6 +295,20 @@ export async function updatePosTerminalSettings(
     throw new PosTerminalSettingsError(
       "VALIDATION_ERROR",
       "The default payment method must also be enabled for this terminal.",
+      422,
+    );
+  }
+  const nextCashHandlingMode =
+    data.cashHandlingMode !== undefined
+      ? data.cashHandlingMode
+      : current.cashHandlingMode;
+  if (
+    (nextEnabledMethods.includes("cash") && nextCashHandlingMode === "none") ||
+    (!nextEnabledMethods.includes("cash") && nextCashHandlingMode !== "none")
+  ) {
+    throw new PosTerminalSettingsError(
+      "VALIDATION_ERROR",
+      "Cash handling must be disabled exactly when cash payments are disabled.",
       422,
     );
   }

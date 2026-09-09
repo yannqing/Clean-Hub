@@ -58,10 +58,8 @@ import {
   resolveRequestedPosDiscountRule,
 } from "../discounts/discounts.service.js";
 import { minorToMoney, moneyToMinor } from "../discounts/pricing-engine.js";
-import {
-  findOpenShiftForUpdate,
-  findShiftByIdForUpdate,
-} from "../staff/staff.repository.js";
+import { PosStaffError } from "../staff/staff.errors.js";
+import { ensurePaymentRegisterContext } from "../staff/staff.service.js";
 import { findTerminalSettingsById } from "../terminal-settings/terminal-settings.repository.js";
 import { applyPosOrderFinancialRules } from "./orders.financial.js";
 import {
@@ -116,12 +114,16 @@ export function paymentIntentMatches(
     payment.paymentMethod === data.paymentMethod &&
     Number(payment.amount) === Number(data.amount) &&
     (data.paymentMethod === "cash"
-      ? data.tenderedAmount && data.shiftId && data.occurredAt
-        ? payment.shiftId === data.shiftId &&
+      ? data.tenderedAmount && data.occurredAt
+        ? (!data.shiftId || payment.shiftId === data.shiftId) &&
+          (!data.registerSessionId ||
+            payment.registerSessionId === data.registerSessionId) &&
+          (!data.cashDrawerSessionId ||
+            payment.cashDrawerSessionId === data.cashDrawerSessionId) &&
           moneyToMinor(payment.tenderedAmount ?? "0") ===
             moneyToMinor(data.tenderedAmount) &&
           payment.paidAt === new Date(data.occurredAt).toISOString()
-        : payment.shiftId === null && payment.tenderedAmount === null
+        : payment.tenderedAmount === null
       : data.paymentMethod === "card"
         ? payment.gateway === "tpe"
         : payment.provider === data.provider &&
@@ -150,98 +152,20 @@ async function assertPaymentMethodEnabled(
   }
 }
 
-async function validateCashShift(
-  db: Database,
-  input: {
-    authContext: AuthContext;
-    tenantId: string;
-    branchId: string;
-    shiftId: string;
-    occurredAt: string;
-  },
-): Promise<Date> {
-  const terminalId = input.authContext.terminalId;
-  const terminalBranchId = input.authContext.terminalBranchId;
-  if (!terminalId || !terminalBranchId) {
-    throw new PosOrderError(
-      "SHIFT_REQUIRED",
-      "Cash payments require an enrolled POS terminal and an active shift.",
-      403,
-    );
-  }
-
-  const shift = await findShiftByIdForUpdate(db, {
-    tenantId: input.tenantId,
-    shiftId: input.shiftId,
-  });
-  const occurredAt = new Date(input.occurredAt);
-  const startedAt = shift ? new Date(shift.startedAt) : null;
-  const endedAt = shift?.endedAt ? new Date(shift.endedAt) : null;
+function validateCashOccurrence(occurredAtValue: string): Date {
+  const occurredAt = new Date(occurredAtValue);
   const futureToleranceMs = 5 * 60 * 1000;
-  const occurredBeforePause =
-    shift?.status !== "on_break" ||
-    occurredAt.getTime() <= new Date(shift.updatedAt).getTime();
-  const canReconcileAnotherStaffShift =
-    input.authContext.role === "owner" || input.authContext.role === "manager";
-
   if (
-    !shift ||
-    (shift.staffId !== input.authContext.userId &&
-      !canReconcileAnotherStaffShift) ||
-    shift.branchId !== input.branchId ||
-    shift.branchId !== terminalBranchId ||
-    shift.terminalId !== terminalId ||
-    !startedAt ||
-    occurredAt.getTime() < startedAt.getTime() ||
-    occurredAt.getTime() > Date.now() + futureToleranceMs ||
-    (endedAt !== null && occurredAt.getTime() > endedAt.getTime()) ||
-    !occurredBeforePause
+    Number.isNaN(occurredAt.getTime()) ||
+    occurredAt.getTime() > Date.now() + futureToleranceMs
   ) {
     throw new PosOrderError(
-      "SHIFT_REQUIRED",
-      "The cash payment does not belong to this operator's valid shift window.",
-      409,
+      "VALIDATION_ERROR",
+      "The cash payment occurrence time is invalid.",
+      422,
     );
   }
-
   return occurredAt;
-}
-
-async function requireActivePaymentShift(
-  db: Database,
-  input: {
-    authContext: AuthContext;
-    tenantId: string;
-    branchId: string;
-  },
-): Promise<string> {
-  const terminalId = input.authContext.terminalId;
-  const terminalBranchId = input.authContext.terminalBranchId;
-  if (!terminalId || !terminalBranchId) {
-    throw new PosOrderError(
-      "SHIFT_REQUIRED",
-      "Payments require an enrolled POS terminal and an active shift.",
-      403,
-    );
-  }
-  const shift = await findOpenShiftForUpdate(db, {
-    tenantId: input.tenantId,
-    staffId: input.authContext.userId,
-  });
-  if (
-    !shift ||
-    shift.status !== "open" ||
-    shift.branchId !== input.branchId ||
-    shift.branchId !== terminalBranchId ||
-    shift.terminalId !== terminalId
-  ) {
-    throw new PosOrderError(
-      "SHIFT_REQUIRED",
-      "The payment does not belong to this operator's active terminal shift.",
-      409,
-    );
-  }
-  return shift.id;
 }
 
 async function loadIdempotentPaymentResult(
@@ -1502,13 +1426,12 @@ export async function createPosOrderPayment(
       | {
           tenderedAmount: string;
           changeAmount: string;
-          shiftId: string;
           occurredAt: Date;
         }
       | undefined;
     if (data.paymentMethod === "cash") {
       const hasAllShiftFields = Boolean(
-        data.tenderedAmount && data.shiftId && data.occurredAt,
+        data.tenderedAmount && data.occurredAt,
       );
       const hasAnyShiftField = Boolean(
         data.tenderedAmount || data.shiftId || data.occurredAt,
@@ -1516,7 +1439,7 @@ export async function createPosOrderPayment(
       if (hasAnyShiftField && !hasAllShiftFields) {
         throw new PosOrderError(
           "VALIDATION_ERROR",
-          "Cash tender, shift, and occurrence time must be supplied together.",
+          "Cash tender and occurrence time must be supplied together.",
           422,
         );
       }
@@ -1533,25 +1456,37 @@ export async function createPosOrderPayment(
         cashDetails = {
           tenderedAmount: minorToMoney(tenderedMinor),
           changeAmount: minorToMoney(tenderedMinor - amountMinor),
-          shiftId: data.shiftId!,
-          occurredAt: await validateCashShift(tx, {
-            authContext,
-            tenantId,
-            branchId: before.branchId,
-            shiftId: data.shiftId!,
-            occurredAt: data.occurredAt!,
-          }),
+          occurredAt: validateCashOccurrence(data.occurredAt!),
         };
       }
     }
 
-    const paymentShiftId =
-      cashDetails?.shiftId ??
-      (await requireActivePaymentShift(tx, {
+    let registerContext: Awaited<
+      ReturnType<typeof ensurePaymentRegisterContext>
+    >;
+    try {
+      registerContext = await ensurePaymentRegisterContext(
         authContext,
-        tenantId,
-        branchId: before.branchId,
-      }));
+        data.paymentMethod,
+        tx,
+        data.paymentMethod === "cash"
+          ? {
+              registerSessionId: data.registerSessionId,
+              cashDrawerSessionId: data.cashDrawerSessionId,
+            }
+          : undefined,
+      );
+    } catch (error) {
+      if (error instanceof PosStaffError) {
+        const isCashSessionError = error.code === "CASH_SESSION_REQUIRED";
+        throw new PosOrderError(
+          isCashSessionError ? "CASH_SESSION_REQUIRED" : "REGISTER_REQUIRED",
+          error.message,
+          error.status,
+        );
+      }
+      throw error;
+    }
     const createdPayment = await createPaymentTransactionRecord(tx, {
       tenantId,
       branchId: before.branchId,
@@ -1562,7 +1497,9 @@ export async function createPosOrderPayment(
       currency: before.currency,
       actorUserId: authContext.userId,
       ...cashDetails,
-      shiftId: paymentShiftId,
+      shiftId: registerContext.shiftId ?? undefined,
+      registerSessionId: registerContext.registerSessionId,
+      cashDrawerSessionId: registerContext.cashDrawerSessionId ?? undefined,
       provider: data.paymentMethod === "app" ? data.provider : undefined,
       gateway: data.paymentMethod === "card" ? "tpe" : undefined,
       externalReference:

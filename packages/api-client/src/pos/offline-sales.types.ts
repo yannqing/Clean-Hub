@@ -23,7 +23,9 @@ export type PosOfflineSaleException = {
   orderId: string;
   branchId: string;
   terminalId: string;
-  shiftId: string;
+  shiftId: string | null;
+  registerSessionId: string | null;
+  cashDrawerSessionId: string | null;
   staffId: string;
   operationType: "checkout" | "payment";
   expectedTotalAmount: string;

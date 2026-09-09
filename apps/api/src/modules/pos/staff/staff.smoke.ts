@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 
 import {
   posShiftCashMovements,
+  posCashDrawerSessions,
+  posRegisterSessions,
   posShiftHandovers,
   posStaffShifts,
   posZReports,
@@ -15,7 +17,7 @@ import {
   calculateNetSales,
 } from "./staff.repository.js";
 import {
-  assertShiftTerminal,
+  assertShiftBranch,
   resolveShiftTransition,
 } from "./staff.service.js";
 import { PosStaffError } from "./staff.errors.js";
@@ -30,6 +32,8 @@ const shiftConfig = getTableConfig(posStaffShifts);
 const handoverConfig = getTableConfig(posShiftHandovers);
 const reportConfig = getTableConfig(posZReports);
 const cashMovementConfig = getTableConfig(posShiftCashMovements);
+const registerConfig = getTableConfig(posRegisterSessions);
+const cashDrawerConfig = getTableConfig(posCashDrawerSessions);
 
 function uniqueIndexNames(config: ReturnType<typeof getTableConfig>): string[] {
   return config.indexes
@@ -41,11 +45,24 @@ assert.ok(
   uniqueIndexNames(shiftConfig).includes("pos_staff_shifts_staff_open_unique"),
   "concurrent clock-in needs a staff-scoped open-shift uniqueness guard",
 );
-assert.ok(
+assert.equal(
   uniqueIndexNames(shiftConfig).includes(
     "pos_staff_shifts_terminal_open_unique",
   ),
-  "concurrent clock-in needs a terminal-scoped open-shift uniqueness guard",
+  false,
+  "work shifts must not be owned by a POS terminal",
+);
+assert.ok(
+  uniqueIndexNames(registerConfig).includes(
+    "pos_register_sessions_terminal_open_unique",
+  ),
+  "each terminal needs at most one open register session",
+);
+assert.ok(
+  uniqueIndexNames(cashDrawerConfig).includes(
+    "pos_cash_drawer_sessions_shared_register_open_unique",
+  ),
+  "a shared or assigned drawer needs one open responsibility session",
 );
 assert.ok(
   uniqueIndexNames(handoverConfig).includes(
@@ -60,6 +77,12 @@ assert.ok(
 assert.ok(
   uniqueIndexNames(reportConfig).includes("pos_z_reports_handover_unique"),
   "a handover may produce only one immutable report snapshot",
+);
+assert.ok(
+  uniqueIndexNames(reportConfig).includes(
+    "pos_z_reports_register_session_unique",
+  ),
+  "a register session may produce only one immutable Z Report",
 );
 assert.ok(
   uniqueIndexNames(cashMovementConfig).includes(
@@ -104,13 +127,21 @@ assert.throws(
 
 assert.equal(
   clockRequestSchema.safeParse({ action: "clock_in" }).success,
-  false,
-  "clock-in requires an opening float",
+  true,
+  "work attendance must not require an opening cash amount",
 );
 assert.equal(
   clockRequestSchema.safeParse({ action: "clock_out" }).success,
+  true,
+  "work attendance must not require a closing cash amount",
+);
+assert.equal(
+  clockRequestSchema.safeParse({
+    action: "clock_in",
+    openingFloat: "100.00",
+  }).success,
   false,
-  "clock-out requires a closing float",
+  "cash accountability must be recorded on a register, not a work shift",
 );
 assert.equal(
   createHandoverRequestSchema.safeParse({
@@ -188,21 +219,18 @@ const shift: ShiftRecord = {
 };
 assert.throws(
   () =>
-    assertShiftTerminal(shift, {
+    assertShiftBranch(shift, {
       branchId: "01ARZ3NDEKTSV4RRFFQ69G5FAY",
-      terminalId: shift.terminalId,
     }),
   (error: unknown) => error instanceof AuthError && error.code === "FORBIDDEN",
   "cross-branch shift access must fail before mutation",
 );
-assert.throws(
+assert.doesNotThrow(
   () =>
-    assertShiftTerminal(shift, {
+    assertShiftBranch(shift, {
       branchId: shift.branchId,
-      terminalId: "01ARZ3NDEKTSV4RRFFQ69G5FB3",
     }),
-  (error: unknown) => error instanceof AuthError && error.code === "FORBIDDEN",
-  "cross-terminal shift access must fail before mutation",
+  "a work shift may be continued from another terminal in the same branch",
 );
 
 console.log("POS staff/shift smoke passed.");

@@ -17,7 +17,10 @@ import {
   checkoutPosOrder,
   createPosOrderPayment,
 } from "../orders/orders.service.js";
-import { findShiftByIdForUpdate } from "../staff/staff.repository.js";
+import {
+  findCashDrawerSessionByIdForUpdate,
+  findRegisterSessionByIdForUpdate,
+} from "../staff/staff.repository.js";
 import {
   findOfflineSaleException,
   listOfflineSaleExceptions,
@@ -43,7 +46,7 @@ function requireCashCommand(command: PosOfflineCashCommand) {
     !payment ||
     payment.paymentMethod !== "cash" ||
     !payment.tenderedAmount ||
-    !payment.shiftId ||
+    !payment.registerSessionId ||
     !payment.occurredAt
   ) {
     throw new PosOrderError(
@@ -55,7 +58,9 @@ function requireCashCommand(command: PosOfflineCashCommand) {
   return {
     ...payment,
     tenderedAmount: payment.tenderedAmount,
-    shiftId: payment.shiftId,
+    shiftId: payment.shiftId ?? null,
+    registerSessionId: payment.registerSessionId,
+    cashDrawerSessionId: payment.cashDrawerSessionId ?? null,
     occurredAt: payment.occurredAt,
   };
 }
@@ -115,21 +120,36 @@ export async function reportPosOfflineSaleException(
         404,
       );
     }
-    const shift = await findShiftByIdForUpdate(tx, {
+    const registerSession = await findRegisterSessionByIdForUpdate(tx, {
       tenantId: terminal.tenantId,
-      shiftId: payment.shiftId,
+      registerSessionId: payment.registerSessionId,
     });
     if (
-      !shift ||
-      shift.staffId !== input.authContext.userId ||
-      shift.terminalId !== terminal.terminalId ||
-      shift.branchId !== terminal.branchId
+      !registerSession ||
+      registerSession.terminalId !== terminal.terminalId ||
+      registerSession.branchId !== terminal.branchId
     ) {
       throw new PosOrderError(
-        "SHIFT_REQUIRED",
-        "The exception report does not belong to this operator's shift.",
+        "REGISTER_REQUIRED",
+        "The exception report does not belong to this terminal's register session.",
         403,
       );
+    }
+    if (payment.cashDrawerSessionId) {
+      const cashSession = await findCashDrawerSessionByIdForUpdate(tx, {
+        tenantId: terminal.tenantId,
+        cashDrawerSessionId: payment.cashDrawerSessionId,
+      });
+      if (
+        !cashSession ||
+        cashSession.registerSessionId !== registerSession.id
+      ) {
+        throw new PosOrderError(
+          "CASH_SESSION_REQUIRED",
+          "The exception report does not belong to this register's cash session.",
+          403,
+        );
+      }
     }
 
     const exception = await upsertOfflineSaleException(tx, {
@@ -137,6 +157,8 @@ export async function reportPosOfflineSaleException(
       branchId: terminal.branchId,
       terminalId: terminal.terminalId,
       shiftId: payment.shiftId,
+      registerSessionId: payment.registerSessionId,
+      cashDrawerSessionId: payment.cashDrawerSessionId,
       staffId: input.authContext.userId,
       commandId: input.data.commandId,
       orderId: input.data.orderId,

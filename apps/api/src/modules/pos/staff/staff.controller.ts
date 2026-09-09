@@ -7,18 +7,26 @@ import {
   clockAction,
   createHandover,
   createShiftCashMovement,
+  createRegisterCashMovement,
+  closePosRegister,
   getCurrentShift,
   getCurrentShiftReconciliation,
+  getCurrentRegisterState,
+  getCurrentRegisterReconciliation,
   getPosStaff,
   getPosZReport,
   listPosStaff,
   listPosZReports,
   listCurrentShiftCashMovements,
+  listCurrentRegisterCashMovements,
+  openPosRegister,
 } from "./staff.service.js";
 import {
+  closeRegisterRequestSchema,
   clockRequestSchema,
   createHandoverRequestSchema,
   createShiftCashMovementRequestSchema,
+  openRegisterRequestSchema,
   posStaffListQuerySchema,
   posStaffParamsSchema,
   posZReportListQuerySchema,
@@ -59,6 +67,99 @@ export async function getPosStaffController(c: Context<AppBindings>) {
 export async function getCurrentShiftController(c: Context<AppBindings>) {
   try {
     return c.json(await getCurrentShift(c.get("authContext")));
+  } catch (error) {
+    if (error instanceof PosStaffError) return errorResponse(c, error);
+    throw error;
+  }
+}
+
+export async function getCurrentRegisterController(c: Context<AppBindings>) {
+  try {
+    return c.json(await getCurrentRegisterState(c.get("authContext")));
+  } catch (error) {
+    if (error instanceof PosStaffError) return errorResponse(c, error);
+    throw error;
+  }
+}
+
+export async function openRegisterController(c: Context<AppBindings>) {
+  const data = openRegisterRequestSchema.parse(
+    await c.req.json().catch(() => ({})),
+  );
+  try {
+    return c.json(
+      await openPosRegister(
+        c.get("authContext"),
+        data,
+        getRequestMeta(c),
+      ),
+      201,
+    );
+  } catch (error) {
+    if (error instanceof PosStaffError) return errorResponse(c, error);
+    throw error;
+  }
+}
+
+export async function closeRegisterController(c: Context<AppBindings>) {
+  const data = closeRegisterRequestSchema.parse(
+    await c.req.json().catch(() => ({})),
+  );
+  try {
+    return c.json(
+      await closePosRegister(
+        c.get("authContext"),
+        data,
+        getRequestMeta(c),
+      ),
+    );
+  } catch (error) {
+    if (error instanceof PosStaffError) return errorResponse(c, error);
+    throw error;
+  }
+}
+
+export async function getCurrentRegisterReconciliationController(
+  c: Context<AppBindings>,
+) {
+  try {
+    return c.json(
+      await getCurrentRegisterReconciliation(c.get("authContext")),
+    );
+  } catch (error) {
+    if (error instanceof PosStaffError) return errorResponse(c, error);
+    throw error;
+  }
+}
+
+export async function listCurrentRegisterCashMovementsController(
+  c: Context<AppBindings>,
+) {
+  try {
+    return c.json(
+      await listCurrentRegisterCashMovements(c.get("authContext")),
+    );
+  } catch (error) {
+    if (error instanceof PosStaffError) return errorResponse(c, error);
+    throw error;
+  }
+}
+
+export async function createRegisterCashMovementController(
+  c: Context<AppBindings>,
+) {
+  const data = createShiftCashMovementRequestSchema.parse(
+    await c.req.json().catch(() => ({})),
+  );
+  try {
+    return c.json(
+      await createRegisterCashMovement({
+        authContext: c.get("authContext"),
+        requestMeta: getRequestMeta(c),
+        data,
+      }),
+      201,
+    );
   } catch (error) {
     if (error instanceof PosStaffError) return errorResponse(c, error);
     throw error;

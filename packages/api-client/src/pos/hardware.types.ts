@@ -12,6 +12,7 @@ export type PosHardwareConnectionType =
   | "other";
 
 export type PosHardwareDeviceStatus = "active" | "inactive";
+export type PosHardwarePrinterPurpose = "receipt" | "label";
 
 export type PosHardwareDeviceSummary = {
   id: string;

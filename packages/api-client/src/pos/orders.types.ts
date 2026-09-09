@@ -140,6 +140,8 @@ export type PosPaymentTransaction = {
   tenderedAmount: string | null;
   changeAmount: string | null;
   shiftId: string | null;
+  registerSessionId: string | null;
+  cashDrawerSessionId: string | null;
   currency: string;
   paymentStatus: PosPaymentTransactionStatus;
   providerStatus: PosPaymentProviderStatus;
@@ -293,7 +295,9 @@ export type CreatePosPaymentRequest =
       paymentMethod: "cash";
       amount: string;
       tenderedAmount: string;
-      shiftId: string;
+      shiftId?: string;
+      registerSessionId?: string;
+      cashDrawerSessionId?: string;
       occurredAt: string;
       idempotencyKey: string;
     }
@@ -321,7 +325,9 @@ export type CreatePosCheckoutPaymentRequest =
       paymentMethod: "cash";
       amount?: string;
       tenderedAmount: string;
-      shiftId: string;
+      shiftId?: string;
+      registerSessionId?: string;
+      cashDrawerSessionId?: string;
       occurredAt: string;
       idempotencyKey: string;
     }

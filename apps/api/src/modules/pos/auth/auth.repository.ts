@@ -288,6 +288,9 @@ export async function updatePosDeviceRecord(
     .update(posTerminalSettings)
     .set({
       ...(input.data.branchId ? { branchId: input.data.branchId } : {}),
+      ...(input.data.cashHandlingMode
+        ? { cashHandlingMode: input.data.cashHandlingMode }
+        : {}),
       ...(input.data.label ? { label: input.data.label } : {}),
       ...(input.data.status ? { status: input.data.status } : {}),
       ...(securityContextChanged

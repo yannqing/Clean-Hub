@@ -17,7 +17,9 @@ import {
   branches,
   orders,
   paymentTransactions,
+  posCashDrawerSessions,
   posPaymentAdjustments,
+  posRegisterSessions,
   posShiftCashMovements,
   posShiftHandovers,
   posStaffShifts,
@@ -38,6 +40,8 @@ import type {
   PosStaffDetail,
   PosStaffListQuery,
   PosStaffRole,
+  PosCashDrawerSession,
+  PosRegisterSession,
   PosZReport,
   PosZReportPaymentBreakdown,
   PosShiftCashMovement,
@@ -69,12 +73,58 @@ function toShift(row: typeof posStaffShifts.$inferSelect): ShiftRecord {
   };
 }
 
+function toRegisterSession(
+  row: typeof posRegisterSessions.$inferSelect,
+): PosRegisterSession {
+  return {
+    id: row.id,
+    tenantId: row.tenantId,
+    branchId: row.branchId,
+    terminalId: row.terminalId,
+    currency: row.currency,
+    status: row.status,
+    openedAt: row.openedAt.toISOString(),
+    closedAt: row.closedAt?.toISOString() ?? null,
+    openedBy: row.openedBy,
+    closedBy: row.closedBy,
+    closeNotes: row.closeNotes,
+    version: row.version,
+  };
+}
+
+function toCashDrawerSession(
+  row: typeof posCashDrawerSessions.$inferSelect,
+): PosCashDrawerSession {
+  if (row.handlingMode === "none" || row.handlingMode === "untracked") {
+    throw new Error(
+      `Invalid persisted cash drawer handling mode: ${row.handlingMode}`,
+    );
+  }
+  return {
+    id: row.id,
+    registerSessionId: row.registerSessionId,
+    handlingMode: row.handlingMode,
+    assignedStaffId: row.assignedStaffId,
+    currency: row.currency,
+    status: row.status,
+    openingFloat: row.openingFloat,
+    expectedCash: row.expectedCash,
+    countedCash: row.countedCash,
+    variance: row.variance,
+    openedAt: row.openedAt.toISOString(),
+    closedAt: row.closedAt?.toISOString() ?? null,
+    version: row.version,
+  };
+}
+
 function toCashMovement(
   row: typeof posShiftCashMovements.$inferSelect,
 ): PosShiftCashMovement {
   return {
     id: row.id,
     shiftId: row.shiftId,
+    registerSessionId: row.registerSessionId,
+    cashDrawerSessionId: row.cashDrawerSessionId,
     movementType: row.movementType,
     amount: row.amount,
     currency: row.currency,
@@ -93,6 +143,7 @@ function toZReport(row: typeof posZReports.$inferSelect): PosZReport {
     terminalId: row.terminalId,
     shiftId: row.shiftId,
     handoverId: row.handoverId,
+    registerSessionId: row.registerSessionId,
     currency: row.currency,
     cutoffAt: row.cutoffAt.toISOString(),
     orderCount: row.orderCount,
@@ -316,6 +367,291 @@ export async function findOpenShift(
   return rows[0] ? toShift(rows[0]) : null;
 }
 
+export async function findOpenRegisterSession(
+  db: Database,
+  input: { tenantId: string; terminalId: string; forUpdate?: boolean },
+): Promise<PosRegisterSession | null> {
+  const query = db
+    .select()
+    .from(posRegisterSessions)
+    .where(
+      and(
+        eq(posRegisterSessions.tenantId, input.tenantId),
+        eq(posRegisterSessions.terminalId, input.terminalId),
+        eq(posRegisterSessions.status, "open"),
+      ),
+    )
+    .limit(1);
+  const rows = input.forUpdate ? await query.for("update") : await query;
+  return rows[0] ? toRegisterSession(rows[0]) : null;
+}
+
+export async function findRegisterSessionByIdForUpdate(
+  db: Database,
+  input: { tenantId: string; registerSessionId: string },
+): Promise<PosRegisterSession | null> {
+  const [row] = await db
+    .select()
+    .from(posRegisterSessions)
+    .where(
+      and(
+        eq(posRegisterSessions.tenantId, input.tenantId),
+        eq(posRegisterSessions.id, input.registerSessionId),
+      ),
+    )
+    .for("update")
+    .limit(1);
+  return row ? toRegisterSession(row) : null;
+}
+
+export async function insertRegisterSession(
+  db: Database,
+  input: {
+    tenantId: string;
+    branchId: string;
+    terminalId: string;
+    currency: string;
+    actorUserId: string;
+  },
+): Promise<PosRegisterSession | null> {
+  const [row] = await db
+    .insert(posRegisterSessions)
+    .values({
+      id: createId(),
+      tenantId: input.tenantId,
+      branchId: input.branchId,
+      terminalId: input.terminalId,
+      currency: input.currency,
+      openedBy: input.actorUserId,
+    })
+    .onConflictDoNothing()
+    .returning();
+  return row ? toRegisterSession(row) : null;
+}
+
+export async function findOpenCashDrawerSession(
+  db: Database,
+  input: {
+    tenantId: string;
+    registerSessionId: string;
+    staffId: string;
+    handlingMode: "shared_drawer" | "assigned_drawer" | "cash_in_hand";
+    forUpdate?: boolean;
+  },
+): Promise<PosCashDrawerSession | null> {
+  const query = db
+    .select()
+    .from(posCashDrawerSessions)
+    .where(
+      and(
+        eq(posCashDrawerSessions.tenantId, input.tenantId),
+        eq(posCashDrawerSessions.registerSessionId, input.registerSessionId),
+        eq(posCashDrawerSessions.status, "open"),
+        input.handlingMode === "cash_in_hand"
+          ? and(
+              eq(posCashDrawerSessions.handlingMode, "cash_in_hand"),
+              eq(posCashDrawerSessions.assignedStaffId, input.staffId),
+            )
+          : inArray(posCashDrawerSessions.handlingMode, [
+              "shared_drawer",
+              "assigned_drawer",
+            ]),
+      ),
+    )
+    .limit(1);
+  const rows = input.forUpdate ? await query.for("update") : await query;
+  return rows[0] ? toCashDrawerSession(rows[0]) : null;
+}
+
+export async function findCashDrawerSessionByIdForUpdate(
+  db: Database,
+  input: { tenantId: string; cashDrawerSessionId: string },
+): Promise<PosCashDrawerSession | null> {
+  const [row] = await db
+    .select()
+    .from(posCashDrawerSessions)
+    .where(
+      and(
+        eq(posCashDrawerSessions.tenantId, input.tenantId),
+        eq(posCashDrawerSessions.id, input.cashDrawerSessionId),
+      ),
+    )
+    .for("update")
+    .limit(1);
+  return row ? toCashDrawerSession(row) : null;
+}
+
+export async function insertCashDrawerSession(
+  db: Database,
+  input: {
+    tenantId: string;
+    branchId: string;
+    terminalId: string;
+    registerSessionId: string;
+    handlingMode: "shared_drawer" | "assigned_drawer" | "cash_in_hand";
+    assignedStaffId: string | null;
+    currency: string;
+    openingFloat: string;
+    actorUserId: string;
+  },
+): Promise<PosCashDrawerSession | null> {
+  const [row] = await db
+    .insert(posCashDrawerSessions)
+    .values({
+      id: createId(),
+      tenantId: input.tenantId,
+      branchId: input.branchId,
+      terminalId: input.terminalId,
+      registerSessionId: input.registerSessionId,
+      handlingMode: input.handlingMode,
+      assignedStaffId: input.assignedStaffId,
+      currency: input.currency,
+      openingFloat: input.openingFloat,
+      openedBy: input.actorUserId,
+    })
+    .onConflictDoNothing()
+    .returning();
+  return row ? toCashDrawerSession(row) : null;
+}
+
+export async function closeCashDrawerSessionRecord(
+  db: Database,
+  input: {
+    tenantId: string;
+    cashDrawerSessionId: string;
+    actorUserId: string;
+    expectedCash: string;
+    countedCash: string;
+    variance: string;
+  },
+): Promise<PosCashDrawerSession | null> {
+  const now = new Date();
+  const [row] = await db
+    .update(posCashDrawerSessions)
+    .set({
+      status: "closed",
+      expectedCash: input.expectedCash,
+      countedCash: input.countedCash,
+      variance: input.variance,
+      closedAt: now,
+      closedBy: input.actorUserId,
+      updatedAt: now,
+      version: sql`${posCashDrawerSessions.version} + 1`,
+    })
+    .where(
+      and(
+        eq(posCashDrawerSessions.id, input.cashDrawerSessionId),
+        eq(posCashDrawerSessions.tenantId, input.tenantId),
+        eq(posCashDrawerSessions.status, "open"),
+      ),
+    )
+    .returning();
+  return row ? toCashDrawerSession(row) : null;
+}
+
+export async function findRegisterCashSessionTotals(
+  db: Database,
+  input: { tenantId: string; registerSessionId: string },
+): Promise<{
+  openCount: number;
+  openingFloat: string;
+  countedCash: string;
+}> {
+  const [row] = await db
+    .select({
+      openCount: sql<number>`count(*) filter (
+        where ${posCashDrawerSessions.status} = 'open'
+      )::int`,
+      openingFloat: sql<string>`coalesce(sum(${posCashDrawerSessions.openingFloat}), 0)::text`,
+      countedCash: sql<string>`coalesce(sum(
+        case when ${posCashDrawerSessions.status} = 'closed'
+          then ${posCashDrawerSessions.countedCash}
+          else 0
+        end
+      ), 0)::text`,
+    })
+    .from(posCashDrawerSessions)
+    .where(
+      and(
+        eq(posCashDrawerSessions.tenantId, input.tenantId),
+        eq(
+          posCashDrawerSessions.registerSessionId,
+          input.registerSessionId,
+        ),
+      ),
+    );
+  return {
+    openCount: row?.openCount ?? 0,
+    openingFloat: row?.openingFloat ?? "0.00",
+    countedCash: row?.countedCash ?? "0.00",
+  };
+}
+
+export async function closeRegisterSessionRecords(
+  db: Database,
+  input: {
+    tenantId: string;
+    registerSessionId: string;
+    cashDrawerSessionId?: string;
+    actorUserId: string;
+    expectedCash?: string;
+    countedCash?: string;
+    variance?: string;
+    notes?: string;
+  },
+): Promise<{
+  registerSession: PosRegisterSession;
+  cashSession: PosCashDrawerSession | null;
+} | null> {
+  const now = new Date();
+  let cashSession: PosCashDrawerSession | null = null;
+  if (input.cashDrawerSessionId) {
+    const [cashRow] = await db
+      .update(posCashDrawerSessions)
+      .set({
+        status: "closed",
+        expectedCash: input.expectedCash,
+        countedCash: input.countedCash,
+        variance: input.variance,
+        closedAt: now,
+        closedBy: input.actorUserId,
+        updatedAt: now,
+        version: sql`${posCashDrawerSessions.version} + 1`,
+      })
+      .where(
+        and(
+          eq(posCashDrawerSessions.id, input.cashDrawerSessionId),
+          eq(posCashDrawerSessions.tenantId, input.tenantId),
+          eq(posCashDrawerSessions.registerSessionId, input.registerSessionId),
+          eq(posCashDrawerSessions.status, "open"),
+        ),
+      )
+      .returning();
+    if (!cashRow) return null;
+    cashSession = toCashDrawerSession(cashRow);
+  }
+  const [registerRow] = await db
+    .update(posRegisterSessions)
+    .set({
+      status: "closed",
+      closedAt: now,
+      closedBy: input.actorUserId,
+      closeNotes: input.notes?.trim() || null,
+      updatedAt: now,
+      version: sql`${posRegisterSessions.version} + 1`,
+    })
+    .where(
+      and(
+        eq(posRegisterSessions.id, input.registerSessionId),
+        eq(posRegisterSessions.tenantId, input.tenantId),
+        eq(posRegisterSessions.status, "open"),
+      ),
+    )
+    .returning();
+  if (!registerRow) return null;
+  return { registerSession: toRegisterSession(registerRow), cashSession };
+}
+
 export async function findPosTerminalForShiftUpdate(
   db: Database,
   input: { tenantId: string; terminalId: string },
@@ -389,7 +725,9 @@ export async function insertShiftCashMovement(
     tenantId: string;
     branchId: string;
     terminalId: string;
-    shiftId: string;
+    shiftId?: string;
+    registerSessionId?: string;
+    cashDrawerSessionId?: string;
     movementType: "pay_in" | "pay_out";
     amount: string;
     currency: string;
@@ -406,6 +744,8 @@ export async function insertShiftCashMovement(
       branchId: input.branchId,
       terminalId: input.terminalId,
       shiftId: input.shiftId,
+      registerSessionId: input.registerSessionId,
+      cashDrawerSessionId: input.cashDrawerSessionId,
       movementType: input.movementType,
       amount: input.amount,
       currency: input.currency,
@@ -435,6 +775,36 @@ export async function listShiftCashMovements(
   return rows.map(toCashMovement);
 }
 
+export async function listRegisterCashMovements(
+  db: Database,
+  input: {
+    tenantId: string;
+    registerSessionId: string;
+    cashDrawerSessionId?: string;
+  },
+): Promise<PosShiftCashMovement[]> {
+  const rows = await db
+    .select()
+    .from(posShiftCashMovements)
+    .where(
+      and(
+        eq(posShiftCashMovements.tenantId, input.tenantId),
+        eq(
+          posShiftCashMovements.registerSessionId,
+          input.registerSessionId,
+        ),
+        input.cashDrawerSessionId
+          ? eq(
+              posShiftCashMovements.cashDrawerSessionId,
+              input.cashDrawerSessionId,
+            )
+          : undefined,
+      ),
+    )
+    .orderBy(asc(posShiftCashMovements.createdAt));
+  return rows.map(toCashMovement);
+}
+
 export async function findShiftByIdForUpdate(
   db: Database,
   input: { tenantId: string; shiftId: string },
@@ -458,7 +828,7 @@ export async function createShiftRecord(
   input: {
     tenantId: string;
     branchId: string;
-    terminalId: string;
+    terminalId: string | null;
     staffId: string;
     currency: string;
     openingFloat: string;
@@ -555,14 +925,35 @@ export async function calculateHandoverSnapshot(
   input: {
     tenantId: string;
     branchId: string;
-    shiftId: string;
-    staffId: string;
+    shiftId?: string;
+    registerSessionId?: string;
+    cashDrawerSessionId?: string;
+    staffId?: string;
     currency: string;
     startedAt: Date;
     cutoffAt: Date;
     openingFloat: string;
   },
 ): Promise<HandoverSnapshot> {
+  if (!input.shiftId && !input.registerSessionId) {
+    throw new Error("A shift or register session is required for reconciliation.");
+  }
+  const paymentSessionFilter = input.cashDrawerSessionId
+    ? eq(
+        paymentTransactions.cashDrawerSessionId,
+        input.cashDrawerSessionId,
+      )
+    : input.registerSessionId
+      ? eq(paymentTransactions.registerSessionId, input.registerSessionId)
+    : eq(paymentTransactions.shiftId, input.shiftId!);
+  const cashMovementSessionFilter = input.cashDrawerSessionId
+    ? eq(
+        posShiftCashMovements.cashDrawerSessionId,
+        input.cashDrawerSessionId,
+      )
+    : input.registerSessionId
+      ? eq(posShiftCashMovements.registerSessionId, input.registerSessionId)
+    : eq(posShiftCashMovements.shiftId, input.shiftId!);
   const [
     orderRows,
     unsettledPaymentRows,
@@ -601,7 +992,7 @@ export async function calculateHandoverSnapshot(
         and(
           eq(paymentTransactions.tenantId, input.tenantId),
           eq(paymentTransactions.branchId, input.branchId),
-          eq(paymentTransactions.shiftId, input.shiftId),
+          paymentSessionFilter,
           eq(paymentTransactions.currency, input.currency),
           eq(paymentTransactions.paymentStatus, "pending"),
           inArray(paymentTransactions.paymentMethod, ["card", "app"]),
@@ -620,7 +1011,9 @@ export async function calculateHandoverSnapshot(
         and(
           eq(posPaymentAdjustments.tenantId, input.tenantId),
           eq(posPaymentAdjustments.branchId, input.branchId),
-          eq(posPaymentAdjustments.createdBy, input.staffId),
+          input.staffId
+            ? eq(posPaymentAdjustments.createdBy, input.staffId)
+            : sql`false`,
           eq(posPaymentAdjustments.currency, input.currency),
           eq(posPaymentAdjustments.adjustmentType, "refund"),
           eq(posPaymentAdjustments.status, "pending"),
@@ -639,7 +1032,7 @@ export async function calculateHandoverSnapshot(
         and(
           eq(paymentTransactions.tenantId, input.tenantId),
           eq(paymentTransactions.branchId, input.branchId),
-          eq(paymentTransactions.shiftId, input.shiftId),
+          paymentSessionFilter,
           eq(paymentTransactions.currency, input.currency),
           eq(paymentTransactions.paymentStatus, "paid"),
           gte(paymentTransactions.paidAt, input.startedAt),
@@ -667,10 +1060,12 @@ export async function calculateHandoverSnapshot(
           eq(posPaymentAdjustments.currency, input.currency),
           eq(posPaymentAdjustments.status, "succeeded"),
           or(
-            eq(paymentTransactions.shiftId, input.shiftId),
+            paymentSessionFilter,
             and(
               isNull(posPaymentAdjustments.originalPaymentId),
-              eq(posPaymentAdjustments.createdBy, input.staffId),
+              input.staffId
+                ? eq(posPaymentAdjustments.createdBy, input.staffId)
+                : sql`false`,
             ),
           ),
           gte(posPaymentAdjustments.occurredAt, input.startedAt),
@@ -686,7 +1081,7 @@ export async function calculateHandoverSnapshot(
       .where(
         and(
           eq(posShiftCashMovements.tenantId, input.tenantId),
-          eq(posShiftCashMovements.shiftId, input.shiftId),
+          cashMovementSessionFilter,
           eq(posShiftCashMovements.currency, input.currency),
           lte(posShiftCashMovements.createdAt, input.cutoffAt),
         ),
@@ -914,6 +1309,54 @@ export async function createHandoverAndZReport(
     createdAt: handover.createdAt.toISOString(),
     zReport: toZReport(reportRows[0]),
   };
+}
+
+export async function insertRegisterZReport(
+  db: Database,
+  input: {
+    tenantId: string;
+    branchId: string;
+    terminalId: string;
+    registerSessionId: string;
+    countedCash: string;
+    cutoffAt: Date;
+    actorUserId: string;
+    snapshot: HandoverSnapshot;
+  },
+): Promise<PosZReport | null> {
+  const [row] = await db
+    .insert(posZReports)
+    .values({
+      id: createId(),
+      tenantId: input.tenantId,
+      branchId: input.branchId,
+      terminalId: input.terminalId,
+      registerSessionId: input.registerSessionId,
+      currency: input.snapshot.currency,
+      cutoffAt: input.cutoffAt,
+      orderCount: input.snapshot.orderCount,
+      grossSales: input.snapshot.grossSales,
+      discountAmount: input.snapshot.discountAmount,
+      refundAmount: input.snapshot.refundAmount,
+      correctionAmount: input.snapshot.correctionAmount,
+      unsettledPaymentCount: input.snapshot.unsettledPaymentCount,
+      unsettledPaymentAmount: input.snapshot.unsettledPaymentAmount,
+      unsettledRefundCount: input.snapshot.unsettledRefundCount,
+      unsettledRefundAmount: input.snapshot.unsettledRefundAmount,
+      netSales: input.snapshot.netSales,
+      expectedCash: input.snapshot.expectedCash,
+      countedCash: input.countedCash,
+      variance: calculateCashVariance(
+        input.countedCash,
+        input.snapshot.expectedCash,
+      ),
+      outstandingOrders: input.snapshot.outstandingOrders,
+      paymentBreakdown: input.snapshot.paymentBreakdown,
+      createdBy: input.actorUserId,
+    })
+    .onConflictDoNothing()
+    .returning();
+  return row ? toZReport(row) : null;
 }
 
 export async function listZReports(

@@ -30,6 +30,12 @@ export type BindPosDeviceRequest = {
 
 export type UpdatePosDeviceRequest = {
   branchId?: string;
+  cashHandlingMode?:
+    | "none"
+    | "untracked"
+    | "shared_drawer"
+    | "assigned_drawer"
+    | "cash_in_hand";
   label?: string;
   status?: PosDeviceStatus;
   reason: string;

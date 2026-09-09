@@ -17,6 +17,8 @@ function toException(
     branchId: row.branchId,
     terminalId: row.terminalId,
     shiftId: row.shiftId,
+    registerSessionId: row.registerSessionId,
+    cashDrawerSessionId: row.cashDrawerSessionId,
     staffId: row.staffId,
     operationType: row.operationType as "checkout" | "payment",
     expectedTotalAmount: row.expectedTotalAmount,
@@ -42,7 +44,9 @@ export async function upsertOfflineSaleException(
     tenantId: string;
     branchId: string;
     terminalId: string;
-    shiftId: string;
+    shiftId: string | null;
+    registerSessionId: string;
+    cashDrawerSessionId: string | null;
     staffId: string;
     commandId: string;
     orderId: string;

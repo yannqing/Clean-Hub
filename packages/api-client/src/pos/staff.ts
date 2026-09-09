@@ -2,8 +2,12 @@ import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   ClockRequest,
   CreatePosShiftCashMovementRequest,
+  ClosePosRegisterRequest,
+  ClosePosRegisterResult,
   CreateHandoverRequest,
   HandoverRecord,
+  OpenPosRegisterRequest,
+  PosRegisterState,
   PosStaffDetail,
   PosCurrentShiftReconciliation,
   PosStaffListQuery,
@@ -26,6 +30,45 @@ export function createPosStaffApi(client: ApiClient) {
       client.get<PosStaffDetail>(`/pos/staff/${staffId}`, options),
     currentShift: (options?: RequestOptions) =>
       client.get<ShiftRecord | null>("/pos/staff/current-shift", options),
+    currentRegister: (options?: RequestOptions) =>
+      client.get<PosRegisterState>("/pos/staff/current-register", options),
+    currentRegisterReconciliation: (options?: RequestOptions) =>
+      client.get<PosCurrentShiftReconciliation | null>(
+        "/pos/staff/current-register/reconciliation",
+        options,
+      ),
+    listCurrentRegisterCashMovements: (options?: RequestOptions) =>
+      client.get<PosShiftCashMovementListResponse>(
+        "/pos/staff/current-register/cash-movements",
+        options,
+      ),
+    createRegisterCashMovement: (
+      input: CreatePosShiftCashMovementRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<PosShiftCashMovement>(
+        "/pos/staff/current-register/cash-movements",
+        input,
+        { ...options, idempotencyKey: input.idempotencyKey },
+      ),
+    openRegister: (
+      input: OpenPosRegisterRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<PosRegisterState>(
+        "/pos/staff/register-sessions/open",
+        input,
+        options,
+      ),
+    closeRegister: (
+      input: ClosePosRegisterRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<ClosePosRegisterResult>(
+        "/pos/staff/register-sessions/close",
+        input,
+        options,
+      ),
     currentShiftReconciliation: (options?: RequestOptions) =>
       client.get<PosCurrentShiftReconciliation | null>(
         "/pos/staff/current-shift/reconciliation",

@@ -252,6 +252,8 @@ function toPaymentTransaction(
     tenderedAmount: row.tenderedAmount,
     changeAmount: row.changeAmount,
     shiftId: row.shiftId,
+    registerSessionId: row.registerSessionId,
+    cashDrawerSessionId: row.cashDrawerSessionId,
     currency: row.currency,
     paymentStatus: row.paymentStatus,
     providerStatus: row.providerStatus,
@@ -916,6 +918,8 @@ export async function createPaymentTransactionRecord(
     tenderedAmount?: string;
     changeAmount?: string;
     shiftId?: string;
+    registerSessionId?: string;
+    cashDrawerSessionId?: string;
     occurredAt?: Date;
     provider?: PosMobileMoneyProvider;
     gateway?: string;
@@ -940,6 +944,8 @@ export async function createPaymentTransactionRecord(
       tenderedAmount: input.tenderedAmount,
       changeAmount: input.changeAmount,
       shiftId: input.shiftId,
+      registerSessionId: input.registerSessionId,
+      cashDrawerSessionId: input.cashDrawerSessionId,
       currency: input.currency,
       paymentStatus: isCash ? "paid" : "pending",
       providerStatus: isCash

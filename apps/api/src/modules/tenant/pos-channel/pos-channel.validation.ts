@@ -90,6 +90,15 @@ export const updatePosChannelDeviceBodySchema = z
   .object({
     label: z.string().trim().min(1).max(64).optional(),
     branchId: z.string().regex(ULID_PATTERN).optional(),
+    cashHandlingMode: z
+      .enum([
+        "none",
+        "untracked",
+        "shared_drawer",
+        "assigned_drawer",
+        "cash_in_hand",
+      ])
+      .optional(),
     status: z.enum(["active", "inactive"]).optional(),
     reason: z.string().trim().min(3).max(500),
     version: z.coerce.number().int().min(1),
@@ -99,6 +108,7 @@ export const updatePosChannelDeviceBodySchema = z
     (data) =>
       data.label !== undefined ||
       data.branchId !== undefined ||
+      data.cashHandlingMode !== undefined ||
       data.status !== undefined,
     "At least one terminal field must be provided.",
   );
@@ -123,6 +133,15 @@ export const posChannelRegisterSessionQuerySchema = dateRangeQuerySchema
 export const updatePosChannelSettingsBodySchema = z
   .object({
     cashTrackingEnabled: z.boolean().optional(),
+    defaultCashHandlingMode: z
+      .enum([
+        "none",
+        "untracked",
+        "shared_drawer",
+        "assigned_drawer",
+        "cash_in_hand",
+      ])
+      .optional(),
     requireOpeningFloat: z.boolean().optional(),
     requireClosingCount: z.boolean().optional(),
     requireReturnReason: z.boolean().optional(),
