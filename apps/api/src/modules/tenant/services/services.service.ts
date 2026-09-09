@@ -32,6 +32,7 @@ import type {
   CreateServiceRequest,
   RequestTenantServiceMediaDownloads,
   RequestTenantServiceMediaUpload,
+  ServiceApplicableItemType,
   ServiceBusinessLine,
   ServiceBranchSettingInput,
   ServiceDetail,
@@ -46,6 +47,28 @@ import type {
 } from "./services.types.js";
 
 const SERVICE_IMAGE_PURPOSE = "service_image";
+
+function requireApplicableItemTypesMatchBusinessLine(
+  businessLine: ServiceBusinessLine,
+  itemTypes: ServiceApplicableItemType[],
+): void {
+  const invalid =
+    businessLine === "car_wash"
+      ? itemTypes.some((itemType) => itemType !== "car")
+      : businessLine === "laundry"
+        ? itemTypes.includes("car")
+        : false;
+
+  if (invalid) {
+    throw new TenantServicesError(
+      "SERVICE_APPLICABLE_ITEM_TYPES_INVALID",
+      businessLine === "car_wash"
+        ? "Car-wash services can only apply to vehicles."
+        : "Laundry services cannot apply to vehicles.",
+      422,
+    );
+  }
+}
 
 type TenantServiceMediaServiceLike = Pick<
   MediaService,
@@ -405,6 +428,11 @@ export async function createTenantService(
 ): Promise<ServiceDetail> {
   const tenantId = requireTenantContext(authContext);
 
+  requireApplicableItemTypesMatchBusinessLine(
+    data.businessLine,
+    data.applicableItemTypes,
+  );
+
   await requireTenantReadyForServices(authContext, db, data.businessLine);
   await requireCompatibleServiceCategory(db, {
     tenantId,
@@ -561,6 +589,10 @@ export async function updateTenantService(
     }
 
     const nextAllBranches = data.allBranches ?? before.allBranches;
+    requireApplicableItemTypesMatchBusinessLine(
+      data.businessLine ?? before.businessLine,
+      data.applicableItemTypes ?? before.applicableItemTypes,
+    );
     const nextBranchSettings = data.branchSettings ?? before.branchSettings;
     await requireValidServiceBranchSettings(tx, {
       tenantId,

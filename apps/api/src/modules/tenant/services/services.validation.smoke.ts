@@ -32,6 +32,7 @@ function validServiceBody() {
     displayOrder: 10,
     pricingUnit: "per_item" as const,
     labelRule: "per_order_item" as const,
+    applicableItemTypes: ["cloth"] as const,
     standardPrice: "40.00",
     compareAtPrice: "50.00",
     costPrice: "18.50",
@@ -48,6 +49,26 @@ export function runTenantServiceValidationSmokeChecks(): void {
   assert.equal(parsed.costPrice, "18.50");
   assert.equal(parsed.allBranches, false);
   assert.equal(parsed.branchSettings?.[0]?.priceOverrideAmount, "45.00");
+  assert.deepEqual(parsed.applicableItemTypes, ["cloth"]);
+
+  assert.equal(
+    createServiceBodySchema.safeParse({
+      ...validServiceBody(),
+      applicableItemTypes: [],
+    }).success,
+    false,
+    "every service must declare at least one applicable item type",
+  );
+
+  assert.equal(
+    createServiceBodySchema.safeParse({
+      ...validServiceBody(),
+      businessLine: "car_wash",
+      applicableItemTypes: ["cloth"],
+    }).success,
+    false,
+    "car-wash services cannot be assigned to garment items",
+  );
 
   assert.equal(
     createServiceBodySchema.safeParse({

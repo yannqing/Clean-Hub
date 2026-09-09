@@ -13,6 +13,7 @@ export type ServiceLabelRule =
   | "per_item"
   | "per_order_item"
   | "per_bag";
+export type ServiceApplicableItemType = "cloth" | "car" | "shoe" | "carpet";
 
 export type ServiceBranchSettingInput = {
   branchId: string;
@@ -67,6 +68,7 @@ export type ServiceSummary = {
   displayOrder: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
+  applicableItemTypes: ServiceApplicableItemType[];
   standardPrice: string;
   compareAtPrice: string | null;
   costPrice: string | null;
@@ -102,6 +104,7 @@ export type CreateServiceRequest = {
   displayOrder?: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
+  applicableItemTypes: ServiceApplicableItemType[];
   standardPrice: string;
   compareAtPrice?: string | null;
   costPrice?: string | null;
@@ -171,6 +174,7 @@ export type ServiceAuditSnapshot = {
   displayOrder: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
+  applicableItemTypes: ServiceApplicableItemType[];
   standardPrice: string;
   compareAtPrice: string | null;
   costPrice: string | null;

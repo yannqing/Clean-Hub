@@ -335,6 +335,41 @@ export const TICKET_ITEM_TYPE_OPTIONS: ReadonlyArray<{
   (value) => ({ value, label: TICKET_ITEM_TYPE_LABELS[value] }),
 );
 
+export const TICKET_DEFECT_QUICK_PHRASES = [
+  "明显污渍",
+  "顽固油渍",
+  "破损",
+  "开线",
+  "缺扣",
+  "拉链损坏",
+  "褪色",
+  "染色风险",
+  "起球",
+  "变形",
+] as const;
+
+export const TICKET_REQUEST_QUICK_PHRASES = [
+  "加急处理",
+  "加强去渍",
+  "单独清洗",
+  "轻柔处理",
+  "低温清洗",
+  "不可烘干",
+  "自然晾干",
+  "无香处理",
+  "保持熨痕",
+  "独立包装",
+] as const;
+
+export const TICKET_REMARK_QUICK_PHRASES = [
+  "顾客已确认风险",
+  "口袋已检查",
+  "贵重物品",
+  "附件单独保管",
+  "取件时当面检查",
+  "已拍照留档",
+] as const;
+
 // --- 格式化 --------------------------------------------------------------
 
 /** Default currency shown when the active branch does not expose one. */

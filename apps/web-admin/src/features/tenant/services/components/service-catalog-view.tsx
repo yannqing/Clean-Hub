@@ -81,6 +81,7 @@ import {
   getServiceMediaDownloadsQuery,
 } from "../queries";
 import type {
+  ServiceApplicableItemType,
   ServiceBusinessLine,
   ServiceCategorySummary,
   ServiceFormErrors,
@@ -93,6 +94,21 @@ import type {
 const PAGE_SIZE = 10;
 const SERVICE_IMAGE_REFRESH_BUFFER_MS = 30_000;
 const SERVICE_IMAGE_RETRY_DELAY_MS = 60_000;
+
+const SERVICE_ITEM_TYPE_VALUES: ServiceApplicableItemType[] = [
+  "cloth",
+  "car",
+  "shoe",
+  "carpet",
+];
+
+function defaultApplicableItemTypes(
+  businessLine: ServiceBusinessLine,
+): ServiceApplicableItemType[] {
+  if (businessLine === "car_wash") return ["car"];
+  if (businessLine === "laundry") return ["cloth"];
+  return [...SERVICE_ITEM_TYPE_VALUES];
+}
 
 type ServiceImageSource = {
   downloadUrl: string;
@@ -154,6 +170,7 @@ const defaultFormValues: ServiceFormValues = {
   displayOrder: "0",
   pricingUnit: "per_item",
   labelRule: "per_order_item",
+  applicableItemTypes: ["cloth"],
   standardPrice: "",
   compareAtPrice: "",
   costPrice: "",
@@ -784,6 +801,7 @@ export function ServiceCatalogView({
         ...current,
         businessLine: value,
         categoryId: categoryStillMatches ? current.categoryId : "",
+        applicableItemTypes: defaultApplicableItemTypes(value),
       };
     });
     setFormErrors((current) => {
@@ -1555,6 +1573,45 @@ export function ServiceCatalogView({
                   {m.services.create.noCategoriesForBusinessLine}
                 </p>
               ) : null}
+            </div>
+
+            <div className="grid gap-2 sm:col-span-2">
+              <Label>{m.services.formLabels.applicableItemTypes}</Label>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {SERVICE_ITEM_TYPE_VALUES.filter((itemType) =>
+                  formValues.businessLine === "car_wash"
+                    ? itemType === "car"
+                    : formValues.businessLine === "laundry"
+                      ? itemType !== "car"
+                      : true,
+                ).map((itemType) => (
+                  <label
+                    className="flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                    key={itemType}
+                  >
+                    <Checkbox
+                      checked={formValues.applicableItemTypes.includes(
+                        itemType,
+                      )}
+                      onCheckedChange={(checked) => {
+                        const next = checked
+                          ? [...formValues.applicableItemTypes, itemType]
+                          : formValues.applicableItemTypes.filter(
+                              (value) => value !== itemType,
+                            );
+                        updateFormField("applicableItemTypes", [
+                          ...new Set(next),
+                        ]);
+                      }}
+                    />
+                    {m.services.itemTypeLabels[itemType]}
+                  </label>
+                ))}
+              </div>
+              <FieldError message={getFieldError("applicableItemTypes")} />
+              <p className="text-xs text-muted-foreground">
+                {m.services.create.applicableItemTypesHint}
+              </p>
             </div>
 
             {categoriesError ? (

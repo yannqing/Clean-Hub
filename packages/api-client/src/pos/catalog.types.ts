@@ -10,6 +10,7 @@ export type PosCatalogLabelRule =
   | "per_item"
   | "per_order_item"
   | "per_bag";
+export type PosCatalogApplicableItemType = "cloth" | "car" | "shoe" | "carpet";
 
 export type PosCatalogMedia = {
   id: string;
@@ -29,6 +30,7 @@ export type PosCatalogService = {
   businessLine: PosCatalogBusinessLine;
   pricingUnit: PosCatalogPricingUnit;
   labelRule: PosCatalogLabelRule;
+  applicableItemTypes: PosCatalogApplicableItemType[];
   turnaroundMinutes: number | null;
   amount: string;
   currency: string;

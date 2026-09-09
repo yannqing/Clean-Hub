@@ -77,7 +77,7 @@ ON CONFLICT (tenant_id, business_line, name) WHERE deleted_at IS NULL DO UPDATE 
 -- ───────────────────────────────────────────────
 INSERT INTO services (
   id, tenant_id, category_id, name, description, business_line,
-  pricing_unit, display_order, label_rule, status
+  pricing_unit, display_order, label_rule, applicable_item_types, status
 )
 VALUES
   (
@@ -91,7 +91,7 @@ VALUES
         AND deleted_at IS NULL
     ),
     '衬衫水洗', '单件衬衫标准水洗、烘干与整理服务', 'laundry',
-    'per_item', 10, 'per_item', 'active'
+    'per_item', 10, 'per_item', ARRAY['cloth']::text[], 'active'
   ),
   (
     '01SEED0100SVC0000000000002', '01KRERJN800000000000000001',
@@ -104,7 +104,7 @@ VALUES
         AND deleted_at IS NULL
     ),
     '西装干洗', '单件西装专业干洗与整形护理服务', 'laundry',
-    'per_item', 20, 'per_item', 'active'
+    'per_item', 20, 'per_item', ARRAY['cloth']::text[], 'active'
   ),
   (
     '01SEED0100SVC0000000000003', '01KRERJN800000000000000001',
@@ -117,7 +117,7 @@ VALUES
         AND deleted_at IS NULL
     ),
     '外套水洗', '单件日常外套水洗与整理服务', 'laundry',
-    'per_item', 30, 'per_item', 'active'
+    'per_item', 30, 'per_item', ARRAY['cloth']::text[], 'active'
   ),
   (
     '01SEED0100SVC0000000000004', '01KRERJN800000000000000001',
@@ -130,7 +130,7 @@ VALUES
         AND deleted_at IS NULL
     ),
     '床单水洗', '床单、被套等家纺用品按公斤计价的水洗服务', 'laundry',
-    'per_kg', 40, 'per_bag', 'active'
+    'per_kg', 40, 'per_bag', ARRAY['cloth']::text[], 'active'
   ),
   (
     '01SEED0100SVC0000000000005', '01KRERJN800000000000000001',
@@ -143,7 +143,7 @@ VALUES
         AND deleted_at IS NULL
     ),
     'SUV 精洗', 'SUV 车型内外精细清洁服务', 'car_wash',
-    'per_item', 10, 'none', 'active'
+    'per_item', 10, 'none', ARRAY['car']::text[], 'active'
   ),
   (
     '01SEED0100SVC0000000000006', '01KRERJN800000000000000001',
@@ -156,7 +156,7 @@ VALUES
         AND deleted_at IS NULL
     ),
     '轿车精洗', '轿车车型内外精细清洁服务', 'car_wash',
-    'per_item', 20, 'none', 'active'
+    'per_item', 20, 'none', ARRAY['car']::text[], 'active'
   ),
   (
     '01SEED0100SVC0000000000007', '01KRERJN800000000000000001',
@@ -169,7 +169,7 @@ VALUES
         AND deleted_at IS NULL
     ),
     '银卡月度会员', '面向普通会员的月度服务权益方案', 'retail',
-    'per_item', 10, 'none', 'active'
+    'per_item', 10, 'none', ARRAY['cloth', 'car', 'shoe', 'carpet']::text[], 'active'
   ),
   (
     '01SEED0100SVC0000000000008', '01KRERJN800000000000000001',
@@ -182,7 +182,7 @@ VALUES
         AND deleted_at IS NULL
     ),
     '织物除味剂', '作为洗护订单附加项目销售的织物除味服务', 'retail',
-    'per_item', 20, 'none', 'active'
+    'per_item', 20, 'none', ARRAY['cloth']::text[], 'active'
   )
 ON CONFLICT (id) DO UPDATE SET
   category_id = EXCLUDED.category_id,
@@ -192,6 +192,7 @@ ON CONFLICT (id) DO UPDATE SET
   pricing_unit = EXCLUDED.pricing_unit,
   display_order = EXCLUDED.display_order,
   label_rule = EXCLUDED.label_rule,
+  applicable_item_types = EXCLUDED.applicable_item_types,
   status = EXCLUDED.status,
   updated_at = now();
 

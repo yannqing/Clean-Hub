@@ -76,7 +76,10 @@ type ResolvedTicketItemPricing = {
  * enabled before the ticket can be created or mutated. Retail sales and
  * delivery tasks deliberately do not have service-ticket workflows.
  */
-const BUSINESS_LINE_FEATURES: Record<ServiceTicketType, "laundry" | "car_wash"> = {
+const BUSINESS_LINE_FEATURES: Record<
+  ServiceTicketType,
+  "laundry" | "car_wash"
+> = {
   laundry: "laundry",
   car_wash: "car_wash",
 };
@@ -172,6 +175,21 @@ async function resolveTicketItemPricing(
       422,
     );
   }
+  const itemType = input.data.itemType ?? input.existing?.itemType;
+  if (!itemType) {
+    throw new ServiceTicketError(
+      "VALIDATION_ERROR",
+      "Select an item type before choosing a service.",
+      422,
+    );
+  }
+  if (!service.applicableItemTypes.includes(itemType)) {
+    throw new ServiceTicketError(
+      "VALIDATION_ERROR",
+      "The selected service does not apply to this item type.",
+      422,
+    );
+  }
   if (service.currency !== input.ticket.currency) {
     throw new ServiceTicketError(
       "VALIDATION_ERROR",
@@ -180,7 +198,8 @@ async function resolveTicketItemPricing(
     );
   }
 
-  const serviceChanged = !input.existing || serviceId !== input.existing.serviceId;
+  const serviceChanged =
+    !input.existing || serviceId !== input.existing.serviceId;
   const standardUnitAmount =
     serviceChanged || !input.existing
       ? service.amount
@@ -256,7 +275,11 @@ export async function listPosServiceTickets(
   const listInput = {
     tenantId,
     allowedBranchIds: resolvePosBranchScope(authContext),
-    status: query.status ? (Array.isArray(query.status) ? query.status : [query.status]) : undefined,
+    status: query.status
+      ? Array.isArray(query.status)
+        ? query.status
+        : [query.status]
+      : undefined,
     priority: query.priority,
     ticketType: query.ticketType,
     sourceChannel: query.sourceChannel,
@@ -515,7 +538,9 @@ export async function changePosServiceTicketStatus(
     if (from === to) {
       const detail = await findServiceTicketDetail(tx, { tenantId, ticketId });
       if (!detail) {
-        throw new Error("Service ticket could not be loaded for status replay.");
+        throw new Error(
+          "Service ticket could not be loaded for status replay.",
+        );
       }
       return detail;
     }

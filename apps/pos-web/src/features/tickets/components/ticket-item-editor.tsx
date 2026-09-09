@@ -1,14 +1,8 @@
 "use client";
 
 import { posToast as toast } from "@/lib/pos-toast";
-import {
-  Combobox,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@cleanhub/ui";
-import { useState, useTransition } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@cleanhub/ui";
+import { useMemo, useState, useTransition } from "react";
 
 import { Icon } from "@/components/app-shell";
 
@@ -22,9 +16,12 @@ import {
   ITEM_BRAND_OPTIONS,
   ITEM_COLOR_OPTIONS,
   ITEM_MATERIAL_OPTIONS,
+  TICKET_DEFECT_QUICK_PHRASES,
   TICKET_ITEM_STATUS_LABELS,
   TICKET_ITEM_STATUS_TRANSITIONS,
   TICKET_ITEM_TYPE_OPTIONS,
+  TICKET_REMARK_QUICK_PHRASES,
+  TICKET_REQUEST_QUICK_PHRASES,
   formatTicketMoney,
 } from "../constants";
 import { coerceTicketItemType, validateTicketItemForm } from "../validators";
@@ -35,6 +32,10 @@ import type {
   ServiceTicketItem,
   ServiceTicketItemStatus,
 } from "@cleanhub/api-client";
+import {
+  TicketAttributePicker,
+  TicketServicePicker,
+} from "./ticket-item-pickers";
 
 type TicketItemEditorProps = {
   canManage: boolean;
@@ -429,6 +430,14 @@ function ItemForm({
   itemId?: string;
 }) {
   const [isPending, startTransition] = useTransition();
+  const compatibleCatalog = useMemo(() => {
+    const itemType = form.itemType;
+    return itemType
+      ? catalog.filter((service) =>
+          service.applicableItemTypes.includes(itemType),
+        )
+      : [];
+  }, [catalog, form.itemType]);
 
   function update<K extends keyof TicketItemFormValues>(
     key: K,
@@ -442,6 +451,45 @@ function ItemForm({
     event.currentTarget.blur();
   }
 
+  function changeItemType(itemType: ReturnType<typeof coerceTicketItemType>) {
+    const selectedService = catalog.find(
+      (service) => service.id === form.serviceId,
+    );
+    const keepService =
+      itemType !== "" &&
+      (selectedService?.applicableItemTypes.includes(itemType) ?? false);
+
+    onChange({
+      ...form,
+      itemType,
+      ...(keepService
+        ? {}
+        : {
+            serviceId: "",
+            pricingUnit: "per_item",
+            standardUnitAmount: "0",
+            chargedUnitAmount: "0",
+            priceTouched: false,
+            weight: "",
+            bagCount: "1",
+            overrideReason: "",
+          }),
+    });
+  }
+
+  function appendQuickPhrase(
+    field: "defectNotes" | "specialRequest" | "remark",
+    phrase: string,
+  ) {
+    const current = form[field].trim();
+    const phrases = current
+      .split(/[；;\n]+/)
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (phrases.includes(phrase)) return;
+    update(field, current ? `${current}；${phrase}` : phrase);
+  }
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
     const errors = validateTicketItemForm(form);
@@ -452,10 +500,15 @@ function ItemForm({
       }
       return;
     }
+    const itemType = coerceTicketItemType(form.itemType);
+    if (!itemType) {
+      toast.error("请先选择物品类型");
+      return;
+    }
 
     const payload = {
       serviceId: form.serviceId,
-      itemType: coerceTicketItemType(form.itemType) || undefined,
+      itemType,
       itemCategory: form.itemCategory.trim() || undefined,
       itemColor: form.itemColor.trim() || undefined,
       itemBrand: form.itemBrand.trim() || undefined,
@@ -495,17 +548,27 @@ function ItemForm({
   return (
     <form onSubmit={submit}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Field label="服务项目（必填）" wide>
+        <Field label="物品类型（必填）" wide>
           <select
             className={inputClass}
-            onChange={(event) => {
-              const service = catalog.find(
-                (entry) => entry.id === event.target.value,
-              );
-              if (!service) {
-                update("serviceId", "");
-                return;
-              }
+            disabled={isPending}
+            onChange={(event) =>
+              changeItemType(coerceTicketItemType(event.target.value))
+            }
+            value={form.itemType}
+          >
+            <option value="">请先选择物品类型</option>
+            {TICKET_ITEM_TYPE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="服务项目（必填）" portalControl wide>
+          <TicketServicePicker
+            disabled={isPending || !form.itemType}
+            onValueChange={(service) => {
               onChange({
                 ...form,
                 serviceId: service.id,
@@ -523,38 +586,18 @@ function ItemForm({
                 overrideReason: "",
               });
             }}
+            services={compatibleCatalog}
             value={form.serviceId}
-          >
-            <option value="">请选择服务</option>
-            {catalog.map((service) => (
-              <option key={service.id} value={service.id}>
-                {service.name} ·{" "}
-                {service.pricingUnit === "per_kg" ? "按公斤" : "按件"} ·{" "}
-                {formatTicketMoney(service.amount, service.currency)}
-              </option>
-            ))}
-          </select>
-          {catalog.length === 0 ? (
+          />
+          {!form.itemType ? (
+            <span className="mt-1.5 block text-xs text-muted-foreground">
+              选择物品类型后，仅显示适用于该物品的服务。
+            </span>
+          ) : compatibleCatalog.length === 0 ? (
             <span className="mt-1.5 block text-xs text-amber-700">
-              当前业务类型没有可用的服务及有效价格。
+              当前物品类型没有可用服务，请先在管理后台配置服务的适用物品。
             </span>
           ) : null}
-        </Field>
-        <Field label="物品类型">
-          <select
-            className={inputClass}
-            onChange={(event) =>
-              update("itemType", coerceTicketItemType(event.target.value))
-            }
-            value={form.itemType}
-          >
-            <option value="">（未指定）</option>
-            {TICKET_ITEM_TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
         </Field>
         <Field label="分类">
           <input
@@ -563,8 +606,8 @@ function ItemForm({
             value={form.itemCategory}
           />
         </Field>
-        <Field label="颜色">
-          <Combobox
+        <Field label="颜色" portalControl>
+          <TicketAttributePicker
             options={ITEM_COLOR_OPTIONS}
             value={form.itemColor}
             onValueChange={(v) => update("itemColor", v)}
@@ -573,8 +616,8 @@ function ItemForm({
             emptyText="无匹配颜色，按回车自定义"
           />
         </Field>
-        <Field label="品牌">
-          <Combobox
+        <Field label="品牌" portalControl>
+          <TicketAttributePicker
             options={ITEM_BRAND_OPTIONS}
             value={form.itemBrand}
             onValueChange={(v) => update("itemBrand", v)}
@@ -583,8 +626,8 @@ function ItemForm({
             emptyText="无匹配品牌，按回车自定义"
           />
         </Field>
-        <Field label="材质">
-          <Combobox
+        <Field label="材质" portalControl>
+          <TicketAttributePicker
             options={ITEM_MATERIAL_OPTIONS}
             value={form.itemMaterial}
             onValueChange={(v) => update("itemMaterial", v)}
@@ -686,6 +729,11 @@ function ItemForm({
             onChange={(event) => update("defectNotes", event.target.value)}
             value={form.defectNotes}
           />
+          <QuickPhrasePicker
+            onSelect={(phrase) => appendQuickPhrase("defectNotes", phrase)}
+            options={TICKET_DEFECT_QUICK_PHRASES}
+            value={form.defectNotes}
+          />
         </Field>
         <Field label="特殊要求" wide>
           <textarea
@@ -693,11 +741,21 @@ function ItemForm({
             onChange={(event) => update("specialRequest", event.target.value)}
             value={form.specialRequest}
           />
+          <QuickPhrasePicker
+            onSelect={(phrase) => appendQuickPhrase("specialRequest", phrase)}
+            options={TICKET_REQUEST_QUICK_PHRASES}
+            value={form.specialRequest}
+          />
         </Field>
         <Field label="项目备注" wide>
           <textarea
             className={`${inputClass} min-h-[72px]`}
             onChange={(event) => update("remark", event.target.value)}
+            value={form.remark}
+          />
+          <QuickPhrasePicker
+            onSelect={(phrase) => appendQuickPhrase("remark", phrase)}
+            options={TICKET_REMARK_QUICK_PHRASES}
             value={form.remark}
           />
         </Field>
@@ -727,21 +785,64 @@ function ItemForm({
 const inputClass =
   "h-9 w-full rounded-md border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted disabled:text-muted-foreground";
 
+function QuickPhrasePicker({
+  onSelect,
+  options,
+  value,
+}: {
+  onSelect: (phrase: string) => void;
+  options: readonly string[];
+  value: string;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5" aria-label="常用词条">
+      {options.map((option) => {
+        const selected = value
+          .split(/[；;\n]+/)
+          .map((part) => part.trim())
+          .includes(option);
+
+        return (
+          <button
+            aria-pressed={selected}
+            className="min-h-8 rounded-full border bg-background px-3 text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-muted hover:text-foreground aria-pressed:border-foreground/30 aria-pressed:bg-foreground aria-pressed:text-background"
+            disabled={selected}
+            key={option}
+            onClick={() => onSelect(option)}
+            type="button"
+          >
+            {option}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function Field({
   label,
+  portalControl,
   wide,
   children,
 }: {
   label: string;
+  portalControl?: boolean;
   wide?: boolean;
   children: React.ReactNode;
 }) {
-  return (
-    <label className={wide ? "sm:col-span-2 lg:col-span-3" : ""}>
+  const className = wide ? "sm:col-span-2 lg:col-span-3" : "";
+  const content = (
+    <>
       <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>
       {children}
-    </label>
+    </>
   );
+
+  if (portalControl) {
+    return <div className={className}>{content}</div>;
+  }
+
+  return <label className={className}>{content}</label>;
 }

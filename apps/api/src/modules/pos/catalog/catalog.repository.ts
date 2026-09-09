@@ -186,6 +186,7 @@ export async function findPosCatalogServices(
       businessLine: services.businessLine,
       pricingUnit: services.pricingUnit,
       labelRule: services.labelRule,
+      applicableItemTypes: services.applicableItemTypes,
       turnaroundMinutes: input.branchId
         ? sql<
             number | null
@@ -255,6 +256,7 @@ export async function findPosCatalogServiceById(
       businessLine: services.businessLine,
       pricingUnit: services.pricingUnit,
       labelRule: services.labelRule,
+      applicableItemTypes: services.applicableItemTypes,
       turnaroundMinutes: sql<
         number | null
       >`coalesce(${serviceBranchSettings.turnaroundMinutesOverride}, ${services.turnaroundMinutes})`,

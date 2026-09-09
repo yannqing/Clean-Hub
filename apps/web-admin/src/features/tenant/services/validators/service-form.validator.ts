@@ -5,6 +5,7 @@ import type {
 
 import type {
   ServiceBusinessLine,
+  ServiceApplicableItemType,
   ServiceFormErrors,
   ServiceFormValues,
   ServiceLabelRule,
@@ -26,6 +27,12 @@ const labelRules: ServiceLabelRule[] = [
   "per_bag",
 ];
 const statuses: ServiceStatus[] = ["active", "inactive"];
+const applicableItemTypes: ServiceApplicableItemType[] = [
+  "cloth",
+  "car",
+  "shoe",
+  "carpet",
+];
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const STANDARD_PRICE_PATTERN = /^\d+(\.\d{1,2})?$/;
 const SERVICE_CODE_PATTERN = /^[A-Z0-9][A-Z0-9._-]{0,63}$/;
@@ -152,6 +159,22 @@ function validateBase(input: ServiceFormValues) {
     errors.labelRule = "labelRuleInvalid";
   }
 
+  if (input.applicableItemTypes.length === 0) {
+    errors.applicableItemTypes = "applicableItemTypesRequired";
+  } else if (
+    new Set(input.applicableItemTypes).size !==
+      input.applicableItemTypes.length ||
+    input.applicableItemTypes.some(
+      (itemType) => !applicableItemTypes.includes(itemType),
+    ) ||
+    (input.businessLine === "car_wash" &&
+      input.applicableItemTypes.some((itemType) => itemType !== "car")) ||
+    (input.businessLine === "laundry" &&
+      input.applicableItemTypes.includes("car"))
+  ) {
+    errors.applicableItemTypes = "applicableItemTypesInvalid";
+  }
+
   if (!statuses.includes(input.status)) {
     errors.status = "statusInvalid";
   }
@@ -181,6 +204,7 @@ function validateBase(input: ServiceFormValues) {
       displayOrder,
       pricingUnit: input.pricingUnit,
       labelRule: input.labelRule,
+      applicableItemTypes: input.applicableItemTypes,
       status: input.status,
     },
   };

@@ -16,6 +16,10 @@ export function validateTicketItemForm(
 ): TicketItemFormFieldErrors | null {
   const errors: TicketItemFormFieldErrors = {};
 
+  if (!values.itemType) {
+    errors.itemType = "请先选择物品类型";
+  }
+
   if (!values.serviceId) {
     errors.serviceId = "请选择服务项目";
   }

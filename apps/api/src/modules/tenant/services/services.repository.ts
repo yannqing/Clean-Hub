@@ -69,6 +69,7 @@ type ServiceJoinedRow = {
   displayOrder: number;
   pricingUnit: ServiceSummary["pricingUnit"];
   labelRule: ServiceSummary["labelRule"];
+  applicableItemTypes: ServiceSummary["applicableItemTypes"];
   standardPrice: string;
   compareAtPrice: string | null;
   costPrice: string | null;
@@ -114,6 +115,7 @@ function buildServiceSelect() {
     displayOrder: services.displayOrder,
     pricingUnit: services.pricingUnit,
     labelRule: services.labelRule,
+    applicableItemTypes: services.applicableItemTypes,
     standardPrice: prices.amount,
     compareAtPrice: prices.compareAtAmount,
     costPrice: prices.costAmount,
@@ -163,6 +165,7 @@ function toServiceSummary(row: ServiceJoinedRow): ServiceSummary {
     displayOrder: row.displayOrder,
     pricingUnit: row.pricingUnit,
     labelRule: row.labelRule,
+    applicableItemTypes: row.applicableItemTypes,
     standardPrice: row.standardPrice,
     compareAtPrice: row.compareAtPrice,
     costPrice: row.costPrice,
@@ -193,6 +196,7 @@ function toAuditSnapshot(row: ServiceDetailRecord): ServiceAuditSnapshot {
     displayOrder: row.displayOrder,
     pricingUnit: row.pricingUnit,
     labelRule: row.labelRule,
+    applicableItemTypes: row.applicableItemTypes,
     standardPrice: row.standardPrice,
     compareAtPrice: row.compareAtPrice,
     costPrice: row.costPrice,
@@ -851,6 +855,7 @@ export async function createServiceRecord(
     displayOrder: input.displayOrder ?? 0,
     pricingUnit: input.pricingUnit,
     labelRule: input.labelRule,
+    applicableItemTypes: input.applicableItemTypes,
     status: input.status ?? "active",
     createdBy: input.actorUserId,
     updatedBy: input.actorUserId,
@@ -939,6 +944,8 @@ export async function updateServiceRecord(
       displayOrder: input.displayOrder ?? existing.displayOrder,
       pricingUnit: input.pricingUnit ?? existing.pricingUnit,
       labelRule: input.labelRule ?? existing.labelRule,
+      applicableItemTypes:
+        input.applicableItemTypes ?? existing.applicableItemTypes,
       status: input.status ?? existing.status,
       updatedAt: new Date(),
       updatedBy: input.actorUserId,

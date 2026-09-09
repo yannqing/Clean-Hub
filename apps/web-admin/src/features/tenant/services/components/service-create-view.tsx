@@ -8,6 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  Checkbox,
   Icon,
   Input,
   Label,
@@ -55,6 +56,7 @@ import {
 } from "../actions";
 import type {
   ServiceBusinessLine,
+  ServiceApplicableItemType,
   ServiceBranchFormValue,
   ServiceCategorySummary,
   ServiceDetail,
@@ -80,6 +82,7 @@ const DEFAULT_FORM_VALUES: ServiceFormValues = {
   displayOrder: "0",
   pricingUnit: "per_item",
   labelRule: "per_order_item",
+  applicableItemTypes: ["cloth"],
   standardPrice: "",
   compareAtPrice: "",
   costPrice: "",
@@ -87,6 +90,21 @@ const DEFAULT_FORM_VALUES: ServiceFormValues = {
   status: "active",
   version: 0,
 };
+
+const SERVICE_ITEM_TYPE_VALUES: ServiceApplicableItemType[] = [
+  "cloth",
+  "car",
+  "shoe",
+  "carpet",
+];
+
+function defaultApplicableItemTypes(
+  businessLine: ServiceBusinessLine,
+): ServiceApplicableItemType[] {
+  if (businessLine === "car_wash") return ["car"];
+  if (businessLine === "laundry") return ["cloth"];
+  return [...SERVICE_ITEM_TYPE_VALUES];
+}
 
 const MAX_SERVICE_IMAGES = 10;
 const MAX_SERVICE_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
@@ -196,6 +214,7 @@ function getInitialFormValues(
     displayOrder: String(initialService.displayOrder),
     pricingUnit: initialService.pricingUnit,
     labelRule: initialService.labelRule,
+    applicableItemTypes: initialService.applicableItemTypes,
     standardPrice: initialService.standardPrice,
     compareAtPrice: initialService.compareAtPrice ?? "",
     costPrice: initialService.costPrice ?? "",
@@ -604,12 +623,14 @@ export function ServiceCreateView({
         ...current,
         businessLine: value,
         categoryId: categoryStillMatches ? current.categoryId : "",
+        applicableItemTypes: defaultApplicableItemTypes(value),
       };
     });
     setErrors((current) => {
       const next = { ...current };
       delete next.businessLine;
       delete next.categoryId;
+      delete next.applicableItemTypes;
       return next;
     });
     setFormError(null);
@@ -1528,6 +1549,50 @@ export function ServiceCreateView({
                         {m.services.create.noCategoriesForBusinessLine}
                       </p>
                     ) : null}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>
+                      {m.services.formLabels.applicableItemTypes}{" "}
+                      <RequiredMark />
+                    </Label>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      {SERVICE_ITEM_TYPE_VALUES.filter((itemType) =>
+                        formValues.businessLine === "car_wash"
+                          ? itemType === "car"
+                          : formValues.businessLine === "laundry"
+                            ? itemType !== "car"
+                            : true,
+                      ).map((itemType) => (
+                        <label
+                          className="flex min-h-10 cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                          key={itemType}
+                        >
+                          <Checkbox
+                            checked={formValues.applicableItemTypes.includes(
+                              itemType,
+                            )}
+                            onCheckedChange={(checked) => {
+                              const next = checked
+                                ? [...formValues.applicableItemTypes, itemType]
+                                : formValues.applicableItemTypes.filter(
+                                    (value) => value !== itemType,
+                                  );
+                              updateField("applicableItemTypes", [
+                                ...new Set(next),
+                              ]);
+                            }}
+                          />
+                          {m.services.itemTypeLabels[itemType]}
+                        </label>
+                      ))}
+                    </div>
+                    <FieldError
+                      message={getFieldError("applicableItemTypes")}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {m.services.create.applicableItemTypesHint}
+                    </p>
                   </div>
                 </CardContent>
               </Card>

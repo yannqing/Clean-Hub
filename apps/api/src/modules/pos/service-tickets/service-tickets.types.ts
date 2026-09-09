@@ -24,7 +24,12 @@ export type ServiceTicketSourceChannel = "pos" | "app" | "phone" | "whatsapp";
 
 export type ServiceTicketItemType = "cloth" | "car" | "shoe" | "carpet";
 
-export type ServiceTicketItemStatus = "pending_wash" | "washing" | "done" | "ready_to_pick" | "exception";
+export type ServiceTicketItemStatus =
+  | "pending_wash"
+  | "washing"
+  | "done"
+  | "ready_to_pick"
+  | "exception";
 
 export type ServiceTicketPricingUnit = "per_item" | "per_kg";
 
@@ -157,7 +162,7 @@ export type ChangeServiceTicketStatusRequest = {
 
 export type CreateServiceTicketItemRequest = {
   serviceId: string;
-  itemType?: ServiceTicketItemType;
+  itemType: ServiceTicketItemType;
   itemCategory?: string;
   itemColor?: string;
   itemBrand?: string;

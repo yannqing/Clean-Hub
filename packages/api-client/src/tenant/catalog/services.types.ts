@@ -5,6 +5,7 @@ export type ServiceLabelRule =
   | "per_item"
   | "per_order_item"
   | "per_bag";
+export type ServiceApplicableItemType = "cloth" | "car" | "shoe" | "carpet";
 export type ServiceBusinessLine =
   | "laundry"
   | "car_wash"
@@ -52,6 +53,7 @@ export type ServiceSummary = {
   displayOrder: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
+  applicableItemTypes: ServiceApplicableItemType[];
   standardPrice: string;
   compareAtPrice: string | null;
   costPrice: string | null;
@@ -82,6 +84,7 @@ export type CreateServiceRequest = {
   displayOrder?: number;
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
+  applicableItemTypes: ServiceApplicableItemType[];
   standardPrice: string;
   compareAtPrice?: string | null;
   costPrice?: string | null;

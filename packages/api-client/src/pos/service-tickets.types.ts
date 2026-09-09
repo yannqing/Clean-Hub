@@ -154,7 +154,7 @@ export type ChangeServiceTicketStatusRequest = {
 
 export type CreateServiceTicketItemRequest = {
   serviceId: string;
-  itemType?: ServiceTicketItemType;
+  itemType: ServiceTicketItemType;
   itemCategory?: string;
   itemColor?: string;
   itemBrand?: string;

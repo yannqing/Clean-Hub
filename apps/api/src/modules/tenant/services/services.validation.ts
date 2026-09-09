@@ -29,6 +29,12 @@ export const serviceLabelRuleSchema = z.enum([
   "per_order_item",
   "per_bag",
 ]);
+export const serviceApplicableItemTypeSchema = z.enum([
+  "cloth",
+  "car",
+  "shoe",
+  "carpet",
+]);
 
 const standardPriceSchema = z
   .union([z.string(), z.number()])
@@ -80,6 +86,31 @@ function validateBranchSettings(
       code: "custom",
       message: "Select at least one available branch.",
       path: ["branchSettings"],
+    });
+  }
+}
+
+function validateApplicableItemTypes(
+  value: {
+    businessLine?: z.infer<typeof serviceBusinessLineSchema>;
+    applicableItemTypes?: Array<
+      z.infer<typeof serviceApplicableItemTypeSchema>
+    >;
+  },
+  context: z.RefinementCtx,
+) {
+  if (!value.businessLine || !value.applicableItemTypes) return;
+  const invalid =
+    value.businessLine === "car_wash"
+      ? value.applicableItemTypes.some((itemType) => itemType !== "car")
+      : value.businessLine === "laundry"
+        ? value.applicableItemTypes.includes("car")
+        : false;
+  if (invalid) {
+    context.addIssue({
+      code: "custom",
+      message: "Applicable item types do not match the business line.",
+      path: ["applicableItemTypes"],
     });
   }
 }
@@ -148,6 +179,13 @@ const serviceProfileBodySchema = z.object({
   displayOrder: z.number().int().min(0).max(1_000_000).optional(),
   pricingUnit: servicePricingUnitSchema,
   labelRule: serviceLabelRuleSchema,
+  applicableItemTypes: z
+    .array(serviceApplicableItemTypeSchema)
+    .min(1, "Select at least one applicable item type.")
+    .max(4)
+    .refine((values) => new Set(values).size === values.length, {
+      message: "Applicable item types must be unique.",
+    }),
   status: serviceStatusSchema.optional(),
   mediaObjectKeys: serviceMediaObjectKeysSchema.optional(),
 });
@@ -160,6 +198,7 @@ export const createServiceBodySchema = serviceProfileBodySchema
   })
   .superRefine((value, context) => {
     validateBranchSettings(value, context);
+    validateApplicableItemTypes(value, context);
     if (
       value.compareAtPrice != null &&
       Number(value.compareAtPrice) <= Number(value.standardPrice)
@@ -189,6 +228,7 @@ export const updateServiceBodySchema = serviceProfileBodySchema
   )
   .superRefine((value, context) => {
     validateBranchSettings(value, context);
+    validateApplicableItemTypes(value, context);
     if (
       (value.retainedMediaIds?.length ?? 0) +
         (value.newMediaObjectKeys?.length ?? 0) >

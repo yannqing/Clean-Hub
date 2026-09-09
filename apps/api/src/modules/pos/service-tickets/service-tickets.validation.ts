@@ -64,7 +64,10 @@ const isoTimestampSchema = z
   .string()
   .trim()
   .min(1)
-  .refine((value) => !Number.isNaN(Date.parse(value)), "Invalid ISO timestamp.");
+  .refine(
+    (value) => !Number.isNaN(Date.parse(value)),
+    "Invalid ISO timestamp.",
+  );
 
 // `status` accepts a single value or a repeated query param (?status=a&status=b).
 const statusFilterSchema = z
@@ -140,7 +143,7 @@ export const changeServiceTicketStatusBodySchema = z
 
 export const createServiceTicketItemBodySchema = z.object({
   serviceId: z.string().regex(ULID_PATTERN),
-  itemType: serviceTicketItemTypeSchema.optional(),
+  itemType: serviceTicketItemTypeSchema,
   itemCategory: z.string().trim().max(80).optional(),
   itemColor: z.string().trim().max(40).optional(),
   itemBrand: z.string().trim().max(80).optional(),
@@ -177,8 +180,7 @@ export const updateServiceTicketItemBodySchema = z
   .refine(
     (value) => Object.keys(value).length > 0,
     "At least one item field must be provided.",
-  )
-  ;
+  );
 
 export const changeServiceTicketItemStatusBodySchema = z.object({
   to: serviceTicketItemStatusSchema,
