@@ -103,6 +103,16 @@ export function canWorkTicketItems(status: ServiceTicketStatus): boolean {
 }
 
 /**
+ * Whether a ticket still accepts edits: changing its own fields, or adding,
+ * editing and removing items. A draft is still being written up so it stays
+ * editable, but a handed-over or cancelled ticket is settled history — letting
+ * items grow there would silently move the total away from the paid order.
+ */
+export function canEditTicket(status: ServiceTicketStatus): boolean {
+  return !isTerminalTicketStatus(status);
+}
+
+/**
  * The ticket status implied by its items, or null when the ticket should stay
  * where it is. Every item ready means the whole ticket is ready; any item in
  * exception raises the ticket so the problem is visible on the board.
@@ -130,10 +140,13 @@ export function resolveTicketStatusFromItems(input: {
 
   if (isAllowedTicketTransition(ticketStatus, target)) return [target];
 
-  // pending has no direct edge to ready_to_pick or exception; both are reached
-  // once the ticket is actually in progress.
+  // Neither pending nor exception has a direct edge to ready_to_pick, but both
+  // reach it through in_progress. Without this a ticket raised to exception
+  // would stay there even after every item was repaired, and since no further
+  // item change would follow, nothing would ever move it again.
   if (
-    ticketStatus === "pending" &&
+    (ticketStatus === "pending" || ticketStatus === "exception") &&
+    isAllowedTicketTransition(ticketStatus, "in_progress") &&
     isAllowedTicketTransition("in_progress", target)
   ) {
     return ["in_progress", target];

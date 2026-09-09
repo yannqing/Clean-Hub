@@ -17,6 +17,7 @@ import {
   TICKET_EMPTY_PLACEHOLDER,
   TICKET_PRIORITY_LABELS,
   TICKET_SOURCE_LABELS,
+  TICKET_TERMINAL_STATUSES,
   TICKET_TYPE_LABELS,
 } from "../constants";
 import type {
@@ -63,6 +64,7 @@ export function TicketDetailView({
   const [editing, setEditing] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const ticketEditable = !TICKET_TERMINAL_STATUSES.has(ticket.ticketStatus);
   const fromIntake = from === "intake";
   const fromCustomer = from === "customer";
   const fromHandover = from === "handover";
@@ -182,19 +184,21 @@ export function TicketDetailView({
               onClick={() => setStatusOpen(true)}
               size="lg"
               type="button"
-              variant="outline"
+              variant={ticket.ticketStatus === "draft" ? "default" : "outline"}
             >
-              更新工单状态
+              {ticket.ticketStatus === "draft" ? "确认工单" : "更新工单状态"}
             </Button>
-            <Button
-              onClick={() => setDeleteOpen(true)}
-              size="lg"
-              type="button"
-              variant="destructive"
-            >
-              <Icon className="h-4 w-4" name="trash" />
-              删除工单
-            </Button>
+            {canManage ? (
+              <Button
+                onClick={() => setDeleteOpen(true)}
+                size="lg"
+                type="button"
+                variant="destructive"
+              >
+                <Icon className="h-4 w-4" name="trash" />
+                删除工单
+              </Button>
+            ) : null}
           </div>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4">
@@ -239,15 +243,17 @@ export function TicketDetailView({
             <Card>
               <CardHeader className="flex-row items-center justify-between">
                 <CardTitle className="text-base">工单信息</CardTitle>
-                <Button
-                  onClick={() => setEditing(true)}
-                  size="sm"
-                  type="button"
-                  variant="outline"
-                >
-                  <Icon className="h-4 w-4" name="square-pen" />
-                  修改工单
-                </Button>
+                {ticketEditable ? (
+                  <Button
+                    onClick={() => setEditing(true)}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Icon className="h-4 w-4" name="square-pen" />
+                    修改工单
+                  </Button>
+                ) : null}
               </CardHeader>
               <CardContent>
                 <dl className="grid grid-cols-2 gap-x-8 gap-y-4">
@@ -299,6 +305,7 @@ export function TicketDetailView({
 
           <TicketItemEditor
             canManage={canManage}
+            ticketStatus={ticket.ticketStatus}
             catalog={catalog.filter(
               (service) =>
                 service.businessLine === ticket.ticketType &&

@@ -675,6 +675,74 @@ export async function softDeleteServiceTicketRecord(
  * order is paid. Cancelled orders do not reserve ticket items and therefore do
  * not count as billed or settled.
  */
+/**
+ * Whether a ticket item is already carried by a live order.
+ *
+ * Removing such an item would drop it out of the settlement coverage count as
+ * well, so the ticket would look fully billed and could be handed over even
+ * though the customer never paid for that garment.
+ */
+/**
+ * Whether any money has already been taken for this ticket. Cancelling such a
+ * ticket would close it while the customer's payment stays on the order, so the
+ * refund has to happen first.
+ *
+ * Partial payments count: the customer is owed that money too.
+ */
+export async function hasCollectedPaymentForTicket(
+  db: Database,
+  input: { tenantId: string; ticketId: string },
+): Promise<boolean> {
+  const rows = await db
+    .select({ paymentStatus: orders.paymentStatus })
+    .from(orders)
+    .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
+    .where(
+      and(
+        eq(orders.tenantId, input.tenantId),
+        eq(orderItems.tenantId, input.tenantId),
+        eq(orderItems.ticketId, input.ticketId),
+        ne(orders.status, "cancelled"),
+        inArray(orders.paymentStatus, ["paid", "partial"]),
+        isNull(orderItems.deletedAt),
+        isNull(orders.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows.length > 0;
+}
+
+export async function isTicketItemBilled(
+  db: Database,
+  input: { tenantId: string; ticketId: string; itemId: string },
+): Promise<boolean> {
+  const rows = await db
+    .select({ orderId: orders.id })
+    .from(orderItems)
+    .innerJoin(
+      orders,
+      and(
+        eq(orders.id, orderItems.orderId),
+        eq(orders.tenantId, input.tenantId),
+        ne(orders.status, "cancelled"),
+        isNull(orders.deletedAt),
+      ),
+    )
+    .where(
+      and(
+        eq(orderItems.tenantId, input.tenantId),
+        eq(orderItems.ticketId, input.ticketId),
+        eq(orderItems.sourceType, "ticket_item"),
+        eq(orderItems.sourceId, input.itemId),
+        isNull(orderItems.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows.length > 0;
+}
+
 export async function areLinkedOrdersSettled(
   db: Database,
   input: { tenantId: string; ticketId: string },

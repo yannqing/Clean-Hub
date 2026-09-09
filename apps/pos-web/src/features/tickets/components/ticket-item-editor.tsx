@@ -53,6 +53,7 @@ import type {
   PosCatalogService,
   ServiceTicketItem,
   ServiceTicketItemStatus,
+  ServiceTicketStatus,
 } from "@cleanhub/api-client";
 import {
   TicketAttributePicker,
@@ -63,6 +64,7 @@ type TicketItemEditorProps = {
   canManage: boolean;
   catalog: PosCatalogService[];
   ticketId: string;
+  ticketStatus: ServiceTicketStatus;
   currency: string;
   items: ServiceTicketItem[];
 };
@@ -99,6 +101,7 @@ const EMPTY_ITEM_FORM: TicketItemFormValues = {
  */
 export function TicketItemEditor({
   canManage,
+  ticketStatus,
   catalog,
   ticketId,
   currency,
@@ -145,6 +148,11 @@ export function TicketItemEditor({
   }
 
   const formOpen = creating || editingId !== null;
+  // Mirrors the server: a settled ticket is frozen, and a draft has to be
+  // confirmed before the shop floor can start moving garments through.
+  const ticketEditable =
+    ticketStatus !== "picked_up" && ticketStatus !== "cancelled";
+  const itemsWorkable = ticketEditable && ticketStatus !== "draft";
 
   return (
     <Card className="gap-0 overflow-hidden py-0">
@@ -156,11 +164,19 @@ export function TicketItemEditor({
             {items.reduce((n, x) => n + x.quantity, 0)}
           </p>
         </div>
-        <Button onClick={startCreate} size="lg" type="button">
-          <Icon className="h-4 w-4" name="plus" />
-          添加项目
-        </Button>
+        {ticketEditable ? (
+          <Button onClick={startCreate} size="lg" type="button">
+            <Icon className="h-4 w-4" name="plus" />
+            添加项目
+          </Button>
+        ) : null}
       </CardHeader>
+
+      {ticketStatus === "draft" ? (
+        <p className="border-b bg-muted/40 px-5 py-3 text-xs text-muted-foreground">
+          工单还是草稿，项目暂时不能流转。点击右上角「确认工单」后即可开始清洗。
+        </p>
+      ) : null}
 
       <div className="divide-y">
         {items.length === 0 ? (
@@ -175,7 +191,9 @@ export function TicketItemEditor({
             item={item}
             key={item.id}
             onEdit={() => startEdit(item)}
+            ticketEditable={ticketEditable}
             ticketId={ticketId}
+            workable={itemsWorkable}
           />
         ))}
       </div>
@@ -213,12 +231,16 @@ export function TicketItemEditor({
 
 function ItemRow({
   canManage,
+  ticketEditable,
+  workable,
   currency,
   item,
   onEdit,
   ticketId,
 }: {
   canManage: boolean;
+  ticketEditable: boolean;
+  workable: boolean;
   currency: string;
   item: ServiceTicketItem;
   onEdit: () => void;
@@ -259,7 +281,9 @@ function ItemRow({
     });
   }
 
-  const reachable = TICKET_ITEM_STATUS_TRANSITIONS[item.itemStatus] ?? [];
+  const reachable = workable
+    ? (TICKET_ITEM_STATUS_TRANSITIONS[item.itemStatus] ?? [])
+    : [];
   const details = [
     item.itemCategory,
     item.itemColor,
@@ -288,7 +312,7 @@ function ItemRow({
         <div className="flex shrink-0 gap-2">
           <Button
             aria-label="修改项目"
-            disabled={isPending}
+            disabled={isPending || !ticketEditable}
             onClick={onEdit}
             size="icon-lg"
             title="修改项目"
@@ -297,7 +321,7 @@ function ItemRow({
           >
             <Icon className="h-4 w-4" name="square-pen" />
           </Button>
-          {canManage ? (
+          {canManage && ticketEditable ? (
             <Button
               aria-label="删除项目"
               disabled={isPending}

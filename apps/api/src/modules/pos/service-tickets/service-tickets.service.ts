@@ -26,6 +26,8 @@ import {
   findServiceTicketDetail,
   findServiceTicketOverview,
   findServiceTicketRaw,
+  hasCollectedPaymentForTicket,
+  isTicketItemBilled,
   findServiceTickets,
   softDeleteServiceTicketRecord,
   updateServiceTicketRecord,
@@ -39,6 +41,7 @@ import {
   updateServiceTicketItemRecord,
 } from "./service-ticket-items.repository.js";
 import {
+  canEditTicket,
   canWorkTicketItems,
   isAllowedItemTransition,
   isAllowedTicketTransition,
@@ -463,6 +466,14 @@ export async function updatePosServiceTicket(
       tx,
     );
 
+    if (!canEditTicket(before.ticketStatus)) {
+      throw new ServiceTicketError(
+        "INVALID_STATUS_TRANSITION",
+        `A ticket that is "${before.ticketStatus}" can no longer be changed.`,
+        422,
+      );
+    }
+
     const summary = await updateServiceTicketRecord(tx, {
       ...data,
       tenantId,
@@ -554,6 +565,37 @@ export async function changePosServiceTicketStatus(
         `Cannot transition ticket from "${from}" to "${to}".`,
         422,
       );
+    }
+
+    if (to === "ready_to_pick") {
+      const itemStatuses = await findTicketItemStatuses(tx, {
+        tenantId,
+        ticketId,
+      });
+      const unfinished = itemStatuses.filter(
+        (status) => status !== "ready_to_pick",
+      );
+      if (unfinished.length > 0) {
+        throw new ServiceTicketError(
+          "INVALID_STATUS_TRANSITION",
+          `${unfinished.length} item(s) are not ready yet. Finish them before marking the ticket ready for pickup.`,
+          422,
+        );
+      }
+    }
+
+    if (to === "cancelled") {
+      const collected = await hasCollectedPaymentForTicket(tx, {
+        tenantId,
+        ticketId,
+      });
+      if (collected) {
+        throw new ServiceTicketError(
+          "VALIDATION_ERROR",
+          "This ticket has already been paid. Refund the linked order before cancelling it.",
+          422,
+        );
+      }
     }
 
     if (requiresSettlementCheck(from, to)) {
@@ -715,6 +757,14 @@ export async function createPosServiceTicketItem(
     requirePosBranchAccess(authContext, before.branchId);
     await requireTicketFeature(authContext, before.ticketType, tx);
 
+    if (!canEditTicket(before.ticketStatus)) {
+      throw new ServiceTicketError(
+        "INVALID_STATUS_TRANSITION",
+        `A ticket that is "${before.ticketStatus}" can no longer be changed.`,
+        422,
+      );
+    }
+
     const pricing = await resolveTicketItemPricing(tx, {
       authContext,
       tenantId,
@@ -794,6 +844,14 @@ export async function updatePosServiceTicketItem(
     }
 
     requirePosBranchAccess(authContext, before.branchId);
+
+    if (!canEditTicket(before.ticketStatus)) {
+      throw new ServiceTicketError(
+        "INVALID_STATUS_TRANSITION",
+        `A ticket that is "${before.ticketStatus}" can no longer be changed.`,
+        422,
+      );
+    }
 
     const existing = await findTicketItemById(tx, {
       tenantId,
@@ -1082,6 +1140,14 @@ export async function deletePosServiceTicketItem(
 
     requirePosBranchAccess(authContext, before.branchId);
 
+    if (!canEditTicket(before.ticketStatus)) {
+      throw new ServiceTicketError(
+        "INVALID_STATUS_TRANSITION",
+        `A ticket that is "${before.ticketStatus}" can no longer be changed.`,
+        422,
+      );
+    }
+
     const existing = await findTicketItemById(tx, {
       tenantId,
       ticketId,
@@ -1092,6 +1158,14 @@ export async function deletePosServiceTicketItem(
         "SERVICE_TICKET_ITEM_NOT_FOUND",
         "Service ticket item was not found.",
         404,
+      );
+    }
+
+    if (await isTicketItemBilled(tx, { tenantId, ticketId, itemId })) {
+      throw new ServiceTicketError(
+        "VALIDATION_ERROR",
+        "This item is already billed on an order. Refund or amend that order instead of removing the item.",
+        422,
       );
     }
 
