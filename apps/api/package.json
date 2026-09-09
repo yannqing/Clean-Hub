@@ -18,6 +18,7 @@
     "smoke:pos-surface-boundary": "tsx src/http/pos-terminal.middleware.smoke.ts",
     "smoke:pos-terminal-lifecycle": "tsx src/modules/pos/auth/auth.lifecycle.repository.smoke.ts",
     "smoke:pos-branch-lifecycle": "tsx src/modules/pos/terminal-lifecycle/branch-status-lifecycle.smoke.ts",
+    "smoke:pos-register-lifecycle": "tsx src/modules/pos/terminal-lifecycle/register-session-lifecycle.smoke.ts",
     "smoke:pos-tenant-lifecycle": "tsx src/modules/pos/terminal-lifecycle/tenant-status-lifecycle.smoke.ts",
     "smoke:pos-terminal-settings-security": "tsx src/modules/pos/terminal-settings/terminal-settings.security.smoke.ts",
     "smoke:pos-hardware": "tsx src/modules/pos/hardware/hardware.smoke.ts",
