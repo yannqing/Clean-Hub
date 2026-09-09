@@ -15,6 +15,7 @@ import {
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
 import {
+  posCashHandlingModeEnum,
   posPaymentMethodEnum,
   posRoundingRuleEnum,
 } from "./pos-terminal-settings.js";
@@ -56,6 +57,11 @@ export const posChannelSettings = pgTable(
       .array()
       .notNull()
       .default(sql`ARRAY['cash', 'app']::pos_payment_method[]`),
+    defaultCashHandlingMode: posCashHandlingModeEnum(
+      "default_cash_handling_mode",
+    )
+      .notNull()
+      .default("shared_drawer"),
     defaultRoundingRule: posRoundingRuleEnum("default_rounding_rule")
       .notNull()
       .default("none"),

@@ -1,4 +1,5 @@
 import {
+  check,
   index,
   integer,
   jsonb,
@@ -10,12 +11,28 @@ import {
   uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+
+import {
+  DEFAULT_POS_RECEIPT_FIELDS,
+  DEFAULT_POS_TICKET_LABEL_FIELDS,
+  POS_RECEIPT_FIELDS,
+  POS_TICKET_LABEL_FIELDS,
+  type PosReceiptField,
+  type PosTicketLabelField,
+} from "@cleanhub/domain/receipt";
 
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
 import { tenants } from "./tenants.js";
 
 export const branchStatusEnum = pgEnum("branch_status", ["active", "inactive"]);
+
+const receiptFieldArraySql = (fields: readonly PosReceiptField[]) =>
+  sql.raw(`ARRAY[${fields.map((field) => `'${field}'`).join(", ")}]::text[]`);
+
+const ticketLabelFieldArraySql = (fields: readonly PosTicketLabelField[]) =>
+  sql.raw(`ARRAY[${fields.map((field) => `'${field}'`).join(", ")}]::text[]`);
 
 export const branches = pgTable(
   "branches",
@@ -37,6 +54,16 @@ export const branches = pgTable(
     receiptName: varchar("receipt_name", { length: 200 }),
     receiptPhone: varchar("receipt_phone", { length: 32 }),
     receiptAddress: text("receipt_address"),
+    receiptFields: text("receipt_fields")
+      .array()
+      .$type<PosReceiptField[]>()
+      .notNull()
+      .default(receiptFieldArraySql(DEFAULT_POS_RECEIPT_FIELDS)),
+    ticketLabelFields: text("ticket_label_fields")
+      .array()
+      .$type<PosTicketLabelField[]>()
+      .notNull()
+      .default(ticketLabelFieldArraySql(DEFAULT_POS_TICKET_LABEL_FIELDS)),
     logoUrl: text("logo_url"),
     status: branchStatusEnum("status").notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true })
@@ -56,6 +83,26 @@ export const branches = pgTable(
     index("branches_tenant_id_idx").on(table.tenantId),
     index("branches_status_idx").on(table.status),
     index("branches_deleted_at_idx").on(table.deletedAt),
+    check(
+      "branches_receipt_fields_valid_check",
+      sql`${table.receiptFields} <@ ${receiptFieldArraySql(POS_RECEIPT_FIELDS)}`,
+    ),
+    check(
+      "branches_receipt_fields_merchant_required_check",
+      sql`array_position(${table.receiptFields}, 'merchant_name') is not null`,
+    ),
+    check(
+      "branches_ticket_label_fields_valid_check",
+      sql`${table.ticketLabelFields} <@ ${ticketLabelFieldArraySql(POS_TICKET_LABEL_FIELDS)}`,
+    ),
+    check(
+      "branches_ticket_label_fields_ticket_required_check",
+      sql`array_position(${table.ticketLabelFields}, 'ticket_number') is not null`,
+    ),
+    check(
+      "branches_ticket_label_fields_item_required_check",
+      sql`array_position(${table.ticketLabelFields}, 'item_name') is not null`,
+    ),
   ],
 );
 

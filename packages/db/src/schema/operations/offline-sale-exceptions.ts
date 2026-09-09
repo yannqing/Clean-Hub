@@ -17,7 +17,11 @@ import { users } from "../identity/users.js";
 import { branches } from "../tenancy/branches.js";
 import { posTerminalSettings } from "../tenancy/pos-terminal-settings.js";
 import { tenants } from "../tenancy/tenants.js";
-import { posStaffShifts } from "./pos-shifts.js";
+import {
+  posCashDrawerSessions,
+  posRegisterSessions,
+  posStaffShifts,
+} from "./pos-shifts.js";
 
 export const posOfflineSaleExceptionStatusEnum = pgEnum(
   "pos_offline_sale_exception_status",
@@ -43,8 +47,13 @@ export const posOfflineSaleExceptions = pgTable(
       .notNull()
       .references(() => posTerminalSettings.id),
     shiftId: ulidColumn("shift_id")
-      .notNull()
       .references(() => posStaffShifts.id),
+    registerSessionId: ulidColumn("register_session_id").references(
+      () => posRegisterSessions.id,
+    ),
+    cashDrawerSessionId: ulidColumn("cash_drawer_session_id").references(
+      () => posCashDrawerSessions.id,
+    ),
     staffId: ulidColumn("staff_id")
       .notNull()
       .references(() => users.id),

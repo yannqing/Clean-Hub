@@ -51,6 +51,18 @@ export const posTerminalSyncStatusEnum = pgEnum("pos_terminal_sync_status", [
   "error",
 ]);
 
+/**
+ * How this terminal is expected to account for cash. This is deliberately
+ * independent from whether an electronic drawer is physically connected.
+ */
+export const posCashHandlingModeEnum = pgEnum("pos_cash_handling_mode", [
+  "none",
+  "untracked",
+  "shared_drawer",
+  "assigned_drawer",
+  "cash_in_hand",
+]);
+
 export const posTerminalSettings = pgTable(
   "pos_terminal_settings",
   {
@@ -76,6 +88,9 @@ export const posTerminalSettings = pgTable(
       .array()
       .notNull()
       .default(sql`ARRAY['cash', 'app']::pos_payment_method[]`),
+    cashHandlingMode: posCashHandlingModeEnum("cash_handling_mode")
+      .notNull()
+      .default("shared_drawer"),
     roundingRule: posRoundingRuleEnum("rounding_rule")
       .notNull()
       .default("none"),

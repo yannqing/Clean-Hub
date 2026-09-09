@@ -12,6 +12,9 @@
     "smoke": "pnpm --filter @cleanhub/desktop exec tsx ../../packages/hardware/src/hardware.smoke.ts",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@cleanhub/domain": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^5"
   }

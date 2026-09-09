@@ -41,6 +41,8 @@ export const serviceLabelRuleEnum = pgEnum("service_label_rule", [
   "per_bag",
 ]);
 
+export type ServiceApplicableItemType = "cloth" | "car" | "shoe" | "carpet";
+
 export const serviceCategories = pgTable(
   "service_categories",
   {
@@ -113,6 +115,11 @@ export const services = pgTable(
     labelRule: serviceLabelRuleEnum("label_rule")
       .notNull()
       .default("per_order_item"),
+    applicableItemTypes: text("applicable_item_types")
+      .array()
+      .$type<ServiceApplicableItemType[]>()
+      .notNull()
+      .default(sql`ARRAY['cloth', 'shoe', 'carpet']::text[]`),
     status: catalogItemStatusEnum("status").notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -164,6 +171,13 @@ export const services = pgTable(
       sql`${table.turnaroundMinutes} is null or (${table.turnaroundMinutes} >= 1 and ${table.turnaroundMinutes} <= 525600)`,
     ),
     check("services_display_order_check", sql`${table.displayOrder} >= 0`),
+    check(
+      "services_applicable_item_types_check",
+      sql`cardinality(${table.applicableItemTypes}) > 0
+        and ${table.applicableItemTypes} <@ ARRAY['cloth', 'car', 'shoe', 'carpet']::text[]
+        and (${table.businessLine}::text <> 'car_wash' or ${table.applicableItemTypes} <@ ARRAY['car']::text[])
+        and (${table.businessLine}::text <> 'laundry' or not (${table.applicableItemTypes} @> ARRAY['car']::text[]))`,
+    ),
   ],
 );
 

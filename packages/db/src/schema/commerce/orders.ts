@@ -19,7 +19,11 @@ import { productPrices, productSkus } from "../catalog/products.js";
 import { pricingUnitEnum, services } from "../catalog/services.js";
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
-import { posStaffShifts } from "../operations/pos-shifts.js";
+import {
+  posCashDrawerSessions,
+  posRegisterSessions,
+  posStaffShifts,
+} from "../operations/pos-shifts.js";
 import { branches } from "../tenancy/branches.js";
 import { tenants } from "../tenancy/tenants.js";
 import { customerAccounts } from "./customer-accounts.js";
@@ -348,6 +352,12 @@ export const paymentTransactions = pgTable(
     }),
     changeAmount: numeric("change_amount", { precision: 12, scale: 2 }),
     shiftId: ulidColumn("shift_id").references(() => posStaffShifts.id),
+    registerSessionId: ulidColumn("register_session_id").references(
+      () => posRegisterSessions.id,
+    ),
+    cashDrawerSessionId: ulidColumn("cash_drawer_session_id").references(
+      () => posCashDrawerSessions.id,
+    ),
     currency: varchar("currency", { length: 3 }).notNull().default("XOF"),
     paymentStatus: paymentTransactionStatusEnum("payment_status")
       .notNull()
@@ -385,6 +395,12 @@ export const paymentTransactions = pgTable(
     ),
     index("payment_transactions_order_id_idx").on(table.orderId),
     index("payment_transactions_shift_id_idx").on(table.shiftId),
+    index("payment_transactions_register_session_id_idx").on(
+      table.registerSessionId,
+    ),
+    index("payment_transactions_cash_drawer_session_id_idx").on(
+      table.cashDrawerSessionId,
+    ),
     uniqueIndex("payment_transactions_tenant_gateway_external_id_unique")
       .on(table.tenantId, table.gateway, table.externalId)
       .where(
