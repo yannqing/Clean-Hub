@@ -71,7 +71,6 @@ export const webAdminRoutes = {
       hardwareDevice: (hardwareId: string) =>
         `/tenant/point-of-sale/hardware/${encodeURIComponent(hardwareId)}`,
       registerSessions: "/tenant/point-of-sale/register-sessions",
-      settings: "/tenant/point-of-sale/settings",
     },
     branches: "/tenant/branches",
     services: "/tenant/services",

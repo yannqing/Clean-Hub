@@ -36,16 +36,6 @@ function isWholeNumberInRange(
 export function validatePointOfSaleSettings(
   input: PointOfSaleSettingsFormValues,
 ): PointOfSaleSettingsValidationResult {
-  if (
-    input.defaultPaymentMethodsEnabled.length === 0 ||
-    !input.defaultPaymentMethodsEnabled.includes(input.defaultPaymentMethod)
-  ) {
-    return {
-      ok: false,
-      message: "The default payment method must be enabled.",
-    };
-  }
-
   const taxRate = Number(input.defaultTaxRate);
   if (!Number.isFinite(taxRate) || taxRate < 0 || taxRate > 1) {
     return {

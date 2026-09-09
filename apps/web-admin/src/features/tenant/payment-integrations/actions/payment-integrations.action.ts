@@ -38,7 +38,6 @@ function failure(error: unknown): PaymentIntegrationActionResult {
 function revalidatePaymentConsumers(): void {
   revalidatePath("/tenant/system/settings/payments");
   revalidatePath("/tenant/system/settings/point-of-sale");
-  revalidatePath("/tenant/point-of-sale/settings");
   revalidatePath("/tenant", "layout");
 }
 

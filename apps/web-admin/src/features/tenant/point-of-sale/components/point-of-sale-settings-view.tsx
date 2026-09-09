@@ -29,7 +29,6 @@ import { useTenantI18n } from "@/i18n";
 
 import { updatePointOfSaleSettingsAction } from "../actions";
 import type {
-  PointOfSalePaymentMethod,
   PointOfSaleRoundingRule,
   PointOfSaleSettings,
 } from "../types";
@@ -55,7 +54,6 @@ function toFormValues(
 ): PointOfSaleSettingsFormValues {
   return {
     cashTrackingEnabled: settings.cashTrackingEnabled,
-    defaultCashHandlingMode: settings.defaultCashHandlingMode,
     requireOpeningFloat: settings.requireOpeningFloat,
     requireClosingCount: settings.requireClosingCount,
     requireReturnReason: settings.requireReturnReason,
@@ -63,8 +61,6 @@ function toFormValues(
     offlineModeEnabled: settings.offlineModeEnabled,
     syncIntervalSeconds: settings.syncIntervalSeconds,
     deviceOfflineAfterSeconds: settings.deviceOfflineAfterSeconds,
-    defaultPaymentMethod: settings.defaultPaymentMethod,
-    defaultPaymentMethodsEnabled: settings.defaultPaymentMethodsEnabled,
     defaultRoundingRule: settings.defaultRoundingRule,
     taxEnabled: settings.taxEnabled,
     defaultTaxRate: settings.defaultTaxRate,
@@ -225,78 +221,6 @@ export function PointOfSaleSettingsView({
               </p>
             </div>
           </div>
-          <div className="mt-4 grid gap-2">
-            <Label>{m.pointOfSale.settings.fields.cashHandlingMode}</Label>
-            <Select
-              disabled={disabled}
-              onValueChange={(value) =>
-                update(
-                  "defaultCashHandlingMode",
-                  value as PointOfSaleSettingsFormValues["defaultCashHandlingMode"],
-                )
-              }
-              value={form.defaultCashHandlingMode}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(
-                  [
-                    "none",
-                    "untracked",
-                    "shared_drawer",
-                    "assigned_drawer",
-                    "cash_in_hand",
-                  ] as const
-                ).map((mode) => (
-                  <SelectItem key={mode} value={mode}>
-                    {m.pointOfSale.settings.cashHandlingModes[mode]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] leading-4 text-muted-foreground">
-              {m.pointOfSale.settings.hints.cashHandlingMode}
-            </p>
-          </div>
-          <div className="mt-4 grid gap-2">
-            <Label htmlFor="pos-cash-handling-mode">
-              {m.pointOfSale.settings.fields.cashHandlingMode}
-            </Label>
-            <Select
-              disabled={disabled}
-              onValueChange={(value) =>
-                update(
-                  "defaultCashHandlingMode",
-                  value as PointOfSaleSettingsFormValues["defaultCashHandlingMode"],
-                )
-              }
-              value={form.defaultCashHandlingMode}
-            >
-              <SelectTrigger id="pos-cash-handling-mode">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {(
-                  [
-                    "none",
-                    "untracked",
-                    "shared_drawer",
-                    "assigned_drawer",
-                    "cash_in_hand",
-                  ] as const
-                ).map((mode) => (
-                  <SelectItem key={mode} value={mode}>
-                    {m.pointOfSale.settings.cashHandlingModes[mode]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-[11px] leading-4 text-muted-foreground">
-              {m.pointOfSale.settings.hints.cashHandlingMode}
-            </p>
-          </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <BooleanSetting
               checked={form.cashTrackingEnabled}
@@ -350,62 +274,6 @@ export function PointOfSaleSettingsView({
             </div>
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2 sm:col-span-2">
-              <Label>新终端默认启用的支付方式</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {(["cash", "card", "app"] as const).map((method) => {
-                  const checked =
-                    form.defaultPaymentMethodsEnabled.includes(method);
-                  const unavailable =
-                    method === "app" &&
-                    settings.mobileMoneyProvidersEnabled.length === 0;
-                  return (
-                    <label
-                      className={`flex items-center gap-2 rounded-md border px-3 py-2 text-xs ${
-                        unavailable
-                          ? "cursor-not-allowed bg-muted/40 text-muted-foreground"
-                          : "cursor-pointer"
-                      }`}
-                      key={method}
-                    >
-                      <Checkbox
-                        checked={checked}
-                        disabled={disabled || unavailable}
-                        onCheckedChange={(value) => {
-                          const next =
-                            value === true
-                              ? [...form.defaultPaymentMethodsEnabled, method]
-                              : form.defaultPaymentMethodsEnabled.filter(
-                                  (candidate) => candidate !== method,
-                                );
-                          if (next.length === 0) return;
-                          setForm((current) =>
-                            current
-                              ? {
-                                  ...current,
-                                  defaultPaymentMethodsEnabled: next,
-                                  defaultPaymentMethod: next.includes(
-                                    current.defaultPaymentMethod,
-                                  )
-                                    ? current.defaultPaymentMethod
-                                    : next[0]!,
-                                }
-                              : current,
-                          );
-                        }}
-                      />
-                      {m.pointOfSale.settings.paymentMethods[method]}
-                    </label>
-                  );
-                })}
-              </div>
-              {settings.mobileMoneyProvidersEnabled.length === 0 ? (
-                <p className="text-[11px] leading-4 text-amber-700">
-                  请先在“支付”设置中绑定、验证并启用 Wave 或 Orange
-                  Money，之后才能把移动支付设为新终端默认方式。
-                </p>
-              ) : null}
-            </div>
             <div className="grid gap-2">
               <Label htmlFor="pos-cart-retention">
                 {m.pointOfSale.settings.fields.recentCartRetentionHours}
@@ -535,37 +403,6 @@ export function PointOfSaleSettingsView({
             </div>
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label htmlFor="pos-default-payment">
-                {m.pointOfSale.settings.fields.defaultPaymentMethod}
-              </Label>
-              <Select
-                disabled={disabled}
-                onValueChange={(value) =>
-                  update(
-                    "defaultPaymentMethod",
-                    value as PointOfSalePaymentMethod,
-                  )
-                }
-                value={form.defaultPaymentMethod}
-              >
-                <SelectTrigger id="pos-default-payment">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(["cash", "card", "app"] as const)
-                    .filter((method) =>
-                      form.defaultPaymentMethodsEnabled.includes(method),
-                    )
-                    .map((method) => (
-                      <SelectItem key={method} value={method}>
-                        {m.pointOfSale.settings.paymentMethods[method]}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="grid gap-2">
               <Label htmlFor="pos-default-rounding">
                 {m.pointOfSale.settings.fields.roundingRule}

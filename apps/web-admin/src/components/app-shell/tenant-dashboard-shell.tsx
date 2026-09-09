@@ -134,7 +134,7 @@ export function TenantDashboardShell({
       label: messages.tenant.pointOfSale.tabs.registerSessions,
     },
     {
-      href: webAdminRoutes.tenant.pointOfSale.settings,
+      href: webAdminRoutes.tenant.system.settingsSections.pointOfSale,
       label: messages.tenant.pointOfSale.tabs.settings,
     },
   ];
