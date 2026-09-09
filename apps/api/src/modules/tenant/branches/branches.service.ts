@@ -12,6 +12,7 @@ import {
 import {
   invalidateLockedPosTerminalsForBranchStatusChange,
   lockPosTerminalsForBranchStatusChange,
+  securityForceClosePosTerminalRegisterSessions,
   securityForceClosePosTerminalShifts,
 } from "../../pos/terminal-lifecycle/terminal-lifecycle.repository.js";
 import { MediaService } from "../../media/media.service.js";
@@ -349,6 +350,18 @@ export async function updateTenantBranchStatus(
 
       if (input.data.status === "inactive") {
         await securityForceClosePosTerminalShifts(tx, {
+          tenantId,
+          terminalIds: finalLockedTerminals.map((terminal) => terminal.id),
+          actorUserId: input.authContext.userId,
+          reason: "The branch was disabled.",
+          metadata: {
+            securityTrigger: "branch_status_change",
+            branchId,
+            branchStatus: input.data.status,
+          },
+          requestMeta: input.requestMeta,
+        });
+        await securityForceClosePosTerminalRegisterSessions(tx, {
           tenantId,
           terminalIds: finalLockedTerminals.map((terminal) => terminal.id),
           actorUserId: input.authContext.userId,

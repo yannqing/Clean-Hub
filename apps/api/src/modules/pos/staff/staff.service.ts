@@ -1055,7 +1055,7 @@ export async function clockAction(
       const shift = await createShiftRecord(tx, {
         tenantId,
         branchId: terminal.branchId,
-        terminalId: null,
+        terminalId: terminal.terminalId,
         staffId: input.authContext.userId,
         currency,
         openingFloat: "0",

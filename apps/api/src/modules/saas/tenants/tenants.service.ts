@@ -11,6 +11,7 @@ import {
 import {
   invalidateLockedPosTerminalsForTenantStatusChange,
   lockPosTerminalsForTenantStatusChange,
+  securityForceClosePosTerminalRegisterSessions,
   securityForceClosePosTerminalShifts,
 } from "../../pos/terminal-lifecycle/terminal-lifecycle.repository.js";
 import {
@@ -529,6 +530,17 @@ export async function updateSaasTenantStatus(
 
     if (input.data.status !== "active") {
       await securityForceClosePosTerminalShifts(tx, {
+        tenantId: input.tenantId,
+        terminalIds: finalLockedTerminals.map((terminal) => terminal.id),
+        actorUserId: input.authContext.userId,
+        reason: input.data.reason,
+        metadata: {
+          securityTrigger: "tenant_status_change",
+          tenantStatus: input.data.status,
+        },
+        requestMeta: input.requestMeta,
+      });
+      await securityForceClosePosTerminalRegisterSessions(tx, {
         tenantId: input.tenantId,
         terminalIds: finalLockedTerminals.map((terminal) => terminal.id),
         actorUserId: input.authContext.userId,

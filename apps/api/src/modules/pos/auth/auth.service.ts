@@ -16,7 +16,10 @@ import {
   requirePosRole,
   requirePosTenantId,
 } from "../access-control.helper.js";
-import { securityForceClosePosTerminalShifts } from "../terminal-lifecycle/terminal-lifecycle.repository.js";
+import {
+  securityForceClosePosTerminalRegisterSessions,
+  securityForceClosePosTerminalShifts,
+} from "../terminal-lifecycle/terminal-lifecycle.repository.js";
 import { PosTerminalAuthError } from "./auth.errors.js";
 import {
   enrollExistingPosDevice,
@@ -330,6 +333,18 @@ export async function updatePosDevice(
         },
         requestMeta: input.requestMeta,
       });
+      await securityForceClosePosTerminalRegisterSessions(tx, {
+        tenantId,
+        terminalIds: [lockedCurrent.id],
+        actorUserId: input.authContext.userId,
+        reason: input.data.reason,
+        metadata: {
+          securityTrigger: "terminal_disabled",
+          terminalId: lockedCurrent.id,
+          terminalDeviceId: lockedCurrent.deviceId,
+        },
+        requestMeta: input.requestMeta,
+      });
     }
 
     const saved = await updatePosDeviceRecord(tx, lockedCurrent, {
@@ -394,6 +409,18 @@ export async function revokePosDevice(
     }
 
     await securityForceClosePosTerminalShifts(tx, {
+      tenantId,
+      terminalIds: [lockedCurrent.id],
+      actorUserId: input.authContext.userId,
+      reason: input.data.reason,
+      metadata: {
+        securityTrigger: "terminal_credential_revoked",
+        terminalId: lockedCurrent.id,
+        terminalDeviceId: lockedCurrent.deviceId,
+      },
+      requestMeta: input.requestMeta,
+    });
+    await securityForceClosePosTerminalRegisterSessions(tx, {
       tenantId,
       terminalIds: [lockedCurrent.id],
       actorUserId: input.authContext.userId,

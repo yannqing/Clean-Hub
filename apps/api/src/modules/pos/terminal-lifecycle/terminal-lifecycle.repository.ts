@@ -2,6 +2,8 @@ import { and, asc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import {
   authRefreshTokens,
+  posCashDrawerSessions,
+  posRegisterSessions,
   posStaffShifts,
   posTerminalSettings,
   type Database,
@@ -26,6 +28,15 @@ export type SecurityForcedClosedShift = {
   previousStatus: "open" | "on_break";
   previousVersion: number;
   version: number;
+};
+
+export type SecurityForcedClosedRegisterSession = {
+  id: string;
+  branchId: string;
+  terminalId: string;
+  previousVersion: number;
+  version: number;
+  cashDrawerSessionIds: string[];
 };
 
 type RequestMeta = {
@@ -213,6 +224,160 @@ export async function securityForceClosePosTerminalShifts(
       previousStatus: shift.status,
       previousVersion: shift.version,
       version,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Register sessions belong to a terminal rather than to one employee, so a
+ * security close covers every session on the affected terminals. Revoking the
+ * terminal credential would otherwise leave an open session that no operator
+ * can reach to close.
+ *
+ * Like the shift close, this records no counted cash. The dedicated audit
+ * event tells operators that cash reconciliation is still outstanding.
+ */
+export async function securityForceClosePosTerminalRegisterSessions(
+  db: Database,
+  input: {
+    tenantId: string;
+    terminalIds: string[];
+    actorUserId: string;
+    reason: string;
+    metadata?: Record<string, unknown>;
+    requestMeta?: RequestMeta;
+  },
+): Promise<SecurityForcedClosedRegisterSession[]> {
+  if (input.terminalIds.length === 0) return [];
+
+  const lockedSessions = await db
+    .select({
+      id: posRegisterSessions.id,
+      branchId: posRegisterSessions.branchId,
+      terminalId: posRegisterSessions.terminalId,
+      status: posRegisterSessions.status,
+      closedAt: posRegisterSessions.closedAt,
+      version: posRegisterSessions.version,
+    })
+    .from(posRegisterSessions)
+    .where(
+      and(
+        eq(posRegisterSessions.tenantId, input.tenantId),
+        inArray(posRegisterSessions.terminalId, input.terminalIds),
+        eq(posRegisterSessions.status, "open"),
+      ),
+    )
+    .orderBy(asc(posRegisterSessions.terminalId), asc(posRegisterSessions.id))
+    .for("update");
+
+  if (lockedSessions.length === 0) return [];
+
+  const sessionIds = lockedSessions.map((session) => session.id);
+  const closedAt = new Date();
+
+  const closedCashRows = await db
+    .update(posCashDrawerSessions)
+    .set({
+      status: "closed",
+      closedAt,
+      closedBy: input.actorUserId,
+      updatedAt: closedAt,
+      version: sql`${posCashDrawerSessions.version} + 1`,
+    })
+    .where(
+      and(
+        eq(posCashDrawerSessions.tenantId, input.tenantId),
+        inArray(posCashDrawerSessions.registerSessionId, sessionIds),
+        eq(posCashDrawerSessions.status, "open"),
+      ),
+    )
+    .returning({
+      id: posCashDrawerSessions.id,
+      registerSessionId: posCashDrawerSessions.registerSessionId,
+    });
+  const cashSessionsByRegister = new Map<string, string[]>();
+  for (const row of closedCashRows) {
+    const existing = cashSessionsByRegister.get(row.registerSessionId) ?? [];
+    existing.push(row.id);
+    cashSessionsByRegister.set(row.registerSessionId, existing);
+  }
+
+  const closedRows = await db
+    .update(posRegisterSessions)
+    .set({
+      status: "closed",
+      closedAt,
+      closedBy: input.actorUserId,
+      updatedAt: closedAt,
+      version: sql`${posRegisterSessions.version} + 1`,
+    })
+    .where(
+      and(
+        eq(posRegisterSessions.tenantId, input.tenantId),
+        inArray(posRegisterSessions.id, sessionIds),
+        eq(posRegisterSessions.status, "open"),
+      ),
+    )
+    .returning({
+      id: posRegisterSessions.id,
+      version: posRegisterSessions.version,
+    });
+  const closedVersions = new Map(
+    closedRows.map((session) => [session.id, session.version]),
+  );
+
+  if (closedVersions.size !== lockedSessions.length) {
+    throw new Error(
+      "One or more POS register sessions changed while applying a security close.",
+    );
+  }
+
+  const result: SecurityForcedClosedRegisterSession[] = [];
+  for (const session of lockedSessions) {
+    const version = closedVersions.get(session.id);
+    if (version === undefined) continue;
+    const cashDrawerSessionIds = cashSessionsByRegister.get(session.id) ?? [];
+
+    await writeAuditLog(db, {
+      actorUserId: input.actorUserId,
+      tenantId: input.tenantId,
+      branchId: session.branchId,
+      eventCategory: "pos_register",
+      eventType: "pos.register.security_forced_closed",
+      entityType: "pos_register_session",
+      entityId: session.id,
+      reason: input.reason,
+      before: {
+        status: session.status,
+        closedAt: session.closedAt?.toISOString() ?? null,
+        version: session.version,
+      },
+      after: {
+        status: "closed",
+        closedAt: closedAt.toISOString(),
+        version,
+      },
+      metadata: {
+        ...input.metadata,
+        terminalId: session.terminalId,
+        cashDrawerSessionIds,
+        cashReconciliationRequired: true,
+        countedCashCaptured: false,
+        zReportGenerated: false,
+      },
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    result.push({
+      id: session.id,
+      branchId: session.branchId,
+      terminalId: session.terminalId,
+      previousVersion: session.version,
+      version,
+      cashDrawerSessionIds,
     });
   }
 
