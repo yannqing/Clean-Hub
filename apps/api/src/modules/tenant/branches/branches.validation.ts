@@ -107,7 +107,7 @@ const branchBodyBaseSchema = z.object({
   ticketLabelFields: ticketLabelFieldsSchema.default([
     ...DEFAULT_POS_TICKET_LABEL_FIELDS,
   ]),
-  paymentMethodsEnabled: paymentMethodsEnabledSchema.default(["cash", "app"]),
+  paymentMethodsEnabled: paymentMethodsEnabledSchema.default(["cash"]),
   defaultPaymentMethod: branchPaymentMethodSchema.default("cash"),
   cashHandlingMode: cashHandlingModeSchema.default("shared_drawer"),
   logoObjectKey: branchLogoObjectKeySchema.optional(),

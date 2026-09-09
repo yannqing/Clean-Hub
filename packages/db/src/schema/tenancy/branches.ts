@@ -77,7 +77,7 @@ export const branches = pgTable(
     paymentMethodsEnabled: posPaymentMethodEnum("payment_methods_enabled")
       .array()
       .notNull()
-      .default(sql`ARRAY['cash', 'app']::pos_payment_method[]`),
+      .default(sql`ARRAY['cash']::pos_payment_method[]`),
     defaultPaymentMethod: posPaymentMethodEnum("default_payment_method")
       .notNull()
       .default("cash"),

@@ -45,7 +45,7 @@ async function withTenantFinancialDefaults(
         branchId: settings.branchId,
       }),
     ]);
-  const branchMethods = branchPolicy?.paymentMethodsEnabled ?? ["cash", "app"];
+  const branchMethods = branchPolicy?.paymentMethodsEnabled ?? ["cash"];
   const paymentMethodsEnabled =
     mobileMoneyProvidersEnabled.length > 0
       ? [...branchMethods]

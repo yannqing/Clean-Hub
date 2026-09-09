@@ -217,7 +217,7 @@ export async function createBranchRecord(
     ticketLabelFields: input.ticketLabelFields ?? [
       ...DEFAULT_POS_TICKET_LABEL_FIELDS,
     ],
-    paymentMethodsEnabled: input.paymentMethodsEnabled ?? ["cash", "app"],
+    paymentMethodsEnabled: input.paymentMethodsEnabled ?? ["cash"],
     defaultPaymentMethod: input.defaultPaymentMethod ?? "cash",
     cashHandlingMode: input.cashHandlingMode ?? "shared_drawer",
     logoUrl: normalizeNullable(input.logoObjectKey),
