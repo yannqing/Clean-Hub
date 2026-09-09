@@ -52,13 +52,20 @@ export function requirePosTenantId(authContext: AuthContext): string {
   return authContext.tenantId!;
 }
 
+export function hasPosRole(
+  authContext: AuthContext,
+  allowedRoles: readonly PosRole[],
+): boolean {
+  return allowedRoles.includes(authContext.role as PosRole);
+}
+
 export function requirePosRole(
   authContext: AuthContext,
   allowedRoles: readonly PosRole[],
 ): void {
   assertPosContext(authContext);
 
-  if (!allowedRoles.includes(authContext.role as PosRole)) {
+  if (!hasPosRole(authContext, allowedRoles)) {
     forbidden("User does not have enough permission for this POS operation.");
   }
 }

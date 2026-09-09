@@ -6,6 +6,7 @@ import { writeAuditLog } from "../../audit/audit.helper.js";
 import {
   authorizePosSensitiveOperation,
   createPosAuditMetadata,
+  hasPosRole,
   requirePosBranchAccess,
   requirePosTenantId,
 } from "../access-control.helper.js";
@@ -520,8 +521,7 @@ export async function closePosRegister(
     if (
       state.cashSession?.handlingMode === "assigned_drawer" &&
       state.cashSession.assignedStaffId !== authContext.userId &&
-      authContext.role !== "owner" &&
-      authContext.role !== "manager"
+      !hasPosRole(authContext, ["owner", "manager"])
     ) {
       throw new AuthError(
         "FORBIDDEN",
@@ -606,7 +606,7 @@ export async function closePosRegister(
           })
         : null;
     if (personalCashTotals) {
-      if (authContext.role !== "owner" && authContext.role !== "manager") {
+      if (!hasPosRole(authContext, ["owner", "manager"])) {
         throw new AuthError(
           "FORBIDDEN",
           "Only a manager can close the register after personal cash sessions are closed.",
@@ -831,8 +831,7 @@ export async function ensurePaymentRegisterContext(
       if (
         cashSession?.handlingMode === "assigned_drawer" &&
         cashSession.assignedStaffId !== authContext.userId &&
-        authContext.role !== "owner" &&
-        authContext.role !== "manager"
+        !hasPosRole(authContext, ["owner", "manager"])
       ) {
         throw new AuthError(
           "FORBIDDEN",
