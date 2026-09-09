@@ -71,7 +71,9 @@ export type ServiceTicketSummary = {
   customerId: string;
   customerName: string;
   customerAccountName: string | null;
+  customerAccountPhone: string | null;
   customerProfileName: string | null;
+  customerProfilePhone: string | null;
   assistantId: string | null;
   assistantName: string | null;
   ticketNo: string | null;

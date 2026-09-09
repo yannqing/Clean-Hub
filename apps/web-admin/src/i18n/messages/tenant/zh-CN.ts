@@ -1578,7 +1578,6 @@ export const tenantMessagesZhCN: TenantMessages = {
       branchesLoadFailed: "门店列表加载失败，暂时无法保存服务。",
       compareAtPriceHint: "可选的原价展示，必须高于标准价格。",
       costPriceHint: "用于利润分析的内部成本，不会向顾客展示。",
-      changeDefaultCurrency: "修改默认货币",
       displayOrderHint: "数字越小，在服务目录中显示越靠前。",
       pricingHint:
         "标准价格使用租户默认币种；保存后可在服务目录修改金额，币种统一在设置中管理。",

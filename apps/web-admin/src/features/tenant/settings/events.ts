@@ -3,5 +3,6 @@ export const TENANT_SETTINGS_UPDATED_EVENT =
 
 export type TenantSettingsUpdatedEventDetail = {
   defaultLanguage: "en" | "fr" | "zh-CN";
+  tenantName: string;
   timezone: string;
 };

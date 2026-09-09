@@ -122,14 +122,25 @@ export function TicketsTable({ tickets, total }: TicketsTableProps) {
                       </span>
                     </TableCell>
                   ) : null}
+                  {visibleColumns.has("account") ? (
+                    <TableCell className="max-w-56">
+                      <span className="block truncate font-medium text-foreground">
+                        {ticket.customerAccountName ?? TICKET_EMPTY_PLACEHOLDER}
+                      </span>
+                      <span className="mt-0.5 block text-[10px] text-muted-foreground">
+                        {ticket.customerAccountPhone ??
+                          TICKET_EMPTY_PLACEHOLDER}
+                      </span>
+                    </TableCell>
+                  ) : null}
                   {visibleColumns.has("customer") ? (
                     <TableCell className="max-w-56">
                       <span className="block truncate font-medium text-foreground">
-                        {ticket.customerName}
+                        {ticket.customerProfileName ?? ticket.customerName}
                       </span>
                       <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                        {ticket.itemCount} {text("个项目")} ·{" "}
-                        {formatTicketMoney(ticket.totalAmount, ticket.currency)}
+                        {ticket.customerProfilePhone ??
+                          TICKET_EMPTY_PLACEHOLDER}
                       </span>
                     </TableCell>
                   ) : null}
@@ -205,7 +216,16 @@ function TicketCard({
             {displayTicketCode(ticket)}
           </div>
           <div className="mt-1 truncate text-sm font-medium text-foreground">
-            {ticket.customerName}
+            {ticket.customerProfileName ?? ticket.customerName}
+          </div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {text("客户手机号")}：
+            {ticket.customerProfilePhone ?? TICKET_EMPTY_PLACEHOLDER}
+          </div>
+          <div className="mt-1 truncate text-xs text-muted-foreground">
+            {text("账户")}：
+            {ticket.customerAccountName ?? TICKET_EMPTY_PLACEHOLDER} ·{" "}
+            {ticket.customerAccountPhone ?? TICKET_EMPTY_PLACEHOLDER}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {text(TICKET_TYPE_LABELS[ticket.ticketType])} · {ticket.itemCount}{" "}

@@ -6,6 +6,21 @@ import {
   toDateTimeLocalValue,
 } from "@cleanhub/domain/timezone";
 import { useState, useTransition } from "react";
+import {
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
+} from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
@@ -90,104 +105,113 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
   }
 
   return (
-    <form className="border-y bg-background p-5" onSubmit={submit}>
-      <h3 className="font-semibold text-foreground">基本信息</h3>
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="工单类型">
-          <select
-            className={inputClass}
-            onChange={(event) =>
-              update(
-                "ticketType",
-                event.target.value as TicketBasicFormValues["ticketType"],
-              )
-            }
-            value={values.ticketType}
-          >
-            {TICKET_TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="优先级">
-          <select
-            className={inputClass}
-            onChange={(event) =>
-              update(
-                "priority",
-                event.target.value as TicketBasicFormValues["priority"],
-              )
-            }
-            value={values.priority}
-          >
-            {TICKET_PRIORITY_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="来源渠道">
-          <select
-            className={inputClass}
-            onChange={(event) =>
-              update(
-                "sourceChannel",
-                event.target.value as TicketBasicFormValues["sourceChannel"],
-              )
-            }
-            value={values.sourceChannel}
-          >
-            {TICKET_SOURCE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="预计取件时间">
-          <input
-            className={inputClass}
-            onChange={(event) => update("expectedPickupAt", event.target.value)}
-            type="datetime-local"
-            value={values.expectedPickupAt}
-          />
-        </Field>
-        <Field label="备注" wide>
-          <textarea
-            className={`${inputClass} min-h-[88px]`}
-            maxLength={1000}
-            onChange={(event) => update("remark", event.target.value)}
-            value={values.remark}
-          />
-        </Field>
-      </div>
-      <div className="mt-4 flex justify-end gap-2">
-        <button
-          className="h-9 rounded-md border bg-background px-4 text-sm font-semibold text-foreground hover:bg-accent"
-          disabled={isPending}
-          onClick={onCancel}
-          type="button"
-        >
-          取消
-        </button>
-        <button
-          className="flex h-9 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:bg-foreground/90 disabled:opacity-60"
-          disabled={isPending}
-          type="submit"
-        >
-          <Icon className="h-4 w-4" name="save" />
-          {isPending ? "保存中…" : "保存修改"}
-        </button>
-      </div>
+    <form onSubmit={submit}>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">基本信息</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="工单类型">
+              <Select
+                onValueChange={(value) =>
+                  update(
+                    "ticketType",
+                    value as TicketBasicFormValues["ticketType"],
+                  )
+                }
+                value={values.ticketType}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TICKET_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="优先级">
+              <Select
+                onValueChange={(value) =>
+                  update("priority", value as TicketBasicFormValues["priority"])
+                }
+                value={values.priority}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TICKET_PRIORITY_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="来源渠道">
+              <Select
+                onValueChange={(value) =>
+                  update(
+                    "sourceChannel",
+                    value as TicketBasicFormValues["sourceChannel"],
+                  )
+                }
+                value={values.sourceChannel}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {TICKET_SOURCE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <Field label="预计取件时间">
+              <Input
+                onChange={(event) =>
+                  update("expectedPickupAt", event.target.value)
+                }
+                type="datetime-local"
+                value={values.expectedPickupAt}
+              />
+            </Field>
+            <Field label="备注" wide>
+              <Textarea
+                className="min-h-[88px]"
+                maxLength={1000}
+                onChange={(event) => update("remark", event.target.value)}
+                value={values.remark}
+              />
+            </Field>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              disabled={isPending}
+              onClick={onCancel}
+              type="button"
+              variant="outline"
+            >
+              取消
+            </Button>
+            <Button disabled={isPending} type="submit">
+              <Icon className="h-4 w-4" name="save" />
+              {isPending ? "保存中…" : "保存修改"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     </form>
   );
 }
-
-const inputClass =
-  "h-9 w-full rounded-md border bg-background px-3 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring";
 
 function Field({
   label,
@@ -199,11 +223,11 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <label className={wide ? "sm:col-span-2" : ""}>
-      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
+    <div className={wide ? "sm:col-span-2" : ""}>
+      <Label className="mb-1.5 block text-xs text-muted-foreground">
         {label}
-      </span>
+      </Label>
       {children}
-    </label>
+    </div>
   );
 }

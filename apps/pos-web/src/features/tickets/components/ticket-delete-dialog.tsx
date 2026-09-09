@@ -3,6 +3,17 @@
 import { posToast as toast } from "@/lib/pos-toast";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Label,
+  Textarea,
+} from "@cleanhub/ui";
 
 import { posRoutes } from "@/config";
 
@@ -29,10 +40,6 @@ export function TicketDeleteDialog({
   const [isPending, startTransition] = useTransition();
   const [reason, setReason] = useState("");
 
-  if (!open) {
-    return null;
-  }
-
   function confirm() {
     const normalizedReason = reason.trim();
     if (!normalizedReason) {
@@ -55,56 +62,51 @@ export function TicketDeleteDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-4"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
+    <Dialog
+      onOpenChange={(nextOpen) => !nextOpen && !isPending && onClose()}
+      open={open}
     >
-      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto overscroll-contain rounded-xl border bg-background text-foreground shadow-2xl">
-        <div className="border-b p-5">
-          <h2 className="text-lg font-semibold text-foreground">删除工单</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>删除工单</DialogTitle>
+          <DialogDescription>
             确定要删除工单
             <span className="mx-1 font-mono font-semibold text-foreground">
               {ticketNo ?? ticketId.slice(-8).toUpperCase()}
             </span>
             吗？此操作为软删除，将级联删除该工单下的所有项目。
-          </p>
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-2">
+          <Label htmlFor="ticket-delete-reason">删除原因（必填）</Label>
+          <Textarea
+            className="min-h-24"
+            disabled={isPending}
+            id="ticket-delete-reason"
+            maxLength={500}
+            onChange={(event) => setReason(event.target.value)}
+            value={reason}
+          />
         </div>
-        <div className="p-5">
-          <label className="grid gap-2 text-sm font-semibold text-foreground">
-            删除原因（必填）
-            <textarea
-              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              disabled={isPending}
-              maxLength={500}
-              onChange={(event) => setReason(event.target.value)}
-              value={reason}
-            />
-          </label>
-        </div>
-        <div className="flex justify-end gap-2 border-t p-4">
-          <button
-            className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+        <DialogFooter>
+          <Button
             disabled={isPending || !reason.trim()}
             onClick={onClose}
             type="button"
+            variant="outline"
           >
             取消
-          </button>
-          <button
-            className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-60"
+          </Button>
+          <Button
             disabled={isPending}
             onClick={confirm}
             type="button"
+            variant="destructive"
           >
             {isPending ? "删除中…" : "确认删除"}
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

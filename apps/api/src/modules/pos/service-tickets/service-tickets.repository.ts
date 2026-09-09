@@ -84,8 +84,10 @@ export function toTicketItem(
 
 type TicketJoinedRow = typeof serviceTickets.$inferSelect & {
   customerAccountName: string | null;
+  customerAccountPhone: string | null;
   customerName: string | null;
   customerProfileName: string | null;
+  customerProfilePhone: string | null;
   assistantName: string | null;
   itemCount: string | number | null;
   totalAmount: string | null;
@@ -100,7 +102,9 @@ function toTicketSummary(row: TicketJoinedRow): ServiceTicketSummary {
     customerId: row.customerId,
     customerName: row.customerName ?? "",
     customerAccountName: row.customerAccountName,
+    customerAccountPhone: row.customerAccountPhone,
     customerProfileName: row.customerProfileName ?? row.customerName,
+    customerProfilePhone: row.customerProfilePhone,
     assistantId: row.assistantId,
     assistantName: row.assistantName,
     ticketNo: row.ticketNo,
@@ -224,7 +228,9 @@ export async function findServiceTickets(
       ticket: serviceTickets,
       customerName: customers.fullName,
       customerAccountName: customerAccounts.accountName,
+      customerAccountPhone: customerAccounts.phone,
       customerProfileName: customers.fullName,
+      customerProfilePhone: customers.phone,
       assistantName: userProfiles.displayName,
       itemCount: sql<number>`(
         select count(*)::int from ${ticketItems}
@@ -337,6 +343,9 @@ function buildServiceTicketFilters(input: ServiceTicketListInput): SQL[] {
         sql`${serviceTickets.ticketNo} ilike ${query} escape '\\'`,
         sql`${serviceTickets.ticketType}::text ilike ${query} escape '\\'`,
         sql`${customers.fullName} ilike ${query} escape '\\'`,
+        sql`${customers.phone} ilike ${query} escape '\\'`,
+        sql`${customerAccounts.accountName} ilike ${query} escape '\\'`,
+        sql`${customerAccounts.phone} ilike ${query} escape '\\'`,
       )!,
     );
   }
@@ -376,7 +385,9 @@ export async function findServiceTicketById(
       ticket: serviceTickets,
       customerName: customers.fullName,
       customerAccountName: customerAccounts.accountName,
+      customerAccountPhone: customerAccounts.phone,
       customerProfileName: customers.fullName,
+      customerProfilePhone: customers.phone,
       assistantName: userProfiles.displayName,
       itemCount: sql<number>`(
         select count(*)::int from ${ticketItems}

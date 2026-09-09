@@ -5,6 +5,17 @@ import { usePosOfflineWrites } from "@/features/offline/lib";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Label,
+  Textarea,
+} from "@cleanhub/ui";
 
 import {
   TICKET_STATUS_LABELS,
@@ -44,10 +55,6 @@ export function TicketStatusDialog({
   const [cancelReason, setCancelReason] = useState("");
   const { changeTicketStatus } = usePosOfflineWrites();
 
-  if (!open) {
-    return null;
-  }
-
   const reachable = TICKET_STATUS_TRANSITIONS[current];
 
   function choose(next: ServiceTicketStatus) {
@@ -78,33 +85,16 @@ export function TicketStatusDialog({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/35 p-4"
-      onClick={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
+    <Dialog
+      onOpenChange={(nextOpen) => !nextOpen && !isPending && onClose()}
+      open={open}
     >
-      <div className="max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto overscroll-contain rounded-xl border bg-background text-foreground shadow-2xl">
-        <div className="flex items-start justify-between border-b p-5">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">
-              更新工单状态
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              状态更新会记录操作人员与时间。
-            </p>
-          </div>
-          <button
-            className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            onClick={onClose}
-            type="button"
-          >
-            ×
-          </button>
-        </div>
-        <div className="grid grid-cols-2 gap-3 p-5">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>更新工单状态</DialogTitle>
+          <DialogDescription>状态更新会记录操作人员与时间。</DialogDescription>
+        </DialogHeader>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {reachable.length === 0 ? (
             <p className="col-span-2 rounded-md bg-muted/50 p-4 text-sm text-muted-foreground">
               当前状态「{TICKET_STATUS_LABELS[current]}」为终态，无法继续流转。
@@ -113,16 +103,13 @@ export function TicketStatusDialog({
             reachable.map((next) => {
               const isPickup = isPickupTransition(next);
               return (
-                <button
-                  className={`flex h-12 items-center justify-between rounded-md border px-4 text-sm font-semibold transition ${
-                    isPending
-                      ? "cursor-wait text-muted-foreground opacity-60"
-                      : "text-foreground hover:bg-accent hover:text-accent-foreground"
-                  }`}
+                <Button
+                  className="h-12 justify-between"
                   disabled={isPending}
                   key={next}
                   onClick={() => choose(next)}
                   type="button"
+                  variant="outline"
                 >
                   <span className="flex items-center gap-2">
                     {TICKET_STATUS_LABELS[next]}
@@ -135,34 +122,33 @@ export function TicketStatusDialog({
                   <TicketBadge tone={TICKET_STATUS_TONES[next]}>
                     {TICKET_STATUS_LABELS[next]}
                   </TicketBadge>
-                </button>
+                </Button>
               );
             })
           )}
         </div>
         {reachable.includes("cancelled") ? (
-          <label className="mx-5 mb-5 grid gap-2 text-sm font-semibold text-foreground">
-            取消原因（选择取消时必填）
-            <textarea
-              className="min-h-20 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          <div className="grid gap-2">
+            <Label htmlFor="ticket-cancel-reason">
+              取消原因（选择取消时必填）
+            </Label>
+            <Textarea
+              className="min-h-20"
               disabled={isPending}
+              id="ticket-cancel-reason"
               maxLength={500}
               onChange={(event) => setCancelReason(event.target.value)}
               value={cancelReason}
             />
-          </label>
+          </div>
         ) : null}
-        <div className="flex justify-end border-t p-4">
-          <button
-            className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
-            onClick={onClose}
-            type="button"
-          >
+        <DialogFooter>
+          <Button onClick={onClose} type="button" variant="outline">
             取消
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

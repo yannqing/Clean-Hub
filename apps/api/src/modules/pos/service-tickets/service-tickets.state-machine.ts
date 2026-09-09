@@ -63,7 +63,10 @@ export function requiresSettlementCheck(
  *   washing       → done | exception
  *   done          → ready_to_pick | washing  (rework)
  *   exception     → washing                  (retry)
- *   ready_to_pick → (terminal)
+ *   ready_to_pick → washing | exception      (problem found at the shelf)
+ *
+ * An item on the pickup shelf can still turn out to be unfinished, so
+ * ready_to_pick is not terminal: staff can send it back for rework or flag it.
  */
 const ITEM_TRANSITIONS: Record<ServiceTicketItemStatus, ServiceTicketItemStatus[]> =
   {
@@ -71,7 +74,7 @@ const ITEM_TRANSITIONS: Record<ServiceTicketItemStatus, ServiceTicketItemStatus[
     washing: ["done", "exception"],
     done: ["ready_to_pick", "washing"],
     exception: ["washing"],
-    ready_to_pick: [],
+    ready_to_pick: ["washing", "exception"],
   };
 
 export function isAllowedItemTransition(
@@ -79,4 +82,62 @@ export function isAllowedItemTransition(
   to: ServiceTicketItemStatus,
 ): boolean {
   return ITEM_TRANSITIONS[from].includes(to);
+}
+
+/**
+ * Ticket statuses whose items are still being worked on. Outside these the
+ * ticket is a draft, cancelled, or already handed over, and its items must not
+ * move: a draft has not been confirmed with the customer yet, and the other two
+ * are settled history.
+ */
+const ITEM_WORKABLE_TICKET_STATUSES: ReadonlySet<ServiceTicketStatus> =
+  new Set<ServiceTicketStatus>([
+    "pending",
+    "in_progress",
+    "ready_to_pick",
+    "exception",
+  ]);
+
+export function canWorkTicketItems(status: ServiceTicketStatus): boolean {
+  return ITEM_WORKABLE_TICKET_STATUSES.has(status);
+}
+
+/**
+ * The ticket status implied by its items, or null when the ticket should stay
+ * where it is. Every item ready means the whole ticket is ready; any item in
+ * exception raises the ticket so the problem is visible on the board.
+ *
+ * Returns the full path to walk, because a ticket sitting in `pending` cannot
+ * jump straight to `ready_to_pick` — it has to pass through `in_progress`.
+ */
+export function resolveTicketStatusFromItems(input: {
+  ticketStatus: ServiceTicketStatus;
+  itemStatuses: readonly ServiceTicketItemStatus[];
+}): ServiceTicketStatus[] {
+  const { itemStatuses, ticketStatus } = input;
+  if (itemStatuses.length === 0) return [];
+  if (!canWorkTicketItems(ticketStatus)) return [];
+
+  const target: ServiceTicketStatus | null = itemStatuses.some(
+    (status) => status === "exception",
+  )
+    ? "exception"
+    : itemStatuses.every((status) => status === "ready_to_pick")
+      ? "ready_to_pick"
+      : null;
+
+  if (!target || target === ticketStatus) return [];
+
+  if (isAllowedTicketTransition(ticketStatus, target)) return [target];
+
+  // pending has no direct edge to ready_to_pick or exception; both are reached
+  // once the ticket is actually in progress.
+  if (
+    ticketStatus === "pending" &&
+    isAllowedTicketTransition("in_progress", target)
+  ) {
+    return ["in_progress", target];
+  }
+
+  return [];
 }

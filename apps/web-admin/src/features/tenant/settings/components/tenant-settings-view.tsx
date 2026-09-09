@@ -235,6 +235,7 @@ export function TenantSettingsView() {
             {
               detail: {
                 defaultLanguage: result.data.defaultLanguage,
+                tenantName: result.data.tenantName,
                 timezone: result.data.timezone,
               },
             },

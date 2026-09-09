@@ -3,6 +3,7 @@
 import { useTranslation } from "@cleanhub/i18n/react";
 import { useState } from "react";
 import type { PosTicketLabelField } from "@cleanhub/domain/receipt";
+import { Button, Card, CardContent, CardHeader, CardTitle } from "@cleanhub/ui";
 
 import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
@@ -81,21 +82,27 @@ export function TicketDetailView({
         { label: ticketCode },
       ]
     : fromIntake
-    ? [
-        { href: buildIntakeReturnPath(intakeQuery), label: "客户接待" },
-        { href: customerDetailHref, label: ticket.customerName || "客户档案" },
-        { label: ticketCode },
-      ]
-    : fromCustomer
       ? [
-          { href: posRoutes.customers, label: "客户管理" },
+          { href: buildIntakeReturnPath(intakeQuery), label: "客户接待" },
           {
             href: customerDetailHref,
             label: ticket.customerName || "客户档案",
           },
           { label: ticketCode },
         ]
-      : [{ href: posRoutes.tickets, label: "工单管理" }, { label: ticketCode }];
+      : fromCustomer
+        ? [
+            { href: posRoutes.customers, label: "客户管理" },
+            {
+              href: customerDetailHref,
+              label: ticket.customerName || "客户档案",
+            },
+            { label: ticketCode },
+          ]
+        : [
+            { href: posRoutes.tickets, label: "工单管理" },
+            { label: ticketCode },
+          ];
   const itemLines = (ticket.items ?? []).flatMap((item) => {
     const measurement =
       item.pricingUnit === "per_kg"
@@ -149,7 +156,7 @@ export function TicketDetailView({
     <section className="mx-auto w-full max-w-[1080px] space-y-4 pb-12">
       <PosBreadcrumb items={breadcrumbItems} />
 
-      <section className="overflow-hidden border-y bg-background">
+      <Card className="gap-0 overflow-hidden py-0">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <TicketStatusBadge status={ticket.ticketStatus} />
@@ -171,21 +178,23 @@ export function TicketDetailView({
               relatedOrders={relatedOrders}
               ticket={ticket}
             />
-            <button
-              className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground hover:bg-accent"
+            <Button
               onClick={() => setStatusOpen(true)}
+              size="lg"
               type="button"
+              variant="outline"
             >
               更新工单状态
-            </button>
-            <button
-              className="flex h-11 items-center gap-2 rounded-md border border-destructive/30 px-4 text-sm font-semibold text-destructive hover:bg-destructive/10"
+            </Button>
+            <Button
               onClick={() => setDeleteOpen(true)}
+              size="lg"
               type="button"
+              variant="destructive"
             >
               <Icon className="h-4 w-4" name="trash" />
               删除工单
-            </button>
+            </Button>
           </div>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-4">
@@ -201,7 +210,11 @@ export function TicketDetailView({
           />
           <HeaderMetric
             label="预计取件"
-            value={formatTicketDateTime(ticket.expectedPickupAt, locale, timeZone)}
+            value={formatTicketDateTime(
+              ticket.expectedPickupAt,
+              locale,
+              timeZone,
+            )}
             note={
               ticket.expectedPickupAt ? "请按时完成" : TICKET_EMPTY_PLACEHOLDER
             }
@@ -212,7 +225,7 @@ export function TicketDetailView({
             note="项目金额合计"
           />
         </div>
-      </section>
+      </Card>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         {/* Left column: basic info / editor + items */}
@@ -223,50 +236,65 @@ export function TicketDetailView({
               ticket={ticket}
             />
           ) : (
-            <section className="border-y bg-background p-5">
-              <div className="flex items-center justify-between">
-                <h2 className="font-semibold text-foreground">工单信息</h2>
-                <button
-                  className="flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-semibold text-foreground hover:bg-accent"
+            <Card>
+              <CardHeader className="flex-row items-center justify-between">
+                <CardTitle className="text-base">工单信息</CardTitle>
+                <Button
                   onClick={() => setEditing(true)}
+                  size="sm"
                   type="button"
+                  variant="outline"
                 >
                   <Icon className="h-4 w-4" name="square-pen" />
                   修改工单
-                </button>
-              </div>
-              <dl className="mt-4 grid grid-cols-2 gap-x-8 gap-y-4">
-                <Detail
-                  label="工单类型"
-                  value={TICKET_TYPE_LABELS[ticket.ticketType]}
-                />
-                <Detail
-                  label="优先级"
-                  value={TICKET_PRIORITY_LABELS[ticket.priority]}
-                />
-                <Detail
-                  label="来源渠道"
-                  value={TICKET_SOURCE_LABELS[ticket.sourceChannel]}
-                />
-                <Detail
-                  label="预计取件"
-                  value={formatTicketDateTime(ticket.expectedPickupAt, locale, timeZone)}
-                />
-                <Detail
-                  label="完成时间"
-                  value={formatTicketDateTime(ticket.completedAt, locale, timeZone)}
-                />
-                <Detail
-                  label="取消时间"
-                  value={formatTicketDateTime(ticket.cancelledAt, locale, timeZone)}
-                />
-                <Detail
-                  label="备注"
-                  value={ticket.remark ?? TICKET_EMPTY_PLACEHOLDER}
-                  wide
-                />
-              </dl>
-            </section>
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid grid-cols-2 gap-x-8 gap-y-4">
+                  <Detail
+                    label="工单类型"
+                    value={TICKET_TYPE_LABELS[ticket.ticketType]}
+                  />
+                  <Detail
+                    label="优先级"
+                    value={TICKET_PRIORITY_LABELS[ticket.priority]}
+                  />
+                  <Detail
+                    label="来源渠道"
+                    value={TICKET_SOURCE_LABELS[ticket.sourceChannel]}
+                  />
+                  <Detail
+                    label="预计取件"
+                    value={formatTicketDateTime(
+                      ticket.expectedPickupAt,
+                      locale,
+                      timeZone,
+                    )}
+                  />
+                  <Detail
+                    label="完成时间"
+                    value={formatTicketDateTime(
+                      ticket.completedAt,
+                      locale,
+                      timeZone,
+                    )}
+                  />
+                  <Detail
+                    label="取消时间"
+                    value={formatTicketDateTime(
+                      ticket.cancelledAt,
+                      locale,
+                      timeZone,
+                    )}
+                  />
+                  <Detail
+                    label="备注"
+                    value={ticket.remark ?? TICKET_EMPTY_PLACEHOLDER}
+                    wide
+                  />
+                </dl>
+              </CardContent>
+            </Card>
           )}
 
           <TicketItemEditor
@@ -284,23 +312,27 @@ export function TicketDetailView({
 
         {/* Right column: customer, related orders, status meta */}
         <aside className="sticky top-4 space-y-5 self-start">
-          <section className="border-y bg-background p-5">
-            <h2 className="font-semibold text-foreground">客户与取件信息</h2>
-            <dl className="mt-4 space-y-3">
-              <Detail
-                label="客户姓名"
-                value={ticket.customerProfileName ?? ticket.customerName}
-              />
-              <Detail
-                label="所属账户"
-                value={ticket.customerAccountName ?? ticket.customerName}
-              />
-              <Detail
-                label="接待店员"
-                value={ticket.assistantName ?? TICKET_EMPTY_PLACEHOLDER}
-              />
-            </dl>
-          </section>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">客户与取件信息</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="space-y-3">
+                <Detail
+                  label="客户姓名"
+                  value={ticket.customerProfileName ?? ticket.customerName}
+                />
+                <Detail
+                  label="所属账户"
+                  value={ticket.customerAccountName ?? ticket.customerName}
+                />
+                <Detail
+                  label="接待店员"
+                  value={ticket.assistantName ?? TICKET_EMPTY_PLACEHOLDER}
+                />
+              </dl>
+            </CardContent>
+          </Card>
 
           <TicketRelatedOrders
             orderDetailHref={(orderId) =>
@@ -313,31 +345,43 @@ export function TicketDetailView({
             orders={relatedOrders ?? []}
           />
 
-          <section className="border-y bg-background p-5">
-            <h2 className="font-semibold text-foreground">状态与时间</h2>
-            <dl className="mt-4 space-y-3">
-              <DetailRow
-                label="当前状态"
-                value={<TicketStatusBadge status={ticket.ticketStatus} />}
-              />
-              <DetailRow
-                label="优先级"
-                value={<TicketPriorityBadge priority={ticket.priority} />}
-              />
-              <DetailRow
-                label="来源"
-                value={<TicketSourceBadge source={ticket.sourceChannel} />}
-              />
-              <Detail
-                label="创建时间"
-                value={formatTicketDateTime(ticket.createdAt, locale, timeZone)}
-              />
-              <Detail
-                label="最后更新"
-                value={formatTicketDateTime(ticket.updatedAt, locale, timeZone)}
-              />
-            </dl>
-          </section>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">状态与时间</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="space-y-3">
+                <DetailRow
+                  label="当前状态"
+                  value={<TicketStatusBadge status={ticket.ticketStatus} />}
+                />
+                <DetailRow
+                  label="优先级"
+                  value={<TicketPriorityBadge priority={ticket.priority} />}
+                />
+                <DetailRow
+                  label="来源"
+                  value={<TicketSourceBadge source={ticket.sourceChannel} />}
+                />
+                <Detail
+                  label="创建时间"
+                  value={formatTicketDateTime(
+                    ticket.createdAt,
+                    locale,
+                    timeZone,
+                  )}
+                />
+                <Detail
+                  label="最后更新"
+                  value={formatTicketDateTime(
+                    ticket.updatedAt,
+                    locale,
+                    timeZone,
+                  )}
+                />
+              </dl>
+            </CardContent>
+          </Card>
         </aside>
       </div>
 

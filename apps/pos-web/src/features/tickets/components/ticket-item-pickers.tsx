@@ -24,6 +24,7 @@ import { formatTicketMoney } from "../constants";
 type PickerOption = {
   value: string;
   label: string;
+  swatch?: string;
 };
 
 const servicePickerCopy = {
@@ -286,8 +287,11 @@ export function TicketAttributePicker({
           role="combobox"
           type="button"
         >
-          <span className={cn("truncate", !value && "text-muted-foreground")}>
+          <span className="flex min-w-0 items-center gap-2">
+            {selected?.swatch ? <ColorSwatch swatch={selected.swatch} /> : null}
+            <span className={cn("truncate", !value && "text-muted-foreground")}>
             {selected?.localizedLabel || value || placeholder}
+            </span>
           </span>
           <Icon
             className="ml-2 size-4 shrink-0 text-muted-foreground"
@@ -340,6 +344,7 @@ export function TicketAttributePicker({
                       )}
                       name="check"
                     />
+                    {option.swatch ? <ColorSwatch swatch={option.swatch} /> : null}
                     <span className="truncate">{option.localizedLabel}</span>
                   </ComboboxItem>
                 ))}
@@ -365,6 +370,16 @@ export function TicketAttributePicker({
         </Command>
       </PopoverContent>
     </Popover>
+  );
+}
+
+function ColorSwatch({ swatch }: { swatch: string }) {
+  return (
+    <span
+      aria-hidden
+      className="size-5 shrink-0 rounded-full border border-black/15 shadow-sm"
+      style={{ background: swatch }}
+    />
   );
 }
 

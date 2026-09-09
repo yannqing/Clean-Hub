@@ -1689,7 +1689,6 @@ export const tenantMessagesFr: TenantMessages = {
         "Prix de référence facultatif affiché comme prix d'origine ; il doit être supérieur au prix standard.",
       costPriceHint:
         "Coût interne facultatif utilisé pour l'analyse de marge et jamais affiché aux clients.",
-      changeDefaultCurrency: "Modifier la devise par défaut",
       displayOrderHint:
         "Les numéros inférieurs apparaissent plus tôt dans le catalogue de services.",
       pricingHint:

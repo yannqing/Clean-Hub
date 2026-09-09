@@ -1664,7 +1664,6 @@ export const tenantMessagesEn: TenantMessages = {
         "Optional reference price shown as the original price; it must be higher than the standard price.",
       costPriceHint:
         "Optional internal cost used for margin analysis and never shown to customers.",
-      changeDefaultCurrency: "Change default currency",
       displayOrderHint: "Lower numbers appear earlier in the service catalog.",
       pricingHint:
         "The standard price uses the tenant default currency. Its amount can be updated from the service catalog; currency is managed in settings.",

@@ -38,6 +38,7 @@ export const TICKET_MAX_PAGE_SIZE = 100;
 
 export const TICKET_COLUMN_KEYS = [
   "ticket",
+  "account",
   "customer",
   "type",
   "status",
@@ -49,6 +50,7 @@ export type TicketColumnKey = (typeof TICKET_COLUMN_KEYS)[number];
 
 export const TICKET_COLUMN_LABELS: Record<TicketColumnKey, string> = {
   ticket: "工单",
+  account: "账户",
   customer: "客户",
   type: "类型",
   status: "状态",

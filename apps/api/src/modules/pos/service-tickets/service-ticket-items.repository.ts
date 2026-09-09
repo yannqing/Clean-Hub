@@ -308,6 +308,29 @@ export async function changeServiceTicketItemStatusRecord(
   return { updated: false, exists: Boolean(existing) };
 }
 
+/**
+ * Live item statuses for a ticket, used to derive the ticket's own status.
+ * Soft-deleted items are excluded so a removed garment cannot hold the ticket
+ * back from being ready.
+ */
+export async function findTicketItemStatuses(
+  db: Database,
+  input: { tenantId: string; ticketId: string },
+): Promise<ServiceTicketItemStatus[]> {
+  const rows = await db
+    .select({ itemStatus: ticketItems.itemStatus })
+    .from(ticketItems)
+    .where(
+      and(
+        eq(ticketItems.ticketId, input.ticketId),
+        eq(ticketItems.tenantId, input.tenantId),
+        isNull(ticketItems.deletedAt),
+      ),
+    );
+
+  return rows.map((row) => row.itemStatus);
+}
+
 export async function softDeleteServiceTicketItemRecord(
   db: Database,
   input: {

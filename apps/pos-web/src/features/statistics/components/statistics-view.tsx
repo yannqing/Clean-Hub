@@ -20,6 +20,14 @@ import {
 
 import type { PosStatisticsOverview } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@cleanhub/ui";
 
 import {
   Icon,
@@ -161,24 +169,26 @@ function MetricCard({
   value: string;
 }) {
   return (
-    <article className="flex min-h-20 items-center gap-3 rounded-md border bg-background px-3 py-2.5">
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
-        <Icon className="h-4 w-4" name={icon} />
-      </span>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-medium text-muted-foreground">
-            {label}
-          </p>
-          <p className="mt-0.5 truncate text-lg font-semibold text-foreground">
-            {value}
-          </p>
-          <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-            {helper}
-          </p>
+    <Card className="min-h-20 gap-0 py-0 shadow-none">
+      <CardContent className="flex items-center gap-3 px-3 py-2.5">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+          <Icon className="h-4 w-4" name={icon} />
+        </span>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-muted-foreground">
+              {label}
+            </p>
+            <p className="mt-0.5 truncate text-lg font-semibold text-foreground">
+              {value}
+            </p>
+            <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
+              {helper}
+            </p>
+          </div>
         </div>
-      </div>
-    </article>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -263,13 +273,13 @@ function ChartCard({
   title: string;
 }) {
   return (
-    <section className="border-y bg-background p-5">
-      <div>
-        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
-      </div>
-      {children}
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm">{title}</CardTitle>
+        <CardDescription className="text-xs">{description}</CardDescription>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   );
 }
 
@@ -943,191 +953,198 @@ function CustomerPanel({
   }));
 
   return (
-    <section className="border-y bg-background p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-foreground">
-            客户运营概览
-          </h3>
-          <p className="mt-1 text-xs text-muted-foreground">
+    <Card>
+      <CardHeader className="flex-row items-start justify-between">
+        <div className="grid gap-1.5">
+          <CardTitle className="text-sm">客户运营概览</CardTitle>
+          <CardDescription className="text-xs">
             账户、档案、服务参与度与新增趋势
-          </p>
+          </CardDescription>
         </div>
         <Icon className="h-4 w-4 text-muted-foreground" name="users" />
-      </div>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 lg:grid-cols-3">
+          <Card className="gap-0 bg-muted/30 py-0 shadow-none">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    客户账户
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-foreground">
+                    {formatNumber(totalCount, locale)}
+                  </p>
+                </div>
+                <Badge variant="secondary">
+                  今日 +{formatNumber(todayNewCount, locale)}
+                </Badge>
+              </div>
+              <div className="mt-4">
+                <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
+                  <span>启用账户</span>
+                  <span>{formatPercent(activeAccountPercent, locale)}</span>
+                </div>
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      backgroundColor: CHART_COLORS.customers,
+                      width: `${activeAccountPercent}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p className="text-muted-foreground">启用</p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {formatNumber(activeCount, locale)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">停用</p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {formatNumber(disabledCount, locale)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        <div className="rounded-md border bg-muted/30 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">
-                客户账户
-              </p>
-              <p className="mt-1 text-2xl font-bold text-foreground">
-                {formatNumber(totalCount, locale)}
-              </p>
-            </div>
-            <span className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground">
-              今日 +{formatNumber(todayNewCount, locale)}
-            </span>
-          </div>
-          <div className="mt-4">
-            <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
-              <span>启用账户</span>
-              <span>{formatPercent(activeAccountPercent, locale)}</span>
-            </div>
-            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  backgroundColor: CHART_COLORS.customers,
-                  width: `${activeAccountPercent}%`,
-                }}
-              />
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <p className="text-muted-foreground">启用</p>
-              <p className="mt-1 font-semibold text-foreground">
-                {formatNumber(activeCount, locale)}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">停用</p>
-              <p className="mt-1 font-semibold text-foreground">
-                {formatNumber(disabledCount, locale)}
-              </p>
-            </div>
-          </div>
+          <Card className="gap-0 bg-muted/30 py-0 shadow-none">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    客户档案
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-foreground">
+                    {formatNumber(profileCount, locale)}
+                  </p>
+                </div>
+                <Badge variant="secondary">
+                  今日 +{formatNumber(todayNewProfileCount, locale)}
+                </Badge>
+              </div>
+              <div className="mt-4">
+                <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
+                  <span>可服务档案</span>
+                  <span>{formatPercent(activeProfilePercent, locale)}</span>
+                </div>
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      backgroundColor: CHART_COLORS.paid,
+                      width: `${activeProfilePercent}%`,
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p className="text-muted-foreground">启用档案</p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {formatNumber(activeProfileCount, locale)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">停用档案</p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {formatNumber(disabledProfileCount, locale)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="gap-0 bg-muted/30 py-0 shadow-none">
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    服务参与客户
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-foreground">
+                    {formatNumber(engagedCustomerCount, locale)}
+                  </p>
+                </div>
+                <Badge variant="secondary">
+                  {formatPercent(engagementPercent, locale)}
+                </Badge>
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <p className="text-muted-foreground">有订单</p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {formatNumber(orderedCustomerCount, locale)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">有工单</p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {formatNumber(ticketedCustomerCount, locale)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">复购客户</p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {formatNumber(repeatOrderCustomerCount, locale)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">多次工单</p>
+                  <p className="mt-1 font-semibold text-foreground">
+                    {formatNumber(repeatTicketCustomerCount, locale)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4">
+                <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
+                  <span>订单复购率</span>
+                  <span>{formatPercent(repeatOrderPercent, locale)}</span>
+                </div>
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      backgroundColor: CHART_COLORS.risk,
+                      width: `${repeatOrderPercent}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        <div className="rounded-md border bg-muted/30 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">
-                客户档案
-              </p>
-              <p className="mt-1 text-2xl font-bold text-foreground">
-                {formatNumber(profileCount, locale)}
-              </p>
+        <Card className="mt-4 gap-0 bg-muted/30 py-0 shadow-none">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h4 className="text-xs font-semibold text-foreground">
+                  近 7 天新增客户
+                </h4>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  按客户账户创建日期统计
+                </p>
+              </div>
+              <Badge variant="secondary">
+                {formatCountUnit(
+                  trendData.reduce((sum, item) => sum + item.count, 0),
+                  locale,
+                  "个账户",
+                  "accounts",
+                  "comptes",
+                )}
+              </Badge>
             </div>
-            <span className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground">
-              今日 +{formatNumber(todayNewProfileCount, locale)}
-            </span>
-          </div>
-          <div className="mt-4">
-            <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
-              <span>可服务档案</span>
-              <span>{formatPercent(activeProfilePercent, locale)}</span>
-            </div>
-            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  backgroundColor: CHART_COLORS.paid,
-                  width: `${activeProfilePercent}%`,
-                }}
-              />
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <p className="text-muted-foreground">启用档案</p>
-              <p className="mt-1 font-semibold text-foreground">
-                {formatNumber(activeProfileCount, locale)}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">停用档案</p>
-              <p className="mt-1 font-semibold text-foreground">
-                {formatNumber(disabledProfileCount, locale)}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-md border bg-muted/30 p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">
-                服务参与客户
-              </p>
-              <p className="mt-1 text-2xl font-bold text-foreground">
-                {formatNumber(engagedCustomerCount, locale)}
-              </p>
-            </div>
-            <span className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground">
-              {formatPercent(engagementPercent, locale)}
-            </span>
-          </div>
-          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-            <div>
-              <p className="text-muted-foreground">有订单</p>
-              <p className="mt-1 font-semibold text-foreground">
-                {formatNumber(orderedCustomerCount, locale)}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">有工单</p>
-              <p className="mt-1 font-semibold text-foreground">
-                {formatNumber(ticketedCustomerCount, locale)}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">复购客户</p>
-              <p className="mt-1 font-semibold text-foreground">
-                {formatNumber(repeatOrderCustomerCount, locale)}
-              </p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">多次工单</p>
-              <p className="mt-1 font-semibold text-foreground">
-                {formatNumber(repeatTicketCustomerCount, locale)}
-              </p>
-            </div>
-          </div>
-          <div className="mt-4">
-            <div className="flex items-center justify-between gap-3 text-xs font-medium text-muted-foreground">
-              <span>订单复购率</span>
-              <span>{formatPercent(repeatOrderPercent, locale)}</span>
-            </div>
-            <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full"
-                style={{
-                  backgroundColor: CHART_COLORS.risk,
-                  width: `${repeatOrderPercent}%`,
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-md border bg-muted/30 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h4 className="text-xs font-semibold text-foreground">
-              近 7 天新增客户
-            </h4>
-            <p className="mt-1 text-xs text-muted-foreground">
-              按客户账户创建日期统计
-            </p>
-          </div>
-          <span className="rounded-md bg-background px-2 py-1 text-xs font-semibold text-foreground">
-            {formatCountUnit(
-              trendData.reduce((sum, item) => sum + item.count, 0),
-              locale,
-              "个账户",
-              "accounts",
-              "comptes",
-            )}
-          </span>
-        </div>
-        <CustomerTrendChart data={trendData} locale={locale} />
-      </div>
-    </section>
+            <CustomerTrendChart data={trendData} locale={locale} />
+          </CardContent>
+        </Card>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1140,17 +1157,19 @@ function EmptyState() {
         icon="chart"
         title="统计数据"
       />
-      <div className="border-y border-dashed bg-background p-12 text-center">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-md bg-muted text-muted-foreground">
-          <Icon className="h-6 w-6" name="chart" />
-        </div>
-        <p className="mt-3 text-sm font-medium text-foreground">
-          还没有可展示的统计信息
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          产生订单或工单后，这里会显示经营概况。
-        </p>
-      </div>
+      <Card className="border-dashed shadow-none">
+        <CardContent className="p-12 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-md bg-muted text-muted-foreground">
+            <Icon className="h-6 w-6" name="chart" />
+          </div>
+          <p className="mt-3 text-sm font-medium text-foreground">
+            还没有可展示的统计信息
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            产生订单或工单后，这里会显示经营概况。
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -1192,22 +1211,26 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
       <PosPageHeader
         actions={
           <div className="grid min-w-[260px] grid-cols-2 gap-3">
-            <div className="rounded-md border bg-background px-3 py-2 text-right">
-              <p className="text-xs font-medium text-muted-foreground">
-                今日销售额
-              </p>
-              <p className="mt-0.5 truncate text-base font-semibold text-foreground">
-                {formatCurrency(totalAmount, locale, currency)}
-              </p>
-            </div>
-            <div className="rounded-md border bg-background px-3 py-2 text-right">
-              <p className="text-xs font-medium text-muted-foreground">
-                收款完成率
-              </p>
-              <p className="mt-0.5 text-base font-semibold text-foreground">
-                {formatPercent(paidPercent, locale)}
-              </p>
-            </div>
+            <Card className="gap-0 py-0 text-right shadow-none">
+              <CardContent className="px-3 py-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  今日销售额
+                </p>
+                <p className="mt-0.5 truncate text-base font-semibold text-foreground">
+                  {formatCurrency(totalAmount, locale, currency)}
+                </p>
+              </CardContent>
+            </Card>
+            <Card className="gap-0 py-0 text-right shadow-none">
+              <CardContent className="px-3 py-2">
+                <p className="text-xs font-medium text-muted-foreground">
+                  收款完成率
+                </p>
+                <p className="mt-0.5 text-base font-semibold text-foreground">
+                  {formatPercent(paidPercent, locale)}
+                </p>
+              </CardContent>
+            </Card>
           </div>
         }
         description="查看门店经营数据：订单、工单和客户统计。"
@@ -1221,9 +1244,9 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
           icon="receipt"
           title="订单统计"
           action={
-            <span className="inline-flex h-8 items-center rounded-md border bg-background px-3 text-xs font-semibold text-muted-foreground">
+            <Badge className="h-8 px-3" variant="outline">
               {formatCountUnit(orderCount, locale, "单", "orders", "commandes")}
-            </span>
+            </Badge>
           }
         />
 
@@ -1277,7 +1300,7 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
           icon="clipboard-list"
           title="工单统计"
           action={
-            <span className="inline-flex h-8 items-center rounded-md border bg-background px-3 text-xs font-semibold text-muted-foreground">
+            <Badge className="h-8 px-3" variant="outline">
               {formatCountUnit(
                 totalTicketCount,
                 locale,
@@ -1285,7 +1308,7 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
                 "tickets",
                 "tickets",
               )}
-            </span>
+            </Badge>
           }
         />
 

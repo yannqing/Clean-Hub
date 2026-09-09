@@ -194,7 +194,7 @@ export function PosShell({
                       : label
                   }
                   className={cn(
-                    "group relative flex h-8 items-center gap-2 rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                    "group relative flex min-h-12 items-center gap-3 rounded-lg px-3 text-base font-semibold transition-colors",
                     "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                     active
@@ -206,13 +206,13 @@ export function PosShell({
                 >
                   <span
                     className={cn(
-                      "absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity",
+                      "absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity",
                       active && "opacity-100",
                     )}
                   />
                   <Icon
                     className={cn(
-                      "h-4 w-4 text-muted-foreground transition-colors",
+                      "size-5 shrink-0 text-muted-foreground transition-colors",
                       active && "text-sidebar-accent-foreground",
                     )}
                     name={item.icon}
@@ -235,7 +235,7 @@ export function PosShell({
             <Link
               aria-current={settingsActive ? "page" : undefined}
               className={cn(
-                "relative flex h-9 items-center gap-2.5 rounded-md px-2.5 text-[13px] font-medium transition-colors",
+                "relative flex min-h-12 items-center gap-3 rounded-lg px-3 text-base font-semibold transition-colors",
                 "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                 settingsActive
@@ -246,13 +246,13 @@ export function PosShell({
             >
               <span
                 className={cn(
-                  "absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity",
+                  "absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-primary opacity-0 transition-opacity",
                   settingsActive && "opacity-100",
                 )}
               />
               <Icon
                 className={cn(
-                  "h-4 w-4 text-muted-foreground",
+                  "size-5 shrink-0 text-muted-foreground",
                   settingsActive && "text-sidebar-accent-foreground",
                 )}
                 name="settings"

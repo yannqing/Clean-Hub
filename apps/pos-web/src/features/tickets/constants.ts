@@ -129,39 +129,40 @@ export const TICKET_TYPE_LABELS: Record<ServiceTicketType, string> = {
 export const ITEM_COLOR_OPTIONS: ReadonlyArray<{
   value: string;
   label: string;
+  swatch: string;
 }> = [
   // 基础色
-  { value: "白色", label: "白色" },
-  { value: "黑色", label: "黑色" },
-  { value: "灰色", label: "灰色" },
-  { value: "米色", label: "米色" },
+  { value: "白色", label: "白色", swatch: "#ffffff" },
+  { value: "黑色", label: "黑色", swatch: "#171717" },
+  { value: "灰色", label: "灰色", swatch: "#737373" },
+  { value: "米色", label: "米色", swatch: "#d6c7aa" },
   // 彩色
-  { value: "红色", label: "红色" },
-  { value: "蓝色", label: "蓝色" },
-  { value: "绿色", label: "绿色" },
-  { value: "黄色", label: "黄色" },
-  { value: "紫色", label: "紫色" },
-  { value: "粉色", label: "粉色" },
-  { value: "橙色", label: "橙色" },
-  { value: "棕色", label: "棕色" },
+  { value: "红色", label: "红色", swatch: "#dc2626" },
+  { value: "蓝色", label: "蓝色", swatch: "#2563eb" },
+  { value: "绿色", label: "绿色", swatch: "#16a34a" },
+  { value: "黄色", label: "黄色", swatch: "#eab308" },
+  { value: "紫色", label: "紫色", swatch: "#9333ea" },
+  { value: "粉色", label: "粉色", swatch: "#ec4899" },
+  { value: "橙色", label: "橙色", swatch: "#f97316" },
+  { value: "棕色", label: "棕色", swatch: "#92400e" },
   // 深色系
-  { value: "藏青", label: "藏青" },
-  { value: "深灰", label: "深灰" },
-  { value: "深蓝", label: "深蓝" },
-  { value: "深绿", label: "深绿" },
-  { value: "酒红", label: "酒红" },
-  { value: "驼色", label: "驼色" },
+  { value: "藏青", label: "藏青", swatch: "#172554" },
+  { value: "深灰", label: "深灰", swatch: "#404040" },
+  { value: "深蓝", label: "深蓝", swatch: "#1e3a8a" },
+  { value: "深绿", label: "深绿", swatch: "#14532d" },
+  { value: "酒红", label: "酒红", swatch: "#881337" },
+  { value: "驼色", label: "驼色", swatch: "#b08968" },
   // 浅色系
-  { value: "浅蓝", label: "浅蓝" },
-  { value: "浅粉", label: "浅粉" },
-  { value: "浅灰", label: "浅灰" },
-  { value: "奶白", label: "奶白" },
-  { value: "杏色", label: "杏色" },
+  { value: "浅蓝", label: "浅蓝", swatch: "#93c5fd" },
+  { value: "浅粉", label: "浅粉", swatch: "#fbcfe8" },
+  { value: "浅灰", label: "浅灰", swatch: "#d4d4d4" },
+  { value: "奶白", label: "奶白", swatch: "#fffaf0" },
+  { value: "杏色", label: "杏色", swatch: "#f5d0a9" },
   // 花色
-  { value: "花色", label: "花色" },
-  { value: "格子", label: "格子" },
-  { value: "条纹", label: "条纹" },
-  { value: "迷彩", label: "迷彩" },
+  { value: "花色", label: "花色", swatch: "linear-gradient(135deg,#ef4444 0 25%,#facc15 25% 50%,#22c55e 50% 75%,#3b82f6 75%)" },
+  { value: "格子", label: "格子", swatch: "conic-gradient(#1f2937 25%,#f5f5f4 0 50%,#1f2937 0 75%,#f5f5f4 0)" },
+  { value: "条纹", label: "条纹", swatch: "repeating-linear-gradient(135deg,#2563eb 0 4px,#ffffff 4px 8px)" },
+  { value: "迷彩", label: "迷彩", swatch: "linear-gradient(135deg,#3f4f2f 0 30%,#8a7b4f 30% 55%,#26351f 55% 80%,#b09b68 80%)" },
 ];
 
 /** 常见品牌选项（覆盖国际/国内主流服装品牌）。 */
@@ -270,7 +271,7 @@ export const TICKET_ITEM_STATUS_LABELS: Record<
 > = {
   pending_wash: "待清洗",
   washing: "清洗中",
-  done: "已完成",
+  done: "质检中",
   ready_to_pick: "待取件",
   exception: "清洗异常",
 };
@@ -281,7 +282,7 @@ export const TICKET_ITEM_STATUS_TONES: Record<
 > = {
   pending_wash: "slate",
   washing: "blue",
-  done: "emerald",
+  done: "amber",
   ready_to_pick: "violet",
   exception: "red",
 };
@@ -294,7 +295,7 @@ export const TICKET_ITEM_STATUS_TRANSITIONS: Record<
   washing: ["done", "exception"],
   done: ["ready_to_pick", "washing"],
   exception: ["washing"],
-  ready_to_pick: [],
+  ready_to_pick: ["washing", "exception"],
 };
 
 // --- 选项列表（供 select / 筛选条复用） -----------------------------------

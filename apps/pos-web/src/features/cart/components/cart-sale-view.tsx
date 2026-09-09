@@ -24,6 +24,11 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Badge,
   Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -37,6 +42,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
+  Textarea,
   cn,
 } from "@cleanhub/ui";
 import Image from "next/image";
@@ -209,7 +215,7 @@ export function CartSaleView({
   );
 
   return (
-    <section className="space-y-4 pb-28 sm:space-y-5 xl:pb-8">
+    <section className="space-y-4 pb-28 sm:space-y-5 xl:flex xl:h-full xl:min-h-0 xl:flex-col xl:overflow-hidden xl:pb-0">
       <PosPageHeader
         actions={
           <Badge className="gap-1.5" variant="outline">
@@ -224,24 +230,20 @@ export function CartSaleView({
 
       {canManageSensitiveOperations ? <OfflineCashExceptionPanel /> : null}
 
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="min-w-0 space-y-4">
+      <div className="grid items-start gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="pos-scrollbar min-w-0 space-y-4 xl:h-full xl:overflow-y-auto xl:overscroll-contain xl:pr-2">
           <div className="sticky top-0 z-20 -mx-2 flex flex-col gap-2 border-y bg-background/95 px-2 py-2.5 backdrop-blur sm:static sm:mx-0 sm:gap-3 sm:px-3 sm:py-3 md:flex-row md:items-center">
             <div className="grid w-full shrink-0 grid-cols-3 rounded-md bg-muted p-1 md:flex md:w-auto">
               {(["all", "products", "services"] as const).map((value) => (
-                <button
-                  className={cn(
-                    "h-9 min-w-0 rounded-md px-2 text-xs font-medium sm:px-3 sm:text-sm",
-                    filter === value
-                      ? "bg-background text-foreground shadow-sm"
-                      : "text-muted-foreground",
-                  )}
+                <Button
+                  className={cn("min-w-0 px-2 text-xs sm:px-3 sm:text-sm")}
                   key={value}
                   onClick={() => setFilter(value)}
                   type="button"
+                  variant={filter === value ? "secondary" : "ghost"}
                 >
                   {t(`pos.cart.${value}`)}
-                </button>
+                </Button>
               ))}
             </div>
             <div className="relative min-w-0 flex-1">
@@ -291,21 +293,24 @@ export function CartSaleView({
           ) : null}
 
           {visibleProducts.length === 0 && visibleServices.length === 0 ? (
-            <div className="border-y bg-background px-5 py-16 text-center text-sm text-muted-foreground">
-              {t("pos.cart.noResults")}
-            </div>
+            <Card className="border-dashed shadow-none">
+              <CardContent className="px-5 py-16 text-center text-sm text-muted-foreground">
+                {t("pos.cart.noResults")}
+              </CardContent>
+            </Card>
           ) : null}
         </div>
 
-        <aside className="sticky top-5 hidden h-[calc(100dvh-2.5rem)] overflow-hidden border bg-background xl:block">
+        <Card className="hidden h-full min-h-0 gap-0 overflow-hidden py-0 xl:block">
           {cartPanel}
-        </aside>
+        </Card>
       </div>
 
       <Sheet onOpenChange={setCartOpen} open={cartOpen}>
         <SheetTrigger asChild>
-          <button
+          <Button
             className="fixed inset-x-3 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-30 flex h-14 items-center justify-between rounded-xl bg-foreground px-4 text-background shadow-xl sm:left-1/2 sm:right-auto sm:w-[min(36rem,calc(100vw-2rem))] sm:-translate-x-1/2 lg:bottom-4 xl:hidden"
+            size="lg"
             type="button"
           >
             <span className="flex items-center gap-2 font-semibold">
@@ -322,7 +327,7 @@ export function CartSaleView({
                 locale,
               )}
             </span>
-          </button>
+          </Button>
         </SheetTrigger>
         <SheetContent
           className="h-[calc(100dvh-env(safe-area-inset-top))] max-h-dvh gap-0 rounded-none p-0 sm:left-1/2 sm:h-[88dvh] sm:max-h-[760px] sm:w-[min(44rem,calc(100vw-2rem))] sm:-translate-x-1/2 sm:rounded-t-2xl"
@@ -350,15 +355,15 @@ function CatalogSection({
   title: string;
 }) {
   return (
-    <section className="space-y-3">
-      <div>
-        <h2 className="text-base font-semibold text-foreground">{title}</h2>
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
         {description ? (
-          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+          <CardDescription className="text-xs">{description}</CardDescription>
         ) : null}
-      </div>
-      {children}
-    </section>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   );
 }
 
@@ -383,11 +388,12 @@ function ProductCard({
     : product.name;
 
   return (
-    <button
-      className="group min-w-0 overflow-hidden rounded-lg border bg-background text-left transition hover:border-foreground/25 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-55"
+    <Button
+      className="group h-auto min-w-0 flex-col items-stretch overflow-hidden whitespace-normal rounded-lg p-0 text-left hover:border-foreground/25 hover:shadow-sm"
       disabled={unavailable}
       onClick={onAdd}
       type="button"
+      variant="outline"
     >
       <span className="relative block aspect-[4/3] overflow-hidden bg-muted sm:aspect-square">
         {cover ? (
@@ -425,7 +431,7 @@ function ProductCard({
           </span>
         </span>
       </span>
-    </button>
+    </Button>
   );
 }
 
@@ -441,43 +447,47 @@ function ServiceCard({
     service.media.find((media) => media.isPrimary) ?? service.media[0];
 
   return (
-    <div className="flex min-w-0 gap-3 rounded-lg border bg-background p-3">
-      <Link
-        className="relative size-20 shrink-0 overflow-hidden rounded-md bg-muted"
-        href={posRoutes.catalogServiceDetail(service.id)}
-      >
-        {cover ? (
-          <Image
-            alt={service.name}
-            className="object-cover"
-            fill
-            sizes="80px"
-            src={cover.downloadUrl}
-            unoptimized
-          />
-        ) : (
-          <Icon
-            className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 text-muted-foreground"
-            name="clipboard-list"
-          />
-        )}
-      </Link>
-      <div className="min-w-0 flex-1">
+    <Card className="min-w-0 gap-0 py-0 shadow-none">
+      <CardContent className="flex gap-3 p-3">
         <Link
-          className="line-clamp-2 text-sm font-semibold text-foreground hover:underline"
+          className="relative size-20 shrink-0 overflow-hidden rounded-md bg-muted"
           href={posRoutes.catalogServiceDetail(service.id)}
         >
-          {service.name}
+          {cover ? (
+            <Image
+              alt={service.name}
+              className="object-cover"
+              fill
+              sizes="80px"
+              src={cover.downloadUrl}
+              unoptimized
+            />
+          ) : (
+            <Icon
+              className="absolute left-1/2 top-1/2 size-6 -translate-x-1/2 -translate-y-1/2 text-muted-foreground"
+              name="clipboard-list"
+            />
+          )}
         </Link>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {formatPosMoney(service.amount, service.currency, locale)}
-          {service.pricingUnit === "per_kg" ? " / kg" : ""}
-        </p>
-        <Button asChild className="mt-2 h-8 px-2.5 text-xs" variant="outline">
-          <Link href={posRoutes.newIntake}>{t("pos.cart.intakeService")}</Link>
-        </Button>
-      </div>
-    </div>
+        <div className="min-w-0 flex-1">
+          <Link
+            className="line-clamp-2 text-sm font-semibold text-foreground hover:underline"
+            href={posRoutes.catalogServiceDetail(service.id)}
+          >
+            {service.name}
+          </Link>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {formatPosMoney(service.amount, service.currency, locale)}
+            {service.pricingUnit === "per_kg" ? " / kg" : ""}
+          </p>
+          <Button asChild className="mt-2 h-8 px-2.5 text-xs" variant="outline">
+            <Link href={posRoutes.newIntake}>
+              {t("pos.cart.intakeService")}
+            </Link>
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -567,6 +577,7 @@ function CartPanel({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [clearOpen, setClearOpen] = useState(false);
   const [paymentMode, setPaymentMode] = useState<CheckoutPaymentMode>("cash");
   const [tenders, setTenders] = useState<CheckoutTender[]>([]);
   const [payLater, setPayLater] = useState(false);
@@ -634,9 +645,7 @@ function CartPanel({
   );
   const mixedExternalMethods = runtime.paymentMethodsEnabled.filter(
     (method) =>
-      method !== "cash" &&
-      isOnline &&
-      !isLockedPosPaymentMethod(method),
+      method !== "cash" && isOnline && !isLockedPosPaymentMethod(method),
   );
   const mixedPaymentAvailable =
     runtime.paymentMethodsEnabled.includes("app") &&
@@ -777,8 +786,7 @@ function CartPanel({
     const availableDefault =
       configuredDefault === "cash" && !cashRegisterAvailable
         ? runtime.paymentMethodsEnabled.find(
-            (method) =>
-              method !== "cash" && !isLockedPosPaymentMethod(method),
+            (method) => method !== "cash" && !isLockedPosPaymentMethod(method),
           )
         : configuredDefault === "card" && !hardwareCapabilities.cardTerminal
           ? runtime.paymentMethodsEnabled.find(
@@ -1333,17 +1341,17 @@ function CartPanel({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <button
-            className="min-h-8 text-xs font-semibold text-foreground"
+          <Button
             onClick={openParkedCarts}
+            size="sm"
             type="button"
+            variant="ghost"
           >
             挂单列表
-          </button>
+          </Button>
           {cart.lines.length > 0 ? (
             <>
-              <button
-                className="min-h-8 text-xs font-semibold text-foreground"
+              <Button
                 onClick={() => {
                   setParkName(
                     cart.customer?.name ??
@@ -1354,19 +1362,20 @@ function CartPanel({
                   );
                   setParkedOpen(true);
                 }}
+                size="sm"
                 type="button"
+                variant="ghost"
               >
                 挂起
-              </button>
-              <button
-                className="min-h-8 text-xs font-semibold text-destructive"
-                onClick={() => {
-                  if (window.confirm(`${t("pos.cart.clear")}?`)) void onClear();
-                }}
+              </Button>
+              <Button
+                onClick={() => setClearOpen(true)}
+                size="sm"
                 type="button"
+                variant="ghost"
               >
                 {t("pos.cart.clear")}
-              </button>
+              </Button>
             </>
           ) : null}
         </div>
@@ -1455,8 +1464,8 @@ function CartPanel({
               <span className="text-xs font-semibold text-muted-foreground">
                 {t("pos.cart.notes")}
               </span>
-              <textarea
-                className="mt-2 min-h-20 w-full resize-none rounded-md border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              <Textarea
+                className="mt-2 min-h-20 resize-none"
                 maxLength={2000}
                 onChange={(event) => onSetNotes(event.target.value)}
                 placeholder={t("pos.cart.notesPlaceholder")}
@@ -1538,6 +1547,35 @@ function CartPanel({
           {isPending ? t("pos.cart.loading") : t("pos.cart.checkout")}
         </Button>
       </div>
+
+      <Dialog onOpenChange={setClearOpen} open={clearOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{t("pos.cart.clear")}</DialogTitle>
+            <DialogDescription>
+              确认清空当前购物车吗？商品、客户、折扣和备注都会被移除。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              onClick={() => setClearOpen(false)}
+              type="button"
+              variant="outline"
+            >
+              取消
+            </Button>
+            <Button
+              onClick={() => {
+                void onClear().then(() => setClearOpen(false));
+              }}
+              type="button"
+              variant="destructive"
+            >
+              {t("pos.cart.clear")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         onOpenChange={(open) => {
@@ -1714,63 +1752,45 @@ function CartPanel({
                     (method === "cash" && !cashRegisterAvailable) ||
                     (method === "card" && !hardwareCapabilities.cardTerminal);
                   return (
-                    <button
+                    <Button
                       aria-controls="checkout-payment-panel"
                       aria-selected={paymentMode === method}
-                      className={cn(
-                        "min-h-11 min-w-0 rounded-lg px-2 py-2 text-sm font-semibold transition-all sm:min-w-28 sm:flex-1 sm:px-3",
-                        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                        paymentMode === method
-                          ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                          : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
-                        "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
-                      )}
+                      className={cn("min-h-11 min-w-0 sm:min-w-28 sm:flex-1")}
                       disabled={disabled}
                       key={method}
                       onClick={() => selectPaymentMode(method)}
                       role="tab"
                       type="button"
+                      variant={paymentMode === method ? "secondary" : "ghost"}
                     >
                       {paymentMethodLabel(method)}
-                    </button>
+                    </Button>
                   );
                 })}
-                <button
+                <Button
                   aria-controls="checkout-payment-panel"
                   aria-selected={paymentMode === "mixed"}
-                  className={cn(
-                    "min-h-11 min-w-0 rounded-lg px-2 py-2 text-sm font-semibold transition-all sm:min-w-28 sm:flex-1 sm:px-3",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    paymentMode === "mixed"
-                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                      : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
-                    "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
-                  )}
+                  className={cn("min-h-11 min-w-0 sm:min-w-28 sm:flex-1")}
                   disabled={!mixedPaymentAvailable}
                   onClick={() => selectPaymentMode("mixed")}
                   role="tab"
                   type="button"
+                  variant={paymentMode === "mixed" ? "secondary" : "ghost"}
                 >
                   混合支付
-                </button>
-                <button
+                </Button>
+                <Button
                   aria-controls="checkout-payment-panel"
                   aria-selected={paymentMode === "pay_later"}
-                  className={cn(
-                    "min-h-11 min-w-0 rounded-lg px-2 py-2 text-sm font-semibold transition-all sm:min-w-28 sm:flex-1 sm:px-3",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
-                    paymentMode === "pay_later"
-                      ? "bg-background text-foreground shadow-sm ring-1 ring-border"
-                      : "text-muted-foreground hover:bg-background/70 hover:text-foreground",
-                    "disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
-                  )}
+                  className={cn("min-h-11 min-w-0 sm:min-w-28 sm:flex-1")}
                   disabled={!cart.customer || !canManageSensitiveOperations}
                   onClick={() => selectPaymentMode("pay_later")}
                   role="tab"
                   type="button"
+                  variant={paymentMode === "pay_later" ? "secondary" : "ghost"}
                 >
                   {t("pos.cart.payLater")}
-                </button>
+                </Button>
               </div>
 
               <div
@@ -1831,8 +1851,7 @@ function CartPanel({
                           {paymentMethodLabel(tender.paymentMethod)}
                         </strong>
                         {paymentMode === "mixed" ? (
-                          <button
-                            className="text-xs font-semibold text-destructive"
+                          <Button
                             onClick={() =>
                               setTenders((current) =>
                                 current.filter(
@@ -1840,10 +1859,12 @@ function CartPanel({
                                 ),
                               )
                             }
+                            size="sm"
                             type="button"
+                            variant="ghost"
                           >
                             移除
-                          </button>
+                          </Button>
                         ) : null}
                       </div>
                       <label className="block text-xs font-semibold text-muted-foreground">
@@ -2044,7 +2065,8 @@ function CartPanel({
                 </p>
               ) : printerBinding.state === "not_bound" ? (
                 <p className="text-xs leading-5 text-amber-700">
-                  打印机尚未连接本机，请由 Owner 或 Manager 在“设置 → 硬件设备”中完成测试和连接。
+                  打印机尚未连接本机，请由 Owner 或 Manager 在“设置 →
+                  硬件设备”中完成测试和连接。
                 </p>
               ) : printerBinding.state === "not_detected" ? (
                 <p className="text-xs leading-5 text-amber-700">
@@ -2269,37 +2291,40 @@ function CartLine({
                 : t("pos.cart.ticket", { code: line.ticketCode })}
             </p>
           </div>
-          <button
+          <Button
             aria-label={t("pos.cart.remove")}
-            className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-destructive"
             onClick={onRemove}
+            size="icon-sm"
             type="button"
+            variant="ghost"
           >
             <Icon className="size-4" name="x" />
-          </button>
+          </Button>
         </div>
         <div className="mt-2 flex items-center justify-between gap-2">
           {line.kind === "product" ? (
             <div className="flex h-9 items-center rounded-md border">
-              <button
+              <Button
                 aria-label="Decrease quantity"
-                className="size-9 text-sm"
                 onClick={() => onQuantityChange(line.quantity - 1)}
+                size="icon"
                 type="button"
+                variant="ghost"
               >
                 −
-              </button>
+              </Button>
               <span className="min-w-7 text-center text-xs font-semibold">
                 {line.quantity}
               </span>
-              <button
+              <Button
                 aria-label="Increase quantity"
-                className="size-9 text-sm"
                 onClick={() => onQuantityChange(line.quantity + 1)}
+                size="icon"
                 type="button"
+                variant="ghost"
               >
                 +
-              </button>
+              </Button>
             </div>
           ) : (
             <span className="text-xs text-muted-foreground">
@@ -2373,11 +2398,11 @@ function CustomerSelector({
 
   return (
     <div className="border-b px-4 py-3">
-      <button
+      <Button
         aria-controls="cart-customer-selector-panel"
         aria-expanded={open && !locked}
         className={cn(
-          "group flex w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-3 text-left shadow-sm transition-all",
+          "group h-auto w-full cursor-pointer justify-start gap-3 whitespace-normal rounded-xl px-3 py-3 text-left",
           "border-primary/35 bg-primary/[0.04] hover:border-primary/65 hover:bg-primary/[0.08] hover:shadow-md",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/45 focus-visible:ring-offset-2",
           "disabled:cursor-not-allowed disabled:border-border disabled:bg-muted/40 disabled:opacity-65 disabled:shadow-none",
@@ -2386,6 +2411,7 @@ function CustomerSelector({
         disabled={locked}
         onClick={() => setOpen((current) => !current)}
         type="button"
+        variant="outline"
       >
         <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-primary/12 text-primary transition-colors group-hover:bg-primary/18">
           <Icon className="size-5" name={locked ? "lock" : "user-plus"} />
@@ -2414,7 +2440,7 @@ function CustomerSelector({
             />
           </span>
         ) : null}
-      </button>
+      </Button>
       {open && !locked ? (
         <div className="mt-3 space-y-2" id="cart-customer-selector-panel">
           <Input
@@ -2423,27 +2449,29 @@ function CustomerSelector({
             placeholder={t("pos.cart.customerSearch")}
             value={query}
           />
-          <button
-            className="flex w-full items-center justify-between rounded-md px-2 py-2 text-left text-sm hover:bg-muted"
+          <Button
+            className="w-full justify-between"
             onClick={() => {
               onSelect(null);
               setOpen(false);
             }}
             type="button"
+            variant="ghost"
           >
             {t("pos.cart.walkIn")}
             {!selected ? <Icon className="size-4" name="check" /> : null}
-          </button>
+          </Button>
           <div className="max-h-48 overflow-y-auto">
             {options.map((customer) => (
-              <button
-                className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-2 text-left hover:bg-muted"
+              <Button
+                className="h-auto w-full justify-between gap-2 whitespace-normal text-left"
                 key={customer.id}
                 onClick={() => {
                   onSelect(customer);
                   setOpen(false);
                 }}
                 type="button"
+                variant="ghost"
               >
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">
@@ -2458,7 +2486,7 @@ function CustomerSelector({
                 {selected?.id === customer.id ? (
                   <Icon className="size-4 shrink-0" name="check" />
                 ) : null}
-              </button>
+              </Button>
             ))}
             {!loading && options.length === 0 ? (
               <p className="px-2 py-3 text-xs text-muted-foreground">

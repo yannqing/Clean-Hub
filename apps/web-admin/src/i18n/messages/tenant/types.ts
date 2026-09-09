@@ -1329,7 +1329,6 @@ export type TenantMessages = {
       branchesLoadFailed: string;
       compareAtPriceHint: string;
       costPriceHint: string;
-      changeDefaultCurrency: string;
       displayOrderHint: string;
       pricingHint: string;
       applicableItemTypesHint: string;

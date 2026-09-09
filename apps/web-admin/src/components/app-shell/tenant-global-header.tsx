@@ -19,12 +19,14 @@ type TenantGlobalHeaderProps = {
   authContext: AuthContext | null;
   copy: TenantHeaderCopy;
   displayName: string;
+  tenantName: string;
 };
 
 export function TenantGlobalHeader({
   authContext,
   copy,
   displayName,
+  tenantName,
 }: TenantGlobalHeaderProps) {
   const accountName = authContext?.displayName.trim() || displayName;
   const [activePanel, setActivePanel] = useState<TenantHeaderPanel | null>(
@@ -43,13 +45,13 @@ export function TenantGlobalHeader({
       <div className="flex h-full items-center px-4 sm:px-5 lg:px-0">
         <div className="flex shrink-0 items-center lg:w-[240px] lg:px-3">
           <Link
-            aria-label="CleanHub"
+            aria-label={tenantName}
             className="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
             href={webAdminRoutes.tenant.home}
           >
             <CleanHubBrandMark className="size-10 rounded-lg" priority />
-            <span className="hidden text-sm font-semibold tracking-tight sm:block">
-              CleanHub
+            <span className="hidden max-w-40 truncate text-sm font-semibold tracking-tight sm:block xl:max-w-48">
+              {tenantName}
             </span>
           </Link>
         </div>

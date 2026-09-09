@@ -1138,32 +1138,12 @@ export function ServiceCreateView({
 
               <Card className="gap-0 rounded-lg py-0 shadow-none">
                 <CardHeader className="border-b py-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <CardTitle className="text-base">
-                        {m.services.sections.pricing}
-                      </CardTitle>
-                      <CardDescription className="mt-1">
-                        {m.services.sections.pricingDescription}
-                      </CardDescription>
-                    </div>
-                    <Button
-                      asChild
-                      className="w-fit shrink-0 gap-1.5"
-                      size="sm"
-                      variant="outline"
-                    >
-                      <Link
-                        href={
-                          webAdminRoutes.tenant.system.settingsSections.pricing
-                        }
-                        onClick={confirmNavigation}
-                      >
-                        {m.services.create.changeDefaultCurrency}
-                        <Icon aria-hidden icon={ChevronRight} size={14} />
-                      </Link>
-                    </Button>
-                  </div>
+                  <CardTitle className="text-base">
+                    {m.services.sections.pricing}
+                  </CardTitle>
+                  <CardDescription className="mt-1">
+                    {m.services.sections.pricingDescription}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-5 py-5">
                   <div className="grid gap-5 sm:grid-cols-2">

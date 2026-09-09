@@ -25,6 +25,7 @@ import { TenantGlobalHeader } from "./tenant-global-header";
 type TenantDashboardShellProps = {
   children: React.ReactNode;
   initialAuthContext?: AuthContext | null;
+  initialTenantName?: string;
 };
 
 function isActivePath(pathname: string, href: string): boolean {
@@ -53,6 +54,7 @@ function getDisplayName(authContext: AuthContext | null): string {
 export function TenantDashboardShell({
   children,
   initialAuthContext = null,
+  initialTenantName = "CleanHub",
 }: TenantDashboardShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -60,6 +62,7 @@ export function TenantDashboardShell({
   const [authContext, setAuthContext] = useState<AuthContext | null>(
     initialAuthContext,
   );
+  const [tenantName, setTenantName] = useState(initialTenantName);
   const sidebarItems = useMemo(
     () =>
       filterSidebarSections(messages.sidebar.tenant)
@@ -211,13 +214,15 @@ export function TenantDashboardShell({
       const detail = (event as CustomEvent<TenantSettingsUpdatedEventDetail>)
         .detail;
 
-      if (!detail?.timezone || !detail.defaultLanguage) {
+      if (!detail?.timezone || !detail.defaultLanguage || !detail.tenantName) {
         return;
       }
 
       if (detail.defaultLanguage !== locale) {
         setLocale(detail.defaultLanguage);
       }
+
+      setTenantName(detail.tenantName);
 
       setAuthContext((current) =>
         current
@@ -254,6 +259,7 @@ export function TenantDashboardShell({
             authContext={authContext}
             copy={messages.shell.tenant.header}
             displayName={displayName}
+            tenantName={tenantName}
           />
           <main className="min-w-0">{children}</main>
         </div>
@@ -271,6 +277,7 @@ export function TenantDashboardShell({
         authContext={authContext}
         copy={messages.shell.tenant.header}
         displayName={displayName}
+        tenantName={tenantName}
       />
 
       <div className="grid min-h-[calc(100vh-4rem)] lg:grid-cols-[240px_minmax(0,1fr)]">

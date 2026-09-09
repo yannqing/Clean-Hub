@@ -1,7 +1,25 @@
 "use client";
 
 import { posToast as toast } from "@/lib/pos-toast";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@cleanhub/ui";
+import {
+  Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
+} from "@cleanhub/ui";
 import { useMemo, useState, useTransition } from "react";
 
 import { Icon } from "@/components/app-shell";
@@ -24,6 +42,10 @@ import {
   TICKET_REQUEST_QUICK_PHRASES,
   formatTicketMoney,
 } from "../constants";
+import {
+  loadCachedTicketBrands,
+  rememberTicketBrand,
+} from "../lib/ticket-brand-cache";
 import { coerceTicketItemType, validateTicketItemForm } from "../validators";
 import type { TicketItemFormValues } from "../types";
 import { TicketItemStatusBadge } from "./ticket-badges";
@@ -125,24 +147,20 @@ export function TicketItemEditor({
   const formOpen = creating || editingId !== null;
 
   return (
-    <section className="overflow-hidden border-y bg-background">
-      <div className="flex items-center justify-between border-b p-5">
+    <Card className="gap-0 overflow-hidden py-0">
+      <CardHeader className="flex-row items-center justify-between border-b py-5">
         <div>
-          <h2 className="font-semibold text-foreground">工单项目</h2>
+          <CardTitle className="text-base">工单项目</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
             {items.length} 个项目 · 数量{" "}
             {items.reduce((n, x) => n + x.quantity, 0)}
           </p>
         </div>
-        <button
-          className="flex h-11 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90"
-          onClick={startCreate}
-          type="button"
-        >
+        <Button onClick={startCreate} size="lg" type="button">
           <Icon className="h-4 w-4" name="plus" />
           添加项目
-        </button>
-      </div>
+        </Button>
+      </CardHeader>
 
       <div className="divide-y">
         {items.length === 0 ? (
@@ -189,7 +207,7 @@ export function TicketItemEditor({
           />
         </DialogContent>
       </Dialog>
-    </section>
+    </Card>
   );
 }
 
@@ -268,27 +286,29 @@ function ItemRow({
           ) : null}
         </div>
         <div className="flex shrink-0 gap-2">
-          <button
+          <Button
             aria-label="修改项目"
-            className="flex h-11 w-11 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             disabled={isPending}
             onClick={onEdit}
+            size="icon-lg"
             title="修改项目"
             type="button"
+            variant="outline"
           >
             <Icon className="h-4 w-4" name="square-pen" />
-          </button>
+          </Button>
           {canManage ? (
-            <button
+            <Button
               aria-label="删除项目"
-              className="flex h-11 w-11 items-center justify-center rounded-md border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10"
               disabled={isPending}
               onClick={() => setDeleteOpen(true)}
+              size="icon-lg"
               title="删除项目"
               type="button"
+              variant="destructive"
             >
               <Icon className="h-4 w-4" name="trash" />
-            </button>
+            </Button>
           ) : null}
         </div>
       </div>
@@ -317,21 +337,23 @@ function ItemRow({
             <TicketItemStatusBadge status={item.itemStatus} />
           </div>
           {reachable.length > 0 ? (
-            <select
-              className="mt-2 h-11 w-full rounded-md border bg-background px-2 text-xs text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <Select
               disabled={isPending}
-              onChange={(event) =>
-                changeStatus(event.target.value as ServiceTicketItemStatus)
+              onValueChange={(value) =>
+                changeStatus(value as ServiceTicketItemStatus)
               }
-              value=""
             >
-              <option value="">流转状态…</option>
-              {reachable.map((status) => (
-                <option key={status} value={status}>
-                  → {TICKET_ITEM_STATUS_LABELS[status]}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="mt-2 h-11 w-full text-xs">
+                <SelectValue placeholder="流转状态…" />
+              </SelectTrigger>
+              <SelectContent>
+                {reachable.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    → {TICKET_ITEM_STATUS_LABELS[status]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           ) : null}
         </div>
         <div>
@@ -375,32 +397,32 @@ function ItemRow({
               删除「{item.itemName}」会写入审计记录。
             </p>
             <Field label="删除原因（必填）" wide>
-              <textarea
-                className={`${inputClass} min-h-[88px] py-2`}
+              <Textarea
+                className="min-h-[88px]"
                 disabled={isPending}
                 maxLength={500}
                 onChange={(event) => setDeleteReason(event.target.value)}
                 value={deleteReason}
               />
             </Field>
-            <div className="flex justify-end gap-2">
-              <button
-                className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+            <DialogFooter>
+              <Button
                 disabled={isPending}
                 onClick={() => setDeleteOpen(false)}
                 type="button"
+                variant="outline"
               >
                 取消
-              </button>
-              <button
-                className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-60"
+              </Button>
+              <Button
                 disabled={isPending || !deleteReason.trim()}
                 onClick={remove}
                 type="button"
+                variant="destructive"
               >
                 {isPending ? "删除中…" : "确认删除"}
-              </button>
-            </div>
+              </Button>
+            </DialogFooter>
           </div>
         </DialogContent>
       </Dialog>
@@ -430,6 +452,10 @@ function ItemForm({
   itemId?: string;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [cachedBrands, setCachedBrands] = useState<string[]>(() =>
+    typeof window === "undefined" ? [] : loadCachedTicketBrands(),
+  );
+
   const compatibleCatalog = useMemo(() => {
     const itemType = form.itemType;
     return itemType
@@ -477,7 +503,7 @@ function ItemForm({
     });
   }
 
-  function appendQuickPhrase(
+  function toggleQuickPhrase(
     field: "defectNotes" | "specialRequest" | "remark",
     phrase: string,
   ) {
@@ -486,9 +512,23 @@ function ItemForm({
       .split(/[；;\n]+/)
       .map((value) => value.trim())
       .filter(Boolean);
-    if (phrases.includes(phrase)) return;
-    update(field, current ? `${current}；${phrase}` : phrase);
+    const next = phrases.includes(phrase)
+      ? phrases.filter((value) => value !== phrase)
+      : [...phrases, phrase];
+    update(field, next.join("；"));
   }
+
+  const brandOptions = useMemo(() => {
+    const presetValues = new Set(
+      ITEM_BRAND_OPTIONS.map((option) => option.value.toLocaleLowerCase()),
+    );
+    return [
+      ...ITEM_BRAND_OPTIONS,
+      ...cachedBrands
+        .filter((brand) => !presetValues.has(brand.toLocaleLowerCase()))
+        .map((brand) => ({ label: brand, value: brand })),
+    ];
+  }, [cachedBrands]);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -549,23 +589,26 @@ function ItemForm({
     <form onSubmit={submit}>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="物品类型（必填）" wide>
-          <select
-            className={inputClass}
+          <Select
             disabled={isPending}
-            onChange={(event) =>
-              changeItemType(coerceTicketItemType(event.target.value))
+            onValueChange={(value) =>
+              changeItemType(coerceTicketItemType(value))
             }
             value={form.itemType}
           >
-            <option value="">请先选择物品类型</option>
-            {TICKET_ITEM_TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="请先选择物品类型" />
+            </SelectTrigger>
+            <SelectContent>
+              {TICKET_ITEM_TYPE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
-        <Field label="服务项目（必填）" portalControl wide>
+        <Field label="服务项目（必填）" wide>
           <TicketServicePicker
             disabled={isPending || !form.itemType}
             onValueChange={(service) => {
@@ -600,13 +643,12 @@ function ItemForm({
           ) : null}
         </Field>
         <Field label="分类">
-          <input
-            className={inputClass}
+          <Input
             onChange={(event) => update("itemCategory", event.target.value)}
             value={form.itemCategory}
           />
         </Field>
-        <Field label="颜色" portalControl>
+        <Field label="颜色">
           <TicketAttributePicker
             options={ITEM_COLOR_OPTIONS}
             value={form.itemColor}
@@ -616,17 +658,20 @@ function ItemForm({
             emptyText="无匹配颜色，按回车自定义"
           />
         </Field>
-        <Field label="品牌" portalControl>
+        <Field label="品牌">
           <TicketAttributePicker
-            options={ITEM_BRAND_OPTIONS}
+            options={brandOptions}
             value={form.itemBrand}
-            onValueChange={(v) => update("itemBrand", v)}
+            onValueChange={(value) => {
+              update("itemBrand", value);
+              setCachedBrands(rememberTicketBrand(value));
+            }}
             placeholder="选择品牌…"
             searchPlaceholder="搜索品牌…"
             emptyText="无匹配品牌，按回车自定义"
           />
         </Field>
-        <Field label="材质" portalControl>
+        <Field label="材质">
           <TicketAttributePicker
             options={ITEM_MATERIAL_OPTIONS}
             value={form.itemMaterial}
@@ -639,8 +684,7 @@ function ItemForm({
         {form.pricingUnit === "per_kg" ? (
           <>
             <Field label="重量（kg）">
-              <input
-                className={inputClass}
+              <Input
                 min="0.001"
                 onChange={(event) => update("weight", event.target.value)}
                 onWheel={handleNumberInputWheel}
@@ -650,8 +694,7 @@ function ItemForm({
               />
             </Field>
             <Field label="袋数">
-              <input
-                className={inputClass}
+              <Input
                 min={1}
                 onChange={(event) => update("bagCount", event.target.value)}
                 onWheel={handleNumberInputWheel}
@@ -663,8 +706,7 @@ function ItemForm({
           </>
         ) : (
           <Field label="数量">
-            <input
-              className={inputClass}
+            <Input
               min={1}
               onChange={(event) => update("quantity", event.target.value)}
               onWheel={handleNumberInputWheel}
@@ -675,8 +717,7 @@ function ItemForm({
           </Field>
         )}
         <Field label={canManage ? "收费单价" : "标准单价"}>
-          <input
-            className={inputClass}
+          <Input
             disabled={!canManage}
             min={0}
             onChange={(event) =>
@@ -698,8 +739,7 @@ function ItemForm({
           ) : null}
         </Field>
         <Field label="行金额（自动计算）">
-          <input
-            className={inputClass}
+          <Input
             disabled
             value={formatTicketMoney(
               (form.pricingUnit === "per_kg"
@@ -715,8 +755,8 @@ function ItemForm({
         Number(form.chargedUnitAmount).toFixed(2) !==
           Number(form.standardUnitAmount).toFixed(2) ? (
           <Field label="改价原因（必填）" wide>
-            <textarea
-              className={`${inputClass} min-h-[72px] py-2`}
+            <Textarea
+              className="min-h-[72px]"
               maxLength={500}
               onChange={(event) => update("overrideReason", event.target.value)}
               value={form.overrideReason}
@@ -724,66 +764,59 @@ function ItemForm({
           </Field>
         ) : null}
         <Field label="瑕疵" wide>
-          <textarea
-            className={`${inputClass} min-h-[72px]`}
+          <Textarea
+            className="min-h-[72px]"
             onChange={(event) => update("defectNotes", event.target.value)}
             value={form.defectNotes}
           />
           <QuickPhrasePicker
-            onSelect={(phrase) => appendQuickPhrase("defectNotes", phrase)}
+            onSelect={(phrase) => toggleQuickPhrase("defectNotes", phrase)}
             options={TICKET_DEFECT_QUICK_PHRASES}
             value={form.defectNotes}
           />
         </Field>
         <Field label="特殊要求" wide>
-          <textarea
-            className={`${inputClass} min-h-[72px]`}
+          <Textarea
+            className="min-h-[72px]"
             onChange={(event) => update("specialRequest", event.target.value)}
             value={form.specialRequest}
           />
           <QuickPhrasePicker
-            onSelect={(phrase) => appendQuickPhrase("specialRequest", phrase)}
+            onSelect={(phrase) => toggleQuickPhrase("specialRequest", phrase)}
             options={TICKET_REQUEST_QUICK_PHRASES}
             value={form.specialRequest}
           />
         </Field>
         <Field label="项目备注" wide>
-          <textarea
-            className={`${inputClass} min-h-[72px]`}
+          <Textarea
+            className="min-h-[72px]"
             onChange={(event) => update("remark", event.target.value)}
             value={form.remark}
           />
           <QuickPhrasePicker
-            onSelect={(phrase) => appendQuickPhrase("remark", phrase)}
+            onSelect={(phrase) => toggleQuickPhrase("remark", phrase)}
             options={TICKET_REMARK_QUICK_PHRASES}
             value={form.remark}
           />
         </Field>
       </div>
       <div className="mt-5 flex justify-end gap-2 border-t pt-4">
-        <button
-          className="h-11 rounded-md border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+        <Button
           disabled={isPending}
           onClick={onCancel}
           type="button"
+          variant="outline"
         >
           取消
-        </button>
-        <button
-          className="flex h-11 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-60"
-          disabled={isPending}
-          type="submit"
-        >
+        </Button>
+        <Button disabled={isPending} type="submit">
           <Icon className="h-4 w-4" name="save" />
           {isPending ? "保存中…" : "保存"}
-        </button>
+        </Button>
       </div>
     </form>
   );
 }
-
-const inputClass =
-  "h-9 w-full rounded-md border bg-background px-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted disabled:text-muted-foreground";
 
 function QuickPhrasePicker({
   onSelect,
@@ -803,16 +836,17 @@ function QuickPhrasePicker({
           .includes(option);
 
         return (
-          <button
+          <Button
             aria-pressed={selected}
-            className="min-h-8 rounded-full border bg-background px-3 text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:bg-muted hover:text-foreground aria-pressed:border-foreground/30 aria-pressed:bg-foreground aria-pressed:text-background"
-            disabled={selected}
+            className="rounded-full"
             key={option}
             onClick={() => onSelect(option)}
+            size="sm"
             type="button"
+            variant={selected ? "default" : "outline"}
           >
             {option}
-          </button>
+          </Button>
         );
       })}
     </div>
@@ -821,28 +855,22 @@ function QuickPhrasePicker({
 
 function Field({
   label,
-  portalControl,
   wide,
   children,
 }: {
   label: string;
-  portalControl?: boolean;
   wide?: boolean;
   children: React.ReactNode;
 }) {
   const className = wide ? "sm:col-span-2 lg:col-span-3" : "";
   const content = (
     <>
-      <span className="mb-1.5 block text-xs font-semibold text-muted-foreground">
+      <Label className="mb-1.5 block text-xs text-muted-foreground">
         {label}
-      </span>
+      </Label>
       {children}
     </>
   );
 
-  if (portalControl) {
-    return <div className={className}>{content}</div>;
-  }
-
-  return <label className={className}>{content}</label>;
+  return <div className={className}>{content}</div>;
 }

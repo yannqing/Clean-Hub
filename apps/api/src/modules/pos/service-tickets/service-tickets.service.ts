@@ -35,12 +35,15 @@ import {
   createServiceTicketItemRecord,
   findTicketItemById,
   softDeleteServiceTicketItemRecord,
+  findTicketItemStatuses,
   updateServiceTicketItemRecord,
 } from "./service-ticket-items.repository.js";
 import {
+  canWorkTicketItems,
   isAllowedItemTransition,
   isAllowedTicketTransition,
   requiresSettlementCheck,
+  resolveTicketStatusFromItems,
 } from "./service-tickets.state-machine.js";
 import type {
   ChangeServiceTicketItemStatusRequest,
@@ -875,6 +878,74 @@ export async function updatePosServiceTicketItem(
   });
 }
 
+/**
+ * Move the ticket to match its items after an item changes hands. Staff work
+ * item by item, so without this the board would keep showing a ticket as in
+ * progress after the last garment was already on the shelf.
+ *
+ * Best effort by design: a ticket that cannot legally reach the implied status
+ * is left alone rather than blocking the item update the operator asked for.
+ */
+async function syncTicketStatusWithItems(
+  db: Database,
+  input: {
+    tenantId: string;
+    ticketId: string;
+    branchId: string;
+    authContext: AuthContext;
+    requestMeta: AuthRequestMeta;
+  },
+): Promise<void> {
+  const ticket = await findServiceTicketRaw(db, {
+    tenantId: input.tenantId,
+    ticketId: input.ticketId,
+  });
+  if (!ticket) return;
+
+  const itemStatuses = await findTicketItemStatuses(db, {
+    tenantId: input.tenantId,
+    ticketId: input.ticketId,
+  });
+  const path = resolveTicketStatusFromItems({
+    ticketStatus: ticket.ticketStatus,
+    itemStatuses,
+  });
+
+  let current = ticket.ticketStatus;
+  let version = ticket.version;
+
+  for (const next of path) {
+    const result = await changeServiceTicketStatusRecord(db, {
+      tenantId: input.tenantId,
+      ticketId: input.ticketId,
+      actorUserId: input.authContext.userId,
+      version,
+      to: next,
+    });
+    if (!result.updated) return;
+
+    await writeAuditLog(db, {
+      actorUserId: input.authContext.userId,
+      tenantId: input.tenantId,
+      branchId: input.branchId,
+      eventCategory: "pos_service_ticket",
+      eventType: "pos.service_ticket.status_synced_from_items",
+      entityType: "service_ticket",
+      entityId: input.ticketId,
+      before: { ticketStatus: current },
+      after: { ticketStatus: next },
+      metadata: createPosAuditMetadata(input.authContext, {
+        itemStatuses,
+      }),
+      ipAddress: input.requestMeta.ipAddress,
+      userAgent: input.requestMeta.userAgent,
+    });
+
+    current = next;
+    version += 1;
+  }
+}
+
 export async function changePosServiceTicketItemStatus(
   authContext: AuthContext,
   input: ServiceTicketItemListInput & {
@@ -912,6 +983,14 @@ export async function changePosServiceTicketItemStatus(
         "SERVICE_TICKET_ITEM_NOT_FOUND",
         "Service ticket item was not found.",
         404,
+      );
+    }
+
+    if (!canWorkTicketItems(before.ticketStatus)) {
+      throw new ServiceTicketError(
+        "INVALID_ITEM_STATUS_TRANSITION",
+        `Items cannot be processed while the ticket is "${before.ticketStatus}".`,
+        422,
       );
     }
 
@@ -960,6 +1039,14 @@ export async function changePosServiceTicketItemStatus(
       metadata: createPosAuditMetadata(authContext, { itemId }),
       ipAddress: requestMeta.ipAddress,
       userAgent: requestMeta.userAgent,
+    });
+
+    await syncTicketStatusWithItems(tx, {
+      tenantId,
+      ticketId,
+      branchId: before.branchId,
+      authContext,
+      requestMeta,
     });
 
     return item;
