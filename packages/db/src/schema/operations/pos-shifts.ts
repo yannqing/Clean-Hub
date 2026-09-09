@@ -16,10 +16,8 @@ import {
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
 import { branches } from "../tenancy/branches.js";
-import {
-  posCashHandlingModeEnum,
-  posTerminalSettings,
-} from "../tenancy/pos-terminal-settings.js";
+import { posCashHandlingModeEnum } from "../tenancy/pos-enums.js";
+import { posTerminalSettings } from "../tenancy/pos-terminal-settings.js";
 import { tenants } from "../tenancy/tenants.js";
 
 export const posShiftStatusEnum = pgEnum("pos_shift_status", [
@@ -213,7 +211,7 @@ export const posCashDrawerSessions = pgTable(
     uniqueIndex("pos_cash_drawer_sessions_shared_register_open_unique")
       .on(table.tenantId, table.registerSessionId)
       .where(
-        sql`${table.status} = 'open' and ${table.handlingMode} in ('shared_drawer', 'assigned_drawer')`,
+        sql`${table.status} = 'open' and ${table.handlingMode} = 'shared_drawer'`,
       ),
     uniqueIndex("pos_cash_drawer_sessions_staff_register_open_unique")
       .on(table.tenantId, table.registerSessionId, table.assignedStaffId)
@@ -231,7 +229,7 @@ export const posCashDrawerSessions = pgTable(
     ),
     check(
       "pos_cash_drawer_sessions_assignment_check",
-      sql`(${table.handlingMode} in ('assigned_drawer', 'cash_in_hand') and ${table.assignedStaffId} is not null)
+      sql`(${table.handlingMode} = 'cash_in_hand' and ${table.assignedStaffId} is not null)
         or (${table.handlingMode} = 'shared_drawer' and ${table.assignedStaffId} is null)`,
     ),
   ],

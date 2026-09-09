@@ -365,6 +365,13 @@
       "when": 1788931500000,
       "tag": "0051_normalize_tenant_rls_helpers",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1788932000000,
+      "tag": "0052_branch_cash_and_payment_policy",
+      "breakpoints": true
     }
   ]
 }

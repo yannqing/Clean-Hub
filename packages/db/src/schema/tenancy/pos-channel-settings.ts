@@ -14,11 +14,7 @@ import {
 
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
-import {
-  posCashHandlingModeEnum,
-  posPaymentMethodEnum,
-  posRoundingRuleEnum,
-} from "./pos-terminal-settings.js";
+import { posRoundingRuleEnum } from "./pos-terminal-settings.js";
 import { tenants } from "./tenants.js";
 
 export const posChannelSettings = pgTable(
@@ -48,20 +44,6 @@ export const posChannelSettings = pgTable(
     deviceOfflineAfterSeconds: integer("device_offline_after_seconds")
       .notNull()
       .default(600),
-    defaultPaymentMethod: posPaymentMethodEnum("default_payment_method")
-      .notNull()
-      .default("cash"),
-    defaultPaymentMethodsEnabled: posPaymentMethodEnum(
-      "default_payment_methods_enabled",
-    )
-      .array()
-      .notNull()
-      .default(sql`ARRAY['cash', 'app']::pos_payment_method[]`),
-    defaultCashHandlingMode: posCashHandlingModeEnum(
-      "default_cash_handling_mode",
-    )
-      .notNull()
-      .default("shared_drawer"),
     defaultRoundingRule: posRoundingRuleEnum("default_rounding_rule")
       .notNull()
       .default("none"),
@@ -109,10 +91,6 @@ export const posChannelSettings = pgTable(
     check(
       "pos_channel_settings_print_copies_check",
       sql`${table.defaultPrintCopies} between 1 and 10`,
-    ),
-    check(
-      "pos_channel_settings_payment_methods_nonempty_check",
-      sql`cardinality(${table.defaultPaymentMethodsEnabled}) > 0`,
     ),
     check(
       "pos_channel_settings_tax_rate_check",

@@ -24,6 +24,10 @@ import {
 
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
+import {
+  posCashHandlingModeEnum,
+  posPaymentMethodEnum,
+} from "./pos-enums.js";
 import { tenants } from "./tenants.js";
 
 export const branchStatusEnum = pgEnum("branch_status", ["active", "inactive"]);
@@ -65,6 +69,21 @@ export const branches = pgTable(
       .notNull()
       .default(ticketLabelFieldArraySql(DEFAULT_POS_TICKET_LABEL_FIELDS)),
     logoUrl: text("logo_url"),
+    /**
+     * Cash and payment policy belongs to the branch: whether a store has a
+     * physical drawer is a property of the store, not of the tenant or of an
+     * individual terminal.
+     */
+    paymentMethodsEnabled: posPaymentMethodEnum("payment_methods_enabled")
+      .array()
+      .notNull()
+      .default(sql`ARRAY['cash', 'app']::pos_payment_method[]`),
+    defaultPaymentMethod: posPaymentMethodEnum("default_payment_method")
+      .notNull()
+      .default("cash"),
+    cashHandlingMode: posCashHandlingModeEnum("cash_handling_mode")
+      .notNull()
+      .default("shared_drawer"),
     status: branchStatusEnum("status").notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -102,6 +121,14 @@ export const branches = pgTable(
     check(
       "branches_ticket_label_fields_item_required_check",
       sql`array_position(${table.ticketLabelFields}, 'item_name') is not null`,
+    ),
+    check(
+      "branches_payment_methods_nonempty_check",
+      sql`cardinality(${table.paymentMethodsEnabled}) > 0`,
+    ),
+    check(
+      "branches_default_payment_method_enabled_check",
+      sql`${table.defaultPaymentMethod} = any(${table.paymentMethodsEnabled})`,
     ),
   ],
 );

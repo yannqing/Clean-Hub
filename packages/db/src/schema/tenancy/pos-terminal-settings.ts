@@ -19,12 +19,6 @@ import { users } from "../identity/users.js";
 import { branches } from "./branches.js";
 import { tenants } from "./tenants.js";
 
-export const posPaymentMethodEnum = pgEnum("pos_payment_method", [
-  "cash",
-  "card",
-  "app",
-]);
-
 export const posRoundingRuleEnum = pgEnum("pos_rounding_rule", [
   "none",
   "round_yuan",
@@ -51,18 +45,6 @@ export const posTerminalSyncStatusEnum = pgEnum("pos_terminal_sync_status", [
   "error",
 ]);
 
-/**
- * How this terminal is expected to account for cash. This is deliberately
- * independent from whether an electronic drawer is physically connected.
- */
-export const posCashHandlingModeEnum = pgEnum("pos_cash_handling_mode", [
-  "none",
-  "untracked",
-  "shared_drawer",
-  "assigned_drawer",
-  "cash_in_hand",
-]);
-
 export const posTerminalSettings = pgTable(
   "pos_terminal_settings",
   {
@@ -81,16 +63,6 @@ export const posTerminalSettings = pgTable(
     platform: varchar("platform", { length: 64 }),
     platformVersion: varchar("platform_version", { length: 64 }),
     appVersion: varchar("app_version", { length: 64 }),
-    defaultPaymentMethod: posPaymentMethodEnum("default_payment_method")
-      .notNull()
-      .default("cash"),
-    paymentMethodsEnabled: posPaymentMethodEnum("payment_methods_enabled")
-      .array()
-      .notNull()
-      .default(sql`ARRAY['cash', 'app']::pos_payment_method[]`),
-    cashHandlingMode: posCashHandlingModeEnum("cash_handling_mode")
-      .notNull()
-      .default("shared_drawer"),
     roundingRule: posRoundingRuleEnum("rounding_rule")
       .notNull()
       .default("none"),
@@ -169,10 +141,6 @@ export const posTerminalSettings = pgTable(
     check(
       "pos_terminal_settings_pending_operations_check",
       sql`${table.pendingOperationsCount} is null or ${table.pendingOperationsCount} >= 0`,
-    ),
-    check(
-      "pos_terminal_settings_payment_methods_nonempty_check",
-      sql`cardinality(${table.paymentMethodsEnabled}) > 0`,
     ),
     check(
       "pos_terminal_settings_status_revision_check",
