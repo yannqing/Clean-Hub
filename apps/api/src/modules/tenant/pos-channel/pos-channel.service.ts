@@ -48,20 +48,8 @@ function withPaymentIntegrationAvailability(
   settings: Omit<PosChannelSettings, "mobileMoneyProvidersEnabled">,
   providers: TenantPaymentProvider[],
 ): PosChannelSettings {
-  const enabledMethods =
-    providers.length > 0
-      ? settings.defaultPaymentMethodsEnabled
-      : settings.defaultPaymentMethodsEnabled.filter(
-          (method) => method !== "app",
-        );
-  if (enabledMethods.length === 0) enabledMethods.push("cash");
-
   return {
     ...settings,
-    defaultPaymentMethod: enabledMethods.includes(settings.defaultPaymentMethod)
-      ? settings.defaultPaymentMethod
-      : enabledMethods[0]!,
-    defaultPaymentMethodsEnabled: enabledMethods,
     mobileMoneyProvidersEnabled: providers,
   };
 }
@@ -335,9 +323,6 @@ export async function updateTenantPosChannelDevice(
     const statusChanged =
       input.data.status !== undefined && input.data.status !== current.status;
     const securityContextChanged = branchChanged || statusChanged;
-    const cashHandlingChanged =
-      input.data.cashHandlingMode !== undefined &&
-      input.data.cashHandlingMode !== current.cashHandlingMode;
 
     if (
       input.data.status === "active" &&
@@ -351,11 +336,7 @@ export async function updateTenantPosChannelDevice(
       );
     }
 
-    if (
-      branchChanged ||
-      cashHandlingChanged ||
-      input.data.status === "inactive"
-    ) {
+    if (branchChanged || input.data.status === "inactive") {
       const registerSession = await findOpenRegisterSession(tx, {
         tenantId,
         terminalId: current.id,
@@ -364,7 +345,7 @@ export async function updateTenantPosChannelDevice(
       if (registerSession) {
         throw new TenantPosChannelError(
           "POS_CHANNEL_DEVICE_REGISTER_OPEN",
-          "Close the terminal's register session before changing its branch, cash handling mode, or status.",
+          "Close the terminal's register session before changing its branch or status.",
           409,
         );
       }
@@ -389,9 +370,6 @@ export async function updateTenantPosChannelDevice(
       actorUserId: input.authContext.userId,
       data: {
         ...(input.data.branchId ? { branchId: input.data.branchId } : {}),
-        ...(input.data.cashHandlingMode
-          ? { cashHandlingMode: input.data.cashHandlingMode }
-          : {}),
         ...(input.data.label ? { label: input.data.label } : {}),
         ...(input.data.status ? { status: input.data.status } : {}),
         reason: input.data.reason,
@@ -590,29 +568,6 @@ export async function updateTenantPosChannelSettings(
         current.deviceOfflineAfterSeconds,
     };
     validateSettingsRelationship(nextRelationship);
-    const enabledMethods =
-      input.data.defaultPaymentMethodsEnabled ??
-      current.defaultPaymentMethodsEnabled;
-    const defaultMethod =
-      input.data.defaultPaymentMethod ?? current.defaultPaymentMethod;
-    if (!enabledMethods.includes(defaultMethod)) {
-      throw new TenantPosChannelError(
-        "POS_CHANNEL_SETTINGS_INVALID",
-        "The default payment method must also be enabled.",
-        422,
-      );
-    }
-    if (
-      (input.data.defaultPaymentMethodsEnabled?.includes("app") ||
-        input.data.defaultPaymentMethod === "app") &&
-      mobileMoneyProvidersEnabled.length === 0
-    ) {
-      throw new TenantPosChannelError(
-        "MOBILE_MONEY_INTEGRATION_REQUIRED",
-        "Configure, verify, and enable Wave or Orange Money before enabling mobile payment defaults.",
-        422,
-      );
-    }
 
     const updated = await updatePosChannelSettingsRecord(tx, {
       tenantId,

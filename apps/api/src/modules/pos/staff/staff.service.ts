@@ -38,6 +38,7 @@ import {
 } from "./staff.repository.js";
 import {
   findAuthenticatedTerminalSettings,
+  findBranchPaymentPolicy,
   findTenantPosTerminalDefaults,
 } from "../terminal-settings/terminal-settings.repository.js";
 import type {
@@ -77,9 +78,10 @@ async function resolveRegisterConfiguration(
     deviceId: authContext.terminalDeviceId!,
     credentialVersion: authContext.terminalCredentialVersion!,
   };
-  const [settings, defaults] = await Promise.all([
+  const [settings, defaults, branchPolicy] = await Promise.all([
     findAuthenticatedTerminalSettings(db, terminalIdentity),
     findTenantPosTerminalDefaults(db, tenantId),
+    findBranchPaymentPolicy(db, { tenantId, branchId: terminal.branchId }),
   ]);
   if (!settings) {
     throw new PosStaffError(
@@ -88,14 +90,21 @@ async function resolveRegisterConfiguration(
       403,
     );
   }
-  const cashEnabled = settings.paymentMethodsEnabled.includes("cash");
+  if (!branchPolicy) {
+    throw new PosStaffError(
+      "BRANCH_NOT_FOUND",
+      "The active POS branch was not found.",
+      404,
+    );
+  }
+  const cashEnabled = branchPolicy.paymentMethodsEnabled.includes("cash");
   return {
     terminal,
     mode: !cashEnabled
       ? "none"
       : !defaults.cashTrackingEnabled
         ? "untracked"
-        : settings.cashHandlingMode,
+        : branchPolicy.cashHandlingMode,
     cashTrackingEnabled: defaults.cashTrackingEnabled && cashEnabled,
     requireOpeningFloat: defaults.requireOpeningFloat,
     requireClosingCount: defaults.requireClosingCount,
@@ -207,12 +216,8 @@ export async function getCurrentShift(
 
 function isTrackedCashMode(
   mode: PosRegisterState["cashHandlingMode"],
-): mode is "shared_drawer" | "assigned_drawer" | "cash_in_hand" {
-  return (
-    mode === "shared_drawer" ||
-    mode === "assigned_drawer" ||
-    mode === "cash_in_hand"
-  );
+): mode is "shared_drawer" | "cash_in_hand" {
+  return mode === "shared_drawer" || mode === "cash_in_hand";
 }
 
 async function loadRegisterState(
@@ -458,9 +463,9 @@ export async function openPosRegister(
           registerSessionId: registerSession.id,
           handlingMode: configuration.mode,
           assignedStaffId:
-            configuration.mode === "shared_drawer"
-              ? null
-              : authContext.userId,
+            configuration.mode === "cash_in_hand"
+              ? authContext.userId
+              : null,
           currency,
           openingFloat: data.openingFloat ?? "0",
           actorUserId: authContext.userId,
@@ -516,16 +521,6 @@ export async function closePosRegister(
         "REGISTER_NOT_OPEN",
         "No open register session was found for this terminal.",
         404,
-      );
-    }
-    if (
-      state.cashSession?.handlingMode === "assigned_drawer" &&
-      state.cashSession.assignedStaffId !== authContext.userId &&
-      !hasPosRole(authContext, ["owner", "manager"])
-    ) {
-      throw new AuthError(
-        "FORBIDDEN",
-        "Only the assigned cashier or a manager can close this drawer.",
       );
     }
     if (
@@ -820,23 +815,13 @@ export async function ensurePaymentRegisterContext(
           registerSessionId: register.id,
           handlingMode: configuration.mode,
           assignedStaffId:
-            configuration.mode === "shared_drawer"
-              ? null
-              : authContext.userId,
+            configuration.mode === "cash_in_hand"
+              ? authContext.userId
+              : null,
           currency: register.currency,
           openingFloat: "0",
           actorUserId: authContext.userId,
         });
-      }
-      if (
-        cashSession?.handlingMode === "assigned_drawer" &&
-        cashSession.assignedStaffId !== authContext.userId &&
-        !hasPosRole(authContext, ["owner", "manager"])
-      ) {
-        throw new AuthError(
-          "FORBIDDEN",
-          "This cash drawer is assigned to another cashier.",
-        );
       }
     }
   }

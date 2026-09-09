@@ -34,8 +34,7 @@ export type UpdatePosDeviceRequest = {
     | "none"
     | "untracked"
     | "shared_drawer"
-    | "assigned_drawer"
-    | "cash_in_hand";
+      | "cash_in_hand";
   label?: string;
   status?: PosDeviceStatus;
   reason: string;

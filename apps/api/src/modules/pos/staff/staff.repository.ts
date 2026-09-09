@@ -435,7 +435,7 @@ export async function findOpenCashDrawerSession(
     tenantId: string;
     registerSessionId: string;
     staffId: string;
-    handlingMode: "shared_drawer" | "assigned_drawer" | "cash_in_hand";
+    handlingMode: "shared_drawer" | "cash_in_hand";
     forUpdate?: boolean;
   },
 ): Promise<PosCashDrawerSession | null> {
@@ -452,10 +452,7 @@ export async function findOpenCashDrawerSession(
               eq(posCashDrawerSessions.handlingMode, "cash_in_hand"),
               eq(posCashDrawerSessions.assignedStaffId, input.staffId),
             )
-          : inArray(posCashDrawerSessions.handlingMode, [
-              "shared_drawer",
-              "assigned_drawer",
-            ]),
+          : eq(posCashDrawerSessions.handlingMode, "shared_drawer"),
       ),
     )
     .limit(1);
@@ -488,7 +485,7 @@ export async function insertCashDrawerSession(
     branchId: string;
     terminalId: string;
     registerSessionId: string;
-    handlingMode: "shared_drawer" | "assigned_drawer" | "cash_in_hand";
+    handlingMode: "shared_drawer" | "cash_in_hand";
     assignedStaffId: string | null;
     currency: string;
     openingFloat: string;

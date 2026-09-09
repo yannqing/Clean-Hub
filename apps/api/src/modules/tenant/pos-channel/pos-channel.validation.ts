@@ -90,15 +90,6 @@ export const updatePosChannelDeviceBodySchema = z
   .object({
     label: z.string().trim().min(1).max(64).optional(),
     branchId: z.string().regex(ULID_PATTERN).optional(),
-    cashHandlingMode: z
-      .enum([
-        "none",
-        "untracked",
-        "shared_drawer",
-        "assigned_drawer",
-        "cash_in_hand",
-      ])
-      .optional(),
     status: z.enum(["active", "inactive"]).optional(),
     reason: z.string().trim().min(3).max(500),
     version: z.coerce.number().int().min(1),
@@ -108,7 +99,6 @@ export const updatePosChannelDeviceBodySchema = z
     (data) =>
       data.label !== undefined ||
       data.branchId !== undefined ||
-      data.cashHandlingMode !== undefined ||
       data.status !== undefined,
     "At least one terminal field must be provided.",
   );
@@ -159,12 +149,6 @@ export const updatePosChannelSettingsBodySchema = z
       .min(10)
       .max(86400)
       .optional(),
-    defaultPaymentMethod: z.enum(["cash", "card", "app"]).optional(),
-    defaultPaymentMethodsEnabled: z
-      .array(z.enum(["cash", "card", "app"]))
-      .min(1)
-      .max(3)
-      .optional(),
     defaultRoundingRule: z
       .enum(["none", "round_yuan", "round_jiao"])
       .optional(),
@@ -196,17 +180,4 @@ export const updatePosChannelSettingsBodySchema = z
         ([key, value]) => key !== "version" && value !== undefined,
       ),
     "At least one POS channel setting must be provided.",
-  )
-  .superRefine((data, context) => {
-    if (
-      data.defaultPaymentMethod &&
-      data.defaultPaymentMethodsEnabled &&
-      !data.defaultPaymentMethodsEnabled.includes(data.defaultPaymentMethod)
-    ) {
-      context.addIssue({
-        code: "custom",
-        message: "The default payment method must be enabled.",
-        path: ["defaultPaymentMethod"],
-      });
-    }
-  });
+  );

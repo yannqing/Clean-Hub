@@ -13,6 +13,7 @@ import { PosTerminalSettingsError } from "./terminal-settings.errors.js";
 import {
   findAuthenticatedTerminalSettings,
   findTerminalSettingsByTenantAndDevice,
+  findBranchPaymentPolicy,
   findTenantPosTerminalDefaults,
   insertTerminalSettings,
   updateAuthenticatedTerminalLastSeen,
@@ -35,19 +36,26 @@ async function withTenantFinancialDefaults(
   db: Database,
   settings: PosTerminalSettingsSummary,
 ): Promise<PosTerminalSettingsSummary> {
-  const [defaults, mobileMoneyProvidersEnabled] = await Promise.all([
-    findTenantPosTerminalDefaults(db, settings.tenantId),
-    findEnabledTenantPaymentProviders(db, settings.tenantId),
-  ]);
+  const [defaults, mobileMoneyProvidersEnabled, branchPolicy] =
+    await Promise.all([
+      findTenantPosTerminalDefaults(db, settings.tenantId),
+      findEnabledTenantPaymentProviders(db, settings.tenantId),
+      findBranchPaymentPolicy(db, {
+        tenantId: settings.tenantId,
+        branchId: settings.branchId,
+      }),
+    ]);
+  const branchMethods = branchPolicy?.paymentMethodsEnabled ?? ["cash", "app"];
   const paymentMethodsEnabled =
     mobileMoneyProvidersEnabled.length > 0
-      ? [...settings.paymentMethodsEnabled]
-      : settings.paymentMethodsEnabled.filter((method) => method !== "app");
+      ? [...branchMethods]
+      : branchMethods.filter((method) => method !== "app");
   if (paymentMethodsEnabled.length === 0) paymentMethodsEnabled.push("cash");
+  const branchDefaultMethod = branchPolicy?.defaultPaymentMethod ?? "cash";
   const defaultPaymentMethod = paymentMethodsEnabled.includes(
-    settings.defaultPaymentMethod,
+    branchDefaultMethod,
   )
-    ? settings.defaultPaymentMethod
+    ? branchDefaultMethod
     : paymentMethodsEnabled[0]!;
   return {
     ...settings,
@@ -57,7 +65,7 @@ async function withTenantFinancialDefaults(
       ? "none"
       : !defaults.cashTrackingEnabled
         ? "untracked"
-        : settings.cashHandlingMode,
+        : (branchPolicy?.cashHandlingMode ?? "shared_drawer"),
     cashTrackingEnabled: defaults.cashTrackingEnabled,
     requireOpeningFloat: defaults.requireOpeningFloat,
     requireClosingCount: defaults.requireClosingCount,
@@ -138,42 +146,12 @@ export async function createPosTerminalSettings(
     }
 
     const defaults = await findTenantPosTerminalDefaults(tx, tenantId);
-    const mobileMoneyProviders = await findEnabledTenantPaymentProviders(
-      tx,
-      tenantId,
-    );
-    const configuredMethods =
-      data.paymentMethodsEnabled ?? defaults.paymentMethodsEnabled;
-    const enabledMethods =
-      mobileMoneyProviders.length > 0
-        ? configuredMethods
-        : configuredMethods.filter((method) => method !== "app");
-    if (enabledMethods.length === 0) enabledMethods.push("cash");
-    const configuredDefault =
-      data.defaultPaymentMethod ?? defaults.defaultPaymentMethod;
-    const defaultMethod = enabledMethods.includes(configuredDefault)
-      ? configuredDefault
-      : enabledMethods[0]!;
-    if (!enabledMethods.includes(defaultMethod)) {
-      throw new PosTerminalSettingsError(
-        "VALIDATION_ERROR",
-        "The default payment method must also be enabled for this terminal.",
-        422,
-      );
-    }
     const settings = await insertTerminalSettings(
       tx,
       tenantId,
       authContext.userId,
       {
         ...data,
-        defaultPaymentMethod: defaultMethod,
-        paymentMethodsEnabled: enabledMethods,
-        cashHandlingMode: !enabledMethods.includes("cash")
-          ? "none"
-          : !defaults.cashTrackingEnabled
-            ? "untracked"
-            : (data.cashHandlingMode ?? defaults.cashHandlingMode),
         roundingRule: data.roundingRule ?? defaults.roundingRule,
         autoPrintReceipt: data.autoPrintReceipt ?? defaults.autoPrintReceipt,
         printCopies: data.printCopies ?? defaults.printCopies,
@@ -195,21 +173,7 @@ export async function createPosTerminalSettings(
       userAgent: requestMeta?.userAgent,
     });
 
-    return {
-      ...settings,
-      taxEnabled: defaults.taxEnabled,
-      defaultTaxRate: defaults.defaultTaxRate,
-      pricesIncludeTax: defaults.pricesIncludeTax,
-      taxRegistrationNumber: defaults.taxRegistrationNumber,
-      cashTrackingEnabled: defaults.cashTrackingEnabled,
-      cashHandlingMode: !enabledMethods.includes("cash")
-        ? "none"
-        : !defaults.cashTrackingEnabled
-          ? "untracked"
-          : settings.cashHandlingMode,
-      requireOpeningFloat: defaults.requireOpeningFloat,
-      requireClosingCount: defaults.requireClosingCount,
-    };
+    return withTenantFinancialDefaults(tx, settings);
   });
 }
 

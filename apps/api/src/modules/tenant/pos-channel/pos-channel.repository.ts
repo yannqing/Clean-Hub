@@ -126,7 +126,6 @@ type BranchOperationalMetrics = {
 
 const DEFAULT_POS_CHANNEL_SETTINGS = {
   cashTrackingEnabled: true,
-  defaultCashHandlingMode: "shared_drawer" as const,
   requireOpeningFloat: true,
   requireClosingCount: true,
   requireReturnReason: true,
@@ -134,10 +133,6 @@ const DEFAULT_POS_CHANNEL_SETTINGS = {
   offlineModeEnabled: true,
   syncIntervalSeconds: 60,
   deviceOfflineAfterSeconds: 600,
-  defaultPaymentMethod: "cash",
-  defaultPaymentMethodsEnabled: ["cash", "app"] as Array<
-    "cash" | "card" | "app"
-  >,
   defaultRoundingRule: "none",
   taxEnabled: false,
   defaultTaxRate: "0.0000",
@@ -199,7 +194,6 @@ function toSettingsRecord(
     id: row.id,
     tenantId: row.tenantId,
     cashTrackingEnabled: row.cashTrackingEnabled,
-    defaultCashHandlingMode: row.defaultCashHandlingMode,
     requireOpeningFloat: row.requireOpeningFloat,
     requireClosingCount: row.requireClosingCount,
     requireReturnReason: row.requireReturnReason,
@@ -207,8 +201,6 @@ function toSettingsRecord(
     offlineModeEnabled: row.offlineModeEnabled,
     syncIntervalSeconds: row.syncIntervalSeconds,
     deviceOfflineAfterSeconds: row.deviceOfflineAfterSeconds,
-    defaultPaymentMethod: row.defaultPaymentMethod,
-    defaultPaymentMethodsEnabled: row.defaultPaymentMethodsEnabled,
     defaultRoundingRule: row.defaultRoundingRule,
     taxEnabled: row.taxEnabled,
     defaultTaxRate: row.defaultTaxRate,
@@ -445,9 +437,6 @@ export async function updatePosChannelSettingsRecord(
   const values = {
     cashTrackingEnabled:
       requestedValues.cashTrackingEnabled ?? input.current.cashTrackingEnabled,
-    defaultCashHandlingMode:
-      requestedValues.defaultCashHandlingMode ??
-      input.current.defaultCashHandlingMode,
     requireOpeningFloat:
       requestedValues.requireOpeningFloat ?? input.current.requireOpeningFloat,
     requireClosingCount:
@@ -464,12 +453,6 @@ export async function updatePosChannelSettingsRecord(
     deviceOfflineAfterSeconds:
       requestedValues.deviceOfflineAfterSeconds ??
       input.current.deviceOfflineAfterSeconds,
-    defaultPaymentMethod:
-      requestedValues.defaultPaymentMethod ??
-      input.current.defaultPaymentMethod,
-    defaultPaymentMethodsEnabled:
-      requestedValues.defaultPaymentMethodsEnabled ??
-      input.current.defaultPaymentMethodsEnabled,
     defaultRoundingRule:
       requestedValues.defaultRoundingRule ?? input.current.defaultRoundingRule,
     taxEnabled: requestedValues.taxEnabled ?? input.current.taxEnabled,
@@ -742,8 +725,8 @@ export async function findPosChannelDevices(
         credentialIssuedAt: posTerminalSettings.credentialIssuedAt,
         credentialRotatedAt: posTerminalSettings.credentialRotatedAt,
         credentialLastUsedAt: posTerminalSettings.credentialLastUsedAt,
-        defaultPaymentMethod: posTerminalSettings.defaultPaymentMethod,
-        cashHandlingMode: posTerminalSettings.cashHandlingMode,
+        defaultPaymentMethod: branches.defaultPaymentMethod,
+        cashHandlingMode: branches.cashHandlingMode,
         roundingRule: posTerminalSettings.roundingRule,
         autoPrintReceipt: posTerminalSettings.autoPrintReceipt,
         printCopies: posTerminalSettings.printCopies,

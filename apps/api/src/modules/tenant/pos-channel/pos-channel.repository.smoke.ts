@@ -200,10 +200,6 @@ export async function runTenantPosChannelRepositorySmoke(): Promise<void> {
       label: "POS channel smoke terminal",
     });
     terminalId = terminal.id;
-    assert.equal(
-      terminal.defaultPaymentMethod,
-      ownerSettings.defaultPaymentMethod,
-    );
     assert.equal(terminal.roundingRule, ownerSettings.defaultRoundingRule);
     assert.equal(
       terminal.autoPrintReceipt,

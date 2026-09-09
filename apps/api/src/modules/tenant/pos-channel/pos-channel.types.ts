@@ -11,7 +11,6 @@ export type PosChannelCashHandlingMode =
   | "none"
   | "untracked"
   | "shared_drawer"
-  | "assigned_drawer"
   | "cash_in_hand";
 export type PosChannelRoundingRule = "none" | "round_yuan" | "round_jiao";
 export type PosChannelDeviceStatus = "active" | "inactive";
@@ -279,7 +278,6 @@ export type PosChannelSettings = {
   id: string | null;
   tenantId: string;
   cashTrackingEnabled: boolean;
-  defaultCashHandlingMode: PosChannelCashHandlingMode;
   requireOpeningFloat: boolean;
   requireClosingCount: boolean;
   requireReturnReason: boolean;
@@ -287,8 +285,6 @@ export type PosChannelSettings = {
   offlineModeEnabled: boolean;
   syncIntervalSeconds: number;
   deviceOfflineAfterSeconds: number;
-  defaultPaymentMethod: PosChannelPaymentMethod;
-  defaultPaymentMethodsEnabled: PosChannelPaymentMethod[];
   mobileMoneyProvidersEnabled: TenantPaymentProvider[];
   defaultRoundingRule: PosChannelRoundingRule;
   taxEnabled: boolean;
@@ -308,7 +304,6 @@ export type PosChannelSettings = {
 
 export type UpdatePosChannelSettingsRequest = {
   cashTrackingEnabled?: boolean;
-  defaultCashHandlingMode?: PosChannelCashHandlingMode;
   requireOpeningFloat?: boolean;
   requireClosingCount?: boolean;
   requireReturnReason?: boolean;
@@ -316,8 +311,6 @@ export type UpdatePosChannelSettingsRequest = {
   offlineModeEnabled?: boolean;
   syncIntervalSeconds?: number;
   deviceOfflineAfterSeconds?: number;
-  defaultPaymentMethod?: PosChannelPaymentMethod;
-  defaultPaymentMethodsEnabled?: PosChannelPaymentMethod[];
   defaultRoundingRule?: PosChannelRoundingRule;
   taxEnabled?: boolean;
   defaultTaxRate?: string;

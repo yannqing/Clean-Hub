@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import {
+  branches,
   posChannelSettings,
   posTerminalSettings,
   type Database,
@@ -35,9 +36,11 @@ function toSummary(
     platform: row.platform,
     platformVersion: row.platformVersion,
     appVersion: row.appVersion,
-    defaultPaymentMethod: row.defaultPaymentMethod,
-    paymentMethodsEnabled: row.paymentMethodsEnabled,
-    cashHandlingMode: row.cashHandlingMode,
+    // Payment policy lives on the branch; withTenantFinancialDefaults overlays
+    // the real values. These placeholders keep the row shape complete.
+    defaultPaymentMethod: "cash",
+    paymentMethodsEnabled: ["cash", "app"],
+    cashHandlingMode: "shared_drawer",
     cashTrackingEnabled: true,
     requireOpeningFloat: true,
     requireClosingCount: true,
@@ -77,14 +80,6 @@ export async function findTenantPosTerminalDefaults(
   db: Database,
   tenantId: string,
 ): Promise<{
-  defaultPaymentMethod: "cash" | "card" | "app";
-  paymentMethodsEnabled: Array<"cash" | "card" | "app">;
-  cashHandlingMode:
-    | "none"
-    | "untracked"
-    | "shared_drawer"
-    | "assigned_drawer"
-    | "cash_in_hand";
   cashTrackingEnabled: boolean;
   requireOpeningFloat: boolean;
   requireClosingCount: boolean;
@@ -99,9 +94,6 @@ export async function findTenantPosTerminalDefaults(
 }> {
   const rows = await db
     .select({
-      defaultPaymentMethod: posChannelSettings.defaultPaymentMethod,
-      paymentMethodsEnabled: posChannelSettings.defaultPaymentMethodsEnabled,
-      cashHandlingMode: posChannelSettings.defaultCashHandlingMode,
       cashTrackingEnabled: posChannelSettings.cashTrackingEnabled,
       requireOpeningFloat: posChannelSettings.requireOpeningFloat,
       requireClosingCount: posChannelSettings.requireClosingCount,
@@ -120,9 +112,6 @@ export async function findTenantPosTerminalDefaults(
 
   return (
     rows[0] ?? {
-      defaultPaymentMethod: "cash",
-      paymentMethodsEnabled: ["cash", "app"],
-      cashHandlingMode: "shared_drawer",
       cashTrackingEnabled: true,
       requireOpeningFloat: true,
       requireClosingCount: true,
@@ -136,6 +125,38 @@ export async function findTenantPosTerminalDefaults(
       taxRegistrationNumber: null,
     }
   );
+}
+
+export type BranchPaymentPolicy = {
+  paymentMethodsEnabled: Array<"cash" | "card" | "app">;
+  defaultPaymentMethod: "cash" | "card" | "app";
+  cashHandlingMode: "none" | "untracked" | "shared_drawer" | "cash_in_hand";
+};
+
+/**
+ * Cash and payment policy is owned by the branch, so a store with a physical
+ * drawer and one whose staff carry cash can differ under the same tenant.
+ */
+export async function findBranchPaymentPolicy(
+  db: Database,
+  input: { tenantId: string; branchId: string },
+): Promise<BranchPaymentPolicy | null> {
+  const rows = await db
+    .select({
+      paymentMethodsEnabled: branches.paymentMethodsEnabled,
+      defaultPaymentMethod: branches.defaultPaymentMethod,
+      cashHandlingMode: branches.cashHandlingMode,
+    })
+    .from(branches)
+    .where(
+      and(
+        eq(branches.id, input.branchId),
+        eq(branches.tenantId, input.tenantId),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
 }
 
 export async function findTerminalSettingsByTenantAndDevice(
@@ -213,9 +234,6 @@ export async function insertTerminalSettings(
       branchId: input.branchId,
       deviceId: input.deviceId,
       label: input.label ?? null,
-      defaultPaymentMethod: input.defaultPaymentMethod ?? "cash",
-      paymentMethodsEnabled: input.paymentMethodsEnabled ?? ["cash", "app"],
-      cashHandlingMode: input.cashHandlingMode ?? "shared_drawer",
       roundingRule: input.roundingRule ?? "none",
       autoPrintReceipt: input.autoPrintReceipt ?? true,
       printCopies: input.printCopies ?? 1,
@@ -242,12 +260,6 @@ export async function updateTerminalSettingsRecord(
   };
 
   if (input.label !== undefined) setValues.label = input.label;
-  if (input.defaultPaymentMethod !== undefined)
-    setValues.defaultPaymentMethod = input.defaultPaymentMethod;
-  if (input.paymentMethodsEnabled !== undefined)
-    setValues.paymentMethodsEnabled = input.paymentMethodsEnabled;
-  if (input.cashHandlingMode !== undefined)
-    setValues.cashHandlingMode = input.cashHandlingMode;
   if (input.roundingRule !== undefined)
     setValues.roundingRule = input.roundingRule;
   if (input.autoPrintReceipt !== undefined)

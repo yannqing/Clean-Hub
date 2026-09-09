@@ -13,7 +13,6 @@ export type PosCashHandlingMode =
   | "none"
   | "untracked"
   | "shared_drawer"
-  | "assigned_drawer"
   | "cash_in_hand";
 
 export type PosRoundingRule = "none" | "round_yuan" | "round_jiao";
