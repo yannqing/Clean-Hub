@@ -19,15 +19,29 @@ export function buildPosOrderReceipt(input: {
   const { branch, order, payments } = input;
   const locale = toPrintLocale(input.locale);
   const copy = receiptCopy[locale];
+  // The customer brings this slip back to collect their garments, so each line
+  // carries the ticket it belongs to and its label code.
+  const ticketReferences = order.ticketReferences ?? [];
+  const ticketNoByTicketId = new Map(
+    ticketReferences.map((reference) => [
+      reference.ticketId,
+      reference.ticketNo,
+    ]),
+  );
   const items = order.items.map((item) => {
     const quantity =
       item.pricingUnit === "per_kg"
         ? Number(item.weight ?? item.quantity)
         : Number(item.quantity);
+    const ticketNo = item.ticketId
+      ? ticketNoByTicketId.get(item.ticketId)
+      : null;
     const details = [
       item.pricingUnit === "per_kg"
         ? `${item.weight ?? item.quantity} kg${item.bagCount ? ` / ${item.bagCount}` : ""}`
         : `${item.quantity} × ${item.unitOfMeasure ?? "item"}`,
+      ticketNo ? `${copy.ticket}: ${ticketNo}` : null,
+      item.itemIdentifier ? `${copy.label}: ${item.itemIdentifier}` : null,
       item.itemColor ? `${copy.color}: ${item.itemColor}` : null,
       item.specialRequest ? item.specialRequest : null,
     ].filter((value): value is string => Boolean(value));
@@ -41,6 +55,10 @@ export function buildPosOrderReceipt(input: {
       note: details.length > 0 ? details.join(" · ") : undefined,
     };
   });
+  const earliestPickupAt = ticketReferences
+    .map((reference) => reference.expectedPickupAt)
+    .filter((value): value is string => Boolean(value))
+    .sort()[0];
   const totalMinor = toMinorUnits(order.totalAmount, order.currency);
   const paymentMethod = [
     ...new Set(
@@ -112,6 +130,9 @@ export function buildPosOrderReceipt(input: {
           totalMinor - toMinorUnits(order.paidAmount, order.currency),
         ),
         paymentMethod: paymentMethod || undefined,
+        expectedPickup: earliestPickupAt
+          ? `${copy.expectedPickup}: ${formatReceiptPickup(earliestPickupAt, locale)}`
+          : undefined,
         receiptAddress: branch?.receiptAddress ?? undefined,
         receiptPhone: branch?.receiptPhone ?? undefined,
         thankYouMessage: copy.thankYou,
@@ -128,13 +149,19 @@ export function getPosReceiptCopy(locale: string) {
 const receiptCopy = {
   en: {
     color: "Color",
+    expectedPickup: "Ready for pickup",
+    label: "Tag",
     thankYou: "Thank you",
+    ticket: "Ticket",
     walkInCustomer: "Walk-in customer",
     paymentMethods: { cash: "Cash", card: "Card", app: "Mobile payment" },
   },
   fr: {
     color: "Couleur",
+    expectedPickup: "Retrait prévu",
+    label: "Étiquette",
     thankYou: "Merci",
+    ticket: "Bon",
     walkInCustomer: "Client de passage",
     paymentMethods: {
       cash: "Espèces",
@@ -144,7 +171,10 @@ const receiptCopy = {
   },
   "zh-CN": {
     color: "颜色",
+    expectedPickup: "预计取件",
+    label: "标签",
     thankYou: "谢谢惠顾",
+    ticket: "工单",
     walkInCustomer: "散客",
     paymentMethods: { cash: "现金", card: "银行卡", app: "移动支付" },
   },
@@ -152,11 +182,25 @@ const receiptCopy = {
   PrintLocale,
   {
     color: string;
+    expectedPickup: string;
+    label: string;
     thankYou: string;
+    ticket: string;
     walkInCustomer: string;
     paymentMethods: Record<PosPaymentTransaction["paymentMethod"], string>;
   }
 >;
+
+function formatReceiptPickup(iso: string, locale: PrintLocale): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString(locale, {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
 
 function toMinorUnits(value: string, currency: string): number {
   const fractionDigits =

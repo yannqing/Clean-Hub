@@ -59,6 +59,7 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
       change: "Change",
       balance: "Balance",
       payment_method: "Payment method",
+      expected_pickup: "Expected pickup",
       receipt_address: "Receipt address",
       receipt_phone: "Receipt phone",
       thank_you_message: "Thank-you message",
@@ -105,6 +106,7 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
       change: "Monnaie",
       balance: "Solde",
       payment_method: "Mode de paiement",
+      expected_pickup: "Retrait prévu",
       receipt_address: "Adresse du reçu",
       receipt_phone: "Téléphone du reçu",
       thank_you_message: "Message de remerciement",
@@ -150,6 +152,7 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
       change: "找零",
       balance: "未付余额",
       payment_method: "支付方式",
+      expected_pickup: "预计取件时间",
       receipt_address: "小票地址",
       receipt_phone: "小票联系电话",
       thank_you_message: "感谢语",
@@ -207,7 +210,12 @@ const groups: Array<{
   },
   {
     key: "footer",
-    fields: ["receipt_address", "receipt_phone", "thank_you_message"],
+    fields: [
+      "expected_pickup",
+      "receipt_address",
+      "receipt_phone",
+      "thank_you_message",
+    ],
   },
 ];
 

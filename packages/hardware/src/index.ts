@@ -368,6 +368,8 @@ export type PosReceiptDocument = {
   cashTenderedMinor?: number;
   changeMinor?: number;
   paymentMethod?: string;
+  /** When the customer can collect, printed so the slip works as a claim tag. */
+  expectedPickup?: string;
   receiptAddress?: string;
   receiptPhone?: string;
   thankYouMessage?: string;
@@ -857,6 +859,7 @@ function buildPosReceiptLines(
     "item_notes",
   ].some((field) => has(field as PosReceiptField));
   const footerParts = [
+    has("expected_pickup") ? receipt.expectedPickup : undefined,
     has("receipt_address") ? receipt.receiptAddress : undefined,
     has("receipt_phone") ? receipt.receiptPhone : undefined,
     has("thank_you_message") ? receipt.thankYouMessage : undefined,
