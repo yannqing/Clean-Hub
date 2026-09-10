@@ -144,8 +144,8 @@ function ProductCartButton({ product }: { product: PosCatalogProduct }) {
     <Button
       className="h-8 gap-1.5 px-3 text-xs"
       disabled={!loaded}
-      onClick={() => {
-        const result = addProduct(product);
+      onClick={async () => {
+        const result = await addProduct(product);
         if (result.changed) {
           toast.success(t("pos.cart.added"));
         } else {

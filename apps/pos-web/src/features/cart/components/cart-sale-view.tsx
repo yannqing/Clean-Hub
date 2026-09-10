@@ -159,8 +159,8 @@ export function CartSaleView({
   );
 
   const handleAddProduct = useCallback(
-    (product: PosCatalogProduct, scanned = false) => {
-      const result = addProduct(product);
+    async (product: PosCatalogProduct, scanned = false) => {
+      const result = await addProduct(product);
       if (!result.changed) {
         toast.error(result.message ?? t("pos.cart.unavailable"));
         return;
@@ -183,7 +183,7 @@ export function CartSaleView({
           entry.sku.trim().toLowerCase() === code,
       );
       if (product) {
-        handleAddProduct(product, true);
+        void handleAddProduct(product, true);
       } else {
         toast.error(t("pos.cart.scanNotFound", { code: event.value }));
       }
@@ -557,17 +557,19 @@ function CartPanel({
     name: string,
     handoffNote?: string,
   ) => Promise<import("@cleanhub/api-client").PosSavedCart>;
-  onRemoveLine: (lineId: string) => { changed: boolean; message?: string };
-  onSelectCustomer: (customer: PosCustomerProfileWithAccount | null) => {
+  onRemoveLine: (
+    lineId: string,
+  ) => Promise<{ changed: boolean; message?: string }>;
+  onSelectCustomer: (customer: PosCustomerProfileWithAccount | null) => Promise<{
     changed: boolean;
     message?: string;
-  };
+  }>;
   onSetDiscount: (code: string, reason: string) => void;
   onSetNotes: (notes: string) => void;
   onSetProductQuantity: (
     lineId: string,
     quantity: number,
-  ) => { changed: boolean; message?: string };
+  ) => Promise<{ changed: boolean; message?: string }>;
   scopeReady: boolean;
 }) {
   const { locale, t } = useTranslation();
@@ -1389,8 +1391,8 @@ function CartPanel({
       <div className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <CustomerSelector
           locked={hasTicketLines}
-          onSelect={(customer) => {
-            const result = onSelectCustomer(customer);
+          onSelect={async (customer) => {
+            const result = await onSelectCustomer(customer);
             if (!result.changed && result.message) toast.error(result.message);
           }}
           selected={cart.customer}
@@ -1416,12 +1418,12 @@ function CartPanel({
                 key={line.id}
                 line={line}
                 locale={locale}
-                onQuantityChange={(quantity) => {
-                  const result = onSetProductQuantity(line.id, quantity);
+                onQuantityChange={async (quantity) => {
+                  const result = await onSetProductQuantity(line.id, quantity);
                   if (!result.changed && result.message)
                     toast.error(result.message);
                 }}
-                onRemove={() => onRemoveLine(line.id)}
+                onRemove={() => void onRemoveLine(line.id)}
               />
             ))}
           </div>

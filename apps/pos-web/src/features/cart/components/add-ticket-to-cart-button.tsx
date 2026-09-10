@@ -62,12 +62,14 @@ export function AddTicketToCartButton({
     setOpen(true);
   }
 
-  function addSelectedItems() {
-    const result = addTicket({ ...ticket, items: selectedItems });
+  async function addSelectedItems() {
+    const result = await addTicket({ ...ticket, items: selectedItems });
     if (!result.changed) {
       toast.error(result.message ?? t("pos.cart.unavailable"));
       return;
     }
+    // Navigating before the cart write settles loses the items: the sale page
+    // remounts the hook, which reads storage that has not been updated yet.
     setOpen(false);
     router.push(posRoutes.sale);
   }

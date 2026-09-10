@@ -180,6 +180,120 @@ assert.equal(ticketResult.changed, true);
 assert.equal(ticketResult.cart.customer?.id, "01ARZ3NDEKTSV4RRFFQ69G5FB5");
 assert.equal(calculatePosCartTotal(ticketResult.cart), "1750.00");
 
+// A customer collecting one ticket while dropping off another must settle in
+// a single order, so a second ticket has to accumulate onto the first.
+const secondTicketResult = addTicketToPosCart(
+  ticketResult.cart,
+  {
+    id: "01ARZ3NDEKTSV4RRFFQ69G5FC0",
+    branchId: scope.branchId,
+    currency: "XOF",
+    customerId: "01ARZ3NDEKTSV4RRFFQ69G5FB5",
+    customerName: "Awa",
+    ticketNo: "TK-101",
+    items: [
+      {
+        id: "01ARZ3NDEKTSV4RRFFQ69G5FC1",
+        ticketId: "01ARZ3NDEKTSV4RRFFQ69G5FC0",
+        itemType: "cloth",
+        itemName: "Suit dry clean",
+        itemCategory: null,
+        itemStatus: "pending_wash",
+        itemColor: null,
+        itemBrand: null,
+        itemMaterial: null,
+        quantity: 1,
+        pricingUnit: "per_item",
+        standardUnitAmount: "2000",
+        chargedUnitAmount: "2000",
+        weight: null,
+        bagCount: null,
+        unitAmount: "2000",
+        lineAmount: "2000",
+        serviceId: "01ARZ3NDEKTSV4RRFFQ69G5FC2",
+        labelCode: null,
+        defectNotes: null,
+        specialRequest: null,
+        remark: null,
+        sortOrder: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1,
+      },
+    ],
+  },
+  scope.branchId,
+);
+assert.equal(secondTicketResult.changed, true);
+assert.equal(
+  secondTicketResult.cart.lines.filter((line) => line.kind === "ticket_item")
+    .length,
+  2,
+  "a second ticket must add to the cart instead of replacing the first",
+);
+assert.deepEqual(
+  secondTicketResult.cart.lines
+    .filter((line) => line.kind === "ticket_item")
+    .map((line) => line.ticketCode)
+    .sort(),
+  ["TK-100", "TK-101"],
+  "each ticket item must keep the ticket it came from",
+);
+assert.equal(
+  calculatePosCartTotal(secondTicketResult.cart),
+  "3750.00",
+  "a multi-ticket cart must total every ticket it holds",
+);
+
+const foreignCustomerTicket = addTicketToPosCart(
+  ticketResult.cart,
+  {
+    id: "01ARZ3NDEKTSV4RRFFQ69G5FC3",
+    branchId: scope.branchId,
+    currency: "XOF",
+    customerId: "01ARZ3NDEKTSV4RRFFQ69G5FC4",
+    customerName: "Bintou",
+    ticketNo: "TK-102",
+    items: secondTicketResult.cart.lines
+      .filter((line) => line.kind === "ticket_item")
+      .slice(0, 1)
+      .map(() => ({
+        id: "01ARZ3NDEKTSV4RRFFQ69G5FC5",
+        ticketId: "01ARZ3NDEKTSV4RRFFQ69G5FC3",
+        itemType: "cloth" as const,
+        itemName: "Coat wash",
+        itemCategory: null,
+        itemStatus: "pending_wash" as const,
+        itemColor: null,
+        itemBrand: null,
+        itemMaterial: null,
+        quantity: 1,
+        pricingUnit: "per_item" as const,
+        standardUnitAmount: "500",
+        chargedUnitAmount: "500",
+        weight: null,
+        bagCount: null,
+        unitAmount: "500",
+        lineAmount: "500",
+        serviceId: "01ARZ3NDEKTSV4RRFFQ69G5FC6",
+        labelCode: null,
+        defectNotes: null,
+        specialRequest: null,
+        remark: null,
+        sortOrder: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1,
+      })),
+  },
+  scope.branchId,
+);
+assert.equal(
+  foreignCustomerTicket.changed,
+  false,
+  "tickets belonging to another customer must never join the same cart",
+);
+
 const older = { ...ticketResult.cart, updatedAt: "2026-01-01T00:00:00.000Z" };
 const newer = { ...ticketResult.cart, updatedAt: "2026-01-02T00:00:00.000Z" };
 assert.equal(

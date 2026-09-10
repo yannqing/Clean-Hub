@@ -217,37 +217,47 @@ export function usePosCart() {
   }, [loaded, scope]);
 
   const commit = useCallback(
-    (next: PosCartSnapshot) => {
+    async (next: PosCartSnapshot) => {
       // Mutations are persisted immediately; the 30-second timer is an
       // additional checkpoint, not the only opportunity to save the cart.
-      void replaceCart(next).catch(() => undefined);
+      // Awaited so callers that navigate right after a mutation cannot race
+      // the storage write and lose the lines they just added.
+      await replaceCart(next).catch(() => undefined);
       scheduleCloudSave(next);
     },
     [replaceCart, scheduleCloudSave],
   );
   const apply = useCallback(
-    (result: PosCartMutationResult) => {
-      if (result.changed) commit(result.cart);
+    async (result: PosCartMutationResult) => {
+      if (result.changed) await commit(result.cart);
       return result;
     },
     [commit],
   );
+  // Mutations read cartRef rather than the `cart` state value: a burst of
+  // scans (or a second add before React re-renders) would otherwise each
+  // build from the same stale snapshot and drop the earlier lines.
   const addProduct = useCallback(
-    (product: PosCatalogProduct) => apply(addProductToPosCart(cart, product)),
-    [apply, cart],
+    (product: PosCatalogProduct) =>
+      apply(addProductToPosCart(cartRef.current, product)),
+    [apply],
   );
   const addTicket = useCallback(
-    (ticket: ServiceTicketDetail) =>
+    async (ticket: ServiceTicketDetail): Promise<PosCartMutationResult> =>
       branchId
-        ? apply(addTicketToPosCart(cart, ticket, branchId))
-        : { cart, changed: false, message: "当前门店尚未初始化。" },
-    [apply, branchId, cart],
+        ? apply(addTicketToPosCart(cartRef.current, ticket, branchId))
+        : {
+            cart: cartRef.current,
+            changed: false,
+            message: "当前门店尚未初始化。",
+          },
+    [apply, branchId],
   );
   const setCustomer = useCallback(
     (customer: PosCustomerProfileWithAccount | null) =>
       apply(
         setPosCartCustomer(
-          cart,
+          cartRef.current,
           customer
             ? {
                 id: customer.id,
@@ -257,25 +267,25 @@ export function usePosCart() {
             : null,
         ),
       ),
-    [apply, cart],
+    [apply],
   );
   const setProductQuantity = useCallback(
     (lineId: string, quantity: number) =>
-      apply(setPosCartProductQuantity(cart, lineId, quantity)),
-    [apply, cart],
+      apply(setPosCartProductQuantity(cartRef.current, lineId, quantity)),
+    [apply],
   );
   const removeLine = useCallback(
-    (lineId: string) => apply(removePosCartLine(cart, lineId)),
-    [apply, cart],
+    (lineId: string) => apply(removePosCartLine(cartRef.current, lineId)),
+    [apply],
   );
   const setNotes = useCallback(
-    (notes: string) => commit(setPosCartNotes(cart, notes)),
-    [cart, commit],
+    (notes: string) => commit(setPosCartNotes(cartRef.current, notes)),
+    [commit],
   );
   const setDiscount = useCallback(
     (code: string, reason: string) =>
-      commit(setPosCartDiscount(cart, { code, reason })),
-    [cart, commit],
+      commit(setPosCartDiscount(cartRef.current, { code, reason })),
+    [commit],
   );
   const clear = useCallback(async () => {
     const empty = createEmptyPosCart(currency);
