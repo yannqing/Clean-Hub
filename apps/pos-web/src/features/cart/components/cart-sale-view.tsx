@@ -233,17 +233,22 @@ export function CartSaleView({
       <div className="grid items-start gap-5 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_380px]">
         <div className="pos-scrollbar min-w-0 space-y-4 xl:h-full xl:overflow-y-auto xl:overscroll-contain xl:pr-2">
           <div className="sticky top-0 z-20 -mx-2 flex flex-col gap-2 border-y bg-background/95 px-2 py-2.5 backdrop-blur sm:static sm:mx-0 sm:gap-3 sm:px-3 sm:py-3 md:flex-row md:items-center">
-            <div className="grid w-full shrink-0 grid-cols-3 rounded-md bg-muted p-1 md:flex md:w-auto">
+            <div className="grid w-full shrink-0 grid-cols-3 rounded-lg bg-muted p-1 md:flex md:w-auto">
               {(["all", "products", "services"] as const).map((value) => (
-                <Button
-                  className={cn("min-w-0 px-2 text-xs sm:px-3 sm:text-sm")}
+                <button
+                  aria-pressed={filter === value}
+                  className={cn(
+                    "h-9 min-w-0 rounded-md px-2 text-xs font-medium transition-colors sm:px-4 sm:text-sm",
+                    filter === value
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
                   key={value}
                   onClick={() => setFilter(value)}
                   type="button"
-                  variant={filter === value ? "secondary" : "ghost"}
                 >
                   {t(`pos.cart.${value}`)}
-                </Button>
+                </button>
               ))}
             </div>
             <div className="relative min-w-0 flex-1">
