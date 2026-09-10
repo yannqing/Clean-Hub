@@ -18,11 +18,13 @@ import {
   customers,
   orderDiscountApplications,
   orderItems,
+  orderTicketReferences,
   orders,
   paymentTransactions,
   serviceTickets,
   tenantSettings,
   ticketItems,
+  userProfiles,
   type Database,
 } from "@cleanhub/db";
 import {
@@ -45,6 +47,7 @@ import type {
   PosOrderSort,
   PosOrderSummary,
   PosOrderSettlementIntent,
+  PosOrderTicketReference,
   PosOrderType,
   PosMobileMoneyProvider,
   PosPaymentMethod,
@@ -451,11 +454,13 @@ export async function findPosOrderDetail(
     db,
     input,
   );
+  const ticketReferences = await listPosOrderTicketReferences(db, input);
 
   return {
     ...summary,
     items: itemRows.map(toOrderItem),
     discountApplications,
+    ticketReferences,
   };
 }
 
@@ -714,6 +719,101 @@ export async function insertOrderItemsFromTicketItems(
       updatedBy: input.actorUserId,
     })),
   );
+
+  await insertOrderTicketReference(db, input);
+}
+
+/**
+ * Record what the ticket said at checkout so the order keeps its fulfilment
+ * context even after the ticket is edited or cancelled, the same rule the tax
+ * snapshots on `orders` follow.
+ */
+async function insertOrderTicketReference(
+  db: Database,
+  input: {
+    tenantId: string;
+    branchId: string;
+    orderId: string;
+    ticketId: string;
+    items: (typeof ticketItems.$inferSelect)[];
+    actorUserId: string;
+  },
+): Promise<void> {
+  const ticketRows = await db
+    .select({
+      ticketNo: serviceTickets.ticketNo,
+      remark: serviceTickets.remark,
+      priority: serviceTickets.priority,
+      expectedPickupAt: serviceTickets.expectedPickupAt,
+      assistantName: userProfiles.displayName,
+    })
+    .from(serviceTickets)
+    .leftJoin(userProfiles, eq(userProfiles.userId, serviceTickets.assistantId))
+    .where(
+      and(
+        eq(serviceTickets.id, input.ticketId),
+        eq(serviceTickets.tenantId, input.tenantId),
+      ),
+    )
+    .limit(1);
+  const ticket = ticketRows[0];
+  if (!ticket) {
+    return;
+  }
+
+  const itemAmount = input.items.reduce(
+    (total, item) => total + Number(item.lineAmount),
+    0,
+  );
+
+  await db
+    .insert(orderTicketReferences)
+    .values({
+      id: createId(),
+      tenantId: input.tenantId,
+      branchId: input.branchId,
+      orderId: input.orderId,
+      ticketId: input.ticketId,
+      ticketNoSnapshot: ticket.ticketNo,
+      ticketRemarkSnapshot: ticket.remark,
+      prioritySnapshot: ticket.priority,
+      expectedPickupAtSnapshot: ticket.expectedPickupAt,
+      assistantNameSnapshot: ticket.assistantName,
+      itemCount: input.items.length,
+      itemAmount: itemAmount.toFixed(2),
+      createdBy: input.actorUserId,
+      updatedBy: input.actorUserId,
+    })
+    .onConflictDoNothing({
+      target: [orderTicketReferences.orderId, orderTicketReferences.ticketId],
+    });
+}
+
+export async function listPosOrderTicketReferences(
+  db: Database,
+  input: { tenantId: string; orderId: string },
+): Promise<PosOrderTicketReference[]> {
+  const rows = await db
+    .select()
+    .from(orderTicketReferences)
+    .where(
+      and(
+        eq(orderTicketReferences.orderId, input.orderId),
+        eq(orderTicketReferences.tenantId, input.tenantId),
+      ),
+    )
+    .orderBy(orderTicketReferences.createdAt);
+
+  return rows.map((row) => ({
+    ticketId: row.ticketId,
+    ticketNo: row.ticketNoSnapshot,
+    remark: row.ticketRemarkSnapshot,
+    priority: row.prioritySnapshot,
+    expectedPickupAt: row.expectedPickupAtSnapshot?.toISOString() ?? null,
+    assistantName: row.assistantNameSnapshot,
+    itemCount: row.itemCount,
+    itemAmount: row.itemAmount,
+  }));
 }
 
 export async function insertManualOrderItems(

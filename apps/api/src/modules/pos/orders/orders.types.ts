@@ -171,9 +171,26 @@ export type PosOrderSummary = {
   version: number;
 };
 
+/**
+ * Fulfilment context captured from a service ticket at checkout. Snapshotted,
+ * so an order keeps showing what the clerk agreed to even if the ticket is
+ * edited or cancelled later.
+ */
+export type PosOrderTicketReference = {
+  ticketId: string;
+  ticketNo: string | null;
+  remark: string | null;
+  priority: "normal" | "urgent" | "critical";
+  expectedPickupAt: string | null;
+  assistantName: string | null;
+  itemCount: number;
+  itemAmount: string;
+};
+
 export type PosOrderDetail = PosOrderSummary & {
   items: PosOrderItem[];
   discountApplications: PosOrderDiscountApplication[];
+  ticketReferences: PosOrderTicketReference[];
 };
 
 export type PosOrderListQuery = {

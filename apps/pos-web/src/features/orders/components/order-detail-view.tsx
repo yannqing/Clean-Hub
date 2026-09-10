@@ -50,6 +50,7 @@ import { OrderDiscountsCard } from "./order-discounts-card";
 import { OrderInfoEditor } from "./order-info-editor";
 import { OrderItemsManager } from "./order-items-manager";
 import { OrderPaymentAdjustments } from "./order-payment-adjustments";
+import { OrderTicketReferencesCard } from "./order-ticket-references-card";
 import { ProductReturnDialog } from "./product-return-dialog";
 import { ReceiptDeliveryHistory } from "./receipt-delivery-history";
 import { getPosReceiptCopy } from "../lib/order-receipt";
@@ -129,6 +130,11 @@ export function OrderDetailView({
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid gap-4">
           <OrderInfoEditor order={order} />
+          <OrderTicketReferencesCard
+            currency={order.currency}
+            locale={locale}
+            ticketReferences={order.ticketReferences}
+          />
           <OrderItemsManager
             canManageSensitiveOperations={canResolveManualPayments}
             catalog={
@@ -315,12 +321,15 @@ function buildOrderBreadcrumbItems(
   order: PosOrderDetail,
   source: OrderDetailViewProps["source"],
 ) {
-  const ticketId =
-    source?.from === "ticket"
-      ? (source.ticketId ?? order.items.find((item) => item.ticketId)?.ticketId)
-      : null;
+  const arrivedFromTicket = source?.from === "ticket";
+  const ticketId = arrivedFromTicket
+    ? (source.ticketId ?? order.items.find((item) => item.ticketId)?.ticketId)
+    : null;
 
   if (!ticketId) {
+    // Reached from the order list (or anywhere else): the trail stays rooted in
+    // orders, and the ticket is reachable through the 关联工单 panel instead —
+    // a single order may settle several tickets, which a breadcrumb cannot show.
     return [
       { href: posRoutes.orders, label: "订单管理" },
       { label: displayOrderCode(order.id) },

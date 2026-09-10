@@ -102,6 +102,21 @@ export function OrderItemsManager({
     });
   }
 
+  // Only label rows when the order settles more than one ticket; with a single
+  // ticket the 关联工单 panel already says which, and repeating it on every row
+  // is noise.
+  const ticketNoByTicketId =
+    order.ticketReferences.length > 1
+      ? new Map(
+          order.ticketReferences.map((reference) => [
+            reference.ticketId,
+            reference.ticketNo,
+          ]),
+        )
+      : null;
+  const ticketNoFor = (item: PosOrderItem) =>
+    item.ticketId ? ticketNoByTicketId?.get(item.ticketId) : null;
+
   return (
     <section className="overflow-hidden border-y bg-background">
       <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
@@ -145,6 +160,7 @@ export function OrderItemsManager({
             key={item.id}
             onDelete={() => setDeleteTarget(item)}
             onEdit={() => setItemDialog({ type: "edit", item })}
+            ticketNo={ticketNoFor(item)}
           />
         ))}
       </div>
@@ -168,6 +184,7 @@ export function OrderItemsManager({
               key={item.id}
               onDelete={() => setDeleteTarget(item)}
               onEdit={() => setItemDialog({ type: "edit", item })}
+              ticketNo={ticketNoFor(item)}
             />
           ))}
         </div>
@@ -258,6 +275,7 @@ function ReadOnlyItemCard({
   disabled,
   onEdit,
   onDelete,
+  ticketNo,
 }: {
   item: PosOrderItem;
   canEdit: boolean;
@@ -266,10 +284,11 @@ function ReadOnlyItemCard({
   disabled: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  ticketNo?: string | null;
 }) {
   return (
     <article className="p-4 sm:p-5">
-      <ItemHeading item={item} />
+      <ItemHeading item={item} ticketNo={ticketNo} />
       <dl className="mt-4 grid grid-cols-3 gap-3 rounded-md bg-muted/40 p-3">
         <OrderItemCardDetail label="计量" value={formatMeasurement(item)} />
         <OrderItemCardDetail
@@ -716,6 +735,7 @@ function ReadOnlyItemRow({
   disabled,
   onEdit,
   onDelete,
+  ticketNo,
 }: {
   item: PosOrderItem;
   canEdit: boolean;
@@ -724,11 +744,12 @@ function ReadOnlyItemRow({
   disabled: boolean;
   onEdit: () => void;
   onDelete: () => void;
+  ticketNo?: string | null;
 }) {
   return (
     <div className="grid grid-cols-[minmax(260px,1fr)_150px_150px_120px_110px] items-center border-t px-5 py-4 text-sm">
       <div className="min-w-0">
-        <ItemHeading item={item} />
+        <ItemHeading item={item} ticketNo={ticketNo} />
         <IntakeDetails item={item} />
       </div>
       <div className="font-medium text-foreground">
@@ -773,12 +794,23 @@ function ReadOnlyItemRow({
   );
 }
 
-function ItemHeading({ item }: { item: PosOrderItem }) {
+function ItemHeading({
+  item,
+  ticketNo,
+}: {
+  item: PosOrderItem;
+  ticketNo?: string | null;
+}) {
   return (
     <div>
       <div className="truncate font-semibold text-foreground">
         {item.itemName}
       </div>
+      {ticketNo ? (
+        <div className="mt-1 text-[11px] text-muted-foreground">
+          工单 {ticketNo}
+        </div>
+      ) : null}
       {item.itemKind === "product" && item.sku ? (
         <div className="mt-1 font-mono text-[11px] text-muted-foreground">
           SKU {item.sku}
