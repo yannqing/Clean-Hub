@@ -20,6 +20,7 @@ import {
   customerAccounts,
   orders,
   orderItems,
+  orderTicketReferences,
   serviceTickets,
   ticketItems,
   userProfiles,
@@ -849,6 +850,18 @@ export async function findRelatedOrders(
       totalAmount: orders.totalAmount,
       paidAmount: orders.paidAmount,
       createdAt: orders.createdAt,
+      // What this ticket contributed, and how many tickets the order settles.
+      // Without these the panel shows the whole order's total against a single
+      // ticket, which reads as the wrong amount whenever tickets were merged.
+      ticketAmount: sql<
+        string | null
+      >`(select ${orderTicketReferences.itemAmount}
+        from ${orderTicketReferences}
+        where ${orderTicketReferences.orderId} = ${orders.id}
+          and ${orderTicketReferences.ticketId} = ${input.ticketId})`,
+      ticketCount: sql<number>`(select count(*)::int
+        from ${orderTicketReferences}
+        where ${orderTicketReferences.orderId} = ${orders.id})`,
     })
     .from(orders)
     .innerJoin(orderItems, eq(orderItems.orderId, orders.id))
@@ -874,6 +887,10 @@ export async function findRelatedOrders(
     totalAmount: row.totalAmount,
     paidAmount: row.paidAmount,
     createdAt: row.createdAt.toISOString(),
+    ticketAmount: row.ticketAmount,
+    // Orders predating the reference table report 0; treat that as "unknown"
+    // rather than claiming the order settles no tickets at all.
+    settledTicketCount: row.ticketCount > 0 ? row.ticketCount : 1,
   }));
 }
 

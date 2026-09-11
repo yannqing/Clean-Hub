@@ -221,6 +221,14 @@ export type RelatedOrderSummary = {
   totalAmount: string;
   paidAmount: string;
   createdAt: string;
+  /**
+   * What this ticket contributed to the order, and how many tickets the order
+   * settles in total. An order may merge several tickets, so its own total is
+   * not this ticket's amount. Null for orders created before the reference
+   * table existed.
+   */
+  ticketAmount: string | null;
+  settledTicketCount: number;
 };
 
 export type RelatedOrderListResponse = {

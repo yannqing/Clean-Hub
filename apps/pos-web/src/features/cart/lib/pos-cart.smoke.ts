@@ -318,6 +318,8 @@ const activeOrder = {
   totalAmount: "750",
   paidAmount: "0",
   createdAt: new Date().toISOString(),
+  ticketAmount: "750",
+  settledTicketCount: 1,
 };
 assert.equal(
   getTicketItemAvailability(

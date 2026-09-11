@@ -90,6 +90,14 @@ export function TicketRelatedOrders({
                     {formatTicketMoney(order.totalAmount, order.currency)}
                   </span>
                 </div>
+                {order.settledTicketCount > 1 ? (
+                  <div className="mt-2 rounded-md bg-muted/60 px-2.5 py-2 text-xs leading-5 text-muted-foreground">
+                    该订单合并结算了 {order.settledTicketCount} 张工单，上方金额为订单总额。
+                    {order.ticketAmount
+                      ? `本工单占 ${formatTicketMoney(order.ticketAmount, order.currency)}。`
+                      : ""}
+                  </div>
+                ) : null}
               </Link>
             ))}
           </div>
