@@ -1,6 +1,7 @@
 "use client";
 
 import type { AuthContext } from "@cleanhub/api-client";
+import { isSaasAdminRole } from "@cleanhub/domain";
 import { Icon, cn } from "@cleanhub/ui";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -55,12 +56,16 @@ export function AdminDashboardShell({
   const { messages } = useWebAdminLocale();
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const platformSettingsHref = webAdminRoutes.saas.config.platformSettings;
+  // The backend already refuses privileged writes from support staff; hiding
+  // the links keeps the console honest about what this account can do.
+  const saasRole =
+    authContext && isSaasAdminRole(authContext.role) ? authContext.role : null;
   const sidebarItems = useMemo(
     () =>
-      filterSidebarSections(messages.sidebar.saas)
+      filterSidebarSections(messages.sidebar.saas, saasRole)
         .flatMap((section) => section.items)
         .filter((item) => item.href !== platformSettingsHref),
-    [messages.sidebar.saas, platformSettingsHref],
+    [messages.sidebar.saas, platformSettingsHref, saasRole],
   );
   const settingsActive = isActivePath(pathname, platformSettingsHref);
   const SettingsIcon = getNavIcon(platformSettingsHref);
