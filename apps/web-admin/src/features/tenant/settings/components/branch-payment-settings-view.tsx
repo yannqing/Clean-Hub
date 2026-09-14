@@ -57,6 +57,10 @@ type Copy = {
   defaultMethodHint: string;
   cashModeLabel: string;
   cashModeHint: string;
+  cashRoundingLabel: string;
+  cashRoundingHint: string;
+  cashRoundingOff: string;
+  cashRoundingNote: (step: number) => string;
   cashModes: Record<BranchCashHandlingMode, string>;
   cashModeDescriptions: Record<BranchCashHandlingMode, string>;
   cashDisabled: string;
@@ -94,6 +98,12 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     defaultMethodHint: "Pre-selected at checkout. It must also be enabled.",
     cashModeLabel: "Cash handling mode",
     cashModeHint: "Enable cash first to choose how the branch handles it.",
+    cashRoundingLabel: "Smallest cash note",
+    cashRoundingHint:
+      "The smallest note or coin this till stocks. Cashiers can offer to round a cash total down to it; card and mobile payments are always exact.",
+    cashRoundingOff: "No rounding (exact amounts)",
+    cashRoundingNote: (step) =>
+      `Cashiers may round cash down to a multiple of ${step}. The difference is recorded on the order.`,
     cashModes: {
       none: "No cash accepted",
       untracked: "Accept cash without counting",
@@ -141,6 +151,12 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     defaultMethod: "Moyen de paiement par défaut",
     defaultMethodHint:
       "Présélectionné à l'encaissement. Il doit aussi être activé.",
+    cashRoundingLabel: "Plus petite coupure",
+    cashRoundingHint:
+      "La plus petite pièce ou coupure de cette caisse. Le caissier peut proposer d'arrondir un total en espèces à l'inférieur ; les paiements par carte et mobile restent exacts.",
+    cashRoundingOff: "Aucun arrondi (montants exacts)",
+    cashRoundingNote: (step) =>
+      `Le caissier peut arrondir les espèces à un multiple de ${step}. L'écart est enregistré sur la commande.`,
     cashModeLabel: "Mode de gestion des espèces",
     cashModeHint:
       "Activez d'abord les espèces pour choisir leur mode de gestion.",
@@ -191,6 +207,12 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     defaultMethodHint: "结账时预选的方式，必须同时处于启用状态。",
     cashModeLabel: "现金处理方式",
     cashModeHint: "请先启用现金，再选择本门店的现金处理方式。",
+    cashRoundingLabel: "最小现金面额",
+    cashRoundingHint:
+      "本店钱箱能找开的最小面额。收银员可以选择把现金金额抹零到该面额；刷卡和移动支付始终按原价收取。",
+    cashRoundingOff: "不抹零（按原价收取）",
+    cashRoundingNote: (step) =>
+      `收银员可将现金抹零到 ${step} 的倍数，差额会记录在订单上。`,
     cashModes: {
       none: "不收现金",
       untracked: "收现金但不盘点",
@@ -217,13 +239,18 @@ type EditableSettings = {
   paymentMethodsEnabled: BranchPaymentMethod[];
   defaultPaymentMethod: BranchPaymentMethod;
   cashHandlingMode: BranchCashHandlingMode;
+  cashRoundingStep: number;
 };
+
+/** Note sizes a till realistically stocks; 1 means no rounding is offered. */
+const CASH_ROUNDING_STEPS = [1, 5, 10, 25, 50, 100] as const;
 
 function toEditableSettings(branch: BranchSummary): EditableSettings {
   return {
     paymentMethodsEnabled: [...branch.paymentMethodsEnabled],
     defaultPaymentMethod: branch.defaultPaymentMethod,
     cashHandlingMode: branch.cashHandlingMode,
+    cashRoundingStep: branch.cashRoundingStep,
   };
 }
 
@@ -306,6 +333,7 @@ export function BranchPaymentSettingsView({
         paymentMethodsEnabled: form.paymentMethodsEnabled,
         defaultPaymentMethod: form.defaultPaymentMethod,
         cashHandlingMode: form.cashHandlingMode,
+        cashRoundingStep: form.cashRoundingStep,
       });
 
       if (!result.ok) {
@@ -425,6 +453,35 @@ export function BranchPaymentSettingsView({
               {cashEnabled
                 ? text.cashModeDescriptions[form.cashHandlingMode]
                 : `${text.cashDisabled} ${text.cashModeHint}`}
+            </p>
+          </div>
+
+          <div className="max-w-xl space-y-2">
+            <Label htmlFor="branch-cash-rounding">
+              {text.cashRoundingLabel}
+            </Label>
+            <Select
+              disabled={!canUpdateSettings || saving || !cashEnabled}
+              onValueChange={(value) =>
+                setForm({ ...form, cashRoundingStep: Number(value) })
+              }
+              value={String(form.cashRoundingStep)}
+            >
+              <SelectTrigger id="branch-cash-rounding">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CASH_ROUNDING_STEPS.map((step) => (
+                  <SelectItem key={step} value={String(step)}>
+                    {step === 1 ? text.cashRoundingOff : String(step)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs leading-5 text-slate-500">
+              {form.cashRoundingStep > 1
+                ? text.cashRoundingNote(form.cashRoundingStep)
+                : text.cashRoundingHint}
             </p>
           </div>
         </section>

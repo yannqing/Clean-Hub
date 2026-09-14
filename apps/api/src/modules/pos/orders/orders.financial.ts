@@ -8,6 +8,8 @@ import {
   type Database,
 } from "@cleanhub/db";
 
+import { getCurrencyPayableStep } from "@cleanhub/domain/currency";
+
 import type { AuthContext } from "../../auth/auth.types.js";
 import { minorToMoney, moneyToMinor } from "../discounts/pricing-engine.js";
 
@@ -17,6 +19,12 @@ export type PosFinancialRules = {
   taxRate: string;
   pricesIncludeTax: boolean;
   taxRegistrationNumber: string | null;
+  /**
+   * Settlement currency. Totals must land on an amount the customer can
+   * actually pay: XOF has no sub-franc coin, so a 52.25 total is not a real
+   * price. Optional so callers that predate this default to the storage scale.
+   */
+  currency?: string | null;
 };
 
 export type PosFinancialTotals = {
@@ -78,12 +86,17 @@ export function calculatePosFinancialTotals(input: {
   const beforeRounding = input.rules.pricesIncludeTax
     ? baseMinor
     : baseMinor + taxMinor;
-  const rounded =
+  // A currency's smallest payable unit is a hard floor, not a preference: the
+  // configured rule may round more coarsely than the currency, never finer.
+  const currencyStep = getCurrencyPayableStep(input.rules.currency);
+  const configuredStep =
     input.rules.roundingRule === "round_yuan"
-      ? roundToIncrement(beforeRounding, BigInt(100))
+      ? BigInt(100)
       : input.rules.roundingRule === "round_jiao"
-        ? roundToIncrement(beforeRounding, BigInt(10))
-        : beforeRounding;
+        ? BigInt(10)
+        : BigInt(1);
+  const step = configuredStep > currencyStep ? configuredStep : currencyStep;
+  const rounded = roundToIncrement(beforeRounding, step);
   return {
     taxableMinor,
     taxMinor,
@@ -100,6 +113,7 @@ export async function resolvePosFinancialRules(
   db: Database,
   authContext: AuthContext,
   tenantId: string,
+  currency?: string | null,
 ): Promise<PosFinancialRules> {
   const channelRows = await db
     .select({
@@ -112,12 +126,15 @@ export async function resolvePosFinancialRules(
     .from(posChannelSettings)
     .where(eq(posChannelSettings.tenantId, tenantId))
     .limit(1);
-  const channel = channelRows[0] ?? {
-    roundingRule: "none" as const,
-    taxEnabled: false,
-    taxRate: "0.0000",
-    pricesIncludeTax: true,
-    taxRegistrationNumber: null,
+  const channel = {
+    ...(channelRows[0] ?? {
+      roundingRule: "none" as const,
+      taxEnabled: false,
+      taxRate: "0.0000",
+      pricesIncludeTax: true,
+      taxRegistrationNumber: null,
+    }),
+    currency: currency ?? null,
   };
   if (!authContext.terminalId) return channel;
   const terminalRows = await db
@@ -164,6 +181,7 @@ export async function applyPosOrderFinancialRules(
     db,
     input.authContext,
     input.tenantId,
+    order.currency,
   );
   const totals = calculatePosFinancialTotals({
     subtotalMinor: moneyToMinor(order.subtotalAmount),

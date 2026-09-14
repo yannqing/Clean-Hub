@@ -5,8 +5,12 @@
   "type": "module",
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "scripts": {
+    "smoke:currency": "tsx src/currency.smoke.ts"
+  },
   "exports": {
     ".": "./src/index.ts",
+    "./currency": "./src/currency.ts",
     "./order-codes": "./src/order-codes.ts",
     "./payment-methods": "./src/payment-methods.ts",
     "./pin": "./src/pin.ts",

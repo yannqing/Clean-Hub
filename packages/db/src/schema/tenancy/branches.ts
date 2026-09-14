@@ -84,6 +84,14 @@ export const branches = pgTable(
     cashHandlingMode: posCashHandlingModeEnum("cash_handling_mode")
       .notNull()
       .default("shared_drawer"),
+    /**
+     * Smallest note or coin the till stocks, in major units. Cash totals may be
+     * rounded down to a multiple of this at the cashier's discretion, because a
+     * drawer with no coin under 5 F CFA cannot make exact change. Electronic
+     * payments ignore it: mobile money has no such physical limit. 1 disables
+     * the offer.
+     */
+    cashRoundingStep: integer("cash_rounding_step").notNull().default(1),
     status: branchStatusEnum("status").notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

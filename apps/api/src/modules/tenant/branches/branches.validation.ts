@@ -110,6 +110,7 @@ const branchBodyBaseSchema = z.object({
   paymentMethodsEnabled: paymentMethodsEnabledSchema.default(["cash"]),
   defaultPaymentMethod: branchPaymentMethodSchema.default("cash"),
   cashHandlingMode: cashHandlingModeSchema.default("shared_drawer"),
+  cashRoundingStep: z.coerce.number().int().min(1).max(1000).default(1),
   logoObjectKey: branchLogoObjectKeySchema.optional(),
   status: branchStatusSchema.default("active"),
 });

@@ -20,6 +20,7 @@ export type BranchPaymentSettingsInput = {
   paymentMethodsEnabled: BranchPaymentMethod[];
   defaultPaymentMethod: BranchPaymentMethod;
   cashHandlingMode: BranchCashHandlingMode;
+  cashRoundingStep: number;
 };
 
 type BranchPaymentSettingsActionResult =
@@ -96,6 +97,14 @@ export async function updateBranchPaymentSettingsAction(
     };
   }
 
+  if (
+    !Number.isInteger(input.cashRoundingStep) ||
+    input.cashRoundingStep < 1 ||
+    input.cashRoundingStep > 1000
+  ) {
+    return { ok: false, message: "Choose a valid cash rounding step." };
+  }
+
   if (!CASH_HANDLING_MODES.includes(input.cashHandlingMode)) {
     return { ok: false, message: "Choose a valid cash handling mode." };
   }
@@ -115,6 +124,7 @@ export async function updateBranchPaymentSettingsAction(
         paymentMethodsEnabled: methods,
         defaultPaymentMethod: input.defaultPaymentMethod,
         cashHandlingMode: input.cashHandlingMode,
+        cashRoundingStep: input.cashRoundingStep,
         version: input.version,
       },
       requestOptions,

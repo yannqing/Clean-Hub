@@ -119,6 +119,7 @@ function toBranchSummary(row: typeof branches.$inferSelect): BranchSummary {
     paymentMethodsEnabled: row.paymentMethodsEnabled,
     defaultPaymentMethod: row.defaultPaymentMethod,
     cashHandlingMode: row.cashHandlingMode,
+    cashRoundingStep: row.cashRoundingStep,
     logoObjectKey: isBranchLogoObjectKey(row.logoUrl) ? row.logoUrl : null,
     logoUrl: isBranchLogoObjectKey(row.logoUrl) ? null : row.logoUrl,
     status: row.status,
@@ -220,6 +221,7 @@ export async function createBranchRecord(
     paymentMethodsEnabled: input.paymentMethodsEnabled ?? ["cash"],
     defaultPaymentMethod: input.defaultPaymentMethod ?? "cash",
     cashHandlingMode: input.cashHandlingMode ?? "shared_drawer",
+    cashRoundingStep: input.cashRoundingStep ?? 1,
     logoUrl: normalizeNullable(input.logoObjectKey),
     status: input.status ?? "active",
     createdBy: input.actorUserId,
@@ -300,6 +302,8 @@ export async function updateBranchRecord(
         input.data.defaultPaymentMethod ?? input.current.defaultPaymentMethod,
       cashHandlingMode:
         input.data.cashHandlingMode ?? input.current.cashHandlingMode,
+      cashRoundingStep:
+        input.data.cashRoundingStep ?? input.current.cashRoundingStep,
       logoUrl:
         input.data.logoObjectKey === undefined
           ? (input.current.logoObjectKey ?? input.current.logoUrl)

@@ -481,6 +481,7 @@ export async function previewCurrentPosCart(
     db,
     input.authContext,
     terminal.tenantId,
+    branch.defaultCurrency,
   );
   const financial = financialTotalsToMoney(
     calculatePosFinancialTotals({

@@ -46,6 +46,11 @@ export type BranchSummary = {
   paymentMethodsEnabled: BranchPaymentMethod[];
   defaultPaymentMethod: BranchPaymentMethod;
   cashHandlingMode: BranchCashHandlingMode;
+  /**
+   * Smallest note the till stocks, in major units. Cash totals may be rounded
+   * down to a multiple of this at the cashier's discretion; 1 disables it.
+   */
+  cashRoundingStep: number;
   logoObjectKey: string | null;
   logoUrl: string | null;
   status: BranchStatus;
@@ -74,6 +79,7 @@ export type CreateBranchRequest = {
   paymentMethodsEnabled?: BranchPaymentMethod[];
   defaultPaymentMethod?: BranchPaymentMethod;
   cashHandlingMode?: BranchCashHandlingMode;
+  cashRoundingStep?: number;
   logoObjectKey?: string | null;
   status?: BranchStatus;
 };
