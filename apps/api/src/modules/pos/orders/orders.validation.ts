@@ -276,6 +276,11 @@ export const createPosCheckoutBodySchema = z
     balanceDueAt: isoTimestampSchema.optional(),
     unpaidReason: z.string().trim().min(3).max(500).optional(),
     taxExemptionReason: z.string().trim().min(3).max(500).optional(),
+    /**
+     * Cashier chose to round the cash total down to the branch's smallest
+     * note, because the till cannot make exact change.
+     */
+    cashRoundingApplied: z.boolean().optional(),
   })
   .superRefine((value, context) => {
     if (value.payment && value.payments) {

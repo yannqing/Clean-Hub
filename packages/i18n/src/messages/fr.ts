@@ -900,6 +900,9 @@ export const frMessages = {
       cash: "Espèces",
       cashTendered: "Espèces reçues",
       cashChange: "Monnaie à rendre",
+      cashRounding: "Arrondir les espèces",
+      cashRoundingHint: "La caisse n'a pas de coupure sous {step}.",
+      cashRoundingApplied: "Arrondi appliqué",
       cashTenderInsufficient:
         "Les espèces reçues doivent couvrir le montant à payer.",
       cashShiftRequired:

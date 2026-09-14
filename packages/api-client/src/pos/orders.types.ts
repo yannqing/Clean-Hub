@@ -371,6 +371,11 @@ export type CreatePosCheckoutRequest = {
   balanceDueAt?: string;
   unpaidReason?: string;
   taxExemptionReason?: string;
+  /**
+   * Cashier chose to round the cash total down to the branch's smallest note.
+   * Only honoured when the tender is entirely cash.
+   */
+  cashRoundingApplied?: boolean;
 };
 
 export type CreatePosCheckoutResponse = {

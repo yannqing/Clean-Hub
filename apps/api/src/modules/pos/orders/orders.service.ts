@@ -4,6 +4,7 @@ import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { findBranchById } from "../../tenant/branches/branches.repository.js";
 import { isLockedPosPaymentMethod } from "@cleanhub/domain/payment-methods";
+import { cashRoundingStepToMinor } from "@cleanhub/domain/currency";
 
 import { findEnabledTenantPaymentProviders } from "../../tenant/payment-integrations/payment-integrations.repository.js";
 import {
@@ -1745,12 +1746,30 @@ export async function checkoutPosOrder(
       { authContext, data: data.order, requestMeta },
       tx,
     );
+    // A cash concession only makes sense when the whole tender is cash: an
+    // electronic payment has no change to make, so there is nothing to concede.
+    const tenders = data.payments ?? (data.payment ? [data.payment] : []);
+    const allCashTender =
+      tenders.length > 0 &&
+      tenders.every((tender) => tender.paymentMethod === "cash");
+    let cashRoundingStepMinor: bigint | undefined;
+    if (data.cashRoundingApplied && allCashTender) {
+      const checkoutBranch = await findBranchById(tx, {
+        tenantId,
+        branchId: order.branchId,
+      });
+      cashRoundingStepMinor = cashRoundingStepToMinor(
+        checkoutBranch?.cashRoundingStep,
+      );
+    }
+
     await applyPosOrderFinancialRules(tx, {
       authContext,
       tenantId,
       orderId: order.id,
       taxExemptionReason: data.taxExemptionReason,
       actorUserId: authContext.userId,
+      cashRoundingStepMinor,
     });
     const financiallyFinalizedOrder = await findPosOrderDetail(tx, {
       tenantId,

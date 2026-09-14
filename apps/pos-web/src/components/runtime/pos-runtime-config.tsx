@@ -29,6 +29,11 @@ type PosRuntimeConfig = {
   paymentMethodsEnabled: PosPaymentMethod[];
   mobileMoneyProvidersEnabled: PosMobileMoneyProvider[];
   roundingRule: PosRoundingRule;
+  /**
+   * Smallest note this branch's till stocks, in major units. The cashier may
+   * offer to round a cash total down to it; 1 means no offer is made.
+   */
+  cashRoundingStep: number;
   taxEnabled: boolean;
   defaultTaxRate: string;
   pricesIncludeTax: boolean;
@@ -59,6 +64,7 @@ const PosRuntimeConfigContext = createContext<PosRuntimeConfig>({
   paymentMethodsEnabled: ["cash"],
   mobileMoneyProvidersEnabled: [],
   roundingRule: "none",
+  cashRoundingStep: 1,
   taxEnabled: false,
   defaultTaxRate: "0.0000",
   pricesIncludeTax: true,
@@ -97,6 +103,7 @@ export function PosRuntimeConfigProvider({
   branchName,
   receiptName,
   receiptPhone,
+  cashRoundingStep,
   receiptAddress,
   receiptFields,
   ticketLabelFields,
@@ -118,6 +125,7 @@ export function PosRuntimeConfigProvider({
   paymentMethodsEnabled?: PosPaymentMethod[] | null;
   mobileMoneyProvidersEnabled?: PosMobileMoneyProvider[] | null;
   roundingRule?: PosRoundingRule | null;
+  cashRoundingStep?: number | null;
   taxEnabled?: boolean | null;
   defaultTaxRate?: string | null;
   pricesIncludeTax?: boolean | null;
@@ -149,6 +157,7 @@ export function PosRuntimeConfigProvider({
       paymentMethodsEnabled: paymentMethodsEnabled ?? ["cash"],
       mobileMoneyProvidersEnabled: mobileMoneyProvidersEnabled ?? [],
       roundingRule: roundingRule ?? "none",
+      cashRoundingStep: cashRoundingStep ?? 1,
       taxEnabled: taxEnabled ?? false,
       defaultTaxRate: defaultTaxRate ?? "0.0000",
       pricesIncludeTax: pricesIncludeTax ?? true,
@@ -178,6 +187,7 @@ export function PosRuntimeConfigProvider({
       paymentMethodsEnabled,
       mobileMoneyProvidersEnabled,
       roundingRule,
+      cashRoundingStep,
       taxEnabled,
       defaultTaxRate,
       pricesIncludeTax,

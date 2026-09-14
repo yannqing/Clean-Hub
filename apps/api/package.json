@@ -29,6 +29,7 @@
     "smoke:pos-returns": "tsx src/modules/pos/returns/returns.smoke.ts",
     "smoke:pos-offline-sales": "tsx src/modules/pos/offline-sales/offline-sales.smoke.ts",
     "smoke:pos-orders": "tsx src/modules/pos/orders/orders.smoke.ts",
+    "smoke:pos-financial": "tsx src/modules/pos/orders/orders.financial.smoke.ts",
     "smoke:pos-service-tickets": "tsx src/modules/pos/service-tickets/service-tickets.smoke.ts",
     "smoke:pos-realtime": "tsx src/realtime/realtime.smoke.ts",
     "test:integration:pos-realtime": "tsx src/realtime/realtime.handshake.integration.ts",

@@ -75,6 +75,10 @@ import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 import { formatPosMoney } from "@/lib/money";
 import { isLockedPosPaymentMethod } from "@cleanhub/domain/payment-methods";
+import {
+  cashRoundingStepToMinor,
+  roundCashDown,
+} from "@cleanhub/domain/currency";
 
 import { posToast as toast } from "@/lib/pos-toast";
 
@@ -588,6 +592,9 @@ function CartPanel({
   const [paymentMode, setPaymentMode] = useState<CheckoutPaymentMode>("cash");
   const [tenders, setTenders] = useState<CheckoutTender[]>([]);
   const [payLater, setPayLater] = useState(false);
+  // Rounding is the cashier's call, offered only where the till cannot make
+  // exact change. Defaults on so the common case is one tap, not two.
+  const [cashRoundingApplied, setCashRoundingApplied] = useState(true);
   const [unpaidReason, setUnpaidReason] = useState("");
   const [balanceDueAt, setBalanceDueAt] = useState("");
   const [receiptDelivery, setReceiptDelivery] =
@@ -614,7 +621,7 @@ function CartPanel({
     runtime,
   );
   const effectivePreview = previewUpdatedAt === cart.updatedAt ? preview : null;
-  const total = effectivePreview?.totalAmount ?? localTotal;
+  const pricedTotal = effectivePreview?.totalAmount ?? localTotal;
   const offlineProductEligible = productLines.every(
     (line) =>
       line.allowOfflineSale &&
@@ -642,6 +649,36 @@ function CartPanel({
       : Boolean(register.registerSession) &&
         (register.cashHandlingMode === "untracked" ||
           Boolean(register.cashSession)));
+  // Cash rounding is only meaningful when the whole tender is cash and the
+  // till is actually open: an electronic payment has no change to make, so
+  // there is nothing to concede.
+  const cashOnlyTender =
+    paymentMode === "cash" ||
+    (tenders.length > 0 &&
+      tenders.every((tender) => tender.paymentMethod === "cash"));
+  const cashRoundingStepMinor = cashRoundingStepToMinor(
+    runtime.cashRoundingStep,
+  );
+  const cashRoundingOffered =
+    cashOnlyTender &&
+    cashRegisterAvailable &&
+    cashRoundingStepMinor > BigInt(1) &&
+    Number(pricedTotal) > 0;
+  const roundedCashTotal = cashRoundingOffered
+    ? toMoney(
+        Number(
+          roundCashDown(
+            BigInt(Math.round(Number(pricedTotal) * 100)),
+            cashRoundingStepMinor,
+          ),
+        ) / 100,
+      )
+    : pricedTotal;
+  const cashRoundingActive = cashRoundingOffered && cashRoundingApplied;
+  // The server recomputes this the same way, so the displayed total is also
+  // what `expectedTotalAmount` must carry or checkout fails as PRICE_CHANGED.
+  const total = cashRoundingActive ? roundedCashTotal : pricedTotal;
+  const cashRoundingDiscount = Number(pricedTotal) - Number(roundedCashTotal);
   const paidNowAmount = tenders.reduce(
     (sum, tender) => sum + Math.max(0, Number(tender.amount) || 0),
     0,
@@ -777,6 +814,9 @@ function CartPanel({
 
   function openCheckout() {
     if (!scopeReady || cart.lines.length === 0) return;
+    // Each sale decides for itself; a previous customer's concession must not
+    // carry over silently into the next one.
+    setCashRoundingApplied(true);
     if (offlineCheckoutBlocked) {
       toast.error(t("pos.cart.offlineCheckoutBlocked"));
       return;
@@ -1019,6 +1059,7 @@ function CartPanel({
           {
             expectedTotalAmount: toMoney(total),
             settlementIntent,
+            ...(cashRoundingActive ? { cashRoundingApplied: true } : {}),
             ...(settlementIntent !== "pay_now"
               ? {
                   balanceDueAt: new Date(balanceDueAt).toISOString(),
@@ -1710,6 +1751,33 @@ function CartPanel({
                   {formatPosMoney(total, cart.currency, locale)}
                 </span>
               </div>
+              {cashRoundingOffered ? (
+                <label className="flex items-center justify-between gap-3 rounded-md bg-muted/50 px-3 py-2">
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+                      <input
+                        checked={cashRoundingApplied}
+                        className="size-4 shrink-0 accent-foreground"
+                        onChange={(event) =>
+                          setCashRoundingApplied(event.target.checked)
+                        }
+                        type="checkbox"
+                      />
+                      {t("pos.cart.cashRounding")}
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                      {t("pos.cart.cashRoundingHint", {
+                        step: runtime.cashRoundingStep,
+                      })}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-sm font-semibold text-foreground">
+                    {cashRoundingApplied
+                      ? `−${formatPosMoney(cashRoundingDiscount, cart.currency, locale)}`
+                      : formatPosMoney(0, cart.currency, locale)}
+                  </span>
+                </label>
+              ) : null}
               {effectivePreview && Number(effectivePreview.taxAmount) !== 0 ? (
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>

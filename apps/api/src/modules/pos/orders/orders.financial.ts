@@ -8,7 +8,10 @@ import {
   type Database,
 } from "@cleanhub/db";
 
-import { getCurrencyPayableStep } from "@cleanhub/domain/currency";
+import {
+  getCurrencyPayableStep,
+  roundCashDown,
+} from "@cleanhub/domain/currency";
 
 import type { AuthContext } from "../../auth/auth.types.js";
 import { minorToMoney, moneyToMinor } from "../discounts/pricing-engine.js";
@@ -37,6 +40,27 @@ export type PosFinancialTotals = {
   roundingAdjustmentMinor: bigint;
   totalMinor: bigint;
 };
+
+/**
+ * Apply the cashier's cash concession to an already-priced total.
+ *
+ * Rounds **down** to the till's smallest note and folds the difference into
+ * the order's rounding adjustment, so the books still add up: the customer
+ * pays a payable amount and the shortfall is named rather than lost.
+ */
+export function applyCashRoundingToTotals(
+  totals: PosFinancialTotals,
+  stepMinor: bigint,
+): PosFinancialTotals {
+  const rounded = roundCashDown(totals.totalMinor, stepMinor);
+  if (rounded === totals.totalMinor) return totals;
+  return {
+    ...totals,
+    totalMinor: rounded,
+    roundingAdjustmentMinor:
+      totals.roundingAdjustmentMinor + (rounded - totals.totalMinor),
+  };
+}
 
 function signedMinorToMoney(value: bigint): string {
   return value < BigInt(0) ? `-${minorToMoney(-value)}` : minorToMoney(value);
@@ -162,6 +186,12 @@ export async function applyPosOrderFinancialRules(
     orderId: string;
     taxExemptionReason?: string | null;
     actorUserId: string;
+    /**
+     * Extra rounding the cashier conceded at the counter, in storage minor
+     * units. Applied on top of the currency's own step, and always downward:
+     * it is a goodwill concession, never a surcharge.
+     */
+    cashRoundingStepMinor?: bigint;
   },
 ): Promise<PosFinancialTotals> {
   const orderRows = await db
@@ -183,12 +213,16 @@ export async function applyPosOrderFinancialRules(
     input.tenantId,
     order.currency,
   );
-  const totals = calculatePosFinancialTotals({
+  const pricedTotals = calculatePosFinancialTotals({
     subtotalMinor: moneyToMinor(order.subtotalAmount),
     discountMinor: moneyToMinor(order.discountAmount),
     rules,
     taxExemptionReason: input.taxExemptionReason,
   });
+  const totals =
+    input.cashRoundingStepMinor && input.cashRoundingStepMinor > BigInt(1)
+      ? applyCashRoundingToTotals(pricedTotals, input.cashRoundingStepMinor)
+      : pricedTotals;
   const itemRows = await db
     .select({ id: orderItems.id, lineAmount: orderItems.lineAmount })
     .from(orderItems)
