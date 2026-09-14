@@ -596,9 +596,8 @@ function CartPanel({
   const [payLater, setPayLater] = useState(false);
   // The cashier picks the denomination per sale rather than only toggling the
   // branch default, because which notes the drawer can break varies through
-  // the day. A step of 1 means no rounding. The branch setting is the opening
-  // suggestion; where it is 1 the till still offers the smallest real note, so
-  // the choice is available without an admin first configuring one.
+  // the day. A step of 1 means no rounding.
+  //
   // The branch setting is the opening suggestion. Where it is 1 the till still
   // offers the smallest real note, so the cashier has the choice without an
   // admin configuring one first. Taken from the shared list rather than a
@@ -709,6 +708,34 @@ function CartPanel({
     runtime.paymentMethodsEnabled.includes("cash") &&
     mixedExternalMethods.length > 0 &&
     Number(total) >= 0.02;
+  const payLaterAvailable =
+    Boolean(cart.customer) && canManageSensitiveOperations;
+  /**
+   * Why a payment tab is greyed out, in the order the cashier can act on it.
+   *
+   * A disabled tab with no explanation reads as a broken button: each of these
+   * conditions has a different fix, and some are not the cashier's to make, so
+   * naming the specific one is the difference between "open the till" and
+   * "ask the office to set up mobile money".
+   */
+  const disabledPaymentHint = !cashRegisterAvailable &&
+    runtime.paymentMethodsEnabled.includes("cash")
+    ? t("pos.cart.cashShiftRequired")
+    : !mixedPaymentAvailable &&
+        !runtime.paymentMethodsEnabled.includes("app")
+      ? t("pos.cart.mixedNeedsCashAndApp")
+      : !mixedPaymentAvailable &&
+          runtime.mobileMoneyProvidersEnabled.length === 0
+        ? t("pos.cart.mixedNeedsMobileMoney")
+        : !mixedPaymentAvailable && !isOnline
+          ? t("pos.cart.mixedNeedsOnline")
+          : !mixedPaymentAvailable && Number(total) < 0.02
+            ? t("pos.cart.mixedAmountTooSmall")
+            : !payLaterAvailable && !cart.customer
+              ? t("pos.cart.payLaterNeedsCustomer")
+              : !payLaterAvailable
+                ? t("pos.cart.payLaterNeedsPermission")
+                : null;
   const productAmount = cart.lines.reduce(
     (sum, line) =>
       line.kind === "product"
@@ -1954,7 +1981,7 @@ function CartPanel({
                   aria-controls="checkout-payment-panel"
                   aria-selected={paymentMode === "pay_later"}
                   className={cn("min-h-11 min-w-0 sm:min-w-28 sm:flex-1")}
-                  disabled={!cart.customer || !canManageSensitiveOperations}
+                  disabled={!payLaterAvailable}
                   onClick={() => selectPaymentMode("pay_later")}
                   role="tab"
                   type="button"
@@ -1963,13 +1990,12 @@ function CartPanel({
                   {t("pos.cart.payLater")}
                 </Button>
               </div>
-              {/* Sits directly under the tabs: the cash tab is disabled until a
-                  drawer session is open, so the reason belongs where the
-                  cashier is looking, not further down the dialog. */}
-              {!cashRegisterAvailable &&
-              runtime.paymentMethodsEnabled.includes("cash") ? (
+              {/* Sits directly under the tabs: a greyed-out tab is only
+                  understandable next to the reason it is greyed out, not
+                  further down the dialog. */}
+              {disabledPaymentHint ? (
                 <p className="text-xs leading-5 text-amber-700">
-                  {t("pos.cart.cashShiftRequired")}
+                  {disabledPaymentHint}
                 </p>
               ) : null}
 

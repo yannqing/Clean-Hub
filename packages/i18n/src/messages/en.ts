@@ -897,6 +897,15 @@ export const enMessages = {
       cashShiftRequired:
         "Open an available cash session under Shifts & register before accepting cash.",
       payLater: "Pay later",
+      mixedNeedsMobileMoney:
+        "Mixed payment needs a mobile money provider configured and verified in the back office.",
+      mixedNeedsCashAndApp:
+        "Mixed payment needs both cash and mobile money enabled for this branch.",
+      mixedNeedsOnline:
+        "Mixed payment is unavailable offline: mobile money needs a connection.",
+      mixedAmountTooSmall: "The amount is too small to split across two payments.",
+      payLaterNeedsCustomer: "Attach a customer to this sale before leaving a balance.",
+      payLaterNeedsPermission: "Leaving a balance requires supervisor permission.",
       paymentReference: "Wave / Orange Money transaction reference",
       paymentReferenceRequired: "Enter a valid mobile payment reference.",
       offlinePayLater:

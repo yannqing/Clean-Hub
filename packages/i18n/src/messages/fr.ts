@@ -911,6 +911,18 @@ export const frMessages = {
       cashShiftRequired:
         "Ouvrez une session d’espèces dans Services et caisse avant d’accepter des espèces.",
       payLater: "Payer plus tard",
+      mixedNeedsMobileMoney:
+        "Le paiement mixte exige un fournisseur mobile configuré et vérifié dans l'administration.",
+      mixedNeedsCashAndApp:
+        "Le paiement mixte exige que les espèces et le paiement mobile soient activés pour cette boutique.",
+      mixedNeedsOnline:
+        "Le paiement mixte est indisponible hors ligne : le paiement mobile exige une connexion.",
+      mixedAmountTooSmall:
+        "Le montant est trop faible pour être réparti sur deux paiements.",
+      payLaterNeedsCustomer:
+        "Associez un client à cette vente avant de laisser un solde.",
+      payLaterNeedsPermission:
+        "Laisser un solde nécessite une autorisation de superviseur.",
       paymentReference: "Référence Wave / Orange Money",
       paymentReferenceRequired:
         "Saisissez une référence de paiement mobile valide.",
