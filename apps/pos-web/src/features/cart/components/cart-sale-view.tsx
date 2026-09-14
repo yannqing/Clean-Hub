@@ -1794,7 +1794,11 @@ function CartPanel({
               {effectivePreview &&
               Number(effectivePreview.roundingAdjustmentAmount) !== 0 ? (
                 <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>舍入调整（{runtime.roundingRule}）</span>
+                  {/* The configured rule is internal setup, not something the
+                      cashier acts on -- and printing the raw enum showed them
+                      "（none）" while an amount was in fact being rounded, since
+                      a zero-decimal currency rounds regardless of the rule. */}
+                  <span>{t("pos.cart.roundingAdjustment")}</span>
                   <span>
                     {formatPosMoney(
                       effectivePreview.roundingAdjustmentAmount,

@@ -845,6 +845,7 @@ export const frMessages = {
       notes: "Note de commande",
       notesPlaceholder: "Ajouter une note à cette vente",
       subtotal: "Sous-total",
+      roundingAdjustment: "Ajustement d'arrondi",
       checkout: "Créer la commande et encaisser",
       clear: "Vider",
       remove: "Retirer",

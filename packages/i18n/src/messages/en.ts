@@ -833,6 +833,7 @@ export const enMessages = {
       notes: "Order note",
       notesPlaceholder: "Add a note for this sale",
       subtotal: "Subtotal",
+      roundingAdjustment: "Rounding adjustment",
       checkout: "Create order and checkout",
       clear: "Clear",
       remove: "Remove",

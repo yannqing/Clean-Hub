@@ -817,6 +817,7 @@ export const zhCNMessages = {
       notes: "订单备注",
       notesPlaceholder: "添加本次销售的备注",
       subtotal: "小计",
+      roundingAdjustment: "舍入调整",
       checkout: "创建订单并结账",
       clear: "清空",
       remove: "移除",
