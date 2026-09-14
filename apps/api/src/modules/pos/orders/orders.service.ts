@@ -4,7 +4,10 @@ import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import { findBranchById } from "../../tenant/branches/branches.repository.js";
 import { isLockedPosPaymentMethod } from "@cleanhub/domain/payment-methods";
-import { cashRoundingStepToMinor } from "@cleanhub/domain/currency";
+import {
+  cashRoundingStepToMinor,
+  isCashRoundingStep,
+} from "@cleanhub/domain/currency";
 
 import { findEnabledTenantPaymentProviders } from "../../tenant/payment-integrations/payment-integrations.repository.js";
 import {
@@ -1753,14 +1756,25 @@ export async function checkoutPosOrder(
       tenders.length > 0 &&
       tenders.every((tender) => tender.paymentMethod === "cash");
     let cashRoundingStepMinor: bigint | undefined;
-    if (data.cashRoundingApplied && allCashTender) {
-      const checkoutBranch = await findBranchById(tx, {
-        tenantId,
-        branchId: order.branchId,
-      });
-      cashRoundingStepMinor = cashRoundingStepToMinor(
-        checkoutBranch?.cashRoundingStep,
-      );
+    // The cashier picks the denomination per sale; the branch setting is the
+    // fallback for payloads that predate that choice, including sales queued
+    // offline before the upgrade. Either way the concession is computed here
+    // from a step, never taken as an amount from the client.
+    const requestedRoundingStep = isCashRoundingStep(data.cashRoundingStep)
+      ? data.cashRoundingStep
+      : undefined;
+    if ((data.cashRoundingApplied || requestedRoundingStep) && allCashTender) {
+      if (requestedRoundingStep) {
+        cashRoundingStepMinor = cashRoundingStepToMinor(requestedRoundingStep);
+      } else {
+        const checkoutBranch = await findBranchById(tx, {
+          tenantId,
+          branchId: order.branchId,
+        });
+        cashRoundingStepMinor = cashRoundingStepToMinor(
+          checkoutBranch?.cashRoundingStep,
+        );
+      }
     }
 
     await applyPosOrderFinancialRules(tx, {

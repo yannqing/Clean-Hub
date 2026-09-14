@@ -358,11 +358,17 @@ export type CreatePosCheckoutRequest = {
   unpaidReason?: string;
   taxExemptionReason?: string;
   /**
-   * Cashier chose to round the cash total down to the branch's smallest note.
-   * Only honoured when the tender is entirely cash: an electronic payment has
-   * no physical change constraint to concede for.
+   * Cashier chose to round the cash total down. Only honoured when the tender
+   * is entirely cash: an electronic payment has no physical change constraint
+   * to concede for. Without `cashRoundingStep` this means "use the branch's
+   * configured note", which is how payloads queued offline still behave.
    */
   cashRoundingApplied?: boolean;
+  /**
+   * Denomination chosen for this sale, in major units. The server computes the
+   * concession from it, so the cashier picks the coarseness, not the amount.
+   */
+  cashRoundingStep?: number;
 };
 
 export type CreatePosCheckoutResponse = {

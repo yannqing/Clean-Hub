@@ -372,10 +372,16 @@ export type CreatePosCheckoutRequest = {
   unpaidReason?: string;
   taxExemptionReason?: string;
   /**
-   * Cashier chose to round the cash total down to the branch's smallest note.
-   * Only honoured when the tender is entirely cash.
+   * Cashier chose to round the cash total down. Only honoured when the tender
+   * is entirely cash. Without `cashRoundingStep` it falls back to the branch's
+   * configured note.
    */
   cashRoundingApplied?: boolean;
+  /**
+   * Denomination chosen for this sale, in major units. Must be one of
+   * `CASH_ROUNDING_STEPS`; the server derives the concession from it.
+   */
+  cashRoundingStep?: number;
 };
 
 export type CreatePosCheckoutResponse = {

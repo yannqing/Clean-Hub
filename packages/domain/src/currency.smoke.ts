@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 
 import {
+  CASH_ROUNDING_STEPS,
   cashRoundingStepToMinor,
   getCurrencyMinorUnits,
   getCurrencyPayableStep,
+  isCashRoundingStep,
   roundCashDown,
   roundToPayableAmount,
   roundToStep,
@@ -80,6 +82,24 @@ assert.equal(
   roundCashDown(roundToPayableAmount(BigInt(5225), "XOF"), cashRoundingStepToMinor(5)),
   BigInt(5000),
   "pricing rounds to a payable franc, then cash rounding concedes down to a note",
+);
+
+// The cashier picks a denomination from a fixed list, never a free amount:
+// this bound is what keeps the concession a rounding step rather than an
+// unaudited discount.
+assert.equal(isCashRoundingStep(5), true);
+assert.equal(isCashRoundingStep(1), true, "1 is offered and means no rounding");
+assert.equal(isCashRoundingStep(100), true);
+assert.equal(isCashRoundingStep(7), false, "an off-list note must be refused");
+assert.equal(isCashRoundingStep(3000), false, "a large write-off is not a step");
+assert.equal(isCashRoundingStep(0), false);
+assert.equal(isCashRoundingStep(-5), false);
+assert.equal(isCashRoundingStep(null), false);
+assert.equal(isCashRoundingStep(undefined), false);
+assert.equal(
+  CASH_ROUNDING_STEPS.every((step) => cashRoundingStepToMinor(step) > BigInt(0)),
+  true,
+  "every offered step converts to a usable minor-unit step",
 );
 
 console.log("currency smoke passed.");

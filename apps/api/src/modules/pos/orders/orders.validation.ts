@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { isCashRoundingStep } from "@cleanhub/domain/currency";
+
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 const ulidSchema = z.string().regex(ULID_PATTERN);
@@ -277,10 +279,25 @@ export const createPosCheckoutBodySchema = z
     unpaidReason: z.string().trim().min(3).max(500).optional(),
     taxExemptionReason: z.string().trim().min(3).max(500).optional(),
     /**
-     * Cashier chose to round the cash total down to the branch's smallest
-     * note, because the till cannot make exact change.
+     * Cashier chose to round the cash total down, because the till cannot make
+     * exact change. Kept for payloads that predate `cashRoundingStep`,
+     * including offline sales queued before the upgrade: on its own it means
+     * "use the branch's configured note".
      */
     cashRoundingApplied: z.boolean().optional(),
+    /**
+     * The denomination the cashier picked for this sale, in major units.
+     *
+     * Constrained to the shared allowlist: the server derives the concession
+     * from this step, so the cashier never posts an amount of their own. A
+     * free-form deduction would be a manual discount, which has to carry a
+     * reason and an idempotency key.
+     */
+    cashRoundingStep: z
+      .number()
+      .int()
+      .refine(isCashRoundingStep, "Choose an offered cash rounding step.")
+      .optional(),
   })
   .superRefine((value, context) => {
     if (value.payment && value.payments) {

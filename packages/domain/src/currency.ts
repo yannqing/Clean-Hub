@@ -87,6 +87,33 @@ export function roundToPayableAmount(
 export const DEFAULT_CASH_ROUNDING_STEP_XOF = 5;
 
 /**
+ * The cash rounding steps a cashier may choose at checkout, in major units.
+ *
+ * A fixed allowlist rather than a free amount, and deliberately so: the server
+ * computes the concession from this step, so the cashier chooses *how coarse*
+ * the rounding is, never *how much* to deduct. An arbitrary amount accepted
+ * from the client would be a manual discount wearing a rounding label, which
+ * would bypass the reason, permission and idempotency checks that real
+ * discounts go through.
+ *
+ * Matches the branch setting's options so the till and the back office offer
+ * the same denominations.
+ */
+export const CASH_ROUNDING_STEPS = [1, 5, 10, 25, 50, 100] as const;
+
+export type CashRoundingStep = (typeof CASH_ROUNDING_STEPS)[number];
+
+/** True when `step` is one of the offered denominations. */
+export function isCashRoundingStep(
+  step: number | null | undefined,
+): step is CashRoundingStep {
+  return (
+    typeof step === "number" &&
+    (CASH_ROUNDING_STEPS as readonly number[]).includes(step)
+  );
+}
+
+/**
  * Round a cash amount **down** to the nearest payable note.
  *
  * Down, not half-up: this is a goodwill concession the cashier grants at the

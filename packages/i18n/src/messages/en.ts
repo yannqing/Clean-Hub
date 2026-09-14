@@ -889,7 +889,9 @@ export const enMessages = {
       cashTendered: "Cash tendered",
       cashChange: "Change due",
       cashRounding: "Round cash down",
-      cashRoundingHint: "The till has no note under {step}.",
+      cashRoundingHint:
+        "Choose the note to round down to for this sale, when the till cannot make change.",
+      cashRoundingOff: "None",
       cashRoundingApplied: "Rounded down",
       cashTenderInsufficient: "Cash tendered must cover the amount due.",
       cashShiftRequired:
