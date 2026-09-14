@@ -199,6 +199,24 @@ export const saasMessagesZhCN: SaasMessages = {
       statusPermissionError: "仅超级管理员可更新租户状态。",
       readOnlyHint:
         "您可以查看租户详情。更新租户资料需要超级管理员或 SaaS 租户写入权限。",
+      offboardSection: "退租",
+      offboardHint:
+        "退租会立即停用访问权限，并在保留期内保留数据。停用前会自动导出一份数据备份。",
+      offboardPermissionHint: "退租操作需要超级管理员权限。",
+      offboardAction: "退租",
+      offboardConfirm:
+        "确定要为该租户办理退租吗？访问权限将立即停用。数据会保留至保留期结束，在此之前可以撤销。",
+      offboardSucceeded: "已办理退租，事前已导出 {tables} 张数据表。",
+      offboardFailed: "退租办理失败。",
+      offboardedBanner: "该租户已于 {date} 退租。原因：{reason}",
+      purgeAfterLabel: "数据保留至 {date}",
+      restoreAction: "撤销退租",
+      restoreSucceeded: "已撤销退租，该租户当前为暂停状态。",
+      restoreFailed: "撤销退租失败。",
+      exportAction: "导出数据",
+      exportHint: "将该租户的全部业务数据导出为 CSV 压缩包。",
+      exportSucceeded: "导出已下载。",
+      exportFailed: "租户数据导出失败。",
       fields: {
         pressingCode: "pressing 编码",
         status: "状态",

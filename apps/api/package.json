@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "cron:media-cleanup": "tsx src/cron/media-cleanup.ts",
     "cron:email-delivery": "tsx src/cron/email-delivery.ts",
+    "cron:tenant-purge": "tsx src/cron/tenant-purge.ts",
     "backfill:delivery-proof-media": "tsx src/scripts/backfill-delivery-proof-media.ts",
     "e2e:mobile": "tsx src/e2e/mobile.e2e.ts",
     "test:integration:tenant-orders": "tsx src/modules/tenant/orders/orders.integration.ts",
@@ -34,6 +35,7 @@
     "smoke:pos-realtime": "tsx src/realtime/realtime.smoke.ts",
     "test:integration:pos-realtime": "tsx src/realtime/realtime.handshake.integration.ts",
     "test:integration:pos-realtime-proxy": "tsx src/realtime/realtime.proxy.integration.ts",
+    "smoke:saas-tenant-offboarding": "tsx src/modules/saas/tenants/tenant-offboarding.smoke.ts",
     "smoke:tenant-users": "tsx src/modules/tenant/users/tenant-users.repository.smoke.ts",
     "smoke:tenant-resource-branch-scope": "tsx src/modules/tenant/tenant-resource-branch-scope.smoke.ts",
     "smoke:tenant-timezone": "tsx src/modules/auth/tenant-timezone.smoke.ts",
@@ -52,6 +54,7 @@
     "@cleanhub/logger": "workspace:*",
     "@cleanhub/storage": "workspace:*",
     "@hono/node-server": "^2.0.2",
+    "archiver": "^8.0.0",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.12.18",
@@ -62,6 +65,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@types/archiver": "^8.0.0",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
     "@types/pg": "^8.15.6",

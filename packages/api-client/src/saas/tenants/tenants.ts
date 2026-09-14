@@ -2,6 +2,9 @@ import type { ApiClient, ApiRequestOptions, QueryParams } from "../../types";
 import type {
   CreateTenantRequest,
   CreateTenantResponse,
+  OffboardTenantRequest,
+  OffboardTenantResponse,
+  RestoreTenantRequest,
   TenantDetail,
   TenantFeatureFlags,
   TenantListResponse,
@@ -69,6 +72,39 @@ export function createSaasTenantsApi(client: ApiClient) {
     ) =>
       client.patch<TenantDetail>(
         `/saas/tenants/${tenantId}/status`,
+        input,
+        options,
+      ),
+    /** Start the retention countdown; reversible until `purgeAfter`. */
+    offboard: (
+      tenantId: string,
+      input: OffboardTenantRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<OffboardTenantResponse>(
+        `/saas/tenants/${tenantId}/offboarding`,
+        input,
+        options,
+      ),
+    /**
+     * Download the tenant's data as a zip of CSVs.
+     *
+     * `parseAs: "blob"` is explicit rather than relying on content-type
+     * sniffing, so the archive is never run through `response.json()`.
+     */
+    exportArchive: (tenantId: string, options?: RequestOptions) =>
+      client.get<Blob>(`/saas/tenants/${tenantId}/export`, {
+        ...options,
+        parseAs: "blob",
+      }),
+    /** Cancel an offboarding while the tenant is still inside its window. */
+    restore: (
+      tenantId: string,
+      input: RestoreTenantRequest,
+      options?: RequestOptions,
+    ) =>
+      client.post<TenantDetail>(
+        `/saas/tenants/${tenantId}/offboarding/restore`,
         input,
         options,
       ),

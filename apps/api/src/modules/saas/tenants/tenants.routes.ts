@@ -3,10 +3,13 @@ import { Hono } from "hono";
 import type { AppBindings } from "../../../http/types.js";
 import {
   createSaasTenantController,
+  exportSaasTenantController,
   getSaasTenantFeatureFlagsController,
   getSaasTenantController,
   getSaasTenantSettingsController,
   listSaasTenantsController,
+  offboardSaasTenantController,
+  restoreSaasTenantController,
   updateSaasTenantController,
   updateSaasTenantFeatureFlagsController,
   updateSaasTenantSettingsController,
@@ -26,6 +29,12 @@ export function createSaasTenantsRoutes() {
   routes.get("/:tenantId/settings", getSaasTenantSettingsController);
   routes.patch("/:tenantId/settings", updateSaasTenantSettingsController);
   routes.patch("/:tenantId/status", updateSaasTenantStatusController);
+  routes.get("/:tenantId/export", exportSaasTenantController);
+  routes.post(
+    "/:tenantId/offboarding/restore",
+    restoreSaasTenantController,
+  );
+  routes.post("/:tenantId/offboarding", offboardSaasTenantController);
   routes.get("/:tenantId", getSaasTenantController);
   routes.patch("/:tenantId", updateSaasTenantController);
 

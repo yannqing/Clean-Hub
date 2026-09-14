@@ -200,6 +200,26 @@ export const saasMessagesEn: SaasMessages = {
       statusPermissionError: "Only super admins can update tenant status.",
       readOnlyHint:
         "You can view tenant details. Updating tenant profile fields requires Super Admin or SaaS tenant write permission.",
+      offboardSection: "Offboarding",
+      offboardHint:
+        "Offboarding disables access immediately and keeps the data for a retention window. A data export is taken automatically before access is cut.",
+      offboardPermissionHint: "Offboarding a tenant requires Super Admin.",
+      offboardAction: "Offboard tenant",
+      offboardConfirm:
+        "Offboard this tenant? Access is disabled immediately. The data is kept until the retention window ends, and this can be undone until then.",
+      offboardSucceeded:
+        "Tenant offboarded. {tables} table(s) were exported beforehand.",
+      offboardFailed: "Tenant offboarding failed.",
+      offboardedBanner: "This tenant was offboarded on {date}. Reason: {reason}",
+      purgeAfterLabel: "Data is kept until {date}",
+      restoreAction: "Cancel offboarding",
+      restoreSucceeded: "Offboarding cancelled. The tenant is now suspended.",
+      restoreFailed: "Offboarding could not be cancelled.",
+      exportAction: "Export data",
+      exportHint:
+        "Download every business record for this tenant as a zip of CSV files.",
+      exportSucceeded: "Export downloaded.",
+      exportFailed: "Tenant data export failed.",
       fields: {
         pressingCode: "Pressing code",
         status: "Status",

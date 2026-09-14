@@ -16,6 +16,7 @@ import {
   type Database,
   authRefreshTokens,
   branches,
+  getDb,
   platformSettings,
   tenantFeatureFlags,
   tenantSettings,
@@ -337,6 +338,9 @@ export async function findSaasTenantDetailById(
       updatedAt: tenants.updatedAt,
       defaultLanguage: tenantSettings.defaultLanguage,
       defaultCurrency: tenantSettings.defaultCurrency,
+      offboardedAt: tenants.offboardedAt,
+      offboardReason: tenants.offboardReason,
+      purgeAfter: tenants.purgeAfter,
     })
     .from(tenants)
     .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))
@@ -362,6 +366,16 @@ export async function findSaasTenantDetailById(
     contactPhone: tenant.contactPhone,
     contactEmail: tenant.contactEmail,
     userCount: userCountRows[0]?.value ?? 0,
+    // The CHECK constraint keeps these three either all set or all null, so a
+    // single guard is enough to decide whether the tenant is offboarded.
+    offboarding:
+      tenant.offboardedAt && tenant.purgeAfter && tenant.offboardReason
+        ? {
+            offboardedAt: tenant.offboardedAt.toISOString(),
+            offboardReason: tenant.offboardReason,
+            purgeAfter: tenant.purgeAfter.toISOString(),
+          }
+        : null,
   };
 }
 
@@ -760,5 +774,206 @@ export async function writeSaasTenantStatusChangedAuditLog(
     metadata: {
       reason: input.reason,
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Offboarding
+// ---------------------------------------------------------------------------
+
+/**
+ * Start the retention countdown for a departing tenant.
+ *
+ * The tenant row stays intact and `deleted_at` stays null: this is reversible
+ * until `purge_after` elapses. Sessions are revoked immediately, because a
+ * tenant that has left should not keep working while the window runs.
+ */
+export async function offboardSaasTenantRecord(
+  db: Database,
+  input: {
+    tenantId: string;
+    actorUserId: string;
+    reason: string;
+    retentionDays: number;
+  },
+): Promise<SaasTenantDetail | null> {
+  const now = new Date();
+  const purgeAfter = new Date(
+    now.getTime() + input.retentionDays * 24 * 60 * 60 * 1000,
+  );
+
+  await db
+    .update(tenants)
+    .set({
+      status: "disabled",
+      offboardedAt: now,
+      offboardedBy: input.actorUserId,
+      offboardReason: input.reason,
+      purgeAfter,
+      updatedAt: now,
+      version: sql`${tenants.version} + 1`,
+    })
+    .where(and(eq(tenants.id, input.tenantId), isNull(tenants.deletedAt)));
+
+  await revokeTenantRefreshTokens(db, input.tenantId);
+
+  return findSaasTenantDetailById(db, input.tenantId);
+}
+
+/** Cancel an offboarding while the tenant is still inside its window. */
+export async function restoreSaasTenantRecord(
+  db: Database,
+  input: {
+    tenantId: string;
+    actorUserId: string;
+  },
+): Promise<SaasTenantDetail | null> {
+  const now = new Date();
+
+  await db
+    .update(tenants)
+    .set({
+      status: "suspended",
+      offboardedAt: null,
+      offboardedBy: null,
+      offboardReason: null,
+      purgeAfter: null,
+      updatedAt: now,
+      version: sql`${tenants.version} + 1`,
+    })
+    .where(and(eq(tenants.id, input.tenantId), isNull(tenants.deletedAt)));
+
+  return findSaasTenantDetailById(db, input.tenantId);
+}
+
+/**
+ * Soft-delete tenants whose retention window has elapsed.
+ *
+ * Returns the ids it marked so the caller can log them. Physical row removal
+ * across the tenant-scoped tables stays a separate, deliberate operation.
+ */
+export async function purgeElapsedTenants(
+  input: { limit: number },
+  db: Database = getDb(),
+): Promise<string[]> {
+  const now = new Date();
+  const due = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(
+      and(
+        isNull(tenants.deletedAt),
+        sql`${tenants.purgeAfter} is not null`,
+        sql`${tenants.purgeAfter} <= ${now}`,
+      ),
+    )
+    .limit(input.limit);
+
+  const purged: string[] = [];
+
+  for (const tenant of due) {
+    await db
+      .update(tenants)
+      .set({
+        deletedAt: now,
+        updatedAt: now,
+        version: sql`${tenants.version} + 1`,
+      })
+      .where(and(eq(tenants.id, tenant.id), isNull(tenants.deletedAt)));
+
+    await writeAuditLog(db, {
+      tenantId: tenant.id,
+      actorUserId: null,
+      eventCategory: "saas_tenant",
+      eventType: "tenant.purged",
+      entityType: "tenant",
+      entityId: tenant.id,
+      success: true,
+      reason: "Retention window elapsed",
+    });
+
+    purged.push(tenant.id);
+  }
+
+  return purged;
+}
+
+export async function writeSaasTenantOffboardedAuditLog(
+  db: Database,
+  input: {
+    actorUserId: string;
+    tenantId: string;
+    reason: string;
+    purgeAfter: string;
+    exportedTables: number;
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    eventCategory: "saas_tenant",
+    eventType: "tenant.offboarded",
+    entityType: "tenant",
+    entityId: input.tenantId,
+    success: true,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    reason: input.reason,
+    metadata: {
+      reason: input.reason,
+      purgeAfter: input.purgeAfter,
+      exportedTables: input.exportedTables,
+    },
+  });
+}
+
+export async function writeSaasTenantRestoredAuditLog(
+  db: Database,
+  input: {
+    actorUserId: string;
+    tenantId: string;
+    reason: string;
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    eventCategory: "saas_tenant",
+    eventType: "tenant.restored",
+    entityType: "tenant",
+    entityId: input.tenantId,
+    success: true,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    reason: input.reason,
+    metadata: { reason: input.reason },
+  });
+}
+
+export async function writeSaasTenantExportedAuditLog(
+  db: Database,
+  input: {
+    actorUserId: string;
+    tenantId: string;
+    tables: string[];
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    eventCategory: "saas_tenant",
+    eventType: "tenant.exported",
+    entityType: "tenant",
+    entityId: input.tenantId,
+    success: true,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
+    metadata: { tableCount: input.tables.length, tables: input.tables },
   });
 }

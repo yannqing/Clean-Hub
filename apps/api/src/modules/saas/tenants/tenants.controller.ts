@@ -4,10 +4,13 @@ import type { AppBindings } from "../../../http/types.js";
 import { SaasTenantsError } from "./tenants.errors.js";
 import {
   createSaasTenant,
+  exportSaasTenant,
   getSaasTenantDetail,
   getSaasTenantFeatureFlags,
   getSaasTenantSettings,
   listSaasTenants,
+  offboardSaasTenant,
+  restoreSaasTenant,
   updateSaasTenant,
   updateSaasTenantFeatureFlags,
   updateSaasTenantSettings,
@@ -17,6 +20,8 @@ import {
   createSaasTenantBodySchema,
   getSaasTenantParamsSchema,
   listSaasTenantsQuerySchema,
+  offboardSaasTenantBodySchema,
+  restoreSaasTenantBodySchema,
   updateSaasTenantBodySchema,
   updateSaasTenantFeatureFlagsBodySchema,
   updateSaasTenantSettingsBodySchema,
@@ -244,6 +249,93 @@ export async function updateSaasTenantStatusController(c: Context<AppBindings>) 
     });
 
     return c.json(tenant);
+  } catch (error) {
+    if (error instanceof SaasTenantsError) {
+      return createSaasTenantsErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function offboardSaasTenantController(c: Context<AppBindings>) {
+  const params = getSaasTenantParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = offboardSaasTenantBodySchema.parse(rawBody);
+
+  try {
+    const result = await offboardSaasTenant({
+      authContext: c.get("authContext"),
+      requestMeta: {
+        ipAddress: getClientIp(c),
+        userAgent: c.req.header("user-agent"),
+      },
+      tenantId: params.tenantId,
+      data,
+    });
+
+    // The archive itself is not returned here: it can be megabytes, and this
+    // response is what the console renders. The operator downloads it from the
+    // export endpoint, which the console offers alongside the confirmation.
+    return c.json({
+      tenant: result.tenant,
+      exportedTables: result.export.tables.length,
+    });
+  } catch (error) {
+    if (error instanceof SaasTenantsError) {
+      return createSaasTenantsErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function restoreSaasTenantController(c: Context<AppBindings>) {
+  const params = getSaasTenantParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const data = restoreSaasTenantBodySchema.parse(rawBody);
+
+  try {
+    const tenant = await restoreSaasTenant({
+      authContext: c.get("authContext"),
+      requestMeta: {
+        ipAddress: getClientIp(c),
+        userAgent: c.req.header("user-agent"),
+      },
+      tenantId: params.tenantId,
+      data,
+    });
+
+    return c.json(tenant);
+  } catch (error) {
+    if (error instanceof SaasTenantsError) {
+      return createSaasTenantsErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function exportSaasTenantController(c: Context<AppBindings>) {
+  const params = getSaasTenantParamsSchema.parse(c.req.param());
+
+  try {
+    const result = await exportSaasTenant({
+      authContext: c.get("authContext"),
+      requestMeta: {
+        ipAddress: getClientIp(c),
+        userAgent: c.req.header("user-agent"),
+      },
+      tenantId: params.tenantId,
+    });
+
+    c.header("Content-Type", "application/zip");
+    c.header(
+      "Content-Disposition",
+      `attachment; filename="${result.fileName}"`,
+    );
+
+    return c.body(result.content as unknown as ArrayBuffer);
   } catch (error) {
     if (error instanceof SaasTenantsError) {
       return createSaasTenantsErrorResponse(c, error);

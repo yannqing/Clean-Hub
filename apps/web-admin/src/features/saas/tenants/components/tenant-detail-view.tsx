@@ -22,9 +22,19 @@ import { getCurrentAuthQuery } from "@/features/auth/queries";
 import { SaasBreadcrumbs } from "@/features/saas/shared";
 import { useSaasI18n } from "@/i18n";
 import { interpolate } from "@/i18n/messages/saas";
-import { canUpdateTenantStatus, canWriteTenant } from "@/lib/permissions";
+import { webAdminApi } from "@/lib/api-client";
+import {
+  canOffboardTenant,
+  canUpdateTenantStatus,
+  canWriteTenant,
+} from "@/lib/permissions";
 
-import { updateTenantAction, updateTenantStatusAction } from "../actions";
+import {
+  offboardTenantAction,
+  restoreTenantAction,
+  updateTenantAction,
+  updateTenantStatusAction,
+} from "../actions";
 import { getTenantLoadErrorMessage } from "../actions/tenant-action-errors";
 import { tenantDefaultValues } from "../constants";
 import { getTenantDetailQuery } from "../queries";
@@ -102,8 +112,103 @@ export function TenantDetailView({
   const [statusSubmitting, setStatusSubmitting] = useState<TenantStatus | null>(
     null,
   );
+  const [offboardReason, setOffboardReason] = useState("");
+  const [offboardError, setOffboardError] = useState<string | null>(null);
+  const [offboardSubmitting, setOffboardSubmitting] = useState(false);
+  const [restoreSubmitting, setRestoreSubmitting] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const canManageTenant = canWriteTenant(authContext);
   const canManageStatus = canUpdateTenantStatus(authContext);
+  const canManageOffboarding = canOffboardTenant(authContext);
+
+  /**
+   * Download the export straight from the browser.
+   *
+   * Deliberately not a Server Action: the archive can be megabytes, and routing
+   * it through one would buffer the whole thing twice on the server.
+   */
+  async function handleExport() {
+    setExporting(true);
+
+    try {
+      const blob = await webAdminApi.saas.tenants.exportArchive(tenantId);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${tenant?.pressingCode ?? tenantId}-export.zip`;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      // Release on the next tick so the click has time to fire.
+      setTimeout(() => URL.revokeObjectURL(url), 0);
+      toast.success(m.tenants.detail.exportSucceeded);
+    } catch {
+      toast.error(m.tenants.detail.exportFailed);
+    }
+
+    setExporting(false);
+  }
+
+  async function handleOffboard() {
+    if (!window.confirm(m.tenants.detail.offboardConfirm)) {
+      return;
+    }
+
+    setOffboardSubmitting(true);
+    setOffboardError(null);
+
+    const result = await offboardTenantAction(tenantId, {
+      reason: offboardReason,
+    });
+
+    if (!result.ok) {
+      const message =
+        result.errors.reason ??
+        result.message ??
+        m.tenants.detail.offboardFailed;
+      setOffboardError(message);
+      toast.error(message);
+      setOffboardSubmitting(false);
+      return;
+    }
+
+    setTenant(result.data);
+    setOffboardReason("");
+    onTenantUpdated?.();
+    toast.success(
+      interpolate(m.tenants.detail.offboardSucceeded, {
+        tables: String(result.exportedTables),
+      }),
+    );
+    setOffboardSubmitting(false);
+  }
+
+  async function handleRestore() {
+    setRestoreSubmitting(true);
+    setOffboardError(null);
+
+    const result = await restoreTenantAction(tenantId, {
+      reason: offboardReason,
+    });
+
+    if (!result.ok) {
+      const message =
+        result.errors.reason ??
+        result.message ??
+        m.tenants.detail.restoreFailed;
+      setOffboardError(message);
+      toast.error(message);
+      setRestoreSubmitting(false);
+      return;
+    }
+
+    setTenant(result.data);
+    setOffboardReason("");
+    onTenantUpdated?.();
+    toast.success(m.tenants.detail.restoreSucceeded);
+    setRestoreSubmitting(false);
+  }
   async function handleUpdateTenant(values: TenantFormValues) {
     const tenantResult = await updateTenantAction(tenantId, values);
 
@@ -412,6 +517,116 @@ export function TenantDetailView({
                               : getStatusActionLabel(status, m)}
                           </Button>
                         ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="gap-0 rounded-lg py-0 shadow-none">
+                  <CardContent className="grid gap-4 py-5">
+                    <div>
+                      <h2 className="text-sm font-semibold text-foreground">
+                        {m.tenants.detail.offboardSection}
+                      </h2>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {m.tenants.detail.offboardHint}
+                      </p>
+                    </div>
+
+                    {tenant.offboarding ? (
+                      <div className="grid gap-1 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                        <span>
+                          {interpolate(m.tenants.detail.offboardedBanner, {
+                            date: formatDate(tenant.offboarding.offboardedAt),
+                            reason: tenant.offboarding.offboardReason,
+                          })}
+                        </span>
+                        <span>
+                          {interpolate(m.tenants.detail.purgeAfterLabel, {
+                            date: formatDate(tenant.offboarding.purgeAfter),
+                          })}
+                        </span>
+                      </div>
+                    ) : null}
+
+                    {offboardError ? (
+                      <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive">
+                        {offboardError}
+                      </div>
+                    ) : null}
+
+                    {!canManageOffboarding ? (
+                      <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+                        {m.tenants.detail.offboardPermissionHint}
+                      </div>
+                    ) : null}
+
+                    <div className="grid gap-2">
+                      <Label htmlFor="tenant-offboard-reason">
+                        {m.tenants.detail.reason}
+                      </Label>
+                      <Input
+                        disabled={
+                          !canManageOffboarding ||
+                          offboardSubmitting ||
+                          restoreSubmitting
+                        }
+                        id="tenant-offboard-reason"
+                        onChange={(event) => {
+                          setOffboardReason(event.target.value);
+                          setOffboardError(null);
+                        }}
+                        placeholder={m.tenants.detail.reasonPlaceholder}
+                        value={offboardReason}
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Button
+                        className="w-full"
+                        disabled={!canManageOffboarding || exporting}
+                        onClick={() => {
+                          void handleExport();
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        {exporting
+                          ? m.common.updating
+                          : m.tenants.detail.exportAction}
+                      </Button>
+
+                      {tenant.offboarding ? (
+                        <Button
+                          className="w-full"
+                          disabled={!canManageOffboarding || restoreSubmitting}
+                          onClick={() => {
+                            void handleRestore();
+                          }}
+                          size="sm"
+                          type="button"
+                          variant="default"
+                        >
+                          {restoreSubmitting
+                            ? m.common.updating
+                            : m.tenants.detail.restoreAction}
+                        </Button>
+                      ) : (
+                        <Button
+                          className="w-full"
+                          disabled={!canManageOffboarding || offboardSubmitting}
+                          onClick={() => {
+                            void handleOffboard();
+                          }}
+                          size="sm"
+                          type="button"
+                          variant="destructive"
+                        >
+                          {offboardSubmitting
+                            ? m.common.updating
+                            : m.tenants.detail.offboardAction}
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

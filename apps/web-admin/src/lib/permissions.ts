@@ -80,3 +80,12 @@ export function canUpdateTenantStatus(auth: AuthContext | null): boolean {
 export function canManageSaasUsers(auth: AuthContext | null): boolean {
   return isPlatformSuperAdmin(auth);
 }
+
+/**
+ * Can offboard a tenant, restore one inside its retention window, or export
+ * its data. Offboarding starts a countdown to permanent deletion, so it is
+ * held to the same bar as other destructive platform actions: super admin only.
+ */
+export function canOffboardTenant(auth: AuthContext | null): boolean {
+  return isPlatformSuperAdmin(auth);
+}

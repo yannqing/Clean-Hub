@@ -44,11 +44,34 @@ export const tenants = pgTable(
       .notNull()
       .defaultNow(),
     deletedAt: timestamp("deleted_at", { withTimezone: true }),
+    /**
+     * Mirrors the soft-delete pair used across the rest of the schema.
+     *
+     * Declared without `.references(() => users.id)`: `users.tenantId` already
+     * points back here, and a Drizzle-level reference in both directions makes
+     * the two table types circular (TS7022). The foreign keys are created and
+     * enforced in the migration instead.
+     */
+    deletedBy: ulidColumn("deleted_by"),
+    /**
+     * Offboarding: the tenant has left, but their data is kept for a retention
+     * window so the decision stays reversible and an export can still be taken.
+     *
+     * `purgeAfter` is when the cleanup job may physically delete the data.
+     * Until then the tenant is hidden from the normal list but restorable.
+     */
+    offboardedAt: timestamp("offboarded_at", { withTimezone: true }),
+    /** FK enforced in the migration; see the note on `deletedBy`. */
+    offboardedBy: ulidColumn("offboarded_by"),
+    offboardReason: text("offboard_reason"),
+    purgeAfter: timestamp("purge_after", { withTimezone: true }),
     version: integer("version").notNull().default(1),
   },
   (table) => [
     index("tenants_status_idx").on(table.status),
     index("tenants_deleted_at_idx").on(table.deletedAt),
+    // The purge job scans for elapsed retention windows.
+    index("tenants_purge_after_idx").on(table.purgeAfter),
   ],
 );
 

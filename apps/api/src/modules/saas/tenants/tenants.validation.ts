@@ -94,6 +94,25 @@ export const updateSaasTenantStatusBodySchema = z.object({
   reason: z.string().trim().min(1).max(500),
 });
 
+/** Default retention before an offboarded tenant may be purged. */
+export const DEFAULT_TENANT_RETENTION_DAYS = 90;
+
+export const offboardSaasTenantBodySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+  // Bounded so an operator cannot set a window that never elapses (or one that
+  // purges the data before anyone could change their mind).
+  retentionDays: z.coerce
+    .number()
+    .int()
+    .min(7)
+    .max(365)
+    .default(DEFAULT_TENANT_RETENTION_DAYS),
+});
+
+export const restoreSaasTenantBodySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+});
+
 export const updateSaasTenantSettingsBodySchema = z
   .object({
     defaultLanguage: saasTenantLanguageSchema.optional(),

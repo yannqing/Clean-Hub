@@ -51,6 +51,16 @@ export type TenantListResponse = {
   };
 };
 
+/**
+ * Offboarding state. Present on a tenant that has left but is still inside its
+ * retention window, so the console can show what happened and offer a restore.
+ */
+export type TenantOffboarding = {
+  offboardedAt: string;
+  offboardReason: string;
+  purgeAfter: string;
+};
+
 export type TenantDetail = TenantSummary & {
   defaultLanguage: TenantLanguage;
   defaultCurrency: string;
@@ -58,6 +68,27 @@ export type TenantDetail = TenantSummary & {
   contactPhone: string | null;
   contactEmail: string | null;
   userCount: number;
+  /** Null while the tenant is active. */
+  offboarding: TenantOffboarding | null;
+};
+
+export type OffboardTenantRequest = {
+  reason: string;
+  retentionDays?: number;
+};
+
+/**
+ * Offboarding returns the updated tenant plus how many tables the automatic
+ * pre-offboarding export covered, so the console can confirm the data was
+ * captured before access was cut. The archive itself is downloaded separately.
+ */
+export type OffboardTenantResponse = {
+  tenant: TenantDetail;
+  exportedTables: number;
+};
+
+export type RestoreTenantRequest = {
+  reason: string;
 };
 
 export type CreateTenantRequest = {

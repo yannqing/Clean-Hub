@@ -192,6 +192,22 @@ export type SaasMessages = {
       statusUpdateFailed: string;
       statusPermissionError: string;
       readOnlyHint: string;
+      offboardSection: string;
+      offboardHint: string;
+      offboardPermissionHint: string;
+      offboardAction: string;
+      offboardConfirm: string;
+      offboardSucceeded: string;
+      offboardFailed: string;
+      offboardedBanner: string;
+      purgeAfterLabel: string;
+      restoreAction: string;
+      restoreSucceeded: string;
+      restoreFailed: string;
+      exportAction: string;
+      exportHint: string;
+      exportSucceeded: string;
+      exportFailed: string;
       fields: {
         pressingCode: string;
         status: string;

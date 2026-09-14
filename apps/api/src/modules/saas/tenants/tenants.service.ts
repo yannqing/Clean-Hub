@@ -37,17 +37,27 @@ import {
   writeSaasTenantCreatedAuditLog,
   writeSaasTenantFeatureFlagsUpdatedAuditLog,
   writeSaasTenantSettingsUpdatedAuditLog,
+  offboardSaasTenantRecord,
+  restoreSaasTenantRecord,
+  writeSaasTenantExportedAuditLog,
+  writeSaasTenantOffboardedAuditLog,
+  writeSaasTenantRestoredAuditLog,
   writeSaasTenantStatusChangedAuditLog,
   writeSaasTenantUpdatedAuditLog,
 } from "./tenants.repository.js";
+import { buildTenantExportArchive } from "./tenant-export.service.js";
 import type {
   CreateSaasTenantInput,
   CreateSaasTenantResult,
+  ExportSaasTenantInput,
   GetSaasTenantFeatureFlagsInput,
   GetSaasTenantSettingsInput,
   GetSaasTenantDetailInput,
   ListSaasTenantsInput,
+  OffboardSaasTenantInput,
+  RestoreSaasTenantInput,
   SaasTenantDetail,
+  SaasTenantExport,
   SaasTenantFeatureFlags,
   SaasTenantLanguage,
   SaasTenantListResult,
@@ -57,6 +67,7 @@ import type {
   UpdateSaasTenantSettingsInput,
   UpdateSaasTenantStatusInput,
 } from "./tenants.types.js";
+import { DEFAULT_TENANT_RETENTION_DAYS } from "./tenants.validation.js";
 
 function requireSaasTenantsAccess(
   authContext: AuthContext,
@@ -582,6 +593,220 @@ export async function updateSaasTenantStatus(
       tenantId: input.tenantId,
       before,
       after,
+      reason: input.data.reason,
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return tenant;
+  });
+}
+
+/**
+ * Export every tenant-scoped table as a zip of CSVs.
+ *
+ * Restricted to `super_admin` rather than the broader write permission: this
+ * returns the tenant's entire business dataset in one file, which is a much
+ * larger disclosure than any single console screen.
+ */
+export async function exportSaasTenant(
+  input: ExportSaasTenantInput,
+  db: Database = getDb(),
+): Promise<SaasTenantExport> {
+  requireSaasTenantsAccess(input.authContext, ["super_admin"]);
+
+  const tenant = await findSaasTenantDetailById(db, input.tenantId);
+
+  if (!tenant) {
+    throw new SaasTenantsError(
+      "SAAS_TENANT_NOT_FOUND",
+      "SaaS tenant was not found.",
+      404,
+    );
+  }
+
+  const archive = await buildTenantExportArchive(input.tenantId, db);
+
+  await writeSaasTenantExportedAuditLog(db, {
+    actorUserId: input.authContext.userId,
+    tenantId: input.tenantId,
+    tables: archive.tables,
+    ipAddress: input.requestMeta?.ipAddress,
+    userAgent: input.requestMeta?.userAgent,
+  });
+
+  return {
+    fileName: `${tenant.pressingCode}-export-${new Date().toISOString().slice(0, 10)}.zip`,
+    content: archive.content,
+    tables: archive.tables,
+  };
+}
+
+/**
+ * Start a tenant's offboarding: disable access now, keep the data until the
+ * retention window elapses.
+ *
+ * An export is taken first so the operator always has the data as it stood at
+ * the moment access was cut, even if the purge later runs. It is built outside
+ * the transaction on purpose: the export reads every tenant-scoped table, and
+ * holding the tenant row lock for that long would block POS logins meanwhile.
+ * The cost is that rows written during the export may be missed, which is the
+ * better trade for a tenant that is leaving anyway.
+ */
+export async function offboardSaasTenant(
+  input: OffboardSaasTenantInput,
+  db: Database = getDb(),
+): Promise<{ tenant: SaasTenantDetail; export: SaasTenantExport }> {
+  requireSaasTenantsAccess(input.authContext, ["super_admin"]);
+
+  const existing = await findSaasTenantDetailById(db, input.tenantId);
+
+  if (!existing) {
+    throw new SaasTenantsError(
+      "SAAS_TENANT_NOT_FOUND",
+      "SaaS tenant was not found.",
+      404,
+    );
+  }
+
+  if (existing.offboarding) {
+    throw new SaasTenantsError(
+      "SAAS_TENANT_ALREADY_OFFBOARDED",
+      "Tenant is already offboarded.",
+      409,
+    );
+  }
+
+  const tenantExport = await exportSaasTenant(
+    {
+      authContext: input.authContext,
+      requestMeta: input.requestMeta,
+      tenantId: input.tenantId,
+    },
+    db,
+  );
+
+  const retentionDays =
+    input.data.retentionDays ?? DEFAULT_TENANT_RETENTION_DAYS;
+
+  const tenant = await db.transaction(async (tx) => {
+    // Offboarding disables the tenant, so it has to close POS access the same
+    // way a suspension does. Skipping this would leave enrolled terminals
+    // signed in against a tenant that is no longer entitled to the service.
+    await lockPosTerminalsForTenantStatusChange(tx, input.tenantId);
+
+    const updated = await offboardSaasTenantRecord(tx, {
+      tenantId: input.tenantId,
+      actorUserId: input.authContext.userId,
+      reason: input.data.reason,
+      retentionDays,
+    });
+
+    if (!updated) {
+      throw new SaasTenantsError(
+        "SAAS_TENANT_NOT_FOUND",
+        "SaaS tenant was not found.",
+        404,
+      );
+    }
+
+    // Re-scan under the tenant row lock to catch a terminal enrolled between
+    // the first scan and this update.
+    const finalLockedTerminals =
+      await lockPosTerminalsForTenantStatusChange(tx, input.tenantId);
+    const terminalIds = finalLockedTerminals.map((terminal) => terminal.id);
+    const metadata = { securityTrigger: "tenant_offboarding" };
+
+    await securityForceClosePosTerminalShifts(tx, {
+      tenantId: input.tenantId,
+      terminalIds,
+      actorUserId: input.authContext.userId,
+      reason: input.data.reason,
+      metadata,
+      requestMeta: input.requestMeta,
+    });
+    await securityForceClosePosTerminalRegisterSessions(tx, {
+      tenantId: input.tenantId,
+      terminalIds,
+      actorUserId: input.authContext.userId,
+      reason: input.data.reason,
+      metadata,
+      requestMeta: input.requestMeta,
+    });
+    await invalidateLockedPosTerminalsForTenantStatusChange(tx, {
+      tenantId: input.tenantId,
+      previousTenantStatus: existing.status,
+      tenantStatus: "disabled",
+      actorUserId: input.authContext.userId,
+      reason: input.data.reason,
+      terminals: finalLockedTerminals,
+      requestMeta: input.requestMeta,
+    });
+
+    await writeSaasTenantOffboardedAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      tenantId: input.tenantId,
+      reason: input.data.reason,
+      purgeAfter: updated.offboarding?.purgeAfter ?? "",
+      exportedTables: tenantExport.tables.length,
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return updated;
+  });
+
+  return { tenant, export: tenantExport };
+}
+
+/**
+ * Cancel an offboarding while the tenant is still inside its retention window.
+ *
+ * The tenant comes back `suspended`, not `active`: reinstating billing and POS
+ * access should be a separate, deliberate decision rather than a side effect of
+ * undoing the offboarding.
+ */
+export async function restoreSaasTenant(
+  input: RestoreSaasTenantInput,
+  db: Database = getDb(),
+): Promise<SaasTenantDetail> {
+  requireSaasTenantsAccess(input.authContext, ["super_admin"]);
+
+  return db.transaction(async (tx) => {
+    const existing = await findSaasTenantDetailById(tx, input.tenantId);
+
+    if (!existing) {
+      throw new SaasTenantsError(
+        "SAAS_TENANT_NOT_FOUND",
+        "SaaS tenant was not found.",
+        404,
+      );
+    }
+
+    if (!existing.offboarding) {
+      throw new SaasTenantsError(
+        "SAAS_TENANT_NOT_OFFBOARDED",
+        "Tenant is not offboarded.",
+        409,
+      );
+    }
+
+    const tenant = await restoreSaasTenantRecord(tx, {
+      tenantId: input.tenantId,
+      actorUserId: input.authContext.userId,
+    });
+
+    if (!tenant) {
+      throw new SaasTenantsError(
+        "SAAS_TENANT_NOT_FOUND",
+        "SaaS tenant was not found.",
+        404,
+      );
+    }
+
+    await writeSaasTenantRestoredAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      tenantId: input.tenantId,
       reason: input.data.reason,
       ipAddress: input.requestMeta?.ipAddress,
       userAgent: input.requestMeta?.userAgent,

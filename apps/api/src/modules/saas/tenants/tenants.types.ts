@@ -154,6 +154,16 @@ export type SaasTenantListItem = {
   updatedAt: string;
 };
 
+/**
+ * Offboarding state. Present on a tenant that has left but is still inside its
+ * retention window, so the console can show what happened and offer a restore.
+ */
+export type SaasTenantOffboarding = {
+  offboardedAt: string;
+  offboardReason: string;
+  purgeAfter: string;
+};
+
 export type SaasTenantDetail = SaasTenantListItem & {
   defaultLanguage: SaasTenantLanguage;
   defaultCurrency: string;
@@ -161,6 +171,45 @@ export type SaasTenantDetail = SaasTenantListItem & {
   contactPhone: string | null;
   contactEmail: string | null;
   userCount: number;
+  /** Null while the tenant is active. */
+  offboarding: SaasTenantOffboarding | null;
+};
+
+export type OffboardSaasTenantRequest = {
+  reason: string;
+  /** Days of data retention before the purge job may delete the tenant. */
+  retentionDays?: number;
+};
+
+export type OffboardSaasTenantInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  tenantId: string;
+  data: OffboardSaasTenantRequest;
+};
+
+export type RestoreSaasTenantRequest = {
+  reason: string;
+};
+
+export type RestoreSaasTenantInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  tenantId: string;
+  data: RestoreSaasTenantRequest;
+};
+
+export type ExportSaasTenantInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  tenantId: string;
+};
+
+export type SaasTenantExport = {
+  fileName: string;
+  content: Uint8Array;
+  /** Tables written into the archive, in the order they were exported. */
+  tables: string[];
 };
 
 export type CreateSaasTenantResult = SaasTenantDetail & {
