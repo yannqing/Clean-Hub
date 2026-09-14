@@ -82,11 +82,9 @@ export function OrderActionsPanel({
   const [sensitiveReason, setSensitiveReason] = useState("");
   const idempotencyKeyRef = useRef<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const trackedCashMode = [
-    "shared_drawer",
-    "assigned_drawer",
-    "cash_in_hand",
-  ].includes(register.cashHandlingMode);
+  const trackedCashMode = ["shared_drawer", "cash_in_hand"].includes(
+    register.cashHandlingMode,
+  );
   const cashRegisterAvailable =
     register.cashHandlingMode !== "none" &&
     (register.cashHandlingMode === "untracked" ||

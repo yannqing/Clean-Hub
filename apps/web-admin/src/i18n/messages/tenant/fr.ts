@@ -2246,7 +2246,6 @@ export const tenantMessagesFr: TenantMessages = {
         none: "Espèces non acceptées",
         untracked: "Espèces acceptées sans comptage",
         shared_drawer: "Tiroir partagé",
-        assigned_drawer: "Tiroir attribué à un caissier",
         cash_in_hand: "Espèces conservées par chaque employé",
       },
       roundingRules: {

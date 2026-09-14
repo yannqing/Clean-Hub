@@ -123,15 +123,6 @@ export const posChannelRegisterSessionQuerySchema = dateRangeQuerySchema
 export const updatePosChannelSettingsBodySchema = z
   .object({
     cashTrackingEnabled: z.boolean().optional(),
-    defaultCashHandlingMode: z
-      .enum([
-        "none",
-        "untracked",
-        "shared_drawer",
-        "assigned_drawer",
-        "cash_in_hand",
-      ])
-      .optional(),
     requireOpeningFloat: z.boolean().optional(),
     requireClosingCount: z.boolean().optional(),
     requireReturnReason: z.boolean().optional(),

@@ -2206,7 +2206,6 @@ export const tenantMessagesEn: TenantMessages = {
         none: "Cash not accepted",
         untracked: "Cash accepted without counting",
         shared_drawer: "Shared cash drawer",
-        assigned_drawer: "Drawer assigned to one cashier",
         cash_in_hand: "Cash held by each staff member",
       },
       roundingRules: {

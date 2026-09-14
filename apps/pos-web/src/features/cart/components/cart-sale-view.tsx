@@ -635,11 +635,9 @@ function CartPanel({
     (hasTicketLines || Boolean(cart.discountCode) || !offlineProductEligible);
   const onlinePriceUnconfirmed =
     isOnline && cart.lines.length > 0 && effectivePreview === null;
-  const trackedCashMode = [
-    "shared_drawer",
-    "assigned_drawer",
-    "cash_in_hand",
-  ].includes(register.cashHandlingMode);
+  const trackedCashMode = ["shared_drawer", "cash_in_hand"].includes(
+    register.cashHandlingMode,
+  );
   const cashRegisterAvailable =
     register.cashHandlingMode !== "none" &&
     (isOnline
@@ -1867,6 +1865,15 @@ function CartPanel({
                   {t("pos.cart.payLater")}
                 </Button>
               </div>
+              {/* Sits directly under the tabs: the cash tab is disabled until a
+                  drawer session is open, so the reason belongs where the
+                  cashier is looking, not further down the dialog. */}
+              {!cashRegisterAvailable &&
+              runtime.paymentMethodsEnabled.includes("cash") ? (
+                <p className="text-xs leading-5 text-amber-700">
+                  {t("pos.cart.cashShiftRequired")}
+                </p>
+              ) : null}
 
               <div
                 aria-label={`${paymentModeLabel(paymentMode)}支付信息`}
@@ -2167,12 +2174,6 @@ function CartPanel({
               ) : null}
             </section>
 
-            {!cashRegisterAvailable &&
-            runtime.paymentMethodsEnabled.includes("cash") ? (
-              <p className="text-xs leading-5 text-amber-700">
-                {t("pos.cart.cashShiftRequired")}
-              </p>
-            ) : null}
             {!isOnline ? (
               <p className="text-xs leading-5 text-amber-700">
                 {t("pos.cart.offlinePayLater")}

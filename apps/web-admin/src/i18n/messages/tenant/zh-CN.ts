@@ -2077,7 +2077,6 @@ export const tenantMessagesZhCN: TenantMessages = {
         none: "不接受现金",
         untracked: "接受现金但不盘点",
         shared_drawer: "多人共用一个钱箱",
-        assigned_drawer: "钱箱分配给指定收银员",
         cash_in_hand: "店员保管随身现金",
       },
       roundingRules: {

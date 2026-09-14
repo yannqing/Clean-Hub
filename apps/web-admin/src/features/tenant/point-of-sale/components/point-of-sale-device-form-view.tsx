@@ -218,7 +218,6 @@ export function PointOfSaleDeviceFormView({
                           "none",
                           "untracked",
                           "shared_drawer",
-                          "assigned_drawer",
                           "cash_in_hand",
                         ] as const
                       ).map((mode) => (

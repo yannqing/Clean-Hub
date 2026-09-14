@@ -1812,7 +1812,6 @@ export type TenantMessages = {
         none: string;
         untracked: string;
         shared_drawer: string;
-        assigned_drawer: string;
         cash_in_hand: string;
       };
       roundingRules: {
