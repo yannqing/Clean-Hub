@@ -151,10 +151,14 @@ export type TenantPosChannelDeviceList = {
   deviceOfflineAfterSeconds: number;
 };
 
+/**
+ * Cash handling is a branch policy, not a per-device one: the API's device
+ * schema is `.strict()` and rejects `cashHandlingMode`, so sending it fails
+ * the whole update. Set it on the branch instead.
+ */
 export type UpdateTenantPosChannelDeviceRequest = {
   label?: string;
   branchId?: string;
-  cashHandlingMode?: PosChannelCashHandlingMode;
   status?: PosChannelDeviceStatus;
   reason: string;
   version: number;

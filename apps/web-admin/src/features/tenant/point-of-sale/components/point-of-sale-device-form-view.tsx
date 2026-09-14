@@ -26,7 +26,6 @@ import { useTenantI18n } from "@/i18n";
 import { updatePointOfSaleDeviceAction } from "../actions";
 import type {
   PointOfSaleBranchOption,
-  PointOfSaleCashHandlingMode,
   PointOfSaleDevice,
   PointOfSaleDeviceStatus,
 } from "../types";
@@ -46,8 +45,6 @@ export function PointOfSaleDeviceFormView({
   const [label, setLabel] = useState(device.label ?? device.deviceId);
   const [branchId, setBranchId] = useState(device.branchId);
   const [status, setStatus] = useState<PointOfSaleDeviceStatus>(device.status);
-  const [cashHandlingMode, setCashHandlingMode] =
-    useState<PointOfSaleCashHandlingMode>(device.cashHandlingMode);
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +64,6 @@ export function PointOfSaleDeviceFormView({
       const result = await updatePointOfSaleDeviceAction(device.id, {
         label: normalizedLabel,
         branchId,
-        cashHandlingMode,
         status,
         reason: normalizedReason,
         version: device.version,
@@ -193,43 +189,6 @@ export function PointOfSaleDeviceFormView({
                       </SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="pos-device-cash-handling">
-                    {m.pointOfSale.settings.fields.cashHandlingMode}
-                  </Label>
-                  <Select
-                    onValueChange={(value) =>
-                      setCashHandlingMode(
-                        value as PointOfSaleCashHandlingMode,
-                      )
-                    }
-                    value={cashHandlingMode}
-                  >
-                    <SelectTrigger
-                      className="w-full"
-                      id="pos-device-cash-handling"
-                    >
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(
-                        [
-                          "none",
-                          "untracked",
-                          "shared_drawer",
-                          "cash_in_hand",
-                        ] as const
-                      ).map((mode) => (
-                        <SelectItem key={mode} value={mode}>
-                          {m.pointOfSale.settings.cashHandlingModes[mode]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    {m.pointOfSale.settings.hints.cashHandlingMode}
-                  </p>
                 </div>
                 <div className="grid gap-2">
                   <Label htmlFor="pos-device-reason">{copy.edit.reason}</Label>
