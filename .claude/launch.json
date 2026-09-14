@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@cleanhub/api", "dev"],
+      "port": 4000
+    },
+    {
+      "name": "web-admin",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@cleanhub/web-admin", "dev"],
+      "port": 3000
+    }
+  ]
+}
