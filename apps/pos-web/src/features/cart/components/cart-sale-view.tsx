@@ -91,6 +91,7 @@ import type {
 import {
   calculatePosCartTotal,
   splitMixedPaymentTotal,
+  tendersMatchSeededTotal,
   usePosCart,
 } from "../lib";
 
@@ -737,6 +738,7 @@ function CartPanel({
     };
   }, []);
 
+
   useEffect(() => {
     let active = true;
     const hardware = getPosHardwareBridge();
@@ -927,6 +929,68 @@ function CartPanel({
     ]);
     setPaymentMode(mode);
     setPayLater(false);
+  }
+
+  /**
+   * Change the rounding note, and carry the tenders with it.
+   *
+   * The tenders were seeded from the old total, so without this the drawer
+   * would collect the pre-concession amount while the order records the
+   * rounded one -- a cash variance, not just a stale label. Done here on the
+   * cashier's own action rather than in an effect watching the total, which
+   * would be setState reacting to its own state.
+   *
+   * Only an untouched set is re-seeded: a part payment or an over-tender the
+   * cashier typed has to survive, so it is compared against the total those
+   * tenders were seeded from.
+   */
+  function selectCashRoundingStep(step: number) {
+    const nextTotal = cashRoundingOffered
+      ? toMoney(
+          Number(
+            roundCashDown(
+              BigInt(Math.round(Number(pricedTotal) * 100)),
+              cashRoundingStepToMinor(step),
+            ),
+          ) / 100,
+        )
+      : pricedTotal;
+
+    setCashRoundingStep(step);
+
+    if (payLater || tenders.length === 0) return;
+    if (!tendersMatchSeededTotal(tenders, total)) return;
+
+    if (paymentMode === "mixed") {
+      const { cashAmount, externalAmount } = splitMixedPaymentTotal(nextTotal);
+      setTenders((current) =>
+        current.map((tender, index) => {
+          const amount = index === 0 ? cashAmount : externalAmount;
+          return {
+            ...tender,
+            amount,
+            // An exact-change tender stays exact; a cashier who already keyed
+            // a larger note keeps it, so the change due stays right.
+            tenderedAmount:
+              tender.tenderedAmount === tender.amount
+                ? amount
+                : tender.tenderedAmount,
+          };
+        }),
+      );
+      return;
+    }
+
+    setTenders((current) =>
+      current.map((tender) => ({
+        ...tender,
+        amount: nextTotal,
+        tenderedAmount:
+          tender.tenderedAmount === tender.amount
+            ? nextTotal
+            : tender.tenderedAmount,
+      })),
+    );
   }
 
   function updateTender(id: string, patch: Partial<CheckoutTender>) {
@@ -1793,7 +1857,7 @@ function CartPanel({
                         aria-pressed={cashRoundingStep === step}
                         className="min-h-9 flex-1 px-2 text-xs sm:min-w-14 sm:flex-none"
                         key={step}
-                        onClick={() => setCashRoundingStep(step)}
+                        onClick={() => selectCashRoundingStep(step)}
                         size="sm"
                         type="button"
                         variant={

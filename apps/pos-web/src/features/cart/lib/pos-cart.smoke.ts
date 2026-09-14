@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { createMemoryStorage } from "@cleanhub/offline";
 
 import type { PosCartScope } from "../cart.types";
-import { splitMixedPaymentTotal } from "./checkout-payment";
+import {
+  splitMixedPaymentTotal,
+  sumTenderMinor,
+  tendersMatchSeededTotal,
+} from "./checkout-payment";
 import {
   addProductToPosCart,
   addTicketToPosCart,
@@ -27,6 +31,36 @@ assert.deepEqual(
     externalAmount: "50.01",
   },
   "mixed payment must preserve the exact total for odd minor units",
+);
+
+// Changing the cash rounding step changes the total after the tenders were
+// seeded. An untouched tender must follow the new total, or the drawer would
+// collect the pre-concession amount while the order records the rounded one.
+assert.equal(sumTenderMinor([{ amount: "52.00" }]), 5200);
+assert.equal(
+  sumTenderMinor([{ amount: "50.00" }, { amount: "2.00" }]),
+  5200,
+  "a mixed tender sums across every entry",
+);
+assert.equal(
+  sumTenderMinor([{ amount: "" }, { amount: "abc" }]),
+  0,
+  "a blank or unparseable amount counts as nothing, never NaN",
+);
+assert.equal(
+  tendersMatchSeededTotal([{ amount: "52.00" }], "52.00"),
+  true,
+  "an untouched tender is safe to re-seed",
+);
+assert.equal(
+  tendersMatchSeededTotal([{ amount: "20.00" }], "52.00"),
+  false,
+  "a part payment the cashier typed must never be overwritten",
+);
+assert.equal(
+  tendersMatchSeededTotal([{ amount: "50.00" }, { amount: "2.00" }], "52.00"),
+  true,
+  "a split that still adds up to the seeded total is untouched",
 );
 
 const scope: PosCartScope = {
