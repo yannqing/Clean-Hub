@@ -11,7 +11,7 @@ import type {
 import { useTranslation } from "@cleanhub/i18n/react";
 import { PosBreadcrumb, PosDetailPageSkeleton } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
-import { posRoutes } from "@/config";
+import { buildNewIntakePath, posRoutes } from "@/config";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import { formatPosMoney } from "@/lib/money";
@@ -79,7 +79,7 @@ export function CustomerDetailView({
   // the intake page rather than the customer-management list.
   const fromIntake = from === "intake";
   const intakeReturnPath = fromIntake
-    ? buildIntakeReturnPath(intakeQuery)
+    ? buildNewIntakePath({ query: intakeQuery, serviceId })
     : "/customers";
   const buildScopedTicketDetailHref = useCallback(
     (ticketId: string) =>
@@ -503,13 +503,6 @@ export function CustomerDetailView({
       />
     </section>
   );
-}
-
-function buildIntakeReturnPath(query: string | undefined): string {
-  const keyword = query?.trim();
-  if (!keyword) return "/new-intake";
-
-  return `/new-intake?q=${encodeURIComponent(keyword)}`;
 }
 
 function buildTicketDetailPath(

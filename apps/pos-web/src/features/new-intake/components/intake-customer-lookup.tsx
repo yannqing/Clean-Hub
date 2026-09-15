@@ -9,7 +9,7 @@ import { PosPageHeader } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { posToast as toast } from "@/lib/pos-toast";
 
-import { customerDetailPath } from "@/config";
+import { buildNewIntakePath, customerDetailPath } from "@/config";
 
 import {
   INTAKE_DEFAULT_QUERY,
@@ -165,7 +165,7 @@ export function IntakeCustomerLookup({
       setHasSearched(false);
       setQuery((current) => ({ ...current, q: "", page: 1 }));
       clearResults();
-      router.replace("/new-intake");
+      router.replace(buildNewIntakePath({ serviceId }));
       return;
     }
 
@@ -173,7 +173,7 @@ export function IntakeCustomerLookup({
     setSelectedAccount(null);
     setHasSearched(true);
     setQuery((current) => ({ ...current, q: keyword, page: 1 }));
-    router.replace(`/new-intake?q=${encodeURIComponent(keyword)}`);
+    router.replace(buildNewIntakePath({ query: keyword, serviceId }));
   }
 
   function handlePageChange(page: number) {
@@ -231,7 +231,7 @@ export function IntakeCustomerLookup({
       setHasSearched(false);
       setQuery((current) => ({ ...current, q: "", page: 1 }));
       clearResults();
-      router.replace("/new-intake");
+      router.replace(buildNewIntakePath({ serviceId }));
       return;
     }
 
@@ -240,7 +240,7 @@ export function IntakeCustomerLookup({
     setTotal(0);
     setLoading(true);
     setQuery((current) => ({ ...current, q: keyword, page: 1 }));
-    router.replace(`/new-intake?q=${encodeURIComponent(keyword)}`);
+    router.replace(buildNewIntakePath({ query: keyword, serviceId }));
   }
 
   function handleAccountCreated(account: IntakeCreatedAccount) {

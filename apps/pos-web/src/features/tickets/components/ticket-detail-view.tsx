@@ -7,7 +7,11 @@ import { Button, Card, CardContent, CardHeader, CardTitle } from "@cleanhub/ui";
 
 import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
-import { customerDetailPath, posRoutes } from "@/config";
+import {
+  buildNewIntakePath,
+  customerDetailPath,
+  posRoutes,
+} from "@/config";
 import { AddTicketToCartButton } from "@/features/cart/components";
 import { PrintJobControl } from "@/features/hardware/components";
 
@@ -75,6 +79,7 @@ export function TicketDetailView({
     ticket.customerId,
     from,
     intakeQuery,
+    prefillServiceId,
   );
   const ticketCode =
     ticket.ticketNo ?? `TK-${ticket.id.slice(-8).toUpperCase()}`;
@@ -88,7 +93,13 @@ export function TicketDetailView({
       ]
     : fromIntake
       ? [
-          { href: buildIntakeReturnPath(intakeQuery), label: "客户接待" },
+          {
+            href: buildNewIntakePath({
+              query: intakeQuery,
+              serviceId: prefillServiceId,
+            }),
+            label: "客户接待",
+          },
           {
             href: customerDetailHref,
             label: ticket.customerName || "客户档案",
@@ -452,19 +463,11 @@ function getTicketLabelCopy(locale: string) {
   };
 }
 
-function buildIntakeReturnPath(query: string | undefined): string {
-  const keyword = query?.trim();
-  if (!keyword) {
-    return posRoutes.newIntake;
-  }
-
-  return `${posRoutes.newIntake}?q=${encodeURIComponent(keyword)}`;
-}
-
 function buildCustomerDetailHref(
   customerId: string,
   from: string | undefined,
   intakeQuery: string | undefined,
+  serviceId: string | undefined,
 ): string {
   const base = customerDetailPath(customerId);
   if (from !== "intake") {
@@ -475,6 +478,9 @@ function buildCustomerDetailHref(
   const keyword = intakeQuery?.trim();
   if (keyword) {
     params.set("q", keyword);
+  }
+  if (serviceId) {
+    params.set("serviceId", serviceId);
   }
 
   return `${base}?${params.toString()}`;
