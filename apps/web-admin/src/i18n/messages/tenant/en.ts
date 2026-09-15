@@ -1873,7 +1873,6 @@ export const tenantMessagesEn: TenantMessages = {
       devices: "POS terminals",
       hardware: "POS peripherals",
       registerSessions: "Register sessions",
-      settings: "Settings",
     },
     filters: {
       dateRange: "Date range",

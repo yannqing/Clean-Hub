@@ -1511,7 +1511,6 @@ export type TenantMessages = {
       devices: string;
       hardware: string;
       registerSessions: string;
-      settings: string;
     };
     filters: {
       dateRange: string;

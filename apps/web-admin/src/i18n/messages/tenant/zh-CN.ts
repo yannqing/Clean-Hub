@@ -1769,7 +1769,6 @@ export const tenantMessagesZhCN: TenantMessages = {
       devices: "收银终端",
       hardware: "POS 外设",
       registerSessions: "收银班次",
-      settings: "设置",
     },
     filters: {
       dateRange: "日期范围",

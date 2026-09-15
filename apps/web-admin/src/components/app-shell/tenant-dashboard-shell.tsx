@@ -136,10 +136,6 @@ export function TenantDashboardShell({
       href: webAdminRoutes.tenant.pointOfSale.registerSessions,
       label: messages.tenant.pointOfSale.tabs.registerSessions,
     },
-    {
-      href: webAdminRoutes.tenant.system.settingsSections.pointOfSale,
-      label: messages.tenant.pointOfSale.tabs.settings,
-    },
   ];
   const customerAccountsActive = isActivePath(
     pathname,

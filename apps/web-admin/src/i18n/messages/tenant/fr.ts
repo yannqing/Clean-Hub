@@ -1906,7 +1906,6 @@ export const tenantMessagesFr: TenantMessages = {
       devices: "Terminaux de point de vente",
       hardware: "Périphériques de point de vente",
       registerSessions: "Sessions de caisse",
-      settings: "Paramètres",
     },
     filters: {
       dateRange: "Plage de dates",
