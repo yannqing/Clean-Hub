@@ -2,13 +2,7 @@
 
 import { isApiHttpError, type TenantProfileBranch } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
-import {
-  Badge,
-  Button,
-  Input,
-  Label,
-  cn,
-} from "@cleanhub/ui";
+import { Badge, Button, Input, Label, cn } from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
 import {
   type FormEvent,
@@ -20,11 +14,13 @@ import {
 } from "react";
 
 import { posRoutes } from "@/config/routes";
-import {
-  Icon,
-  type PosIconName,
-} from "@/components/app-shell/icons";
+import { Icon, type PosIconName } from "@/components/app-shell/icons";
 import { getOrCreatePosDeviceId } from "@/features/auth/utils/device-id";
+import {
+  inspectBuiltInHardware,
+  type DiscoveredBuiltInHardware,
+} from "@/features/hardware/lib/built-in-hardware";
+import { getPosHardwareBridge } from "@/features/hardware/lib/desktop-bridge";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 
 import {
@@ -52,6 +48,16 @@ type PageState =
   | { kind: "disabled"; bootstrap: TerminalBootstrapResponse }
   | { kind: "setup"; bootstrap: TerminalBootstrapResponse };
 
+type HardwareInspectionState =
+  | { kind: "loading" }
+  | { kind: "unavailable" }
+  | { kind: "error" }
+  | {
+      kind: "ready";
+      devices: DiscoveredBuiltInHardware[];
+      hardwareModel: string | null;
+    };
+
 const ADMIN_ROLES = new Set(["owner", "manager"]);
 
 function defaultTerminalLabel(branchName: string): string {
@@ -66,8 +72,9 @@ export function TerminalSetupView() {
   const [pageState, setPageState] = useState<PageState>({ kind: "loading" });
   const [step, setStep] = useState<SetupStep>("admin");
   const [deviceId, setDeviceId] = useState("");
-  const [adminSession, setAdminSession] =
-    useState<SetupAdminSession | null>(null);
+  const [adminSession, setAdminSession] = useState<SetupAdminSession | null>(
+    null,
+  );
   const [selectedBranchId, setSelectedBranchId] = useState("");
   const [terminalLabel, setTerminalLabel] = useState("");
   const [identifier, setIdentifier] = useState("");
@@ -77,6 +84,8 @@ export function TerminalSetupView() {
   const [finalizing, setFinalizing] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [completionError, setCompletionError] = useState<string | null>(null);
+  const [hardwareInspection, setHardwareInspection] =
+    useState<HardwareInspectionState>({ kind: "loading" });
 
   const bootstrap =
     pageState.kind === "setup" || pageState.kind === "disabled"
@@ -94,8 +103,7 @@ export function TerminalSetupView() {
   const selectedBranch =
     activeBranches.find((branch) => branch.id === selectedBranchId) ?? null;
   const managerBranchInvalid =
-    adminSession?.authContext.role === "manager" &&
-    activeBranches.length !== 1;
+    adminSession?.authContext.role === "manager" && activeBranches.length !== 1;
   const recoveryBranchUnavailable =
     recovering &&
     (!bootstrap?.terminal ||
@@ -133,10 +141,7 @@ export function TerminalSetupView() {
           originalTerminal?.label ?? copy.setup.recovery.unnamedTerminal,
         );
 
-        if (
-          authContext.role === "manager" &&
-          availableBranches.length !== 1
-        ) {
+        if (authContext.role === "manager" && availableBranches.length !== 1) {
           setSelectedBranchId("");
           setFormError(copy.setup.branch.managerAssignmentInvalid);
           setStep("branch");
@@ -217,6 +222,27 @@ export function TerminalSetupView() {
     }
   }, [copy.setup.complete.signOutFailed, router]);
 
+  const inspectCurrentHardware = useCallback(async () => {
+    setHardwareInspection({ kind: "loading" });
+    const hardware = getPosHardwareBridge();
+    if (!hardware) {
+      setHardwareInspection({ kind: "unavailable" });
+      return;
+    }
+
+    try {
+      const result = await inspectBuiltInHardware(hardware);
+      if (!mountedRef.current) return;
+      setHardwareInspection({
+        kind: "ready",
+        devices: result.devices,
+        hardwareModel: result.hardwareModel,
+      });
+    } catch {
+      if (mountedRef.current) setHardwareInspection({ kind: "error" });
+    }
+  }, []);
+
   const initialize = useCallback(async () => {
     setPageState({ kind: "loading" });
     setFormError(null);
@@ -262,13 +288,20 @@ export function TerminalSetupView() {
     mountedRef.current = true;
     const timeoutId = window.setTimeout(() => {
       void initialize();
+      void inspectCurrentHardware();
     }, 0);
 
     return () => {
       mountedRef.current = false;
       window.clearTimeout(timeoutId);
     };
-  }, [initialize]);
+  }, [initialize, inspectCurrentHardware]);
+
+  useEffect(() => {
+    if (step === "terminal") {
+      void inspectCurrentHardware();
+    }
+  }, [inspectCurrentHardware, step]);
 
   async function submitAdministrator(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -388,9 +421,7 @@ export function TerminalSetupView() {
       setStep("complete");
       await finalizeSetup();
     } catch (error) {
-      setFormError(
-        getPosApiErrorMessage(error, copy.setup.terminal.failed),
-      );
+      setFormError(getPosApiErrorMessage(error, copy.setup.terminal.failed));
     } finally {
       setSubmittingEnrollment(false);
     }
@@ -407,10 +438,7 @@ export function TerminalSetupView() {
   if (pageState.kind === "error") {
     return (
       <TerminalSetupShell>
-        <TerminalStatusPanel
-          kind="error"
-          onRetry={() => void initialize()}
-        />
+        <TerminalStatusPanel kind="error" onRetry={() => void initialize()} />
       </TerminalSetupShell>
     );
   }
@@ -439,9 +467,7 @@ export function TerminalSetupView() {
             {copy.setup.title}
           </h1>
           <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
-            {recovering
-              ? copy.setup.recovery.hint
-              : copy.setup.description}
+            {recovering ? copy.setup.recovery.hint : copy.setup.description}
           </p>
         </div>
 
@@ -522,9 +548,7 @@ export function TerminalSetupView() {
             <div className="flex justify-end">
               <Button
                 className="h-10 min-w-28 rounded-xl"
-                disabled={
-                  submittingLogin || !identifier.trim() || !password
-                }
+                disabled={submittingLogin || !identifier.trim() || !password}
                 type="submit"
               >
                 {submittingLogin ? (
@@ -701,6 +725,95 @@ export function TerminalSetupView() {
                 mono
               />
             </dl>
+
+            <div className="rounded-xl border border-black/10 bg-muted/25 px-4 py-3.5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 items-start gap-3">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-background text-foreground shadow-sm ring-1 ring-black/10">
+                    <Icon className="size-4" name="settings" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-foreground">
+                      {copy.setup.terminal.hardwareTitle}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-5 text-muted-foreground">
+                      {copy.setup.terminal.hardwareDescription}
+                    </p>
+                  </div>
+                </div>
+                {hardwareInspection.kind === "error" ? (
+                  <Button
+                    className="h-8 shrink-0 rounded-lg px-2.5 text-xs"
+                    onClick={() => void inspectCurrentHardware()}
+                    type="button"
+                    variant="outline"
+                  >
+                    <Icon className="size-3.5" name="rotate-ccw" />
+                    {copy.setup.terminal.hardwareRetry}
+                  </Button>
+                ) : null}
+              </div>
+
+              <div className="mt-3 border-t border-black/8 pt-3">
+                {hardwareInspection.kind === "loading" ? (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Icon className="size-3.5 animate-spin" name="rotate-ccw" />
+                    {copy.setup.terminal.hardwareScanning}
+                  </p>
+                ) : hardwareInspection.kind === "unavailable" ? (
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    {copy.setup.terminal.hardwareEnvironmentUnavailable}
+                  </p>
+                ) : hardwareInspection.kind === "error" ? (
+                  <p className="text-xs leading-5 text-destructive">
+                    {copy.setup.terminal.hardwareFailed}
+                  </p>
+                ) : hardwareInspection.devices.length === 0 ? (
+                  <p className="text-xs leading-5 text-muted-foreground">
+                    {copy.setup.terminal.hardwareNone}
+                  </p>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {hardwareInspection.devices.map((device) => {
+                      const model =
+                        device.deviceModel ?? hardwareInspection.hardwareModel;
+                      const typeLabel =
+                        device.deviceType === "printer"
+                          ? copy.setup.terminal.hardwarePrinter
+                          : copy.setup.terminal.hardwareScanner;
+                      return (
+                        <div
+                          className="flex items-center justify-between gap-2 rounded-lg bg-background px-3 py-2 ring-1 ring-black/8"
+                          key={device.hardwareKey}
+                        >
+                          <span className="flex min-w-0 items-center gap-2">
+                            <Icon
+                              className="size-4 shrink-0 text-muted-foreground"
+                              name={
+                                device.deviceType === "printer"
+                                  ? "printer"
+                                  : "scan-line"
+                              }
+                            />
+                            <span className="truncate text-xs font-medium">
+                              {model ? `${model} ${typeLabel}` : device.name}
+                            </span>
+                          </span>
+                          <Badge
+                            className="shrink-0 text-[10px]"
+                            variant={device.available ? "secondary" : "outline"}
+                          >
+                            {device.available
+                              ? copy.setup.terminal.hardwareDetected
+                              : copy.setup.terminal.hardwareServiceUnavailable}
+                          </Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div className="flex items-start gap-3 rounded-xl border border-emerald-600/15 bg-emerald-500/[0.06] px-4 py-3">
               <Icon
