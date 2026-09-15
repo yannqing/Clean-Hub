@@ -38,6 +38,7 @@ import type {
   RefundRequest,
   RefundRequestStatus,
 } from "./payment.types.js";
+import { findPosOrderFulfilmentState } from "../../pos/orders/orders.repository.js";
 
 export type PaymentOrderRecord = {
   id: string;
@@ -1025,6 +1026,10 @@ export class PaymentRepository {
       totalAmount: order.totalAmount,
       paidAmount,
     });
+    const fulfilment = await findPosOrderFulfilmentState(this.db, {
+      tenantId: input.tenantId,
+      orderId: input.orderId,
+    });
     const now = new Date();
 
     await this.db
@@ -1034,7 +1039,9 @@ export class PaymentRepository {
         paymentStatus,
         status:
           paymentStatus === "paid" && order.status === "received"
-            ? "paid"
+            ? fulfilment.isProductOnly
+              ? "delivered"
+              : "paid"
             : order.status,
         paidAt: paymentStatus === "unpaid" ? null : input.paidAt,
         updatedAt: now,

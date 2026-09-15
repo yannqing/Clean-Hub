@@ -25,6 +25,7 @@ import {
   assertGuestOrderItemAllowed,
   paymentIntentMatches,
 } from "./orders.service.js";
+import { projectPosOrderPaymentState } from "./order-payment-state.js";
 import type { PosPaymentTransaction } from "./orders.types.js";
 import {
   createPosOrderBodySchema,
@@ -316,6 +317,42 @@ assert.equal(
   }),
   "300.00",
   "weight-priced lines must calculate from measured weight",
+);
+
+const paidProductOnlyState = projectPosOrderPaymentState({
+  current: {
+    totalAmount: "100.00",
+    paidAmount: "0.00",
+    paymentStatus: "unpaid",
+    paidAt: null,
+    status: "received",
+  },
+  nextTotalAmount: "100.00",
+  nextPaidAmount: "100.00",
+  autoDeliverWhenPaid: true,
+});
+assert.equal(
+  paidProductOnlyState.status,
+  "delivered",
+  "a product-only counter sale must be delivered when fully paid",
+);
+
+const paidFulfilmentState = projectPosOrderPaymentState({
+  current: {
+    totalAmount: "100.00",
+    paidAmount: "0.00",
+    paymentStatus: "unpaid",
+    paidAt: null,
+    status: "received",
+  },
+  nextTotalAmount: "100.00",
+  nextPaidAmount: "100.00",
+  autoDeliverWhenPaid: false,
+});
+assert.equal(
+  paidFulfilmentState.status,
+  "paid",
+  "an order requiring fulfilment must remain paid until handoff completes",
 );
 
 const orderItemColumns = getTableConfig(orderItems).columns.map(

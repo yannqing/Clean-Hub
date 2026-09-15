@@ -16,12 +16,21 @@ import {
 import { createId } from "@cleanhub/id";
 import { useTranslation } from "@cleanhub/i18n/react";
 import {
+  Button,
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
+  Textarea,
 } from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";
@@ -106,11 +115,19 @@ export function OrderActionsPanel({
     Number(order.paidAmount) === 0 &&
     order.paymentStatus === "paid" &&
     (order.status === "draft" || order.status === "received");
+  const hasLinkedTickets = order.ticketReferences.length > 0;
+  const unfulfilledTicketCount = order.ticketReferences.filter(
+    (reference) => reference.ticketStatus !== "picked_up",
+  ).length;
+  const ticketFulfilmentReady =
+    !hasLinkedTickets || unfulfilledTicketCount === 0;
   const availableTransitions = isZeroTotalReadyForConfirmation
     ? [...STATUS_TRANSITIONS[order.status], "paid" as const]
     : STATUS_TRANSITIONS[order.status];
   const transitions = availableTransitions.filter(
-    (status) => status !== "cancelled" || canManageSensitiveOperations,
+    (status) =>
+      (status !== "cancelled" || canManageSensitiveOperations) &&
+      (status !== "delivered" || ticketFulfilmentReady),
   );
   const canDelete =
     canManageSensitiveOperations &&
@@ -326,257 +343,267 @@ export function OrderActionsPanel({
   }
 
   return (
-    <section className="sticky top-4 border-y bg-background p-5">
-      <div className="flex items-center justify-between gap-3">
+    <Card className="self-start gap-0 overflow-hidden py-0 xl:sticky xl:top-4">
+      <CardHeader className="border-b px-5 py-4">
         <div>
-          <h2 className="font-semibold text-foreground">订单操作</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <CardTitle>订单操作</CardTitle>
+          <CardDescription className="mt-1 text-xs">
             支付状态由成功流水自动累加计算。
-          </p>
+          </CardDescription>
         </div>
-        <Icon className="h-5 w-5 text-muted-foreground" name="wallet-cards" />
-      </div>
+        <CardAction>
+          <Icon className="h-5 w-5 text-muted-foreground" name="wallet-cards" />
+        </CardAction>
+      </CardHeader>
 
-      <div className="mt-5 rounded-md bg-muted/40 p-4">
-        <div className="grid gap-2 border-b pb-3 text-xs">
-          <div className="flex items-center justify-between gap-3 text-muted-foreground">
-            <span>{text("订单小计")}</span>
-            <span className="font-semibold text-foreground">
-              {formatOrderMoney(order.subtotalAmount, order.currency, locale)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between gap-3 text-muted-foreground">
-            <span>{text("优惠金额")}</span>
-            <span className="font-semibold text-emerald-700">
-              {Number(order.discountAmount) > 0 ? "−" : ""}
-              {formatOrderMoney(order.discountAmount, order.currency, locale)}
-            </span>
-          </div>
-          {Number(order.taxAmount) !== 0 ? (
+      <CardContent className="px-5 py-5">
+        <div className="rounded-lg border bg-muted/30 p-4">
+          <div className="grid gap-2 border-b pb-3 text-xs">
             <div className="flex items-center justify-between gap-3 text-muted-foreground">
-              <span>
-                VAT {Number(order.taxRateSnapshot) * 100}%
-                {order.pricesIncludeTax ? "（含税）" : ""}
-              </span>
+              <span>{text("订单小计")}</span>
               <span className="font-semibold text-foreground">
-                {formatOrderMoney(order.taxAmount, order.currency, locale)}
+                {formatOrderMoney(order.subtotalAmount, order.currency, locale)}
               </span>
             </div>
-          ) : null}
-          {order.taxExemptionReason ? (
             <div className="flex items-center justify-between gap-3 text-muted-foreground">
-              <span>税务豁免</span>
-              <span className="max-w-40 truncate font-semibold text-foreground">
-                {order.taxExemptionReason}
+              <span>{text("优惠金额")}</span>
+              <span className="font-semibold text-emerald-700">
+                {Number(order.discountAmount) > 0 ? "−" : ""}
+                {formatOrderMoney(order.discountAmount, order.currency, locale)}
               </span>
             </div>
-          ) : null}
-          {Number(order.roundingAdjustmentAmount) !== 0 ? (
-            <div className="flex items-center justify-between gap-3 text-muted-foreground">
-              <span>舍入调整</span>
-              <span className="font-semibold text-foreground">
-                {formatOrderMoney(
-                  order.roundingAdjustmentAmount,
-                  order.currency,
-                  locale,
-                )}
+            {Number(order.taxAmount) !== 0 ? (
+              <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                <span>
+                  VAT {Number(order.taxRateSnapshot) * 100}%
+                  {order.pricesIncludeTax ? "（含税）" : ""}
+                </span>
+                <span className="font-semibold text-foreground">
+                  {formatOrderMoney(order.taxAmount, order.currency, locale)}
+                </span>
+              </div>
+            ) : null}
+            {order.taxExemptionReason ? (
+              <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                <span>税务豁免</span>
+                <span className="max-w-40 truncate font-semibold text-foreground">
+                  {order.taxExemptionReason}
+                </span>
+              </div>
+            ) : null}
+            {Number(order.roundingAdjustmentAmount) !== 0 ? (
+              <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                <span>舍入调整</span>
+                <span className="font-semibold text-foreground">
+                  {formatOrderMoney(
+                    order.roundingAdjustmentAmount,
+                    order.currency,
+                    locale,
+                  )}
+                </span>
+              </div>
+            ) : null}
+            <div className="flex items-center justify-between gap-3 text-foreground">
+              <span className="font-semibold">{text("应付总额")}</span>
+              <span className="text-sm font-semibold text-foreground">
+                {formatOrderMoney(order.totalAmount, order.currency, locale)}
               </span>
             </div>
-          ) : null}
-          <div className="flex items-center justify-between gap-3 text-foreground">
-            <span className="font-semibold">{text("应付总额")}</span>
-            <span className="text-sm font-semibold text-foreground">
-              {formatOrderMoney(order.totalAmount, order.currency, locale)}
-            </span>
           </div>
-        </div>
-        <div className="mt-3 text-xs font-medium text-muted-foreground">
-          待收金额
-        </div>
-        <div className="mt-1 text-xl font-semibold text-foreground">
-          {formatOrderMoney(outstanding, order.currency)}
-        </div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {(["cash", "wave", "orange_money"] satisfies PaymentOption[]).map(
-            (option) => (
-              <button
-                className={`min-h-11 rounded-md border px-3 text-sm font-semibold transition ${
-                  paymentOption === option
-                    ? "border-foreground bg-foreground text-background"
-                    : "bg-background text-foreground hover:bg-accent hover:text-accent-foreground"
-                }`}
-                disabled={
-                  !canPay ||
-                  isPending ||
-                  (option === "cash" && !cashRegisterAvailable)
-                }
-                key={option}
-                onClick={() => {
-                  setPaymentOption(option);
-                  setExternalReference("");
-                  if (option === "cash") setCashTendered(amount);
+          <div className="mt-3 text-xs font-medium text-muted-foreground">
+            待收金额
+          </div>
+          <div className="mt-1 text-xl font-semibold text-foreground">
+            {formatOrderMoney(outstanding, order.currency)}
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            {(["cash", "wave", "orange_money"] satisfies PaymentOption[]).map(
+              (option) => (
+                <Button
+                  className="min-h-11 min-w-0 px-2"
+                  disabled={
+                    !canPay ||
+                    isPending ||
+                    (option === "cash" && !cashRegisterAvailable)
+                  }
+                  key={option}
+                  onClick={() => {
+                    setPaymentOption(option);
+                    setExternalReference("");
+                    if (option === "cash") setCashTendered(amount);
+                    idempotencyKeyRef.current = null;
+                  }}
+                  type="button"
+                  variant={paymentOption === option ? "default" : "outline"}
+                >
+                  {option === "cash"
+                    ? "现金"
+                    : MOBILE_MONEY_PROVIDER_LABELS[option]}
+                </Button>
+              ),
+            )}
+          </div>
+
+          {pendingManualPayment ? (
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
+              当前订单已有一笔
+              {pendingManualPayment.provider
+                ? ` ${MOBILE_MONEY_PROVIDER_LABELS[pendingManualPayment.provider]} `
+                : "移动支付"}
+              待确认。处理完成前不能继续收款。
+            </div>
+          ) : paymentOption !== "cash" ? (
+            <div className="mt-3 rounded-md border bg-accent/60 p-3 text-xs leading-5 text-accent-foreground">
+              客户需先在外部应用完成转账。这里只记录付款凭证，不会自动扣款；Owner
+              或 Manager 核对商户账户后才能确认到账。
+            </div>
+          ) : null}
+
+          {isZeroTotalReadyForConfirmation ? (
+            <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
+              {text("当前订单应付金额为 0。确认零元订单后即可继续完成交付。")}
+            </div>
+          ) : null}
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto]">
+            <Input
+              aria-label="本次收款金额"
+              className="h-11 font-semibold"
+              disabled={!canPay || isPending}
+              inputMode="decimal"
+              onChange={(event) => {
+                setAmount(event.target.value);
+                idempotencyKeyRef.current = null;
+              }}
+              value={amount}
+            />
+            {paymentOption !== "cash" ? (
+              <Input
+                className="h-11"
+                disabled={!canPay || isPending}
+                maxLength={120}
+                onChange={(event) => {
+                  setExternalReference(event.target.value);
                   idempotencyKeyRef.current = null;
                 }}
-                type="button"
-              >
-                {option === "cash"
-                  ? "现金"
-                  : MOBILE_MONEY_PROVIDER_LABELS[option]}
-              </button>
-            ),
-          )}
-        </div>
-
-        {pendingManualPayment ? (
-          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
-            当前订单已有一笔
-            {pendingManualPayment.provider
-              ? ` ${MOBILE_MONEY_PROVIDER_LABELS[pendingManualPayment.provider]} `
-              : "移动支付"}
-            待确认。处理完成前不能继续收款。
-          </div>
-        ) : paymentOption !== "cash" ? (
-          <div className="mt-3 rounded-md border bg-accent/60 p-3 text-xs leading-5 text-accent-foreground">
-            客户需先在外部应用完成转账。这里只记录付款凭证，不会自动扣款；Owner
-            或 Manager 核对商户账户后才能确认到账。
-          </div>
-        ) : null}
-
-        {isZeroTotalReadyForConfirmation ? (
-          <div className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs leading-5 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/20 dark:text-emerald-300">
-            {text("当前订单应付金额为 0。确认零元订单后即可继续完成交付。")}
-          </div>
-        ) : null}
-
-        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto]">
-          <input
-            className="h-11 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            disabled={!canPay || isPending}
-            inputMode="decimal"
-            onChange={(event) => {
-              setAmount(event.target.value);
-              idempotencyKeyRef.current = null;
-            }}
-            value={amount}
-          />
-          {paymentOption !== "cash" ? (
-            <input
-              className="h-11 min-w-0 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              disabled={!canPay || isPending}
-              maxLength={120}
-              onChange={(event) => {
-                setExternalReference(event.target.value);
-                idempotencyKeyRef.current = null;
-              }}
-              placeholder="交易流水号"
-              value={externalReference}
-            />
-          ) : (
-            <input
-              className="h-11 min-w-0 rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              disabled={!canPay || isPending || !cashRegisterAvailable}
-              inputMode="decimal"
-              min={0}
-              onChange={(event) => {
-                setCashTendered(event.target.value);
-                idempotencyKeyRef.current = null;
-              }}
-              placeholder="实收现金"
-              step="0.01"
-              type="number"
-              value={cashTendered}
-            />
-          )}
-          <button
-            className={`flex h-11 items-center justify-center gap-2 rounded-md px-4 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-              paymentOption === "cash"
-                ? "bg-foreground text-background hover:bg-foreground/90"
-                : "bg-amber-600 text-white hover:bg-amber-700"
-            }`}
-            disabled={
-              !canPay ||
-              isPending ||
-              Number(amount) <= 0 ||
-              (paymentOption === "cash" &&
-                (!cashRegisterAvailable ||
-                  Number(cashTendered) < Number(amount))) ||
-              (paymentOption !== "cash" && externalReference.trim().length < 3)
-            }
-            onClick={pay}
-            type="button"
-          >
-            <Icon className="h-4 w-4" name="wallet-cards" />
-            {paymentOption === "cash"
-              ? "现金收款"
-              : `记录 ${MOBILE_MONEY_PROVIDER_LABELS[paymentOption]}`}
-          </button>
-        </div>
-        {paymentOption === "cash" ? (
-          <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-            <span>
-              {cashRegisterAvailable
-                ? "现金找零"
-                : "请先开班后再进行现金收款"}
-            </span>
-            {cashRegisterAvailable ? (
-              <strong className="text-foreground">
-                {formatOrderMoney(
-                  Math.max(
-                    0,
-                    Number(cashTendered || 0) - Number(amount),
-                  ).toFixed(2),
-                  order.currency,
-                  locale,
-                )}
-              </strong>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-
-      <div className="mt-5 grid gap-2">
-        {transitions.length === 0 ? (
-          <div className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
-            当前状态无可用流转。
-          </div>
-        ) : (
-          transitions.map((status) => (
-            <button
-              className="flex h-11 items-center justify-between rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={isPending}
-              key={status}
-              onClick={() => {
-                if (status === "cancelled") {
-                  setSensitiveAction("cancel");
-                  return;
-                }
-                changeStatus(status);
-              }}
+                placeholder="交易流水号"
+                value={externalReference}
+              />
+            ) : (
+              <Input
+                className="h-11"
+                disabled={!canPay || isPending || !cashRegisterAvailable}
+                inputMode="decimal"
+                min={0}
+                onChange={(event) => {
+                  setCashTendered(event.target.value);
+                  idempotencyKeyRef.current = null;
+                }}
+                placeholder="实收现金"
+                step="0.01"
+                type="number"
+                value={cashTendered}
+              />
+            )}
+            <Button
+              className={`h-11 ${
+                paymentOption === "cash"
+                  ? ""
+                  : "bg-amber-600 text-white hover:bg-amber-700"
+              }`}
+              disabled={
+                !canPay ||
+                isPending ||
+                Number(amount) <= 0 ||
+                (paymentOption === "cash" &&
+                  (!cashRegisterAvailable ||
+                    Number(cashTendered) < Number(amount))) ||
+                (paymentOption !== "cash" &&
+                  externalReference.trim().length < 3)
+              }
+              onClick={pay}
               type="button"
             >
+              <Icon className="h-4 w-4" name="wallet-cards" />
+              {paymentOption === "cash"
+                ? "现金收款"
+                : `记录 ${MOBILE_MONEY_PROVIDER_LABELS[paymentOption]}`}
+            </Button>
+          </div>
+          {paymentOption === "cash" ? (
+            <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                {status === "paid" && isZeroTotalReadyForConfirmation
-                  ? text("确认零元订单")
-                  : `设为 ${ORDER_STATUS_LABELS[status]}`}
+                {cashRegisterAvailable
+                  ? "现金找零"
+                  : "请先开班后再进行现金收款"}
               </span>
-              <Icon
-                className="h-4 w-4 text-muted-foreground"
-                name="chevron-right"
-              />
-            </button>
-          ))
-        )}
+              {cashRegisterAvailable ? (
+                <strong className="text-foreground">
+                  {formatOrderMoney(
+                    Math.max(
+                      0,
+                      Number(cashTendered || 0) - Number(amount),
+                    ).toFixed(2),
+                    order.currency,
+                    locale,
+                  )}
+                </strong>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
 
-        <button
-          className="mt-2 flex h-11 items-center justify-center gap-2 rounded-md border border-destructive/30 px-4 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!canDelete || isPending}
-          onClick={() => setSensitiveAction("delete")}
-          type="button"
-        >
-          <Icon className="h-4 w-4" name="trash" />
-          删除订单
-        </button>
-      </div>
+        <div className="mt-5 grid gap-2">
+          {order.status === "paid" && !ticketFulfilmentReady ? (
+            <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
+              还有 {unfulfilledTicketCount} 张关联工单尚未完成取件。全部交给顾客后，才能将订单设为已交付。
+            </div>
+          ) : null}
+          {transitions.length === 0 ? (
+            <div className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
+              当前状态无可用流转。
+            </div>
+          ) : (
+            transitions.map((status) => (
+              <Button
+                className="h-11 justify-between"
+                disabled={isPending}
+                key={status}
+                onClick={() => {
+                  if (status === "cancelled") {
+                    setSensitiveAction("cancel");
+                    return;
+                  }
+                  changeStatus(status);
+                }}
+                type="button"
+                variant="outline"
+              >
+                <span>
+                  {status === "paid" && isZeroTotalReadyForConfirmation
+                    ? text("确认零元订单")
+                    : `设为 ${ORDER_STATUS_LABELS[status]}`}
+                </span>
+                <Icon
+                  className="h-4 w-4 text-muted-foreground"
+                  name="chevron-right"
+                />
+              </Button>
+            ))
+          )}
+
+          <Button
+            className="mt-2 h-11"
+            disabled={!canDelete || isPending}
+            onClick={() => setSensitiveAction("delete")}
+            type="button"
+            variant="destructive"
+          >
+            <Icon className="h-4 w-4" name="trash" />
+            删除订单
+          </Button>
+        </div>
+      </CardContent>
 
       <Dialog
         onOpenChange={(open) => {
@@ -598,8 +625,8 @@ export function OrderActionsPanel({
           </DialogHeader>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             操作原因
-            <textarea
-              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <Textarea
+              className="min-h-24"
               disabled={isPending}
               maxLength={500}
               onChange={(event) => setSensitiveReason(event.target.value)}
@@ -608,29 +635,31 @@ export function OrderActionsPanel({
             />
           </label>
           <DialogFooter>
-            <button
-              className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+            <Button
+              className="h-11"
               disabled={isPending}
               onClick={() => {
                 setSensitiveAction(null);
                 setSensitiveReason("");
               }}
               type="button"
+              variant="outline"
             >
               返回
-            </button>
-            <button
-              className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-50"
+            </Button>
+            <Button
+              className="h-11"
               disabled={isPending || !sensitiveReason.trim()}
               onClick={submitSensitiveAction}
               type="button"
+              variant="destructive"
             >
               {isPending ? "处理中…" : "确认"}
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </section>
+    </Card>
   );
 }
 

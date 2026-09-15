@@ -55,6 +55,7 @@ function resolveOrderCapabilities(
     paymentStatus: string;
     paidAmount: string;
     totalAmount: string;
+    ticketReferences?: Array<{ ticketStatus: string }>;
   },
   hasPaidTransaction = false,
 ) {
@@ -66,7 +67,11 @@ function resolveOrderCapabilities(
   const canRecordPayment =
     !isFinal && Number(order.totalAmount) > Number(order.paidAmount);
   const canMarkDelivered =
-    order.status === "paid" && order.paymentStatus === "paid";
+    order.status === "paid" &&
+    order.paymentStatus === "paid" &&
+    !order.ticketReferences?.some(
+      (reference) => reference.ticketStatus !== "picked_up",
+    );
   const allowedNextStatuses: TenantOrderStatus[] = [];
 
   if (order.status === "draft") allowedNextStatuses.push("received");

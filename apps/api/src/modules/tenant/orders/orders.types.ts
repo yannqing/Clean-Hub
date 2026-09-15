@@ -4,6 +4,7 @@ import type {
   DeletePosOrderItemRequest,
   PosOrderDiscountApplication,
   PosOrderItem,
+  PosOrderTicketReference,
   PosPaymentTransaction,
   UpdatePosOrderItemRequest,
 } from "../../pos/orders/orders.types.js";
@@ -63,6 +64,7 @@ export type TenantOrderItem = PosOrderItem;
 export type TenantOrderDiscountApplication = PosOrderDiscountApplication;
 export type TenantOrderPaymentTransaction = PosPaymentTransaction;
 export type TenantOrderPaymentAdjustment = PosPaymentAdjustment;
+export type TenantOrderTicketReference = PosOrderTicketReference;
 
 export type CreateTenantOrderItemRequest = CreatePosOrderItemRequest;
 export type UpdateTenantOrderItemRequest = UpdatePosOrderItemRequest;
@@ -92,6 +94,7 @@ export type TenantOrderDetail = TenantOrderSummary & {
   discountApplications: TenantOrderDiscountApplication[];
   payments: TenantOrderPaymentTransaction[];
   paymentAdjustments: TenantOrderPaymentAdjustment[];
+  ticketReferences: TenantOrderTicketReference[];
   capabilities: TenantOrderCapabilities;
 };
 

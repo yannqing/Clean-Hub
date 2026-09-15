@@ -503,6 +503,71 @@ export async function findPosOrderRawForUpdate(
   return rows[0] ?? null;
 }
 
+export type PosOrderFulfilmentState = {
+  isProductOnly: boolean;
+  linkedTicketCount: number;
+  unfulfilledTicketCount: number;
+};
+
+/**
+ * Reads the live fulfilment shape of an order. Product-only counter sales can
+ * finish as part of payment, while ticket-backed orders remain open until the
+ * physical items have actually been handed to the customer.
+ */
+export async function findPosOrderFulfilmentState(
+  db: Database,
+  input: { tenantId: string; orderId: string },
+): Promise<PosOrderFulfilmentState> {
+  const itemRows = await db
+    .select({
+      itemCount: sql<number>`count(*)::int`,
+      nonProductCount: sql<number>`count(*) filter (
+        where ${orderItems.itemKind} <> 'product'
+      )::int`,
+    })
+    .from(orderItems)
+    .where(
+      and(
+        eq(orderItems.tenantId, input.tenantId),
+        eq(orderItems.orderId, input.orderId),
+        isNull(orderItems.deletedAt),
+      ),
+    );
+
+  const ticketRows = await db
+    .select({
+      ticketId: serviceTickets.id,
+      ticketStatus: serviceTickets.ticketStatus,
+    })
+    .from(orderItems)
+    .innerJoin(
+      serviceTickets,
+      and(
+        eq(serviceTickets.id, orderItems.ticketId),
+        eq(serviceTickets.tenantId, input.tenantId),
+      ),
+    )
+    .where(
+      and(
+        eq(orderItems.tenantId, input.tenantId),
+        eq(orderItems.orderId, input.orderId),
+        isNull(orderItems.deletedAt),
+      ),
+    )
+    .groupBy(serviceTickets.id, serviceTickets.ticketStatus);
+
+  const itemCount = Number(itemRows[0]?.itemCount ?? 0);
+  const nonProductCount = Number(itemRows[0]?.nonProductCount ?? 0);
+
+  return {
+    isProductOnly: itemCount > 0 && nonProductCount === 0,
+    linkedTicketCount: ticketRows.length,
+    unfulfilledTicketCount: ticketRows.filter(
+      (ticket) => ticket.ticketStatus !== "picked_up",
+    ).length,
+  };
+}
+
 export async function findPosOrderAuditSnapshot(
   db: Database,
   input: { tenantId: string; orderId: string },
@@ -794,8 +859,18 @@ export async function listPosOrderTicketReferences(
   input: { tenantId: string; orderId: string },
 ): Promise<PosOrderTicketReference[]> {
   const rows = await db
-    .select()
+    .select({
+      reference: orderTicketReferences,
+      ticketStatus: serviceTickets.ticketStatus,
+    })
     .from(orderTicketReferences)
+    .innerJoin(
+      serviceTickets,
+      and(
+        eq(serviceTickets.id, orderTicketReferences.ticketId),
+        eq(serviceTickets.tenantId, input.tenantId),
+      ),
+    )
     .where(
       and(
         eq(orderTicketReferences.orderId, input.orderId),
@@ -804,15 +879,17 @@ export async function listPosOrderTicketReferences(
     )
     .orderBy(orderTicketReferences.createdAt);
 
-  return rows.map((row) => ({
-    ticketId: row.ticketId,
-    ticketNo: row.ticketNoSnapshot,
-    remark: row.ticketRemarkSnapshot,
-    priority: row.prioritySnapshot,
-    expectedPickupAt: row.expectedPickupAtSnapshot?.toISOString() ?? null,
-    assistantName: row.assistantNameSnapshot,
-    itemCount: row.itemCount,
-    itemAmount: row.itemAmount,
+  return rows.map(({ reference, ticketStatus }) => ({
+    ticketId: reference.ticketId,
+    ticketNo: reference.ticketNoSnapshot,
+    ticketStatus,
+    remark: reference.ticketRemarkSnapshot,
+    priority: reference.prioritySnapshot,
+    expectedPickupAt:
+      reference.expectedPickupAtSnapshot?.toISOString() ?? null,
+    assistantName: reference.assistantNameSnapshot,
+    itemCount: reference.itemCount,
+    itemAmount: reference.itemAmount,
   }));
 }
 
@@ -1265,6 +1342,7 @@ export async function recalculateOrderPaymentState(
   const latestPaidTransactionAt = rows[0]?.paidAt
     ? new Date(rows[0].paidAt)
     : null;
+  const fulfilment = await findPosOrderFulfilmentState(db, input);
   const payment = projectPosOrderPaymentState({
     current: order,
     nextTotalAmount: order.totalAmount,
@@ -1273,6 +1351,7 @@ export async function recalculateOrderPaymentState(
       moneyToMinor(order.subtotalAmount) > BigInt(0) &&
       moneyToMinor(order.discountAmount) === moneyToMinor(order.subtotalAmount),
     latestPaidTransactionAt,
+    autoDeliverWhenPaid: fulfilment.isProductOnly,
   });
 
   await db

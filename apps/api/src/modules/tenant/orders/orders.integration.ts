@@ -344,6 +344,11 @@ async function runOrderLifecycleAssertions(
   );
   assert.equal(checkout.order.totalAmount, "18.00");
   assert.equal(checkout.order.paymentStatus, "paid");
+  assert.equal(
+    checkout.order.status,
+    "delivered",
+    "fully paid product-only checkout should finish at the till",
+  );
   assert.equal(checkout.payment?.paymentStatus, "paid");
   assert.equal(checkout.idempotent, false);
 
@@ -396,6 +401,7 @@ async function runOrderLifecycleAssertions(
   );
   assert.equal(paidGuestOrder.customerId, null);
   assert.equal(paidGuestOrder.paymentStatus, "paid");
+  assert.equal(paidGuestOrder.status, "delivered");
 
   const guestPayment = paidGuestOrder.payments[0];
   assert.ok(guestPayment, "the guest payment must be returned");

@@ -1,4 +1,13 @@
 import type { PosOrderTicketReference } from "@cleanhub/api-client";
+import {
+  Badge,
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@cleanhub/ui";
 import Link from "next/link";
 
 import { Icon } from "@/components/app-shell";
@@ -10,6 +19,19 @@ const PRIORITY_LABELS: Record<PosOrderTicketReference["priority"], string> = {
   normal: "普通",
   urgent: "加急",
   critical: "特急",
+};
+
+const TICKET_STATUS_LABELS: Record<
+  PosOrderTicketReference["ticketStatus"],
+  string
+> = {
+  draft: "草稿",
+  pending: "待处理",
+  in_progress: "处理中",
+  ready_to_pick: "待取件",
+  picked_up: "已取件",
+  cancelled: "已取消",
+  exception: "异常",
 };
 
 /**
@@ -34,20 +56,25 @@ export function OrderTicketReferencesCard({
   }
 
   return (
-    <section className="overflow-hidden border-y bg-background">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
+    <Card className="gap-0 overflow-hidden py-0">
+      <CardHeader className="border-b px-5 py-4">
         <div className="min-w-0">
-          <h2 className="font-semibold text-foreground">关联工单</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <CardTitle>关联工单</CardTitle>
+          <CardDescription className="mt-1 text-xs">
             {ticketReferences.length > 1
               ? `本单合并结算了 ${ticketReferences.length} 张工单，以下为受理时记录的信息。`
               : "以下为受理时记录的信息，不随工单后续修改而变化。"}
-          </p>
+          </CardDescription>
         </div>
-        <Icon className="h-5 w-5 text-muted-foreground" name="clipboard-list" />
-      </div>
+        <CardAction>
+          <Icon
+            className="h-5 w-5 text-muted-foreground"
+            name="clipboard-list"
+          />
+        </CardAction>
+      </CardHeader>
 
-      <div className="divide-y">
+      <CardContent className="divide-y px-0">
         {ticketReferences.map((reference) => (
           <div className="px-5 py-4" key={reference.ticketId}>
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -59,10 +86,23 @@ export function OrderTicketReferencesCard({
                   >
                     {reference.ticketNo ?? "工单详情"}
                   </Link>
+                  <Badge
+                    className="rounded-md text-[11px]"
+                    variant={
+                      reference.ticketStatus === "picked_up"
+                        ? "default"
+                        : "secondary"
+                    }
+                  >
+                    {TICKET_STATUS_LABELS[reference.ticketStatus]}
+                  </Badge>
                   {reference.priority === "normal" ? null : (
-                    <span className="rounded-md bg-foreground px-2 py-0.5 text-[11px] font-semibold text-background">
+                    <Badge
+                      className="rounded-md text-[11px]"
+                      variant="secondary"
+                    >
                       {PRIORITY_LABELS[reference.priority]}
-                    </span>
+                    </Badge>
                   )}
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -88,7 +128,7 @@ export function OrderTicketReferencesCard({
             ) : null}
           </div>
         ))}
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }

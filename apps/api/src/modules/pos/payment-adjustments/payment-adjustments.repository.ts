@@ -14,6 +14,7 @@ import type {
   PosPaymentAdjustmentType,
 } from "./payment-adjustments.types.js";
 import { projectPosOrderPaymentState } from "../orders/order-payment-state.js";
+import { findPosOrderFulfilmentState } from "../orders/orders.repository.js";
 
 export type PosAdjustmentOrder = {
   id: string;
@@ -333,6 +334,10 @@ export async function recalculateOrderAfterAdjustment(
   const debit = Number(adjustmentRows[0]?.debit ?? "0");
   const credit = Number(adjustmentRows[0]?.credit ?? "0");
   const paid = Math.max(0, grossPaid - debit + credit);
+  const fulfilment = await findPosOrderFulfilmentState(db, {
+    tenantId: input.tenantId,
+    orderId: input.order.id,
+  });
   const projected = projectPosOrderPaymentState({
     current: {
       ...input.order,
@@ -340,6 +345,7 @@ export async function recalculateOrderAfterAdjustment(
     },
     nextTotalAmount: input.order.totalAmount,
     nextPaidAmount: paid.toFixed(2),
+    autoDeliverWhenPaid: fulfilment.isProductOnly,
   });
   const paymentStatus =
     paid <= 0 && grossPaid > 0 ? "refunded" : projected.paymentStatus;

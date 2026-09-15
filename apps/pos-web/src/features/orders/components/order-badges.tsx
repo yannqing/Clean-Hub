@@ -1,6 +1,6 @@
 "use client";
 
-import { cn } from "@cleanhub/ui";
+import { Badge, cn } from "@cleanhub/ui";
 import { useTranslation } from "@cleanhub/i18n/react";
 import type {
   PosOrderPaymentStatus,
@@ -36,14 +36,15 @@ export function OrderBadge({
   tone: BadgeTone;
 }) {
   return (
-    <span
+    <Badge
       className={cn(
-        "inline-flex h-6 items-center rounded-full px-2.5 text-xs font-semibold",
+        "h-6 border-0 px-2.5 font-semibold shadow-none",
         DETAIL_BADGE_TONE_CLASSES[tone],
       )}
+      variant="secondary"
     >
       {children}
-    </span>
+    </Badge>
   );
 }
 

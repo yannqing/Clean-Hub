@@ -1,4 +1,5 @@
 import type { PosPaymentMethod } from "./terminal-settings.types";
+import type { ServiceTicketStatus } from "./service-tickets.types";
 
 export type PosOrderType = "ticket" | "manual";
 
@@ -198,6 +199,8 @@ export type PosOrderSummary = {
 export type PosOrderTicketReference = {
   ticketId: string;
   ticketNo: string | null;
+  /** Live workflow status; the remaining fields are checkout snapshots. */
+  ticketStatus: ServiceTicketStatus;
   remark: string | null;
   priority: "normal" | "urgent" | "critical";
   expectedPickupAt: string | null;

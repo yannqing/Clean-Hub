@@ -12,6 +12,8 @@ export type PosOrderPaymentProjectionInput = {
   nextTotalAmount: string;
   nextPaidAmount: string;
   zeroTotalSettlement?: boolean;
+  /** Product-only sales are handed over at the till when payment succeeds. */
+  autoDeliverWhenPaid?: boolean;
   latestPaidTransactionAt?: Date | null;
   now?: Date;
 };
@@ -68,7 +70,7 @@ export function projectPosOrderPaymentState(
   let status = input.current.status;
   const finalized = status === "delivered" || status === "cancelled";
   if (!finalized && !financiallySettledZeroTotal && paymentStatus === "paid") {
-    status = "paid";
+    status = input.autoDeliverWhenPaid ? "delivered" : "paid";
   } else if (!finalized && paymentStatus !== "paid" && status === "paid") {
     status = "received";
   }

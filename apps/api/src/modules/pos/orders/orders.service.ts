@@ -32,6 +32,7 @@ import {
   findPendingManualPaymentForOrder,
   findPosOrderAuditSnapshot,
   findPosOrderDetail,
+  findPosOrderFulfilmentState,
   findPosOrderItemById,
   findPosOrderOverview,
   findPosOrderRaw,
@@ -1156,6 +1157,23 @@ export async function changePosOrderStatus(
       );
     }
 
+    const fulfilment =
+      data.to === "delivered" || confirmsZeroTotalOrder
+        ? await findPosOrderFulfilmentState(tx, { tenantId, orderId })
+        : null;
+    if (
+      data.to === "delivered" &&
+      fulfilment &&
+      fulfilment.linkedTicketCount > 0 &&
+      fulfilment.unfulfilledTicketCount > 0
+    ) {
+      throw new PosOrderError(
+        "ORDER_FULFILMENT_PENDING",
+        "Order cannot be delivered until every linked service ticket has been picked up.",
+        422,
+      );
+    }
+
     if (
       data.to === "cancelled" &&
       moneyToMinor(before.paidAmount) > BigInt(0)
@@ -1167,11 +1185,14 @@ export async function changePosOrderStatus(
       );
     }
 
+    const autoDeliveredZeroTotalOrder = Boolean(
+      confirmsZeroTotalOrder && fulfilment?.isProductOnly,
+    );
     const result = await changeOrderStatusRecord(tx, {
       tenantId,
       orderId,
       actorUserId: authContext.userId,
-      to: data.to,
+      to: autoDeliveredZeroTotalOrder ? "delivered" : data.to,
       version: data.version,
     });
 
@@ -1241,6 +1262,7 @@ export async function changePosOrderStatus(
       metadata: {
         ...(data.note ? { note: data.note } : {}),
         zeroTotalConfirmation: confirmsZeroTotalOrder,
+        autoDeliveredProductOnlyOrder: autoDeliveredZeroTotalOrder,
         releasedDiscountApplications: releasedDiscounts,
       },
     });

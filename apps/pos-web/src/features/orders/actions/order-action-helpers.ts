@@ -21,6 +21,7 @@ export type PosOrderErrorCode =
   | "INVALID_STATUS_TRANSITION"
   | "ORDER_ALREADY_PAID"
   | "ORDER_NOT_PAID"
+  | "ORDER_FULFILMENT_PENDING"
   | "ORDER_CANNOT_BE_DELETED"
   | "DISCOUNT_NOT_FOUND"
   | "DISCOUNT_NOT_APPLICABLE"
@@ -60,6 +61,7 @@ const ORDER_ERROR_MESSAGES: Record<PosOrderErrorCode, string> = {
   INVALID_STATUS_TRANSITION: "当前订单状态不允许此操作。",
   ORDER_ALREADY_PAID: "订单已收款，不能执行该操作。",
   ORDER_NOT_PAID: "订单未结清，不能交付。",
+  ORDER_FULFILMENT_PENDING: "关联工单尚未全部取件，订单暂时不能交付。",
   ORDER_CANNOT_BE_DELETED: "该订单不能删除。",
   DISCOUNT_NOT_FOUND: "优惠码不存在、已停用或不适用于当前门店。",
   DISCOUNT_NOT_APPLICABLE: "当前订单不满足该折扣的使用条件。",

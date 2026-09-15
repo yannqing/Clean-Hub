@@ -1,4 +1,5 @@
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
+import type { ServiceTicketStatus } from "../service-tickets/service-tickets.types.js";
 
 export type PosOrderType = "ticket" | "manual";
 
@@ -179,6 +180,8 @@ export type PosOrderSummary = {
 export type PosOrderTicketReference = {
   ticketId: string;
   ticketNo: string | null;
+  /** Live workflow status; the remaining fields are checkout snapshots. */
+  ticketStatus: ServiceTicketStatus;
   remark: string | null;
   priority: "normal" | "urgent" | "critical";
   expectedPickupAt: string | null;
