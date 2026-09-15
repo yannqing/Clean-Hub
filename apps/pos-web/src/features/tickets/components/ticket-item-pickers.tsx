@@ -14,7 +14,7 @@ import {
   cn,
 } from "@cleanhub/ui";
 import Image from "next/image";
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
@@ -236,6 +236,9 @@ export function TicketAttributePicker({
   const listId = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const localizedOptions = useMemo(
     () =>
       options.map((option) => ({
@@ -262,114 +265,157 @@ export function TicketAttributePicker({
   );
   const customValue = query.trim();
 
+  useEffect(() => {
+    if (!open) return;
+
+    const focusFrame = window.requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !rootRef.current?.contains(event.target)
+      ) {
+        setOpen(false);
+        setQuery("");
+      }
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer, true);
+    return () => {
+      window.cancelAnimationFrame(focusFrame);
+      document.removeEventListener(
+        "pointerdown",
+        closeOnOutsidePointer,
+        true,
+      );
+    };
+  }, [open]);
+
   function select(nextValue: string) {
     onValueChange(nextValue);
     setQuery("");
     setOpen(false);
   }
 
-  return (
-    <Popover
-      modal
-      onOpenChange={(nextOpen) => {
-        setOpen(nextOpen);
-        if (!nextOpen) setQuery("");
-      }}
-      open={open}
-    >
-      <PopoverTrigger asChild>
-        <button
-          aria-expanded={open}
-          aria-controls={listId}
-          aria-label={placeholder}
-          className="flex h-11 w-full items-center justify-between rounded-md border bg-background px-3 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
-          disabled={disabled}
-          role="combobox"
-          type="button"
-        >
-          <span className="flex min-w-0 items-center gap-2">
-            {selected?.swatch ? <ColorSwatch swatch={selected.swatch} /> : null}
-            <span className={cn("truncate", !value && "text-muted-foreground")}>
-            {selected?.localizedLabel || value || placeholder}
-            </span>
-          </span>
-          <Icon
-            className="ml-2 size-4 shrink-0 text-muted-foreground"
-            name="chevron-down"
-          />
-        </button>
-      </PopoverTrigger>
+  function closeAndRestoreFocus() {
+    setOpen(false);
+    setQuery("");
+    window.requestAnimationFrame(() => triggerRef.current?.focus());
+  }
 
-      <PopoverContent
-        align="start"
-        className="z-[80] w-(--radix-popover-trigger-width) overflow-hidden p-0"
-        sideOffset={6}
+  return (
+    <div className="relative" data-ticket-attribute-picker ref={rootRef}>
+      <button
+        aria-controls={listId}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-label={placeholder}
+        className="flex h-11 w-full items-center justify-between rounded-md border bg-background px-3 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground"
+        disabled={disabled}
+        onClick={() => {
+          setOpen((current) => !current);
+          if (open) setQuery("");
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "ArrowDown") {
+            event.preventDefault();
+            setOpen(true);
+          }
+        }}
+        ref={triggerRef}
+        role="combobox"
+        type="button"
       >
-        <Command
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && customValue && !exactMatch) {
-              event.preventDefault();
-              select(customValue);
-            }
-          }}
-          shouldFilter={false}
-        >
-          <div className="flex items-center gap-2 border-b px-3">
-            <Icon className="size-4 text-muted-foreground" name="search" />
-            <ComboboxInput
-              aria-label={searchPlaceholder}
-              className="h-11 flex-1 px-0"
-              onValueChange={setQuery}
-              placeholder={searchPlaceholder}
-              value={query}
-            />
-          </div>
-          <ComboboxList
-            className="max-h-[min(18rem,42dvh)] touch-pan-y overscroll-contain p-1"
-            id={listId}
+        <span className="flex min-w-0 items-center gap-2">
+          {selected?.swatch ? <ColorSwatch swatch={selected.swatch} /> : null}
+          <span className={cn("truncate", !value && "text-muted-foreground")}>
+            {selected?.localizedLabel || value || placeholder}
+          </span>
+        </span>
+        <Icon
+          className="ml-2 size-4 shrink-0 text-muted-foreground"
+          name="chevron-down"
+        />
+      </button>
+
+      {open ? (
+        <div className="absolute top-full left-0 z-[80] mt-1 w-full min-w-56 overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md">
+          <Command
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                closeAndRestoreFocus();
+                return;
+              }
+              if (event.key === "Enter" && customValue && !exactMatch) {
+                event.preventDefault();
+                select(customValue);
+              }
+            }}
+            shouldFilter={false}
           >
-            {filteredOptions.length > 0 ? (
-              <ComboboxGroup className="p-0">
-                {filteredOptions.map((option) => (
-                  <ComboboxItem
-                    className="min-h-10 cursor-pointer"
-                    key={option.value}
-                    onSelect={() => select(option.value)}
-                    value={option.value}
-                  >
-                    <Icon
-                      className={cn(
-                        "size-4 shrink-0",
-                        option.value === value ? "opacity-100" : "opacity-0",
-                      )}
-                      name="check"
-                    />
-                    {option.swatch ? <ColorSwatch swatch={option.swatch} /> : null}
-                    <span className="truncate">{option.localizedLabel}</span>
-                  </ComboboxItem>
-                ))}
-              </ComboboxGroup>
-            ) : null}
-            {customValue && !exactMatch ? (
-              <ComboboxItem
-                className="min-h-11 cursor-pointer"
-                onSelect={() => select(customValue)}
-                value={`custom:${customValue}`}
-              >
-                <Icon className="size-4 shrink-0" name="plus" />
-                <span className="truncate">
-                  {emptyText}「{customValue}」
-                </span>
-              </ComboboxItem>
-            ) : !customValue && filteredOptions.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                {emptyText}
-              </div>
-            ) : null}
-          </ComboboxList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+            <div className="flex items-center gap-2 border-b px-3">
+              <Icon className="size-4 text-muted-foreground" name="search" />
+              <ComboboxInput
+                aria-label={searchPlaceholder}
+                className="h-11 flex-1 px-0"
+                onValueChange={setQuery}
+                placeholder={searchPlaceholder}
+                ref={inputRef}
+                value={query}
+              />
+            </div>
+            <ComboboxList
+              className="max-h-[min(18rem,42dvh)] touch-pan-y overscroll-contain p-1"
+              id={listId}
+            >
+              {filteredOptions.length > 0 ? (
+                <ComboboxGroup className="p-0">
+                  {filteredOptions.map((option) => (
+                    <ComboboxItem
+                      className="min-h-10 cursor-pointer"
+                      key={option.value}
+                      onSelect={() => select(option.value)}
+                      value={option.value}
+                    >
+                      <Icon
+                        className={cn(
+                          "size-4 shrink-0",
+                          option.value === value ? "opacity-100" : "opacity-0",
+                        )}
+                        name="check"
+                      />
+                      {option.swatch ? (
+                        <ColorSwatch swatch={option.swatch} />
+                      ) : null}
+                      <span className="truncate">{option.localizedLabel}</span>
+                    </ComboboxItem>
+                  ))}
+                </ComboboxGroup>
+              ) : null}
+              {customValue && !exactMatch ? (
+                <ComboboxItem
+                  className="min-h-11 cursor-pointer"
+                  onSelect={() => select(customValue)}
+                  value={`custom:${customValue}`}
+                >
+                  <Icon className="size-4 shrink-0" name="plus" />
+                  <span className="truncate">
+                    {emptyText}「{customValue}」
+                  </span>
+                </ComboboxItem>
+              ) : !customValue && filteredOptions.length === 0 ? (
+                <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  {emptyText}
+                </div>
+              ) : null}
+            </ComboboxList>
+          </Command>
+        </div>
+      ) : null}
+    </div>
   );
 }
 

@@ -17,6 +17,12 @@ import {
   DialogHeader,
   DialogTitle,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
 } from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, useTransition } from "react";
@@ -211,6 +217,7 @@ export function ProductReturnDialog({
   return (
     <>
       <Button
+        className="h-11"
         onClick={() => {
           setOpen(true);
           load();
@@ -267,39 +274,45 @@ export function ProductReturnDialog({
                         type="number"
                         value={selection.quantity}
                       />
-                      <select
-                        className="h-10 rounded-md border bg-background px-2 text-sm"
-                        onChange={(event) =>
+                      <Select
+                        onValueChange={(condition) =>
                           updateSelection(item.orderItemId, {
-                            condition: event.target
-                              .value as PosReturnItemCondition,
+                            condition: condition as PosReturnItemCondition,
                           })
                         }
                         value={selection.condition}
                       >
-                        <option value="unopened">未开封</option>
-                        <option value="good">完好</option>
-                        <option value="damaged">损坏</option>
-                        <option value="defective">质量问题</option>
-                        <option value="unknown">未知</option>
-                      </select>
-                      <select
-                        className="h-10 rounded-md border bg-background px-2 text-sm"
-                        onChange={(event) =>
+                        <SelectTrigger className="h-10 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unopened">未开封</SelectItem>
+                          <SelectItem value="good">完好</SelectItem>
+                          <SelectItem value="damaged">损坏</SelectItem>
+                          <SelectItem value="defective">质量问题</SelectItem>
+                          <SelectItem value="unknown">未知</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        onValueChange={(disposition) =>
                           updateSelection(item.orderItemId, {
-                            disposition: event.target
-                              .value as PosReturnDisposition,
+                            disposition: disposition as PosReturnDisposition,
                           })
                         }
                         value={selection.disposition}
                       >
-                        {item.trackInventory ? (
-                          <option value="restock">回库</option>
-                        ) : null}
-                        <option value="damaged">损坏区</option>
-                        <option value="discarded">报废</option>
-                        <option value="exchange">换货留存</option>
-                      </select>
+                        <SelectTrigger className="h-10 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {item.trackInventory ? (
+                            <SelectItem value="restock">回库</SelectItem>
+                          ) : null}
+                          <SelectItem value="damaged">损坏区</SelectItem>
+                          <SelectItem value="discarded">报废</SelectItem>
+                          <SelectItem value="exchange">换货留存</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   );
                 })}
@@ -317,22 +330,25 @@ export function ProductReturnDialog({
                   </span>
                 </div>
                 <div className="grid gap-2 sm:grid-cols-[1fr_100px_auto]">
-                  <select
-                    className="h-10 rounded-md border bg-background px-2 text-sm"
-                    onChange={(event) => setExchangeSkuId(event.target.value)}
+                  <Select
+                    onValueChange={setExchangeSkuId}
                     value={exchangeSkuId}
                   >
-                    <option value="">选择替换商品</option>
-                    {products.map((product) => (
-                      <option
-                        key={product.productSkuId}
-                        value={product.productSkuId}
-                      >
-                        {product.name} {product.variantName ?? ""} ·{" "}
-                        {product.amount}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="h-10 w-full">
+                      <SelectValue placeholder="选择替换商品" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {products.map((product) => (
+                        <SelectItem
+                          key={product.productSkuId}
+                          value={product.productSkuId}
+                        >
+                          {product.name} {product.variantName ?? ""} ·{" "}
+                          {product.amount}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input
                     min={0.001}
                     onChange={(event) =>
@@ -359,8 +375,8 @@ export function ProductReturnDialog({
                     <span>
                       {item.name} × {item.quantity}
                     </span>
-                    <button
-                      className="text-destructive"
+                    <Button
+                      className="h-auto px-0 text-destructive hover:text-destructive"
                       onClick={() =>
                         setExchangeItems((current) =>
                           current.filter(
@@ -368,10 +384,12 @@ export function ProductReturnDialog({
                           ),
                         )
                       }
+                      size="sm"
                       type="button"
+                      variant="link"
                     >
                       移除
-                    </button>
+                    </Button>
                   </div>
                 ))}
                 <div className="grid gap-1 rounded-md bg-muted/50 p-3 text-xs text-muted-foreground sm:grid-cols-2">
@@ -406,7 +424,7 @@ export function ProductReturnDialog({
               </label>
               <label className="block text-xs font-semibold text-muted-foreground">
                 备注（可选）
-                <Input
+                <Textarea
                   className="mt-1.5"
                   maxLength={2000}
                   onChange={(event) => setNotes(event.target.value)}

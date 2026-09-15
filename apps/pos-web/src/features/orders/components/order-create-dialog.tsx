@@ -140,6 +140,7 @@ export function OrderCreateDialog({
     receiptFields: runtimeReceiptFields,
     receiptName: runtimeReceiptName,
     receiptPhone: runtimeReceiptPhone,
+    receiptThankYouMessage: runtimeReceiptThankYouMessage,
     tenantId: runtimeTenantId,
     terminalId: runtimeTerminalId,
     terminalName: runtimeTerminalName,
@@ -226,10 +227,11 @@ export function OrderCreateDialog({
       priceTouched: item.priceTouched,
     }));
 
-    if (!selectedCustomer && normalizedItems.some((item) => item.itemKind === "service")) {
-      toast.error(
-        text("散客订单只能添加商品；服务订单需要选择客户档案。"),
-      );
+    if (
+      !selectedCustomer &&
+      normalizedItems.some((item) => item.itemKind === "service")
+    ) {
+      toast.error(text("散客订单只能添加商品；服务订单需要选择客户档案。"));
       return null;
     }
 
@@ -301,8 +303,7 @@ export function OrderCreateDialog({
               return true;
             }
             const product = products.find(
-              (candidate) =>
-                candidate.productSkuId === item.productSkuId,
+              (candidate) => candidate.productSkuId === item.productSkuId,
             );
             if (!product?.allowOfflineSale) {
               return false;
@@ -337,6 +338,7 @@ export function OrderCreateDialog({
               operatorName: runtimeOperatorName,
               receiptAddress: runtimeReceiptAddress,
               receiptPhone: runtimeReceiptPhone,
+              receiptThankYouMessage: runtimeReceiptThankYouMessage,
               terminalName: runtimeTerminalName,
             },
             runtimeCurrency,
@@ -545,6 +547,7 @@ function buildOfflineOrderReceipt(input: {
     operatorName: string | null;
     receiptAddress: string | null;
     receiptPhone: string | null;
+    receiptThankYouMessage: string | null;
     terminalName: string | null;
   };
   runtimeCurrency?: string;
@@ -625,12 +628,16 @@ function buildOfflineOrderReceipt(input: {
         balanceMinor: totalMinor,
         receiptAddress: input.receiptConfig.receiptAddress ?? undefined,
         receiptPhone: input.receiptConfig.receiptPhone ?? undefined,
-        thankYouMessage:
+        thankYouMessage: [
+          input.receiptConfig.receiptThankYouMessage,
           input.locale === "zh-CN"
             ? "离线暂存单 · 待同步 · 金额以同步成功后的正式订单为准"
             : input.locale === "fr"
               ? "Brouillon hors ligne · Le montant final sera confirmé après synchronisation"
               : "Offline draft · Final amount is confirmed after sync",
+        ]
+          .filter(Boolean)
+          .join(" · "),
       },
       { locale: input.locale },
     ),
@@ -896,7 +903,8 @@ function ManualOrderFields({
                             {product.variantName
                               ? ` · ${product.variantName}`
                               : ""}{" "}
-                            · {formatOrderMoney(product.amount, product.currency)}
+                            ·{" "}
+                            {formatOrderMoney(product.amount, product.currency)}
                             {product.trackInventory
                               ? ` · ${text("库存")} ${Number(product.availableQuantity ?? 0)}`
                               : ""}
@@ -907,15 +915,20 @@ function ManualOrderFields({
                   ) : null}
                   {catalog.length > 0 ? (
                     <optgroup label={text("服务项目")}>
-                  {catalog.map((service) => (
-                    <option key={service.id} value={`service:${service.id}`}>
-                      {service.name} ·{" "}
-                      {text(
-                        service.pricingUnit === "per_kg" ? "按公斤" : "按件",
-                      )}{" "}
-                      · {formatOrderMoney(service.amount, service.currency)}
-                    </option>
-                  ))}
+                      {catalog.map((service) => (
+                        <option
+                          key={service.id}
+                          value={`service:${service.id}`}
+                        >
+                          {service.name} ·{" "}
+                          {text(
+                            service.pricingUnit === "per_kg"
+                              ? "按公斤"
+                              : "按件",
+                          )}{" "}
+                          · {formatOrderMoney(service.amount, service.currency)}
+                        </option>
+                      ))}
                     </optgroup>
                   ) : null}
                 </select>

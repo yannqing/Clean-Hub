@@ -2,12 +2,24 @@
 
 import { useTranslation } from "@cleanhub/i18n/react";
 import type { PosReceiptField } from "@cleanhub/domain/receipt";
+import { formatPosOrderQrPayload } from "@cleanhub/domain/order-codes";
 import {
+  Badge,
+  Button,
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
+  Textarea,
 } from "@cleanhub/ui";
 import type {
   PosCatalogService,
@@ -54,6 +66,7 @@ import { OrderTicketReferencesCard } from "./order-ticket-references-card";
 import { ProductReturnDialog } from "./product-return-dialog";
 import { ReceiptDeliveryHistory } from "./receipt-delivery-history";
 import { getPosReceiptCopy } from "../lib/order-receipt";
+import { formatOrderItemMeasurement } from "../lib/order-measurement";
 
 type OrderDetailViewProps = {
   canResolveManualPayments: boolean;
@@ -93,39 +106,67 @@ export function OrderDetailView({
     operatorName: runtime.operatorName,
     receiptAddress: runtime.receiptAddress,
     receiptPhone: runtime.receiptPhone,
+    receiptThankYouMessage: runtime.receiptThankYouMessage,
     terminalName: runtime.terminalName,
   });
+  const receiptQrCode = runtime.receiptFields.includes("order_qr_code")
+    ? formatPosOrderQrPayload(order.id)
+    : undefined;
 
   return (
     <section className="mx-auto w-full max-w-[1080px] space-y-4 pb-12">
       <PosBreadcrumb items={breadcrumbItems} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-y bg-background px-4 py-3">
-        <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-foreground">
-            {order.customerName || "散客"}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {ORDER_TYPE_LABELS[order.orderType]} · {displayOrderCode(order.id)}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {canResolveManualPayments &&
-          order.items.some((item) => item.itemKind === "product") ? (
-            <ProductReturnDialog order={order} products={products} />
-          ) : null}
-          <PrintJobControl
-            canReprint={canResolveManualPayments}
-            content={receiptContent}
-            documentType="receipt"
-            entityId={order.id}
-            initialLabel="打印小票"
-            title={`RC-${order.id.slice(-8).toUpperCase()}`}
+      <Card className="gap-0 overflow-hidden py-0">
+        <CardHeader className="border-b px-5 py-4">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-2">
+              <OrderStatusBadge status={order.status} />
+              <OrderPaymentStatusBadge status={order.paymentStatus} />
+            </div>
+            <CardTitle className="truncate text-xl">
+              {displayOrderCode(order.id)}
+            </CardTitle>
+            <CardDescription className="mt-1">
+              {order.customerName || "散客"} ·{" "}
+              {ORDER_TYPE_LABELS[order.orderType]}
+            </CardDescription>
+          </div>
+          <CardAction className="col-span-2 col-start-1 row-start-3 flex flex-wrap items-center justify-self-stretch gap-2 sm:col-span-1 sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:justify-self-end">
+            {canResolveManualPayments &&
+            order.items.some((item) => item.itemKind === "product") ? (
+              <ProductReturnDialog order={order} products={products} />
+            ) : null}
+            <PrintJobControl
+              canReprint={canResolveManualPayments}
+              content={receiptContent}
+              documentType="receipt"
+              entityId={order.id}
+              initialLabel="打印小票"
+              qrCodeContent={receiptQrCode}
+              title={`RC-${order.id.slice(-8).toUpperCase()}`}
+            />
+          </CardAction>
+        </CardHeader>
+        <CardContent className="grid grid-cols-2 gap-px bg-border px-0 sm:grid-cols-4">
+          <OrderHeaderMetric
+            label="订单金额"
+            value={formatOrderMoney(order.totalAmount, order.currency, locale)}
           />
-          <OrderStatusBadge status={order.status} />
-          <OrderPaymentStatusBadge status={order.paymentStatus} />
-        </div>
-      </div>
+          <OrderHeaderMetric
+            label="已收金额"
+            value={formatOrderMoney(order.paidAmount, order.currency, locale)}
+          />
+          <OrderHeaderMetric
+            label="条目数量"
+            value={`${order.items.length} 项`}
+          />
+          <OrderHeaderMetric
+            label="订单类型"
+            value={ORDER_TYPE_LABELS[order.orderType]}
+          />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="grid gap-4">
@@ -180,6 +221,17 @@ export function OrderDetailView({
   );
 }
 
+function OrderHeaderMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 bg-card px-5 py-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 truncate text-sm font-semibold text-foreground">
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function buildOrderReceiptContent(
   order: PosOrderDetail,
   payments: PosPaymentTransaction[],
@@ -191,6 +243,7 @@ function buildOrderReceiptContent(
     operatorName: string | null;
     receiptAddress: string | null;
     receiptPhone: string | null;
+    receiptThankYouMessage: string | null;
     terminalName: string | null;
   },
 ): string {
@@ -201,9 +254,7 @@ function buildOrderReceiptContent(
         ? Number(item.weight ?? item.quantity)
         : Number(item.quantity);
     const details = [
-      item.pricingUnit === "per_kg"
-        ? `计量 ${item.weight ?? item.quantity} kg${item.bagCount ? ` / ${item.bagCount} 袋` : ""}`
-        : `计量 ${item.quantity} 件`,
+      `计量 ${formatOrderItemMeasurement(item, locale)}`,
       `成交价 ${formatOrderMoney(item.chargedUnitAmount, order.currency)}`,
       item.standardUnitAmount !== item.chargedUnitAmount
         ? `标准价 ${formatOrderMoney(item.standardUnitAmount, order.currency)}`
@@ -297,7 +348,7 @@ function buildOrderReceiptContent(
       paymentMethod: paymentMethod || undefined,
       receiptAddress: config.receiptAddress ?? undefined,
       receiptPhone: config.receiptPhone ?? undefined,
-      thankYouMessage: copy.thankYou,
+      thankYouMessage: config.receiptThankYouMessage || copy.thankYou,
     },
     { locale: toPrintLocale(locale) },
   );
@@ -524,19 +575,19 @@ function OrderPaymentsCard({
   }
 
   return (
-    <section className="overflow-hidden border-y bg-background">
-      <div className="border-b px-5 py-4">
-        <h2 className="font-semibold text-foreground">支付流水</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
+    <Card className="gap-0 overflow-hidden py-0">
+      <CardHeader className="border-b px-5 py-4">
+        <CardTitle>支付流水</CardTitle>
+        <CardDescription className="text-xs">
           Wave / Orange Money 需由 Owner 或 Manager 在商户应用核对后确认。
-        </p>
-      </div>
+        </CardDescription>
+      </CardHeader>
       {payments.length === 0 ? (
-        <div className="px-5 py-8 text-sm text-muted-foreground">
+        <CardContent className="px-5 py-8 text-sm text-muted-foreground">
           暂无支付流水。
-        </div>
+        </CardContent>
       ) : (
-        <div className="divide-y">
+        <CardContent className="divide-y px-0">
           {payments.map((payment) => (
             <div
               className="flex flex-wrap items-center justify-between gap-4 px-5 py-4 text-sm"
@@ -550,11 +601,12 @@ function OrderPaymentsCard({
                       payment.provider,
                     )}
                   </div>
-                  <span
+                  <Badge
                     className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${PAYMENT_TRANSACTION_STATUS_TONES[payment.paymentStatus]}`}
+                    variant="secondary"
                   >
                     {PAYMENT_TRANSACTION_STATUS_LABELS[payment.paymentStatus]}
-                  </span>
+                  </Badge>
                 </div>
                 {payment.externalReference ? (
                   <div className="mt-1 truncate text-xs text-muted-foreground">
@@ -587,26 +639,28 @@ function OrderPaymentsCard({
                 {payment.paymentStatus === "pending" ? (
                   canResolveManualPayments ? (
                     <div className="flex gap-2">
-                      <button
-                        className="h-9 rounded-md bg-emerald-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-emerald-700"
+                      <Button
+                        className="bg-emerald-600 text-white hover:bg-emerald-700"
                         onClick={() =>
                           setResolution({ payment, action: "confirm" })
                         }
+                        size="sm"
                         type="button"
                       >
                         {payment.paymentMethod === "card"
                           ? "核销成功"
                           : "确认到账"}
-                      </button>
-                      <button
-                        className="h-9 rounded-md border border-destructive/30 px-3 text-xs font-semibold text-destructive transition-colors hover:bg-destructive/10"
+                      </Button>
+                      <Button
                         onClick={() =>
                           setResolution({ payment, action: "fail" })
                         }
+                        size="sm"
                         type="button"
+                        variant="destructive"
                       >
                         标记失败
-                      </button>
+                      </Button>
                     </div>
                   ) : (
                     <span className="text-xs text-amber-700">
@@ -617,7 +671,7 @@ function OrderPaymentsCard({
               </div>
             </div>
           ))}
-        </div>
+        </CardContent>
       )}
       <Dialog
         onOpenChange={(open) => {
@@ -662,8 +716,8 @@ function OrderPaymentsCard({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="grid gap-2 text-sm font-medium">
                     TPE 交易流水号
-                    <input
-                      className="h-11 rounded-md border bg-background px-3 font-normal"
+                    <Input
+                      className="h-11"
                       maxLength={120}
                       onChange={(event) => setTpeReference(event.target.value)}
                       value={tpeReference}
@@ -671,8 +725,8 @@ function OrderPaymentsCard({
                   </label>
                   <label className="grid gap-2 text-sm font-medium">
                     授权码（可选）
-                    <input
-                      className="h-11 rounded-md border bg-background px-3 font-normal"
+                    <Input
+                      className="h-11"
                       maxLength={120}
                       onChange={(event) =>
                         setAuthorizationCode(event.target.value)
@@ -684,8 +738,8 @@ function OrderPaymentsCard({
               ) : null}
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 {resolution.action === "fail" ? "失败原因" : "确认备注（可选）"}
-                <textarea
-                  className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                <Textarea
+                  className="min-h-24"
                   disabled={isPending}
                   maxLength={500}
                   onChange={(event) => setReason(event.target.value)}
@@ -697,37 +751,41 @@ function OrderPaymentsCard({
                   value={reason}
                 />
               </label>
-              <div className="flex justify-end gap-2">
-                <button
-                  className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+              <DialogFooter>
+                <Button
+                  className="h-11"
                   disabled={isPending}
                   onClick={closeResolutionDialog}
                   type="button"
+                  variant="outline"
                 >
                   取消
-                </button>
-                <button
-                  className={`h-11 rounded-md px-4 text-sm font-semibold text-white disabled:opacity-50 ${
+                </Button>
+                <Button
+                  className={`h-11 ${
                     resolution.action === "confirm"
                       ? "bg-emerald-600 hover:bg-emerald-700"
-                      : "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      : ""
                   }`}
                   disabled={isPending}
                   onClick={submitResolution}
                   type="button"
+                  variant={
+                    resolution.action === "confirm" ? "default" : "destructive"
+                  }
                 >
                   {isPending
                     ? "处理中…"
                     : resolution.action === "confirm"
                       ? "确认已到账"
                       : "确认标记失败"}
-                </button>
-              </div>
+                </Button>
+              </DialogFooter>
             </div>
           ) : null}
         </DialogContent>
       </Dialog>
-    </section>
+    </Card>
   );
 }
 

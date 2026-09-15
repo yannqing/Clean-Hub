@@ -9,12 +9,27 @@ import type {
 import { createId } from "@cleanhub/id";
 import { useTranslation } from "@cleanhub/i18n/react";
 import {
+  Badge,
+  Button,
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Textarea,
 } from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
@@ -229,44 +244,45 @@ export function OrderPaymentAdjustments({
   }
 
   return (
-    <section className="overflow-hidden border-y bg-background">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+    <Card className="gap-0 overflow-hidden py-0">
+      <CardHeader className="border-b px-5 py-4">
         <div>
-          <h2 className="font-semibold text-foreground">退款与支付修正</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <CardTitle>退款与支付修正</CardTitle>
+          <CardDescription className="mt-1 text-xs">
             不可变支付调整记录
-          </p>
+          </CardDescription>
         </div>
         {canManage ? (
-          <div className="flex gap-2">
-            <button
-              className="flex h-9 items-center gap-2 rounded-md border px-3 text-xs font-semibold text-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          <CardAction className="flex gap-2">
+            <Button
               disabled={refundablePayments.length === 0}
               onClick={() => open("refund")}
+              size="sm"
               type="button"
+              variant="outline"
             >
               <Icon className="h-4 w-4" name="rotate-ccw" />
               退款
-            </button>
-            <button
-              className="flex h-9 items-center gap-2 rounded-md bg-foreground px-3 text-xs font-semibold text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
+            </Button>
+            <Button
               disabled={paidPayments.length === 0}
               onClick={() => open("correction")}
+              size="sm"
               type="button"
             >
               <Icon className="h-4 w-4" name="replace" />
               支付修正
-            </button>
-          </div>
+            </Button>
+          </CardAction>
         ) : null}
-      </div>
+      </CardHeader>
 
       {adjustments.length === 0 ? (
-        <div className="px-5 py-8 text-sm text-muted-foreground">
+        <CardContent className="px-5 py-8 text-sm text-muted-foreground">
           暂无调整记录。
-        </div>
+        </CardContent>
       ) : (
-        <div className="divide-y">
+        <CardContent className="divide-y px-0">
           {adjustments.map((adjustment) => (
             <div
               className="flex flex-wrap items-start justify-between gap-4 px-5 py-4 text-sm"
@@ -288,13 +304,18 @@ export function OrderPaymentAdjustments({
                 </div>
                 {adjustment.adjustmentType === "refund" ? (
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-                    <span
+                    <Badge
                       className={
                         adjustment.status === "succeeded"
-                          ? "text-emerald-700"
+                          ? "border-0 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-300"
                           : adjustment.status === "failed"
-                            ? "text-red-600"
-                            : "text-amber-700"
+                            ? ""
+                            : "border-0 bg-amber-50 text-amber-700 dark:bg-amber-950/35 dark:text-amber-300"
+                      }
+                      variant={
+                        adjustment.status === "failed"
+                          ? "destructive"
+                          : "secondary"
                       }
                     >
                       {adjustment.status === "succeeded"
@@ -302,15 +323,15 @@ export function OrderPaymentAdjustments({
                         : adjustment.status === "failed"
                           ? "退款失败"
                           : "等待渠道确认"}
-                    </span>
+                    </Badge>
                     {adjustment.settlementReference ? (
                       <span className="text-muted-foreground">
                         渠道流水 {adjustment.settlementReference}
                       </span>
                     ) : null}
                     {canManage && adjustment.status !== "succeeded" ? (
-                      <button
-                        className="font-semibold text-primary underline-offset-2 hover:underline"
+                      <Button
+                        className="h-auto px-0 text-xs"
                         onClick={() => {
                           setResolutionAdjustment(adjustment);
                           setResolutionOutcome("succeeded");
@@ -318,9 +339,10 @@ export function OrderPaymentAdjustments({
                           setResolutionReason("");
                         }}
                         type="button"
+                        variant="link"
                       >
                         核销退款结果
-                      </button>
+                      </Button>
                     ) : null}
                   </div>
                 ) : null}
@@ -337,7 +359,7 @@ export function OrderPaymentAdjustments({
               </div>
             </div>
           ))}
-        </div>
+        </CardContent>
       )}
 
       <Dialog
@@ -359,11 +381,9 @@ export function OrderPaymentAdjustments({
           {mode === "refund" ? (
             <label className="grid gap-2 text-sm font-medium text-foreground">
               原始支付流水
-              <select
-                className="h-11 rounded-md border bg-background px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              <Select
                 disabled={isPending}
-                onChange={(event) => {
-                  const paymentId = event.target.value;
+                onValueChange={(paymentId) => {
                   const selected = refundablePayments.find(
                     ({ payment }) => payment.id === paymentId,
                   );
@@ -373,46 +393,51 @@ export function OrderPaymentAdjustments({
                 }}
                 value={selectedPaymentId}
               >
-                {refundablePayments.map(({ payment, remaining }) => (
-                  <option key={payment.id} value={payment.id}>
-                    {payment.id.slice(-8)} · 可退{" "}
-                    {formatOrderMoney(remaining, payment.currency)}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="h-11 w-full">
+                  <SelectValue placeholder="选择支付流水" />
+                </SelectTrigger>
+                <SelectContent>
+                  {refundablePayments.map(({ payment, remaining }) => (
+                    <SelectItem key={payment.id} value={payment.id}>
+                      {payment.id.slice(-8)} · 可退{" "}
+                      {formatOrderMoney(remaining, payment.currency)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </label>
           ) : (
             <div className="grid gap-4">
               <label className="grid gap-2 text-sm font-medium text-foreground">
                 原始支付流水
-                <select
-                  className="h-11 rounded-md border bg-background px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                <Select
                   disabled={isPending}
-                  onChange={(event) => {
-                    setSelectedPaymentId(event.target.value);
+                  onValueChange={(paymentId) => {
+                    setSelectedPaymentId(paymentId);
                     resetIntent();
                   }}
                   value={selectedPaymentId}
                 >
-                  {paidPayments.map((payment) => (
-                    <option key={payment.id} value={payment.id}>
-                      {payment.id.slice(-8)} ·{" "}
-                      {formatOrderMoney(payment.amount, payment.currency)}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-11 w-full">
+                    <SelectValue placeholder="选择支付流水" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {paidPayments.map((payment) => (
+                      <SelectItem key={payment.id} value={payment.id}>
+                        {payment.id.slice(-8)} ·{" "}
+                        {formatOrderMoney(payment.amount, payment.currency)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </label>
               <div className="text-sm font-medium text-foreground">
                 修正方向
               </div>
               <div className="grid grid-cols-2 rounded-md border bg-muted/50 p-1">
                 {(["debit", "credit"] as const).map((value) => (
-                  <button
-                    className={`h-11 rounded-md text-sm font-semibold transition ${
-                      direction === value
-                        ? "bg-background text-foreground ring-1 ring-border"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
+                  <Button
+                    className="h-11"
                     disabled={isPending}
                     key={value}
                     onClick={() => {
@@ -420,9 +445,10 @@ export function OrderPaymentAdjustments({
                       resetIntent();
                     }}
                     type="button"
+                    variant={direction === value ? "secondary" : "ghost"}
                   >
                     {value === "debit" ? "减少实收" : "增加实收"}
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>
@@ -430,8 +456,8 @@ export function OrderPaymentAdjustments({
 
           <label className="grid gap-2 text-sm font-medium text-foreground">
             金额
-            <input
-              className="h-11 rounded-md border bg-background px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <Input
+              className="h-11"
               disabled={isPending}
               inputMode="decimal"
               onChange={(event) => {
@@ -445,8 +471,8 @@ export function OrderPaymentAdjustments({
 
           <label className="grid gap-2 text-sm font-medium text-foreground">
             操作原因
-            <textarea
-              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <Textarea
+              className="min-h-24"
               disabled={isPending}
               maxLength={500}
               onChange={(event) => {
@@ -459,22 +485,23 @@ export function OrderPaymentAdjustments({
           </label>
 
           <DialogFooter>
-            <button
-              className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+            <Button
+              className="h-11"
               disabled={isPending}
               onClick={close}
               type="button"
+              variant="outline"
             >
               取消
-            </button>
-            <button
-              className="h-11 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
+            </Button>
+            <Button
+              className="h-11"
               disabled={isPending || !reason.trim() || Number(amount) <= 0}
               onClick={submit}
               type="button"
             >
               {isPending ? "提交中…" : "确认提交"}
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -494,26 +521,23 @@ export function OrderPaymentAdjustments({
           </DialogHeader>
           <div className="grid grid-cols-2 rounded-md border bg-muted/50 p-1">
             {(["succeeded", "failed"] as const).map((outcome) => (
-              <button
-                className={`h-11 rounded-md text-sm font-semibold ${
-                  resolutionOutcome === outcome
-                    ? "bg-background ring-1 ring-border"
-                    : "text-muted-foreground"
-                }`}
+              <Button
+                className="h-11"
                 disabled={isPending}
                 key={outcome}
                 onClick={() => setResolutionOutcome(outcome)}
                 type="button"
+                variant={resolutionOutcome === outcome ? "secondary" : "ghost"}
               >
                 {outcome === "succeeded" ? "资金已退回" : "退款失败"}
-              </button>
+              </Button>
             ))}
           </div>
           {resolutionOutcome === "succeeded" ? (
             <label className="grid gap-2 text-sm font-medium">
               渠道退款流水号
-              <input
-                className="h-11 rounded-md border bg-background px-3 font-normal"
+              <Input
+                className="h-11"
                 disabled={isPending}
                 maxLength={160}
                 onChange={(event) => setSettlementReference(event.target.value)}
@@ -524,8 +548,8 @@ export function OrderPaymentAdjustments({
           ) : null}
           <label className="grid gap-2 text-sm font-medium">
             核销原因 / 证据说明
-            <textarea
-              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal"
+            <Textarea
+              className="min-h-24"
               disabled={isPending}
               maxLength={500}
               onChange={(event) => setResolutionReason(event.target.value)}
@@ -533,25 +557,26 @@ export function OrderPaymentAdjustments({
             />
           </label>
           <DialogFooter>
-            <button
-              className="h-11 rounded-md border px-4 text-sm font-semibold"
+            <Button
+              className="h-11"
               disabled={isPending}
               onClick={() => setResolutionAdjustment(null)}
               type="button"
+              variant="outline"
             >
               取消
-            </button>
-            <button
-              className="h-11 rounded-md bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-50"
+            </Button>
+            <Button
+              className="h-11"
               disabled={isPending || resolutionReason.trim().length < 3}
               onClick={submitRefundResolution}
               type="button"
             >
               {isPending ? "核销中…" : "确认核销"}
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </section>
+    </Card>
   );
 }

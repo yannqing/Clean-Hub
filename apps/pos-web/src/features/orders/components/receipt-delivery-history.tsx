@@ -1,6 +1,15 @@
 "use client";
 
 import type { PosReceiptDelivery } from "@cleanhub/api-client";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@cleanhub/ui";
 import { useEffect, useState } from "react";
 
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
@@ -68,24 +77,32 @@ export function ReceiptDeliveryHistory({ orderId }: { orderId: string }) {
   if (loading || deliveries.length === 0) return null;
 
   return (
-    <section className="overflow-hidden border-y bg-background">
-      <div className="border-b px-5 py-4">
-        <h2 className="font-semibold text-foreground">小票发送记录</h2>
-        <p className="mt-1 text-xs text-muted-foreground">
+    <Card className="gap-0 overflow-hidden py-0">
+      <CardHeader className="border-b px-5 py-4">
+        <CardTitle>小票发送记录</CardTitle>
+        <CardDescription className="text-xs">
           失败的邮件或短信可使用原始小票快照重试。
-        </p>
-      </div>
-      <div className="divide-y">
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="divide-y px-0">
         {deliveries.map((delivery) => (
           <div
             className="flex flex-wrap items-start justify-between gap-3 px-5 py-4 text-sm"
             key={delivery.id}
           >
             <div>
-              <p className="font-semibold">
-                {CHANNEL_LABELS[delivery.channel]} ·{" "}
-                {STATUS_LABELS[delivery.status]}
-              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold">
+                  {CHANNEL_LABELS[delivery.channel]}
+                </p>
+                <Badge
+                  variant={
+                    delivery.status === "failed" ? "destructive" : "secondary"
+                  }
+                >
+                  {STATUS_LABELS[delivery.status]}
+                </Badge>
+              </div>
               {delivery.destination ? (
                 <p className="mt-1 text-xs text-muted-foreground">
                   {delivery.destination}
@@ -102,18 +119,19 @@ export function ReceiptDeliveryHistory({ orderId }: { orderId: string }) {
             </div>
             {delivery.status === "failed" &&
             (delivery.channel === "email" || delivery.channel === "sms") ? (
-              <button
-                className="h-9 rounded-md border px-3 text-xs font-semibold disabled:opacity-50"
+              <Button
                 disabled={retryingId !== null}
                 onClick={() => void retry(delivery.id)}
+                size="sm"
                 type="button"
+                variant="outline"
               >
                 {retryingId === delivery.id ? "重试中…" : "重新发送"}
-              </button>
+              </Button>
             ) : null}
           </div>
         ))}
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }

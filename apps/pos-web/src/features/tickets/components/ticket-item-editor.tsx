@@ -235,7 +235,16 @@ export function TicketItemEditor({
         }}
         open={formOpen}
       >
-        <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain sm:max-w-4xl">
+        <DialogContent
+          className="max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain sm:max-w-4xl"
+          onEscapeKeyDown={(event) => {
+            if (
+              document.activeElement?.closest("[data-ticket-attribute-picker]")
+            ) {
+              event.preventDefault();
+            }
+          }}
+        >
           <DialogHeader>
             <DialogTitle>
               {creating ? "添加工单项目" : "编辑工单项目"}

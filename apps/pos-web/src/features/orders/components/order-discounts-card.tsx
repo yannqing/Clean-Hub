@@ -8,12 +8,21 @@ import type {
 import { createId } from "@cleanhub/id";
 import { useTranslation } from "@cleanhub/i18n/react";
 import {
+  Badge,
+  Button,
+  Card,
+  CardAction,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
+  Textarea,
 } from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
@@ -176,18 +185,18 @@ export function OrderDiscountsCard({
   }
 
   return (
-    <section className="overflow-hidden border-y bg-background">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
+    <Card className="gap-0 overflow-hidden py-0">
+      <CardHeader className="border-b px-5 py-4">
         <div>
-          <h2 className="font-semibold text-foreground">
-            {text("折扣与优惠码")}
-          </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <CardTitle>{text("折扣与优惠码")}</CardTitle>
+          <CardDescription className="mt-1 text-xs">
             {text("自动折扣由系统计算，优惠码可在收款前应用或移除。")}
-          </p>
+          </CardDescription>
         </div>
-        <Icon className="h-5 w-5 text-muted-foreground" name="receipt" />
-      </div>
+        <CardAction>
+          <Icon className="h-5 w-5 text-muted-foreground" name="receipt" />
+        </CardAction>
+      </CardHeader>
 
       <div className="grid grid-cols-1 divide-y bg-muted/40 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
         <AmountSummary
@@ -234,19 +243,20 @@ export function OrderDiscountsCard({
                     <span className="truncate text-sm font-semibold text-foreground">
                       {application.title}
                     </span>
-                    <span
+                    <Badge
                       className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                         application.method === "automatic"
                           ? "bg-accent text-accent-foreground"
                           : "bg-muted text-muted-foreground"
                       }`}
+                      variant="secondary"
                     >
                       {text(
                         application.method === "automatic"
                           ? "自动折扣"
                           : "优惠码",
                       )}
-                    </span>
+                    </Badge>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
                     <span>{text(DISCOUNT_TYPE_LABELS[application.type])}</span>
@@ -267,14 +277,15 @@ export function OrderDiscountsCard({
                     )}
                   </span>
                   {application.method === "code" && canEdit ? (
-                    <button
-                      className="h-9 rounded-md border border-destructive/30 px-2.5 text-xs font-semibold text-destructive transition hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    <Button
                       disabled={isPending}
                       onClick={() => setRemoveTarget(application)}
+                      size="sm"
                       type="button"
+                      variant="destructive"
                     >
                       {text("移除")}
-                    </button>
+                    </Button>
                   ) : null}
                 </div>
               </div>
@@ -285,9 +296,9 @@ export function OrderDiscountsCard({
 
       <div className="border-t px-5 py-4">
         <div className="flex flex-col gap-2 sm:flex-row">
-          <input
+          <Input
             autoComplete="off"
-            className="h-11 min-w-0 flex-1 rounded-md border bg-background px-3 text-sm font-semibold uppercase text-foreground outline-none transition placeholder:font-normal placeholder:normal-case focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted disabled:text-muted-foreground"
+            className="h-11 flex-1 font-semibold uppercase placeholder:font-normal placeholder:normal-case"
             disabled={!canEdit || isPending}
             maxLength={100}
             onChange={(event) => {
@@ -308,15 +319,15 @@ export function OrderDiscountsCard({
             placeholder={text("输入优惠码")}
             value={code}
           />
-          <button
-            className="flex h-11 items-center justify-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
+          <Button
+            className="h-11"
             disabled={!canEdit || isPending || !code.trim()}
             onClick={requestApplyCode}
             type="button"
           >
             <Icon className="h-4 w-4" name="plus" />
             {text(isPending ? "应用中…" : "应用优惠码")}
-          </button>
+          </Button>
         </div>
         {editRestrictionMessage ? (
           <p className="mt-2 text-xs text-muted-foreground">
@@ -348,8 +359,8 @@ export function OrderDiscountsCard({
           </div>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             {text("应用原因")}
-            <textarea
-              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <Textarea
+              className="min-h-24"
               disabled={isPending}
               maxLength={500}
               onChange={(event) => setApplyReason(event.target.value)}
@@ -358,25 +369,26 @@ export function OrderDiscountsCard({
             />
           </label>
           <DialogFooter>
-            <button
-              className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+            <Button
+              className="h-11"
               disabled={isPending}
               onClick={() => {
                 setApplyConfirmationOpen(false);
                 setApplyReason("");
               }}
               type="button"
+              variant="outline"
             >
               {text("返回")}
-            </button>
-            <button
-              className="h-11 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-50"
+            </Button>
+            <Button
+              className="h-11"
               disabled={isPending || !applyReason.trim()}
               onClick={applyCode}
               type="button"
             >
               {text(isPending ? "应用中…" : "确认应用")}
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -407,8 +419,8 @@ export function OrderDiscountsCard({
           </div>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             {text("移除原因")}
-            <textarea
-              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <Textarea
+              className="min-h-24"
               disabled={isPending}
               maxLength={500}
               onChange={(event) => setRemoveReason(event.target.value)}
@@ -417,29 +429,31 @@ export function OrderDiscountsCard({
             />
           </label>
           <DialogFooter>
-            <button
-              className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+            <Button
+              className="h-11"
               disabled={isPending}
               onClick={() => {
                 setRemoveTarget(null);
                 setRemoveReason("");
               }}
               type="button"
+              variant="outline"
             >
               {text("返回")}
-            </button>
-            <button
-              className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-50"
+            </Button>
+            <Button
+              className="h-11"
               disabled={isPending || !removeReason.trim()}
               onClick={removeCodeDiscount}
               type="button"
+              variant="destructive"
             >
               {text(isPending ? "移除中…" : "确认移除")}
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </section>
+    </Card>
   );
 }
 

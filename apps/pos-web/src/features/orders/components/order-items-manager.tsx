@@ -8,13 +8,37 @@ import type {
   PosOrderDetail,
   PosOrderItem,
 } from "@cleanhub/api-client";
+import { useTranslation } from "@cleanhub/i18n/react";
 import {
+  Badge,
+  Button,
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Input,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Textarea,
 } from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";
@@ -26,6 +50,7 @@ import {
   updateOrderItemAction,
 } from "../actions";
 import { formatOrderMoney } from "../constants";
+import { formatOrderItemMeasurement } from "../lib/order-measurement";
 
 type ItemDraft = {
   itemKind: "service" | "product";
@@ -76,6 +101,7 @@ export function OrderItemsManager({
   products: PosCatalogProduct[];
   order: PosOrderDetail;
 }) {
+  const { locale } = useTranslation();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [itemDialog, setItemDialog] = useState<ItemDialogMode | null>(null);
@@ -118,30 +144,34 @@ export function OrderItemsManager({
     item.ticketId ? ticketNoByTicketId?.get(item.ticketId) : null;
 
   return (
-    <section className="overflow-hidden border-y bg-background">
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b px-5 py-4">
+    <Card className="gap-0 overflow-hidden py-0">
+      <CardHeader className="border-b px-5 py-4">
         <div>
-          <h2 className="font-semibold text-foreground">订单条目</h2>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <CardTitle>订单条目</CardTitle>
+          <CardDescription className="mt-1 text-xs">
             条目价格按目录保存快照，称重服务按实际重量计算。
-          </p>
+          </CardDescription>
         </div>
         {canEdit ? (
-          <button
-            className="flex h-11 items-center justify-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-60"
-            disabled={isPending || (catalog.length === 0 && products.length === 0)}
-            onClick={() => setItemDialog({ type: "create" })}
-            type="button"
-          >
-            <Icon className="h-4 w-4" name="plus" />
-            新增条目
-          </button>
+          <CardAction>
+            <Button
+              className="h-11"
+              disabled={
+                isPending || (catalog.length === 0 && products.length === 0)
+              }
+              onClick={() => setItemDialog({ type: "create" })}
+              type="button"
+            >
+              <Icon className="h-4 w-4" name="plus" />
+              新增条目
+            </Button>
+          </CardAction>
         ) : (
-          <span className="rounded-md bg-muted px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-            当前不可编辑
-          </span>
+          <CardAction>
+            <Badge variant="secondary">当前不可编辑</Badge>
+          </CardAction>
         )}
-      </div>
+      </CardHeader>
 
       {catalog.length === 0 && products.length === 0 && canEdit ? (
         <div className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-300">
@@ -149,7 +179,7 @@ export function OrderItemsManager({
         </div>
       ) : null}
 
-      <div className="divide-y min-[1400px]:hidden">
+      <CardContent className="divide-y px-0 lg:hidden">
         {order.items.map((item) => (
           <ReadOnlyItemCard
             canDelete={canDelete}
@@ -158,37 +188,43 @@ export function OrderItemsManager({
             disabled={isPending}
             item={item}
             key={item.id}
+            locale={locale}
             onDelete={() => setDeleteTarget(item)}
             onEdit={() => setItemDialog({ type: "edit", item })}
             ticketNo={ticketNoFor(item)}
           />
         ))}
-      </div>
+      </CardContent>
 
-      <div className="hidden overflow-x-auto min-[1400px]:block">
-        <div className="min-w-[920px]">
-          <div className="grid grid-cols-[minmax(260px,1fr)_150px_150px_120px_110px] bg-muted/50 px-5 py-3 text-[11px] font-semibold uppercase text-muted-foreground">
-            <div>项目</div>
-            <div>计量</div>
-            <div>单价</div>
-            <div className="text-right">小计</div>
-            <div className="text-right">操作</div>
-          </div>
-          {order.items.map((item) => (
-            <ReadOnlyItemRow
-              canDelete={canDelete}
-              canEdit={canEdit}
-              currency={order.currency}
-              disabled={isPending}
-              item={item}
-              key={item.id}
-              onDelete={() => setDeleteTarget(item)}
-              onEdit={() => setItemDialog({ type: "edit", item })}
-              ticketNo={ticketNoFor(item)}
-            />
-          ))}
-        </div>
-      </div>
+      <CardContent className="hidden px-0 lg:block">
+        <Table className="min-w-[660px]">
+          <TableHeader className="bg-muted/50">
+            <TableRow>
+              <TableHead className="w-full px-5">项目</TableHead>
+              <TableHead className="w-[110px]">计量</TableHead>
+              <TableHead className="w-[120px]">单价</TableHead>
+              <TableHead className="w-[110px] text-right">小计</TableHead>
+              <TableHead className="w-[96px] px-5 text-right">操作</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {order.items.map((item) => (
+              <ReadOnlyItemRow
+                canDelete={canDelete}
+                canEdit={canEdit}
+                currency={order.currency}
+                disabled={isPending}
+                item={item}
+                key={item.id}
+                locale={locale}
+                onDelete={() => setDeleteTarget(item)}
+                onEdit={() => setItemDialog({ type: "edit", item })}
+                ticketNo={ticketNoFor(item)}
+              />
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
 
       {itemDialog ? (
         <OrderItemDialog
@@ -229,8 +265,8 @@ export function OrderItemsManager({
           </DialogHeader>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             操作原因
-            <textarea
-              className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            <Textarea
+              className="min-h-24"
               disabled={isPending}
               maxLength={500}
               onChange={(event) => setDeleteReason(event.target.value)}
@@ -238,32 +274,34 @@ export function OrderItemsManager({
             />
           </label>
           <DialogFooter>
-            <button
-              className="h-11 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent"
+            <Button
+              className="h-11"
               disabled={isPending}
               onClick={() => {
                 setDeleteTarget(null);
                 setDeleteReason("");
               }}
               type="button"
+              variant="outline"
             >
               返回
-            </button>
-            <button
-              className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-50"
+            </Button>
+            <Button
+              className="h-11"
               disabled={isPending || !deleteReason.trim()}
               onClick={() => {
                 if (deleteTarget)
                   removeItem(deleteTarget.id, deleteReason.trim());
               }}
               type="button"
+              variant="destructive"
             >
               {isPending ? "删除中…" : "确认删除"}
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </section>
+    </Card>
   );
 }
 
@@ -273,6 +311,7 @@ function ReadOnlyItemCard({
   canDelete,
   currency,
   disabled,
+  locale,
   onEdit,
   onDelete,
   ticketNo,
@@ -282,6 +321,7 @@ function ReadOnlyItemCard({
   canDelete: boolean;
   currency: string;
   disabled: boolean;
+  locale: string;
   onEdit: () => void;
   onDelete: () => void;
   ticketNo?: string | null;
@@ -290,7 +330,10 @@ function ReadOnlyItemCard({
     <article className="p-4 sm:p-5">
       <ItemHeading item={item} ticketNo={ticketNo} />
       <dl className="mt-4 grid grid-cols-3 gap-3 rounded-md bg-muted/40 p-3">
-        <OrderItemCardDetail label="计量" value={formatMeasurement(item)} />
+        <OrderItemCardDetail
+          label="计量"
+          value={formatOrderItemMeasurement(item, locale)}
+        />
         <OrderItemCardDetail
           label="收费单价"
           value={formatOrderMoney(item.chargedUnitAmount, currency)}
@@ -302,25 +345,27 @@ function ReadOnlyItemCard({
       </dl>
       <IntakeDetails item={item} />
       <div className="mt-4 flex justify-end gap-2">
-        <button
-          className="flex h-11 items-center gap-2 rounded-md border px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-40"
+        <Button
+          className="h-11"
           disabled={!canEdit || disabled}
           onClick={onEdit}
           type="button"
+          variant="outline"
         >
           <Icon className="h-4 w-4" name="square-pen" />
           编辑
-        </button>
+        </Button>
         {canDelete ? (
-          <button
-            className="flex h-11 items-center gap-2 rounded-md border border-destructive/30 px-4 text-sm font-semibold text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-40"
+          <Button
+            className="h-11"
             disabled={disabled}
             onClick={onDelete}
             type="button"
+            variant="destructive"
           >
             <Icon className="h-4 w-4" name="trash" />
             删除
-          </button>
+          </Button>
         ) : null}
       </div>
     </article>
@@ -357,7 +402,7 @@ function OrderItemDialog({
     pricingUnit: editingItem?.pricingUnit ?? "per_item",
     standardUnitAmount: editingItem?.standardUnitAmount ?? "0",
     chargedUnitAmount: editingItem?.chargedUnitAmount ?? "0",
-    quantity: editingItem?.quantity ?? "1",
+    quantity: normalizeEditableQuantity(editingItem?.quantity ?? "1"),
     weight: editingItem?.weight ?? "",
     bagCount: String(editingItem?.bagCount ?? 1),
     itemColor: editingItem?.itemColor ?? "",
@@ -551,10 +596,9 @@ function OrderItemDialog({
             <span className="mb-1 block text-xs font-semibold text-muted-foreground">
               服务或商品
             </span>
-            <select
-              className={inputClass}
+            <Select
               disabled={blocked}
-              onChange={(event) => selectCatalogItem(event.target.value)}
+              onValueChange={selectCatalogItem}
               value={
                 draft.itemKind === "product" && draft.productSkuId
                   ? `product:${draft.productSkuId}`
@@ -563,44 +607,55 @@ function OrderItemDialog({
                     : ""
               }
             >
-              <option value="">请选择服务或商品</option>
-              {products.length > 0 ? (
-                <optgroup label="商品">
-                  {products.map((product) => {
-                    const outOfStock =
-                      product.trackInventory &&
-                      !product.allowNegativeStock &&
-                      Number(product.availableQuantity ?? 0) <= 0;
-                    return (
-                      <option
-                        disabled={outOfStock}
-                        key={product.productSkuId}
-                        value={`product:${product.productSkuId}`}
+              <SelectTrigger className="h-11 w-full">
+                <SelectValue placeholder="请选择服务或商品" />
+              </SelectTrigger>
+              <SelectContent>
+                {products.length > 0 ? (
+                  <SelectGroup>
+                    <SelectLabel>商品</SelectLabel>
+                    {products.map((product) => {
+                      const outOfStock =
+                        product.trackInventory &&
+                        !product.allowNegativeStock &&
+                        Number(product.availableQuantity ?? 0) <= 0;
+                      return (
+                        <SelectItem
+                          disabled={outOfStock}
+                          key={product.productSkuId}
+                          value={`product:${product.productSkuId}`}
+                        >
+                          {product.name}
+                          {product.variantName
+                            ? ` · ${product.variantName}`
+                            : ""}
+                          {" · "}
+                          {formatOrderMoney(product.amount, product.currency)}
+                          {product.trackInventory
+                            ? ` · 库存 ${Number(product.availableQuantity ?? 0)}`
+                            : ""}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectGroup>
+                ) : null}
+                {catalog.length > 0 ? (
+                  <SelectGroup>
+                    <SelectLabel>服务</SelectLabel>
+                    {catalog.map((service) => (
+                      <SelectItem
+                        key={service.id}
+                        value={`service:${service.id}`}
                       >
-                        {product.name}
-                        {product.variantName ? ` · ${product.variantName}` : ""}
-                        {" · "}
-                        {formatOrderMoney(product.amount, product.currency)}
-                        {product.trackInventory
-                          ? ` · 库存 ${Number(product.availableQuantity ?? 0)}`
-                          : ""}
-                      </option>
-                    );
-                  })}
-                </optgroup>
-              ) : null}
-              {catalog.length > 0 ? (
-                <optgroup label="服务">
-              {catalog.map((service) => (
-                <option key={service.id} value={`service:${service.id}`}>
-                  {service.name} ·{" "}
-                  {service.pricingUnit === "per_kg" ? "按公斤" : "按件"} ·{" "}
-                  {formatOrderMoney(service.amount, service.currency)}
-                </option>
-              ))}
-                </optgroup>
-              ) : null}
-            </select>
+                        {service.name} ·{" "}
+                        {service.pricingUnit === "per_kg" ? "按公斤" : "按件"} ·{" "}
+                        {formatOrderMoney(service.amount, service.currency)}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                ) : null}
+              </SelectContent>
+            </Select>
           </label>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -704,22 +759,19 @@ function OrderItemDialog({
           ) : null}
 
           <DialogFooter>
-            <button
-              className="h-11 rounded-md border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent disabled:opacity-40"
+            <Button
+              className="h-11"
               disabled={blocked}
               onClick={onClose}
               type="button"
+              variant="outline"
             >
               取消
-            </button>
-            <button
-              className="flex h-11 items-center justify-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background transition-colors hover:bg-foreground/90 disabled:opacity-40"
-              disabled={blocked}
-              type="submit"
-            >
+            </Button>
+            <Button className="h-11" disabled={blocked} type="submit">
               <Icon className="h-4 w-4" name="save" />
               {isPending ? "保存中…" : editingItem ? "保存" : "添加"}
-            </button>
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -733,6 +785,7 @@ function ReadOnlyItemRow({
   canDelete,
   currency,
   disabled,
+  locale,
   onEdit,
   onDelete,
   ticketNo,
@@ -742,55 +795,61 @@ function ReadOnlyItemRow({
   canDelete: boolean;
   currency: string;
   disabled: boolean;
+  locale: string;
   onEdit: () => void;
   onDelete: () => void;
   ticketNo?: string | null;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(260px,1fr)_150px_150px_120px_110px] items-center border-t px-5 py-4 text-sm">
-      <div className="min-w-0">
+    <TableRow>
+      <TableCell className="min-w-[260px] whitespace-normal px-5 py-4">
         <ItemHeading item={item} ticketNo={ticketNo} />
         <IntakeDetails item={item} />
-      </div>
-      <div className="font-medium text-foreground">
-        {formatMeasurement(item)}
-      </div>
-      <div className="font-medium text-foreground">
+      </TableCell>
+      <TableCell className="font-medium text-foreground">
+        {formatOrderItemMeasurement(item, locale)}
+      </TableCell>
+      <TableCell className="font-medium text-foreground">
         {formatOrderMoney(item.chargedUnitAmount, currency)}
         {item.chargedUnitAmount !== item.standardUnitAmount ? (
           <div className="text-xs text-amber-700">
             标准 {formatOrderMoney(item.standardUnitAmount, currency)}
           </div>
         ) : null}
-      </div>
-      <div className="text-right font-semibold text-foreground">
+      </TableCell>
+      <TableCell className="text-right font-semibold text-foreground">
         {formatOrderMoney(item.lineAmount, currency)}
-      </div>
-      <div className="flex justify-end gap-1">
-        <button
-          aria-label="编辑条目"
-          className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-40"
-          disabled={!canEdit || disabled}
-          onClick={onEdit}
-          title="编辑条目"
-          type="button"
-        >
-          <Icon className="h-4 w-4" name="square-pen" />
-        </button>
-        {canDelete ? (
-          <button
-            aria-label="删除条目"
-            className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
-            disabled={disabled}
-            onClick={onDelete}
-            title="删除条目"
+      </TableCell>
+      <TableCell className="px-5 text-right">
+        <div className="flex justify-end gap-1">
+          <Button
+            aria-label="编辑条目"
+            disabled={!canEdit || disabled}
+            onClick={onEdit}
+            size="icon"
+            title="编辑条目"
             type="button"
+            variant="ghost"
           >
-            <Icon className="h-4 w-4" name="trash" />
-          </button>
-        ) : null}
-      </div>
-    </div>
+            <Icon className="h-4 w-4" name="square-pen" />
+          </Button>
+          {canDelete ? (
+            <Button
+              aria-label="删除条目"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              disabled={disabled}
+              onClick={onDelete}
+              size="icon"
+              title="删除条目"
+              type="button"
+              variant="ghost"
+            >
+              <Icon className="h-4 w-4" name="trash" />
+            </Button>
+          ) : null}
+        </div>
+      </TableCell>
+    </TableRow>
   );
 }
 
@@ -838,14 +897,13 @@ function IntakeDetails({ item }: { item: PosOrderItem }) {
   ) : null;
 }
 
-function formatMeasurement(item: PosOrderItem): string {
-  return item.pricingUnit === "per_kg"
-    ? `${item.weight ?? "0"} kg${item.bagCount ? ` · ${item.bagCount} 袋` : ""}`
-    : `${item.quantity} ${item.unitOfMeasure ?? "件"}`;
-}
-
 function moneyEquals(left: string, right: string): boolean {
   return Number(left).toFixed(2) === Number(right).toFixed(2);
+}
+
+function normalizeEditableQuantity(value: string): string {
+  const quantity = Number(value);
+  return Number.isFinite(quantity) ? String(quantity) : value;
 }
 
 function OrderItemCardDetail({
@@ -862,9 +920,6 @@ function OrderItemCardDetail({
     </div>
   );
 }
-
-const inputClass =
-  "h-11 w-full rounded-md border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted disabled:text-muted-foreground";
 
 function SmallInput({
   label,
@@ -884,8 +939,8 @@ function SmallInput({
       <span className="mb-1 block text-xs font-semibold text-muted-foreground">
         {label}
       </span>
-      <input
-        className={inputClass}
+      <Input
+        className="h-11"
         disabled={disabled}
         onChange={(event) => onChange(event.target.value)}
         step={type === "number" ? "0.001" : undefined}
@@ -912,8 +967,8 @@ function TextAreaField({
   return (
     <label className="grid gap-2 text-sm font-medium text-foreground">
       {label}
-      <textarea
-        className="min-h-20 rounded-md border bg-background px-3 py-2 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted"
+      <Textarea
+        className="min-h-20"
         disabled={disabled}
         maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}
