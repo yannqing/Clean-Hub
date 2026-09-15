@@ -79,7 +79,9 @@ import { parsePosOrderQrPayload } from "@cleanhub/domain/order-codes";
 import {
   CASH_ROUNDING_STEPS,
   cashRoundingStepToMinor,
+  getCurrencyPayableStep,
   roundCashDown,
+  roundToStep,
 } from "@cleanhub/domain/currency";
 
 import { posToast as toast } from "@/lib/pos-toast";
@@ -2404,11 +2406,23 @@ function cardOutcomeLabel(
   }[outcome];
 }
 
+/**
+ * Offline fallback for the priced total, mirroring the server's
+ * `calculatePosFinancialTotals`.
+ *
+ * The currency's smallest payable unit is a hard floor here too, exactly as on
+ * the server: without it an offline XOF sale showed 52.37, an amount with no
+ * coin behind it, and the total then disagreed with the server on sync.
+ */
 function calculateLocalFinancialTotal(
   subtotal: string,
   rules: Pick<
     ReturnType<typeof usePosRuntimeConfig>,
-    "taxEnabled" | "defaultTaxRate" | "pricesIncludeTax" | "roundingRule"
+    | "currency"
+    | "taxEnabled"
+    | "defaultTaxRate"
+    | "pricesIncludeTax"
+    | "roundingRule"
   >,
 ): string {
   const subtotalMinor = Math.round(Number(subtotal) * 100);
@@ -2422,13 +2436,17 @@ function calculateLocalFinancialTotal(
   const beforeRounding = rules.pricesIncludeTax
     ? subtotalMinor
     : subtotalMinor + taxMinor;
-  const increment =
+  const configuredStep =
     rules.roundingRule === "round_yuan"
-      ? 100
+      ? BigInt(100)
       : rules.roundingRule === "round_jiao"
-        ? 10
-        : 1;
-  return toMoney((Math.round(beforeRounding / increment) * increment) / 100);
+        ? BigInt(10)
+        : BigInt(1);
+  const currencyStep = getCurrencyPayableStep(rules.currency);
+  const step = configuredStep > currencyStep ? configuredStep : currencyStep;
+  return toMoney(
+    Number(roundToStep(BigInt(beforeRounding), step)) / 100,
+  );
 }
 
 function buildCashTenderPresets(total: string, currency: string): number[] {

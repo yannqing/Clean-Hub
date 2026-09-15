@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from "@cleanhub/ui";
 
+import { getCurrencyPayableStep } from "@cleanhub/domain/currency";
+
 import { Icon, type PosIconName } from "@/components/app-shell";
 
 import {
@@ -25,12 +27,21 @@ import {
 import type { TerminalSettingsFormValues } from "../types";
 
 type TerminalSettingsCardProps = {
+  /** Settlement currency, so the card can tell when rounding is meaningless. */
+  currency: string;
   initial: TerminalSettingsFormValues;
   loading: boolean;
   mode: TerminalSettingsMode;
   saving: boolean;
   onSave: (values: TerminalSettingsFormValues) => void;
 };
+
+/**
+ * The coarsest rounding this control can ask for, in storage minor units.
+ * A currency whose own smallest payable unit is at least this large rounds
+ * every total the same way regardless of the rule.
+ */
+const COARSEST_ROUNDING_STEP_MINOR = BigInt(100);
 
 /**
  * Each section route edits one slice of the terminal settings. There is no
@@ -107,6 +118,7 @@ function MobileSettingSwitch({
 }
 
 export function TerminalSettingsCard({
+  currency,
   initial,
   loading,
   mode,
@@ -115,6 +127,11 @@ export function TerminalSettingsCard({
 }: TerminalSettingsCardProps) {
   const [form, setForm] = useState<TerminalSettingsFormValues>(initial);
   const copy = MODE_COPY[mode];
+  // XOF and other zero-decimal currencies already round to a whole unit, which
+  // is coarser than anything this rule can add. Offering the choice would
+  // suggest the cashier can change a total that will not move.
+  const roundingHasNoEffect =
+    getCurrencyPayableStep(currency) >= COARSEST_ROUNDING_STEP_MINOR;
 
   function updateField<K extends keyof TerminalSettingsFormValues>(
     key: K,
@@ -235,6 +252,7 @@ export function TerminalSettingsCard({
                 抹零规则
               </Label>
               <Select
+                disabled={roundingHasNoEffect}
                 onValueChange={(value) =>
                   updateField(
                     "roundingRule",
@@ -254,6 +272,11 @@ export function TerminalSettingsCard({
                   ))}
                 </SelectContent>
               </Select>
+              {roundingHasNoEffect ? (
+                <p className="text-sm leading-6 text-muted-foreground lg:text-xs lg:leading-normal">
+                  {currency} 没有比 1 更小的面额，金额本就会取整到整数，此设置不会改变任何总额。
+                </p>
+              ) : null}
             </div>
           ) : null}
 

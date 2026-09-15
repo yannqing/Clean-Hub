@@ -10,6 +10,7 @@ import { posRoutes } from "@/config";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import { posApi } from "@/lib/api-client";
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { getOrCreatePosDeviceId } from "@/features/auth/utils/device-id";
 
 import { TERMINAL_SETTINGS_DEFAULTS } from "../constants";
@@ -97,6 +98,7 @@ type SettingsViewProps = {
 
 export function SettingsView({ section }: SettingsViewProps = {}) {
   const router = useRouter();
+  const runtime = usePosRuntimeConfig();
   const [pageState, setPageState] = useState<SettingsPageState>("loading");
   const [terminalSettings, setTerminalSettings] =
     useState<PosTerminalSettings | null>(null);
@@ -245,6 +247,7 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
       ) : (
         <TerminalSettingsCard
           key={`terminal-${section}-${terminalSettings?.version ?? "new"}-${isLoading}`}
+          currency={runtime.currency}
           initial={formValues}
           loading={isLoading}
           mode={section}
