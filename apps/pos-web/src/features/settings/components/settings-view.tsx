@@ -5,23 +5,14 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
 import type { PosHardwareDeviceSummary } from "@cleanhub/api-client";
-import {
-  PosBreadcrumb,
-  PosFormLayout,
-  Icon,
-  PosPageHeader,
-} from "@/components/app-shell";
+import { Icon } from "@/components/app-shell";
 import { posRoutes } from "@/config";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import { posApi } from "@/lib/api-client";
 import { getOrCreatePosDeviceId } from "@/features/auth/utils/device-id";
 
-import {
-  SETTINGS_PAGE_DESCRIPTION,
-  SETTINGS_PAGE_TITLE,
-  TERMINAL_SETTINGS_DEFAULTS,
-} from "../constants";
+import { TERMINAL_SETTINGS_DEFAULTS } from "../constants";
 import { fetchTerminalSettings, updateTerminalSettings } from "../queries";
 import type {
   PosTerminalSettings,
@@ -125,14 +116,8 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
   const [canManageSensitiveHardware, setCanManageSensitiveHardware] =
     useState(false);
 
-  const handleHardwareDeviceUpdated = useCallback(
-    (updated: PosHardwareDeviceSummary) => {
-      setHardwareDevices((current) =>
-        current.map((device) =>
-          device.id === updated.id ? updated : device,
-        ),
-      );
-    },
+  const handleHardwareDevicesUpdated = useCallback(
+    (updated: PosHardwareDeviceSummary[]) => setHardwareDevices(updated),
     [],
   );
 
@@ -255,7 +240,7 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
           canManageSensitiveHardware={canManageSensitiveHardware}
           devices={hardwareDevices}
           loading={hardwareLoading}
-          onDeviceUpdated={handleHardwareDeviceUpdated}
+          onDevicesUpdated={handleHardwareDevicesUpdated}
         />
       ) : (
         <TerminalSettingsCard
@@ -269,7 +254,7 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
       );
 
     return (
-      <section className="mx-auto w-full max-w-[720px] space-y-4 pb-8">
+      <section className="mx-auto w-full max-w-[720px] space-y-4 pb-8 lg:max-w-none">
         <Link
           className="inline-flex h-9 items-center gap-1.5 rounded-lg pr-3 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring lg:hidden"
           href={posRoutes.settings}
@@ -277,13 +262,6 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
           <Icon className="size-4" name="arrow-left" />
           设置
         </Link>
-        <PosBreadcrumb
-          className="hidden lg:block"
-          items={[
-            { href: posRoutes.settings, label: SETTINGS_PAGE_TITLE },
-            { label: sectionTitle },
-          ]}
-        />
         <h1 className="sr-only">{sectionTitle}</h1>
         {sectionContent}
       </section>
@@ -299,44 +277,14 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
         loading={isLoading || hardwareLoading}
       />
 
-      <section className="mx-auto hidden w-full max-w-[960px] space-y-7 pb-8 lg:block">
-        <PosBreadcrumb items={[{ label: SETTINGS_PAGE_TITLE }]} />
-        <PosPageHeader
-          description={SETTINGS_PAGE_DESCRIPTION}
-          icon="settings"
-          title={SETTINGS_PAGE_TITLE}
+      <section className="hidden pb-8 lg:block">
+        <TerminalSettingsCard
+          key={`terminal-${terminalSettings?.version ?? "new"}-${isLoading}`}
+          initial={formValues}
+          loading={isLoading}
+          saving={saving}
+          onSave={handleSave}
         />
-
-        <PosFormLayout
-          className="pb-0"
-          aside={
-            <div className="grid gap-5">
-              <GeneralSettingsCard
-                branchAddress={branchInfo?.address ?? null}
-                branchName={branchInfo?.name ?? ""}
-                branchPhone={branchInfo?.phone ?? null}
-                receiptAddress={branchInfo?.receiptAddress ?? null}
-                receiptName={branchInfo?.receiptName ?? null}
-                receiptPhone={branchInfo?.receiptPhone ?? null}
-              />
-              <HardwareSettingsCard
-                canManageSensitiveHardware={canManageSensitiveHardware}
-                devices={hardwareDevices}
-                loading={hardwareLoading}
-                onDeviceUpdated={handleHardwareDeviceUpdated}
-              />
-            </div>
-          }
-        >
-          {/* key forces remount when server data arrives, so useState re-initializes. */}
-          <TerminalSettingsCard
-            key={`terminal-${terminalSettings?.version ?? "new"}-${isLoading}`}
-            initial={formValues}
-            loading={isLoading}
-            saving={saving}
-            onSave={handleSave}
-          />
-        </PosFormLayout>
       </section>
     </>
   );

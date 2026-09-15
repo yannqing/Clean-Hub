@@ -32,7 +32,9 @@ function optionLabel<T extends string | number>(
   options: readonly { label: string; value: T }[],
   value: T,
 ): string {
-  return options.find((option) => option.value === value)?.label ?? String(value);
+  return (
+    options.find((option) => option.value === value)?.label ?? String(value)
+  );
 }
 
 function SettingsGroup({
@@ -121,8 +123,8 @@ export function SettingsMobileIndex({
       description: loading
         ? "正在加载…"
         : hardwareCount > 0
-          ? `${hardwareCount} 台已配置设备`
-          : "暂无已配置设备",
+          ? `${hardwareCount} 台已登记设备`
+          : "打开查看本机可用设备",
       href: posRoutes.settingsHardware,
       title: "硬件设备",
     },

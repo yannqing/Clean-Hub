@@ -1,3 +1,25 @@
+export function buildNewIntakePath({
+  query,
+  serviceId,
+}: {
+  query?: string;
+  serviceId?: string;
+} = {}): string {
+  const params = new URLSearchParams();
+  const keyword = query?.trim();
+  const selectedServiceId = serviceId?.trim();
+
+  if (keyword) {
+    params.set("q", keyword);
+  }
+  if (selectedServiceId) {
+    params.set("serviceId", selectedServiceId);
+  }
+
+  const search = params.toString();
+  return search ? `/new-intake?${search}` : "/new-intake";
+}
+
 export const posRoutes = {
   home: "/",
   login: "/login",
@@ -9,9 +31,9 @@ export const posRoutes = {
    * Intake started from a service. The clerk still has to pick the customer,
    * but the service they were looking at rides along so they do not have to
    * find it again once the ticket exists.
-   */
+  */
   newIntakeForService: (serviceId: string) =>
-    `/new-intake?serviceId=${encodeURIComponent(serviceId)}`,
+    buildNewIntakePath({ serviceId }),
   scan: "/scan",
   customers: "/customers",
   catalog: "/catalog",

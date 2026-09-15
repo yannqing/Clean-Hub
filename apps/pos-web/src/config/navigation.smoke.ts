@@ -1,11 +1,23 @@
 import assert from "node:assert/strict";
 
 import {
+  buildNewIntakePath,
   posMobileOverflowNavigation,
   posMobilePrimaryNavigation,
   posRoutes,
   posSidebarNavigation,
 } from "@/config";
+
+assert.equal(buildNewIntakePath(), posRoutes.newIntake);
+assert.equal(
+  buildNewIntakePath({ query: "张 三", serviceId: "service/001" }),
+  "/new-intake?q=%E5%BC%A0+%E4%B8%89&serviceId=service%2F001",
+  "intake navigation must preserve both the customer query and selected service",
+);
+assert.equal(
+  posRoutes.newIntakeForService("service/001"),
+  "/new-intake?serviceId=service%2F001",
+);
 
 assert.equal(
   posMobilePrimaryNavigation.length,
