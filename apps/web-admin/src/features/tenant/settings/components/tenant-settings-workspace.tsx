@@ -8,7 +8,6 @@ import {
   CreditCard,
   Printer,
   ReceiptText,
-  ScrollText,
   Search,
   SquareTerminal,
   Store,
@@ -40,8 +39,7 @@ export type TenantSettingsNavigationKey =
   | "cash"
   | "pointOfSale"
   | "printing"
-  | "hardware"
-  | "activityLog";
+  | "hardware";
 
 export type TenantSettingsNavigationItem = {
   href: string;
@@ -84,11 +82,6 @@ export const tenantSettingsNavigationItems: TenantSettingsNavigationItem[] = [
     key: "hardware",
     href: webAdminRoutes.tenant.system.settingsSections.hardware,
     icon: Printer,
-  },
-  {
-    key: "activityLog",
-    href: webAdminRoutes.tenant.system.settingsSections.activityLog,
-    icon: ScrollText,
   },
 ];
 

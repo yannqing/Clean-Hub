@@ -2669,7 +2669,6 @@ export const tenantMessagesEn: TenantMessages = {
         pointOfSale: "Point of sale",
         printing: "Printing",
         hardware: "POS peripherals",
-        activityLog: "Activity log",
       },
     },
     general: {

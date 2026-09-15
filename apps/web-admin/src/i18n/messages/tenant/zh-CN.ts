@@ -2523,7 +2523,6 @@ export const tenantMessagesZhCN: TenantMessages = {
         pointOfSale: "销售点",
         printing: "打印设置",
         hardware: "POS 外设",
-        activityLog: "操作日志",
       },
     },
     general: {

@@ -103,7 +103,6 @@ export const webAdminRoutes = {
         pointOfSale: "/tenant/system/settings/point-of-sale",
         printing: "/tenant/system/settings/printing",
         hardware: "/tenant/point-of-sale/hardware",
-        activityLog: "/tenant/system/settings/activity-log",
       },
       preferences: "/tenant/system/preferences",
     },

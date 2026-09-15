@@ -88,13 +88,7 @@ function getStatusVariant(success: boolean): "default" | "destructive" {
   return success ? "default" : "destructive";
 }
 
-export type TenantAuditLogViewProps = {
-  embedded?: boolean;
-};
-
-export function TenantAuditLogView({
-  embedded = false,
-}: TenantAuditLogViewProps = {}) {
+export function TenantAuditLogView() {
   const { m, formatDateTime, timeZone } = useTenantI18n();
   const router = useRouter();
   const [logs, setLogs] = useState<TenantAuditLogSummary[]>([]);
@@ -191,16 +185,14 @@ export function TenantAuditLogView({
 
   return (
     <section
-      className={cn("space-y-7 pb-8", embedded && "space-y-4 pb-0")}
+      className="space-y-7 pb-8"
       data-testid="tenant-audit-log-view"
     >
       <header className="flex items-center justify-between gap-3">
-        {!embedded ? (
-          <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-            <Icon aria-hidden icon={ScrollText} size={19} />
-            <span>{m.auditLogs.title}</span>
-          </h1>
-        ) : null}
+        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
+          <Icon aria-hidden icon={ScrollText} size={19} />
+          <span>{m.auditLogs.title}</span>
+        </h1>
         <Button
           aria-label={m.common.refresh}
           className="h-8 gap-1.5 px-2.5 text-xs"

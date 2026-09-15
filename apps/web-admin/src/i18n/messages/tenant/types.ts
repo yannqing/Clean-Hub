@@ -2247,7 +2247,6 @@ export type TenantMessages = {
         pointOfSale: string;
         printing: string;
         hardware: string;
-        activityLog: string;
       };
     };
     general: {

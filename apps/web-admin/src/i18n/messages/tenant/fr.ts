@@ -2721,7 +2721,6 @@ export const tenantMessagesFr: TenantMessages = {
         pointOfSale: "Point de vente",
         printing: "Impression",
         hardware: "Périphériques de point de vente",
-        activityLog: "Journal d'activité",
       },
     },
     general: {
