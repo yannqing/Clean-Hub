@@ -101,12 +101,6 @@ export const saasMessagesEn: SaasMessages = {
       success: "Success",
       failed: "Failed",
     },
-    auditCategoryLabels: {
-      auth: "Auth",
-      saasPlatform: "SaaS Platform",
-      saasTenant: "SaaS Tenant",
-      saasUser: "SaaS User",
-    },
   },
   overview: {
     badge: "SaaS platform",

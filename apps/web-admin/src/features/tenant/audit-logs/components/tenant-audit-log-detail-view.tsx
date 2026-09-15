@@ -6,9 +6,7 @@ import Link from "next/link";
 
 import { webAdminRoutes } from "@/config/routes";
 import { getAuditEventDescription } from "@/features/audit/event-description";
-import { useTenantI18n } from "@/i18n";
-
-import { categoryEntries } from "./tenant-audit-log-view";
+import { useTenantI18n, useWebAdminLocale } from "@/i18n";
 
 import type { TenantAuditLogDetail } from "../types";
 
@@ -24,15 +22,17 @@ export function TenantAuditLogDetailView({
 }: {
   initialLog: TenantAuditLogDetail;
 }) {
-  const { locale, m, formatDateTime } = useTenantI18n();
-  const categoryEntry = categoryEntries.find(
-    (entry) => entry.value === initialLog.eventCategory,
-  );
-  const categoryLabel = categoryEntry
-    ? m.auditLogs.categoryLabels[categoryEntry.key]
-    : initialLog.eventCategory
-        .replace(/[._]/g, " ")
-        .replace(/\b\w/g, (character) => character.toUpperCase());
+  const { m, formatDateTime } = useTenantI18n();
+  const { messages } = useWebAdminLocale();
+  const auditCopy = messages.common.auditEvents;
+  const auditCategoryCopy = messages.common.auditCategories;
+  const categoryLabel =
+    auditCategoryCopy[
+      initialLog.eventCategory as keyof typeof auditCategoryCopy
+    ] ??
+    initialLog.eventCategory
+      .replace(/[._]/g, " ")
+      .replace(/\b\w/g, (character) => character.toUpperCase());
 
   return (
     <section
@@ -40,7 +40,7 @@ export function TenantAuditLogDetailView({
       data-testid="tenant-audit-log-detail-view"
     >
       <h1 className="sr-only">
-        {getAuditEventDescription(initialLog.eventType, locale)}
+        {getAuditEventDescription(initialLog.eventType, auditCopy)}
       </h1>
       <nav aria-label={m.auditLogs.title}>
         <ol className="flex items-center gap-2 text-sm">
@@ -59,7 +59,7 @@ export function TenantAuditLogDetailView({
           </li>
           <li>
             <span aria-current="page" className="font-medium">
-              {getAuditEventDescription(initialLog.eventType, locale)}
+              {getAuditEventDescription(initialLog.eventType, auditCopy)}
             </span>
           </li>
         </ol>
@@ -72,7 +72,7 @@ export function TenantAuditLogDetailView({
               {m.auditLogs.detailLabels.event}
             </p>
             <p className="mt-1 text-sm font-medium">
-              {getAuditEventDescription(initialLog.eventType, locale)}
+              {getAuditEventDescription(initialLog.eventType, auditCopy)}
             </p>
           </div>
           <div>

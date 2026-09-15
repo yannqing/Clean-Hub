@@ -99,12 +99,6 @@ export type SaasMessages = {
       success: string;
       failed: string;
     };
-    auditCategoryLabels: {
-      auth: string;
-      saasPlatform: string;
-      saasTenant: string;
-      saasUser: string;
-    };
   };
   overview: {
     badge: string;

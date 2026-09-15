@@ -100,12 +100,6 @@ export const saasMessagesZhCN: SaasMessages = {
       success: "成功",
       failed: "失败",
     },
-    auditCategoryLabels: {
-      auth: "认证",
-      saasPlatform: "SaaS 平台",
-      saasTenant: "SaaS 租户",
-      saasUser: "SaaS 用户",
-    },
   },
   overview: {
     badge: "SaaS 平台",

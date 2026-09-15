@@ -6,7 +6,7 @@ import { ScrollText } from "lucide-react";
 import { webAdminRoutes } from "@/config/routes";
 import { getAuditEventDescription } from "@/features/audit/event-description";
 import { SaasBreadcrumbs } from "@/features/saas/shared";
-import { useSaasI18n } from "@/i18n";
+import { useSaasI18n, useWebAdminLocale } from "@/i18n";
 
 import type { AuditLogDetail } from "../types";
 
@@ -23,7 +23,12 @@ export function SaasAuditLogDetailView({
   initialLog: AuditLogDetail;
 }) {
   const { locale, m, formatDateTime } = useSaasI18n();
-  const eventLabel = getAuditEventDescription(initialLog.eventType, locale);
+  const { messages } = useWebAdminLocale();
+  const auditCategoryCopy = messages.common.auditCategories;
+  const eventLabel = getAuditEventDescription(
+    initialLog.eventType,
+    messages.common.auditEvents,
+  );
   const localCopy =
     locale === "zh-CN"
       ? {
@@ -43,15 +48,9 @@ export function SaasAuditLogDetailView({
           userAgent: "User agent",
         };
   const categoryLabel =
-    initialLog.eventCategory === "auth"
-      ? m.common.auditCategoryLabels.auth
-      : initialLog.eventCategory === "saas_platform"
-        ? m.common.auditCategoryLabels.saasPlatform
-        : initialLog.eventCategory === "saas_tenant"
-          ? m.common.auditCategoryLabels.saasTenant
-          : initialLog.eventCategory === "saas_user"
-            ? m.common.auditCategoryLabels.saasUser
-            : initialLog.eventCategory;
+    auditCategoryCopy[
+      initialLog.eventCategory as keyof typeof auditCategoryCopy
+    ] ?? initialLog.eventCategory;
 
   return (
     <section

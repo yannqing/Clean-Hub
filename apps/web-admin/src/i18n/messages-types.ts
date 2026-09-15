@@ -2,6 +2,124 @@ import type { SaasMessages } from "./messages/saas";
 import type { TenantMessages } from "./messages/tenant";
 
 /**
+ * Audit categories emitted by `apps/api`, as they appear in
+ * `audit_logs.event_category`.
+ */
+export type AuditCategoryCode =
+  | "auth"
+  | "saas_platform"
+  | "saas_tenant"
+  | "saas_user"
+  | "tenant_branch"
+  | "tenant_user"
+  | "tenant_service"
+  | "tenant_price"
+  | "tenant_hardware"
+  | "tenant_notification"
+  | "tenant_settings"
+  | "tenant_product"
+  | "tenant_customer"
+  | "tenant_order"
+  | "tenant_backup"
+  | "pos_order"
+  | "pos_service_ticket"
+  | "pos_customer"
+  | "pos_hardware"
+  | "pos_terminal_security"
+  | "pos_shift"
+  | "pos_register"
+  | "pos_notification"
+  | "pos_channel_settings";
+
+/**
+ * Audit events described to operators, as they appear in
+ * `audit_logs.event_type`.
+ *
+ * Events the API emits but that are deliberately left undescribed are absent
+ * here on purpose -- see `UNDESCRIBED_AUDIT_EVENT_TYPES`. They render as their
+ * humanised code rather than carrying a guessed meaning in an audit trail.
+ */
+export type AuditEventCode =
+  | "auth.login.success"
+  | "auth.login.failed"
+  | "auth.logout"
+  | "auth.refresh.reuse_detected"
+  | "auth.pos_pin_login.success"
+  | "auth.pos_pin_login.failed"
+  | "platform_settings.updated"
+  | "security_settings.updated"
+  | "security.settings.updated"
+  | "backup_job.created"
+  | "restore_request.created"
+  | "feedback_ticket.status_updated"
+  | "feedback_ticket.assignee_updated"
+  | "tenant.created"
+  | "tenant.updated"
+  | "tenant.status_updated"
+  | "tenant_settings.updated"
+  | "tenant_feature_flags.updated"
+  | "saas_user.created"
+  | "saas_user.updated"
+  | "saas_user.roles_updated"
+  | "saas_user.status_updated"
+  | "branch.created"
+  | "branch.updated"
+  | "branch.status_changed"
+  | "tenant_user.created"
+  | "tenant_user.updated"
+  | "tenant_user.disabled"
+  | "tenant_user.pin_reset"
+  | "tenant_user.owner_created"
+  | "service.created"
+  | "service.updated"
+  | "service.status_changed"
+  | "service.deleted"
+  | "price.created"
+  | "price.updated"
+  | "price.deleted"
+  | "tenant_hardware.created"
+  | "tenant_hardware.updated"
+  | "tenant_hardware.deleted"
+  | "notification_settings.updated"
+  | "settings.updated"
+  | "product.created"
+  | "product.updated"
+  | "tenant.customer.comment_created"
+  | "tenant.customer.comment_updated"
+  | "tenant.order.comment_created"
+  | "pos.order.created"
+  | "pos.order.item_added"
+  | "pos.order.payment_created"
+  | "pos.order.payment_refunded"
+  | "pos.order.status_changed"
+  | "pos.service_ticket.created"
+  | "pos.service_ticket.item_added"
+  | "pos.service_ticket.item_updated"
+  | "pos.service_ticket.item_status_changed"
+  | "pos.service_ticket.status_changed"
+  | "pos_customer.profile_created"
+  | "pos_customer.account_created"
+  | "pos_customer.account_status_changed"
+  | "pos_customer.account_deleted"
+  | "pos_hardware.printer.bound"
+  | "pos_hardware.print_job.printed"
+  | "pos_hardware.print_job.failed"
+  | "pos_hardware.built_in.connected"
+  | "pos_hardware.cash_payment_drawer.failed"
+  | "pos_terminal.enrolled"
+  | "pos_terminal.enabled"
+  | "pos_terminal.disabled"
+  | "pos_terminal.revoked"
+  | "pos_terminal.credential_rotated"
+  | "pos_terminal.credential_re_enrolled"
+  | "pos.shift.clock_in"
+  | "pos.shift.break_start"
+  | "pos.shift.break_end"
+  | "pos.register.opened"
+  | "pos.notification.read"
+  | "pos_channel_settings.updated";
+
+/**
  * Shape of the full web-admin message bundle (shell copy + sidebar nav data +
  * shared common copy + the saas/tenant feature catalogs).
  *
@@ -236,6 +354,15 @@ export type WebAdminMessages = {
     switchToLightTheme: string;
     signOut: string;
     signingOut: string;
+    /**
+     * Audit copy lives in the shared namespace because both consoles render the
+     * same feed: the tenant log and the SaaS log describe the same events from
+     * the same table. Keys are the raw `eventType` / `eventCategory` codes the
+     * API emits, so a missing translation is a compile error rather than a
+     * silent fallback to English.
+     */
+    auditCategories: Record<AuditCategoryCode, string>;
+    auditEvents: Record<AuditEventCode, string>;
   };
   auth: AuthCopy;
   saas: SaasMessages;

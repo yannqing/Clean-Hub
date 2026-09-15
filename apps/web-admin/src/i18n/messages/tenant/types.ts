@@ -2093,29 +2093,6 @@ export type TenantMessages = {
     allEventTypes: string;
     successLabel: string;
     failedLabel: string;
-    categoryLabels: {
-      auth: string;
-      branches: string;
-      users: string;
-      services: string;
-      products: string;
-      prices: string;
-      customers: string;
-      orders: string;
-      hardware: string;
-      notifications: string;
-      settings: string;
-      backups: string;
-      posOrders: string;
-      posServiceTickets: string;
-      posCustomers: string;
-      posHardware: string;
-      posTerminalSecurity: string;
-      posShifts: string;
-      posRegister: string;
-      posNotifications: string;
-      posChannelSettings: string;
-    };
     columns: {
       time: string;
       category: string;

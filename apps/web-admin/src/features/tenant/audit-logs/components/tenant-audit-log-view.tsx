@@ -37,7 +37,7 @@ import { useRouter } from "next/navigation";
 import { Pagination } from "@/components/pagination";
 import { webAdminRoutes } from "@/config/routes";
 import { getAuditEventDescription, getAuditEventTypesByCategory } from "@/features/audit/event-description";
-import { useTenantI18n } from "@/i18n";
+import { useTenantI18n, useWebAdminLocale } from "@/i18n";
 
 import {
   getTenantAuditLogListQuery,
@@ -101,7 +101,12 @@ function getStatusVariant(success: boolean): "default" | "destructive" {
 }
 
 export function TenantAuditLogView() {
-  const { locale, m, formatDateTime, timeZone } = useTenantI18n();
+  const { m, formatDateTime, timeZone } = useTenantI18n();
+  // Audit copy is shared between both consoles, so it lives in the top-level
+  // `common` namespace rather than either feature catalogue.
+  const { messages } = useWebAdminLocale();
+  const auditCopy = messages.common.auditEvents;
+  const auditCategoryCopy = messages.common.auditCategories;
   const router = useRouter();
   const [logs, setLogs] = useState<TenantAuditLogSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -169,24 +174,21 @@ export function TenantAuditLogView() {
   }, [filters, m.auditLogs.requestFailed]);
 
   const getCategoryLabel = useCallback(
-    (value: string): string => {
-      const entry = categoryEntries.find((option) => option.value === value);
-      // A category with no label is still readable as words rather than as the
-      // raw `pos_terminal_security` code the API sends.
-      return entry
-        ? m.auditLogs.categoryLabels[entry.key]
-        : value.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-    },
-    [m.auditLogs.categoryLabels],
+    (value: string): string =>
+      // A category the catalogue does not know is still readable as words
+      // rather than as the raw `pos_terminal_security` code the API sends.
+      auditCategoryCopy[value as keyof typeof auditCategoryCopy] ??
+      value.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    [auditCategoryCopy],
   );
 
   const eventTypeOptions = useMemo(
     () =>
       getAuditEventTypesByCategory(
         category === "all" ? undefined : category,
-        locale,
+        auditCopy,
       ),
-    [category, locale],
+    [category, auditCopy],
   );
 
   function resetToFirstPage() {
@@ -245,7 +247,7 @@ export function TenantAuditLogView() {
               <SelectItem value="all">{m.auditLogs.allCategories}</SelectItem>
               {categoryEntries.map((entry) => (
                 <SelectItem key={entry.value} value={entry.value}>
-                  {m.auditLogs.categoryLabels[entry.key]}
+                  {getCategoryLabel(entry.value)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -416,7 +418,7 @@ export function TenantAuditLogView() {
                     <TableCell>{formatDateTime(log.createdAt)}</TableCell>
                     <TableCell>{getCategoryLabel(log.eventCategory)}</TableCell>
                     <TableCell>
-                      {getAuditEventDescription(log.eventType, locale)}
+                      {getAuditEventDescription(log.eventType, auditCopy)}
                     </TableCell>
                     <TableCell>
                       {/* A sign-in has no entity by nature -- the person is the

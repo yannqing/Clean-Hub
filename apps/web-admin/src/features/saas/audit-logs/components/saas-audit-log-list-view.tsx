@@ -29,7 +29,7 @@ import {
   SaasTableSurface,
   saasCompactTableClassName,
 } from "@/features/saas/shared";
-import { useSaasI18n } from "@/i18n";
+import { useSaasI18n, useWebAdminLocale } from "@/i18n";
 import {
   getAuditEventDescription,
   getAuditEventTypesByCategory,
@@ -51,6 +51,10 @@ function getErrorMessage(error: unknown): string {
 export function SaasAuditLogListView() {
   const router = useRouter();
   const { locale, m, formatDateTime } = useSaasI18n();
+  // Shared with the tenant console: both render the same audit feed.
+  const { messages } = useWebAdminLocale();
+  const auditCopy = messages.common.auditEvents;
+  const auditCategoryCopy = messages.common.auditCategories;
   const [logs, setLogs] = useState<AuditLogSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -97,8 +101,8 @@ export function SaasAuditLogListView() {
   // category's events; "all" exposes every known event type.
   const eventTypeOptions = useMemo(
     () =>
-      getAuditEventTypesByCategory(eventCategory.trim() || undefined, locale),
-    [eventCategory, locale],
+      getAuditEventTypesByCategory(eventCategory.trim() || undefined, auditCopy),
+    [eventCategory, auditCopy],
   );
 
   const loadLogs = useCallback(async () => {
@@ -192,13 +196,9 @@ export function SaasAuditLogListView() {
               <SelectItem value="all">{m.common.allCategories}</SelectItem>
               {auditEventCategoryOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
-                  {option.value === "auth"
-                    ? m.common.auditCategoryLabels.auth
-                    : option.value === "saas_platform"
-                      ? m.common.auditCategoryLabels.saasPlatform
-                      : option.value === "saas_tenant"
-                        ? m.common.auditCategoryLabels.saasTenant
-                        : m.common.auditCategoryLabels.saasUser}
+                  {auditCategoryCopy[
+                    option.value as keyof typeof auditCategoryCopy
+                  ] ?? option.value}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -368,15 +368,9 @@ export function SaasAuditLogListView() {
                       {formatDateTime(log.createdAt) || m.common.invalidDate}
                     </TableCell>
                     <TableCell>
-                      {log.eventCategory === "auth"
-                        ? m.common.auditCategoryLabels.auth
-                        : log.eventCategory === "saas_platform"
-                          ? m.common.auditCategoryLabels.saasPlatform
-                          : log.eventCategory === "saas_tenant"
-                            ? m.common.auditCategoryLabels.saasTenant
-                            : log.eventCategory === "saas_user"
-                              ? m.common.auditCategoryLabels.saasUser
-                              : log.eventCategory}
+                      {auditCategoryCopy[
+                        log.eventCategory as keyof typeof auditCategoryCopy
+                      ] ?? log.eventCategory}
                     </TableCell>
                     <TableCell>
                       <Link
@@ -387,7 +381,7 @@ export function SaasAuditLogListView() {
                           router.prefetch(webAdminRoutes.saas.auditLog(log.id))
                         }
                       >
-                        {getAuditEventDescription(log.eventType, locale)}
+                        {getAuditEventDescription(log.eventType, auditCopy)}
                       </Link>
                     </TableCell>
                     <TableCell>{log.entityType ?? m.common.notSet}</TableCell>
