@@ -133,7 +133,7 @@ export function SettingsMobileIndex({
   return (
     <section
       aria-busy={loading}
-      className="mx-auto w-full max-w-lg space-y-9 pb-8 lg:hidden"
+      className="mx-auto w-full max-w-lg space-y-9 pb-8 lg:max-w-[720px]"
     >
       <header className="pt-1">
         <h1 className="text-3xl font-bold tracking-tight text-foreground">

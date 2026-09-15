@@ -28,7 +28,7 @@ import {
 } from "./terminal-settings-card";
 
 export type SettingsSection =
-  | Exclude<TerminalSettingsMode, "all">
+  | TerminalSettingsMode
   | "store"
   | "hardware";
 
@@ -268,24 +268,16 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
     );
   }
 
+  // The index is a way in, not a form. It used to render every terminal field
+  // on desktop, which repeated whole-for-whole what the four section routes
+  // already edit -- two places to change the same setting, and no sign which
+  // one had been saved. Mobile was always a list; desktop now matches.
   return (
-    <>
-      <SettingsMobileIndex
-        branchName={branchInfo?.name ?? ""}
-        formValues={formValues}
-        hardwareCount={hardwareDevices.length}
-        loading={isLoading || hardwareLoading}
-      />
-
-      <section className="hidden pb-8 lg:block">
-        <TerminalSettingsCard
-          key={`terminal-${terminalSettings?.version ?? "new"}-${isLoading}`}
-          initial={formValues}
-          loading={isLoading}
-          saving={saving}
-          onSave={handleSave}
-        />
-      </section>
-    </>
+    <SettingsMobileIndex
+      branchName={branchInfo?.name ?? ""}
+      formValues={formValues}
+      hardwareCount={hardwareDevices.length}
+      loading={isLoading || hardwareLoading}
+    />
   );
 }

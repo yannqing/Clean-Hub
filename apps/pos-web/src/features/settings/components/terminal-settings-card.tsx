@@ -27,13 +27,17 @@ import type { TerminalSettingsFormValues } from "../types";
 type TerminalSettingsCardProps = {
   initial: TerminalSettingsFormValues;
   loading: boolean;
-  mode?: TerminalSettingsMode;
+  mode: TerminalSettingsMode;
   saving: boolean;
   onSave: (values: TerminalSettingsFormValues) => void;
 };
 
+/**
+ * Each section route edits one slice of the terminal settings. There is no
+ * "all" mode: the settings index is a list of entry points, so a card showing
+ * every field would duplicate what those routes already own.
+ */
 export type TerminalSettingsMode =
-  | "all"
   | "terminal"
   | "checkout"
   | "printing"
@@ -43,11 +47,6 @@ const MODE_COPY: Record<
   TerminalSettingsMode,
   { description: string; icon: PosIconName; title: string }
 > = {
-  all: {
-    description: "配置当前终端的收银偏好、打印和锁屏策略。",
-    icon: "settings",
-    title: "终端设置",
-  },
   terminal: {
     description: "设置当前收银终端在设备列表中显示的名称。",
     icon: "monitor",
@@ -110,7 +109,7 @@ function MobileSettingSwitch({
 export function TerminalSettingsCard({
   initial,
   loading,
-  mode = "all",
+  mode,
   saving,
   onSave,
 }: TerminalSettingsCardProps) {
@@ -180,7 +179,7 @@ export function TerminalSettingsCard({
       <form onSubmit={handleSubmit}>
         <div className="space-y-7 lg:space-y-5 lg:p-4">
           {/* 设备标签 */}
-          {mode === "all" || mode === "terminal" ? (
+          {mode === "terminal" ? (
             <div className="space-y-1.5 py-2 lg:py-0">
               <Label
                 className="text-base font-medium lg:text-sm"
@@ -203,7 +202,7 @@ export function TerminalSettingsCard({
           ) : null}
 
           {/* 支付与现金策略（门店级，只读） */}
-          {mode === "all" || mode === "checkout" ? (
+          {mode === "checkout" ? (
             <div className="space-y-2 py-2 lg:py-0">
               <Label className="text-base font-medium lg:text-sm">
                 支付与现金策略
@@ -230,7 +229,7 @@ export function TerminalSettingsCard({
           ) : null}
 
           {/* 抹零规则 */}
-          {mode === "all" || mode === "checkout" ? (
+          {mode === "checkout" ? (
             <div className="space-y-1.5 py-2 lg:py-0">
               <Label className="text-base font-medium lg:text-sm">
                 抹零规则
@@ -259,7 +258,7 @@ export function TerminalSettingsCard({
           ) : null}
 
           {/* 自动打印收据 */}
-          {mode === "all" || mode === "printing" ? (
+          {mode === "printing" ? (
             <>
               <MobileSettingSwitch
                 checked={form.autoPrintReceipt}
@@ -284,7 +283,7 @@ export function TerminalSettingsCard({
           ) : null}
 
           {/* 打印联数 */}
-          {mode === "all" || mode === "printing" ? (
+          {mode === "printing" ? (
             <div className="space-y-1.5 py-2 lg:py-0">
               <Label className="text-base font-medium lg:text-sm">
                 打印联数
@@ -310,7 +309,7 @@ export function TerminalSettingsCard({
           ) : null}
 
           {/* 锁屏超时 */}
-          {mode === "all" || mode === "security" ? (
+          {mode === "security" ? (
             <div className="space-y-1.5 py-2 lg:py-0">
               <Label className="text-base font-medium lg:text-sm">
                 自动锁屏
