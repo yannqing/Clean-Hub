@@ -47,28 +47,40 @@ import type {
   TenantAuditLogSummary,
 } from "../types";
 
-type CategoryFilter =
-  | "all"
-  | "tenant_branch"
-  | "tenant_user"
-  | "tenant_service"
-  | "tenant_price"
-  | "tenant_hardware"
-  | "tenant_notification"
-  | "tenant_settings"
-  | "tenant_backup";
 type SuccessFilter = "all" | "true" | "false";
 
-const categoryEntries = [
+/**
+ * Every category the tenant audit feed can contain.
+ *
+ * The filter used to offer eight, while the API returns seventeen -- so the
+ * busiest categories (sign-ins, orders, tickets, terminals) could not be
+ * filtered at all and rendered their raw code in the table.
+ */
+export const categoryEntries = [
+  { key: "auth", value: "auth" },
   { key: "branches", value: "tenant_branch" },
   { key: "users", value: "tenant_user" },
   { key: "services", value: "tenant_service" },
+  { key: "products", value: "tenant_product" },
   { key: "prices", value: "tenant_price" },
+  { key: "customers", value: "tenant_customer" },
+  { key: "orders", value: "tenant_order" },
   { key: "hardware", value: "tenant_hardware" },
   { key: "notifications", value: "tenant_notification" },
   { key: "settings", value: "tenant_settings" },
   { key: "backups", value: "tenant_backup" },
+  { key: "posOrders", value: "pos_order" },
+  { key: "posServiceTickets", value: "pos_service_ticket" },
+  { key: "posCustomers", value: "pos_customer" },
+  { key: "posHardware", value: "pos_hardware" },
+  { key: "posTerminalSecurity", value: "pos_terminal_security" },
+  { key: "posShifts", value: "pos_shift" },
+  { key: "posRegister", value: "pos_register" },
+  { key: "posNotifications", value: "pos_notification" },
+  { key: "posChannelSettings", value: "pos_channel_settings" },
 ] as const;
+
+type CategoryFilter = "all" | (typeof categoryEntries)[number]["value"];
 
 const TENANT_AUDIT_LOG_PAGE_SIZE = 10;
 
@@ -89,7 +101,7 @@ function getStatusVariant(success: boolean): "default" | "destructive" {
 }
 
 export function TenantAuditLogView() {
-  const { m, formatDateTime, timeZone } = useTenantI18n();
+  const { locale, m, formatDateTime, timeZone } = useTenantI18n();
   const router = useRouter();
   const [logs, setLogs] = useState<TenantAuditLogSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -159,16 +171,22 @@ export function TenantAuditLogView() {
   const getCategoryLabel = useCallback(
     (value: string): string => {
       const entry = categoryEntries.find((option) => option.value === value);
+      // A category with no label is still readable as words rather than as the
+      // raw `pos_terminal_security` code the API sends.
       return entry
         ? m.auditLogs.categoryLabels[entry.key]
-        : value;
+        : value.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     },
     [m.auditLogs.categoryLabels],
   );
 
   const eventTypeOptions = useMemo(
-    () => getAuditEventTypesByCategory(category === "all" ? undefined : category),
-    [category],
+    () =>
+      getAuditEventTypesByCategory(
+        category === "all" ? undefined : category,
+        locale,
+      ),
+    [category, locale],
   );
 
   function resetToFirstPage() {
@@ -397,7 +415,9 @@ export function TenantAuditLogView() {
                   >
                     <TableCell>{formatDateTime(log.createdAt)}</TableCell>
                     <TableCell>{getCategoryLabel(log.eventCategory)}</TableCell>
-                    <TableCell>{getAuditEventDescription(log.eventType)}</TableCell>
+                    <TableCell>
+                      {getAuditEventDescription(log.eventType, locale)}
+                    </TableCell>
                     <TableCell>
                       <div>{log.entityType ?? m.auditLogs.placeholders.unknownEntity}</div>
                       <div className="text-[11px] text-muted-foreground">
