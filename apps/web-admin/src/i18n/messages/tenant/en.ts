@@ -2540,6 +2540,7 @@ export const tenantMessagesEn: TenantMessages = {
     placeholders: {
       unknownEntity: "Unknown",
       noEntity: "No entity",
+      entityNotApplicable: "—",
       systemActor: "System",
       noIp: "No IP",
     },

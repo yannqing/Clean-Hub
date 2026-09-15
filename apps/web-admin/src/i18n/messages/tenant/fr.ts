@@ -2587,6 +2587,7 @@ export const tenantMessagesFr: TenantMessages = {
     placeholders: {
       unknownEntity: "Inconnu",
       noEntity: "Aucune entité",
+      entityNotApplicable: "—",
       systemActor: "Système",
       noIp: "Pas d'adresse IP",
     },

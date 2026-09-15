@@ -419,10 +419,24 @@ export function TenantAuditLogView() {
                       {getAuditEventDescription(log.eventType, locale)}
                     </TableCell>
                     <TableCell>
-                      <div>{log.entityType ?? m.auditLogs.placeholders.unknownEntity}</div>
-                      <div className="text-[11px] text-muted-foreground">
-                        {log.entityId ?? m.auditLogs.placeholders.noEntity}
-                      </div>
+                      {/* A sign-in has no entity by nature -- the person is the
+                          actor, not the subject. Showing "unknown" there reads
+                          as a failed lookup rather than "does not apply". */}
+                      {log.entityType || log.entityId ? (
+                        <>
+                          <div>
+                            {log.entityType ??
+                              m.auditLogs.placeholders.unknownEntity}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            {log.entityId ?? m.auditLogs.placeholders.noEntity}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-muted-foreground">
+                          {m.auditLogs.placeholders.entityNotApplicable}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div>

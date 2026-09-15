@@ -2128,6 +2128,8 @@ export type TenantMessages = {
     placeholders: {
       unknownEntity: string;
       noEntity: string;
+      /** Shown when an event has no entity by nature, such as a sign-in. */
+      entityNotApplicable: string;
       systemActor: string;
       noIp: string;
     };

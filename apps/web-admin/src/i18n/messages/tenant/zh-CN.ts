@@ -2398,6 +2398,7 @@ export const tenantMessagesZhCN: TenantMessages = {
     placeholders: {
       unknownEntity: "未知",
       noEntity: "无实体",
+      entityNotApplicable: "—",
       systemActor: "系统",
       noIp: "无 IP",
     },
