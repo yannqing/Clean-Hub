@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MAX_POS_PRINT_COPIES } from "@cleanhub/hardware";
+
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
 const posRoundingRuleSchema = z.enum(["none", "round_yuan", "round_jiao"]);
@@ -10,7 +12,12 @@ export const createTerminalSettingsBodySchema = z.object({
   label: z.string().trim().max(64).optional(),
   roundingRule: posRoundingRuleSchema.optional(),
   autoPrintReceipt: z.boolean().optional(),
-  printCopies: z.coerce.number().int().min(1).max(10).optional(),
+  printCopies: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_POS_PRINT_COPIES)
+    .optional(),
   lockTimeoutSeconds: z.coerce.number().int().min(30).max(86400).optional(),
 });
 
@@ -19,7 +26,12 @@ export const updateTerminalSettingsBodySchema = z
     label: z.string().trim().max(64).optional(),
     roundingRule: posRoundingRuleSchema.optional(),
     autoPrintReceipt: z.boolean().optional(),
-    printCopies: z.coerce.number().int().min(1).max(10).optional(),
+    printCopies: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_POS_PRINT_COPIES)
+      .optional(),
     lockTimeoutSeconds: z.coerce.number().int().min(30).max(86400).optional(),
   })
   .strict()

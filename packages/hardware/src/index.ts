@@ -53,6 +53,15 @@ export type PosPrinterDevice = {
 
 export type PosPrintJobStatus = "pending" | "printing" | "printed" | "failed";
 
+/**
+ * Most copies a single print request may ask for.
+ *
+ * Matched to the native POS host's own limit: it rejects anything larger at
+ * print time, so accepting a bigger number anywhere upstream would only save
+ * a setting that fails at the counter, long after the operator left the page.
+ */
+export const MAX_POS_PRINT_COPIES = 5;
+
 export type PosPrintRequest = PrintJob & {
   title?: string;
   copies?: number;

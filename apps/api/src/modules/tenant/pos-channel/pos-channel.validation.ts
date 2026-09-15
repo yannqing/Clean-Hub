@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MAX_POS_PRINT_COPIES } from "@cleanhub/hardware";
+
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
@@ -155,7 +157,12 @@ export const updatePosChannelSettingsBodySchema = z
       .union([z.string().trim().max(200), z.null()])
       .optional(),
     defaultAutoPrintReceipt: z.boolean().optional(),
-    defaultPrintCopies: z.coerce.number().int().min(1).max(10).optional(),
+    defaultPrintCopies: z.coerce
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_POS_PRINT_COPIES)
+      .optional(),
     defaultLockTimeoutSeconds: z.coerce
       .number()
       .int()
