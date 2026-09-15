@@ -143,6 +143,51 @@ export function PosShell({
     contentScrollRef.current?.scrollTo({ left: 0, top: 0 });
   }, [pathname]);
 
+  // Settings is a workspace, not a page inside the till: it brings its own
+  // navigation, so rendering it inside the shell put two sidebars side by side
+  // and left the cashier unsure which one they were in. Mirrors how the tenant
+  // console drops its dashboard chrome on the settings routes.
+  //
+  // The mobile bottom bar stays: on a phone it is how settings was reached and
+  // how the cashier gets back out, and the shell's sidebar is hidden there
+  // anyway, so it was never part of the problem.
+  if (settingsActive) {
+    return (
+      <div className="flex h-screen h-dvh min-h-0 flex-col overflow-hidden bg-[#f1f1f1] pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] text-foreground">
+        <div className="relative z-50 hidden shrink-0 bg-black pt-[env(safe-area-inset-top)] lg:block">
+          <PosGlobalHeader
+            canReprint={canReprint}
+            displayInitials={displayInitials}
+            merchantName={merchantName}
+            notificationUnreadCount={currentUnreadCount}
+            onUnreadCountChange={setCurrentUnreadCount}
+            pendingPrintTaskCount={pendingPrintTaskCount}
+            profileName={profileName}
+            roleLabel={roleLabel}
+            syncingPrintTaskCount={syncingPrintTaskCount}
+          />
+        </div>
+
+        <main
+          className="pos-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-[env(safe-area-inset-top)] lg:pt-0"
+          ref={contentScrollRef}
+        >
+          {children}
+        </main>
+
+        <PosMobileNavigation
+          activePathname={activePathname}
+          branchName={branchName}
+          hasNotificationAttention={
+            currentUnreadCount > 0 || hasPrintTaskAttention
+          }
+          profileName={profileName}
+          settingsActive={settingsActive}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen h-dvh min-h-0 flex-col overflow-hidden bg-muted/30 pr-[env(safe-area-inset-right)] pl-[env(safe-area-inset-left)] text-foreground">
       <div className="relative z-50 hidden shrink-0 bg-black pt-[env(safe-area-inset-top)] lg:block">
