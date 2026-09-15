@@ -60,8 +60,9 @@ export default async function PosLayout({
       merchantName={branch?.merchantName}
       branchName={branch?.name}
       receiptName={branch?.receiptName}
-      receiptPhone={branch?.receiptPhone}
-      receiptAddress={branch?.receiptAddress}
+      receiptPhone={branch?.receiptPhone || branch?.phone}
+      receiptAddress={branch?.receiptAddress || branch?.address}
+      receiptThankYouMessage={branch?.receiptThankYouMessage}
       receiptFields={branch?.receiptFields}
       ticketLabelFields={branch?.ticketLabelFields}
       operatorName={user?.displayName}

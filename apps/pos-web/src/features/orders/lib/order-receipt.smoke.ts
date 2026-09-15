@@ -6,12 +6,43 @@ import type {
   PosPaymentTransaction,
 } from "@cleanhub/api-client";
 import { buildPosReceiptText } from "@cleanhub/hardware";
+import {
+  formatPosOrderQrPayload,
+  parsePosOrderQrPayload,
+} from "@cleanhub/domain/order-codes";
 
 import { buildPosOrderReceipt, getPosReceiptCopy } from "./order-receipt";
+import { formatOrderItemMeasurement } from "./order-measurement";
 
 assert.equal(getPosReceiptCopy("en").paymentMethods.cash, "Cash");
 assert.equal(getPosReceiptCopy("fr").paymentMethods.cash, "Espèces");
 assert.equal(getPosReceiptCopy("zh-CN").paymentMethods.cash, "现金");
+assert.equal(
+  formatOrderItemMeasurement(
+    {
+      bagCount: null,
+      pricingUnit: "per_item",
+      quantity: "2.000",
+      unitOfMeasure: "piece",
+      weight: null,
+    },
+    "zh-CN",
+  ),
+  "2 件",
+);
+assert.equal(
+  formatOrderItemMeasurement(
+    {
+      bagCount: 2,
+      pricingUnit: "per_kg",
+      quantity: "1.000",
+      unitOfMeasure: null,
+      weight: "1.250",
+    },
+    "zh-CN",
+  ),
+  "1.25 kg · 2 袋",
+);
 
 const content = buildPosReceiptText(
   {
@@ -41,12 +72,28 @@ assert.doesNotMatch(content, /ORDER-1/);
 
 const integratedReceipt = buildPosOrderReceipt({
   branch: {
+    address: "12 Dakar Avenue",
     merchantName: "CleanHub Merchant",
     name: "Dakar Branch",
+    phone: "+221 33 000 00 00",
     receiptName: null,
     receiptAddress: null,
     receiptPhone: null,
-    receiptFields: ["merchant_name", "branch_name", "payment_method"],
+    receiptThankYouMessage: "Please visit again",
+    receiptFields: [
+      "merchant_name",
+      "branch_name",
+      "payment_method",
+      "receipt_address",
+      "receipt_phone",
+      "discount",
+      "taxable_amount",
+      "tax",
+      "tax_exemption_reason",
+      "rounding",
+      "thank_you_message",
+      "order_qr_code",
+    ],
   } as PosBranchSummary,
   locale: "en",
   order: {
@@ -83,7 +130,28 @@ const integratedReceipt = buildPosOrderReceipt({
 assert.match(integratedReceipt.content, /CleanHub Merchant/);
 assert.match(integratedReceipt.content, /Dakar Branch/);
 assert.match(integratedReceipt.content, /Payment: Cash/);
+assert.match(integratedReceipt.content, /Discount:/);
+assert.match(integratedReceipt.content, /Taxable:/);
+assert.match(integratedReceipt.content, /VAT 0%:/);
+assert.match(integratedReceipt.content, /Tax exemption: N\/A/);
+assert.match(integratedReceipt.content, /Rounding:/);
+assert.match(integratedReceipt.content, /12 Dakar Avenue/);
+assert.match(integratedReceipt.content, /\+221 33 000 00 00/);
+assert.match(integratedReceipt.content, /Please visit again/);
 assert.doesNotMatch(integratedReceipt.content, /现金/);
+assert.equal(
+  integratedReceipt.qrCodeContent,
+  "CH1:ORDER:01M2F4J4P3V3V3V3V3V3V3V3V3",
+);
+assert.equal(
+  parsePosOrderQrPayload(integratedReceipt.qrCodeContent ?? ""),
+  "01M2F4J4P3V3V3V3V3V3V3V3V3",
+);
+assert.equal(
+  formatPosOrderQrPayload("01m2f4j4p3v3v3v3v3v3v3v3v3"),
+  integratedReceipt.qrCodeContent,
+);
+assert.equal(parsePosOrderQrPayload("https://example.com/orders/1"), null);
 
 // The customer brings this slip back to collect their garments, so every line
 // has to name the ticket and tag it belongs to, and the slip has to say when
@@ -138,6 +206,7 @@ const pickupReceipt = buildPosOrderReceipt({
       {
         ticketId: "01ARZ3NDEKTSV4RRFFQ69G5FB4",
         ticketNo: "TK-100",
+        ticketStatus: "picked_up",
         remark: null,
         priority: "normal",
         expectedPickupAt: "2026-09-12T09:00:00.000Z",
@@ -148,6 +217,7 @@ const pickupReceipt = buildPosOrderReceipt({
       {
         ticketId: "01ARZ3NDEKTSV4RRFFQ69G5FC0",
         ticketNo: "TK-101",
+        ticketStatus: "ready_to_pick",
         remark: null,
         priority: "urgent",
         expectedPickupAt: "2026-09-11T09:00:00.000Z",
@@ -178,6 +248,11 @@ assert.match(
   pickupReceipt.content,
   /Ticket: TK-100/,
   "a receipt line must name the ticket its garment belongs to",
+);
+assert.equal(
+  pickupReceipt.qrCodeContent,
+  undefined,
+  "the receipt QR must remain opt-in per branch",
 );
 assert.match(
   pickupReceipt.content,

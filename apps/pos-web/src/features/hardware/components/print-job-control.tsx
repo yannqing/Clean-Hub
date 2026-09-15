@@ -7,12 +7,14 @@ import {
   type PersistentPrintJob,
 } from "@cleanhub/offline";
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  Textarea,
 } from "@cleanhub/ui";
 import {
   useCallback,
@@ -49,6 +51,7 @@ type PrintJobControlProps = {
   documentType: PosPrintDocumentType;
   entityId: string;
   initialLabel: string;
+  qrCodeContent?: string;
   title: string;
 };
 
@@ -69,6 +72,7 @@ export function PrintJobControl({
   documentType,
   entityId,
   initialLabel,
+  qrCodeContent,
   title,
 }: PrintJobControlProps) {
   const { tenantId, branchId, terminalId } = usePosRuntimeConfig();
@@ -272,6 +276,7 @@ export function PrintJobControl({
         entityId,
         title,
         content,
+        qrCodeContent,
         autoPrint: true,
         printerId,
       },
@@ -306,6 +311,7 @@ export function PrintJobControl({
           entityId,
           title,
           content,
+          qrCodeContent,
           autoPrint: true,
           printerId,
           authorizationId: authorization.authorizationId,
@@ -353,8 +359,8 @@ export function PrintJobControl({
 
   return (
     <div className="min-w-0">
-      <button
-        className="flex h-11 items-center gap-2 rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      <Button
+        className="h-11"
         disabled={
           busy ||
           !queue ||
@@ -375,10 +381,11 @@ export function PrintJobControl({
           }
         }}
         type="button"
+        variant="outline"
       >
         <Icon className="h-4 w-4" name="printer" />
         {buttonLabel}
-      </button>
+      </Button>
 
       {latestJob ? (
         <p className={`mt-1 max-w-64 text-xs ${statusTone}`} role="status">
@@ -413,8 +420,8 @@ export function PrintJobControl({
           </DialogHeader>
           <label className="grid gap-2 text-sm font-medium text-foreground">
             重打原因
-            <textarea
-              className="min-h-24 rounded-lg border border-border bg-background px-3 py-2 font-normal text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-ring focus:ring-2 focus:ring-ring/20"
+            <Textarea
+              className="min-h-24"
               disabled={busy}
               maxLength={500}
               onChange={(event) => setReprintReason(event.target.value)}
@@ -423,23 +430,24 @@ export function PrintJobControl({
             />
           </label>
           <DialogFooter>
-            <button
-              className="h-10 rounded-lg border border-border bg-background px-4 text-sm font-semibold text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
+            <Button
+              className="h-10"
               disabled={busy}
               onClick={() => setReprintOpen(false)}
               type="button"
+              variant="outline"
             >
               返回
-            </button>
-            <button
-              className="flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+            </Button>
+            <Button
+              className="h-10"
               disabled={busy || !reprintReason.trim()}
               onClick={() => void authorizeAndReprint()}
               type="button"
             >
               <Icon className="h-4 w-4" name="printer" />
               {busy ? "授权中" : "授权并重打"}
-            </button>
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

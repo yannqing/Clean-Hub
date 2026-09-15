@@ -23,6 +23,7 @@ export type BranchPrintingSettingsInput = {
   receiptName: string;
   receiptPhone: string;
   receiptAddress: string;
+  receiptThankYouMessage: string;
   receiptFields: PosReceiptField[];
   ticketLabelFields: PosTicketLabelField[];
 };
@@ -78,14 +79,19 @@ export async function updateBranchPrintingSettingsAction(
     };
   }
 
-  if (!input.branchId || !Number.isInteger(input.version) || input.version < 1) {
+  if (
+    !input.branchId ||
+    !Number.isInteger(input.version) ||
+    input.version < 1
+  ) {
     return { ok: false, message: "Choose a valid branch and try again." };
   }
 
   if (
     input.receiptName.trim().length > 200 ||
     input.receiptPhone.trim().length > 32 ||
-    input.receiptAddress.trim().length > 500
+    input.receiptAddress.trim().length > 500 ||
+    input.receiptThankYouMessage.trim().length > 500
   ) {
     return { ok: false, message: "Check the receipt contact information." };
   }
@@ -112,6 +118,7 @@ export async function updateBranchPrintingSettingsAction(
         receiptName: input.receiptName.trim() || null,
         receiptPhone: input.receiptPhone.trim() || null,
         receiptAddress: input.receiptAddress.trim() || null,
+        receiptThankYouMessage: input.receiptThankYouMessage.trim() || null,
         receiptFields: Array.from(new Set(input.receiptFields)),
         ticketLabelFields: Array.from(new Set(input.ticketLabelFields)),
         version: input.version,

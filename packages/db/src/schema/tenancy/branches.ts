@@ -24,10 +24,7 @@ import {
 
 import { ulidColumn, ulidPrimaryKey } from "../id.js";
 import { users } from "../identity/users.js";
-import {
-  posCashHandlingModeEnum,
-  posPaymentMethodEnum,
-} from "./pos-enums.js";
+import { posCashHandlingModeEnum, posPaymentMethodEnum } from "./pos-enums.js";
 import { tenants } from "./tenants.js";
 
 export const branchStatusEnum = pgEnum("branch_status", ["active", "inactive"]);
@@ -58,6 +55,7 @@ export const branches = pgTable(
     receiptName: varchar("receipt_name", { length: 200 }),
     receiptPhone: varchar("receipt_phone", { length: 32 }),
     receiptAddress: text("receipt_address"),
+    receiptThankYouMessage: text("receipt_thank_you_message"),
     receiptFields: text("receipt_fields")
       .array()
       .$type<PosReceiptField[]>()

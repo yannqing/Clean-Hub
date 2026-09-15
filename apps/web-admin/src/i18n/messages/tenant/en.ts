@@ -1810,6 +1810,11 @@ export const tenantMessagesEn: TenantMessages = {
       unbound: "Connect at POS",
       posChecksConnection: "The store POS checks the live connection",
     },
+    provisioning: {
+      builtIn: "Built-in",
+      builtInReadonly:
+        "This device was discovered by the POS terminal. Its lifecycle is managed on that terminal and it cannot be edited or deleted here.",
+    },
     create: {
       title: "Add POS peripheral",
       description: "Bind a printer, scanner, or cash drawer to a POS terminal.",
@@ -1852,6 +1857,7 @@ export const tenantMessagesEn: TenantMessages = {
     },
     actions: {
       edit: "Edit",
+      view: "View",
       delete: "Delete",
     },
     requestFailed: "An unexpected error occurred.",
@@ -2693,8 +2699,7 @@ export const tenantMessagesEn: TenantMessages = {
         pricing: "Maintain service and product prices.",
         payments:
           "Connect and verify Wave or Orange Money for POS mobile payments.",
-        cash:
-          "Choose how each branch counts cash and who is responsible for it.",
+        cash: "Choose how each branch counts cash and who is responsible for it.",
         pointOfSale:
           "Configure terminals, register sessions, and offline behavior.",
         printing:

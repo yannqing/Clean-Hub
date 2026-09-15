@@ -1708,6 +1708,11 @@ export const tenantMessagesZhCN: TenantMessages = {
       unbound: "待 POS 连接",
       posChecksConnection: "实际在线状态由门店 POS 检测",
     },
+    provisioning: {
+      builtIn: "内置设备",
+      builtInReadonly:
+        "此设备由 POS 终端自动发现，设备生命周期由该终端管理，不能在管理后台编辑或删除。",
+    },
     create: {
       title: "添加 POS 外设",
       description: "将打印机、扫码枪或钱箱绑定到一个收银终端。",
@@ -1749,6 +1754,7 @@ export const tenantMessagesZhCN: TenantMessages = {
     },
     actions: {
       edit: "编辑",
+      view: "查看",
       delete: "删除",
     },
     requestFailed: "发生了意外错误。",
@@ -1967,7 +1973,8 @@ export const tenantMessagesZhCN: TenantMessages = {
     },
     registerSessions: {
       title: "收银台会话",
-      description: "查看终端销售窗口、已结算销售额、现金盘点和 Z Report；员工考勤单独管理。",
+      description:
+        "查看终端销售窗口、已结算销售额、现金盘点和 Z Report；员工考勤单独管理。",
       exportCsv: "导出当前页",
       metrics: {
         total: "会话数",

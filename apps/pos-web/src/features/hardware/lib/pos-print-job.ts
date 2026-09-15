@@ -20,6 +20,7 @@ export type PosPrintJobPayload = {
   entityId: string;
   title: string;
   content: string;
+  qrCodeContent?: string;
   /** Resume after restart only when physical printing was explicitly requested. */
   autoPrint?: boolean;
   copies?: number;
@@ -109,6 +110,7 @@ export async function executePosPrintJob(
     title: job.payload.title,
     content: job.payload.content,
     copies: job.payload.copies,
+    qrCodeContent: job.payload.qrCodeContent,
   };
   const result = await hardware.print(request);
   if (result.jobId !== job.id) {

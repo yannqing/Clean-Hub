@@ -4,9 +4,13 @@ import type {
   PosPaymentTransaction,
 } from "@cleanhub/api-client";
 import { buildPosReceiptText, type PrintLocale } from "@cleanhub/hardware";
-import { formatPosOrderCode } from "@cleanhub/domain/order-codes";
+import {
+  formatPosOrderCode,
+  formatPosOrderQrPayload,
+} from "@cleanhub/domain/order-codes";
 
 import { MOBILE_MONEY_PROVIDER_LABELS } from "../constants";
+import { formatOrderItemMeasurement } from "./order-measurement";
 
 export function buildPosOrderReceipt(input: {
   branch: PosBranchSummary | null;
@@ -15,7 +19,7 @@ export function buildPosOrderReceipt(input: {
   payments: PosPaymentTransaction[];
   operatorName?: string | null;
   terminalName?: string | null;
-}): { content: string; title: string } {
+}): { content: string; qrCodeContent?: string; title: string } {
   const { branch, order, payments } = input;
   const locale = toPrintLocale(input.locale);
   const copy = receiptCopy[locale];
@@ -37,11 +41,9 @@ export function buildPosOrderReceipt(input: {
       ? ticketNoByTicketId.get(item.ticketId)
       : null;
     const details = [
-      item.pricingUnit === "per_kg"
-        ? `${item.weight ?? item.quantity} kg${item.bagCount ? ` / ${item.bagCount}` : ""}`
-        : `${item.quantity} × ${item.unitOfMeasure ?? "item"}`,
-      ticketNo ? `${copy.ticket}: ${ticketNo}` : null,
+      formatOrderItemMeasurement(item, input.locale),
       item.itemIdentifier ? `${copy.label}: ${item.itemIdentifier}` : null,
+      ticketNo ? `${copy.ticket}: ${ticketNo}` : null,
       item.itemColor ? `${copy.color}: ${item.itemColor}` : null,
       item.specialRequest ? item.specialRequest : null,
     ].filter((value): value is string => Boolean(value));
@@ -76,8 +78,12 @@ export function buildPosOrderReceipt(input: {
       payment.paymentMethod === "cash" && payment.paymentStatus === "paid",
   );
   const title = `RC-${order.id.slice(-8).toUpperCase()}`;
+  const qrCodeContent = branch?.receiptFields.includes("order_qr_code")
+    ? formatPosOrderQrPayload(order.id)
+    : undefined;
   return {
     title,
+    qrCodeContent,
     content: buildPosReceiptText(
       {
         receiptNo: title,
@@ -133,9 +139,9 @@ export function buildPosOrderReceipt(input: {
         expectedPickup: earliestPickupAt
           ? `${copy.expectedPickup}: ${formatReceiptPickup(earliestPickupAt, locale)}`
           : undefined,
-        receiptAddress: branch?.receiptAddress ?? undefined,
-        receiptPhone: branch?.receiptPhone ?? undefined,
-        thankYouMessage: copy.thankYou,
+        receiptAddress: branch?.receiptAddress || branch?.address || undefined,
+        receiptPhone: branch?.receiptPhone || branch?.phone || undefined,
+        thankYouMessage: branch?.receiptThankYouMessage || copy.thankYou,
       },
       { locale },
     ),

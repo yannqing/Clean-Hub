@@ -1843,6 +1843,11 @@ export const tenantMessagesFr: TenantMessages = {
       unbound: "Connecter au PDV",
       posChecksConnection: "Le terminal du magasin vérifie la connexion réelle",
     },
+    provisioning: {
+      builtIn: "Intégré",
+      builtInReadonly:
+        "Cet appareil a été détecté par le terminal POS. Son cycle de vie est géré sur ce terminal et il ne peut pas être modifié ou supprimé ici.",
+    },
     create: {
       title: "Ajouter un périphérique POS",
       description:
@@ -1886,6 +1891,7 @@ export const tenantMessagesFr: TenantMessages = {
     },
     actions: {
       edit: "Modifier",
+      view: "Voir",
       delete: "Supprimer",
     },
     requestFailed: "Une erreur inattendue s'est produite.",
@@ -2129,7 +2135,8 @@ export const tenantMessagesFr: TenantMessages = {
         netSales: "Ventes nettes",
         cashVariance: "Écart de caisse",
       },
-      searchPlaceholder: "Session, terminal, personne ayant ouvert ou succursale",
+      searchPlaceholder:
+        "Session, terminal, personne ayant ouvert ou succursale",
       columns: {
         session: "Session",
         branch: "Succursale",
@@ -2745,8 +2752,7 @@ export const tenantMessagesFr: TenantMessages = {
         pricing: "Maintenir les prix des services et des produits.",
         payments:
           "Connectez et vérifiez Wave ou Orange Money pour les paiements mobiles du point de vente.",
-        cash:
-          "Choisissez comment chaque succursale compte les espèces et qui en est responsable.",
+        cash: "Choisissez comment chaque succursale compte les espèces et qui en est responsable.",
         pointOfSale:
           "Configurez les terminaux, enregistrez les sessions et le comportement hors ligne.",
         printing:

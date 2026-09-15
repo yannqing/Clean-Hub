@@ -11,6 +11,7 @@ import {
 function job(
   printerId?: string,
   documentType: PosPrintJobPayload["documentType"] = "receipt",
+  qrCodeContent?: string,
 ): PersistentPrintJob<PosPrintJobPayload> {
   const now = new Date(0).toISOString();
   return {
@@ -21,6 +22,7 @@ function job(
       entityId: "01TEST00000000000000000002",
       title: "Test",
       content: "Test receipt",
+      qrCodeContent,
       printerId,
     },
     status: "pending",
@@ -39,6 +41,8 @@ async function main(): Promise<void> {
       name: "Receipt printer",
       deviceType: "printer" as const,
       connectionType: "usb" as const,
+      provisioningMode: "manual" as const,
+      hardwareKey: null,
       config: { printerId: "default", printerPurpose: "receipt" },
       status: "active" as const,
       createdAt: new Date(0).toISOString(),
@@ -52,6 +56,8 @@ async function main(): Promise<void> {
       name: "Laundry label printer",
       deviceType: "printer" as const,
       connectionType: "usb" as const,
+      provisioningMode: "manual" as const,
+      hardwareKey: null,
       config: { printerId: "bound", printerPurpose: "label" },
       status: "active" as const,
       createdAt: new Date(0).toISOString(),
@@ -63,7 +69,7 @@ async function main(): Promise<void> {
   assert.equal(resolveConfiguredPrinterId(devices, "receipt"), "default");
   assert.equal(resolveConfiguredPrinterId(devices, "label"), "bound");
 
-  const printedWith: string[] = [];
+  const printedWith: Array<{ printerId: string; qrCodeContent?: string }> = [];
   const hardware = {
     async getCapabilities() {
       return {
@@ -80,23 +86,37 @@ async function main(): Promise<void> {
         { id: "bound", name: "Bound", isDefault: false },
       ];
     },
-    async print(request: { id: string; printerId: string }) {
-      printedWith.push(request.printerId);
+    async print(request: {
+      id: string;
+      printerId: string;
+      qrCodeContent?: string;
+    }) {
+      printedWith.push({
+        printerId: request.printerId,
+        qrCodeContent: request.qrCodeContent,
+      });
       return { jobId: request.id, status: "printed" as const };
     },
   };
 
-  await executePosPrintJob(job("bound"), hardware);
-  assert.deepEqual(printedWith, ["bound"]);
+  await executePosPrintJob(job("bound", "receipt", "CH1:ORDER:TEST"), hardware);
+  assert.deepEqual(printedWith, [
+    { printerId: "bound", qrCodeContent: "CH1:ORDER:TEST" },
+  ]);
 
   await assert.rejects(
     () => executePosPrintJob(job("missing"), hardware),
     /\u5df2\u7ed1\u5b9a\u7684\u6253\u5370\u673a\u672a\u88ab\u5f53\u524d\u8bbe\u5907\u68c0\u6d4b\u5230/,
   );
-  assert.deepEqual(printedWith, ["bound"]);
+  assert.deepEqual(printedWith, [
+    { printerId: "bound", qrCodeContent: "CH1:ORDER:TEST" },
+  ]);
 
   await executePosPrintJob(job(), hardware);
-  assert.deepEqual(printedWith, ["bound", "default"]);
+  assert.deepEqual(printedWith, [
+    { printerId: "bound", qrCodeContent: "CH1:ORDER:TEST" },
+    { printerId: "default", qrCodeContent: undefined },
+  ]);
 
   await assert.rejects(
     () => executePosPrintJob(job(undefined, "label"), hardware),
@@ -104,7 +124,11 @@ async function main(): Promise<void> {
   );
 
   await executePosPrintJob(job("bound", "label"), hardware);
-  assert.deepEqual(printedWith, ["bound", "default", "bound"]);
+  assert.deepEqual(printedWith, [
+    { printerId: "bound", qrCodeContent: "CH1:ORDER:TEST" },
+    { printerId: "default", qrCodeContent: undefined },
+    { printerId: "bound", qrCodeContent: undefined },
+  ]);
 
   console.log("POS print job smoke passed.");
 }

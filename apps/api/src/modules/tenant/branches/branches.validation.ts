@@ -65,7 +65,8 @@ const ticketLabelFieldsSchema = z
   .max(POS_TICKET_LABEL_FIELDS.length)
   .transform((fields) => Array.from(new Set(fields)))
   .refine(
-    (fields) => fields.includes("ticket_number") && fields.includes("item_name"),
+    (fields) =>
+      fields.includes("ticket_number") && fields.includes("item_name"),
     { message: "Ticket number and item name are required on every label." },
   );
 
@@ -103,6 +104,7 @@ const branchBodyBaseSchema = z.object({
   receiptName: nullableStringSchema(200),
   receiptPhone: nullableStringSchema(32),
   receiptAddress: nullableStringSchema(500),
+  receiptThankYouMessage: nullableStringSchema(500),
   receiptFields: receiptFieldsSchema.default([...DEFAULT_POS_RECEIPT_FIELDS]),
   ticketLabelFields: ticketLabelFieldsSchema.default([
     ...DEFAULT_POS_TICKET_LABEL_FIELDS,

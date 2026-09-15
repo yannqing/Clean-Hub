@@ -75,6 +75,7 @@ import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 import { formatPosMoney } from "@/lib/money";
 import { isLockedPosPaymentMethod } from "@cleanhub/domain/payment-methods";
+import { parsePosOrderQrPayload } from "@cleanhub/domain/order-codes";
 import {
   CASH_ROUNDING_STEPS,
   cashRoundingStepToMinor,
@@ -115,6 +116,7 @@ export function CartSaleView({
   services,
 }: CartSaleViewProps) {
   const { locale, t } = useTranslation();
+  const router = useRouter();
   const [filter, setFilter] = useState<CatalogFilter>("all");
   const [query, setQuery] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
@@ -182,6 +184,11 @@ export function CartSaleView({
     if (!loaded) return;
     const hardware = getPosHardwareBridge();
     return hardware?.onScan((event) => {
+      const receiptOrderId = parsePosOrderQrPayload(event.value);
+      if (receiptOrderId) {
+        router.push(posRoutes.orderDetail(receiptOrderId));
+        return;
+      }
       const code = event.value.trim().toLowerCase();
       const product = products.find(
         (entry) =>
@@ -194,7 +201,7 @@ export function CartSaleView({
         toast.error(t("pos.cart.scanNotFound", { code: event.value }));
       }
     });
-  }, [handleAddProduct, loaded, products, t]);
+  }, [handleAddProduct, loaded, products, router, t]);
 
   const cartPanel = (
     <CartPanel

@@ -49,7 +49,11 @@ type Copy = {
   receiptName: string;
   receiptNamePlaceholder: string;
   receiptPhone: string;
+  receiptPhonePlaceholder: string;
   receiptAddress: string;
+  receiptAddressPlaceholder: string;
+  receiptThankYouMessage: string;
+  receiptThankYouMessagePlaceholder: string;
   labelContentTitle: string;
   labelContentDescription: string;
   labelGroups: Record<"identity" | "items" | "service", string>;
@@ -89,7 +93,12 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     receiptName: "Printed branch name",
     receiptNamePlaceholder: "Use the branch name when empty",
     receiptPhone: "Printed phone",
+    receiptPhonePlaceholder: "Use the branch phone when empty",
     receiptAddress: "Printed address",
+    receiptAddressPlaceholder: "Use the branch address when empty",
+    receiptThankYouMessage: "Thank-you message",
+    receiptThankYouMessagePlaceholder:
+      "Use the default message for the receipt language when empty",
     labelContentTitle: "Label print content",
     labelContentDescription:
       "Choose the information included when this branch prints a service item label.",
@@ -125,7 +134,8 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     description:
       "Gérez tous les documents imprimés au même endroit. Les règles s’appliquent à tous les terminaux de la succursale sélectionnée.",
     branchLabel: "Succursale",
-    branchHint: "Choisissez la succursale dont vous souhaitez gérer l’impression.",
+    branchHint:
+      "Choisissez la succursale dont vous souhaitez gérer l’impression.",
     noBranches: "Aucune succursale accessible n’est disponible.",
     inactive: "Inactive",
     documents: {
@@ -136,7 +146,8 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
       },
       ticketLabel: {
         title: "Étiquette d’article de service",
-        description: "Imprimée depuis une fiche de service pour identifier les articles.",
+        description:
+          "Imprimée depuis une fiche de service pour identifier les articles.",
         badge: "Étiquette",
       },
     },
@@ -146,7 +157,12 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     receiptName: "Nom de succursale imprimé",
     receiptNamePlaceholder: "Utiliser le nom de la succursale si vide",
     receiptPhone: "Téléphone imprimé",
+    receiptPhonePlaceholder: "Utiliser le téléphone de la succursale si vide",
     receiptAddress: "Adresse imprimée",
+    receiptAddressPlaceholder: "Utiliser l’adresse de la succursale si vide",
+    receiptThankYouMessage: "Message de remerciement",
+    receiptThankYouMessagePlaceholder:
+      "Utiliser le message par défaut de la langue du reçu si vide",
     labelContentTitle: "Contenu de l’étiquette",
     labelContentDescription:
       "Choisissez les informations imprimées sur les étiquettes d’articles de service de cette succursale.",
@@ -198,15 +214,17 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
       },
     },
     receiptIdentityTitle: "小票抬头与联系方式",
-    receiptIdentityDescription:
-      "设置该门店小票页眉、页脚使用的可选显示信息。",
+    receiptIdentityDescription: "设置该门店小票页眉、页脚使用的可选显示信息。",
     receiptName: "打印门店名称",
     receiptNamePlaceholder: "留空时使用门店名称",
     receiptPhone: "打印联系电话",
+    receiptPhonePlaceholder: "留空时使用门店联系电话",
     receiptAddress: "打印地址",
+    receiptAddressPlaceholder: "留空时使用门店地址",
+    receiptThankYouMessage: "感谢语",
+    receiptThankYouMessagePlaceholder: "留空时使用小票语言的默认感谢语",
     labelContentTitle: "标签打印内容",
-    labelContentDescription:
-      "选择该门店打印工单物品标签时需要包含的信息。",
+    labelContentDescription: "选择该门店打印工单物品标签时需要包含的信息。",
     labelGroups: {
       identity: "商户与工单",
       items: "客户与物品",
@@ -275,6 +293,7 @@ type EditableSettings = Pick<
   | "receiptName"
   | "receiptPhone"
   | "receiptAddress"
+  | "receiptThankYouMessage"
   | "receiptFields"
   | "ticketLabelFields"
 >;
@@ -284,6 +303,7 @@ function toEditableSettings(branch: BranchSummary): EditableSettings {
     receiptName: branch.receiptName,
     receiptPhone: branch.receiptPhone,
     receiptAddress: branch.receiptAddress,
+    receiptThankYouMessage: branch.receiptThankYouMessage,
     receiptFields: [...branch.receiptFields],
     ticketLabelFields: [...branch.ticketLabelFields],
   };
@@ -345,6 +365,7 @@ export function BranchPrintingSettingsView({
         receiptName: form.receiptName ?? "",
         receiptPhone: form.receiptPhone ?? "",
         receiptAddress: form.receiptAddress ?? "",
+        receiptThankYouMessage: form.receiptThankYouMessage ?? "",
         receiptFields: form.receiptFields,
         ticketLabelFields: form.ticketLabelFields,
       });
@@ -507,6 +528,7 @@ export function BranchPrintingSettingsView({
                         onChange={(event) =>
                           setForm({ ...form, receiptPhone: event.target.value })
                         }
+                        placeholder={text.receiptPhonePlaceholder}
                         value={form.receiptPhone ?? ""}
                       />
                     </div>
@@ -523,7 +545,26 @@ export function BranchPrintingSettingsView({
                             receiptAddress: event.target.value,
                           })
                         }
+                        placeholder={text.receiptAddressPlaceholder}
                         value={form.receiptAddress ?? ""}
+                      />
+                    </div>
+                    <div className="grid gap-2 sm:col-span-2">
+                      <Label htmlFor="printing-receipt-thank-you-message">
+                        {text.receiptThankYouMessage}
+                      </Label>
+                      <Textarea
+                        disabled={saving || !canUpdateSettings}
+                        id="printing-receipt-thank-you-message"
+                        maxLength={500}
+                        onChange={(event) =>
+                          setForm({
+                            ...form,
+                            receiptThankYouMessage: event.target.value,
+                          })
+                        }
+                        placeholder={text.receiptThankYouMessagePlaceholder}
+                        value={form.receiptThankYouMessage ?? ""}
                       />
                     </div>
                   </div>
@@ -556,10 +597,14 @@ export function BranchPrintingSettingsView({
                           const required = requiredLabelFields.has(field);
                           const id = `printing-ticket-label-${field}`;
                           return (
-                            <div className="flex items-center gap-2.5" key={field}>
+                            <div
+                              className="flex items-center gap-2.5"
+                              key={field}
+                            >
                               <Checkbox
                                 checked={
-                                  required || form.ticketLabelFields.includes(field)
+                                  required ||
+                                  form.ticketLabelFields.includes(field)
                                 }
                                 disabled={
                                   saving || !canUpdateSettings || required

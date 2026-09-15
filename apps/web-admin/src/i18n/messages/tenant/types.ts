@@ -1452,6 +1452,10 @@ export type TenantMessages = {
       unbound: string;
       posChecksConnection: string;
     };
+    provisioning: {
+      builtIn: string;
+      builtInReadonly: string;
+    };
     create: {
       title: string;
       description: string;
@@ -1492,6 +1496,7 @@ export type TenantMessages = {
     };
     actions: {
       edit: string;
+      view: string;
       delete: string;
     };
     requestFailed: string;

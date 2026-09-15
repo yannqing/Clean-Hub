@@ -309,6 +309,7 @@ function PrintJobList({
               documentType={job.payload.documentType}
               entityId={job.payload.entityId}
               initialLabel="打印"
+              qrCodeContent={job.payload.qrCodeContent}
               title={job.payload.title}
             />
           </div>

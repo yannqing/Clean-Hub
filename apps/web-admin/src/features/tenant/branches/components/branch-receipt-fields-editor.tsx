@@ -5,7 +5,14 @@ import {
   REQUIRED_POS_RECEIPT_FIELDS,
   type PosReceiptField,
 } from "@cleanhub/domain/receipt";
-import { Checkbox, Label } from "@cleanhub/ui";
+import {
+  Checkbox,
+  Label,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@cleanhub/ui";
+import { CircleAlert } from "lucide-react";
 
 import { useTenantI18n } from "@/i18n";
 
@@ -13,6 +20,8 @@ type Copy = {
   title: string;
   description: string;
   required: string;
+  barcodeHelp: string;
+  barcodeHelpLabel: string;
   groups: Record<"identity" | "items" | "amounts" | "footer", string>;
   fields: Record<PosReceiptField, string>;
 };
@@ -23,6 +32,9 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     description:
       "Choose the information printed by every POS terminal in this branch.",
     required: "Required",
+    barcodeHelp:
+      "This is the product or variant barcode. If no barcode is configured for the product, it will not appear on the receipt even when this option is selected.",
+    barcodeHelpLabel: "About receipt barcodes",
     groups: {
       identity: "Receipt and sale",
       items: "Products and services",
@@ -35,6 +47,7 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
       receipt_title: "Receipt title",
       receipt_number: "Receipt number",
       order_number: "Order number",
+      order_qr_code: "Order QR code",
       issued_at: "Sale date and time",
       cashier_name: "Cashier name",
       terminal_name: "POS terminal name",
@@ -70,6 +83,9 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     description:
       "Choisissez les informations imprimées par chaque terminal de cette succursale.",
     required: "Obligatoire",
+    barcodeHelp:
+      "Il s’agit du code-barres du produit ou de la variante. Si aucun code-barres n’est configuré pour le produit, il ne figurera pas sur le reçu même si cette option est cochée.",
+    barcodeHelpLabel: "À propos des codes-barres du reçu",
     groups: {
       identity: "Reçu et vente",
       items: "Produits et services",
@@ -82,6 +98,7 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
       receipt_title: "Titre du reçu",
       receipt_number: "Numéro du reçu",
       order_number: "Numéro de commande",
+      order_qr_code: "QR code de la commande",
       issued_at: "Date et heure de vente",
       cashier_name: "Nom du caissier",
       terminal_name: "Nom du terminal POS",
@@ -116,6 +133,9 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     title: "小票打印内容",
     description: "选择该门店所有 POS 终端打印小票时需要包含的信息。",
     required: "必选",
+    barcodeHelp:
+      "这里指商品或规格配置的条码。如果商品没有配置条码，即使勾选此项，小票上也不会显示条码。",
+    barcodeHelpLabel: "查看商品条码说明",
     groups: {
       identity: "小票与销售信息",
       items: "产品与服务明细",
@@ -128,6 +148,7 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
       receipt_title: "小票标题",
       receipt_number: "小票编号",
       order_number: "订单号",
+      order_qr_code: "订单二维码",
       issued_at: "销售日期与时间",
       cashier_name: "收银员名称",
       terminal_name: "POS 终端名称",
@@ -172,6 +193,7 @@ const groups: Array<{
       "receipt_title",
       "receipt_number",
       "order_number",
+      "order_qr_code",
       "issued_at",
       "cashier_name",
       "terminal_name",
@@ -274,14 +296,35 @@ export function BranchReceiptFieldsEditor({
                         update(field, checked === true)
                       }
                     />
-                    <Label className="font-normal" htmlFor={id}>
-                      {text.fields[field]}
-                      {required ? (
-                        <span className="ml-1.5 text-xs text-muted-foreground">
-                          ({text.required})
-                        </span>
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <Label className="font-normal" htmlFor={id}>
+                        {text.fields[field]}
+                        {required ? (
+                          <span className="ml-1.5 text-xs text-muted-foreground">
+                            ({text.required})
+                          </span>
+                        ) : null}
+                      </Label>
+                      {field === "item_barcode" ? (
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              aria-label={text.barcodeHelpLabel}
+                              className="inline-flex size-6 shrink-0 items-center justify-center rounded-full text-amber-600 transition-colors hover:bg-amber-50 hover:text-amber-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              type="button"
+                            >
+                              <CircleAlert aria-hidden className="size-4" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            align="start"
+                            className="w-72 text-sm leading-6"
+                          >
+                            {text.barcodeHelp}
+                          </PopoverContent>
+                        </Popover>
                       ) : null}
-                    </Label>
+                    </div>
                   </div>
                 );
               })}

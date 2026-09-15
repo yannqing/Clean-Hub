@@ -1,7 +1,10 @@
 "use client";
 
 import type { PosGlobalSearchItem } from "@cleanhub/api-client";
-import { isPosOrderLookupQuery } from "@cleanhub/domain/order-codes";
+import {
+  isPosOrderLookupQuery,
+  parsePosOrderQrPayload,
+} from "@cleanhub/domain/order-codes";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { useRouter } from "next/navigation";
 import {
@@ -103,6 +106,12 @@ export default function ScanPage() {
       setRecent((current) =>
         [query, ...current.filter((item) => item !== query)].slice(0, 5),
       );
+
+      const receiptOrderId = parsePosOrderQrPayload(query);
+      if (receiptOrderId) {
+        router.push(posRoutes.orderDetail(receiptOrderId));
+        return;
+      }
 
       try {
         const result = await posApi.pos.search.global({ q: query, limit: 3 });

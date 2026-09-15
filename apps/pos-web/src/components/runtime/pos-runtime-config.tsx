@@ -43,6 +43,7 @@ type PosRuntimeConfig = {
   receiptName: string | null;
   receiptPhone: string | null;
   receiptAddress: string | null;
+  receiptThankYouMessage: string | null;
   receiptFields: PosReceiptField[];
   ticketLabelFields: PosTicketLabelField[];
   operatorName: string | null;
@@ -74,6 +75,7 @@ const PosRuntimeConfigContext = createContext<PosRuntimeConfig>({
   receiptName: null,
   receiptPhone: null,
   receiptAddress: null,
+  receiptThankYouMessage: null,
   receiptFields: [...DEFAULT_POS_RECEIPT_FIELDS],
   ticketLabelFields: [...DEFAULT_POS_TICKET_LABEL_FIELDS],
   operatorName: null,
@@ -105,6 +107,7 @@ export function PosRuntimeConfigProvider({
   receiptPhone,
   cashRoundingStep,
   receiptAddress,
+  receiptThankYouMessage,
   receiptFields,
   ticketLabelFields,
   operatorName,
@@ -135,6 +138,7 @@ export function PosRuntimeConfigProvider({
   receiptName?: string | null;
   receiptPhone?: string | null;
   receiptAddress?: string | null;
+  receiptThankYouMessage?: string | null;
   receiptFields?: PosReceiptField[] | null;
   ticketLabelFields?: PosTicketLabelField[] | null;
   operatorName?: string | null;
@@ -167,9 +171,11 @@ export function PosRuntimeConfigProvider({
       receiptName: receiptName ?? null,
       receiptPhone: receiptPhone ?? null,
       receiptAddress: receiptAddress ?? null,
+      receiptThankYouMessage: receiptThankYouMessage ?? null,
       receiptFields: receiptFields ?? [...DEFAULT_POS_RECEIPT_FIELDS],
-      ticketLabelFields:
-        ticketLabelFields ?? [...DEFAULT_POS_TICKET_LABEL_FIELDS],
+      ticketLabelFields: ticketLabelFields ?? [
+        ...DEFAULT_POS_TICKET_LABEL_FIELDS,
+      ],
       operatorName: operatorName ?? null,
       terminalName: terminalName ?? null,
       autoPrintReceipt: autoPrintReceipt ?? true,
@@ -197,6 +203,7 @@ export function PosRuntimeConfigProvider({
       receiptName,
       receiptPhone,
       receiptAddress,
+      receiptThankYouMessage,
       receiptFields,
       ticketLabelFields,
       operatorName,

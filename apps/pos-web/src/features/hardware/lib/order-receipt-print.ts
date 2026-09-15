@@ -45,6 +45,7 @@ export async function queuePosOrderReceipt(input: {
       entityId: input.order.id,
       title: receipt.title,
       content: receipt.content,
+      qrCodeContent: receipt.qrCodeContent,
       autoPrint: input.autoPrint,
       copies: input.copies,
       printerId: input.printerId,
@@ -135,14 +136,20 @@ export async function queuePosOfflineCartReceipt(input: {
       balanceMinor: input.paymentMethod === "cash" ? 0 : totalMinor,
       paymentMethod:
         input.paymentMethod === "cash" ? copy.paymentMethods.cash : undefined,
-      receiptAddress: input.branch?.receiptAddress ?? undefined,
-      receiptPhone: input.branch?.receiptPhone ?? undefined,
-      thankYouMessage:
+      receiptAddress:
+        input.branch?.receiptAddress || input.branch?.address || undefined,
+      receiptPhone:
+        input.branch?.receiptPhone || input.branch?.phone || undefined,
+      thankYouMessage: [
+        input.branch?.receiptThankYouMessage,
         input.locale === "zh-CN"
           ? "离线暂存小票 · 联网后生成正式订单"
           : input.locale === "fr"
             ? "Reçu hors ligne · Commande définitive après synchronisation"
             : "Offline receipt · Final order after synchronization",
+      ]
+        .filter(Boolean)
+        .join(" · "),
     },
     { locale: toPrintLocale(input.locale) },
   );

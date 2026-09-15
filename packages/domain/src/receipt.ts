@@ -4,6 +4,7 @@ export const POS_RECEIPT_FIELDS = [
   "receipt_title",
   "receipt_number",
   "order_number",
+  "order_qr_code",
   "issued_at",
   "cashier_name",
   "terminal_name",

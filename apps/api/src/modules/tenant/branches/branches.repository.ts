@@ -114,6 +114,7 @@ function toBranchSummary(row: typeof branches.$inferSelect): BranchSummary {
     receiptName: row.receiptName,
     receiptPhone: row.receiptPhone,
     receiptAddress: row.receiptAddress,
+    receiptThankYouMessage: row.receiptThankYouMessage,
     receiptFields: normalizePosReceiptFields(row.receiptFields),
     ticketLabelFields: normalizePosTicketLabelFields(row.ticketLabelFields),
     paymentMethodsEnabled: row.paymentMethodsEnabled,
@@ -214,6 +215,7 @@ export async function createBranchRecord(
     receiptName: normalizeNullable(input.receiptName),
     receiptPhone: normalizeNullable(input.receiptPhone),
     receiptAddress: normalizeNullable(input.receiptAddress),
+    receiptThankYouMessage: normalizeNullable(input.receiptThankYouMessage),
     receiptFields: input.receiptFields ?? [...DEFAULT_POS_RECEIPT_FIELDS],
     ticketLabelFields: input.ticketLabelFields ?? [
       ...DEFAULT_POS_TICKET_LABEL_FIELDS,
@@ -288,6 +290,10 @@ export async function updateBranchRecord(
         input.data.receiptAddress === undefined
           ? input.current.receiptAddress
           : normalizeNullable(input.data.receiptAddress),
+      receiptThankYouMessage:
+        input.data.receiptThankYouMessage === undefined
+          ? input.current.receiptThankYouMessage
+          : normalizeNullable(input.data.receiptThankYouMessage),
       receiptFields:
         input.data.receiptFields === undefined
           ? input.current.receiptFields

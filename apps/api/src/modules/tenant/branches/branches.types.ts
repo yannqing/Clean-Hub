@@ -41,6 +41,7 @@ export type BranchSummary = {
   receiptName: string | null;
   receiptPhone: string | null;
   receiptAddress: string | null;
+  receiptThankYouMessage: string | null;
   receiptFields: PosReceiptField[];
   ticketLabelFields: PosTicketLabelField[];
   paymentMethodsEnabled: BranchPaymentMethod[];
@@ -74,6 +75,7 @@ export type CreateBranchRequest = {
   receiptName?: string | null;
   receiptPhone?: string | null;
   receiptAddress?: string | null;
+  receiptThankYouMessage?: string | null;
   receiptFields?: PosReceiptField[];
   ticketLabelFields?: PosTicketLabelField[];
   paymentMethodsEnabled?: BranchPaymentMethod[];
