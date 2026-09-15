@@ -4,6 +4,7 @@ export type HardwareDeviceType = "printer" | "scanner" | "cash_drawer";
 export type HardwareConnectionType = "usb" | "bluetooth" | "network" | "other";
 export type HardwareDeviceStatus = "active" | "inactive";
 export type HardwarePrinterPurpose = "receipt" | "label";
+export type HardwareProvisioningMode = "manual" | "built_in";
 
 export type HardwareConfigSummary = {
   id: string;
@@ -17,6 +18,8 @@ export type HardwareConfigSummary = {
   name: string;
   deviceType: HardwareDeviceType;
   connectionType: HardwareConnectionType;
+  provisioningMode: HardwareProvisioningMode;
+  hardwareKey: string | null;
   config: Record<string, unknown>;
   status: HardwareDeviceStatus;
   createdAt: string;

@@ -17,18 +17,22 @@ import { PosHardwareUnavailableError } from "@cleanhub/hardware";
 
 import type { PosHardwareBridge } from "./desktop-bridge";
 
-type T1101Capabilities = PosHardwareCapabilities & {
+type AndroidPosCapabilities = PosHardwareCapabilities & {
   connected: boolean;
-  host: "pos-t1101";
+  host: string;
   printerModel?: string;
   printerStatus?: string;
   printerStatusCode?: number;
   serviceVersion?: string;
 };
 
-type T1101HardwarePlugin = {
-  getCapabilities(): Promise<T1101Capabilities>;
+type AndroidPosHardwarePlugin = {
+  getCapabilities(): Promise<AndroidPosCapabilities>;
   listPrinters(): Promise<{ printers: PosPrinterDevice[] }>;
+  discoverPrinters(): Promise<{ printers: PosPrinterDevice[] }>;
+  pairPrinter(input: {
+    printerId: string;
+  }): Promise<{ printer: PosPrinterDevice }>;
   print(request: PosPrintRequest): Promise<PosPrintResult>;
   openCashDrawer(request: PosDrawerOpenRequest): Promise<void>;
   triggerScanner(): Promise<void>;
@@ -38,27 +42,35 @@ type T1101HardwarePlugin = {
   ): Promise<PluginListenerHandle>;
 };
 
-let nativePlugin: T1101HardwarePlugin | null = null;
+let nativePlugin: AndroidPosHardwarePlugin | null = null;
 
-function getNativePlugin(): T1101HardwarePlugin {
-  nativePlugin ??= registerPlugin<T1101HardwarePlugin>("T1101Hardware");
+function getNativePlugin(): AndroidPosHardwarePlugin {
+  nativePlugin ??= registerPlugin<AndroidPosHardwarePlugin>("T1101Hardware");
   return nativePlugin;
 }
 
-export function isT1101NativeRuntime(input: {
+export function isAndroidPosNativeRuntime(input: {
   isNative: boolean;
   platform: string;
 }): boolean {
   return input.isNative && input.platform === "android";
 }
 
-const t1101HardwareBridge: PosHardwareBridge = {
+const androidPosHardwareBridge: PosHardwareBridge = {
   async getCapabilities() {
     return getNativePlugin().getCapabilities();
   },
   async listPrinters() {
     const result = await getNativePlugin().listPrinters();
     return result.printers;
+  },
+  async discoverPrinters() {
+    const result = await getNativePlugin().discoverPrinters();
+    return result.printers;
+  },
+  async pairPrinter(printerId) {
+    const result = await getNativePlugin().pairPrinter({ printerId });
+    return result.printer;
   },
   async print(request) {
     return getNativePlugin().print(request);
@@ -72,7 +84,7 @@ const t1101HardwareBridge: PosHardwareBridge = {
   async processCardPayment() {
     throw new PosHardwareUnavailableError(
       "cardTerminal",
-      "POS-T1101 未提供经过收单认证的银行卡支付 SDK。",
+      "当前 Android POS 未提供经过收单认证的银行卡支付 SDK。",
     );
   },
   onScan(listener) {
@@ -90,15 +102,15 @@ const t1101HardwareBridge: PosHardwareBridge = {
   },
 };
 
-export function getT1101HardwareBridge(): PosHardwareBridge | null {
+export function getAndroidPosHardwareBridge(): PosHardwareBridge | null {
   if (typeof window === "undefined") return null;
   if (
-    !isT1101NativeRuntime({
+    !isAndroidPosNativeRuntime({
       isNative: Capacitor.isNativePlatform(),
       platform: Capacitor.getPlatform(),
     })
   ) {
     return null;
   }
-  return t1101HardwareBridge;
+  return androidPosHardwareBridge;
 }

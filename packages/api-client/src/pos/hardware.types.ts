@@ -1,6 +1,7 @@
 /**
- * POS hardware device DTOs. Lifecycle management belongs to web-admin; local
- * printer binding is performed from the enrolled terminal.
+ * POS hardware device DTOs. Manual device lifecycle belongs to web-admin;
+ * built-in discovery/registration and local printer binding are performed by
+ * the enrolled terminal.
  */
 
 export type PosHardwareDeviceType = "printer" | "scanner" | "cash_drawer";
@@ -13,6 +14,9 @@ export type PosHardwareConnectionType =
 
 export type PosHardwareDeviceStatus = "active" | "inactive";
 export type PosHardwarePrinterPurpose = "receipt" | "label";
+export type PosHardwareProvisioningMode = "manual" | "built_in";
+export type PosBuiltInHardwareKey =
+  `${string}:built-in:${"printer" | "scanner"}`;
 
 export type PosHardwareDeviceSummary = {
   id: string;
@@ -21,6 +25,8 @@ export type PosHardwareDeviceSummary = {
   name: string;
   deviceType: PosHardwareDeviceType;
   connectionType: PosHardwareConnectionType;
+  provisioningMode: PosHardwareProvisioningMode;
+  hardwareKey: string | null;
   config: Record<string, unknown>;
   status: PosHardwareDeviceStatus;
   createdAt: string;
@@ -33,6 +39,14 @@ export type BindPosPrinterRequest = {
   printerName: string;
   isDefault?: boolean;
   version: number;
+};
+
+export type ConnectPosBuiltInHardwareRequest = {
+  hardwareKey: PosBuiltInHardwareKey;
+  name: string;
+  deviceType: Extract<PosHardwareDeviceType, "printer" | "scanner">;
+  localDeviceId: string;
+  deviceModel?: string;
 };
 
 export type PosHardwareDeviceListResponse = {

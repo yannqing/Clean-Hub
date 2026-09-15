@@ -1,40 +1,42 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { PosHardwareDeviceSummary } from "@cleanhub/api-client";
+import type {
+  PosBuiltInHardwareKey,
+  PosHardwareDeviceSummary,
+} from "@cleanhub/api-client";
 import type { PosPrinterDevice } from "@cleanhub/hardware";
 import { createId } from "@cleanhub/id";
+import { useTranslation } from "@cleanhub/i18n/react";
 
 import {
+  Badge,
+  Button,
+  cn,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  RadioGroup,
+  RadioGroupItem,
+  ScrollArea,
+  Separator,
 } from "@cleanhub/ui";
 
 import { Icon, type PosIconName } from "@/components/app-shell";
 import { createCashDrawerOpenRequest } from "@/features/hardware/lib/cash-drawer";
+import {
+  discoverBuiltInHardware,
+  type DiscoveredBuiltInHardware,
+} from "@/features/hardware/lib/built-in-hardware";
 import { getPosHardwareBridge } from "@/features/hardware/lib/desktop-bridge";
 import { getConfiguredPrinter } from "@/features/hardware/lib/printer-binding";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 import { posToast as toast } from "@/lib/pos-toast";
-
-const DEVICE_TYPE_LABELS: Record<string, string> = {
-  printer: "打印机",
-  scanner: "扫码枪",
-  cash_drawer: "钱箱",
-};
-
-const CONNECTION_TYPE_LABELS: Record<string, string> = {
-  usb: "USB",
-  bluetooth: "蓝牙",
-  network: "网络",
-  other: "其他",
-};
 
 const DEVICE_ICONS: Record<string, PosIconName> = {
   printer: "printer",
@@ -46,19 +48,23 @@ type HardwareSettingsCardProps = {
   canManageSensitiveHardware: boolean;
   devices: PosHardwareDeviceSummary[];
   loading: boolean;
-  onDeviceUpdated?(device: PosHardwareDeviceSummary): void;
+  onDevicesUpdated?(devices: PosHardwareDeviceSummary[]): void;
 };
 
 export function HardwareSettingsCard({
   canManageSensitiveHardware,
   devices,
   loading,
-  onDeviceUpdated,
+  onDevicesUpdated,
 }: HardwareSettingsCardProps) {
+  const { locale, t } = useTranslation();
   const [drawerDialogOpen, setDrawerDialogOpen] = useState(false);
   const [drawerReason, setDrawerReason] = useState("");
   const [openingDrawer, setOpeningDrawer] = useState(false);
   const [localPrinters, setLocalPrinters] = useState<PosPrinterDevice[]>([]);
+  const [builtInHardware, setBuiltInHardware] = useState<
+    DiscoveredBuiltInHardware[]
+  >([]);
   const [printerRuntimeState, setPrinterRuntimeState] = useState<
     "loading" | "ready" | "unavailable" | "error"
   >("loading");
@@ -69,10 +75,81 @@ export function HardwareSettingsCard({
     useState<PosHardwareDeviceSummary | null>(null);
   const [selectedPrinterId, setSelectedPrinterId] = useState("");
   const [bindingPrinter, setBindingPrinter] = useState(false);
+  const [scanningPrinters, setScanningPrinters] = useState(false);
+  const [settingDefaultPrinterId, setSettingDefaultPrinterId] = useState<
+    string | null
+  >(null);
+  const [connectingBuiltIn, setConnectingBuiltIn] =
+    useState<PosBuiltInHardwareKey | null>(null);
   const configuredDrawer = devices.find(
     (device) =>
       device.deviceType === "cash_drawer" && device.status === "active",
   );
+  const selectedLocalPrinter = localPrinters.find(
+    (printer) => printer.id === selectedPrinterId,
+  );
+
+  function deviceTypeLabel(deviceType: string) {
+    if (deviceType === "printer") return t("pos.hardware.deviceType.printer");
+    if (deviceType === "scanner") return t("pos.hardware.deviceType.scanner");
+    if (deviceType === "cash_drawer") {
+      return t("pos.hardware.deviceType.cashDrawer");
+    }
+    return deviceType;
+  }
+
+  function connectionTypeLabel(connectionType: string) {
+    if (connectionType === "usb") return t("pos.hardware.connectionType.usb");
+    if (connectionType === "bluetooth") {
+      return t("pos.hardware.connectionType.bluetooth");
+    }
+    if (connectionType === "network") {
+      return t("pos.hardware.connectionType.network");
+    }
+    if (connectionType === "other") {
+      return t("pos.hardware.connectionType.other");
+    }
+    return connectionType;
+  }
+
+  function builtInDeviceName(input: {
+    deviceType: string;
+    deviceModel?: unknown;
+    fallback: string;
+  }) {
+    const deviceModel =
+      typeof input.deviceModel === "string" && input.deviceModel.trim()
+        ? input.deviceModel.trim()
+        : null;
+    if (!deviceModel) return input.fallback;
+    return input.deviceType === "printer"
+      ? t("pos.hardware.deviceName.builtInPrinter", { model: deviceModel })
+      : t("pos.hardware.deviceName.builtInScanner", { model: deviceModel });
+  }
+
+  function printerDisplayName(printer: Pick<PosPrinterDevice, "id" | "name">) {
+    const builtIn = builtInHardware.find(
+      (device) =>
+        device.deviceType === "printer" && device.localDeviceId === printer.id,
+    );
+    return builtIn
+      ? builtInDeviceName({
+          deviceType: "printer",
+          deviceModel: builtIn.deviceModel,
+          fallback: printer.name,
+        })
+      : printer.name;
+  }
+
+  function storedPrinterDisplayName(printerId: string, printerName: string) {
+    return printerDisplayName({ id: printerId, name: printerName });
+  }
+
+  const selectedLocalPrinterName = selectedLocalPrinter
+    ? printerDisplayName(selectedLocalPrinter)
+    : null;
+  const formattedNow = () =>
+    new Date().toLocaleString(locale === "en" ? "en-US" : locale);
 
   const discoverPrinters = useCallback(async () => {
     setPrinterRuntimeState("loading");
@@ -84,14 +161,10 @@ export function HardwareSettingsCard({
       return;
     }
     try {
-      const capabilities = await hardware.getCapabilities();
-      setPrinterOperationalStatus(capabilities.printerStatus ?? null);
-      if (!capabilities.printer) {
-        setLocalPrinters([]);
-        setPrinterRuntimeState("unavailable");
-        return;
-      }
-      const printers = await hardware.listPrinters();
+      const discovery = await discoverBuiltInHardware(hardware);
+      const printers = discovery.localPrinters;
+      setBuiltInHardware(discovery.devices);
+      setPrinterOperationalStatus(discovery.printerStatus);
       setLocalPrinters(printers);
       setSelectedPrinterId((current) =>
         printers.some((printer) => printer.id === current)
@@ -99,13 +172,78 @@ export function HardwareSettingsCard({
           : ((printers.find((printer) => printer.isDefault) ?? printers[0])
               ?.id ?? ""),
       );
-      setPrinterRuntimeState("ready");
+      setPrinterRuntimeState(printers.length > 0 ? "ready" : "unavailable");
     } catch {
+      setBuiltInHardware([]);
       setLocalPrinters([]);
       setPrinterOperationalStatus(null);
       setPrinterRuntimeState("error");
     }
   }, []);
+
+  const scanForNearbyPrinters = useCallback(async () => {
+    const hardware = getPosHardwareBridge();
+    if (!hardware) {
+      setPrinterRuntimeState("unavailable");
+      return;
+    }
+
+    setScanningPrinters(true);
+    try {
+      const printers = hardware.discoverPrinters
+        ? await hardware.discoverPrinters()
+        : await hardware.listPrinters();
+      setLocalPrinters(printers);
+      setSelectedPrinterId((current) =>
+        printers.some((printer) => printer.id === current)
+          ? current
+          : ((printers.find((printer) => printer.isDefault) ?? printers[0])
+              ?.id ?? ""),
+      );
+      setPrinterRuntimeState(printers.length > 0 ? "ready" : "unavailable");
+    } catch (error) {
+      toast.error(
+        getPosApiErrorMessage(error, t("pos.hardware.toast.scanNearbyFailed")),
+      );
+    } finally {
+      setScanningPrinters(false);
+    }
+  }, [t]);
+
+  const persistedBuiltInHardware = useMemo(() => {
+    const currentHardwareKeys = new Set(
+      builtInHardware.map((device) => device.hardwareKey),
+    );
+    return devices.filter(
+      (device) =>
+        device.provisioningMode === "built_in" &&
+        Boolean(device.hardwareKey) &&
+        currentHardwareKeys.has(device.hardwareKey as PosBuiltInHardwareKey),
+    );
+  }, [builtInHardware, devices]);
+  const builtInRows = useMemo(() => {
+    const keys = new Set<string>([
+      ...builtInHardware.map((device) => device.hardwareKey),
+      ...persistedBuiltInHardware
+        .map((device) => device.hardwareKey)
+        .filter((key): key is string => Boolean(key)),
+    ]);
+
+    return [...keys].map((hardwareKey) => ({
+      hardwareKey: hardwareKey as PosBuiltInHardwareKey,
+      discovered:
+        builtInHardware.find((device) => device.hardwareKey === hardwareKey) ??
+        null,
+      persisted:
+        persistedBuiltInHardware.find(
+          (device) => device.hardwareKey === hardwareKey,
+        ) ?? null,
+    }));
+  }, [builtInHardware, persistedBuiltInHardware]);
+  const configuredDevices = useMemo(
+    () => devices.filter((device) => device.provisioningMode !== "built_in"),
+    [devices],
+  );
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- hardware discovery resolves asynchronously from the POS host bridge.
@@ -120,15 +258,141 @@ export function HardwareSettingsCard({
       localPrinters[0];
     setBindingDevice(device);
     setSelectedPrinterId(initialPrinter?.id ?? "");
+    void scanForNearbyPrinters();
+  }
+
+  async function setDefaultPrinter(device: PosHardwareDeviceSummary) {
+    const configured = getConfiguredPrinter(device);
+    if (!configured) {
+      toast.error(t("pos.hardware.toast.defaultRequiresConnection"));
+      return;
+    }
+    if (!localPrinters.some((printer) => printer.id === configured.printerId)) {
+      toast.error(t("pos.hardware.toast.defaultPrinterMissing"));
+      return;
+    }
+
+    setSettingDefaultPrinterId(device.id);
+    try {
+      await posApi.pos.hardware.bindPrinter(device.id, {
+        printerId: configured.printerId,
+        printerName: configured.printerName,
+        isDefault: true,
+        version: device.version,
+      });
+      onDevicesUpdated?.((await posApi.pos.hardware.list()).data);
+      toast.success(
+        t("pos.hardware.toast.defaultSet", {
+          name:
+            device.hardwareKey && device.provisioningMode === "built_in"
+              ? builtInDeviceName({
+                  deviceType: device.deviceType,
+                  deviceModel: device.config.deviceModel,
+                  fallback: device.name,
+                })
+              : device.name,
+          kind:
+            device.config.printerPurpose === "label"
+              ? t("pos.hardware.printerKind.label")
+              : t("pos.hardware.printerKind.receipt"),
+        }),
+      );
+    } catch (error) {
+      toast.error(
+        getPosApiErrorMessage(error, t("pos.hardware.toast.defaultFailed")),
+      );
+    } finally {
+      setSettingDefaultPrinterId(null);
+    }
+  }
+
+  async function testAndConnectBuiltIn(input: {
+    hardwareKey: PosBuiltInHardwareKey;
+    discovered: DiscoveredBuiltInHardware | null;
+  }) {
+    if (!input.discovered) {
+      toast.error(t("pos.hardware.toast.builtInMissing"));
+      return;
+    }
+    if (!input.discovered.available) {
+      await discoverPrinters();
+      toast.error(t("pos.hardware.toast.builtInUnavailable"));
+      return;
+    }
+
+    setConnectingBuiltIn(input.hardwareKey);
+    try {
+      const hardware = getPosHardwareBridge();
+      if (!hardware) {
+        throw new Error(t("pos.hardware.toast.bridgeMissing"));
+      }
+
+      if (input.discovered.deviceType === "printer") {
+        const printer = input.discovered.printer;
+        if (!printer) {
+          throw new Error(t("pos.hardware.toast.builtInPrinterMissing"));
+        }
+        const displayName = printerDisplayName(printer);
+        const jobId = createId();
+        const result = await hardware.print({
+          id: jobId,
+          printerId: printer.id,
+          title: t("pos.hardware.printTest.builtInTitle"),
+          content: [
+            "CleanHub",
+            t("pos.hardware.printTest.builtInConnection"),
+            t("pos.hardware.printTest.deviceLine", { name: displayName }),
+            t("pos.hardware.printTest.timeLine", { time: formattedNow() }),
+            "",
+          ].join("\n"),
+          copies: 1,
+        });
+        if (result.jobId !== jobId || result.status !== "printed") {
+          throw new Error(
+            result.error ?? t("pos.hardware.toast.testPageFailed"),
+          );
+        }
+      } else {
+        if (!hardware.triggerScanner) {
+          throw new Error(t("pos.hardware.toast.scannerTestUnsupported"));
+        }
+        await hardware.triggerScanner();
+      }
+
+      await posApi.pos.hardware.connectBuiltIn({
+        hardwareKey: input.hardwareKey,
+        name: input.discovered.name,
+        deviceType: input.discovered.deviceType,
+        localDeviceId: input.discovered.localDeviceId,
+        ...(input.discovered.deviceModel
+          ? { deviceModel: input.discovered.deviceModel }
+          : {}),
+      });
+      onDevicesUpdated?.((await posApi.pos.hardware.list()).data);
+      toast.success(
+        input.discovered.deviceType === "printer"
+          ? t("pos.hardware.toast.builtInPrinterConnected")
+          : t("pos.hardware.toast.scannerConnected"),
+      );
+    } catch (error) {
+      toast.error(
+        getPosApiErrorMessage(
+          error,
+          t("pos.hardware.toast.builtInConnectFailed"),
+        ),
+      );
+    } finally {
+      setConnectingBuiltIn(null);
+    }
   }
 
   async function testAndBindPrinter() {
     if (!bindingDevice || !selectedPrinterId) return;
-    const printer = localPrinters.find(
+    let printer = localPrinters.find(
       (candidate) => candidate.id === selectedPrinterId,
     );
     if (!printer) {
-      toast.error("所选打印机已不可用，请重新检测。");
+      toast.error(t("pos.hardware.toast.selectedPrinterUnavailable"));
       return;
     }
 
@@ -136,42 +400,82 @@ export function HardwareSettingsCard({
     try {
       const hardware = getPosHardwareBridge();
       if (!hardware) {
-        throw new Error("未检测到可用的 POS 硬件桥。");
+        throw new Error(t("pos.hardware.toast.bridgeMissing"));
+      }
+      if (
+        printer.connectionType === "bluetooth" &&
+        printer.isPaired === false
+      ) {
+        if (!hardware.pairPrinter) {
+          throw new Error(t("pos.hardware.toast.pairUnsupported"));
+        }
+        toast.info(t("pos.hardware.toast.pairing"));
+        const pairedPrinter = await hardware.pairPrinter(printer.id);
+        printer = pairedPrinter;
+        setLocalPrinters((current) =>
+          current.map((candidate) =>
+            candidate.id === pairedPrinter.id ? pairedPrinter : candidate,
+          ),
+        );
       }
       const jobId = createId();
       const isLabelPrinter = bindingDevice.config.printerPurpose === "label";
+      const purpose = isLabelPrinter ? "label" : "receipt";
+      const hasDefaultForPurpose = devices.some(
+        (device) =>
+          device.id !== bindingDevice.id &&
+          device.deviceType === "printer" &&
+          device.status === "active" &&
+          (device.config.printerPurpose === "label" ? "label" : "receipt") ===
+            purpose &&
+          device.config.printerIsDefault === true,
+      );
+      const displayName = printerDisplayName(printer);
       const result = await hardware.print({
         id: jobId,
         printerId: printer.id,
         title: isLabelPrinter
-          ? "CleanHub 标签打印机测试"
-          : "CleanHub 小票打印机测试",
+          ? t("pos.hardware.printTest.labelTitle")
+          : t("pos.hardware.printTest.receiptTitle"),
         content: [
           "CleanHub",
-          isLabelPrinter ? "工单物品标签测试" : "销售小票打印测试",
-          `用途：${isLabelPrinter ? "工单物品标签" : "销售小票"}`,
-          `设备：${printer.name}`,
-          `时间：${new Date().toLocaleString()}`,
+          isLabelPrinter
+            ? t("pos.hardware.printTest.labelContent")
+            : t("pos.hardware.printTest.receiptContent"),
+          t("pos.hardware.printTest.purposeLine", {
+            purpose: isLabelPrinter
+              ? t("pos.hardware.purpose.label")
+              : t("pos.hardware.purpose.receipt"),
+          }),
+          t("pos.hardware.printTest.deviceLine", { name: displayName }),
+          t("pos.hardware.printTest.timeLine", { time: formattedNow() }),
+          t("pos.hardware.printTest.thanks"),
           "",
         ].join("\n"),
+        qrCodeContent: `CH1:PRINTER-TEST:${jobId}`,
         copies: 1,
       });
       if (result.jobId !== jobId || result.status !== "printed") {
-        throw new Error(result.error ?? "测试页未能成功打印。");
+        throw new Error(result.error ?? t("pos.hardware.toast.testPageFailed"));
       }
 
-      const updated = await posApi.pos.hardware.bindPrinter(bindingDevice.id, {
+      await posApi.pos.hardware.bindPrinter(bindingDevice.id, {
         printerId: printer.id,
         printerName: printer.name,
-        isDefault: printer.isDefault,
+        isDefault:
+          bindingDevice.config.printerIsDefault === true ||
+          !hasDefaultForPurpose,
         version: bindingDevice.version,
       });
-      onDeviceUpdated?.(updated);
+      onDevicesUpdated?.((await posApi.pos.hardware.list()).data);
       setBindingDevice(null);
-      toast.success("测试打印成功，打印机已连接到当前终端。");
+      toast.success(t("pos.hardware.toast.printerConnected"));
     } catch (error) {
       toast.error(
-        getPosApiErrorMessage(error, "打印机测试或连接失败，请检查后重试。"),
+        getPosApiErrorMessage(
+          error,
+          t("pos.hardware.toast.printerConnectFailed"),
+        ),
       );
     } finally {
       setBindingPrinter(false);
@@ -184,14 +488,20 @@ export function HardwareSettingsCard({
   } {
     const configured = getConfiguredPrinter(device);
     if (!configured) {
-      return { label: "未连接", tone: "text-amber-700 lg:bg-amber-50" };
+      return {
+        label: t("pos.hardware.status.notConnected"),
+        tone: "text-amber-700 lg:bg-amber-50",
+      };
     }
     if (printerRuntimeState === "loading") {
-      return { label: "检测中…", tone: "text-blue-700 lg:bg-blue-50" };
+      return {
+        label: t("pos.hardware.status.detecting"),
+        tone: "text-blue-700 lg:bg-blue-50",
+      };
     }
     if (printerRuntimeState === "unavailable") {
       return {
-        label: "POS 硬件未连接",
+        label: t("pos.hardware.status.bridgeUnavailable"),
         tone: "text-amber-700 lg:bg-amber-50",
       };
     }
@@ -199,23 +509,23 @@ export function HardwareSettingsCard({
       const operationalIssue: Record<string, { label: string; tone: string }> =
         {
           PRINTER_NO_PAPER: {
-            label: "缺纸",
+            label: t("pos.hardware.status.noPaper"),
             tone: "text-red-700 lg:bg-red-50",
           },
           PRINTER_COVER_OPEN: {
-            label: "仓盖未关闭",
+            label: t("pos.hardware.status.coverOpen"),
             tone: "text-red-700 lg:bg-red-50",
           },
           PRINTER_OVERHEATED: {
-            label: "温度过高",
+            label: t("pos.hardware.status.overheated"),
             tone: "text-red-700 lg:bg-red-50",
           },
           PRINTER_BUSY: {
-            label: "打印中",
+            label: t("pos.hardware.status.printing"),
             tone: "text-blue-700 lg:bg-blue-50",
           },
           PRINTER_LOW_BATTERY: {
-            label: "设备电量低",
+            label: t("pos.hardware.status.lowBattery"),
             tone: "text-amber-700 lg:bg-amber-50",
           },
         };
@@ -223,15 +533,21 @@ export function HardwareSettingsCard({
         ? operationalIssue[printerOperationalStatus]
         : undefined;
       if (issue) return issue;
-      return { label: "已连接", tone: "text-emerald-700 lg:bg-emerald-50" };
+      return {
+        label: t("pos.hardware.status.connected"),
+        tone: "text-emerald-700 lg:bg-emerald-50",
+      };
     }
-    return { label: "未检测到", tone: "text-red-700 lg:bg-red-50" };
+    return {
+      label: t("pos.hardware.status.notDetected"),
+      tone: "text-red-700 lg:bg-red-50",
+    };
   }
 
   async function openDrawer() {
     const reason = drawerReason.trim();
     if (!reason) {
-      toast.error("请填写开钱箱原因。");
+      toast.error(t("pos.hardware.toast.drawerReasonRequired"));
       return;
     }
 
@@ -242,16 +558,16 @@ export function HardwareSettingsCard({
       );
       const hardware = getPosHardwareBridge();
       if (!hardware) {
-        throw new Error("未检测到可用的 POS 硬件桥，请在 POS 客户端中重试。");
+        throw new Error(t("pos.hardware.toast.bridgeMissingInClient"));
       }
 
       const capabilities = await hardware.getCapabilities();
       if (!capabilities.cashDrawer) {
-        throw new Error("当前终端的钱箱适配器不可用，请检查 POS 钱箱配置。");
+        throw new Error(t("pos.hardware.toast.drawerAdapterUnavailable"));
       }
 
       if (!configuredDrawer) {
-        throw new Error("当前收银终端未配置可用钱箱。");
+        throw new Error(t("pos.hardware.toast.drawerNotConfigured"));
       }
 
       await hardware.openCashDrawer(
@@ -264,12 +580,12 @@ export function HardwareSettingsCard({
           },
         }),
       );
-      toast.success("钱箱已打开。");
+      toast.success(t("pos.hardware.toast.drawerOpened"));
       setDrawerDialogOpen(false);
       setDrawerReason("");
     } catch (error) {
       toast.error(
-        getPosApiErrorMessage(error, "开钱箱失败，请检查硬件连接后重试。"),
+        getPosApiErrorMessage(error, t("pos.hardware.toast.drawerOpenFailed")),
       );
     } finally {
       setOpeningDrawer(false);
@@ -277,7 +593,7 @@ export function HardwareSettingsCard({
   }
 
   return (
-    <section className="bg-background lg:overflow-hidden lg:border-y">
+    <section className="bg-background lg:overflow-hidden lg:rounded-xl lg:border lg:border-black/10 lg:shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
       <header className="pb-7 lg:border-b lg:px-4 lg:py-3">
         <div className="flex items-center gap-2">
           <Icon
@@ -285,34 +601,161 @@ export function HardwareSettingsCard({
             name="printer"
           />
           <h2 className="text-3xl font-bold tracking-tight text-foreground lg:text-sm lg:font-semibold lg:tracking-normal">
-            硬件设备
+            {t("pos.hardware.title")}
           </h2>
         </div>
         <p className="mt-2 text-sm leading-6 text-muted-foreground lg:mt-1 lg:text-xs lg:leading-5">
-          当前收银终端已配置的硬件设备。如需添加或修改，请联系管理员在后台操作。
+          {t("pos.hardware.description")}
         </p>
       </header>
       <div className="lg:p-4">
         {loading ? (
           <div className="flex min-h-24 items-center lg:justify-center">
             <div className="text-sm text-muted-foreground">
-              正在加载设备列表…
+              {t("pos.hardware.loadingDevices")}
             </div>
           </div>
-        ) : devices.length === 0 ? (
+        ) : builtInRows.length === 0 && configuredDevices.length === 0 ? (
           <div className="flex min-h-24 items-center lg:justify-center lg:rounded-md lg:border lg:border-dashed">
             <p className="text-sm text-muted-foreground">
-              暂无已配置的硬件设备
+              {t("pos.hardware.emptyDevices")}
             </p>
           </div>
         ) : (
           <div className="space-y-2">
-            {devices.map((device) => {
+            {builtInRows.map(({ hardwareKey, discovered, persisted }) => {
+              const connecting = connectingBuiltIn === hardwareKey;
+              const status = connecting
+                ? {
+                    label: t("pos.hardware.status.connecting"),
+                    tone: "text-blue-700 lg:bg-blue-50",
+                  }
+                : !discovered
+                  ? {
+                      label: t("pos.hardware.status.notDetectedHere"),
+                      tone: "text-red-700 lg:bg-red-50",
+                    }
+                  : !discovered.available
+                    ? {
+                        label: t(
+                          "pos.hardware.status.builtInServiceUnavailable",
+                        ),
+                        tone: "text-red-700 lg:bg-red-50",
+                      }
+                    : persisted
+                      ? persisted.deviceType === "printer"
+                        ? printerStatus(persisted)
+                        : {
+                            label: t("pos.hardware.status.connected"),
+                            tone: "text-emerald-700 lg:bg-emerald-50",
+                          }
+                      : {
+                          label: t("pos.hardware.status.connectable"),
+                          tone: "text-amber-700 lg:bg-amber-50",
+                        };
+              const deviceType =
+                discovered?.deviceType ?? persisted?.deviceType ?? "scanner";
+
+              return (
+                <div
+                  className="flex min-h-[76px] items-center justify-between gap-3 py-3 lg:min-h-0 lg:border-b lg:last:border-b-0"
+                  key={hardwareKey}
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Icon
+                      className="hidden h-5 w-5 shrink-0 text-muted-foreground lg:block"
+                      name={DEVICE_ICONS[deviceType] ?? "settings"}
+                    />
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-base font-medium text-foreground lg:text-sm">
+                          {builtInDeviceName({
+                            deviceType,
+                            deviceModel:
+                              discovered?.deviceModel ??
+                              persisted?.config.deviceModel,
+                            fallback:
+                              discovered?.name ??
+                              persisted?.name ??
+                              hardwareKey,
+                          })}
+                        </p>
+                        <span className="rounded-full bg-sky-50 px-2 py-0.5 text-[11px] font-medium text-sky-700">
+                          {t("pos.hardware.label.builtInDevice")}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-sm text-muted-foreground lg:mt-0 lg:text-xs">
+                        {deviceTypeLabel(deviceType)}
+                        {deviceType === "printer"
+                          ? ` · ${t("pos.hardware.purpose.receipt")}`
+                          : ""}
+                        {persisted?.config.printerIsDefault === true
+                          ? ` · ${t("pos.hardware.label.default")}`
+                          : ""}
+                        {persisted
+                          ? ` · ${t("pos.hardware.label.synced")}`
+                          : ` · ${t("pos.hardware.label.notRegistered")}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    {canManageSensitiveHardware &&
+                    persisted?.deviceType === "printer" ? (
+                      <label className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs font-semibold text-foreground">
+                        <input
+                          checked={persisted.config.printerIsDefault === true}
+                          disabled={
+                            connectingBuiltIn !== null ||
+                            settingDefaultPrinterId !== null ||
+                            !discovered?.available
+                          }
+                          name="default-printer-receipt"
+                          onChange={() => void setDefaultPrinter(persisted)}
+                          type="radio"
+                        />
+                        {t("pos.hardware.label.default")}
+                      </label>
+                    ) : null}
+                    <span
+                      className={`text-sm font-medium lg:rounded-full lg:px-2 lg:py-0.5 lg:text-xs ${status.tone}`}
+                    >
+                      {status.label}
+                    </span>
+                    {canManageSensitiveHardware && discovered ? (
+                      <button
+                        className="h-9 rounded-md border px-3 text-xs font-semibold text-foreground hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={connectingBuiltIn !== null}
+                        onClick={() =>
+                          void testAndConnectBuiltIn({
+                            hardwareKey,
+                            discovered,
+                          })
+                        }
+                        type="button"
+                      >
+                        {connecting
+                          ? t("pos.hardware.action.testing")
+                          : !discovered.available
+                            ? t("pos.hardware.action.rescan")
+                            : persisted
+                              ? t("pos.hardware.action.testReconnect")
+                              : t("pos.hardware.action.testConnect")}
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+
+            {configuredDevices.map((device) => {
               const status =
                 device.deviceType === "printer"
                   ? printerStatus(device)
                   : {
-                      label: device.status === "active" ? "已配置" : "已停用",
+                      label:
+                        device.status === "active"
+                          ? t("pos.hardware.status.configured")
+                          : t("pos.hardware.status.inactive"),
                       tone:
                         device.status === "active"
                           ? "text-emerald-700 lg:bg-emerald-50"
@@ -334,23 +777,54 @@ export function HardwareSettingsCard({
                         {device.name}
                       </p>
                       <p className="mt-0.5 text-sm text-muted-foreground lg:mt-0 lg:text-xs">
-                        {DEVICE_TYPE_LABELS[device.deviceType] ??
-                          device.deviceType}
+                        {deviceTypeLabel(device.deviceType)}
                         {" · "}
-                        {CONNECTION_TYPE_LABELS[device.connectionType] ??
-                          device.connectionType}
+                        {connectionTypeLabel(device.connectionType)}
                         {device.deviceType === "printer"
-                          ? ` · ${device.config.printerPurpose === "label" ? "工单标签" : "销售小票"}`
+                          ? ` · ${
+                              device.config.printerPurpose === "label"
+                                ? t("pos.hardware.purpose.label")
+                                : t("pos.hardware.purpose.receipt")
+                            }`
+                          : ""}
+                        {device.deviceType === "printer" &&
+                        device.config.printerIsDefault === true
+                          ? ` · ${t("pos.hardware.label.default")}`
                           : ""}
                       </p>
                       {device.deviceType === "printer" && configuredPrinter ? (
                         <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                          {configuredPrinter.printerName}
+                          {storedPrinterDisplayName(
+                            configuredPrinter.printerId,
+                            configuredPrinter.printerName,
+                          )}
                         </p>
                       ) : null}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
+                    {canManageSensitiveHardware &&
+                    device.deviceType === "printer" ? (
+                      <label className="flex min-h-9 cursor-pointer items-center gap-2 rounded-md border px-3 text-xs font-semibold text-foreground">
+                        <input
+                          checked={device.config.printerIsDefault === true}
+                          disabled={
+                            !configuredPrinter ||
+                            settingDefaultPrinterId !== null ||
+                            !localPrinters.some(
+                              (printer) =>
+                                printer.id === configuredPrinter.printerId,
+                            )
+                          }
+                          name={`default-printer-${device.config.printerPurpose === "label" ? "label" : "receipt"}`}
+                          onChange={() => void setDefaultPrinter(device)}
+                          type="radio"
+                        />
+                        {settingDefaultPrinterId === device.id
+                          ? t("pos.hardware.action.settingDefault")
+                          : t("pos.hardware.label.default")}
+                      </label>
+                    ) : null}
                     <span
                       className={`text-sm font-medium lg:rounded-full lg:px-2 lg:py-0.5 lg:text-xs ${status.tone}`}
                     >
@@ -364,7 +838,9 @@ export function HardwareSettingsCard({
                         onClick={() => openPrinterBinding(device)}
                         type="button"
                       >
-                        {configuredPrinter ? "测试 / 重连" : "连接"}
+                        {configuredPrinter
+                          ? t("pos.hardware.action.testReconnect")
+                          : t("pos.hardware.action.connect")}
                       </button>
                     ) : null}
                   </div>
@@ -379,12 +855,12 @@ export function HardwareSettingsCard({
         <footer className="flex items-center justify-between gap-4 py-4 lg:border-t lg:px-4 lg:py-3">
           <div className="min-w-0">
             <p className="text-base font-medium text-foreground lg:text-sm">
-              钱箱控制
+              {t("pos.hardware.drawer.control")}
             </p>
             <p className="mt-1 text-sm text-muted-foreground lg:text-xs">
               {configuredDrawer
                 ? configuredDrawer.name
-                : "当前收银终端未配置可用钱箱"}
+                : t("pos.hardware.drawer.notConfigured")}
             </p>
           </div>
           <button
@@ -394,7 +870,7 @@ export function HardwareSettingsCard({
             type="button"
           >
             <Icon className="h-4 w-4" name="wallet-cards" />
-            开钱箱
+            {t("pos.hardware.action.openDrawer")}
           </button>
         </footer>
       ) : null}
@@ -410,19 +886,19 @@ export function HardwareSettingsCard({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>手动开钱箱</DialogTitle>
+            <DialogTitle>{t("pos.hardware.drawer.dialogTitle")}</DialogTitle>
             <DialogDescription>
-              仅 Owner 或 Manager 可执行，授权原因和当前终端会写入审计记录。
+              {t("pos.hardware.drawer.dialogDescription")}
             </DialogDescription>
           </DialogHeader>
           <label className="grid gap-2 text-sm font-medium text-foreground">
-            操作原因
+            {t("pos.hardware.drawer.reason")}
             <textarea
               className="min-h-24 rounded-md border bg-background px-3 py-2 font-normal text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring"
               disabled={openingDrawer}
               maxLength={500}
               onChange={(event) => setDrawerReason(event.target.value)}
-              placeholder="填写手动开钱箱原因"
+              placeholder={t("pos.hardware.drawer.reasonPlaceholder")}
               value={drawerReason}
             />
           </label>
@@ -433,7 +909,7 @@ export function HardwareSettingsCard({
               onClick={() => setDrawerDialogOpen(false)}
               type="button"
             >
-              返回
+              {t("pos.hardware.action.back")}
             </button>
             <button
               className="flex h-11 items-center justify-center gap-2 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -442,7 +918,9 @@ export function HardwareSettingsCard({
               type="button"
             >
               <Icon className="h-4 w-4" name="wallet-cards" />
-              {openingDrawer ? "授权中…" : "授权并打开"}
+              {openingDrawer
+                ? t("pos.hardware.action.authorizing")
+                : t("pos.hardware.action.authorizeOpen")}
             </button>
           </DialogFooter>
         </DialogContent>
@@ -454,74 +932,205 @@ export function HardwareSettingsCard({
         }}
         open={Boolean(bindingDevice)}
       >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              连接
-              {bindingDevice?.config.printerPurpose === "label"
-                ? "标签打印机"
-                : "小票打印机"}
-            </DialogTitle>
-            <DialogDescription>
-              请选择当前设备操作系统中已安装的
-              {bindingDevice?.config.printerPurpose === "label"
-                ? "标签打印机"
-                : "小票打印机"}
-              。系统会先打印测试页，成功后才保存绑定。
-            </DialogDescription>
+        <DialogContent className="max-h-[92vh] gap-0 overflow-hidden p-0 sm:max-w-xl">
+          <DialogHeader className="border-b px-6 py-5 pr-14 text-left">
+            <div className="flex items-start gap-3">
+              <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="size-5" name="printer" />
+              </div>
+              <div className="min-w-0 space-y-1.5">
+                <DialogTitle className="text-xl leading-7">
+                  {t("pos.hardware.printerDialog.title", {
+                    kind:
+                      bindingDevice?.config.printerPurpose === "label"
+                        ? t("pos.hardware.printerKind.label")
+                        : t("pos.hardware.printerKind.receipt"),
+                  })}
+                </DialogTitle>
+                <DialogDescription className="leading-5">
+                  {t("pos.hardware.printerDialog.description")}
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          {printerRuntimeState === "unavailable" ? (
-            <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
-              未检测到 POS 打印能力。T1101
-              请检查内置打印服务，桌面客户端请先在操作系统中安装打印机。
-            </p>
-          ) : printerRuntimeState === "error" ? (
-            <p className="rounded-md bg-red-50 p-3 text-sm text-red-800">
-              检测打印机失败，请检查系统打印服务后重试。
-            </p>
-          ) : localPrinters.length === 0 ? (
-            <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
-              当前设备没有检测到可用打印机。
-            </p>
-          ) : (
-            <label className="grid gap-2 text-sm font-medium text-foreground">
-              本机打印机
-              <select
-                className="h-11 rounded-md border bg-background px-3 font-normal outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                disabled={bindingPrinter}
-                onChange={(event) => setSelectedPrinterId(event.target.value)}
-                value={selectedPrinterId}
+
+          <div className="space-y-4 px-6 py-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-foreground">
+                    {t("pos.hardware.printerDialog.availablePrinters")}
+                  </p>
+                  <Badge variant="secondary">
+                    {t("pos.hardware.printerDialog.deviceCount", {
+                      count: localPrinters.length,
+                    })}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {scanningPrinters
+                    ? t("pos.hardware.printerDialog.scanningHint")
+                    : t("pos.hardware.printerDialog.selectHint")}
+                </p>
+              </div>
+              <Button
+                className="h-10 shrink-0"
+                disabled={bindingPrinter || scanningPrinters}
+                onClick={() => void scanForNearbyPrinters()}
+                size="sm"
+                type="button"
+                variant="outline"
               >
-                {localPrinters.map((printer) => (
-                  <option key={printer.id} value={printer.id}>
-                    {printer.name}
-                    {printer.isDefault ? "（系统默认）" : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-          <DialogFooter>
-            <button
-              className="h-9 rounded-md border px-4 text-sm font-semibold text-foreground hover:bg-accent disabled:opacity-50"
-              disabled={bindingPrinter}
-              onClick={() => void discoverPrinters()}
-              type="button"
-            >
-              重新检测
-            </button>
-            <button
-              className="h-9 rounded-md bg-foreground px-4 text-sm font-semibold text-background hover:bg-foreground/90 disabled:cursor-not-allowed disabled:opacity-50"
+                <Icon
+                  className={cn("size-4", scanningPrinters && "animate-spin")}
+                  name="rotate-ccw"
+                />
+                {scanningPrinters
+                  ? t("pos.hardware.action.scanning")
+                  : t("pos.hardware.action.rescan")}
+              </Button>
+            </div>
+
+            {printerRuntimeState === "error" ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4">
+                <p className="text-sm font-medium text-destructive">
+                  {t("pos.hardware.printerDialog.scanFailedTitle")}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  {t("pos.hardware.printerDialog.scanFailedHint")}
+                </p>
+              </div>
+            ) : localPrinters.length === 0 ? (
+              <div className="flex min-h-52 flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-6 text-center">
+                <div className="flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                  <Icon className="size-5" name="printer" />
+                </div>
+                <p className="mt-3 text-sm font-medium text-foreground">
+                  {scanningPrinters
+                    ? t("pos.hardware.printerDialog.findingPrinters")
+                    : t("pos.hardware.printerDialog.noPrinters")}
+                </p>
+                <p className="mt-1 max-w-xs text-xs leading-5 text-muted-foreground">
+                  {t("pos.hardware.printerDialog.noPrintersHint")}
+                </p>
+              </div>
+            ) : (
+              <ScrollArea className="h-[min(340px,42vh)] rounded-xl border bg-muted/10">
+                <RadioGroup
+                  className="gap-2 p-2"
+                  disabled={bindingPrinter || scanningPrinters}
+                  onValueChange={setSelectedPrinterId}
+                  value={selectedPrinterId}
+                >
+                  {localPrinters.map((printer, index) => {
+                    const selected = printer.id === selectedPrinterId;
+                    const paired = printer.isPaired !== false;
+                    const optionId = `printer-option-${index}`;
+                    const displayName = printerDisplayName(printer);
+
+                    return (
+                      <label
+                        className={cn(
+                          "flex min-h-20 cursor-pointer items-center gap-3 rounded-lg border bg-background p-3.5 transition-colors",
+                          "hover:border-primary/40 hover:bg-accent/40",
+                          selected &&
+                            "border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20",
+                          (bindingPrinter || scanningPrinters) &&
+                            "cursor-not-allowed opacity-60",
+                        )}
+                        htmlFor={optionId}
+                        key={printer.id}
+                      >
+                        <div
+                          className={cn(
+                            "flex size-11 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground",
+                            selected && "bg-primary/10 text-primary",
+                          )}
+                        >
+                          <Icon className="size-5" name="printer" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-foreground">
+                            {displayName}
+                          </p>
+                          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <Badge variant="outline">
+                              {printer.connectionType === "bluetooth"
+                                ? t("pos.hardware.connectionType.bluetooth")
+                                : printer.connectionType === "built_in"
+                                  ? t("pos.hardware.connectionType.builtIn")
+                                  : t(
+                                      "pos.hardware.connectionType.systemDevice",
+                                    )}
+                            </Badge>
+                            {printer.connectionType === "bluetooth" ? (
+                              <Badge variant={paired ? "secondary" : "outline"}>
+                                {paired
+                                  ? t("pos.hardware.printerDialog.paired")
+                                  : t(
+                                      "pos.hardware.printerDialog.pairOnConnect",
+                                    )}
+                              </Badge>
+                            ) : null}
+                            {printer.isDefault ? (
+                              <Badge variant="secondary">
+                                {t("pos.hardware.printerDialog.systemDefault")}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                        <RadioGroupItem
+                          aria-label={t(
+                            "pos.hardware.printerDialog.selectPrinter",
+                            { name: displayName },
+                          )}
+                          className="size-5"
+                          id={optionId}
+                          value={printer.id}
+                        />
+                      </label>
+                    );
+                  })}
+                </RadioGroup>
+              </ScrollArea>
+            )}
+
+            {selectedLocalPrinter ? (
+              <div className="flex items-center gap-2 rounded-lg bg-muted/50 px-3 py-2.5 text-xs text-muted-foreground">
+                <Icon
+                  className="size-4 shrink-0 text-emerald-600"
+                  name="check"
+                />
+                <span className="truncate">
+                  {t("pos.hardware.printerDialog.selected")}
+                  <strong className="font-medium text-foreground">
+                    {selectedLocalPrinterName}
+                  </strong>
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          <Separator />
+          <DialogFooter className="bg-muted/30 px-6 py-4 sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              {t("pos.hardware.printerDialog.pairingHint")}
+            </p>
+            <Button
+              className="h-11 min-w-36"
               disabled={
                 bindingPrinter ||
+                scanningPrinters ||
                 !selectedPrinterId ||
                 printerRuntimeState !== "ready"
               }
               onClick={() => void testAndBindPrinter()}
               type="button"
             >
-              {bindingPrinter ? "正在测试…" : "测试并连接"}
-            </button>
+              {bindingPrinter
+                ? t("pos.hardware.action.pairTesting")
+                : t("pos.hardware.action.testConnect")}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

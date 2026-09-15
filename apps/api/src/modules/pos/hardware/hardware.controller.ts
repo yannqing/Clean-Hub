@@ -7,6 +7,7 @@ import {
   authorizeManualDrawerOpen,
   authorizePrivilegedReprint,
   bindPosPrinter,
+  connectPosBuiltInHardware,
   listPosHardwareDevices,
   recordCashPaymentDrawerResult,
   recordPosPrintJobResult,
@@ -15,6 +16,7 @@ import {
   authorizeManualDrawerOpenBodySchema,
   authorizePrivilegedReprintBodySchema,
   bindPosPrinterBodySchema,
+  connectPosBuiltInHardwareBodySchema,
   posHardwareDeviceParamsSchema,
   recordCashPaymentDrawerResultBodySchema,
   recordPosPrintJobResultBodySchema,
@@ -38,8 +40,8 @@ function createPosHardwareErrorResponse(
  * GET /pos/hardware-devices
  *
  * Returns the active peripherals bound to the current POS terminal.
- * Device lifecycle is admin-only. Local printer binding has a dedicated
- * Owner/Manager endpoint below.
+ * Manually configured device lifecycle remains admin-only. Built-in device
+ * registration and local printer binding have Owner/Manager endpoints below.
  */
 export async function listHardwareDevicesController(c: Context<AppBindings>) {
   const devices = await listPosHardwareDevices(c.get("authContext"));
@@ -65,6 +67,20 @@ export async function bindPosPrinterController(c: Context<AppBindings>) {
     }
     throw error;
   }
+}
+
+export async function connectPosBuiltInHardwareController(
+  c: Context<AppBindings>,
+) {
+  const data = connectPosBuiltInHardwareBodySchema.parse(await c.req.json());
+
+  return c.json(
+    await connectPosBuiltInHardware({
+      authContext: c.get("authContext"),
+      requestMeta: getRequestMeta(c),
+      data,
+    }),
+  );
 }
 
 export async function authorizeManualDrawerOpenController(

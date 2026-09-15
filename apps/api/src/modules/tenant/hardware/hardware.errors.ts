@@ -1,6 +1,7 @@
 export type HardwareErrorCode =
   | "HARDWARE_NOT_FOUND"
   | "HARDWARE_TERMINAL_NOT_FOUND"
+  | "HARDWARE_BUILT_IN_READ_ONLY"
   | "HARDWARE_VERSION_CONFLICT";
 
 export class HardwareError extends Error {

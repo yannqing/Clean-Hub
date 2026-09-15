@@ -6,6 +6,7 @@ export type {
   HardwareDeviceStatus,
   HardwareDeviceType,
   HardwarePrinterPurpose,
+  HardwareProvisioningMode,
   UpdateHardwareConfigRequest,
 } from "@cleanhub/api-client";
 

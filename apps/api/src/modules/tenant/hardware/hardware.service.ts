@@ -154,6 +154,14 @@ export async function updateHardwareConfig(
       );
     }
 
+    if (existing.provisioningMode === "built_in") {
+      throw new HardwareError(
+        "HARDWARE_BUILT_IN_READ_ONLY",
+        "Built-in hardware is managed by its POS terminal and cannot be edited in tenant administration.",
+        409,
+      );
+    }
+
     let targetBranchId = existing.branchId;
 
     if (input.data.terminalId) {
@@ -240,6 +248,14 @@ export async function deleteHardwareConfig(
         "HARDWARE_NOT_FOUND",
         "Hardware config was not found.",
         404,
+      );
+    }
+
+    if (existing.provisioningMode === "built_in") {
+      throw new HardwareError(
+        "HARDWARE_BUILT_IN_READ_ONLY",
+        "Built-in hardware is managed by its POS terminal and cannot be deleted.",
+        409,
       );
     }
 

@@ -796,6 +796,171 @@ export const frMessages = {
       current: "Français",
       switcherLabel: "Changer de langue",
     },
+    hardware: {
+      title: "Périphériques",
+      description:
+        "Les périphériques intégrés sont détectés par ce terminal et peuvent être testés et connectés ici. Les périphériques externes restent configurés par un administrateur.",
+      loadingDevices: "Chargement des périphériques…",
+      emptyDevices: "Aucun périphérique détecté ou configuré pour ce terminal",
+      deviceType: {
+        printer: "Imprimante",
+        scanner: "Lecteur de codes-barres",
+        cashDrawer: "Tiroir-caisse",
+      },
+      connectionType: {
+        usb: "USB",
+        bluetooth: "Bluetooth",
+        network: "Réseau",
+        other: "Autre",
+        builtIn: "Intégré au T11",
+        systemDevice: "Périphérique système",
+      },
+      purpose: {
+        receipt: "Tickets de caisse",
+        label: "Étiquettes de ticket",
+      },
+      printerKind: {
+        receipt: "de tickets",
+        label: "d’étiquettes",
+      },
+      deviceName: {
+        builtInPrinter: "Imprimante thermique intégrée {model}",
+        builtInScanner: "Lecteur intégré {model}",
+      },
+      label: {
+        builtInDevice: "Périphérique intégré",
+        default: "Par défaut",
+        synced: "Synchronisé avec l’administration",
+        notRegistered: "Non enregistré",
+      },
+      status: {
+        connecting: "Connexion…",
+        notDetectedHere: "Non détecté actuellement",
+        builtInServiceUnavailable: "Service intégré indisponible",
+        connected: "Connecté",
+        connectable: "Prêt à connecter",
+        configured: "Configuré",
+        inactive: "Désactivé",
+        notConnected: "Non connecté",
+        detecting: "Détection…",
+        bridgeUnavailable: "Matériel POS indisponible",
+        notDetected: "Non détecté",
+        noPaper: "Plus de papier",
+        coverOpen: "Capot ouvert",
+        overheated: "Surchauffe",
+        printing: "Impression",
+        lowBattery: "Batterie faible",
+      },
+      action: {
+        settingDefault: "Configuration…",
+        testing: "Test…",
+        rescan: "Détecter à nouveau",
+        testReconnect: "Tester / reconnecter",
+        testConnect: "Tester et connecter",
+        connect: "Connecter",
+        openDrawer: "Ouvrir le tiroir",
+        back: "Retour",
+        authorizing: "Autorisation…",
+        authorizeOpen: "Autoriser et ouvrir",
+        scanning: "Recherche",
+        pairTesting: "Appairage et test…",
+      },
+      toast: {
+        scanNearbyFailed:
+          "Impossible de rechercher les appareils Bluetooth à proximité. Vérifiez les autorisations et réessayez.",
+        defaultRequiresConnection:
+          "Testez et connectez cette imprimante avant de la définir par défaut.",
+        defaultPrinterMissing:
+          "Cette imprimante n’est pas détectée sur le terminal actuel. Reconnectez-la d’abord.",
+        defaultSet: "{name} est maintenant l’imprimante {kind} par défaut.",
+        defaultFailed:
+          "Impossible de définir l’imprimante par défaut. Réessayez.",
+        builtInMissing:
+          "Ce périphérique intégré n’est pas détecté. Vérifiez le service matériel et réessayez.",
+        builtInUnavailable:
+          "Le service matériel intégré n’est pas connecté. La détection a été relancée ; réessayez dans un instant.",
+        bridgeMissing: "Aucun pont matériel POS n’a été détecté.",
+        builtInPrinterMissing:
+          "L’imprimante intégrée de cet appareil n’a pas été détectée.",
+        testPageFailed: "La page de test n’a pas été imprimée correctement.",
+        scannerTestUnsupported:
+          "Ce client ne permet pas de tester activement le lecteur intégré.",
+        builtInPrinterConnected:
+          "La page de test a été imprimée. L’imprimante intégrée est connectée et enregistrée.",
+        scannerConnected: "Le lecteur a démarré et a été enregistré.",
+        builtInConnectFailed:
+          "Impossible de connecter le périphérique intégré. Vérifiez-le et réessayez.",
+        selectedPrinterUnavailable:
+          "L’imprimante sélectionnée n’est plus disponible. Relancez la détection.",
+        pairUnsupported:
+          "Ce client ne permet pas d’appairer une imprimante Bluetooth dans l’application.",
+        pairing:
+          "Appairage de l’imprimante Bluetooth. Confirmez la demande système si nécessaire.",
+        printerConnected:
+          "La page de test a été imprimée. L’imprimante est connectée à ce terminal.",
+        printerConnectFailed:
+          "Impossible de tester ou de connecter l’imprimante. Vérifiez-la et réessayez.",
+        drawerReasonRequired:
+          "Indiquez la raison de l’ouverture du tiroir-caisse.",
+        bridgeMissingInClient:
+          "Aucun pont matériel POS n’a été détecté. Réessayez dans le client POS.",
+        drawerAdapterUnavailable:
+          "L’adaptateur du tiroir-caisse est indisponible. Vérifiez la configuration POS du tiroir-caisse.",
+        drawerNotConfigured:
+          "Aucun tiroir-caisse disponible n’est configuré pour ce terminal de caisse.",
+        drawerOpened: "Le tiroir-caisse est ouvert.",
+        drawerOpenFailed:
+          "Impossible d’ouvrir le tiroir-caisse. Vérifiez la connexion matérielle et réessayez.",
+      },
+      printTest: {
+        builtInTitle: "Test de l’imprimante intégrée CleanHub",
+        builtInConnection:
+          "Test de connexion de l’imprimante intégrée POS-T1101",
+        labelTitle: "Test de l’imprimante d’étiquettes CleanHub",
+        receiptTitle: "Test de l’imprimante de tickets CleanHub",
+        labelContent: "Test d’étiquette d’article de ticket",
+        receiptContent: "Test d’impression de ticket de caisse",
+        purposeLine: "Usage : {purpose}",
+        deviceLine: "Périphérique : {name}",
+        timeLine: "Heure : {time}",
+        thanks: "Merci",
+      },
+      drawer: {
+        control: "Contrôle du tiroir-caisse",
+        notConfigured:
+          "Aucun tiroir-caisse disponible n’est configuré pour ce terminal de caisse",
+        dialogTitle: "Ouvrir manuellement le tiroir-caisse",
+        dialogDescription:
+          "Seul un Owner ou Manager peut effectuer cette action. La raison et le terminal actuel seront inscrits dans le journal d’audit.",
+        reason: "Raison",
+        reasonPlaceholder: "Indiquez la raison de l’ouverture du tiroir-caisse",
+      },
+      printerDialog: {
+        title: "Connecter une imprimante {kind}",
+        description:
+          "Choisissez une imprimante à proximité de ce POS. Les appareils non appairés le seront pendant la connexion et ne seront enregistrés qu’après un test d’impression réussi.",
+        availablePrinters: "Imprimantes disponibles",
+        deviceCount: "{count} appareils",
+        scanningHint:
+          "Recherche des appareils à proximité. Cela prend généralement 10 à 15 secondes…",
+        selectHint:
+          "Touchez une ligne pour la sélectionner. Laissez les imprimantes Bluetooth allumées et détectables.",
+        scanFailedTitle: "Impossible de détecter les imprimantes",
+        scanFailedHint:
+          "Vérifiez les autorisations Bluetooth et Appareils à proximité, puis relancez la recherche.",
+        findingPrinters: "Recherche des imprimantes…",
+        noPrinters: "Aucune imprimante trouvée",
+        noPrintersHint:
+          "Vérifiez que l’imprimante est allumée et détectable en Bluetooth, puis relancez la recherche.",
+        paired: "Appairée",
+        pairOnConnect: "Appairer à la connexion",
+        systemDefault: "Par défaut du système",
+        selectPrinter: "Sélectionner {name}",
+        selected: "Sélectionnée :",
+        pairingHint:
+          "Le premier appairage Bluetooth peut demander une confirmation système",
+      },
+    },
     nav: {
       operations: "Opérations",
       records: "Dossiers",
@@ -850,7 +1015,8 @@ export const frMessages = {
       clear: "Vider",
       remove: "Retirer",
       loading: "Chargement du panier…",
-      queued: "Commande hors ligne enregistrée. Elle sera synchronisée au retour du réseau.",
+      queued:
+        "Commande hors ligne enregistrée. Elle sera synchronisée au retour du réseau.",
       created: "Commande créée. Continuez avec l’encaissement.",
       scanAdded: "{name} ajouté par scan",
       scanNotFound: "Aucun code-barres ou SKU trouvé : {code}",

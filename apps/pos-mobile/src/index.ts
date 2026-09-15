@@ -4,7 +4,7 @@
  * This file is the bridge between the web layer (pos-web) and native
  * device capabilities. Add native plugin exports here as they are needed:
  *
- *   - Bluetooth printing (@niceblue/capacitor-bluetooth-printer)
+ *   - Bluetooth ESC/POS printing (implemented by the Android T1101 bridge)
  *   - Barcode scanning (@capacitor-community/barcode-scanner)
  *   - Haptic feedback (@capacitor/haptics)
  *   - Push notifications (@capacitor/push-notifications)

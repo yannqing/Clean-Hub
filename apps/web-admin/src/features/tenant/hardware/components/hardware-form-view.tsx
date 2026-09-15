@@ -129,6 +129,7 @@ export function HardwareFormView({
   const router = useRouter();
   const { m } = useTenantI18n();
   const isEditMode = mode === "edit";
+  const isBuiltIn = initialDevice?.provisioningMode === "built_in";
   const [name, setName] = useState(initialDevice?.name ?? "");
   const [terminalId, setTerminalId] = useState(initialDevice?.terminalId ?? "");
   const [deviceType, setDeviceType] = useState<HardwareDeviceType>(
@@ -146,9 +147,11 @@ export function HardwareFormView({
   const [errors, setErrors] = useState<DeviceFormErrors>({});
   const [saving, setSaving] = useState(false);
 
-  const pageTitle = isEditMode
-    ? m.hardware.edit.title
-    : m.hardware.create.title;
+  const pageTitle = isBuiltIn
+    ? initialDevice?.name || m.hardware.actions.view
+    : isEditMode
+      ? m.hardware.edit.title
+      : m.hardware.create.title;
 
   function clearError(field: keyof DeviceFormErrors) {
     setErrors((current) => ({ ...current, [field]: undefined }));
@@ -157,7 +160,7 @@ export function HardwareFormView({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (saving) {
+    if (saving || isBuiltIn) {
       return;
     }
 
@@ -266,7 +269,16 @@ export function HardwareFormView({
           </p>
         ) : null}
 
-        <fieldset className="contents" disabled={saving || terminalLoadFailed}>
+        {isBuiltIn ? (
+          <p className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
+            {m.hardware.provisioning.builtInReadonly}
+          </p>
+        ) : null}
+
+        <fieldset
+          className="contents"
+          disabled={saving || terminalLoadFailed || isBuiltIn}
+        >
           <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
             <div className="grid gap-5">
               <Card className="gap-0 rounded-lg py-0 shadow-none">
@@ -446,25 +458,27 @@ export function HardwareFormView({
                   {m.common.cancel}
                 </Link>
               </Button>
-              <Button
-                aria-busy={saving}
-                className="min-w-28 gap-2 rounded-lg"
-                disabled={saving || terminalLoadFailed}
-                size="sm"
-                type="submit"
-              >
-                <Icon
-                  aria-hidden
-                  className={saving ? "animate-spin" : undefined}
-                  icon={saving ? LoaderCircle : Check}
-                  size={14}
-                />
-                {saving
-                  ? m.common.saving
-                  : isEditMode
-                    ? m.hardware.edit.saveChanges
-                    : m.hardware.create.action}
-              </Button>
+              {!isBuiltIn ? (
+                <Button
+                  aria-busy={saving}
+                  className="min-w-28 gap-2 rounded-lg"
+                  disabled={saving || terminalLoadFailed}
+                  size="sm"
+                  type="submit"
+                >
+                  <Icon
+                    aria-hidden
+                    className={saving ? "animate-spin" : undefined}
+                    icon={saving ? LoaderCircle : Check}
+                    size={14}
+                  />
+                  {saving
+                    ? m.common.saving
+                    : isEditMode
+                      ? m.hardware.edit.saveChanges
+                      : m.hardware.create.action}
+                </Button>
+              ) : null}
             </div>
           </div>
         </fieldset>

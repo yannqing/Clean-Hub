@@ -14,16 +14,19 @@ import {
 } from "../access-control.helper.js";
 import { PosHardwareError } from "./hardware.errors.js";
 import {
+  clearDefaultPosPrinterBindings,
   findActiveHardwareDeviceForTerminal,
   findHardwareDevicesByTerminal,
   findPaidCashPaymentForBranch,
   updatePosPrinterBindingRecord,
+  upsertBuiltInHardwareDeviceRecord,
 } from "./hardware.repository.js";
 import type {
   AuthorizeManualDrawerOpenRequest,
   AuthorizePosHardwareActionInput,
   AuthorizePrivilegedReprintRequest,
   BindPosPrinterInput,
+  ConnectPosBuiltInHardwareInput,
   PosHardwareAction,
   PosHardwareActionAuthorization,
   PosHardwareDeviceSummary,
@@ -47,6 +50,89 @@ export async function listPosHardwareDevices(
     terminal.tenantId,
     terminal.terminalId,
   );
+}
+
+/**
+ * Persist a built-in peripheral only after the native POS host has confirmed
+ * that it is available. Repeated connections revive/update the same immutable
+ * terminal-scoped record instead of creating duplicates.
+ */
+export async function connectPosBuiltInHardware(
+  input: ConnectPosBuiltInHardwareInput,
+  db: Database = getDb(),
+): Promise<PosHardwareDeviceSummary> {
+  requirePosRole(input.authContext, ["owner", "manager"]);
+  const terminal = requireHardwareTerminal(input.authContext);
+  const connectedAt = new Date().toISOString();
+
+  return db.transaction(async (tx) => {
+    const terminalDevices = await findHardwareDevicesByTerminal(
+      tx,
+      terminal.tenantId,
+      terminal.terminalId,
+    );
+    const existingBuiltIn = terminalDevices.find(
+      (device) => device.hardwareKey === input.data.hardwareKey,
+    );
+    const hasOtherDefaultReceiptPrinter = terminalDevices.some(
+      (device) =>
+        device.id !== existingBuiltIn?.id &&
+        device.deviceType === "printer" &&
+        device.config.printerPurpose !== "label" &&
+        device.config.printerIsDefault === true,
+    );
+    const hardware = await upsertBuiltInHardwareDeviceRecord(tx, {
+      tenantId: terminal.tenantId,
+      terminalId: terminal.terminalId,
+      hardwareKey: input.data.hardwareKey,
+      name: input.data.name,
+      deviceType: input.data.deviceType,
+      config: {
+        ...(input.data.deviceModel
+          ? { deviceModel: input.data.deviceModel }
+          : {}),
+        ...(input.data.deviceType === "printer"
+          ? {
+              printerId: input.data.localDeviceId,
+              printerName: input.data.name,
+              printerIsDefault:
+                existingBuiltIn?.config.printerIsDefault === true ||
+                !hasOtherDefaultReceiptPrinter,
+              printerPurpose: "receipt",
+            }
+          : { scannerId: input.data.localDeviceId }),
+        builtIn: true,
+        hardwareKey: input.data.hardwareKey,
+        connectedAt,
+        connectionSource: "pos_native_discovery",
+      },
+      actorUserId: input.authContext.userId,
+    });
+
+    await writeAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      tenantId: terminal.tenantId,
+      branchId: terminal.branchId,
+      eventCategory: "pos_hardware",
+      eventType: "pos_hardware.built_in.connected",
+      entityType: "hardware_config",
+      entityId: hardware.id,
+      after: {
+        hardwareKey: hardware.hardwareKey,
+        deviceType: hardware.deviceType,
+        terminalId: hardware.terminalId,
+        provisioningMode: hardware.provisioningMode,
+        connectedAt,
+      },
+      metadata: createPosAuditMetadata(input.authContext, {
+        hardwareKey: input.data.hardwareKey,
+      }),
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return hardware;
+  });
 }
 
 /**
@@ -108,6 +194,25 @@ export async function bindPosPrinter(
     }
 
     const boundAt = new Date().toISOString();
+    const printerPurpose =
+      existing.config.printerPurpose === "label" ? "label" : "receipt";
+    const existingDefaultForPurpose = terminalDevices.some(
+      (device) =>
+        device.id !== existing.id &&
+        device.deviceType === "printer" &&
+        (device.config.printerPurpose === "label" ? "label" : "receipt") ===
+          printerPurpose &&
+        device.config.printerIsDefault === true,
+    );
+    if (input.data.isDefault === true && existingDefaultForPurpose) {
+      await clearDefaultPosPrinterBindings(tx, {
+        tenantId: terminal.tenantId,
+        terminalId: terminal.terminalId,
+        hardwareId: existing.id,
+        printerPurpose,
+        actorUserId: input.authContext.userId,
+      });
+    }
     const updated = await updatePosPrinterBindingRecord(tx, {
       tenantId: terminal.tenantId,
       terminalId: terminal.terminalId,

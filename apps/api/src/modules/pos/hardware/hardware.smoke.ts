@@ -8,11 +8,13 @@ import {
   authorizeManualDrawerOpen,
   authorizePrivilegedReprint,
   bindPosPrinter,
+  connectPosBuiltInHardware,
   recordCashPaymentDrawerResult,
   recordPosPrintJobResult,
 } from "./hardware.service.js";
 import {
   bindPosPrinterBodySchema,
+  connectPosBuiltInHardwareBodySchema,
   recordCashPaymentDrawerResultBodySchema,
 } from "./hardware.validation.js";
 
@@ -147,6 +149,8 @@ let bindingRow = {
   name: "Front receipt printer",
   deviceType: "printer" as const,
   connectionType: "usb" as const,
+  provisioningMode: "manual" as const,
+  hardwareKey: null,
   config: { paperWidthMm: 80 },
   status: "active" as const,
   createdAt: new Date(0),
@@ -234,6 +238,48 @@ await assert.rejects(
     db,
   ),
   (error) => error instanceof AuthError && error.code === "FORBIDDEN",
+);
+await assert.rejects(
+  connectPosBuiltInHardware(
+    {
+      authContext: context("cashier"),
+      data: {
+        hardwareKey: "t1101:built-in:printer",
+        name: "POS-T1101 built-in printer",
+        deviceType: "printer",
+        localDeviceId: "t1101:built-in",
+        deviceModel: "POS-T1101",
+      },
+    },
+    {} as Database,
+  ),
+  (error) => error instanceof AuthError && error.code === "FORBIDDEN",
+);
+assert.throws(() =>
+  connectPosBuiltInHardwareBodySchema.parse({
+    hardwareKey: "caller-controlled:printer",
+    name: "Invalid printer",
+    deviceType: "printer",
+    localDeviceId: "invalid",
+  }),
+);
+assert.equal(
+  connectPosBuiltInHardwareBodySchema.parse({
+    hardwareKey: "future-x:built-in:printer",
+    name: "Future built-in printer",
+    deviceType: "printer",
+    localDeviceId: "future-x:printer",
+    deviceModel: "POS-FUTURE",
+  }).hardwareKey,
+  "future-x:built-in:printer",
+);
+assert.throws(() =>
+  connectPosBuiltInHardwareBodySchema.parse({
+    hardwareKey: "future-x:built-in:scanner",
+    name: "Mismatched built-in hardware",
+    deviceType: "printer",
+    localDeviceId: "future-x:printer",
+  }),
 );
 
 await assert.rejects(

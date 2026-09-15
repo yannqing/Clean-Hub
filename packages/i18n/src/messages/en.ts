@@ -784,6 +784,169 @@ export const enMessages = {
       current: "English",
       switcherLabel: "Switch language",
     },
+    hardware: {
+      title: "Hardware devices",
+      description:
+        "Built-in devices are detected by this terminal and can be tested and connected here. External devices are still configured by an administrator.",
+      loadingDevices: "Loading devices…",
+      emptyDevices:
+        "No hardware has been detected or configured for this terminal",
+      deviceType: {
+        printer: "Printer",
+        scanner: "Scanner",
+        cashDrawer: "Cash drawer",
+      },
+      connectionType: {
+        usb: "USB",
+        bluetooth: "Bluetooth",
+        network: "Network",
+        other: "Other",
+        builtIn: "T11 built-in",
+        systemDevice: "System device",
+      },
+      purpose: {
+        receipt: "Sales receipts",
+        label: "Work-order labels",
+      },
+      printerKind: {
+        receipt: "receipt",
+        label: "label",
+      },
+      deviceName: {
+        builtInPrinter: "{model} built-in thermal printer",
+        builtInScanner: "{model} built-in scanner",
+      },
+      label: {
+        builtInDevice: "Built-in device",
+        default: "Default",
+        synced: "Synced to administration",
+        notRegistered: "Not registered",
+      },
+      status: {
+        connecting: "Connecting…",
+        notDetectedHere: "Not currently detected",
+        builtInServiceUnavailable: "Built-in service unavailable",
+        connected: "Connected",
+        connectable: "Ready to connect",
+        configured: "Configured",
+        inactive: "Inactive",
+        notConnected: "Not connected",
+        detecting: "Detecting…",
+        bridgeUnavailable: "POS hardware unavailable",
+        notDetected: "Not detected",
+        noPaper: "Out of paper",
+        coverOpen: "Cover open",
+        overheated: "Overheated",
+        printing: "Printing",
+        lowBattery: "Low device battery",
+      },
+      action: {
+        settingDefault: "Setting…",
+        testing: "Testing…",
+        rescan: "Detect again",
+        testReconnect: "Test / reconnect",
+        testConnect: "Test and connect",
+        connect: "Connect",
+        openDrawer: "Open drawer",
+        back: "Back",
+        authorizing: "Authorizing…",
+        authorizeOpen: "Authorize and open",
+        scanning: "Scanning",
+        pairTesting: "Pairing and testing…",
+      },
+      toast: {
+        scanNearbyFailed:
+          "Unable to scan for nearby Bluetooth devices. Check permissions and try again.",
+        defaultRequiresConnection:
+          "Test and connect this printer before setting it as the default.",
+        defaultPrinterMissing:
+          "This printer was not detected on the current terminal. Reconnect it first.",
+        defaultSet: "{name} is now the default {kind} printer.",
+        defaultFailed: "Unable to set the default printer. Try again.",
+        builtInMissing:
+          "This built-in device was not detected. Check the hardware service and try again.",
+        builtInUnavailable:
+          "The built-in hardware service is not connected. Detection has restarted; try again shortly.",
+        bridgeMissing: "No POS hardware bridge was detected.",
+        builtInPrinterMissing:
+          "The built-in printer for this device was not detected.",
+        testPageFailed: "The test page did not print successfully.",
+        scannerTestUnsupported:
+          "This client cannot actively test the built-in scanner.",
+        builtInPrinterConnected:
+          "The test printed successfully. The built-in printer is connected and registered.",
+        scannerConnected: "The scanner started successfully and is registered.",
+        builtInConnectFailed:
+          "Unable to connect the built-in device. Check it and try again.",
+        selectedPrinterUnavailable:
+          "The selected printer is no longer available. Detect devices again.",
+        pairUnsupported:
+          "This client cannot pair Bluetooth printers inside the app.",
+        pairing:
+          "Pairing the Bluetooth printer. Confirm the system prompt if requested.",
+        printerConnected:
+          "The test printed successfully. The printer is connected to this terminal.",
+        printerConnectFailed:
+          "Unable to test or connect the printer. Check it and try again.",
+        drawerReasonRequired: "Enter a reason for opening the cash drawer.",
+        bridgeMissingInClient:
+          "No POS hardware bridge was detected. Try again in the POS client.",
+        drawerAdapterUnavailable:
+          "The cash-drawer adapter is unavailable. Check the POS cash-drawer configuration.",
+        drawerNotConfigured:
+          "No available cash drawer is configured for this checkout terminal.",
+        drawerOpened: "The cash drawer is open.",
+        drawerOpenFailed:
+          "Unable to open the cash drawer. Check the hardware connection and try again.",
+      },
+      printTest: {
+        builtInTitle: "CleanHub built-in printer test",
+        builtInConnection: "POS-T1101 built-in printer connection test",
+        labelTitle: "CleanHub label printer test",
+        receiptTitle: "CleanHub receipt printer test",
+        labelContent: "Work-order item label test",
+        receiptContent: "Sales receipt print test",
+        purposeLine: "Purpose: {purpose}",
+        deviceLine: "Device: {name}",
+        timeLine: "Time: {time}",
+        thanks: "Thank you",
+      },
+      drawer: {
+        control: "Cash-drawer control",
+        notConfigured:
+          "No available cash drawer is configured for this checkout terminal",
+        dialogTitle: "Open cash drawer manually",
+        dialogDescription:
+          "Only an Owner or Manager can do this. The reason and current terminal will be written to the audit log.",
+        reason: "Reason",
+        reasonPlaceholder: "Enter the reason for opening the cash drawer",
+      },
+      printerDialog: {
+        title: "Connect {kind} printer",
+        description:
+          "Choose a printer near this POS. Unpaired devices will be paired while connecting and saved only after a successful test print.",
+        availablePrinters: "Available printers",
+        deviceCount: "{count} devices",
+        scanningHint:
+          "Searching nearby devices. This usually takes 10–15 seconds…",
+        selectHint:
+          "Tap a row to select it. Keep Bluetooth printers powered on and discoverable.",
+        scanFailedTitle: "Unable to detect printers",
+        scanFailedHint:
+          "Check Bluetooth and nearby-device permissions, then scan again.",
+        findingPrinters: "Looking for printers…",
+        noPrinters: "No printers found",
+        noPrintersHint:
+          "Make sure the printer is on and discoverable over Bluetooth, then scan again.",
+        paired: "Paired",
+        pairOnConnect: "Pair when connecting",
+        systemDefault: "System default",
+        selectPrinter: "Select {name}",
+        selected: "Selected:",
+        pairingHint:
+          "The first Bluetooth pairing may require a system confirmation",
+      },
+    },
     nav: {
       operations: "Operations",
       records: "Records",
@@ -872,7 +1035,8 @@ export const enMessages = {
       discountCodePlaceholder: "Enter a valid discount code",
       discountReason: "Reason",
       discountReasonPlaceholder: "Explain why this discount is being used",
-      discountReasonRequired: "A reason is required when using a discount code.",
+      discountReasonRequired:
+        "A reason is required when using a discount code.",
       total: "Total due",
       pricing: "Calculating authoritative prices and discounts…",
       priceConfirmed:
@@ -903,9 +1067,12 @@ export const enMessages = {
         "Mixed payment needs both cash and mobile money enabled for this branch.",
       mixedNeedsOnline:
         "Mixed payment is unavailable offline: mobile money needs a connection.",
-      mixedAmountTooSmall: "The amount is too small to split across two payments.",
-      payLaterNeedsCustomer: "Attach a customer to this sale before leaving a balance.",
-      payLaterNeedsPermission: "Leaving a balance requires supervisor permission.",
+      mixedAmountTooSmall:
+        "The amount is too small to split across two payments.",
+      payLaterNeedsCustomer:
+        "Attach a customer to this sale before leaving a balance.",
+      payLaterNeedsPermission:
+        "Leaving a balance requires supervisor permission.",
       paymentReference: "Wave / Orange Money transaction reference",
       paymentReferenceRequired: "Enter a valid mobile payment reference.",
       offlinePayLater:

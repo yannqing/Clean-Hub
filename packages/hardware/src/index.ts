@@ -19,15 +19,36 @@ export type PosHardwareCapabilities = {
   secureTerminalCredential: boolean;
   /** Optional host diagnostics. Boolean fields remain the portable contract. */
   host?: string;
+  /** Human-readable model reported by the current native hardware adapter. */
+  hardwareModel?: string;
+  /** Built-in peripherals physically owned by this device; excludes nearby devices. */
+  builtInDevices?: PosBuiltInHardwareDevice[];
   connected?: boolean;
   printerStatus?: string;
   printerStatusCode?: number;
+};
+
+export type PosBuiltInHardwareDevice = {
+  /** Stable adapter-owned identity, for example `vendor-model:built-in:printer`. */
+  hardwareKey: string;
+  /** Native fallback name; localized clients may render model + device type. */
+  name: string;
+  deviceType: "printer" | "scanner";
+  /** Identifier used by the native bridge for print or scan operations. */
+  localDeviceId: string;
+  /** Whether the native service can currently operate this peripheral. */
+  available: boolean;
+  deviceModel?: string;
 };
 
 export type PosPrinterDevice = {
   id: string;
   name: string;
   isDefault: boolean;
+  /** How the current POS host reaches this physical printer. */
+  connectionType?: "built_in" | "bluetooth" | "system";
+  /** Bluetooth devices can be discovered before Android pairing completes. */
+  isPaired?: boolean;
 };
 
 export type PosPrintJobStatus = "pending" | "printing" | "printed" | "failed";
@@ -35,6 +56,8 @@ export type PosPrintJobStatus = "pending" | "printing" | "printed" | "failed";
 export type PosPrintRequest = PrintJob & {
   title?: string;
   copies?: number;
+  /** Optional QR payload rendered by a capable native printer adapter. */
+  qrCodeContent?: string;
 };
 
 export type PosPrintResult = {
@@ -236,7 +259,9 @@ export type PosHardwareRuntime = {
   listPrinters(): Promise<PosPrinterDevice[]>;
   print(request: PosPrintRequest): Promise<PosPrintResult>;
   openCashDrawer(request: PosDrawerOpenRequest): Promise<void>;
-  processCardPayment(request: PosCardPaymentRequest): Promise<PosCardPaymentResult>;
+  processCardPayment(
+    request: PosCardPaymentRequest,
+  ): Promise<PosCardPaymentResult>;
 };
 
 export function createUnavailablePosScannerAdapter(
@@ -309,14 +334,13 @@ export function createPosHardwareRuntime(input: {
         cashDrawerAvailable,
         cardTerminalAvailable,
         secure,
-      ] =
-        await Promise.all([
-          scanner.isAvailable(),
-          printer.isAvailable(),
-          cashDrawer.isAvailable(),
-          cardTerminal.isAvailable(),
-          input.secureTerminalCredential(),
-        ]);
+      ] = await Promise.all([
+        scanner.isAvailable(),
+        printer.isAvailable(),
+        cashDrawer.isAvailable(),
+        cardTerminal.isAvailable(),
+        input.secureTerminalCredential(),
+      ]);
       return {
         scanner: scannerAvailable,
         printer: printerAvailable,
@@ -457,10 +481,17 @@ export type PortablePrinterPrintJob = Omit<PrintJob, "content"> & {
 
 export interface PortablePrinter {
   getStatus(): PortablePrinterStatus;
-  discover(options?: PortablePrinterDiscoveryOptions): Promise<PortablePrinterDevice[]>;
-  connect(options: PortablePrinterConnectionOptions): Promise<PortablePrinterDevice>;
+  discover(
+    options?: PortablePrinterDiscoveryOptions,
+  ): Promise<PortablePrinterDevice[]>;
+  connect(
+    options: PortablePrinterConnectionOptions,
+  ): Promise<PortablePrinterDevice>;
   disconnect(): Promise<void>;
-  print(job: PortablePrinterPrintJob, options?: PortablePrinterWriteOptions): Promise<void>;
+  print(
+    job: PortablePrinterPrintJob,
+    options?: PortablePrinterWriteOptions,
+  ): Promise<void>;
 }
 
 export type PortablePrinterUnavailableOptions = {
@@ -595,6 +626,7 @@ const posReceiptLabels = {
     rounding: "Rounding",
     taxRegistration: "Tax registration",
     taxExemption: "Tax exemption",
+    notApplicable: "N/A",
     total: "Total",
     paid: "Paid",
     cashTendered: "Cash received",
@@ -622,6 +654,7 @@ const posReceiptLabels = {
     rounding: "Arrondi",
     taxRegistration: "N° fiscal",
     taxExemption: "Exonération",
+    notApplicable: "Sans objet",
     total: "Total",
     paid: "Paye",
     cashTendered: "Espèces reçues",
@@ -649,6 +682,7 @@ const posReceiptLabels = {
     rounding: "舍入调整",
     taxRegistration: "税务登记号",
     taxExemption: "税务豁免",
+    notApplicable: "不适用",
     total: "合计",
     paid: "已付",
     cashTendered: "实收现金",
@@ -682,7 +716,9 @@ export function buildDeliveryReceiptEscPos(
   task: DeliveryPrintTask,
   options: DeliveryPrintTemplateOptions = {},
 ): Uint8Array {
-  return escPosDocument(buildDeliveryReceiptLines(task, options), { cut: true });
+  return escPosDocument(buildDeliveryReceiptLines(task, options), {
+    cut: true,
+  });
 }
 
 export function buildPickupReceiptText(
@@ -793,7 +829,8 @@ function buildDeliveryReceiptLines(
 ): string[] {
   const width = options.paperWidth ?? 32;
   const labels = getLabels(options.locale);
-  const title = task.kind === "pickup" ? labels.pickupTitle : labels.deliveryTitle;
+  const title =
+    task.kind === "pickup" ? labels.pickupTitle : labels.deliveryTitle;
   return compactLines([
     center(task.tenantName ?? "CleanHub", width),
     center(title, width),
@@ -803,14 +840,22 @@ function buildDeliveryReceiptLines(
     task.orderId ? keyValue(labels.order, task.orderId) : undefined,
     task.workOrderId ? keyValue(labels.workOrder, task.workOrderId) : undefined,
     keyValue(labels.customer, task.customer.name ?? labels.fallback),
-    task.customer.phone ? keyValue(labels.phone, task.customer.phone) : undefined,
+    task.customer.phone
+      ? keyValue(labels.phone, task.customer.phone)
+      : undefined,
     labels.address,
     ...wrapText(formatAddress(task.address), width),
     task.scheduledAt
-      ? keyValue(labels.scheduled, formatDateTime(task.scheduledAt, options.locale))
+      ? keyValue(
+          labels.scheduled,
+          formatDateTime(task.scheduledAt, options.locale),
+        )
       : undefined,
     task.completedAt
-      ? keyValue(labels.completed, formatDateTime(task.completedAt, options.locale))
+      ? keyValue(
+          labels.completed,
+          formatDateTime(task.completedAt, options.locale),
+        )
       : undefined,
     ...(task.items?.length
       ? [
@@ -827,7 +872,10 @@ function buildDeliveryReceiptLines(
       : []),
     task.note ? keyValue(labels.note, task.note) : undefined,
     rule(width),
-    keyValue(labels.printed, formatDateTime(options.now ?? new Date(), options.locale)),
+    keyValue(
+      labels.printed,
+      formatDateTime(options.now ?? new Date(), options.locale),
+    ),
   ]);
 }
 
@@ -926,22 +974,25 @@ function buildPosReceiptLines(
     has("subtotal")
       ? keyValue(labels.subtotal, amount(receipt.subtotalMinor))
       : undefined,
-    has("discount") && receipt.discountMinor
+    has("discount") && receipt.discountMinor !== undefined
       ? keyValue(labels.discount, `-${amount(receipt.discountMinor)}`)
       : undefined,
     has("taxable_amount") && receipt.taxableMinor !== undefined
       ? keyValue(labels.taxable, amount(receipt.taxableMinor))
       : undefined,
-    has("tax") && receipt.taxMinor
+    has("tax") && receipt.taxMinor !== undefined
       ? keyValue(
           `${labels.tax}${receipt.taxRate ? ` ${Number(receipt.taxRate) * 100}%` : ""}`,
           amount(receipt.taxMinor),
         )
       : undefined,
-    has("tax_exemption_reason") && receipt.taxExemptionReason
-      ? keyValue(labels.taxExemption, receipt.taxExemptionReason)
+    has("tax_exemption_reason")
+      ? keyValue(
+          labels.taxExemption,
+          receipt.taxExemptionReason || labels.notApplicable,
+        )
       : undefined,
-    has("rounding") && receipt.roundingMinor
+    has("rounding") && receipt.roundingMinor !== undefined
       ? keyValue(labels.rounding, amount(receipt.roundingMinor))
       : undefined,
     has("total")
@@ -975,17 +1026,27 @@ function buildDeliveryLabelLines(
 ): string[] {
   const width = options.paperWidth ?? 32;
   const labels = getLabels(options.locale);
-  const title = task.kind === "pickup" ? labels.labelPickupTitle : labels.labelDeliveryTitle;
-  const identifiers = [task.orderId, task.workOrderId, task.taskId].filter(Boolean).join(" / ");
+  const title =
+    task.kind === "pickup"
+      ? labels.labelPickupTitle
+      : labels.labelDeliveryTitle;
+  const identifiers = [task.orderId, task.workOrderId, task.taskId]
+    .filter(Boolean)
+    .join(" / ");
   return compactLines([
     center(title, width),
     rule(width),
     identifiers,
     keyValue(labels.customer, task.customer.name ?? labels.fallback),
-    task.customer.phone ? keyValue(labels.phone, task.customer.phone) : undefined,
+    task.customer.phone
+      ? keyValue(labels.phone, task.customer.phone)
+      : undefined,
     ...wrapText(formatAddress(task.address), width),
     task.scheduledAt
-      ? keyValue(labels.scheduled, formatDateTime(task.scheduledAt, options.locale))
+      ? keyValue(
+          labels.scheduled,
+          formatDateTime(task.scheduledAt, options.locale),
+        )
       : undefined,
   ]);
 }
@@ -994,13 +1055,7 @@ function escPosDocument(
   lines: string[],
   options: { cut?: boolean; emphasizedTitle?: boolean } = {},
 ): Uint8Array {
-  const chunks: number[] = [
-    ESC,
-    0x40,
-    ESC,
-    0x61,
-    0x00,
-  ];
+  const chunks: number[] = [ESC, 0x40, ESC, 0x61, 0x00];
 
   lines.forEach((line, index) => {
     if (index === 0 && options.emphasizedTitle) {
@@ -1100,7 +1155,10 @@ function formatAddress(address: DeliveryPrintAddress | string): string {
     .join(", ");
 }
 
-function formatDateTime(value: string | Date, locale: PrintLocale = "en"): string {
+function formatDateTime(
+  value: string | Date,
+  locale: PrintLocale = "en",
+): string {
   const date = value instanceof Date ? value : new Date(value);
 
   if (Number.isNaN(date.getTime())) {

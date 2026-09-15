@@ -5,6 +5,7 @@ import {
   paymentTransactions,
   type Database,
 } from "@cleanhub/db";
+import { createId } from "@cleanhub/id";
 
 import type { PosHardwareDeviceSummary } from "./hardware.types.js";
 
@@ -18,12 +19,133 @@ function toSummary(
     name: row.name,
     deviceType: row.deviceType,
     connectionType: row.connectionType,
+    provisioningMode: row.provisioningMode,
+    hardwareKey: row.hardwareKey,
     config: (row.config as Record<string, unknown>) ?? {},
     status: row.status,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     version: row.version,
   };
+}
+
+export async function upsertBuiltInHardwareDeviceRecord(
+  db: Database,
+  input: {
+    tenantId: string;
+    terminalId: string;
+    hardwareKey: string;
+    name: string;
+    deviceType: "printer" | "scanner";
+    config: Record<string, unknown>;
+    actorUserId: string | null;
+  },
+): Promise<PosHardwareDeviceSummary> {
+  const now = new Date();
+  const legacyIdentity =
+    input.hardwareKey === "t1101:built-in:printer"
+      ? sql`${hardwareConfigs.config}->>'printerId' = 't1101:built-in'`
+      : input.hardwareKey === "t1101:built-in:scanner"
+        ? sql`${hardwareConfigs.config}->>'scannerId' = 't1101:built-in'`
+        : undefined;
+  const exactMatch = await db
+    .select({ id: hardwareConfigs.id })
+    .from(hardwareConfigs)
+    .where(
+      and(
+        eq(hardwareConfigs.tenantId, input.tenantId),
+        eq(hardwareConfigs.terminalId, input.terminalId),
+        eq(hardwareConfigs.hardwareKey, input.hardwareKey),
+      ),
+    )
+    .limit(1);
+  const legacyMatch =
+    exactMatch.length === 0 && legacyIdentity
+      ? await db
+          .select({ id: hardwareConfigs.id })
+          .from(hardwareConfigs)
+          .where(
+            and(
+              eq(hardwareConfigs.tenantId, input.tenantId),
+              eq(hardwareConfigs.terminalId, input.terminalId),
+              legacyIdentity,
+            ),
+          )
+          .limit(1)
+      : [];
+  const existing = exactMatch[0] ?? legacyMatch[0];
+
+  if (existing) {
+    const revived = await db
+      .update(hardwareConfigs)
+      .set({
+        hardwareKey: input.hardwareKey,
+        name: input.name,
+        deviceType: input.deviceType,
+        connectionType: "other",
+        provisioningMode: "built_in",
+        config: input.config,
+        status: "active",
+        deletedAt: null,
+        deletedBy: null,
+        updatedAt: now,
+        updatedBy: input.actorUserId,
+        version: sql`${hardwareConfigs.version} + 1`,
+      })
+      .where(
+        and(
+          eq(hardwareConfigs.id, existing.id),
+          eq(hardwareConfigs.tenantId, input.tenantId),
+          eq(hardwareConfigs.terminalId, input.terminalId),
+        ),
+      )
+      .returning();
+    if (revived[0]) return toSummary(revived[0]);
+  }
+
+  const rows = await db
+    .insert(hardwareConfigs)
+    .values({
+      id: createId(),
+      tenantId: input.tenantId,
+      terminalId: input.terminalId,
+      hardwareKey: input.hardwareKey,
+      name: input.name,
+      deviceType: input.deviceType,
+      connectionType: "other",
+      provisioningMode: "built_in",
+      config: input.config,
+      status: "active",
+      createdBy: input.actorUserId,
+      updatedBy: input.actorUserId,
+    })
+    .onConflictDoUpdate({
+      target: [
+        hardwareConfigs.tenantId,
+        hardwareConfigs.terminalId,
+        hardwareConfigs.hardwareKey,
+      ],
+      set: {
+        name: input.name,
+        deviceType: input.deviceType,
+        connectionType: "other",
+        provisioningMode: "built_in",
+        config: input.config,
+        status: "active",
+        deletedAt: null,
+        deletedBy: null,
+        updatedAt: now,
+        updatedBy: input.actorUserId,
+        version: sql`${hardwareConfigs.version} + 1`,
+      },
+    })
+    .returning();
+
+  const row = rows[0];
+  if (!row) {
+    throw new Error("Built-in hardware registration did not return a record.");
+  }
+  return toSummary(row);
 }
 
 export async function findActiveHardwareDeviceForTerminal(
@@ -80,6 +202,38 @@ export async function updatePosPrinterBindingRecord(
     .returning();
 
   return rows[0] ? toSummary(rows[0]) : null;
+}
+
+export async function clearDefaultPosPrinterBindings(
+  db: Database,
+  input: {
+    tenantId: string;
+    terminalId: string;
+    hardwareId: string;
+    printerPurpose: "receipt" | "label";
+    actorUserId: string | null;
+  },
+): Promise<void> {
+  await db
+    .update(hardwareConfigs)
+    .set({
+      config: sql`${hardwareConfigs.config} - 'printerIsDefault'`,
+      updatedAt: new Date(),
+      updatedBy: input.actorUserId,
+      version: sql`${hardwareConfigs.version} + 1`,
+    })
+    .where(
+      and(
+        eq(hardwareConfigs.tenantId, input.tenantId),
+        eq(hardwareConfigs.terminalId, input.terminalId),
+        eq(hardwareConfigs.deviceType, "printer"),
+        eq(hardwareConfigs.status, "active"),
+        sql`${hardwareConfigs.id} <> ${input.hardwareId}`,
+        sql`${hardwareConfigs.config}->>'printerPurpose' = ${input.printerPurpose}`,
+        sql`${hardwareConfigs.config}->>'printerIsDefault' = 'true'`,
+        isNull(hardwareConfigs.deletedAt),
+      ),
+    );
 }
 
 /**

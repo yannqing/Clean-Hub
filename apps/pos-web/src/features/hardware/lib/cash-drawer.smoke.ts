@@ -21,6 +21,8 @@ async function runCashDrawerSmoke(): Promise<void> {
     name: "Front drawer",
     deviceType: "cash_drawer",
     connectionType: "usb",
+    provisioningMode: "manual",
+    hardwareKey: null,
     config: {
       printerId: "receipt-printer",
       pulse: { pin: 1, onTimeMs: 100, offTimeMs: 200 },

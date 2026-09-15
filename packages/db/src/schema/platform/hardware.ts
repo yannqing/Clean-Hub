@@ -5,6 +5,7 @@ import {
   pgEnum,
   pgTable,
   timestamp,
+  uniqueIndex,
   varchar,
 } from "drizzle-orm/pg-core";
 
@@ -27,6 +28,11 @@ export const hardwareConnectionTypeEnum = pgEnum("hardware_connection_type", [
   "other",
 ]);
 
+export const hardwareProvisioningModeEnum = pgEnum(
+  "hardware_provisioning_mode",
+  ["manual", "built_in"],
+);
+
 export const hardwareConfigs = pgTable(
   "hardware_configs",
   {
@@ -40,6 +46,10 @@ export const hardwareConfigs = pgTable(
     deviceType: hardwareDeviceTypeEnum("device_type").notNull(),
     name: varchar("name", { length: 200 }).notNull(),
     connectionType: hardwareConnectionTypeEnum("connection_type").notNull(),
+    provisioningMode: hardwareProvisioningModeEnum("provisioning_mode")
+      .notNull()
+      .default("manual"),
+    hardwareKey: varchar("hardware_key", { length: 256 }),
     config: jsonb("config")
       .notNull()
       .$type<Record<string, unknown>>()
@@ -62,5 +72,10 @@ export const hardwareConfigs = pgTable(
     index("hardware_configs_terminal_id_idx").on(table.terminalId),
     index("hardware_configs_status_idx").on(table.status),
     index("hardware_configs_deleted_at_idx").on(table.deletedAt),
+    uniqueIndex("hardware_configs_terminal_hardware_key_unique").on(
+      table.tenantId,
+      table.terminalId,
+      table.hardwareKey,
+    ),
   ],
 );

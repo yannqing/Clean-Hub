@@ -52,7 +52,10 @@ final class T1101PrinterResult {
         }
     }
 
-    static String message(int result) {
+    static String message(int result, String hardwareName) {
+        String deviceName = hardwareName == null || hardwareName.trim().isEmpty()
+            ? "POS"
+            : hardwareName.trim();
         switch (result) {
             case 0:
                 return "操作成功。";
@@ -70,7 +73,7 @@ final class T1101PrinterResult {
                 return "硬件响应超时，请检查设备后重试。";
             case -1099:
             case -1104:
-                return "当前 POS-T1101 不支持此硬件功能。";
+                return "当前 " + deviceName + " 不支持此硬件功能。";
             case -1107:
                 return "应用没有访问硬件的权限。";
             case -1100:
@@ -78,7 +81,7 @@ final class T1101PrinterResult {
             case -1103:
             case -1105:
             case -1106:
-                return "POS-T1101 硬件服务未连接。";
+                return deviceName + " 硬件服务未连接。";
             case -1002:
             case -1202:
                 return "提交给硬件的参数无效。";
@@ -87,7 +90,7 @@ final class T1101PrinterResult {
             case -1292:
                 return "打印机无法定位或检测标签纸。";
             default:
-                return "POS-T1101 硬件操作失败（" + result + "）。";
+                return deviceName + " 硬件操作失败（" + result + "）。";
         }
     }
 }

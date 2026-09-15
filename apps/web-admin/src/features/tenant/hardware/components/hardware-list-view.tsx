@@ -133,12 +133,20 @@ export function HardwareListView({
         deviceType,
         connectionType,
         printerPurpose,
+        device.provisioningMode === "built_in"
+          ? m.hardware.provisioning.builtIn
+          : "",
       ]
         .join(" ")
         .toLowerCase()
         .includes(normalizedSearchQuery);
     });
-  }, [devices, m.hardware.printerPurposeLabels, normalizedSearchQuery]);
+  }, [
+    devices,
+    m.hardware.printerPurposeLabels,
+    m.hardware.provisioning.builtIn,
+    normalizedSearchQuery,
+  ]);
 
   const handleDelete = useCallback(
     async (device: HardwareConfigSummary) => {
@@ -284,7 +292,16 @@ export function HardwareListView({
                     role="link"
                     tabIndex={0}
                   >
-                    <TableCell className="font-medium">{device.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span>{device.name}</span>
+                        {device.provisioningMode === "built_in" ? (
+                          <Badge variant="outline">
+                            {m.hardware.provisioning.builtIn}
+                          </Badge>
+                        ) : null}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="grid gap-0.5">
                         <span>
@@ -306,9 +323,11 @@ export function HardwareListView({
                       </div>
                     </TableCell>
                     <TableCell>
-                      {hardwareConnectionTypeOptions.find(
-                        (option) => option.value === device.connectionType,
-                      )?.label ?? device.connectionType}
+                      {device.provisioningMode === "built_in"
+                        ? m.hardware.provisioning.builtIn
+                        : (hardwareConnectionTypeOptions.find(
+                            (option) => option.value === device.connectionType,
+                          )?.label ?? device.connectionType)}
                     </TableCell>
                     <TableCell>
                       <div className="grid gap-0.5">
@@ -331,7 +350,14 @@ export function HardwareListView({
                       />
                     </TableCell>
                     <TableCell>
-                      {device.deviceType === "printer" ? (
+                      {device.provisioningMode === "built_in" ? (
+                        <Badge
+                          title={m.hardware.provisioning.builtInReadonly}
+                          variant="outline"
+                        >
+                          {m.hardware.binding.bound}
+                        </Badge>
+                      ) : device.deviceType === "printer" ? (
                         <Badge
                           title={m.hardware.binding.posChecksConnection}
                           variant={
@@ -361,21 +387,25 @@ export function HardwareListView({
                         <Link
                           href={webAdminRoutes.tenant.hardwareDevice(device.id)}
                         >
-                          {m.hardware.actions.edit}
+                          {device.provisioningMode === "built_in"
+                            ? m.hardware.actions.view
+                            : m.hardware.actions.edit}
                         </Link>
                       </Button>
-                      <Button
-                        className="h-7 px-2 text-xs"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setPendingDelete(device);
-                        }}
-                        onKeyDown={(event) => event.stopPropagation()}
-                        size="sm"
-                        variant="destructive"
-                      >
-                        {m.hardware.actions.delete}
-                      </Button>
+                      {device.provisioningMode !== "built_in" ? (
+                        <Button
+                          className="h-7 px-2 text-xs"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setPendingDelete(device);
+                          }}
+                          onKeyDown={(event) => event.stopPropagation()}
+                          size="sm"
+                          variant="destructive"
+                        >
+                          {m.hardware.actions.delete}
+                        </Button>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

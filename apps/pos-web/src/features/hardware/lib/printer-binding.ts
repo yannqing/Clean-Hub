@@ -3,6 +3,7 @@ import type { PosPrinterDevice } from "@cleanhub/hardware";
 
 export type PosConfiguredPrinter = {
   hardwareId: string;
+  isDefault: boolean;
   logicalName: string;
   printerId: string;
   printerName: string;
@@ -33,6 +34,7 @@ export function getConfiguredPrinter(
 
   return {
     hardwareId: device.id,
+    isDefault: device.config.printerIsDefault === true,
     logicalName: device.name,
     printerId,
     printerName:
@@ -48,9 +50,18 @@ export function resolvePosPrinterBinding(input: {
   configured: PosConfiguredPrinter | null;
   localPrinter: PosPrinterDevice | null;
 } {
-  const logicalPrinters = input.devices.filter(
-    (device) => device.deviceType === "printer" && device.status === "active",
-  );
+  const logicalPrinters = input.devices
+    .filter(
+      (device) =>
+        device.deviceType === "printer" &&
+        device.status === "active" &&
+        device.config.printerPurpose !== "label",
+    )
+    .sort(
+      (left, right) =>
+        Number(right.config.printerIsDefault === true) -
+        Number(left.config.printerIsDefault === true),
+    );
   if (logicalPrinters.length === 0) {
     return { state: "not_configured", configured: null, localPrinter: null };
   }

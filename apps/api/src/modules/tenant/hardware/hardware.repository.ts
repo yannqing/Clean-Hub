@@ -12,6 +12,7 @@ import type {
   HardwareConnectionType,
   HardwareDeviceStatus,
   HardwareDeviceType,
+  HardwareProvisioningMode,
   ListHardwareConfigsQuery,
 } from "./hardware.types.js";
 import { HardwareError } from "./hardware.errors.js";
@@ -26,6 +27,8 @@ function toHardwareConfigSummary(row: {
   name: string;
   deviceType: HardwareDeviceType;
   connectionType: HardwareConnectionType;
+  provisioningMode: HardwareProvisioningMode;
+  hardwareKey: string | null;
   config: Record<string, unknown>;
   status: HardwareDeviceStatus;
   createdAt: Date;
@@ -42,6 +45,8 @@ function toHardwareConfigSummary(row: {
     name: row.name,
     deviceType: row.deviceType,
     connectionType: row.connectionType,
+    provisioningMode: row.provisioningMode,
+    hardwareKey: row.hardwareKey,
     config: row.config,
     status: row.status,
     createdAt: row.createdAt.toISOString(),
@@ -61,7 +66,9 @@ function buildWhereClause(
     query.terminalId
       ? eq(hardwareConfigs.terminalId, query.terminalId)
       : undefined,
-    query.deviceType ? eq(hardwareConfigs.deviceType, query.deviceType) : undefined,
+    query.deviceType
+      ? eq(hardwareConfigs.deviceType, query.deviceType)
+      : undefined,
     query.status ? eq(hardwareConfigs.status, query.status) : undefined,
     buildBranchScopeCondition(allowedBranchIds),
   ];
@@ -100,6 +107,8 @@ export async function findHardwareConfigs(
       name: hardwareConfigs.name,
       deviceType: hardwareConfigs.deviceType,
       connectionType: hardwareConfigs.connectionType,
+      provisioningMode: hardwareConfigs.provisioningMode,
+      hardwareKey: hardwareConfigs.hardwareKey,
       config: hardwareConfigs.config,
       status: hardwareConfigs.status,
       createdAt: hardwareConfigs.createdAt,
@@ -139,6 +148,8 @@ export async function findHardwareConfigById(
       name: hardwareConfigs.name,
       deviceType: hardwareConfigs.deviceType,
       connectionType: hardwareConfigs.connectionType,
+      provisioningMode: hardwareConfigs.provisioningMode,
+      hardwareKey: hardwareConfigs.hardwareKey,
       config: hardwareConfigs.config,
       status: hardwareConfigs.status,
       createdAt: hardwareConfigs.createdAt,
@@ -175,7 +186,10 @@ export async function findHardwareTerminal(
   terminalId: string,
 ): Promise<{ id: string; branchId: string } | null> {
   const rows = await db
-    .select({ id: posTerminalSettings.id, branchId: posTerminalSettings.branchId })
+    .select({
+      id: posTerminalSettings.id,
+      branchId: posTerminalSettings.branchId,
+    })
     .from(posTerminalSettings)
     .where(
       and(
@@ -204,19 +218,17 @@ export async function insertHardwareConfig(
 ): Promise<HardwareConfigSummary> {
   const id = createId();
 
-  await db
-    .insert(hardwareConfigs)
-    .values({
-      id,
-      tenantId: input.tenantId,
-      terminalId: input.terminalId,
-      name: input.name,
-      deviceType: input.deviceType,
-      connectionType: input.connectionType,
-      config: input.config,
-      createdBy: input.actorUserId,
-      updatedBy: input.actorUserId,
-    });
+  await db.insert(hardwareConfigs).values({
+    id,
+    tenantId: input.tenantId,
+    terminalId: input.terminalId,
+    name: input.name,
+    deviceType: input.deviceType,
+    connectionType: input.connectionType,
+    config: input.config,
+    createdBy: input.actorUserId,
+    updatedBy: input.actorUserId,
+  });
 
   return (await findHardwareConfigById(db, input.tenantId, id))!;
 }
@@ -256,7 +268,8 @@ export async function updateHardwareConfigRecord(
 
   if (input.name !== undefined) setValues.name = input.name;
   if (input.terminalId !== undefined) setValues.terminalId = input.terminalId;
-  if (input.connectionType !== undefined) setValues.connectionType = input.connectionType;
+  if (input.connectionType !== undefined)
+    setValues.connectionType = input.connectionType;
   if (input.config !== undefined) setValues.config = input.config;
   if (input.status !== undefined) setValues.status = input.status;
 
@@ -274,7 +287,11 @@ export async function updateHardwareConfigRecord(
     .returning({ id: hardwareConfigs.id });
 
   if (!updatedRows[0]) {
-    const existing = await findHardwareConfigById(db, input.tenantId, input.hardwareId);
+    const existing = await findHardwareConfigById(
+      db,
+      input.tenantId,
+      input.hardwareId,
+    );
 
     if (!existing) {
       throw new HardwareError(
@@ -323,7 +340,11 @@ export async function softDeleteHardwareConfig(
     .returning({ id: hardwareConfigs.id });
 
   if (!updatedRows[0]) {
-    const existing = await findHardwareConfigById(db, input.tenantId, input.hardwareId);
+    const existing = await findHardwareConfigById(
+      db,
+      input.tenantId,
+      input.hardwareId,
+    );
 
     if (!existing) {
       throw new HardwareError(

@@ -3,6 +3,7 @@ import type {
   AuthorizeManualDrawerOpenRequest,
   AuthorizePrivilegedReprintRequest,
   BindPosPrinterRequest,
+  ConnectPosBuiltInHardwareRequest,
   PosHardwareActionAuthorization,
   PosCashPaymentDrawerAuditResult,
   PosHardwareDeviceListResponse,
@@ -22,6 +23,11 @@ export function createPosHardwareApi(client: ApiClient) {
   return {
     list: () =>
       client.get<PosHardwareDeviceListResponse>("/pos/hardware-devices"),
+    connectBuiltIn: (input: ConnectPosBuiltInHardwareRequest) =>
+      client.post<PosHardwareDeviceSummary>(
+        "/pos/hardware-devices/built-in-connections",
+        input,
+      ),
     bindPrinter: (hardwareId: string, input: BindPosPrinterRequest) =>
       client.put<PosHardwareDeviceSummary>(
         `/pos/hardware-devices/${hardwareId}/printer-binding`,

@@ -15,6 +15,9 @@ export type PosHardwareConnectionType =
   | "other";
 
 export type PosHardwareDeviceStatus = "active" | "inactive";
+export type PosHardwareProvisioningMode = "manual" | "built_in";
+export type PosBuiltInHardwareKey =
+  `${string}:built-in:${"printer" | "scanner"}`;
 
 export type PosHardwareDeviceSummary = {
   id: string;
@@ -23,6 +26,8 @@ export type PosHardwareDeviceSummary = {
   name: string;
   deviceType: PosHardwareDeviceType;
   connectionType: PosHardwareConnectionType;
+  provisioningMode: PosHardwareProvisioningMode;
+  hardwareKey: string | null;
   config: Record<string, unknown>;
   status: PosHardwareDeviceStatus;
   createdAt: string;
@@ -35,6 +40,14 @@ export type BindPosPrinterRequest = {
   printerName: string;
   isDefault?: boolean;
   version: number;
+};
+
+export type ConnectPosBuiltInHardwareRequest = {
+  hardwareKey: PosBuiltInHardwareKey;
+  name: string;
+  deviceType: Extract<PosHardwareDeviceType, "printer" | "scanner">;
+  localDeviceId: string;
+  deviceModel?: string;
 };
 
 export type PosHardwareAction = "manual_drawer_open" | "privileged_reprint";
@@ -104,6 +117,10 @@ export type AuthorizePosHardwareActionInput<TData> = {
   data: TData;
 };
 
-export type BindPosPrinterInput = AuthorizePosHardwareActionInput<BindPosPrinterRequest> & {
-  hardwareId: string;
-};
+export type BindPosPrinterInput =
+  AuthorizePosHardwareActionInput<BindPosPrinterRequest> & {
+    hardwareId: string;
+  };
+
+export type ConnectPosBuiltInHardwareInput =
+  AuthorizePosHardwareActionInput<ConnectPosBuiltInHardwareRequest>;
