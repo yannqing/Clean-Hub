@@ -15,7 +15,7 @@ import {
 } from "../constants";
 import type { TerminalSettingsFormValues } from "../types";
 
-type SettingsMobileIndexProps = {
+type SettingsIndexProps = {
   branchName: string;
   formValues: TerminalSettingsFormValues;
   hardwareCount: number;
@@ -78,12 +78,17 @@ function SettingsGroup({
   );
 }
 
-export function SettingsMobileIndex({
+/**
+ * The settings landing page on every breakpoint: a list of entry points, one
+ * per section, each showing its current value so the cashier can see what is
+ * set without opening it.
+ */
+export function SettingsIndex({
   branchName,
   formValues,
   hardwareCount,
   loading,
-}: SettingsMobileIndexProps) {
+}: SettingsIndexProps) {
   const terminalItems: SettingsItem[] = [
     {
       description: loading ? "正在加载…" : formValues.label || "未设置设备标签",

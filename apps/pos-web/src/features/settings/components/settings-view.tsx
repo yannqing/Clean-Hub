@@ -21,7 +21,7 @@ import type {
 } from "../types";
 import { GeneralSettingsCard } from "./general-settings-card";
 import { HardwareSettingsCard } from "./hardware-settings-card";
-import { SettingsMobileIndex } from "./settings-mobile-index";
+import { SettingsIndex } from "./settings-index";
 import {
   TerminalSettingsCard,
   type TerminalSettingsMode,
@@ -273,7 +273,7 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
   // already edit -- two places to change the same setting, and no sign which
   // one had been saved. Mobile was always a list; desktop now matches.
   return (
-    <SettingsMobileIndex
+    <SettingsIndex
       branchName={branchInfo?.name ?? ""}
       formValues={formValues}
       hardwareCount={hardwareDevices.length}
