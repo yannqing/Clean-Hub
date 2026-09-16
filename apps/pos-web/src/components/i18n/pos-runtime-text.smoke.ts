@@ -65,6 +65,52 @@ for (const source of samples) {
   }
 }
 
+/**
+ * Curated counter vocabulary.
+ *
+ * The generated dictionary renders many of these as lowercase machine
+ * glosses -- 普通 as "ordinary", 设置 as "set up" -- which is worse than an
+ * untranslated string because nothing flags it as wrong. The overrides map
+ * fixes them, and these assertions keep them fixed: deleting an override, or
+ * letting the generated dictionary shadow one, fails here rather than
+ * silently reverting a cashier's priority column to "ordinary / urgent".
+ */
+const curated: ReadonlyArray<readonly [string, string, string]> = [
+  ["普通", "Normal", "Normale"],
+  ["加急", "Rush", "Urgente"],
+  ["最紧急", "Critical", "Critique"],
+  ["衣物", "Garment", "Vêtement"],
+  ["质检中", "Quality check", "Contrôle qualité"],
+  ["异常", "Issue", "Problème"],
+  ["设置", "Settings", "Paramètres"],
+  ["工作台", "Workspace", "Espace de travail"],
+  ["材质", "Material", "Matière"],
+  ["单价", "Unit price", "Prix unitaire"],
+];
+
+for (const [source, en, fr] of curated) {
+  assert.equal(
+    translatePosText(source, "en"),
+    en,
+    `"${source}" must use the curated English wording`,
+  );
+  assert.equal(
+    translatePosText(source, "fr"),
+    fr,
+    `"${source}" must use the curated French wording`,
+  );
+}
+
+// A counter-facing label must never read as a lowercase gloss.
+for (const [source] of curated) {
+  const english = translatePosText(source, "en");
+  assert.equal(
+    /^[A-Z]/.test(english),
+    true,
+    `"${source}" renders as the gloss "${english}" rather than a real label`,
+  );
+}
+
 // Text with no Han characters is returned as-is regardless of locale.
 assert.equal(translatePosText("OD-Q69G5FAW", "fr"), "OD-Q69G5FAW");
 assert.equal(translatePosText("", "en"), "");

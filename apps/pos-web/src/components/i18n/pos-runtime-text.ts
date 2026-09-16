@@ -181,7 +181,9 @@ const POS_TEXT_TRANSLATION_OVERRIDES: Record<
   待取件: { en: "Ready for pickup", fr: "Prêt à récupérer" },
   已取件: { en: "Picked up", fr: "Récupéré" },
   已取消: { en: "Cancelled", fr: "Annulé" },
-  异常: { en: "Exception", fr: "Exception" },
+  // "Exception" is how the API names this state; at the counter it is simply
+  // a garment with a problem, so the cashier-facing wording says that.
+  异常: { en: "Issue", fr: "Problème" },
   已完成: { en: "Completed", fr: "Terminé" },
   已支付: { en: "Paid", fr: "Payé" },
   未支付: { en: "Unpaid", fr: "Non payé" },
@@ -427,6 +429,67 @@ const POS_TEXT_TRANSLATION_OVERRIDES: Record<
     en: "Ticket status distribution",
     fr: "Répartition des statuts",
   },
+
+  // --- Curated counter vocabulary -----------------------------------------
+  //
+  // The generated dictionary renders these as lowercase machine glosses --
+  // 普通 as "ordinary", 加急 as "urgent", 设置 as "set up" -- or leaves them
+  // in Chinese. A priority column reading "ordinary / urgent / most urgent"
+  // is worse than an obvious gap, because nothing flags it as wrong. The
+  // entries below are the wording a counter actually uses; overrides win over
+  // the generated dictionary, so these take effect without touching it.
+
+  // Ticket priority.
+  普通: { en: "Normal", fr: "Normale" },
+  加急: { en: "Rush", fr: "Urgente" },
+  最紧急: { en: "Critical", fr: "Critique" },
+
+  // Ticket and item types.
+  洗衣护理: { en: "Laundry", fr: "Blanchisserie" },
+  车辆清洗: { en: "Car wash", fr: "Lavage auto" },
+  衣物: { en: "Garment", fr: "Vêtement" },
+  车: { en: "Vehicle", fr: "Véhicule" },
+  鞋: { en: "Shoes", fr: "Chaussures" },
+  地毯: { en: "Carpet", fr: "Tapis" },
+
+  // Item status. 质检中 is the quality-check stage, not "cleaning".
+  // 异常 is already curated further up, alongside the other ticket statuses.
+  质检中: { en: "Quality check", fr: "Contrôle qualité" },
+
+  // Navigation.
+  业务操作: { en: "Operations", fr: "Opérations" },
+  工作台: { en: "Workspace", fr: "Espace de travail" },
+  门店: { en: "Store", fr: "Magasin" },
+  销售: { en: "Sale", fr: "Vente" },
+  产品服务: { en: "Catalog", fr: "Catalogue" },
+  班次与收银: { en: "Shifts & register", fr: "Services et caisse" },
+  设置: { en: "Settings", fr: "Paramètres" },
+  更多: { en: "More", fr: "Plus" },
+
+  // Actions.
+  记录: { en: "Record", fr: "Enregistrer" },
+  "记录中…": { en: "Recording...", fr: "Enregistrement..." },
+  新增: { en: "Add", fr: "Ajouter" },
+  确认: { en: "Confirm", fr: "Confirmer" },
+  关闭: { en: "Close", fr: "Fermer" },
+  提交: { en: "Submit", fr: "Valider" },
+  搜索: { en: "Search", fr: "Rechercher" },
+  筛选: { en: "Filter", fr: "Filtrer" },
+  导出: { en: "Export", fr: "Exporter" },
+  刷新: { en: "Refresh", fr: "Actualiser" },
+
+  // Field labels.
+  原因: { en: "Reason", fr: "Motif" },
+  数量: { en: "Quantity", fr: "Quantité" },
+  重量: { en: "Weight", fr: "Poids" },
+  颜色: { en: "Color", fr: "Couleur" },
+  品牌: { en: "Brand", fr: "Marque" },
+  // "Matériel" is equipment; a garment's fabric is "matière".
+  材质: { en: "Material", fr: "Matière" },
+  价格: { en: "Price", fr: "Prix" },
+  单价: { en: "Unit price", fr: "Prix unitaire" },
+  合计: { en: "Total", fr: "Total" },
+  时间: { en: "Time", fr: "Heure" },
 };
 
 const POS_TEXT_TRANSLATION_DICTIONARY = {
