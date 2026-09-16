@@ -13,26 +13,12 @@ import Link from "next/link";
 import { Icon } from "@/components/app-shell";
 import { posRoutes } from "@/config";
 
+import {
+  getTicketPriorityLabel,
+  getTicketStatusLabel,
+} from "@/lib/ticket-labels";
+
 import { formatOrderDateTime, formatOrderMoney } from "../constants";
-
-const PRIORITY_LABELS: Record<PosOrderTicketReference["priority"], string> = {
-  normal: "普通",
-  urgent: "加急",
-  critical: "特急",
-};
-
-const TICKET_STATUS_LABELS: Record<
-  PosOrderTicketReference["ticketStatus"],
-  string
-> = {
-  draft: "草稿",
-  pending: "待处理",
-  in_progress: "处理中",
-  ready_to_pick: "待取件",
-  picked_up: "已取件",
-  cancelled: "已取消",
-  exception: "异常",
-};
 
 /**
  * Fulfilment context an order settles. One order can cover several tickets, so
@@ -94,14 +80,14 @@ export function OrderTicketReferencesCard({
                         : "secondary"
                     }
                   >
-                    {TICKET_STATUS_LABELS[reference.ticketStatus]}
+                    {getTicketStatusLabel(reference.ticketStatus)}
                   </Badge>
                   {reference.priority === "normal" ? null : (
                     <Badge
                       className="rounded-md text-[11px]"
                       variant="secondary"
                     >
-                      {PRIORITY_LABELS[reference.priority]}
+                      {getTicketPriorityLabel(reference.priority)}
                     </Badge>
                   )}
                 </div>

@@ -97,19 +97,10 @@ export const EMPTY_PROFILE_FORM: ProfileFormValues = {
 /** Placeholder for stats the milestone doc defers (tier/balance/orders). */
 export const CUSTOMER_STAT_PLACEHOLDER = "—";
 
-// ---- 服务工单 label maps (local, not cross-feature imports) ----------------
-// Values mirror apps/pos-web/src/features/tickets/constants.ts but are kept
-// local so the customers feature does not depend on the tickets feature.
-
-export const CUSTOMER_TICKET_STATUS_LABELS: Record<string, string> = {
-  draft: "草稿",
-  pending: "待处理",
-  in_progress: "处理中",
-  ready_to_pick: "待取件",
-  picked_up: "已取件",
-  cancelled: "已取消",
-  exception: "异常",
-};
+// ---- 服务工单 tone maps (local) --------------------------------------------
+// Only the colouring is local now. The wording comes from
+// `@/lib/ticket-labels`, which customers, tickets and orders all share -- the
+// copies here had already drifted from the ticket screens.
 
 export const CUSTOMER_TICKET_STATUS_TONES: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -119,17 +110,6 @@ export const CUSTOMER_TICKET_STATUS_TONES: Record<string, string> = {
   picked_up: "bg-emerald-50 text-emerald-700",
   cancelled: "bg-red-50 text-red-700",
   exception: "bg-amber-50 text-amber-700",
-};
-
-export const CUSTOMER_TICKET_TYPE_LABELS: Record<string, string> = {
-  laundry: "洗衣护理",
-  car_wash: "车辆清洗",
-};
-
-export const CUSTOMER_TICKET_PRIORITY_LABELS: Record<string, string> = {
-  normal: "普通",
-  urgent: "加急",
-  critical: "最紧急",
 };
 
 // ---- 订单 label maps (local) -----------------------------------------------
@@ -172,14 +152,6 @@ export const CUSTOMER_ORDER_TYPE_LABELS: Record<string, string> = {
 // ---- 工单项目（服务项目）label maps (local) ---------------------------------
 // Powers the 服务项目 tab on the customer detail view.
 
-export const CUSTOMER_TICKET_ITEM_STATUS_LABELS: Record<string, string> = {
-  pending_wash: "待清洗",
-  washing: "清洗中",
-  done: "已完成",
-  ready_to_pick: "待取件",
-  exception: "异常",
-};
-
 export const CUSTOMER_TICKET_ITEM_STATUS_TONES: Record<string, string> = {
   pending_wash: "bg-muted text-muted-foreground",
   washing: "bg-accent text-accent-foreground",
@@ -188,9 +160,3 @@ export const CUSTOMER_TICKET_ITEM_STATUS_TONES: Record<string, string> = {
   exception: "bg-red-50 text-red-700",
 };
 
-export const CUSTOMER_TICKET_ITEM_TYPE_LABELS: Record<string, string> = {
-  cloth: "衣物",
-  car: "车",
-  shoe: "鞋",
-  carpet: "地毯",
-};

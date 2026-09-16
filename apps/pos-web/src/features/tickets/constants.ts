@@ -8,37 +8,38 @@
 
 import type {
   ServiceTicketItemStatus,
-  ServiceTicketItemType,
   ServiceTicketPriority,
   ServiceTicketSourceChannel,
   ServiceTicketStatus,
-  ServiceTicketType,
 } from "@cleanhub/api-client";
-
-import { createTranslator, type TranslationKey } from "@cleanhub/i18n";
 
 import { getPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
 import { DEFAULT_POS_CURRENCY, formatPosMoney } from "@/lib/money";
 
 /**
- * Ticket wording comes from the typed `pos.ticket.*` catalogue.
- *
- * Resolved per call rather than frozen at module load: the runtime locale is
- * updated during render by `PosRuntimeLocaleBridge`, and the localizer above
- * re-renders the tree on a language switch, so a call-time lookup returns the
- * current language while a module-scope constant would keep the one the tab
- * started in.
- *
- * Keys are the wire enums from `@cleanhub/api-client`, so the API stays the
- * single source of truth for the values and a missing label fails the build.
+ * Ticket wording lives in `@/lib/ticket-labels` because customers and orders
+ * render the same statuses and types. Re-exported here so this feature's own
+ * imports stay in one place.
  */
-function label(key: TranslationKey): string {
-  return createTranslator({ locale: getPosRuntimeLocale() })(key);
-}
-
-export function getTicketsPageTitle(): string {
-  return label("pos.ticket.title");
-}
+export {
+  TICKET_ITEM_TYPE_VALUES,
+  TICKET_PRIORITY_VALUES,
+  TICKET_SOURCE_VALUES,
+  TICKET_STATUS_VALUES,
+  TICKET_TYPE_VALUES,
+  getTicketItemStatusLabel,
+  getTicketItemTypeLabel,
+  getTicketItemTypeOptions,
+  getTicketPriorityLabel,
+  getTicketPriorityOptions,
+  getTicketSourceLabel,
+  getTicketSourceOptions,
+  getTicketStatusLabel,
+  getTicketStatusOptions,
+  getTicketTypeLabel,
+  getTicketTypeOptions,
+  getTicketsPageTitle,
+} from "@/lib/ticket-labels";
 
 /** Tailwind tone token → concrete bg/text classes. Keeps badge components tiny. */
 export type BadgeTone =
@@ -59,20 +60,6 @@ export const BADGE_TONE_CLASSES: Record<BadgeTone, string> = {
 };
 
 // --- 工单状态 -------------------------------------------------------------
-
-export const TICKET_STATUS_VALUES = [
-  "draft",
-  "pending",
-  "in_progress",
-  "ready_to_pick",
-  "picked_up",
-  "cancelled",
-  "exception",
-] as const satisfies ReadonlyArray<ServiceTicketStatus>;
-
-export function getTicketStatusLabel(status: ServiceTicketStatus): string {
-  return label(`pos.ticket.status.${status}`);
-}
 
 export const TICKET_STATUS_TONES: Record<ServiceTicketStatus, BadgeTone> = {
   draft: "slate",
@@ -108,18 +95,6 @@ export const TICKET_STATUS_TRANSITIONS: Record<
 
 // --- 工单优先级 -----------------------------------------------------------
 
-export const TICKET_PRIORITY_VALUES = [
-  "normal",
-  "urgent",
-  "critical",
-] as const satisfies ReadonlyArray<ServiceTicketPriority>;
-
-export function getTicketPriorityLabel(
-  priority: ServiceTicketPriority,
-): string {
-  return label(`pos.ticket.priority.${priority}`);
-}
-
 export const TICKET_PRIORITY_TONES: Record<ServiceTicketPriority, BadgeTone> = {
   normal: "slate",
   urgent: "amber",
@@ -127,19 +102,6 @@ export const TICKET_PRIORITY_TONES: Record<ServiceTicketPriority, BadgeTone> = {
 };
 
 // --- 来源渠道 -------------------------------------------------------------
-
-export const TICKET_SOURCE_VALUES = [
-  "pos",
-  "app",
-  "phone",
-  "whatsapp",
-] as const satisfies ReadonlyArray<ServiceTicketSourceChannel>;
-
-export function getTicketSourceLabel(
-  source: ServiceTicketSourceChannel,
-): string {
-  return label(`pos.ticket.source.${source}`);
-}
 
 export const TICKET_SOURCE_TONES: Record<
   ServiceTicketSourceChannel,
@@ -150,17 +112,6 @@ export const TICKET_SOURCE_TONES: Record<
   phone: "violet",
   whatsapp: "emerald",
 };
-
-// --- 工单类型（业务线）----------------------------------------------------
-
-export const TICKET_TYPE_VALUES = [
-  "laundry",
-  "car_wash",
-] as const satisfies ReadonlyArray<ServiceTicketType>;
-
-export function getTicketTypeLabel(type: ServiceTicketType): string {
-  return label(`pos.ticket.type.${type}`);
-}
 
 // --- 工单项目：颜色 / 品牌 / 材质预设选项 -----------------------------------
 
@@ -297,25 +248,6 @@ export const ITEM_MATERIAL_OPTIONS: ReadonlyArray<{
 
 // --- 工单项目 -------------------------------------------------------------
 
-export const TICKET_ITEM_TYPE_VALUES = [
-  "cloth",
-  "car",
-  "shoe",
-  "carpet",
-] as const satisfies ReadonlyArray<ServiceTicketItemType>;
-
-export function getTicketItemTypeLabel(
-  itemType: ServiceTicketItemType,
-): string {
-  return label(`pos.ticket.itemType.${itemType}`);
-}
-
-export function getTicketItemStatusLabel(
-  itemStatus: ServiceTicketItemStatus,
-): string {
-  return label(`pos.ticket.itemStatus.${itemStatus}`);
-}
-
 export const TICKET_ITEM_STATUS_TONES: Record<
   ServiceTicketItemStatus,
   BadgeTone
@@ -338,64 +270,11 @@ export const TICKET_ITEM_STATUS_TRANSITIONS: Record<
   ready_to_pick: ["washing", "exception"],
 };
 
-// --- 选项列表（供 select / 筛选条复用） -----------------------------------
-
-/**
- * Option lists for selects and filter bars.
- *
- * Functions rather than constants for the same reason the labels are: an array
- * built at module load would freeze the wording in whatever language the tab
- * started in, and never follow a language switch.
- */
-export function getTicketStatusOptions(): ReadonlyArray<{
-  value: ServiceTicketStatus;
-  label: string;
-}> {
-  return TICKET_STATUS_VALUES.map((value) => ({
-    value,
-    label: getTicketStatusLabel(value),
-  }));
-}
-
-export function getTicketPriorityOptions(): ReadonlyArray<{
-  value: ServiceTicketPriority;
-  label: string;
-}> {
-  return TICKET_PRIORITY_VALUES.map((value) => ({
-    value,
-    label: getTicketPriorityLabel(value),
-  }));
-}
-
-export function getTicketTypeOptions(): ReadonlyArray<{
-  value: ServiceTicketType;
-  label: string;
-}> {
-  return TICKET_TYPE_VALUES.map((value) => ({
-    value,
-    label: getTicketTypeLabel(value),
-  }));
-}
-
-export function getTicketSourceOptions(): ReadonlyArray<{
-  value: ServiceTicketSourceChannel;
-  label: string;
-}> {
-  return TICKET_SOURCE_VALUES.map((value) => ({
-    value,
-    label: getTicketSourceLabel(value),
-  }));
-}
-
-export function getTicketItemTypeOptions(): ReadonlyArray<{
-  value: ServiceTicketItemType;
-  label: string;
-}> {
-  return TICKET_ITEM_TYPE_VALUES.map((value) => ({
-    value,
-    label: getTicketItemTypeLabel(value),
-  }));
-}
+// --- 快捷词条 -------------------------------------------------------------
+//
+// Deliberately not translated: these are inserted into defectNotes /
+// specialRequest / remark, which are free-text columns a customer sees.
+// Translating them would fork what gets written into the same column.
 
 export const TICKET_DEFECT_QUICK_PHRASES = [
   "明显污渍",

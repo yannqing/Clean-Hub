@@ -19,10 +19,13 @@ import { formatPosMoney } from "@/lib/money";
 import { posApi } from "@/lib/api-client";
 
 import {
+  getTicketStatusLabel,
+  getTicketTypeLabel,
+} from "@/lib/ticket-labels";
+
+import {
   CUSTOMER_PROFILE_RELATIONSHIPS,
-  CUSTOMER_TICKET_STATUS_LABELS,
   CUSTOMER_TICKET_STATUS_TONES,
-  CUSTOMER_TICKET_TYPE_LABELS,
   CUSTOMER_ORDER_PAYMENT_LABELS,
   CUSTOMER_ORDER_TYPE_LABELS,
 } from "../constants";
@@ -671,7 +674,7 @@ function CurrentServiceCard({
     <div className="mt-4 grid gap-3 border-y py-4 sm:grid-cols-[minmax(0,1fr)_130px_120px] sm:items-center">
       <div className="min-w-0">
         <div className="font-semibold text-foreground">
-          {CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType}
+          {getTicketTypeLabel(ticket.ticketType)}
         </div>
         <div className="mt-1 text-xs text-muted-foreground">
           工单 {ticket.ticketNo || "—"} · {ticket.itemCount} 个项目 ·{" "}
@@ -686,8 +689,7 @@ function CurrentServiceCard({
       <span
         className={`justify-self-end rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}
       >
-        {CUSTOMER_TICKET_STATUS_LABELS[ticket.ticketStatus] ??
-          ticket.ticketStatus}
+        {getTicketStatusLabel(ticket.ticketStatus)}
       </span>
     </div>
   );
@@ -720,7 +722,7 @@ function RecentActivity({
       .slice(0, 3)
       .map<ActivityItem & { timestamp: string }>((ticket) => ({
         title: "工单创建",
-        detail: `${CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ?? ticket.ticketType} · ${ticket.itemCount} 个项目`,
+        detail: `${getTicketTypeLabel(ticket.ticketType)} · ${ticket.itemCount} 个项目`,
         time: formatDateShort(ticket.createdAt, locale, timeZone),
         timestamp: ticket.createdAt,
         amount: ticket.totalAmount

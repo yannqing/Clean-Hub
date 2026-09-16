@@ -11,11 +11,12 @@ import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import {
-  CUSTOMER_TICKET_ITEM_STATUS_LABELS,
-  CUSTOMER_TICKET_ITEM_STATUS_TONES,
-  CUSTOMER_TICKET_ITEM_TYPE_LABELS,
-  CUSTOMER_TICKET_TYPE_LABELS,
-} from "../constants";
+  getTicketItemStatusLabel,
+  getTicketItemTypeLabel,
+  getTicketTypeLabel,
+} from "@/lib/ticket-labels";
+
+import { CUSTOMER_TICKET_ITEM_STATUS_TONES } from "../constants";
 import { fetchCustomerServiceItems } from "../queries";
 
 type CustomerServiceItemListProps = {
@@ -172,10 +173,8 @@ export function CustomerServiceItemList({
                   <div className="text-foreground">
                     {item.itemCategory ??
                       (item.itemType
-                        ? (CUSTOMER_TICKET_ITEM_TYPE_LABELS[item.itemType] ??
-                          item.itemType)
-                        : (CUSTOMER_TICKET_TYPE_LABELS[item.ticketType] ??
-                          item.ticketType))}
+                        ? getTicketItemTypeLabel(item.itemType)
+                        : getTicketTypeLabel(item.ticketType))}
                   </div>
                   <div className="min-w-0">
                     <button
@@ -203,8 +202,7 @@ export function CustomerServiceItemList({
                     <span
                       className={`rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}
                     >
-                      {CUSTOMER_TICKET_ITEM_STATUS_LABELS[item.itemStatus] ??
-                        item.itemStatus}
+                      {getTicketItemStatusLabel(item.itemStatus)}
                     </span>
                   </div>
                 </div>
@@ -283,8 +281,8 @@ function CustomerServiceItemCard({
   const service =
     item.itemCategory ??
     (item.itemType
-      ? (CUSTOMER_TICKET_ITEM_TYPE_LABELS[item.itemType] ?? item.itemType)
-      : (CUSTOMER_TICKET_TYPE_LABELS[item.ticketType] ?? item.ticketType));
+      ? getTicketItemTypeLabel(item.itemType)
+      : getTicketTypeLabel(item.ticketType));
 
   return (
     <article className="p-4 sm:p-5">
@@ -302,8 +300,7 @@ function CustomerServiceItemCard({
         <span
           className={`rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}
         >
-          {CUSTOMER_TICKET_ITEM_STATUS_LABELS[item.itemStatus] ??
-            item.itemStatus}
+          {getTicketItemStatusLabel(item.itemStatus)}
         </span>
       </div>
 

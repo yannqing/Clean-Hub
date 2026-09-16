@@ -19,10 +19,11 @@ import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import {
-  CUSTOMER_TICKET_STATUS_LABELS,
-  CUSTOMER_TICKET_STATUS_TONES,
-  CUSTOMER_TICKET_TYPE_LABELS,
-} from "../constants";
+  getTicketStatusLabel,
+  getTicketTypeLabel,
+} from "@/lib/ticket-labels";
+
+import { CUSTOMER_TICKET_STATUS_TONES } from "../constants";
 import { fetchCustomerTickets } from "../queries";
 
 type CustomerTicketListProps = {
@@ -228,8 +229,7 @@ export function CustomerTicketList({
                     </div>
                   </div>
                   <div className="font-medium text-foreground">
-                    {CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ??
-                      ticket.ticketType}
+                    {getTicketTypeLabel(ticket.ticketType)}
                   </div>
                   <div className="text-muted-foreground">
                     {ticket.itemCount}
@@ -238,8 +238,7 @@ export function CustomerTicketList({
                     <span
                       className={`rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}
                     >
-                      {CUSTOMER_TICKET_STATUS_LABELS[ticket.ticketStatus] ??
-                        ticket.ticketStatus}
+                      {getTicketStatusLabel(ticket.ticketStatus)}
                     </span>
                   </div>
                   <div className="text-muted-foreground">
@@ -332,8 +331,7 @@ function CustomerTicketCard({
             {ticket.ticketNo || "—"}
           </div>
           <div className="mt-1 text-sm font-medium text-foreground">
-            {CUSTOMER_TICKET_TYPE_LABELS[ticket.ticketType] ??
-              ticket.ticketType}
+            {getTicketTypeLabel(ticket.ticketType)}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {formatDate(ticket.createdAt, locale, timeZone)}
@@ -342,8 +340,7 @@ function CustomerTicketCard({
         <span
           className={`rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}
         >
-          {CUSTOMER_TICKET_STATUS_LABELS[ticket.ticketStatus] ??
-            ticket.ticketStatus}
+          {getTicketStatusLabel(ticket.ticketStatus)}
         </span>
       </div>
 
