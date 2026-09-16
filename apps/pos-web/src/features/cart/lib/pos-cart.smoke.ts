@@ -20,18 +20,47 @@ import {
   writePosCart,
 } from "./pos-cart";
 
-assert.deepEqual(splitMixedPaymentTotal("100.00"), {
+assert.deepEqual(splitMixedPaymentTotal("100.00", "EUR"), {
   cashAmount: "50.00",
   externalAmount: "50.00",
 });
 assert.deepEqual(
-  splitMixedPaymentTotal("100.01"),
+  splitMixedPaymentTotal("100.01", "EUR"),
   {
     cashAmount: "50.00",
     externalAmount: "50.01",
   },
   "mixed payment must preserve the exact total for odd minor units",
 );
+
+// XOF has no sub-franc coin. An even split would hand the drawer 12.50 F CFA,
+// which is not money anyone can pay, so the cash leg snaps down to a whole
+// franc and the electronic leg -- which has no denomination to respect --
+// absorbs the remainder.
+for (const [total, cash, external] of [
+  ["25.00", "12.00", "13.00"],
+  ["10.25", "5.00", "5.25"],
+  ["1.00", "0.00", "1.00"],
+  ["50.00", "25.00", "25.00"],
+] as const) {
+  const split = splitMixedPaymentTotal(total, "XOF");
+  assert.deepEqual(
+    split,
+    { cashAmount: cash, externalAmount: external },
+    `XOF ${total} must split into payable cash plus the remainder`,
+  );
+  assert.equal(
+    Math.round(Number(split.cashAmount) * 100) % 100,
+    0,
+    `XOF cash leg ${split.cashAmount} must be a whole franc`,
+  );
+  assert.equal(
+    Math.round(Number(split.cashAmount) * 100) +
+      Math.round(Number(split.externalAmount) * 100),
+    Math.round(Number(total) * 100),
+    `XOF ${total} must still sum to the order total`,
+  );
+}
 
 // Changing the cash rounding step changes the total after the tenders were
 // seeded. An untouched tender must follow the new total, or the drawer would

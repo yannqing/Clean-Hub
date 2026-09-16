@@ -6,6 +6,7 @@ import { findBranchById } from "../../tenant/branches/branches.repository.js";
 import { isLockedPosPaymentMethod } from "@cleanhub/domain/payment-methods";
 import {
   cashRoundingStepToMinor,
+  getCurrencyPayableStep,
   isCashRoundingStep,
 } from "@cleanhub/domain/currency";
 
@@ -289,6 +290,39 @@ export function assertGuestOrderItemAllowed(
     throw new PosOrderError(
       "CUSTOMER_REQUIRED",
       "A customer profile is required for non-retail services.",
+      422,
+    );
+  }
+}
+
+/**
+ * Cash has to be an amount the drawer can actually take.
+ *
+ * XOF has no sub-franc coin, so a 12.50 F CFA cash tender is not money anyone
+ * can hand over. The POS splits mixed payments on this same step, but the
+ * guard belongs on the server too: offline sales replay straight into
+ * `checkoutPosOrder`, and the amount schema only checks the decimal shape.
+ *
+ * Electronic legs are deliberately exempt. Mobile money settles 12.50 exactly,
+ * and the mixed split routes the odd remainder there precisely because it has
+ * no physical denomination to respect.
+ */
+export function assertCashTendersArePayable(
+  payments: readonly CreatePosPaymentRequest[],
+  currency: string | null | undefined,
+): void {
+  const payableStep = getCurrencyPayableStep(currency);
+  if (payableStep <= BigInt(1)) return;
+
+  const unpayable = payments.find(
+    (payment) =>
+      payment.paymentMethod === "cash" &&
+      moneyToMinor(payment.amount) % payableStep !== BigInt(0),
+  );
+  if (unpayable) {
+    throw new PosOrderError(
+      "PAYMENT_AMOUNT_NOT_PAYABLE",
+      `A cash tender of ${unpayable.amount} cannot be paid in ${currency}.`,
       422,
     );
   }
@@ -1844,6 +1878,7 @@ export async function checkoutPosOrder(
         422,
       );
     }
+    assertCashTendersArePayable(normalizedPayments, order.currency);
     const expectedIntent =
       totalMinor === BigInt(0) || requestedMinor === totalMinor
         ? "pay_now"

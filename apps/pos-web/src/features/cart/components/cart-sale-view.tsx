@@ -939,7 +939,10 @@ function CartPanel({
       const externalMethod = mixedExternalMethods[0];
       if (!mixedPaymentAvailable || !externalMethod) return;
 
-      const { cashAmount, externalAmount } = splitMixedPaymentTotal(total);
+      const { cashAmount, externalAmount } = splitMixedPaymentTotal(
+        total,
+        cart.currency,
+      );
       setTenders([
         createCheckoutTender("cash", cashAmount),
         createCheckoutTender(
@@ -998,7 +1001,10 @@ function CartPanel({
     if (!tendersMatchSeededTotal(tenders, total)) return;
 
     if (paymentMode === "mixed") {
-      const { cashAmount, externalAmount } = splitMixedPaymentTotal(nextTotal);
+      const { cashAmount, externalAmount } = splitMixedPaymentTotal(
+        nextTotal,
+        cart.currency,
+      );
       setTenders((current) =>
         current.map((tender, index) => {
           const amount = index === 0 ? cashAmount : externalAmount;

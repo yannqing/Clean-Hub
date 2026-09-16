@@ -22,11 +22,15 @@ import {
   getProductReservationExpiresAt,
 } from "./orders.inventory.js";
 import {
+  assertCashTendersArePayable,
   assertGuestOrderItemAllowed,
   paymentIntentMatches,
 } from "./orders.service.js";
 import { projectPosOrderPaymentState } from "./order-payment-state.js";
-import type { PosPaymentTransaction } from "./orders.types.js";
+import type {
+  CreatePosPaymentRequest,
+  PosPaymentTransaction,
+} from "./orders.types.js";
 import {
   createPosOrderBodySchema,
   createPosCheckoutBodySchema,
@@ -510,5 +514,52 @@ assert.equal(formatPosOrderCode(orderId), "OD-Q69G5FAW");
 assert.equal(parsePosOrderCodeSuffix(" od-q69g5faw "), "Q69G5FAW");
 assert.equal(isPosOrderLookupQuery("OD-Q69G5FAW"), true);
 assert.equal(isPosOrderLookupQuery("ORD-Q69G5FAW"), false);
+
+// A zero-decimal currency has no coin below one unit, so a cash tender with
+// centimes is money nobody can hand over. The schema only checks the decimal
+// shape, and offline sales replay straight into checkout, so the rule is
+// enforced here rather than at the edge.
+const cashTender = (amount: string): CreatePosPaymentRequest => ({
+  paymentMethod: "cash",
+  amount,
+  tenderedAmount: amount,
+  occurredAt: cashOccurredAt,
+  shiftId: cashShiftId,
+  idempotencyKey: `payable-${amount}`,
+});
+
+assert.throws(
+  () => assertCashTendersArePayable([cashTender("12.50")], "XOF"),
+  /cannot be paid in XOF/,
+  "a sub-franc cash tender must be rejected for XOF",
+);
+assert.doesNotThrow(
+  () => assertCashTendersArePayable([cashTender("12.00")], "XOF"),
+  "a whole-franc cash tender is payable in XOF",
+);
+assert.doesNotThrow(
+  () => assertCashTendersArePayable([cashTender("12.50")], "EUR"),
+  "EUR has centimes, so the same amount stays payable",
+);
+// The mixed split deliberately gives the odd remainder to the electronic leg,
+// which has no denomination to respect. Rejecting it would break the very
+// split that keeps the cash leg payable.
+assert.doesNotThrow(
+  () =>
+    assertCashTendersArePayable(
+      [
+        cashTender("12.00"),
+        {
+          paymentMethod: "app",
+          amount: "13.50",
+          provider: "wave",
+          externalReference: "wave-payable-1",
+          idempotencyKey: "payable-app-1",
+        },
+      ],
+      "XOF",
+    ),
+  "an electronic leg may carry the odd remainder in XOF",
+);
 
 console.log("POS order/payment smoke passed.");

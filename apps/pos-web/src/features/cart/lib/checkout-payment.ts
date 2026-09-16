@@ -1,3 +1,5 @@
+import { getCurrencyPayableStep } from "@cleanhub/domain/currency";
+
 /** Sum of tender amounts, in minor units, tolerant of blank/invalid entries. */
 export function sumTenderMinor(
   tenders: readonly { amount: string }[],
@@ -25,7 +27,22 @@ export function tendersMatchSeededTotal(
   return sumTenderMinor(tenders) === Math.max(0, Math.round(parsed * 100));
 }
 
-export function splitMixedPaymentTotal(total: string): {
+/**
+ * Split a total into a cash half and an electronic half.
+ *
+ * The cash leg is snapped **down** to something the drawer can actually take:
+ * XOF has no sub-franc coin, so an even split of 25 F CFA into 12.50/12.50
+ * produces two amounts nobody can hand over. The remainder goes to the
+ * electronic leg, which has no physical denomination to respect -- mobile
+ * money settles 13 F CFA exactly.
+ *
+ * The two legs always sum to the original total, so a currency whose payable
+ * step is a single minor unit (EUR, USD) splits exactly as before.
+ */
+export function splitMixedPaymentTotal(
+  total: string,
+  currency: string | null | undefined,
+): {
   cashAmount: string;
   externalAmount: string;
 } {
@@ -33,7 +50,9 @@ export function splitMixedPaymentTotal(total: string): {
   const totalMinor = Number.isFinite(parsedTotal)
     ? Math.max(0, Math.round(parsedTotal * 100))
     : 0;
-  const cashMinor = Math.floor(totalMinor / 2);
+  const step = Number(getCurrencyPayableStep(currency));
+  const halfMinor = Math.floor(totalMinor / 2);
+  const cashMinor = step > 1 ? Math.floor(halfMinor / step) * step : halfMinor;
 
   return {
     cashAmount: (cashMinor / 100).toFixed(2),

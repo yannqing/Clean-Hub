@@ -115,6 +115,11 @@ const POS_API_ERROR_MESSAGES: Record<string, Record<PosErrorLocale, string>> = {
     en: "Cash tendered must cover the amount due.",
     fr: "Les espèces reçues doivent couvrir le montant à payer.",
   },
+  PAYMENT_AMOUNT_NOT_PAYABLE: {
+    "zh-CN": "现金金额必须是该币种可实际支付的面额，请调整后重试。",
+    en: "The cash amount must be payable in this currency. Adjust it and try again.",
+    fr: "Le montant en espèces doit être payable dans cette devise. Corrigez-le et réessayez.",
+  },
 };
 
 const POS_ACCOUNT_LOCKED_UNTIL_MESSAGES: Record<
