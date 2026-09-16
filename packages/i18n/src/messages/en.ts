@@ -21,6 +21,9 @@ export const enMessages = {
     notScheduled: "Not scheduled",
     notSet: "Not set",
     unavailable: "Unavailable",
+    errorTitle: "This page could not load",
+    errorBody:
+      "Something went wrong unexpectedly. Try again; your saved data is not affected.",
     mainNavigation: "Main navigation",
     language: "Language",
     languageShort: "Language",

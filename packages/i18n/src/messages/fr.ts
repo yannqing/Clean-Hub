@@ -21,6 +21,9 @@ export const frMessages = {
     notScheduled: "Non planifié",
     notSet: "Non renseigné",
     unavailable: "Indisponible",
+    errorTitle: "Cette page n'a pas pu se charger",
+    errorBody:
+      "Une erreur inattendue est survenue. Réessayez ; vos données enregistrées ne sont pas affectées.",
     mainNavigation: "Navigation principale",
     language: "Langue",
     languageShort: "Langue",

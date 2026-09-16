@@ -21,6 +21,8 @@ export const zhCNMessages = {
     notScheduled: "未计划",
     notSet: "未设置",
     unavailable: "不可用",
+    errorTitle: "页面加载失败",
+    errorBody: "出现了意外错误。请重试，已保存的数据不受影响。",
     mainNavigation: "主导航",
     language: "语言",
     languageShort: "语言",
