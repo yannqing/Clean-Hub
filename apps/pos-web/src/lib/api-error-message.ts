@@ -120,6 +120,16 @@ const POS_API_ERROR_MESSAGES: Record<string, Record<PosErrorLocale, string>> = {
     en: "The cash amount must be payable in this currency. Adjust it and try again.",
     fr: "Le montant en espèces doit être payable dans cette devise. Corrigez-le et réessayez.",
   },
+  CASH_AMOUNT_NOT_PAYABLE: {
+    "zh-CN": "现金进出金额必须是该币种可实际支付的面额，请调整后重试。",
+    en: "The cash movement must be payable in this currency. Adjust it and try again.",
+    fr: "Le mouvement d'espèces doit être payable dans cette devise. Corrigez-le et réessayez.",
+  },
+  CASH_SESSION_REQUIRED: {
+    "zh-CN": "请先开启可跟踪的钱箱会话，再登记现金进出。",
+    en: "Open a tracked cash session before recording cash movements.",
+    fr: "Ouvrez une session d'espèces suivie avant d'enregistrer des mouvements.",
+  },
 };
 
 const POS_ACCOUNT_LOCKED_UNTIL_MESSAGES: Record<

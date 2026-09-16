@@ -1,4 +1,5 @@
 import { getDb, type Database } from "@cleanhub/db";
+import { getCurrencyPayableStep } from "@cleanhub/domain/currency";
 
 import { AuthError } from "../../auth/auth.errors.js";
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
@@ -298,6 +299,36 @@ export async function listCurrentRegisterCashMovements(
   };
 }
 
+/**
+ * Cash in and out of a drawer has to be money that exists.
+ *
+ * A pay-in or pay-out is physical: notes and coins crossing the counter. XOF
+ * has no sub-franc coin, so 12.50 F CFA is not an amount anyone can put in or
+ * take out. The request schema only checks the decimal shape, so without this
+ * a fractional movement would be stored and then carried into the expected
+ * cash that the shift is reconciled against.
+ *
+ * Deliberately separate from the order tender guard: that one is typed to
+ * payment requests and exempts electronic legs, neither of which applies to a
+ * drawer movement. Only the currency step itself is shared.
+ */
+export function assertCashMovementAmountIsPayable(
+  amount: string,
+  currency: string,
+): void {
+  const payableStep = getCurrencyPayableStep(currency);
+  if (payableStep <= BigInt(1)) return;
+
+  const minorUnits = BigInt(Math.round(Number(amount) * 100));
+  if (minorUnits % payableStep !== BigInt(0)) {
+    throw new PosStaffError(
+      "CASH_AMOUNT_NOT_PAYABLE",
+      `A cash movement of ${amount} cannot be paid in ${currency}.`,
+      422,
+    );
+  }
+}
+
 export async function createRegisterCashMovement(
   input: CreatePosShiftCashMovementInput,
   db: Database = getDb(),
@@ -321,6 +352,10 @@ export async function createRegisterCashMovement(
         409,
       );
     }
+    assertCashMovementAmountIsPayable(
+      input.data.amount,
+      state.cashSession.currency,
+    );
     const existing = await findShiftCashMovementByIdempotencyKey(tx, {
       tenantId,
       idempotencyKey: input.data.idempotencyKey,

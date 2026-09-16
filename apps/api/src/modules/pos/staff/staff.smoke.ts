@@ -17,6 +17,7 @@ import {
   calculateNetSales,
 } from "./staff.repository.js";
 import {
+  assertCashMovementAmountIsPayable,
   assertShiftBranch,
   resolveShiftTransition,
 } from "./staff.service.js";
@@ -231,6 +232,30 @@ assert.doesNotThrow(
       branchId: shift.branchId,
     }),
   "a work shift may be continued from another terminal in the same branch",
+);
+
+// Cash crossing a drawer has to exist as notes and coins. The request schema
+// accepts any two-decimal string, so a zero-decimal currency needs the service
+// guard: a 12.50 F CFA pay-out would otherwise be stored and then carried into
+// the expected cash the shift is reconciled against.
+assert.throws(
+  () => assertCashMovementAmountIsPayable("12.50", "XOF"),
+  /cannot be paid in XOF/,
+  "a sub-franc cash movement must be rejected for XOF",
+);
+assert.throws(
+  () => assertCashMovementAmountIsPayable("0.50", "XOF"),
+  (error: unknown) =>
+    error instanceof PosStaffError && error.code === "CASH_AMOUNT_NOT_PAYABLE",
+  "the rejection must carry the payable-amount code",
+);
+assert.doesNotThrow(
+  () => assertCashMovementAmountIsPayable("12.00", "XOF"),
+  "a whole-franc cash movement is payable in XOF",
+);
+assert.doesNotThrow(
+  () => assertCashMovementAmountIsPayable("12.50", "EUR"),
+  "EUR has centimes, so the same amount stays payable",
 );
 
 console.log("POS staff/shift smoke passed.");
