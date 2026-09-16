@@ -81,6 +81,7 @@ export const AUDIT_EVENT_DICTIONARY = {
     "pos.service_ticket.item_updated",
     "pos.service_ticket.item_status_changed",
     "pos.service_ticket.status_changed",
+    "pos.service_ticket.status_synced_from_items",
   ],
   pos_customer: [
     "pos_customer.profile_created",
@@ -94,6 +95,7 @@ export const AUDIT_EVENT_DICTIONARY = {
     "pos_hardware.print_job.failed",
     "pos_hardware.built_in.connected",
     "pos_hardware.cash_payment_drawer.failed",
+    "pos_hardware.privileged_reprint.authorized",
   ],
   pos_terminal_security: [
     "pos_terminal.enrolled",
@@ -102,8 +104,14 @@ export const AUDIT_EVENT_DICTIONARY = {
     "pos_terminal.revoked",
     "pos_terminal.credential_rotated",
     "pos_terminal.credential_re_enrolled",
+    "pos_terminal.rebound",
   ],
-  pos_shift: ["pos.shift.clock_in", "pos.shift.break_start", "pos.shift.break_end"],
+  pos_shift: [
+    "pos.shift.clock_in",
+    "pos.shift.break_start",
+    "pos.shift.break_end",
+    "pos.shift.security_forced_closed",
+  ],
   pos_register: ["pos.register.opened"],
   pos_notification: ["pos.notification.read"],
   pos_channel_settings: ["pos_channel_settings.updated"],
@@ -120,13 +128,16 @@ export type AuditEventCopy = Record<AuditEventCode, string>;
  * Each needs a product decision about what it means to a store owner before it
  * gets wording; until then they fall through to the humanised code rather than
  * carrying a confident guess in an audit trail.
+ *
+ * Currently empty: the last four were described once the owner confirmed what
+ * they mean. Two were written to match the code rather than the description
+ * given -- `pos.shift.security_forced_closed` fires when an administrative
+ * change (terminal removed or disabled, staff or tenant status changed)
+ * invalidates a terminal, not on any elapsed-time rule, and
+ * `pos_hardware.privileged_reprint.authorized` still records a reason-backed
+ * authorisation because the POS enforces one today.
  */
-export const UNDESCRIBED_AUDIT_EVENT_TYPES = [
-  "pos.service_ticket.status_synced_from_items",
-  "pos.shift.security_forced_closed",
-  "pos_terminal.rebound",
-  "pos_hardware.privileged_reprint.authorized",
-] as const;
+export const UNDESCRIBED_AUDIT_EVENT_TYPES: ReadonlyArray<string> = [];
 
 function toTitleCase(value: string): string {
   return value.replace(/\b\w/g, (char) => char.toUpperCase());

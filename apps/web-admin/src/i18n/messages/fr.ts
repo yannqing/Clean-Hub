@@ -273,6 +273,8 @@ export const frMessages: WebAdminMessages = {
       "pos.service_ticket.item_updated": "Article du bon mis à jour",
       "pos.service_ticket.item_status_changed": "Statut de l'article modifié",
       "pos.service_ticket.status_changed": "Statut du bon modifié",
+      "pos.service_ticket.status_synced_from_items":
+        "Statut du bon aligné sur ses articles",
       "pos_customer.profile_created": "Fiche client créée",
       "pos_customer.account_created": "Compte client créé",
       "pos_customer.account_status_changed": "Statut du compte client modifié",
@@ -283,15 +285,20 @@ export const frMessages: WebAdminMessages = {
       "pos_hardware.built_in.connected": "Périphérique intégré connecté",
       "pos_hardware.cash_payment_drawer.failed":
         "Échec d'ouverture du tiroir-caisse",
+      "pos_hardware.privileged_reprint.authorized":
+        "Réimpression du reçu autorisée",
       "pos_terminal.enrolled": "Terminal enregistré",
       "pos_terminal.enabled": "Terminal activé",
       "pos_terminal.disabled": "Terminal désactivé",
       "pos_terminal.revoked": "Accès du terminal révoqué",
       "pos_terminal.credential_rotated": "Identifiants du terminal renouvelés",
       "pos_terminal.credential_re_enrolled": "Terminal réenregistré",
+      "pos_terminal.rebound": "Terminal rattaché à une autre succursale",
       "pos.shift.clock_in": "Pointage d'arrivée",
       "pos.shift.break_start": "Début de pause",
       "pos.shift.break_end": "Fin de pause",
+      "pos.shift.security_forced_closed":
+        "Service clôturé d'office par une mesure de sécurité",
       "pos.register.opened": "Caisse ouverte",
       "pos.notification.read": "Notification lue",
       "pos_channel_settings.updated": "Paramètres du canal POS mis à jour",

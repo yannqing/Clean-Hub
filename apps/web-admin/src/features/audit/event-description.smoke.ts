@@ -69,7 +69,9 @@ for (const eventType of UNDESCRIBED_AUDIT_EVENT_TYPES) {
   );
   assert.equal(
     getAuditEventDescription(eventType, enMessages.common.auditEvents),
-    eventType.replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+    eventType
+      .replace(/[._]/g, " ")
+      .replace(/\b\w/g, (c: string) => c.toUpperCase()),
     `${eventType} must read as its humanised code`,
   );
 }
