@@ -472,6 +472,23 @@ export function translatePosText(
     translated = translated.split(source).join(translations);
   }
 
+  /**
+   * A half-substituted string is worse than an untranslated one.
+   *
+   * The loop replaces known phrases wherever they appear, so a sentence the
+   * dictionary does not carry whole comes back spliced: 管理员 became
+   * "manage员" and "gérer员", and 页面不存在 became "page面不存在". Mixed
+   * Chinese and Latin inside one word reads as corruption to every operator,
+   * while plain Chinese at least reads as "not translated yet".
+   *
+   * So the loop's output is only accepted once nothing Han is left in it.
+   * Phrases that do resolve completely (共 3 条 -> Total 3 items) still win;
+   * the rest fall back to the source text until the dictionary carries them.
+   */
+  if (HAN_RE.test(translated)) {
+    return value;
+  }
+
   return `${leading}${translated}${trailing}`;
 }
 
