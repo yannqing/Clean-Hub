@@ -8,6 +8,15 @@ import type {
   ShiftRecord,
 } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
+import {
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@cleanhub/ui";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -77,6 +86,22 @@ const COPY = {
     personalCashOpened: "随身现金会话已开启。",
     closed: "收银台已关闭，Z Report 已生成。",
     personalCashClosed: "随身现金已盘点并关闭，收银台仍保持开启。",
+    confirmCloseTitle: "确认关闭收银台？",
+    confirmClosePersonalCashTitle: "确认盘点并关闭随身现金？",
+    confirmCloseDescription:
+      "关闭后会生成 Z Report 并锁定本次现金会话，此操作无法撤销。",
+    confirmClosePersonalCashDescription:
+      "关闭后会锁定本次随身现金会话，此操作无法撤销。收银台仍保持开启。",
+    confirmCountedCash: "实点现金",
+    confirmExpectedCash: "系统应有现金",
+    confirmVariance: "差额",
+    confirmNotEntered: "未填写",
+    confirmCancel: "再检查一下",
+    confirmClose: "确认关闭",
+    confirmClockOutTitle: "确认下班？",
+    confirmClockOutDescription: "下班后需要重新打卡才能继续收银。",
+    confirmClockOut: "确认下班",
+    closing: "关闭中…",
   },
   en: {
     breadcrumb: "Shifts & register",
@@ -118,6 +143,22 @@ const COPY = {
     personalCashOpened: "Personal cash session opened.",
     closed: "Register closed and Z Report created.",
     personalCashClosed: "Personal cash counted and closed. The register remains open.",
+    confirmCloseTitle: "Close the register?",
+    confirmClosePersonalCashTitle: "Count and close your cash in hand?",
+    confirmCloseDescription:
+      "Closing creates the Z Report and locks this cash session. This cannot be undone.",
+    confirmClosePersonalCashDescription:
+      "Closing locks this personal cash session and cannot be undone. The register stays open.",
+    confirmCountedCash: "Counted cash",
+    confirmExpectedCash: "Expected cash",
+    confirmVariance: "Variance",
+    confirmNotEntered: "Not entered",
+    confirmCancel: "Let me check again",
+    confirmClose: "Close register",
+    confirmClockOutTitle: "Clock out?",
+    confirmClockOutDescription: "You will need to clock in again before taking payments.",
+    confirmClockOut: "Clock out",
+    closing: "Closing...",
   },
   fr: {
     breadcrumb: "Services et caisse",
@@ -159,6 +200,23 @@ const COPY = {
     personalCashOpened: "Session d'espèces personnelle ouverte.",
     closed: "Caisse fermée et rapport Z créé.",
     personalCashClosed: "Espèces personnelles comptées et fermées. La caisse reste ouverte.",
+    confirmCloseTitle: "Fermer la caisse ?",
+    confirmClosePersonalCashTitle: "Compter et fermer vos espèces en main ?",
+    confirmCloseDescription:
+      "La fermeture crée le rapport Z et verrouille cette session d'espèces. C'est irréversible.",
+    confirmClosePersonalCashDescription:
+      "La fermeture verrouille cette session d'espèces personnelle et est irréversible. La caisse reste ouverte.",
+    confirmCountedCash: "Espèces comptées",
+    confirmExpectedCash: "Espèces attendues",
+    confirmVariance: "Écart",
+    confirmNotEntered: "Non saisi",
+    confirmCancel: "Je vérifie encore",
+    confirmClose: "Fermer la caisse",
+    confirmClockOutTitle: "Terminer le service ?",
+    confirmClockOutDescription:
+      "Vous devrez pointer à nouveau avant d'encaisser.",
+    confirmClockOut: "Terminer le service",
+    closing: "Fermeture...",
   },
 } satisfies Record<Locale, Record<string, string>>;
 
@@ -214,6 +272,16 @@ export function PosOperationsView({
   const [countedCash, setCountedCash] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
+  /**
+   * Which irreversible action is waiting on confirmation.
+   *
+   * One slot rather than a flag per action: closing the register and clocking
+   * out can never both be pending, and a single value makes that impossible to
+   * get wrong.
+   */
+  const [pendingAction, setPendingAction] = useState<
+    "close_register" | "clock_out" | null
+  >(null);
   const trackedCash = ["shared_drawer", "cash_in_hand"].includes(register.cashHandlingMode);
   const personalCash = register.cashHandlingMode === "cash_in_hand";
   const needsPersonalCashSession = Boolean(
@@ -234,6 +302,21 @@ export function PosOperationsView({
     router.refresh();
   }
 
+  /**
+   * Clocking out ends the shift and forces a fresh clock-in before the next
+   * sale, so it asks first. The other three transitions are cheap to undo and
+   * go straight through.
+   */
+  function requestClock(
+    action: "clock_in" | "clock_out" | "break_start" | "break_end",
+  ) {
+    if (action === "clock_out") {
+      setPendingAction("clock_out");
+      return;
+    }
+    void clock(action);
+  }
+
   async function openRegister() {
     setBusy(true);
     const result = await openRegisterAction({
@@ -245,20 +328,33 @@ export function PosOperationsView({
     router.refresh();
   }
 
-  async function closeRegister() {
+  /**
+   * Validate before asking, not after.
+   *
+   * A missing cash count is the cashier's to fix, so it surfaces while the
+   * numbers are still on screen. Confirming first and only then being told the
+   * count is blank would make the dialog feel like it did nothing.
+   */
+  function requestCloseRegister() {
     if (
       register.cashSession &&
       register.requireClosingCount &&
       countedCash.trim() === ""
     ) {
-      return toast.warning(copy.countedCash);
+      toast.warning(copy.countedCash);
+      return;
     }
+    setPendingAction("close_register");
+  }
+
+  async function closeRegister() {
     setBusy(true);
     const result = await closeRegisterAction({
       countedCash: register.cashSession ? countedCash : undefined,
       notes: notes.trim() || undefined,
     });
     setBusy(false);
+    setPendingAction(null);
     if (!result.ok) return toast.error(result.message);
     toast.success(result.data.registerClosed ? copy.closed : copy.personalCashClosed);
     setCountedCash("");
@@ -288,7 +384,7 @@ export function PosOperationsView({
             ) : (
               <>
                 <button className="h-11 rounded-md border text-sm font-semibold disabled:opacity-50" disabled={busy} onClick={() => void clock("break_start")} type="button">{copy.startBreak}</button>
-                <button className="h-11 rounded-md border border-destructive/30 text-sm font-semibold text-destructive disabled:opacity-50" disabled={busy} onClick={() => void clock("clock_out")} type="button">{copy.clockOut}</button>
+                <button className="h-11 rounded-md border border-destructive/30 text-sm font-semibold text-destructive disabled:opacity-50" disabled={busy} onClick={() => requestClock("clock_out")} type="button">{copy.clockOut}</button>
               </>
             )}
           </div>
@@ -317,7 +413,7 @@ export function PosOperationsView({
               ) : null}
               <button className="h-11 rounded-md bg-foreground px-4 text-sm font-semibold text-background disabled:opacity-50" disabled={busy} onClick={() => void openRegister()} type="button">{needsPersonalCashSession ? copy.openPersonalCash : copy.openRegister}</button>
               {needsPersonalCashSession && canFinalizeRegister ? (
-                <button className="h-11 rounded-md border border-destructive/30 px-4 text-sm font-semibold text-destructive disabled:opacity-50" disabled={busy} onClick={() => void closeRegister()} type="button">{copy.finalizeRegister}</button>
+                <button className="h-11 rounded-md border border-destructive/30 px-4 text-sm font-semibold text-destructive disabled:opacity-50" disabled={busy} onClick={requestCloseRegister} type="button">{copy.finalizeRegister}</button>
               ) : null}
             </div>
           ) : (
@@ -329,7 +425,7 @@ export function PosOperationsView({
                 </label>
               ) : null}
               <input className="h-11 w-full rounded-md border bg-background px-3 text-sm" maxLength={2000} onChange={(event) => setNotes(event.target.value)} placeholder={copy.notes} value={notes} />
-              <button className="h-11 w-full rounded-md border border-destructive/30 text-sm font-semibold text-destructive disabled:opacity-50" disabled={busy} onClick={() => void closeRegister()} type="button">{personalCash ? copy.closePersonalCash : copy.closeRegister}</button>
+              <button className="h-11 w-full rounded-md border border-destructive/30 text-sm font-semibold text-destructive disabled:opacity-50" disabled={busy} onClick={requestCloseRegister} type="button">{personalCash ? copy.closePersonalCash : copy.closeRegister}</button>
             </div>
           )}
         </section>
@@ -370,6 +466,135 @@ export function PosOperationsView({
           <p className="mt-4 border-t pt-4 text-sm text-muted-foreground">{copy.noReports}</p>
         )}
       </section>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !busy) setPendingAction(null);
+        }}
+        open={pendingAction === "close_register"}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {personalCash
+                ? copy.confirmClosePersonalCashTitle
+                : copy.confirmCloseTitle}
+            </DialogTitle>
+            <DialogDescription>
+              {personalCash
+                ? copy.confirmClosePersonalCashDescription
+                : copy.confirmCloseDescription}
+            </DialogDescription>
+          </DialogHeader>
+          {trackedCash ? (
+            <dl className="grid gap-2 rounded-md bg-muted/45 px-3 py-2.5 text-sm">
+              {/*
+                Expected cash and the variance are only shown when the shift
+                reconciliation actually loaded. Treating a missing one as zero
+                would print a variance equal to the whole drawer, in red, on
+                the screen where the cashier decides whether the till
+                balances -- a discrepancy invented by the UI.
+              */}
+              {reconciliation ? (
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-muted-foreground">
+                    {copy.confirmExpectedCash}
+                  </dt>
+                  <dd className="font-medium">
+                    {money(reconciliation.expectedCash, currency, locale)}
+                  </dd>
+                </div>
+              ) : null}
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted-foreground">
+                  {copy.confirmCountedCash}
+                </dt>
+                <dd className="font-medium">
+                  {countedCash.trim()
+                    ? money(countedCash, currency, locale)
+                    : copy.confirmNotEntered}
+                </dd>
+              </div>
+              {reconciliation && countedCash.trim() ? (
+                <div className="flex items-center justify-between gap-3 border-t pt-2">
+                  <dt className="text-muted-foreground">
+                    {copy.confirmVariance}
+                  </dt>
+                  <dd
+                    className={
+                      Number(countedCash) - Number(reconciliation.expectedCash) ===
+                      0
+                        ? "font-semibold"
+                        : "font-semibold text-destructive"
+                    }
+                  >
+                    {money(
+                      Number(countedCash) - Number(reconciliation.expectedCash),
+                      currency,
+                      locale,
+                    )}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
+          ) : null}
+          <DialogFooter>
+            <Button
+              disabled={busy}
+              onClick={() => setPendingAction(null)}
+              type="button"
+              variant="outline"
+            >
+              {copy.confirmCancel}
+            </Button>
+            <Button
+              disabled={busy}
+              onClick={() => void closeRegister()}
+              type="button"
+              variant="destructive"
+            >
+              {busy ? copy.closing : copy.confirmClose}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        onOpenChange={(open) => {
+          if (!open && !busy) setPendingAction(null);
+        }}
+        open={pendingAction === "clock_out"}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{copy.confirmClockOutTitle}</DialogTitle>
+            <DialogDescription>
+              {copy.confirmClockOutDescription}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              disabled={busy}
+              onClick={() => setPendingAction(null)}
+              type="button"
+              variant="outline"
+            >
+              {copy.confirmCancel}
+            </Button>
+            <Button
+              disabled={busy}
+              onClick={() => {
+                setPendingAction(null);
+                void clock("clock_out");
+              }}
+              type="button"
+              variant="destructive"
+            >
+              {copy.confirmClockOut}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
