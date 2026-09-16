@@ -17,9 +17,9 @@ import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 
 import {
-  TICKET_PRIORITY_OPTIONS,
-  TICKET_STATUS_OPTIONS,
-  TICKET_TYPE_OPTIONS,
+  getTicketPriorityOptions,
+  getTicketStatusOptions,
+  getTicketTypeOptions,
 } from "../constants";
 import type { TicketListScope } from "../types";
 import {
@@ -172,9 +172,9 @@ export function TicketsToolbar({ allCount, mineCount }: TicketsToolbarProps) {
                 }
                 options={[
                   { value: "", label: text("全部") },
-                  ...TICKET_STATUS_OPTIONS.map((option) => ({
+                  ...getTicketStatusOptions().map((option) => ({
                     value: option.value,
-                    label: text(option.label),
+                    label: option.label,
                   })),
                 ]}
                 value={status}
@@ -189,9 +189,9 @@ export function TicketsToolbar({ allCount, mineCount }: TicketsToolbarProps) {
                 }
                 options={[
                   { value: "", label: text("全部") },
-                  ...TICKET_TYPE_OPTIONS.map((option) => ({
+                  ...getTicketTypeOptions().map((option) => ({
                     value: option.value,
-                    label: text(option.label),
+                    label: option.label,
                   })),
                 ]}
                 value={type}
@@ -206,9 +206,9 @@ export function TicketsToolbar({ allCount, mineCount }: TicketsToolbarProps) {
                 }
                 options={[
                   { value: "", label: text("全部") },
-                  ...TICKET_PRIORITY_OPTIONS.map((option) => ({
+                  ...getTicketPriorityOptions().map((option) => ({
                     value: option.value,
-                    label: text(option.label),
+                    label: option.label,
                   })),
                 ]}
                 value={priority}

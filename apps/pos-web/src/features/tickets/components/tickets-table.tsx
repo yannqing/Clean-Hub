@@ -24,8 +24,8 @@ import {
   formatTicketDateTime,
   formatTicketMoney,
   TICKET_EMPTY_PLACEHOLDER,
-  TICKET_SOURCE_LABELS,
-  TICKET_TYPE_LABELS,
+  getTicketSourceLabel,
+  getTicketTypeLabel,
 } from "../constants";
 import {
   TICKET_COLUMN_KEYS,
@@ -118,7 +118,7 @@ export function TicketsTable({ tickets, total }: TicketsTableProps) {
                         {displayTicketCode(ticket)}
                       </span>
                       <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                        {text(TICKET_SOURCE_LABELS[ticket.sourceChannel])}
+                        {getTicketSourceLabel(ticket.sourceChannel)}
                       </span>
                     </TableCell>
                   ) : null}
@@ -146,7 +146,7 @@ export function TicketsTable({ tickets, total }: TicketsTableProps) {
                   ) : null}
                   {visibleColumns.has("type") ? (
                     <TableCell>
-                      {text(TICKET_TYPE_LABELS[ticket.ticketType])}
+                      {getTicketTypeLabel(ticket.ticketType)}
                     </TableCell>
                   ) : null}
                   {visibleColumns.has("status") ? (
@@ -228,7 +228,7 @@ function TicketCard({
             {ticket.customerAccountPhone ?? TICKET_EMPTY_PLACEHOLDER}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {text(TICKET_TYPE_LABELS[ticket.ticketType])} · {ticket.itemCount}{" "}
+            {getTicketTypeLabel(ticket.ticketType)} · {ticket.itemCount}{" "}
             {text("个项目")}
           </div>
         </div>

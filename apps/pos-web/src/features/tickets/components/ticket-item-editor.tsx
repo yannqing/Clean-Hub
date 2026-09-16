@@ -35,9 +35,9 @@ import {
   ITEM_COLOR_OPTIONS,
   ITEM_MATERIAL_OPTIONS,
   TICKET_DEFECT_QUICK_PHRASES,
-  TICKET_ITEM_STATUS_LABELS,
   TICKET_ITEM_STATUS_TRANSITIONS,
-  TICKET_ITEM_TYPE_OPTIONS,
+  getTicketItemStatusLabel,
+  getTicketItemTypeOptions,
   TICKET_REMARK_QUICK_PHRASES,
   TICKET_REQUEST_QUICK_PHRASES,
   formatTicketMoney,
@@ -294,7 +294,7 @@ function ItemRow({
         to: next,
       });
       if (result.ok) {
-        toast.success(`项目状态已更新为「${TICKET_ITEM_STATUS_LABELS[next]}」`);
+        toast.success(`项目状态已更新为「${getTicketItemStatusLabel(next)}」`);
       } else {
         toast.error(result.message);
       }
@@ -411,7 +411,7 @@ function ItemRow({
               <SelectContent>
                 {reachable.map((status) => (
                   <SelectItem key={status} value={status}>
-                    → {TICKET_ITEM_STATUS_LABELS[status]}
+                    → {getTicketItemStatusLabel(status)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -662,7 +662,7 @@ function ItemForm({
               <SelectValue placeholder="请先选择物品类型" />
             </SelectTrigger>
             <SelectContent>
-              {TICKET_ITEM_TYPE_OPTIONS.map((option) => (
+              {getTicketItemTypeOptions().map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>

@@ -1,12 +1,12 @@
 import {
-  TICKET_ITEM_STATUS_LABELS,
   TICKET_ITEM_STATUS_TONES,
-  TICKET_PRIORITY_LABELS,
   TICKET_PRIORITY_TONES,
-  TICKET_SOURCE_LABELS,
   TICKET_SOURCE_TONES,
-  TICKET_STATUS_LABELS,
   TICKET_STATUS_TONES,
+  getTicketItemStatusLabel,
+  getTicketPriorityLabel,
+  getTicketSourceLabel,
+  getTicketStatusLabel,
   type BadgeTone,
 } from "../constants";
 import type {
@@ -48,7 +48,7 @@ export function TicketBadge({
 export function TicketStatusBadge({ status }: { status: ServiceTicketStatus }) {
   return (
     <TicketBadge tone={TICKET_STATUS_TONES[status]}>
-      {TICKET_STATUS_LABELS[status]}
+      {getTicketStatusLabel(status)}
     </TicketBadge>
   );
 }
@@ -60,7 +60,7 @@ export function TicketPriorityBadge({
 }) {
   return (
     <TicketBadge tone={TICKET_PRIORITY_TONES[priority]}>
-      {TICKET_PRIORITY_LABELS[priority]}
+      {getTicketPriorityLabel(priority)}
     </TicketBadge>
   );
 }
@@ -72,7 +72,7 @@ export function TicketSourceBadge({
 }) {
   return (
     <TicketBadge tone={TICKET_SOURCE_TONES[source]}>
-      {TICKET_SOURCE_LABELS[source]}
+      {getTicketSourceLabel(source)}
     </TicketBadge>
   );
 }
@@ -84,7 +84,7 @@ export function TicketItemStatusBadge({
 }) {
   return (
     <TicketBadge tone={TICKET_ITEM_STATUS_TONES[status] ?? "slate"}>
-      {TICKET_ITEM_STATUS_LABELS[status] ?? status}
+      {getTicketItemStatusLabel(status)}
     </TicketBadge>
   );
 }

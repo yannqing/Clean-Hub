@@ -18,9 +18,9 @@ import {
 } from "@cleanhub/ui";
 
 import {
-  TICKET_STATUS_LABELS,
   TICKET_STATUS_TONES,
   TICKET_STATUS_TRANSITIONS,
+  getTicketStatusLabel,
 } from "../constants";
 import { isPickupTransition } from "../actions";
 import { TicketBadge } from "./ticket-badges";
@@ -72,8 +72,8 @@ export function TicketStatusDialog({
         });
         toast.success(
           result.queued
-            ? `网络不可用，「${TICKET_STATUS_LABELS[next]}」状态已加入同步队列。`
-            : `工单状态已更新为「${TICKET_STATUS_LABELS[next]}」`,
+            ? `网络不可用，「${getTicketStatusLabel(next)}」状态已加入同步队列。`
+            : `工单状态已更新为「${getTicketStatusLabel(next)}」`,
         );
         setCancelReason("");
         onClose();
@@ -97,7 +97,7 @@ export function TicketStatusDialog({
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {reachable.length === 0 ? (
             <p className="col-span-2 rounded-md bg-muted/50 p-4 text-sm text-muted-foreground">
-              当前状态「{TICKET_STATUS_LABELS[current]}」为终态，无法继续流转。
+              当前状态「{getTicketStatusLabel(current)}」为终态，无法继续流转。
             </p>
           ) : (
             reachable.map((next) => {
@@ -112,7 +112,7 @@ export function TicketStatusDialog({
                   variant="outline"
                 >
                   <span className="flex items-center gap-2">
-                    {TICKET_STATUS_LABELS[next]}
+                    {getTicketStatusLabel(next)}
                     {isPickup ? (
                       <span className="text-[11px] font-normal text-amber-700">
                         （需校验已结算）
@@ -120,7 +120,7 @@ export function TicketStatusDialog({
                     ) : null}
                   </span>
                   <TicketBadge tone={TICKET_STATUS_TONES[next]}>
-                    {TICKET_STATUS_LABELS[next]}
+                    {getTicketStatusLabel(next)}
                   </TicketBadge>
                 </Button>
               );

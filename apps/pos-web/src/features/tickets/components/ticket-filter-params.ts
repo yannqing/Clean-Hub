@@ -5,9 +5,9 @@ import type {
 } from "@cleanhub/api-client";
 
 import {
-  TICKET_PRIORITY_OPTIONS,
-  TICKET_STATUS_OPTIONS,
-  TICKET_TYPE_OPTIONS,
+  TICKET_PRIORITY_VALUES,
+  TICKET_STATUS_VALUES,
+  TICKET_TYPE_VALUES,
 } from "../constants";
 
 /**
@@ -67,7 +67,7 @@ export function parseStatusParam(
 ): ServiceTicketStatus | undefined {
   return (
     (value &&
-      (TICKET_STATUS_OPTIONS.some((o) => o.value === value)
+      ((TICKET_STATUS_VALUES as readonly string[]).includes(value)
         ? (value as ServiceTicketStatus)
         : undefined)) ||
     undefined
@@ -79,7 +79,7 @@ export function parseTypeParam(
 ): ServiceTicketType | undefined {
   return (
     (value &&
-      (TICKET_TYPE_OPTIONS.some((o) => o.value === value)
+      ((TICKET_TYPE_VALUES as readonly string[]).includes(value)
         ? (value as ServiceTicketType)
         : undefined)) ||
     undefined
@@ -91,7 +91,7 @@ export function parsePriorityParam(
 ): ServiceTicketPriority | undefined {
   return (
     (value &&
-      (TICKET_PRIORITY_OPTIONS.some((o) => o.value === value)
+      ((TICKET_PRIORITY_VALUES as readonly string[]).includes(value)
         ? (value as ServiceTicketPriority)
         : undefined)) ||
     undefined

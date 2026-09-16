@@ -1214,5 +1214,53 @@ export const enMessages = {
     placeholder: {
       badge: "Placeholder",
     },
+    /**
+     * Ticket vocabulary, keyed by the wire enums from `@cleanhub/api-client`.
+     *
+     * The API values stay the source of truth; only the display wording lives
+     * here. Typed keys mean a missing or misspelled one fails the build,
+     * unlike the Chinese-keyed runtime dictionary where a changed source
+     * string silently stops matching.
+     */
+    ticket: {
+      title: "Tickets",
+      status: {
+        draft: "Draft",
+        pending: "Pending",
+        in_progress: "In progress",
+        ready_to_pick: "Ready for pickup",
+        picked_up: "Picked up",
+        cancelled: "Cancelled",
+        exception: "Issue",
+      },
+      priority: {
+        normal: "Normal",
+        urgent: "Rush",
+        critical: "Critical",
+      },
+      type: {
+        laundry: "Laundry",
+        car_wash: "Car wash",
+      },
+      itemType: {
+        cloth: "Garment",
+        car: "Vehicle",
+        shoe: "Shoes",
+        carpet: "Carpet",
+      },
+      itemStatus: {
+        pending_wash: "To be cleaned",
+        washing: "Cleaning",
+        done: "Quality check",
+        ready_to_pick: "Ready for pickup",
+        exception: "Cleaning issue",
+      },
+      source: {
+        pos: "POS",
+        app: "App",
+        phone: "Phone",
+        whatsapp: "WhatsApp",
+      },
+    },
   },
 } as const satisfies MessageCatalog;

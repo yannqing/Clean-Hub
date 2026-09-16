@@ -19,10 +19,10 @@ import {
   formatTicketDateTime,
   formatTicketMoney,
   TICKET_EMPTY_PLACEHOLDER,
-  TICKET_PRIORITY_LABELS,
-  TICKET_SOURCE_LABELS,
   TICKET_TERMINAL_STATUSES,
-  TICKET_TYPE_LABELS,
+  getTicketPriorityLabel,
+  getTicketSourceLabel,
+  getTicketTypeLabel,
 } from "../constants";
 import type {
   PosCatalogService,
@@ -273,15 +273,15 @@ export function TicketDetailView({
                 <dl className="grid grid-cols-2 gap-x-8 gap-y-4">
                   <Detail
                     label="工单类型"
-                    value={TICKET_TYPE_LABELS[ticket.ticketType]}
+                    value={getTicketTypeLabel(ticket.ticketType)}
                   />
                   <Detail
                     label="优先级"
-                    value={TICKET_PRIORITY_LABELS[ticket.priority]}
+                    value={getTicketPriorityLabel(ticket.priority)}
                   />
                   <Detail
                     label="来源渠道"
-                    value={TICKET_SOURCE_LABELS[ticket.sourceChannel]}
+                    value={getTicketSourceLabel(ticket.sourceChannel)}
                   />
                   <Detail
                     label="预计取件"

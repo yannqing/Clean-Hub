@@ -1156,5 +1156,52 @@ export const zhCNMessages = {
     placeholder: {
       badge: "占位",
     },
+    /**
+     * 工单词汇，以 `@cleanhub/api-client` 的 wire enum 作为 key。
+     *
+     * API 的枚举值仍是唯一事实来源，这里只放展示文案。类型化的 key 意味着
+     * 拼错或遗漏会直接编译失败；而以中文原文作 key 的运行时字典，改一个字
+     * 就会静默失配。
+     */
+    ticket: {
+      title: "工单管理",
+      status: {
+        draft: "草稿",
+        pending: "待处理",
+        in_progress: "处理中",
+        ready_to_pick: "待取件",
+        picked_up: "已取件",
+        cancelled: "已取消",
+        exception: "异常",
+      },
+      priority: {
+        normal: "普通",
+        urgent: "加急",
+        critical: "最紧急",
+      },
+      type: {
+        laundry: "洗衣护理",
+        car_wash: "车辆清洗",
+      },
+      itemType: {
+        cloth: "衣物",
+        car: "车",
+        shoe: "鞋",
+        carpet: "地毯",
+      },
+      itemStatus: {
+        pending_wash: "待清洗",
+        washing: "清洗中",
+        done: "质检中",
+        ready_to_pick: "待取件",
+        exception: "清洗异常",
+      },
+      source: {
+        pos: "POS",
+        app: "App",
+        phone: "电话",
+        whatsapp: "WhatsApp",
+      },
+    },
   },
 } as const satisfies MessageCatalog;

@@ -27,9 +27,9 @@ import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 
 import { updateTicketAction } from "../actions";
 import {
-  TICKET_PRIORITY_OPTIONS,
-  TICKET_SOURCE_OPTIONS,
-  TICKET_TYPE_OPTIONS,
+  getTicketPriorityOptions,
+  getTicketSourceOptions,
+  getTicketTypeOptions,
 } from "../constants";
 import { validateTicketForm } from "../validators";
 import type { TicketBasicFormValues } from "../types";
@@ -126,7 +126,7 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TICKET_TYPE_OPTIONS.map((option) => (
+                  {getTicketTypeOptions().map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -145,7 +145,7 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TICKET_PRIORITY_OPTIONS.map((option) => (
+                  {getTicketPriorityOptions().map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
@@ -167,7 +167,7 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TICKET_SOURCE_OPTIONS.map((option) => (
+                  {getTicketSourceOptions().map((option) => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}
                     </SelectItem>
