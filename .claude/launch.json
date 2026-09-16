@@ -12,6 +12,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@cleanhub/web-admin", "dev"],
       "port": 3000
+    },
+    {
+      "name": "pos-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@cleanhub/pos-web", "dev"],
+      "port": 3001
     }
   ]
 }
