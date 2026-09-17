@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState, useTransition } from "react";
 
+import type { TranslationKey } from "@cleanhub/i18n";
 import type { PosNotificationInboxItem } from "@cleanhub/api-client";
 import { useTranslation } from "@cleanhub/i18n/react";
 
@@ -17,6 +18,7 @@ import {
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 import { PendingPrintJobs } from "@/features/hardware/components/pending-print-jobs";
+import { posMessage } from "@/lib/pos-message";
 import {
   getNoticePriorityLabel,
   getNoticePriorityOptions,
@@ -51,12 +53,6 @@ type NotificationsCenterProps = {
 };
 
 type NotificationGroupKey = "today" | "yesterday" | "older";
-
-const GROUP_LABELS: Record<NotificationGroupKey, string> = {
-  today: "今天",
-  yesterday: "昨天",
-  older: "更早",
-};
 
 const PRIORITY_BADGE_CLASSES = {
   critical: "bg-destructive/10 text-destructive",
@@ -297,7 +293,7 @@ export function NotificationsCenter({
                   <NotificationGroup
                     disabled={isPending}
                     key={group}
-                    label={GROUP_LABELS[group]}
+                    label={posMessage(`pos.noticeCenter.${group}` as TranslationKey)}
                     notifications={grouped[group]}
                     onArchive={(deliveryId) =>
                       runAction(() => archiveNotificationAction(deliveryId))
@@ -340,26 +336,26 @@ function NotificationMetrics({
       metrics={[
         {
           icon: "bell",
-          label: "未读通知",
-          note: "当前未处理",
+          label: posMessage("pos.noticeCenter.unreadLabel"),
+          note: posMessage("pos.noticeCenter.unreadNote"),
           value: overview.unreadCount,
         },
         {
           icon: "alert",
-          label: "紧急未读",
-          note: "高优先级与紧急",
+          label: posMessage("pos.noticeCenter.urgentLabel"),
+          note: posMessage("pos.noticeCenter.urgentNote"),
           value: overview.urgentUnreadCount,
         },
         {
           icon: "receipt",
-          label: "业务通知",
-          note: "订单与工单相关",
+          label: posMessage("pos.noticeCenter.businessLabel"),
+          note: posMessage("pos.noticeCenter.businessNote"),
           value: overview.businessCount,
         },
         {
           icon: "settings",
-          label: "系统通知",
-          note: "门店与系统消息",
+          label: posMessage("pos.noticeCenter.systemLabel"),
+          note: posMessage("pos.noticeCenter.systemNote"),
           value: overview.systemCount,
         },
       ]}

@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
+import type { TranslationKey } from "@cleanhub/i18n";
 import { Input, cn } from "@cleanhub/ui";
 
 import { Icon, type PosIconName } from "@/components/app-shell";
+import { posMessage } from "@/lib/pos-message";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 
@@ -17,50 +19,37 @@ type SettingsNavigationItem = {
   title: string;
 };
 
-const SETTINGS_NAVIGATION: SettingsNavigationItem[] = [
-  {
-    href: posRoutes.settings,
-    icon: "settings",
-    title: "设置概览",
-    description: "查看并管理当前收银终端的设置。",
-  },
-  {
-    href: posRoutes.settingsTerminal,
-    icon: "monitor",
-    title: "终端信息",
-    description: "设置当前终端在设备列表中显示的名称。",
-  },
-  {
-    href: posRoutes.settingsCheckout,
-    icon: "wallet-cards",
-    title: "收银偏好",
-    description: "配置默认支付方式和金额处理规则。",
-  },
-  {
-    href: posRoutes.settingsPrinting,
-    icon: "printer",
-    title: "打印设置",
-    description: "配置自动打印与默认打印联数。",
-  },
-  {
-    href: posRoutes.settingsSecurity,
-    icon: "lock",
-    title: "安全设置",
-    description: "设置自动锁屏等待时间。",
-  },
-  {
-    href: posRoutes.settingsStore,
-    icon: "store",
-    title: "门店信息",
-    description: "查看当前门店及小票抬头信息。",
-  },
-  {
-    href: posRoutes.settingsHardware,
-    icon: "printer",
-    title: "硬件设备",
-    description: "发现、测试并连接当前终端的硬件。",
-  },
-];
+/**
+ * Built per call, not held in a module constant: a module body runs once on
+ * first import, so the titles would freeze at whatever locale the tab started
+ * in and a language switch would leave the old sidebar on screen.
+ */
+function getSettingsNavigation(): SettingsNavigationItem[] {
+  const entries = [
+    { key: "overview", href: posRoutes.settings, icon: "settings" },
+    { key: "terminal", href: posRoutes.settingsTerminal, icon: "monitor" },
+    { key: "checkout", href: posRoutes.settingsCheckout, icon: "wallet-cards" },
+    { key: "printing", href: posRoutes.settingsPrinting, icon: "printer" },
+    { key: "security", href: posRoutes.settingsSecurity, icon: "lock" },
+    { key: "store", href: posRoutes.settingsStore, icon: "store" },
+    { key: "hardware", href: posRoutes.settingsHardware, icon: "printer" },
+  ] as const satisfies ReadonlyArray<{
+    key: string;
+    href: string;
+    icon: PosIconName;
+  }>;
+
+  return entries.map((entry) => ({
+    href: entry.href,
+    icon: entry.icon,
+    title: posMessage(
+      `pos.settingsNav.${entry.key}.title` as TranslationKey,
+    ),
+    description: posMessage(
+      `pos.settingsNav.${entry.key}.description` as TranslationKey,
+    ),
+  }));
+}
 
 function isActive(pathname: string, href: string): boolean {
   if (href === posRoutes.settings) return pathname === href;
@@ -84,19 +73,18 @@ export function SettingsWorkspace({ children }: { children: ReactNode }) {
   const router = useRouter();
   const runtime = usePosRuntimeConfig();
   const [query, setQuery] = useState("");
+  const navigation = getSettingsNavigation();
   const active =
-    SETTINGS_NAVIGATION.find((item) => isActive(pathname, item.href)) ??
-    SETTINGS_NAVIGATION[0];
-  const filtered = useMemo(() => {
-    const keyword = query.trim().toLocaleLowerCase();
-    return keyword
-      ? SETTINGS_NAVIGATION.filter((item) =>
-          `${item.title} ${item.description}`
-            .toLocaleLowerCase()
-            .includes(keyword),
-        )
-      : SETTINGS_NAVIGATION;
-  }, [query]);
+    navigation.find((item) => isActive(pathname, item.href)) ?? navigation[0];
+  // Not memoised: `navigation` is rebuilt each render so its labels follow a
+  // language switch, which would make a memo on it recompute every time
+  // anyway. Filtering seven items is cheaper than pretending otherwise.
+  const keyword = query.trim().toLocaleLowerCase();
+  const filtered = keyword
+    ? navigation.filter((item) =>
+        `${item.title} ${item.description}`.toLocaleLowerCase().includes(keyword),
+      )
+    : navigation;
 
   const ActiveIcon = active.icon;
   const tenantName = runtime.merchantName || "CleanHub";

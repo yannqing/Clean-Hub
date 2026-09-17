@@ -823,6 +823,49 @@ export const frMessages = {
       },
       relationshipSelf: "Soi-même",
     },
+    settingsNav: {
+      overview: {
+        title: "Aperçu des réglages",
+        description: "Consultez et gérez les réglages de ce terminal.",
+      },
+      terminal: {
+        title: "Terminal",
+        description: "Définissez le nom de ce terminal dans la liste des appareils.",
+      },
+      checkout: {
+        title: "Encaissement",
+        description: "Configurez le mode de paiement par défaut et les règles d’arrondi.",
+      },
+      printing: {
+        title: "Impression",
+        description: "Configurez l’impression automatique et le nombre de copies.",
+      },
+      security: {
+        title: "Sécurité",
+        description: "Définissez le délai de verrouillage automatique.",
+      },
+      store: {
+        title: "Magasin",
+        description: "Consultez cette succursale et l’en-tête du reçu.",
+      },
+      hardware: {
+        title: "Matériel",
+        description: "Détectez, testez et connectez le matériel de ce terminal.",
+      },
+    },
+    noticeCenter: {
+      today: "Aujourd’hui",
+      yesterday: "Hier",
+      older: "Plus tôt",
+      unreadLabel: "Non lues",
+      unreadNote: "Non traitées",
+      urgentLabel: "Urgentes non lues",
+      urgentNote: "Priorité élevée et critique",
+      businessLabel: "Activité",
+      businessNote: "Commandes et tickets",
+      systemLabel: "Système",
+      systemNote: "Messages magasin et système",
+    },
     inline: {
       cardOutcome: "Résultat carte : {outcome}",
       verifyTerminalBeforeRetry: "{reason} Vérifiez le journal des transactions du terminal avant de réessayer ; ne facturez pas deux fois.",

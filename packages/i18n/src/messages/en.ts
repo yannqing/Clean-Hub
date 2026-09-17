@@ -817,6 +817,49 @@ export const enMessages = {
       },
       relationshipSelf: "Self",
     },
+    settingsNav: {
+      overview: {
+        title: "Settings overview",
+        description: "View and manage this terminal's settings.",
+      },
+      terminal: {
+        title: "Terminal",
+        description: "Set the name this terminal shows in the device list.",
+      },
+      checkout: {
+        title: "Checkout",
+        description: "Configure the default payment method and rounding rules.",
+      },
+      printing: {
+        title: "Printing",
+        description: "Configure auto printing and the default number of copies.",
+      },
+      security: {
+        title: "Security",
+        description: "Set the auto-lock delay.",
+      },
+      store: {
+        title: "Store",
+        description: "View this branch and its receipt header.",
+      },
+      hardware: {
+        title: "Hardware",
+        description: "Discover, test and connect this terminal's hardware.",
+      },
+    },
+    noticeCenter: {
+      today: "Today",
+      yesterday: "Yesterday",
+      older: "Earlier",
+      unreadLabel: "Unread",
+      unreadNote: "Not yet handled",
+      urgentLabel: "Urgent unread",
+      urgentNote: "High and critical priority",
+      businessLabel: "Business",
+      businessNote: "Orders and tickets",
+      systemLabel: "System",
+      systemNote: "Store and system messages",
+    },
     inline: {
       cardOutcome: "Card result: {outcome}",
       verifyTerminalBeforeRetry: "{reason} Check the terminal transaction log before retrying; do not charge twice.",

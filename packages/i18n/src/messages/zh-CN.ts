@@ -804,6 +804,49 @@ export const zhCNMessages = {
       },
       relationshipSelf: "本人",
     },
+    settingsNav: {
+      overview: {
+        title: "设置概览",
+        description: "查看并管理当前收银终端的设置。",
+      },
+      terminal: {
+        title: "终端信息",
+        description: "设置当前终端在设备列表中显示的名称。",
+      },
+      checkout: {
+        title: "收银偏好",
+        description: "配置默认支付方式和金额处理规则。",
+      },
+      printing: {
+        title: "打印设置",
+        description: "配置自动打印与默认打印联数。",
+      },
+      security: {
+        title: "安全设置",
+        description: "设置自动锁屏等待时间。",
+      },
+      store: {
+        title: "门店信息",
+        description: "查看当前门店及小票抬头信息。",
+      },
+      hardware: {
+        title: "硬件设备",
+        description: "发现、测试并连接当前终端的硬件。",
+      },
+    },
+    noticeCenter: {
+      today: "今天",
+      yesterday: "昨天",
+      older: "更早",
+      unreadLabel: "未读通知",
+      unreadNote: "当前未处理",
+      urgentLabel: "紧急未读",
+      urgentNote: "高优先级与紧急",
+      businessLabel: "业务通知",
+      businessNote: "订单与工单相关",
+      systemLabel: "系统通知",
+      systemNote: "门店与系统消息",
+    },
     inline: {
       cardOutcome: "刷卡结果：{outcome}",
       verifyTerminalBeforeRetry: "{reason} 请先核对终端交易记录，勿重复收款。",
