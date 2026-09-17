@@ -18,6 +18,7 @@ import {
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 import { PendingPrintJobs } from "@/features/hardware/components/pending-print-jobs";
+import { getActionErrorMessage } from "@/lib/action-error-message";
 import { posMessage } from "@/lib/pos-message";
 import {
   getNoticePriorityLabel,
@@ -133,7 +134,7 @@ export function NotificationsCenter({
       setActionMessage(null);
       startTransition(() => {
         void task().then((result) => {
-          setActionMessage(result.message);
+          setActionMessage(getActionErrorMessage(result, "notice"));
           router.refresh();
         });
       });

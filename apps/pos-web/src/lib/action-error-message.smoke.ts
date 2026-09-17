@@ -30,6 +30,15 @@ assert.equal(
   "a known ticket code must render in the active locale",
 );
 
+assert.equal(
+  getActionErrorMessage(
+    { code: "NOTIFICATION_ARCHIVED", message: "已归档通知不能再次标记为已读。" },
+    "notice",
+  ),
+  "Une notification archivée ne peut pas être remarquée comme lue.",
+  "a known notification code must render in the active locale",
+);
+
 // 2. The domain selects the table: the same code differs per resource.
 setPosRuntimeLocale("en");
 const orderConflict = getActionErrorMessage(
@@ -49,6 +58,15 @@ assert.ok(
   orderConflict.includes("order") && ticketConflict.includes("ticket"),
   `expected resource-specific wording, got ${orderConflict} / ${ticketConflict}`,
 );
+
+// VALIDATION_ERROR exists in all three tables and must resolve in each.
+for (const domain of ["order", "ticket", "notice"] as const) {
+  const message = getActionErrorMessage(
+    { code: "VALIDATION_ERROR", message: "x" },
+    domain,
+  );
+  assert.notEqual(message, "x", `${domain}: VALIDATION_ERROR must translate`);
+}
 
 // 3. A code the catalogue does not carry falls back to the server message,
 //    never to a key path.

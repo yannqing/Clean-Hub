@@ -725,6 +725,11 @@ export const zhCNMessages = {
       },
     },
     error: {
+      notice: {
+        NOTIFICATION_NOT_FOUND: "通知不存在或无权访问。",
+        NOTIFICATION_ARCHIVED: "已归档通知不能再次标记为已读。",
+        VALIDATION_ERROR: "提交内容校验未通过，请检查后重试。",
+      },
       order: {
         FORBIDDEN: "当前账号没有执行此操作的权限。",
         ORDER_NOT_FOUND: "订单不存在或已被删除。",
@@ -959,7 +964,50 @@ export const zhCNMessages = {
       succeeded: "成功",
       failed: "失败",
     },
+    activityKind: {
+      order: "订单",
+      ticket: "工单",
+      customer: "客户",
+      payment: "支付",
+    },
+    taskPriority: {
+      high: "高优先级",
+      medium: "中优先级",
+      low: "低优先级",
+    },
+    quickAction: {
+      "new-intake": "接待客户并创建服务工单",
+      customers: "查询账户、档案与历史记录",
+      tickets: "跟进状态、取件与异常工单",
+      orders: "查看订单并处理现金收款",
+    },
+    branchState: {
+      active: "营业中",
+      inactive: "已停用",
+    },
+    customerKind: {
+      account: "客户账户",
+      profile: "客户档案",
+    },
+    noticeError: {
+      NOTIFICATION_NOT_FOUND: "通知不存在或无权访问。",
+      NOTIFICATION_ARCHIVED: "已归档通知不能再次标记为已读。",
+      VALIDATION_ERROR: "提交内容校验未通过，请检查后重试。",
+    },
+    drawer: {
+      alreadyOpened: "该现金交易的钱箱已打开，本次不会重复开箱。",
+      interrupted: "上次开箱时发生中断，物理结果不确定；为避免重复开箱，请人工核对。",
+      previouslyFailed: "该现金交易的自动开箱曾失败，请授权后人工开箱。",
+    },
+    branchNotReady: "当前门店尚未初始化。",
+    workspaceRole: {
+      owner: "店主",
+      manager: "店长",
+      cashier: "收银员",
+    },
     inline: {
+      matchResults: "匹配结果",
+      quickActionFallback: "进入对应业务页面",
       cardOutcome: "刷卡结果：{outcome}",
       verifyTerminalBeforeRetry: "{reason} 请先核对终端交易记录，勿重复收款。",
       receiptDeliveryLogFailed: "小票交付记录失败：{reason}",

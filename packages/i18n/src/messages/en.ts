@@ -738,6 +738,11 @@ export const enMessages = {
       },
     },
     error: {
+      notice: {
+        NOTIFICATION_NOT_FOUND: "The notification does not exist or is not accessible.",
+        NOTIFICATION_ARCHIVED: "An archived notification cannot be marked read again.",
+        VALIDATION_ERROR: "The submitted data failed validation. Check it and retry.",
+      },
       order: {
         FORBIDDEN: "This account is not allowed to perform this action.",
         ORDER_NOT_FOUND: "The order does not exist or was deleted.",
@@ -972,7 +977,50 @@ export const enMessages = {
       succeeded: "Succeeded",
       failed: "Failed",
     },
+    activityKind: {
+      order: "Order",
+      ticket: "Ticket",
+      customer: "Customer",
+      payment: "Payment",
+    },
+    taskPriority: {
+      high: "High priority",
+      medium: "Medium priority",
+      low: "Low priority",
+    },
+    quickAction: {
+      "new-intake": "Greet a customer and create a ticket",
+      customers: "Search accounts, profiles and history",
+      tickets: "Track statuses, pickups and exceptions",
+      orders: "Review orders and take cash payments",
+    },
+    branchState: {
+      active: "Open",
+      inactive: "Closed",
+    },
+    customerKind: {
+      account: "Customer account",
+      profile: "Customer profile",
+    },
+    noticeError: {
+      NOTIFICATION_NOT_FOUND: "The notification does not exist or is not accessible.",
+      NOTIFICATION_ARCHIVED: "An archived notification cannot be marked read again.",
+      VALIDATION_ERROR: "The submitted data failed validation. Check it and retry.",
+    },
+    drawer: {
+      alreadyOpened: "The drawer is already open for this cash sale; it will not open again.",
+      interrupted: "The last open was interrupted and its physical result is unknown. Check by hand rather than opening again.",
+      previouslyFailed: "Automatic opening failed for this cash sale. Open it by hand once authorised.",
+    },
+    branchNotReady: "This branch is not set up yet.",
+    workspaceRole: {
+      owner: "Owner",
+      manager: "Manager",
+      cashier: "Cashier",
+    },
     inline: {
+      matchResults: "Matches",
+      quickActionFallback: "Open the matching page",
       cardOutcome: "Card result: {outcome}",
       verifyTerminalBeforeRetry: "{reason} Check the terminal transaction log before retrying; do not charge twice.",
       receiptDeliveryLogFailed: "Could not record receipt delivery: {reason}",

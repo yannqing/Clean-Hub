@@ -523,14 +523,18 @@ function CustomerMetrics({
     value: number;
     icon: Parameters<typeof Icon>[0]["name"];
   }> = [
-    { label: "匹配结果", value: total, icon: "users" },
     {
-      label: "客户账户",
+      label: posMessage("pos.inline.matchResults"),
+      value: total,
+      icon: "users",
+    },
+    {
+      label: posMessage("pos.customerKind.account"),
       value: accountContext ? 1 : totalAccounts,
       icon: "user-circle",
     },
     {
-      label: "客户档案",
+      label: posMessage("pos.customerKind.profile"),
       value: accountContext ? total : totalProfiles,
       icon: "user-plus",
     },

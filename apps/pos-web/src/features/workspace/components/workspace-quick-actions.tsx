@@ -7,11 +7,14 @@ import {
   createTranslator,
   defaultLocale,
   normalizeLocale,
+  type TranslationKey,
 } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
 
 import { Icon, type PosIconName } from "@/components/app-shell/icons";
+import { posMessage } from "@/lib/pos-message";
+import { getCatalogueLabel } from "@/lib/catalogue-label";
 
 type WorkspaceQuickActionsProps = {
   actions: PosQuickAction[];
@@ -41,13 +44,6 @@ const ICON_MAP: Record<string, PosIconName> = {
   shirt: "shirt",
   garment: "shirt",
   customer: "users",
-};
-
-const ACTION_DESCRIPTIONS: Record<string, string> = {
-  "new-intake": "接待客户并创建服务工单",
-  customers: "查询账户、档案与历史记录",
-  tickets: "跟进状态、取件与异常工单",
-  orders: "查看订单并处理现金收款",
 };
 
 function resolveAccent(color: string): AccentColor {
@@ -81,7 +77,10 @@ function QuickActionCard({ action }: { action: PosQuickAction }) {
   const accent = resolveAccent(action.color);
   const color = ACTION_COLORS[accent];
   const icon = resolveIcon(action.icon);
-  const description = ACTION_DESCRIPTIONS[action.id] ?? "进入对应业务页面";
+  const description = getCatalogueLabel(
+    `pos.quickAction.${action.id}` as TranslationKey,
+    posMessage("pos.inline.quickActionFallback"),
+  );
 
   return (
     <Link

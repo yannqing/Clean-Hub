@@ -27,11 +27,12 @@ type ActionResultLike = {
  *
  * `domain` selects the code table, because the same code means different
  * things per resource -- `INVALID_STATUS_TRANSITION` is about an order's
- * status in one and a ticket's in the other.
+ * status in one and a ticket's in the other, and VALIDATION_ERROR names a
+ * different form in each.
  */
 export function getActionErrorMessage(
   result: ActionResultLike,
-  domain: "order" | "ticket",
+  domain: "order" | "ticket" | "notice",
 ): string {
   if (!result.code) {
     return result.message;

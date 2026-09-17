@@ -7,11 +7,13 @@ import {
   createTranslator,
   defaultLocale,
   normalizeLocale,
+  type TranslationKey,
 } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
 
 import { Icon, type PosIconName } from "@/components/app-shell/icons";
+import { posMessage } from "@/lib/pos-message";
 import {
   PendingPrintJobs,
   usePendingPrintJobCounts,
@@ -43,14 +45,13 @@ const TASK_META: Record<
 
 const PRIORITY_STYLES: Record<
   Priority,
-  { badge: string; count: string; icon: string; label: string }
+  { badge: string; count: string; icon: string }
 > = {
   high: {
     badge:
       "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/35 dark:text-red-300",
     count: "bg-red-50 text-red-700 dark:bg-red-950/35 dark:text-red-300",
     icon: "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950/35 dark:text-red-300",
-    label: "高优先级",
   },
   medium: {
     badge:
@@ -58,7 +59,6 @@ const PRIORITY_STYLES: Record<
     count:
       "bg-amber-50 text-amber-700 dark:bg-amber-950/35 dark:text-amber-300",
     icon: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-300",
-    label: "中优先级",
   },
   low: {
     badge:
@@ -66,7 +66,6 @@ const PRIORITY_STYLES: Record<
     count:
       "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-300",
     icon: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-300",
-    label: "低优先级",
   },
 };
 
@@ -154,7 +153,7 @@ function TaskCard({
           <span
             className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${style.badge}`}
           >
-            {style.label}
+            {posMessage(`pos.taskPriority.${task.priority}` as TranslationKey)}
           </span>
         </span>
         <span className="mt-1 block line-clamp-2 text-xs leading-5 text-muted-foreground">

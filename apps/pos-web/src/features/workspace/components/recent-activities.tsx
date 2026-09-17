@@ -9,24 +9,26 @@ import type {
 import {
   createTranslator,
   defaultLocale,
+  hasMessage,
   normalizeLocale,
+  type TranslationKey,
 } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
 
+import { getPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
 import { Icon, type PosIconName } from "@/components/app-shell/icons";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 
 const ACTIVITY_META: Record<
   PosRecentActivityType,
-  { badge: string; icon: PosIconName; iconStyle: string; label: string; time: string }
+  { badge: string; icon: PosIconName; iconStyle: string; time: string }
 > = {
   order: {
     badge:
       "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/35 dark:text-orange-300",
     iconStyle:
       "border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-900 dark:bg-orange-950/35 dark:text-orange-300",
-    label: "订单",
     icon: "receipt",
     time: "bg-orange-50 text-orange-700 dark:bg-orange-950/35 dark:text-orange-300",
   },
@@ -35,7 +37,6 @@ const ACTIVITY_META: Record<
       "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-300",
     iconStyle:
       "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/35 dark:text-amber-300",
-    label: "工单",
     icon: "clipboard-list",
     time: "bg-amber-50 text-amber-700 dark:bg-amber-950/35 dark:text-amber-300",
   },
@@ -44,7 +45,6 @@ const ACTIVITY_META: Record<
       "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-300",
     iconStyle:
       "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/35 dark:text-emerald-300",
-    label: "客户",
     icon: "users",
     time:
       "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/35 dark:text-emerald-300",
@@ -54,11 +54,20 @@ const ACTIVITY_META: Record<
       "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/35 dark:text-sky-300",
     iconStyle:
       "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900 dark:bg-sky-950/35 dark:text-sky-300",
-    label: "支付",
     icon: "wallet-cards",
     time: "bg-sky-50 text-sky-700 dark:bg-sky-950/35 dark:text-sky-300",
   },
 };
+
+/** Falls back to the raw kind for an activity type the catalogue lacks. */
+function activityKindLabel(kind: string): string {
+  const key = `pos.activityKind.${kind}` as TranslationKey;
+  const locale = getPosRuntimeLocale();
+  if (!hasMessage(locale, key) && !hasMessage(defaultLocale, key)) {
+    return kind;
+  }
+  return createTranslator({ locale })(key);
+}
 
 function formatActivityCount(count: number, locale: string): string {
   return createTranslator({ locale: normalizeLocale(locale) ?? defaultLocale })(
@@ -189,7 +198,6 @@ function ActivityContent({
 }) {
   const meta = ACTIVITY_META[activity.type] ?? {
     badge: "border-border bg-muted text-muted-foreground",
-    label: activity.type,
     icon: "clipboard-list" as PosIconName,
     iconStyle: "border-border bg-muted text-muted-foreground",
     time: "bg-muted text-muted-foreground",
@@ -209,7 +217,7 @@ function ActivityContent({
           <span
             className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${meta.badge}`}
           >
-            {meta.label}
+            {activityKindLabel(activity.type)}
           </span>
         </span>
         {activity.description ? (

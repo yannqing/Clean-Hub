@@ -2,14 +2,11 @@
 
 import type { PosWorkspaceBranch } from "@cleanhub/api-client";
 import { Icon } from "@/components/app-shell/icons";
+import { getCatalogueLabel } from "@/lib/catalogue-label";
+import type { TranslationKey } from "@cleanhub/i18n";
 
 type WorkspaceBranchCardProps = {
   branch: PosWorkspaceBranch | null;
-};
-
-const BRANCH_STATUS_LABELS: Record<string, string> = {
-  active: "营业中",
-  inactive: "已停用",
 };
 
 export function WorkspaceBranchCard({ branch }: WorkspaceBranchCardProps) {
@@ -34,7 +31,10 @@ export function WorkspaceBranchCard({ branch }: WorkspaceBranchCardProps) {
     );
   }
 
-  const statusLabel = BRANCH_STATUS_LABELS[branch.status] ?? branch.status;
+  const statusLabel = getCatalogueLabel(
+    `pos.branchState.${branch.status}` as TranslationKey,
+    branch.status,
+  );
   const isActive = branch.status === "active";
 
   return (

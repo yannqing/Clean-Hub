@@ -17,6 +17,7 @@ import {
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { getPosOfflineStorage } from "@/features/hardware/lib/desktop-bridge";
 import { posApi } from "@/lib/api-client";
+import { posMessage } from "@/lib/pos-message";
 
 import type {
   PosCartCloudSyncState,
@@ -249,7 +250,7 @@ export function usePosCart() {
         : {
             cart: cartRef.current,
             changed: false,
-            message: "当前门店尚未初始化。",
+            message: posMessage("pos.branchNotReady"),
           },
     [apply, branchId],
   );

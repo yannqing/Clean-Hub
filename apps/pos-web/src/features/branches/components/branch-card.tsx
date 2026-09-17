@@ -1,5 +1,6 @@
-import { BRANCH_STATUS_LABELS } from "../constants";
 import type { PosBranchSummary } from "../types";
+import type { TranslationKey } from "@cleanhub/i18n";
+import { getCatalogueLabel } from "@/lib/catalogue-label";
 
 type BranchCardProps = {
   branch: PosBranchSummary;
@@ -10,7 +11,10 @@ type BranchCardProps = {
  * be reused in any page that already holds a branch object.
  */
 export function BranchCard({ branch }: BranchCardProps) {
-  const statusLabel = BRANCH_STATUS_LABELS[branch.status] ?? branch.status;
+  const statusLabel = getCatalogueLabel(
+    `pos.branchState.${branch.status}` as TranslationKey,
+    branch.status,
+  );
   const rows: Array<{ label: string; value: string | null }> = [
     { label: "联系电话", value: branch.phone },
     { label: "门店地址", value: branch.address },

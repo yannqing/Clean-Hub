@@ -195,20 +195,19 @@ export async function openCashDrawerForPaymentOnce(
   if (previous === "opened") {
     return {
       opened: false,
-      message: "该现金交易的钱箱已打开，本次不会重复开箱。",
+      message: posMessage("pos.drawer.alreadyOpened"),
     };
   }
   if (previous === "opening") {
     return {
       opened: false,
-      message:
-        "上次开箱时发生中断，物理结果不确定；为避免重复开箱，请人工核对。",
+      message: posMessage("pos.drawer.interrupted"),
     };
   }
   if (previous === "failed") {
     return {
       opened: false,
-      message: "该现金交易的自动开箱曾失败，请授权后人工开箱。",
+      message: posMessage("pos.drawer.previouslyFailed"),
     };
   }
 

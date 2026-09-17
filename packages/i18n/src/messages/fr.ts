@@ -744,6 +744,11 @@ export const frMessages = {
       },
     },
     error: {
+      notice: {
+        NOTIFICATION_NOT_FOUND: "La notification n’existe pas ou n’est pas accessible.",
+        NOTIFICATION_ARCHIVED: "Une notification archivée ne peut pas être remarquée comme lue.",
+        VALIDATION_ERROR: "Les données soumises n’ont pas passé la validation. Vérifiez puis réessayez.",
+      },
       order: {
         FORBIDDEN: "Ce compte n’est pas autorisé à effectuer cette action.",
         ORDER_NOT_FOUND: "La commande n’existe pas ou a été supprimée.",
@@ -978,7 +983,50 @@ export const frMessages = {
       succeeded: "Réussi",
       failed: "Échec",
     },
+    activityKind: {
+      order: "Commande",
+      ticket: "Ticket",
+      customer: "Client",
+      payment: "Paiement",
+    },
+    taskPriority: {
+      high: "Priorité élevée",
+      medium: "Priorité moyenne",
+      low: "Priorité faible",
+    },
+    quickAction: {
+      "new-intake": "Accueillir un client et créer un ticket",
+      customers: "Rechercher comptes, profils et historique",
+      tickets: "Suivre statuts, retraits et exceptions",
+      orders: "Consulter les commandes et encaisser",
+    },
+    branchState: {
+      active: "Ouvert",
+      inactive: "Fermé",
+    },
+    customerKind: {
+      account: "Compte client",
+      profile: "Profil client",
+    },
+    noticeError: {
+      NOTIFICATION_NOT_FOUND: "La notification n’existe pas ou n’est pas accessible.",
+      NOTIFICATION_ARCHIVED: "Une notification archivée ne peut pas être remarquée comme lue.",
+      VALIDATION_ERROR: "Les données soumises n’ont pas passé la validation. Vérifiez puis réessayez.",
+    },
+    drawer: {
+      alreadyOpened: "Le tiroir est déjà ouvert pour cette vente ; il ne s’ouvrira pas à nouveau.",
+      interrupted: "La dernière ouverture a été interrompue et son résultat est inconnu. Vérifiez manuellement plutôt que de rouvrir.",
+      previouslyFailed: "L’ouverture automatique a échoué pour cette vente. Ouvrez-le manuellement après autorisation.",
+    },
+    branchNotReady: "Cette succursale n’est pas encore configurée.",
+    workspaceRole: {
+      owner: "Propriétaire",
+      manager: "Responsable",
+      cashier: "Caissier",
+    },
     inline: {
+      matchResults: "Résultats",
+      quickActionFallback: "Ouvrir la page correspondante",
       cardOutcome: "Résultat carte : {outcome}",
       verifyTerminalBeforeRetry: "{reason} Vérifiez le journal des transactions du terminal avant de réessayer ; ne facturez pas deux fois.",
       receiptDeliveryLogFailed: "Impossible d’enregistrer la remise du reçu : {reason}",

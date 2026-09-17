@@ -10,6 +10,8 @@ import type { PosSessionUser } from "@/lib/session";
 import { Icon } from "@/components/app-shell/icons";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posMessage } from "@/lib/pos-message";
+import { getCatalogueLabel } from "@/lib/catalogue-label";
+import type { TranslationKey } from "@cleanhub/i18n";
 import { WorkspaceBranchCard } from "./workspace-branch-card";
 import { WorkspaceStatistics } from "./workspace-statistics";
 import { WorkspaceQuickActions } from "./workspace-quick-actions";
@@ -23,12 +25,6 @@ type WorkspaceViewProps = {
   pendingTasks: PosPendingTask[];
 };
 
-const ROLE_LABELS: Record<string, string> = {
-  owner: "店主",
-  manager: "店长",
-  cashier: "收银员",
-};
-
 export function WorkspaceView({
   user,
   overview,
@@ -37,7 +33,12 @@ export function WorkspaceView({
 }: WorkspaceViewProps) {
   const { locale } = useTranslation();
   const { timeZone } = usePosRuntimeConfig();
-  const roleLabel = user ? (ROLE_LABELS[user.role] ?? user.role) : null;
+  const roleLabel = user
+    ? getCatalogueLabel(
+        `pos.workspaceRole.${user.role}` as TranslationKey,
+        user.role,
+      )
+    : null;
   const canReprint = user?.role === "owner" || user?.role === "manager";
   const today = new Date().toLocaleDateString(locale, {
     year: "numeric",
