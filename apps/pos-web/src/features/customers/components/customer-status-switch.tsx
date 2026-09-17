@@ -4,6 +4,7 @@ import { CUSTOMER_STATUS_META } from "../constants";
 import type { PosCustomerStatus } from "../types";
 
 import { posMessage } from "@/lib/pos-message";
+import { getCustomerStateLabel } from "@/lib/customer-labels";
 
 type CustomerStatusSwitchProps = {
   status: PosCustomerStatus;
@@ -62,7 +63,7 @@ export function CustomerStatusSwitch({
       <span
         className={`text-xs font-medium ${meta.badgeClassName} rounded-md px-2 py-0.5`}
       >
-        {meta.label}
+        {getCustomerStateLabel(status)}
       </span>
     </div>
   );

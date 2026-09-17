@@ -48,16 +48,6 @@ export const TICKET_COLUMN_KEYS = [
 
 export type TicketColumnKey = (typeof TICKET_COLUMN_KEYS)[number];
 
-export const TICKET_COLUMN_LABELS: Record<TicketColumnKey, string> = {
-  ticket: "工单",
-  account: "账户",
-  customer: "客户",
-  type: "类型",
-  status: "状态",
-  priority: "优先级",
-  pickup: "预计取件",
-};
-
 /**
  * Parse a raw query-string value into a valid ticket status enum, or undefined.
  * Used by the server list page when composing the api-client query.

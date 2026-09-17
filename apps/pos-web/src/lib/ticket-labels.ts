@@ -184,3 +184,7 @@ export function getTicketItemTypeOptions(): ReadonlyArray<{
     label: getTicketItemTypeLabel(value),
   }));
 }
+
+export function getTicketColumnLabel(column: string): string {
+  return label(`pos.ticket.column.${column}` as TranslationKey, column);
+}

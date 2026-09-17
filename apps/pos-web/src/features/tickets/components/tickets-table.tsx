@@ -19,6 +19,7 @@ import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
+import { getTicketColumnLabel } from "@/lib/ticket-labels";
 
 import {
   formatTicketDateTime,
@@ -29,7 +30,6 @@ import {
 } from "../constants";
 import {
   TICKET_COLUMN_KEYS,
-  TICKET_COLUMN_LABELS,
   TICKET_FILTER_KEYS,
   type TicketColumnKey,
 } from "./ticket-filter-params";
@@ -93,7 +93,7 @@ export function TicketsTable({ tickets, total }: TicketsTableProps) {
               {TICKET_COLUMN_KEYS.map((column) =>
                 visibleColumns.has(column) ? (
                   <TableHead key={column}>
-                    {text(TICKET_COLUMN_LABELS[column])}
+                    {getTicketColumnLabel(column)}
                   </TableHead>
                 ) : null,
               )}

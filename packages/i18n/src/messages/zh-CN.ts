@@ -767,6 +767,43 @@ export const zhCNMessages = {
       actionSucceeded: "操作成功。",
       actionFailed: "操作失败，请稍后重试。",
     },
+    notice: {
+      title: "通知中心",
+      type: {
+        business: "业务",
+        system: "系统",
+      },
+      readStatus: {
+        unread: "未读",
+        read: "已读",
+        archived: "已归档",
+      },
+      priority: {
+        low: "低",
+        normal: "普通",
+        high: "高",
+        critical: "紧急",
+      },
+      relatedType: {
+        order: "订单",
+        ticket: "工单",
+      },
+    },
+    customer: {
+      column: {
+        customer: "客户",
+        contact: "联系方式",
+        account: "所属账户",
+        status: "状态",
+        createdAt: "创建时间",
+        actions: "操作",
+      },
+      state: {
+        active: "正常",
+        disabled: "停用",
+      },
+      relationshipSelf: "本人",
+    },
     inline: {
       cardOutcome: "刷卡结果：{outcome}",
       verifyTerminalBeforeRetry: "{reason} 请先核对终端交易记录，勿重复收款。",
@@ -1338,6 +1375,15 @@ export const zhCNMessages = {
      * 就会静默失配。
      */
     ticket: {
+      column: {
+        ticket: "工单",
+        account: "账户",
+        customer: "客户",
+        type: "类型",
+        status: "状态",
+        priority: "优先级",
+        pickup: "预计取件",
+      },
       title: "工单管理",
       status: {
         draft: "草稿",

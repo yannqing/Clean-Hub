@@ -14,10 +14,10 @@ import {
   TableRow,
 } from "@cleanhub/ui";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
+import { getCustomerColumnLabel } from "@/lib/customer-labels";
 
 import {
   CUSTOMER_COLUMN_KEYS,
-  CUSTOMER_COLUMN_LABELS,
   type CustomerColumnKey,
 } from "../constants";
 import type { CustomerListRow } from "../types";
@@ -148,7 +148,7 @@ export function CustomerTable({
                   >
                     {column === "account" && accountContext
                       ? "档案信息"
-                      : CUSTOMER_COLUMN_LABELS[column]}
+                      : getCustomerColumnLabel(column)}
                   </TableHead>
                 ) : null,
               )}

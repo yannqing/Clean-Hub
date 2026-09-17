@@ -15,6 +15,7 @@ import {
 
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
+import { getTicketColumnLabel } from "@/lib/ticket-labels";
 
 import {
   getTicketPriorityOptions,
@@ -24,7 +25,6 @@ import {
 import type { TicketListScope } from "../types";
 import {
   TICKET_COLUMN_KEYS,
-  TICKET_COLUMN_LABELS,
   TICKET_FILTER_KEYS,
   type TicketColumnKey,
 } from "./ticket-filter-params";
@@ -293,7 +293,7 @@ export function TicketsToolbar({ allCount, mineCount }: TicketsToolbarProps) {
                         }
                       />
                       <span className="truncate">
-                        {text(TICKET_COLUMN_LABELS[column])}
+                        {getTicketColumnLabel(column)}
                       </span>
                     </label>
                   );

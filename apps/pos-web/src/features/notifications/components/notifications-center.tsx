@@ -17,6 +17,16 @@ import {
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
 import { PendingPrintJobs } from "@/features/hardware/components/pending-print-jobs";
+import {
+  getNoticePriorityLabel,
+  getNoticePriorityOptions,
+  getNoticeReadStatusLabel,
+  getNoticeReadStatusOptions,
+  getNoticeRelatedTypeLabel,
+  getNoticeRelatedTypeOptions,
+  getNoticeTypeLabel,
+  getNoticeTypeOptions,
+} from "@/lib/notice-labels";
 
 import {
   archiveNotificationAction,
@@ -26,14 +36,6 @@ import {
 import {
   formatNotificationDateTime,
   getNotificationDateGroup,
-  NOTICE_PRIORITY_LABELS,
-  NOTICE_PRIORITY_OPTIONS,
-  NOTICE_READ_STATUS_LABELS,
-  NOTICE_READ_STATUS_OPTIONS,
-  NOTICE_RELATED_TYPE_LABELS,
-  NOTICE_RELATED_TYPE_OPTIONS,
-  NOTICE_TYPE_LABELS,
-  NOTICE_TYPE_OPTIONS,
   NOTIFICATION_FILTER_KEYS,
 } from "../constants";
 import type {
@@ -223,7 +225,7 @@ export function NotificationsCenter({
                 [NOTIFICATION_FILTER_KEYS.noticeType]: value || undefined,
               })
             }
-            options={NOTICE_TYPE_OPTIONS}
+            options={getNoticeTypeOptions()}
             placeholder="全部类型"
             value={params.get(NOTIFICATION_FILTER_KEYS.noticeType) ?? ""}
           />
@@ -234,7 +236,7 @@ export function NotificationsCenter({
                 [NOTIFICATION_FILTER_KEYS.readStatus]: value || undefined,
               })
             }
-            options={NOTICE_READ_STATUS_OPTIONS}
+            options={getNoticeReadStatusOptions()}
             placeholder="全部状态"
             value={params.get(NOTIFICATION_FILTER_KEYS.readStatus) ?? ""}
           />
@@ -245,7 +247,7 @@ export function NotificationsCenter({
                 [NOTIFICATION_FILTER_KEYS.priority]: value || undefined,
               })
             }
-            options={NOTICE_PRIORITY_OPTIONS}
+            options={getNoticePriorityOptions()}
             placeholder="全部优先级"
             value={params.get(NOTIFICATION_FILTER_KEYS.priority) ?? ""}
           />
@@ -256,7 +258,7 @@ export function NotificationsCenter({
                 [NOTIFICATION_FILTER_KEYS.relatedType]: value || undefined,
               })
             }
-            options={NOTICE_RELATED_TYPE_OPTIONS}
+            options={getNoticeRelatedTypeOptions()}
             placeholder="全部关联"
             value={params.get(NOTIFICATION_FILTER_KEYS.relatedType) ?? ""}
           />
@@ -453,7 +455,7 @@ function NotificationRow({
             </span>
             {notification.relatedType ? (
               <span>
-                {NOTICE_RELATED_TYPE_LABELS[notification.relatedType]} ·{" "}
+                {getNoticeRelatedTypeLabel(notification.relatedType)} ·{" "}
                 {notification.relatedId ?? "-"}
               </span>
             ) : null}
@@ -463,15 +465,15 @@ function NotificationRow({
           <div className="flex flex-wrap justify-end gap-1.5">
             <NotificationBadge
               className={NOTICE_TYPE_BADGE_CLASSES[notification.noticeType]}
-              label={NOTICE_TYPE_LABELS[notification.noticeType]}
+              label={getNoticeTypeLabel(notification.noticeType)}
             />
             <NotificationBadge
               className={PRIORITY_BADGE_CLASSES[notification.priority]}
-              label={NOTICE_PRIORITY_LABELS[notification.priority]}
+              label={getNoticePriorityLabel(notification.priority)}
             />
             <NotificationBadge
               className={READ_STATUS_BADGE_CLASSES[notification.readStatus]}
-              label={NOTICE_READ_STATUS_LABELS[notification.readStatus]}
+              label={getNoticeReadStatusLabel(notification.readStatus)}
             />
           </div>
           <div className="flex justify-end gap-1">
@@ -538,7 +540,7 @@ function NotificationDetailPanel({
           </div>
           <NotificationBadge
             className={READ_STATUS_BADGE_CLASSES[notification.readStatus]}
-            label={NOTICE_READ_STATUS_LABELS[notification.readStatus]}
+            label={getNoticeReadStatusLabel(notification.readStatus)}
           />
         </div>
       </div>
@@ -547,11 +549,11 @@ function NotificationDetailPanel({
           <div className="flex flex-wrap gap-1.5">
             <NotificationBadge
               className={NOTICE_TYPE_BADGE_CLASSES[notification.noticeType]}
-              label={NOTICE_TYPE_LABELS[notification.noticeType]}
+              label={getNoticeTypeLabel(notification.noticeType)}
             />
             <NotificationBadge
               className={PRIORITY_BADGE_CLASSES[notification.priority]}
-              label={NOTICE_PRIORITY_LABELS[notification.priority]}
+              label={getNoticePriorityLabel(notification.priority)}
             />
           </div>
           <h3 className="mt-3 text-lg font-semibold text-foreground">
@@ -568,7 +570,7 @@ function NotificationDetailPanel({
               关联对象
             </div>
             <div className="mt-1 font-mono text-xs font-semibold text-foreground">
-              {NOTICE_RELATED_TYPE_LABELS[notification.relatedType]} ·{" "}
+              {getNoticeRelatedTypeLabel(notification.relatedType)} ·{" "}
               {notification.relatedId}
             </div>
             {relatedHref ? (

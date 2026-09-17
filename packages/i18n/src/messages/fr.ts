@@ -786,6 +786,43 @@ export const frMessages = {
       actionSucceeded: "Terminé.",
       actionFailed: "L’action a échoué. Réessayez dans un instant.",
     },
+    notice: {
+      title: "Notifications",
+      type: {
+        business: "Activité",
+        system: "Système",
+      },
+      readStatus: {
+        unread: "Non lu",
+        read: "Lu",
+        archived: "Archivé",
+      },
+      priority: {
+        low: "Faible",
+        normal: "Normale",
+        high: "Élevée",
+        critical: "Critique",
+      },
+      relatedType: {
+        order: "Commande",
+        ticket: "Ticket",
+      },
+    },
+    customer: {
+      column: {
+        customer: "Client",
+        contact: "Coordonnées",
+        account: "Compte",
+        status: "Statut",
+        createdAt: "Création",
+        actions: "Actions",
+      },
+      state: {
+        active: "Actif",
+        disabled: "Désactivé",
+      },
+      relationshipSelf: "Soi-même",
+    },
     inline: {
       cardOutcome: "Résultat carte : {outcome}",
       verifyTerminalBeforeRetry: "{reason} Vérifiez le journal des transactions du terminal avant de réessayer ; ne facturez pas deux fois.",
@@ -1416,6 +1453,15 @@ export const frMessages = {
      * string silently stops matching.
      */
     ticket: {
+      column: {
+        ticket: "Ticket",
+        account: "Compte",
+        customer: "Client",
+        type: "Type",
+        status: "Statut",
+        priority: "Priorité",
+        pickup: "Retrait",
+      },
       title: "Gestion des bons",
       status: {
         draft: "Brouillon",

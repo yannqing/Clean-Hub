@@ -780,6 +780,43 @@ export const enMessages = {
       actionSucceeded: "Done.",
       actionFailed: "The action failed. Try again shortly.",
     },
+    notice: {
+      title: "Notifications",
+      type: {
+        business: "Business",
+        system: "System",
+      },
+      readStatus: {
+        unread: "Unread",
+        read: "Read",
+        archived: "Archived",
+      },
+      priority: {
+        low: "Low",
+        normal: "Normal",
+        high: "High",
+        critical: "Critical",
+      },
+      relatedType: {
+        order: "Order",
+        ticket: "Ticket",
+      },
+    },
+    customer: {
+      column: {
+        customer: "Customer",
+        contact: "Contact",
+        account: "Account",
+        status: "Status",
+        createdAt: "Created",
+        actions: "Actions",
+      },
+      state: {
+        active: "Active",
+        disabled: "Disabled",
+      },
+      relationshipSelf: "Self",
+    },
     inline: {
       cardOutcome: "Card result: {outcome}",
       verifyTerminalBeforeRetry: "{reason} Check the terminal transaction log before retrying; do not charge twice.",
@@ -1397,6 +1434,15 @@ export const enMessages = {
      * string silently stops matching.
      */
     ticket: {
+      column: {
+        ticket: "Ticket",
+        account: "Account",
+        customer: "Customer",
+        type: "Type",
+        status: "Status",
+        priority: "Priority",
+        pickup: "Pickup",
+      },
       title: "Tickets",
       status: {
         draft: "Draft",

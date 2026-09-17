@@ -49,24 +49,13 @@ export const CUSTOMER_COLUMN_KEYS = [
 
 export type CustomerColumnKey = (typeof CUSTOMER_COLUMN_KEYS)[number];
 
-export const CUSTOMER_COLUMN_LABELS: Record<CustomerColumnKey, string> = {
-  customer: "客户",
-  contact: "联系方式",
-  account: "所属账户",
-  status: "状态",
-  createdAt: "创建时间",
-  actions: "操作",
-};
-
-/** Status -> display label + badge classes. */
+/** Status -> badge classes. The wording lives in `lib/customer-labels.ts`. */
 export const CUSTOMER_STATUS_META = {
   active: {
-    label: "正常",
     badgeClassName: "bg-emerald-50 text-emerald-700",
     dotClassName: "bg-emerald-500",
   },
   disabled: {
-    label: "停用",
     badgeClassName: "bg-muted text-muted-foreground",
     dotClassName: "bg-muted-foreground",
   },

@@ -11,10 +11,10 @@ import {
 } from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";
+import { getCustomerColumnLabel } from "@/lib/customer-labels";
 
 import {
   CUSTOMER_COLUMN_KEYS,
-  CUSTOMER_COLUMN_LABELS,
   CUSTOMER_RESULT_TYPE_OPTIONS,
   CUSTOMER_STATUS_OPTIONS,
   type CustomerColumnKey,
@@ -177,7 +177,7 @@ export function CustomerSearchBar({
                       }
                     />
                     <span className="truncate">
-                      {CUSTOMER_COLUMN_LABELS[column]}
+                      {getCustomerColumnLabel(column)}
                     </span>
                   </label>
                 );
