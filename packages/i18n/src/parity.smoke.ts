@@ -34,5 +34,16 @@ for (const [k, zhv] of base) {
   }
 }
 
+// No Chinese may survive in the English or French bundle. A missing
+// translation usually arrives as the Chinese source copied across, which the
+// key and placeholder checks above cannot see.
+const han = /[\u4e00-\u9fff]/;
+for (const loc of locales) {
+  if (loc === "zh-CN") continue;
+  for (const [k, v] of flat.get(loc)!) {
+    if (han.test(v)) { console.error(`UNTRANSLATED ${loc}: ${k} = ${v}`); bad++; }
+  }
+}
+
 console.log(bad === 0 ? `i18n parity passed (${base.size} keys x ${locales.length} locales)` : `i18n parity FAILED: ${bad}`);
 process.exit(bad === 0 ? 0 : 1);
