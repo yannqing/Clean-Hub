@@ -673,6 +673,22 @@ export const zhCNMessages = {
     },
   },
   pos: {
+    inline: {
+      itemCount: "{count} 项",
+      pieceCount: "{count} 件",
+      orderCount: "{count} 单",
+      entryCount: "{count} 个条目",
+      entryCountOne: "{count} 个条目",
+      profileCount: "{count} 个档案",
+      ticketItemCount: "{count} 个工单项目",
+      projectCount: "{count} 个项目",
+      matchCount: "{count} 条匹配结果",
+      taskCount: "{count} 项操作",
+      pendingNow: "当前待处理 {count} 项",
+      recentCount: "最近 {count} 条",
+      deviceCount: "{count} 台已登记设备",
+      pageRange: "第 {from}–{to} 条 / 共 {total} 条",
+    },
     app: {
       title: "CleanHub POS",
       description: "CleanHub 门店收银系统",

@@ -19,7 +19,7 @@ type TicketPaginationProps = {
 };
 
 export function TicketPagination({ total }: TicketPaginationProps) {
-  const { locale } = useTranslation();
+  const { locale, t } = useTranslation();
   const router = useRouter();
   const params = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -50,7 +50,7 @@ export function TicketPagination({ total }: TicketPaginationProps) {
   return (
     <div className="flex flex-col gap-2 border-t px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between">
       <span className="text-muted-foreground">
-        {formatTicketRange(from, to, total, locale)}
+        {t("pos.inline.pageRange", { from, to, total })}
       </span>
 
       <div className="flex items-center gap-1">
@@ -87,20 +87,6 @@ export function TicketPagination({ total }: TicketPaginationProps) {
   );
 }
 
-function formatTicketRange(
-  from: number,
-  to: number,
-  total: number,
-  locale: string,
-): string {
-  if (locale === "en") {
-    return `${from}–${to} of ${total}`;
-  }
-  if (locale === "fr") {
-    return `${from}–${to} sur ${total}`;
-  }
-  return `第 ${from}–${to} 条 / 共 ${total} 条`;
-}
 
 function PagerButton({
   active,

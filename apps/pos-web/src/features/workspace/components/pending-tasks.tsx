@@ -3,6 +3,11 @@
 import type { ReactNode } from "react";
 
 import type { PosPendingTask, PosPendingTaskType } from "@cleanhub/api-client";
+import {
+  createTranslator,
+  defaultLocale,
+  normalizeLocale,
+} from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
 
@@ -72,31 +77,17 @@ function formatNumber(value: number, locale: string): string {
 }
 
 function formatPendingSummary(count: number, locale: string): string {
-  const value = formatNumber(count, locale);
-
-  if (locale === "en") {
-    return `${value} pending`;
-  }
-
-  if (locale === "fr") {
-    return `${value} en attente`;
-  }
-
-  return `当前待处理 ${value} 项`;
+  return createTranslator({ locale: normalizeLocale(locale) ?? defaultLocale })(
+    "pos.inline.pendingNow",
+    { count: formatNumber(count, locale) },
+  );
 }
 
 function formatTaskCount(count: number, locale: string): string {
-  const value = formatNumber(count, locale);
-
-  if (locale === "en") {
-    return `${value} items`;
-  }
-
-  if (locale === "fr") {
-    return `${value} éléments`;
-  }
-
-  return `${value} 项`;
+  return createTranslator({ locale: normalizeLocale(locale) ?? defaultLocale })(
+    "pos.inline.itemCount",
+    { count: formatNumber(count, locale) },
+  );
 }
 
 function SectionHeader({

@@ -6,6 +6,11 @@ import type {
   PosRecentActivity,
   PosRecentActivityType,
 } from "@cleanhub/api-client";
+import {
+  createTranslator,
+  defaultLocale,
+  normalizeLocale,
+} from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
 
@@ -56,17 +61,10 @@ const ACTIVITY_META: Record<
 };
 
 function formatActivityCount(count: number, locale: string): string {
-  const value = new Intl.NumberFormat(locale).format(count);
-
-  if (locale === "en") {
-    return `${value} latest`;
-  }
-
-  if (locale === "fr") {
-    return `${value} récentes`;
-  }
-
-  return `最近 ${value} 条`;
+  return createTranslator({ locale: normalizeLocale(locale) ?? defaultLocale })(
+    "pos.inline.recentCount",
+    { count: new Intl.NumberFormat(locale).format(count) },
+  );
 }
 
 function formatRelativeTime(

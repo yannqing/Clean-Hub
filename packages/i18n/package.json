@@ -11,7 +11,8 @@
   },
   "scripts": {
     "test": "tsx src/i18n.test.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "smoke:parity": "tsx src/parity.smoke.ts"
   },
   "dependencies": {
     "react": "19.2.4"

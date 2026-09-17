@@ -3,6 +3,11 @@
 import type { CSSProperties } from "react";
 
 import type { PosQuickAction } from "@cleanhub/api-client";
+import {
+  createTranslator,
+  defaultLocale,
+  normalizeLocale,
+} from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
 
@@ -66,17 +71,10 @@ function iconAccentStyle(color: string): CSSProperties {
 }
 
 function formatActionCount(count: number, locale: string): string {
-  const value = new Intl.NumberFormat(locale).format(count);
-
-  if (locale === "en") {
-    return `${value} actions`;
-  }
-
-  if (locale === "fr") {
-    return `${value} actions`;
-  }
-
-  return `${value} 项操作`;
+  return createTranslator({ locale: normalizeLocale(locale) ?? defaultLocale })(
+    "pos.inline.taskCount",
+    { count: new Intl.NumberFormat(locale).format(count) },
+  );
 }
 
 function QuickActionCard({ action }: { action: PosQuickAction }) {

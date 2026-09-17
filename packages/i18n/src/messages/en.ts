@@ -686,6 +686,22 @@ export const enMessages = {
     },
   },
   pos: {
+    inline: {
+      itemCount: "{count} items",
+      pieceCount: "{count} pcs",
+      orderCount: "{count} orders",
+      entryCount: "{count} entries",
+      entryCountOne: "{count} item",
+      profileCount: "{count} profiles",
+      ticketItemCount: "{count} ticket items",
+      projectCount: "{count} items",
+      matchCount: "{count} matches",
+      taskCount: "{count} actions",
+      pendingNow: "{count} pending now",
+      recentCount: "Latest {count}",
+      deviceCount: "{count} registered devices",
+      pageRange: "{from}–{to} of {total}",
+    },
     app: {
       title: "CleanHub POS",
       description: "CleanHub store POS",

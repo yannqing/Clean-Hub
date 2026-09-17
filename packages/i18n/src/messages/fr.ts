@@ -692,6 +692,22 @@ export const frMessages = {
     },
   },
   pos: {
+    inline: {
+      itemCount: "{count} articles",
+      pieceCount: "{count} pièces",
+      orderCount: "{count} commandes",
+      entryCount: "{count} entrées",
+      entryCountOne: "{count} article",
+      profileCount: "{count} profils",
+      ticketItemCount: "{count} lignes de ticket",
+      projectCount: "{count} articles",
+      matchCount: "{count} résultats",
+      taskCount: "{count} actions",
+      pendingNow: "{count} en attente",
+      recentCount: "{count} plus récents",
+      deviceCount: "{count} appareils enregistrés",
+      pageRange: "{from}–{to} sur {total}",
+    },
     app: {
       title: "CleanHub POS",
       description: "Caisse magasin CleanHub",

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { KeyboardEvent } from "react";
 import type { PosOrderSummary } from "@cleanhub/api-client";
-import type { SupportedLocale } from "@cleanhub/i18n";
+import { createTranslator, type SupportedLocale } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Table,
@@ -253,11 +253,8 @@ function parseVisibleColumns(value: string | null): Set<OrderColumnKey> {
 }
 
 function formatOrderItemCount(count: number, locale: SupportedLocale): string {
-  if (locale === "en") {
-    return `${count} ${count === 1 ? "item" : "items"}`;
-  }
-  if (locale === "fr") {
-    return `${count} article${count === 1 ? "" : "s"}`;
-  }
-  return `${count} 个条目`;
+  return createTranslator({ locale })(
+    count === 1 ? "pos.inline.entryCountOne" : "pos.inline.entryCount",
+    { count },
+  );
 }
