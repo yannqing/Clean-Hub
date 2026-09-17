@@ -38,14 +38,16 @@ export default async function TenantPaymentSettingsPage() {
     integrations = await getTenantPaymentIntegrationsQuery(options);
   } catch (error) {
     integrations = [...EMPTY_INTEGRATIONS];
-    loadError = error instanceof Error ? error.message : "支付设置加载失败。";
+    loadError = error instanceof Error
+        ? error.message
+        : "Payment settings failed to load.";
   }
 
   const branchResult = await getBranchListQuery({}, options)
     .then((branches) => ({ branches, error: undefined }))
     .catch((error: unknown) => ({
       branches: undefined,
-      error: error instanceof Error ? error.message : "门店列表加载失败。",
+      error: error instanceof Error ? error.message : "Branch list failed to load.",
     }));
 
   // Mirrors findEnabledTenantPaymentProviders on the API: a provider only

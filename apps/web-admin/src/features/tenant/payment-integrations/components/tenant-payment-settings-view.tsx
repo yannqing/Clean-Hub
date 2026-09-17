@@ -17,7 +17,7 @@ import {
 import { useState } from "react";
 
 import { useTenantSettingsWorkspace } from "@/features/tenant/settings/components";
-import { useTenantI18n } from "@/i18n";
+import { interpolate, useTenantI18n } from "@/i18n";
 
 import {
   configureOrangeMoneyPaymentIntegrationAction,
@@ -43,21 +43,11 @@ const EMPTY_FORM: ProviderForm = {
   merchantKey: "",
 };
 
-const PROVIDER_DETAILS = {
-  wave: {
-    name: "Wave",
-    description:
-      "使用 Wave Business Checkout API 创建并核对门店移动支付。API Key 必须拥有 Checkout API 权限。",
-  },
-  orange_money: {
-    name: "Orange Money",
-    description:
-      "使用 Orange Money Web Payment 商户凭据。验证会检查 Orange OAuth Client ID 与 Client Secret。",
-  },
-} satisfies Record<
-  TenantPaymentProvider,
-  { name: string; description: string }
->;
+/** Brand names only; the descriptions live in the catalogue. */
+const PROVIDER_NAMES = {
+  wave: "Wave",
+  orange_money: "Orange Money",
+} satisfies Record<TenantPaymentProvider, string>;
 
 function replaceIntegration(
   integrations: TenantPaymentIntegrationSummary[],
@@ -92,7 +82,8 @@ export function TenantPaymentSettingsView({
   loadError?: string | null;
 }) {
   const { canUpdateSettings } = useTenantSettingsWorkspace();
-  const { formatDateTime } = useTenantI18n();
+  const { formatDateTime, m } = useTenantI18n();
+  const copy = m.settings.paymentIntegrations;
   const [integrations, setIntegrations] = useState(initialIntegrations);
   const [editingProvider, setEditingProvider] =
     useState<TenantPaymentProvider | null>(null);
@@ -147,7 +138,9 @@ export function TenantPaymentSettingsView({
     }));
     setEditingProvider(null);
     toast.success(
-      `${PROVIDER_DETAILS[integration.provider].name} 已验证并保存。`,
+      interpolate(copy.savedAndVerified, {
+        provider: PROVIDER_NAMES[integration.provider],
+      }),
     );
   }
 
@@ -161,11 +154,17 @@ export function TenantPaymentSettingsView({
     }
     setIntegrations((current) => replaceIntegration(current, result.data));
     if (result.data.verificationStatus === "verified") {
-      toast.success(`${PROVIDER_DETAILS[provider].name} API 验证成功。`);
+      toast.success(
+        interpolate(copy.verifySucceeded, {
+          provider: PROVIDER_NAMES[provider],
+        }),
+      );
     } else {
       toast.error(
         result.data.lastVerificationError ??
-          `${PROVIDER_DETAILS[provider].name} API 验证失败。`,
+          interpolate(copy.verifyFailed, {
+            provider: PROVIDER_NAMES[provider],
+          }),
       );
     }
   }
@@ -185,13 +184,15 @@ export function TenantPaymentSettingsView({
       return;
     }
     setIntegrations((current) => replaceIntegration(current, result.data));
-    toast.success(enabled ? "POS 移动支付已启用。" : "POS 移动支付已停用。");
+    toast.success(enabled ? copy.posEnabledToast : copy.posDisabledToast);
   }
 
   async function remove(provider: TenantPaymentProvider) {
     if (
       !window.confirm(
-        `确定解除 ${PROVIDER_DETAILS[provider].name} 绑定吗？POS 将立即停止使用该渠道。`,
+        interpolate(copy.removeConfirm, {
+          provider: PROVIDER_NAMES[provider],
+        }),
       )
     ) {
       return;
@@ -207,7 +208,9 @@ export function TenantPaymentSettingsView({
       replaceIntegration(current, blankIntegration(provider)),
     );
     setEditingProvider(null);
-    toast.success(`${PROVIDER_DETAILS[provider].name} 已解除绑定。`);
+    toast.success(
+      interpolate(copy.unbound, { provider: PROVIDER_NAMES[provider] }),
+    );
   }
 
   return (
@@ -219,12 +222,10 @@ export function TenantPaymentSettingsView({
           </span>
           <div>
             <h2 className="text-sm font-semibold text-slate-950">
-              POS 移动支付准入
+              {copy.title}
             </h2>
             <p className="mt-1 text-[13px] leading-5 text-slate-500">
-              只有 API 凭据验证成功并明确开启的渠道，才会出现在 POS
-              的“移动支付”和“混合支付”中。密钥仅加密保存在服务端，不会返回到浏览器或
-              POS。
+              {copy.description}
             </p>
           </div>
         </div>
@@ -235,14 +236,13 @@ export function TenantPaymentSettingsView({
         ) : null}
         {!canUpdateSettings ? (
           <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 sm:px-5">
-            Manager 可以查看状态，只有租户 Owner
-            可以保存凭据、验证或启停支付渠道。
+            {copy.permissionHint}
           </div>
         ) : null}
       </section>
 
       {integrations.map((integration) => {
-        const details = PROVIDER_DETAILS[integration.provider];
+        const providerName = PROVIDER_NAMES[integration.provider];
         const editing =
           editingProvider === integration.provider || !integration.configured;
         const busy = busyProvider === integration.provider;
@@ -268,7 +268,7 @@ export function TenantPaymentSettingsView({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <h2 className="text-sm font-semibold text-slate-950">
-                      {details.name}
+                      {providerName}
                     </h2>
                     <Badge
                       variant={
@@ -280,25 +280,29 @@ export function TenantPaymentSettingsView({
                       }
                     >
                       {verified
-                        ? "已验证"
+                        ? copy.verified
                         : integration.configured
-                          ? "验证失效"
-                          : "未绑定"}
+                          ? copy.verificationStale
+                          : copy.notBound}
                     </Badge>
                   </div>
                   <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
-                    {details.description}
+                    {integration.provider === "wave"
+                      ? copy.waveDescription
+                      : copy.orangeDescription}
                   </p>
                 </div>
               </div>
 
               <div className="flex shrink-0 items-center gap-3">
                 <span className="text-xs font-medium text-slate-700">
-                  在 POS 启用
+                  {copy.enableInPos}
                 </span>
                 <button
                   aria-checked={integration.posEnabled}
-                  aria-label={`在 POS 启用 ${details.name}`}
+                  aria-label={interpolate(copy.enableInPosAria, {
+                    provider: providerName,
+                  })}
                   className={`relative h-7 w-12 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-not-allowed disabled:opacity-40 ${
                     integration.posEnabled ? "bg-emerald-600" : "bg-slate-300"
                   }`}
@@ -324,13 +328,13 @@ export function TenantPaymentSettingsView({
             {integration.configured ? (
               <div className="grid gap-3 border-b border-black/10 bg-slate-50/60 px-4 py-3 text-xs text-slate-600 sm:grid-cols-3 sm:px-5">
                 <div>
-                  <span className="block text-slate-400">凭据</span>
+                  <span className="block text-slate-400">{copy.credentials}</span>
                   <strong className="mt-0.5 block font-mono font-medium text-slate-700">
                     {integration.credentialHint}
                   </strong>
                 </div>
                 <div>
-                  <span className="block text-slate-400">最近验证</span>
+                  <span className="block text-slate-400">{copy.lastVerified}</span>
                   <strong className="mt-0.5 block font-medium text-slate-700">
                     {integration.verifiedAt
                       ? formatDateTime(integration.verifiedAt)
@@ -338,14 +342,14 @@ export function TenantPaymentSettingsView({
                   </strong>
                 </div>
                 <div>
-                  <span className="block text-slate-400">POS 状态</span>
+                  <span className="block text-slate-400">{copy.posStatus}</span>
                   <strong className="mt-0.5 flex items-center gap-1 font-medium text-slate-700">
                     {integration.posEnabled ? (
                       <CheckCircle2 className="size-3.5 text-emerald-600" />
                     ) : (
                       <CircleAlert className="size-3.5 text-slate-400" />
                     )}
-                    {integration.posEnabled ? "已启用" : "未启用"}
+                    {integration.posEnabled ? copy.enabled : copy.disabled}
                   </strong>
                 </div>
               </div>
@@ -361,7 +365,9 @@ export function TenantPaymentSettingsView({
               <div className="grid gap-4 p-4 sm:p-5">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                   <KeyRound aria-hidden className="size-4" />
-                  {integration.configured ? "更新 API 凭据" : "绑定 API 凭据"}
+                  {integration.configured
+                      ? copy.updateCredentials
+                      : copy.bindCredentials}
                 </div>
                 {integration.provider === "wave" ? (
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -380,7 +386,7 @@ export function TenantPaymentSettingsView({
                     </div>
                     <div className="grid gap-2 sm:col-span-2">
                       <Label htmlFor="wave-signing-secret">
-                        Request Signing Secret（如已启用签名）
+                        {copy.signingSecretLabel}
                       </Label>
                       <Input
                         autoComplete="new-password"
@@ -455,8 +461,7 @@ export function TenantPaymentSettingsView({
                   </div>
                 )}
                 <p className="text-xs leading-5 text-slate-500">
-                  保存时会立即连接支付服务商进行验证。验证失败不会替换当前有效凭据，也不能开启
-                  POS 移动支付。
+                  {copy.saveHint}
                 </p>
                 <div className="flex flex-wrap justify-end gap-2">
                   {integration.configured ? (
@@ -466,7 +471,7 @@ export function TenantPaymentSettingsView({
                       type="button"
                       variant="outline"
                     >
-                      取消
+                      {copy.cancel}
                     </Button>
                   ) : null}
                   <Button
@@ -474,7 +479,7 @@ export function TenantPaymentSettingsView({
                     onClick={() => void configure(integration)}
                     type="button"
                   >
-                    {busy ? "正在验证…" : "保存并验证"}
+                    {busy ? copy.verifying : copy.saveAndVerify}
                   </Button>
                 </div>
               </div>
@@ -488,7 +493,7 @@ export function TenantPaymentSettingsView({
                   variant="outline"
                 >
                   <KeyRound aria-hidden className="size-4" />
-                  更新凭据
+                  {copy.updateCredential}
                 </Button>
                 <Button
                   disabled={busy}
@@ -501,7 +506,7 @@ export function TenantPaymentSettingsView({
                     aria-hidden
                     className={`size-4 ${busy ? "animate-spin" : ""}`}
                   />
-                  重新验证
+                  {copy.reverify}
                 </Button>
                 <Button
                   disabled={busy}
@@ -511,7 +516,7 @@ export function TenantPaymentSettingsView({
                   variant="destructive"
                 >
                   <Trash2 aria-hidden className="size-4" />
-                  解除绑定
+                  {copy.unbind}
                 </Button>
               </div>
             ) : null}

@@ -10,7 +10,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "smoke:nav-visibility": "tsx src/config/feature-visibility.smoke.ts",
-    "smoke:audit-events": "tsx src/features/audit/event-description.smoke.ts"
+    "smoke:audit-events": "tsx src/features/audit/event-description.smoke.ts",
+    "smoke:i18n-parity": "tsx src/i18n/parity.smoke.ts"
   },
   "dependencies": {
     "@cleanhub/api-client": "workspace:*",

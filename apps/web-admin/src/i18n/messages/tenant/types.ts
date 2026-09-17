@@ -2214,6 +2214,42 @@ export type TenantMessages = {
   };
 
   settings: {
+    paymentIntegrations: {
+      unbind: string;
+      savedAndVerified: string;
+      unbound: string;
+      enableInPosAria: string;
+      title: string;
+      description: string;
+      permissionHint: string;
+      waveDescription: string;
+      orangeDescription: string;
+      verified: string;
+      verificationStale: string;
+      notBound: string;
+      enableInPos: string;
+      credentials: string;
+      lastVerified: string;
+      posStatus: string;
+      enabled: string;
+      disabled: string;
+      updateCredentials: string;
+      bindCredentials: string;
+      signingSecretLabel: string;
+      saveHint: string;
+      cancel: string;
+      verifying: string;
+      saveAndVerify: string;
+      updateCredential: string;
+      reverify: string;
+      verifySucceeded: string;
+      verifyFailed: string;
+      posEnabledToast: string;
+      posDisabledToast: string;
+      removeConfirm: string;
+      loadError: string;
+      branchLoadError: string;
+    };
     eyebrow: string;
     description: string;
     navigation: {
