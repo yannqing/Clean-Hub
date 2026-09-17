@@ -464,22 +464,22 @@ function RevenueComparisonChart({
     {
       color: CHART_COLORS.orders,
       displayValue: formatCompactCurrency(totalAmount, locale),
-      label: "今日销售额",
-      shortLabel: "销售额",
+      label: posMessage("pos.chart.salesToday"),
+      shortLabel: posMessage("pos.chart.salesShort"),
       value: totalAmount,
     },
     {
       color: CHART_COLORS.paid,
       displayValue: formatCompactCurrency(paidAmount, locale),
-      label: "已收金额",
-      shortLabel: "已收",
+      label: posMessage("pos.chart.collected"),
+      shortLabel: posMessage("pos.chart.collectedShort"),
       value: paidAmount,
     },
     {
       color: CHART_COLORS.muted,
       displayValue: formatCompactCurrency(unpaidAmount, locale),
-      label: "未收金额",
-      shortLabel: "未收",
+      label: posMessage("pos.chart.outstanding"),
+      shortLabel: posMessage("pos.chart.outstandingShort"),
       value: unpaidAmount,
     },
   ];
@@ -538,29 +538,29 @@ function OrderStructureChart({
     {
       color: CHART_COLORS.orders,
       displayValue: formatNumber(orderCount, locale),
-      label: "今日订单数",
-      shortLabel: "订单",
+      label: posMessage("pos.chart.ordersToday"),
+      shortLabel: posMessage("pos.chart.ordersShort"),
       value: orderCount,
     },
     {
       color: CHART_COLORS.paid,
       displayValue: formatNumber(deliveredCount, locale),
-      label: "已完成订单",
-      shortLabel: "完成",
+      label: posMessage("pos.chart.completedOrders"),
+      shortLabel: posMessage("pos.chart.completedShort"),
       value: deliveredCount,
     },
     {
       color: CHART_COLORS.risk,
       displayValue: formatNumber(unpaidCount, locale),
-      label: "待收款订单",
-      shortLabel: "待收",
+      label: posMessage("pos.chart.unpaidOrders"),
+      shortLabel: posMessage("pos.chart.unpaidShort"),
       value: unpaidCount,
     },
     {
       color: CHART_COLORS.muted,
       displayValue: formatNumber(cancelledCount, locale),
-      label: "已取消订单",
-      shortLabel: "取消",
+      label: posMessage("pos.chart.cancelledOrders"),
+      shortLabel: posMessage("pos.chart.cancelledShort"),
       value: cancelledCount,
     },
   ];
@@ -686,7 +686,7 @@ function DonutChart({
             color: "var(--muted)",
             displayValue: valueFormatter(0),
             helper: undefined,
-            label: "暂无数据",
+            label: posMessage("pos.chart.noData"),
             value: 1,
           },
         ];
@@ -797,12 +797,12 @@ function BusinessStructureChart({
   const customerChartData = [
     {
       color: CHART_COLORS.customers,
-      label: "存量客户",
+      label: posMessage("pos.chart.existingCustomers"),
       value: existingCustomerCount,
     },
     {
       color: CHART_COLORS.paid,
-      label: "今日新增客户",
+      label: posMessage("pos.chart.newCustomersToday"),
       value: todayNewCustomerCount,
     },
   ];

@@ -8,6 +8,7 @@ import type {
   PosOrderSummary,
   ServiceTicketSummary,
 } from "@cleanhub/api-client";
+import type { TranslationKey } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { PosBreadcrumb, PosDetailPageSkeleton } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
@@ -62,13 +63,17 @@ type CustomerDetailViewProps = {
 
 type DetailTab = "overview" | "tickets" | "orders" | "items" | "notes";
 
-const TAB_LABELS: Record<DetailTab, string> = {
-  overview: "概览",
-  tickets: "工单管理",
-  orders: "订单管理",
-  items: "服务项目",
-  notes: "备注",
-};
+const DETAIL_TABS = [
+  "overview",
+  "tickets",
+  "orders",
+  "items",
+  "notes",
+] as const satisfies ReadonlyArray<DetailTab>;
+
+function tabLabel(tab: DetailTab): string {
+  return posMessage(`pos.customerDetail.tab.${tab}` as TranslationKey);
+}
 
 export function CustomerDetailView({
   customerId,
@@ -271,20 +276,24 @@ export function CustomerDetailView({
         <div className="grid grid-cols-2 sm:grid-cols-4">
           {[
             {
-              label: "账户余额",
+              label: posMessage("pos.customerDetail.balanceLabel"),
               value: formatPosMoney(0, currency, locale),
-              hint: "暂未实现",
+              hint: posMessage("pos.customerDetail.balanceHint"),
             },
             {
-              label: "历史工单",
+              label: posMessage("pos.customerDetail.ticketsLabel"),
               value: String(activeTicketCount),
-              hint: "工单总数",
+              hint: posMessage("pos.customerDetail.ticketsHint"),
             },
-            { label: "历史订单", value: String(orderCount), hint: "订单总数" },
             {
-              label: "累计消费",
+              label: posMessage("pos.customerDetail.ordersLabel"),
+              value: String(orderCount),
+              hint: posMessage("pos.customerDetail.ordersHint"),
+            },
+            {
+              label: posMessage("pos.customerDetail.spendLabel"),
               value: formatMoney(totalPaid, locale, currency),
-              hint: "已支付总额",
+              hint: posMessage("pos.customerDetail.spendHint"),
             },
           ].map((metric) => (
             <div
@@ -317,7 +326,7 @@ export function CustomerDetailView({
           </div>
         </div>
         <div className="pos-scrollbar flex overflow-x-auto border-t px-4">
-          {(Object.keys(TAB_LABELS) as DetailTab[]).map((tabKey) => (
+          {DETAIL_TABS.map((tabKey) => (
             <button
               className={`relative h-10 shrink-0 px-3 text-sm font-semibold ${
                 tab === tabKey
@@ -328,7 +337,7 @@ export function CustomerDetailView({
               type="button"
               onClick={() => setTab(tabKey)}
             >
-              {TAB_LABELS[tabKey]}
+              {tabLabel(tabKey)}
               {tab === tabKey ? (
                 <span className="absolute inset-x-3 bottom-0 h-0.5 bg-foreground" />
               ) : null}
@@ -724,7 +733,7 @@ function RecentActivity({
     ...tickets
       .slice(0, 3)
       .map<ActivityItem & { timestamp: string }>((ticket) => ({
-        title: "工单创建",
+        title: posMessage("pos.customerDetail.ticketCreated"),
         detail: `${getTicketTypeLabel(ticket.ticketType)} · ${posMessage(
           "pos.inline.projectCount",
           { count: ticket.itemCount },
@@ -738,7 +747,7 @@ function RecentActivity({
     ...orders
       .slice(0, 3)
       .map<ActivityItem & { timestamp: string }>((order) => ({
-        title: "订单记录",
+        title: posMessage("pos.customerDetail.orderRecord"),
         detail: `${getOrderTypeLabel(order.orderType)} · ${getOrderPaymentStatusLabel(order.paymentStatus)}`,
         time: formatDateShort(order.createdAt, locale, timeZone),
         timestamp: order.createdAt,

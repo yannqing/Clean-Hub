@@ -1,5 +1,6 @@
 "use client";
 
+import type { TranslationKey } from "@cleanhub/i18n";
 import type { PosReceiptDelivery } from "@cleanhub/api-client";
 import {
   Badge,
@@ -15,20 +16,7 @@ import { useEffect, useState } from "react";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 import { posToast as toast } from "@/lib/pos-toast";
-
-const CHANNEL_LABELS: Record<PosReceiptDelivery["channel"], string> = {
-  print: "本地打印",
-  email: "电子邮件",
-  sms: "短信",
-  none: "无需小票",
-};
-
-const STATUS_LABELS: Record<PosReceiptDelivery["status"], string> = {
-  pending: "等待发送",
-  sent: "已送达",
-  failed: "发送失败",
-  skipped: "已跳过",
-};
+import { posMessage } from "@/lib/pos-message";
 
 export function ReceiptDeliveryHistory({ orderId }: { orderId: string }) {
   const [deliveries, setDeliveries] = useState<PosReceiptDelivery[]>([]);
@@ -93,14 +81,18 @@ export function ReceiptDeliveryHistory({ orderId }: { orderId: string }) {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <p className="font-semibold">
-                  {CHANNEL_LABELS[delivery.channel]}
+                  {posMessage(
+                    `pos.receiptDelivery.channel.${delivery.channel}` as TranslationKey,
+                  )}
                 </p>
                 <Badge
                   variant={
                     delivery.status === "failed" ? "destructive" : "secondary"
                   }
                 >
-                  {STATUS_LABELS[delivery.status]}
+                  {posMessage(
+                    `pos.receiptDelivery.status.${delivery.status}` as TranslationKey,
+                  )}
                 </Badge>
               </div>
               {delivery.destination ? (

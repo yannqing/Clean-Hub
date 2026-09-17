@@ -174,7 +174,7 @@ function PaymentChart({
             color: CHART_COLORS.paid,
             displayValue: formatCurrency(paidAmount, locale, currency),
             helper: percentLabel,
-            label: "已收款",
+            label: posMessage("pos.chart.paidLabel"),
             value: paidAmount,
           },
           {
@@ -183,7 +183,7 @@ function PaymentChart({
             helper: posMessage("pos.inline.unpaidOrdersHelper", {
               value: formatOrderUnitCount(unpaidCount, locale),
             }),
-            label: "待收款",
+            label: posMessage("pos.chart.unpaidLabel"),
             value: unpaidAmount,
           },
         ]
@@ -191,7 +191,7 @@ function PaymentChart({
           {
             color: "#e2e8f0",
             displayValue: formatCurrency(0, locale, currency),
-            label: "暂无收款",
+            label: posMessage("pos.chart.noPayments"),
             value: 1,
           },
         ];
@@ -290,7 +290,7 @@ function TicketBars({
         total > 0
           ? formatPercent((todayCreatedCount / total) * 100, locale)
           : "0%",
-      label: "今日新建",
+      label: posMessage("pos.chart.createdToday"),
       value: todayCreatedCount,
     },
     {
@@ -300,7 +300,7 @@ function TicketBars({
         total > 0
           ? formatPercent((todayPickedUpCount / total) * 100, locale)
           : "0%",
-      label: "今日取件",
+      label: posMessage("pos.chart.pickedUpToday"),
       value: todayPickedUpCount,
     },
     {
@@ -308,7 +308,7 @@ function TicketBars({
       displayValue: formatNumber(overdueCount, locale),
       helper:
         total > 0 ? formatPercent((overdueCount / total) * 100, locale) : "0%",
-      label: "逾期工单",
+      label: posMessage("pos.chart.overdueTickets"),
       value: overdueCount,
     },
   ];
@@ -394,14 +394,14 @@ function CustomerGrowth({
             color: CHART_COLORS.customers,
             displayValue: formatNumber(existingCount, locale),
             helper: formatPercent(100 - newCustomerPercent, locale),
-            label: "存量客户",
+            label: posMessage("pos.chart.existingCustomers"),
             value: existingCount,
           },
           {
             color: CHART_COLORS.paid,
             displayValue: formatNumber(todayNewCount, locale),
             helper: formatPercent(newCustomerPercent, locale),
-            label: "今日新增",
+            label: posMessage("pos.chart.newToday"),
             value: todayNewCount,
           },
         ]
@@ -409,7 +409,7 @@ function CustomerGrowth({
           {
             color: "#e2e8f0",
             displayValue: formatNumber(0, locale),
-            label: "暂无客户",
+            label: posMessage("pos.chart.noCustomers"),
             value: 1,
           },
         ];
