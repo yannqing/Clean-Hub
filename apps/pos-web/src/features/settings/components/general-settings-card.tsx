@@ -21,7 +21,7 @@ export function GeneralSettingsCard({
 }: GeneralSettingsCardProps) {
   return (
     <section className="bg-background lg:overflow-hidden lg:rounded-xl lg:border lg:border-black/10 lg:shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-      <header className="pb-7 lg:border-b lg:px-4 lg:py-3">
+      <header className="pt-5 pb-7 lg:border-b lg:px-4 lg:py-3">
         <div className="flex items-center gap-2">
           <Icon
             className="hidden h-4 w-4 text-muted-foreground lg:block"

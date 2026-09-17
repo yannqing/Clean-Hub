@@ -186,7 +186,14 @@ export function SettingsWorkspace({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <main className="min-w-0">
+        {/*
+          The desktop layout supplies its gutter through the section's
+          `lg:px-5`, and every settings card pads itself with `lg:px-4`. Below
+          that breakpoint none of it applies, so the content sat flush against
+          both screen edges on a phone. The gutter lives here rather than on
+          each card so every settings page gets it.
+        */}
+        <main className="min-w-0 px-4 lg:px-0">
           <div className="mb-4 hidden min-h-10 items-start justify-between gap-4 px-1 lg:flex">
             <div className="flex min-w-0 items-start gap-2">
               <Icon
