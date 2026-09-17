@@ -16,6 +16,7 @@ import {
 } from "@cleanhub/ui";
 
 import { posRoutes } from "@/config";
+import { posMessage } from "@/lib/pos-message";
 
 import { deleteTicketAction } from "../actions";
 
@@ -49,7 +50,11 @@ export function TicketDeleteDialog({
     startTransition(async () => {
       const result = await deleteTicketAction(ticketId, normalizedReason);
       if (result.ok) {
-        toast.success(`工单 ${ticketNo ?? ""} 已删除`);
+        toast.success(
+          posMessage("pos.inline.ticketDeleted", {
+            ticketNo: ticketNo ?? "",
+          }),
+        );
         router.replace(posRoutes.tickets);
       } else if (result.code === "VERSION_CONFLICT") {
         toast.error("该工单已被他人修改，正在刷新…");

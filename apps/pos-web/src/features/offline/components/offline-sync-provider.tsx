@@ -24,6 +24,7 @@ import { getPosOfflineStorage } from "@/features/hardware/lib/desktop-bridge";
 import { replayCurrentPosOfflineQueueItem } from "@/features/offline/lib/replay-pos-offline-queue-item";
 import { summarizePosOfflineQueueItems } from "@/features/offline/lib/pos-offline-operations";
 import { verifyPosTerminalSession } from "@/features/terminal-setup/session-health";
+import { posMessage } from "@/lib/pos-message";
 import {
   isPosTerminalSessionInvalidated,
   POS_TERMINAL_SESSION_INVALIDATED_EVENT,
@@ -61,7 +62,9 @@ function getQuarantineWarning(pendingCount: number): string | null {
     return null;
   }
 
-  return `检测到 ${pendingCount} 条待同步记录属于其他门店、其他用户或不同的终端凭证版本。为避免数据错归，系统已将其隔离且不会自动重放，请联系管理员处理。`;
+  return posMessage("pos.inline.offlineScopeMismatch", {
+    count: pendingCount,
+  });
 }
 
 async function runWithOfflineReplayLock(
@@ -279,7 +282,9 @@ export function OfflineSyncProvider({
         ) {
           setSyncError(
             result.failed[0]?.lastError ??
-              `${result.failed.length} 条记录同步失败。`,
+              posMessage("pos.inline.offlineRecordsFailed", {
+                count: result.failed.length,
+              }),
           );
         }
       } catch (replayError) {

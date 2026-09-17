@@ -8,6 +8,7 @@ import { Icon, PosBreadcrumb } from "@/components/app-shell";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import { customerDetailPath } from "@/config";
+import { posMessage } from "@/lib/pos-message";
 
 import {
   CUSTOMER_COLUMN_KEYS,
@@ -296,7 +297,9 @@ export function CustomersView({
             <Icon className="size-[19px]" name="users" />
             <span className="truncate">
               {currentAccount
-                ? `${currentAccount.accountName}的客户档案`
+                ? posMessage("pos.inline.accountProfilesTitle", {
+                    account: currentAccount.accountName,
+                  })
                 : "客户"}
             </span>
           </h1>

@@ -20,6 +20,7 @@ import { useCallback } from "react";
 
 import { posApi } from "@/lib/api-client";
 import { isPosTerminalSessionInvalidated } from "@/lib/pos-terminal-session";
+import { posMessage } from "@/lib/pos-message";
 
 import { useOfflineSync } from "../components/offline-sync-provider";
 import {
@@ -110,7 +111,9 @@ export function usePosOfflineWrites() {
       if (dependencyState.blockedOperationId) {
         throw new Error(
           dependencyState.lastError
-            ? `上游离线数据同步失败：${dependencyState.lastError}`
+            ? posMessage("pos.inline.upstreamSyncFailed", {
+                reason: dependencyState.lastError,
+              })
             : "上游离线数据尚未正确同步，请先处理同步队列后再继续。",
         );
       }
@@ -411,7 +414,9 @@ function assertDependencyUsable(
 
   throw new Error(
     dependency.lastError
-      ? `上游离线数据同步失败：${dependency.lastError}`
+      ? posMessage("pos.inline.upstreamSyncFailed", {
+          reason: dependency.lastError,
+        })
       : "上游离线数据尚未正确同步，请先处理同步队列后再继续。",
   );
 }

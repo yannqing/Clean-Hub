@@ -3,6 +3,8 @@
 import { CUSTOMER_STATUS_META } from "../constants";
 import type { PosCustomerStatus } from "../types";
 
+import { posMessage } from "@/lib/pos-message";
+
 type CustomerStatusSwitchProps = {
   status: PosCustomerStatus;
   kind: "account" | "profile";
@@ -27,11 +29,21 @@ export function CustomerStatusSwitch({
     <div className="flex items-center gap-2">
       <button
         aria-checked={enabled}
-        aria-label={`${enabled ? "停用" : "启用为正常"}${kind === "account" ? "客户账户" : "客户档案"}`}
+        aria-label={posMessage(
+          kind === "account"
+            ? enabled
+              ? "pos.inline.toggleCustomerAccount"
+              : "pos.inline.toggleCustomerAccountOn"
+            : enabled
+              ? "pos.inline.toggleCustomerProfile"
+              : "pos.inline.toggleCustomerProfileOn",
+        )}
         className="flex h-11 w-14 shrink-0 items-center justify-center rounded-md disabled:cursor-not-allowed disabled:opacity-50"
         disabled={disabled}
         role="switch"
-        title={`点击${enabled ? "停用" : "启用为正常"}`}
+        title={posMessage(
+          enabled ? "pos.inline.clickToDisable" : "pos.inline.clickToEnable",
+        )}
         type="button"
         onClick={onToggle}
       >

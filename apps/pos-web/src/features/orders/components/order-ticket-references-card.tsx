@@ -12,6 +12,7 @@ import Link from "next/link";
 
 import { Icon } from "@/components/app-shell";
 import { posRoutes } from "@/config";
+import { posMessage } from "@/lib/pos-message";
 
 import {
   getTicketPriorityLabel,
@@ -48,7 +49,9 @@ export function OrderTicketReferencesCard({
           <CardTitle>关联工单</CardTitle>
           <CardDescription className="mt-1 text-xs">
             {ticketReferences.length > 1
-              ? `本单合并结算了 ${ticketReferences.length} 张工单，以下为受理时记录的信息。`
+              ? posMessage("pos.inline.mergedTicketsNote", {
+                  count: ticketReferences.length,
+                })
               : "以下为受理时记录的信息，不随工单后续修改而变化。"}
           </CardDescription>
         </div>

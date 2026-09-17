@@ -11,6 +11,8 @@ import type { AsyncKeyValueStorage } from "@cleanhub/offline";
 import type { PosHardwareBridge } from "./desktop-bridge";
 import { getPosOfflineStorage } from "./desktop-bridge";
 
+import { posMessage } from "@/lib/pos-message";
+
 type DrawerHardware = Pick<
   PosHardwareBridge,
   "getCapabilities" | "openCashDrawer"
@@ -32,7 +34,7 @@ export type CashPaymentDrawerOutcome =
 function optionalString(value: unknown, label: string): string | undefined {
   if (value === undefined || value === null || value === "") return undefined;
   if (typeof value !== "string" || !value.trim()) {
-    throw new Error(`${label} 配置无效。`);
+    throw new Error(posMessage("pos.inline.drawerConfigInvalid", { label }));
   }
   return value.trim();
 }
@@ -43,7 +45,7 @@ function optionalPulseNumber(
 ): number | undefined {
   if (value === undefined || value === null || value === "") return undefined;
   if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error(`${label} 配置必须是数字。`);
+    throw new Error(posMessage("pos.inline.drawerConfigNotNumber", { label }));
   }
   return value;
 }

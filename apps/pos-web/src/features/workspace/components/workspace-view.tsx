@@ -9,6 +9,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import type { PosSessionUser } from "@/lib/session";
 import { Icon } from "@/components/app-shell/icons";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
+import { posMessage } from "@/lib/pos-message";
 import { WorkspaceBranchCard } from "./workspace-branch-card";
 import { WorkspaceStatistics } from "./workspace-statistics";
 import { WorkspaceQuickActions } from "./workspace-quick-actions";
@@ -57,7 +58,11 @@ export function WorkspaceView({
           />
           <div className="min-w-0">
             <h1 className="truncate text-xl font-semibold tracking-tight">
-              {user ? `欢迎回来，${user.displayName}` : "工作台"}
+              {user
+                ? posMessage("pos.inline.welcomeBack", {
+                    name: user.displayName,
+                  })
+                : "工作台"}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               今日事，今日毕。按轻重缓急，稳妥完成每一次接待与交付。

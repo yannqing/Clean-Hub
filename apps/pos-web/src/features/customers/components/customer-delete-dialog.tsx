@@ -1,6 +1,7 @@
 "use client";
 
 import { posToast as toast } from "@/lib/pos-toast";
+import { posMessage } from "@/lib/pos-message";
 import { useState } from "react";
 
 import {
@@ -44,7 +45,9 @@ export function CustomerDeleteDialog({
   const isAccount = kind === "account";
   const warning =
     isAccount && linkedCount > 0
-      ? `该账户关联 ${linkedCount} 个客户档案。删除账户会同时删除这些档案，此操作不可恢复。`
+      ? posMessage("pos.inline.deleteAccountWarning", {
+          count: linkedCount,
+        })
       : "删除后该数据将不再出现在查询结果中，此操作不可恢复。";
 
   async function handleConfirm() {

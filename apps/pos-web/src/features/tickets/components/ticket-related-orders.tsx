@@ -3,6 +3,7 @@
 import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
+import { posMessage } from "@/lib/pos-message";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@cleanhub/ui";
 
 import {
@@ -94,7 +95,12 @@ export function TicketRelatedOrders({
                   <div className="mt-2 rounded-md bg-muted/60 px-2.5 py-2 text-xs leading-5 text-muted-foreground">
                     该订单合并结算了 {order.settledTicketCount} 张工单，上方金额为订单总额。
                     {order.ticketAmount
-                      ? `本工单占 ${formatTicketMoney(order.ticketAmount, order.currency)}。`
+                      ? posMessage("pos.inline.ticketShareOfOrder", {
+                          amount: formatTicketMoney(
+                            order.ticketAmount,
+                            order.currency,
+                          ),
+                        })
                       : ""}
                   </div>
                 ) : null}
