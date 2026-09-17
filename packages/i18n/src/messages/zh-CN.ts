@@ -674,6 +674,10 @@ export const zhCNMessages = {
   },
   pos: {
     inline: {
+      colorLabeled: "颜色：{value}",
+      defectLabeled: "瑕疵：{value}",
+      requestLabeled: "要求：{value}",
+      stockCount: "库存 {count}",
       receiptPrinted: "小票已打印。",
       labelPrinted: "标签已打印。",
       reprintReceipt: "重打小票",

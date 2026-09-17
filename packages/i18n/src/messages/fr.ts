@@ -693,6 +693,10 @@ export const frMessages = {
   },
   pos: {
     inline: {
+      colorLabeled: "Couleur : {value}",
+      defectLabeled: "Défaut : {value}",
+      requestLabeled: "Demande : {value}",
+      stockCount: "Stock {count}",
       receiptPrinted: "Reçu imprimé.",
       labelPrinted: "Étiquette imprimée.",
       reprintReceipt: "Réimprimer le reçu",

@@ -155,6 +155,12 @@ export function getPosReceiptCopy(locale: string) {
 const receiptCopy = {
   en: {
     color: "Color",
+    measurement: "Qty",
+    chargedPrice: "Price",
+    standardPrice: "List price",
+    defect: "Defect",
+    specialRequest: "Request",
+    identifier: "Tag no.",
     expectedPickup: "Ready for pickup",
     label: "Tag",
     thankYou: "Thank you",
@@ -164,6 +170,12 @@ const receiptCopy = {
   },
   fr: {
     color: "Couleur",
+    measurement: "Quantité",
+    chargedPrice: "Prix",
+    standardPrice: "Prix courant",
+    defect: "Défaut",
+    specialRequest: "Demande",
+    identifier: "N° étiquette",
     expectedPickup: "Retrait prévu",
     label: "Étiquette",
     thankYou: "Merci",
@@ -177,6 +189,12 @@ const receiptCopy = {
   },
   "zh-CN": {
     color: "颜色",
+    measurement: "计量",
+    chargedPrice: "成交价",
+    standardPrice: "标准价",
+    defect: "瑕疵",
+    specialRequest: "要求",
+    identifier: "标识",
     expectedPickup: "预计取件",
     label: "标签",
     thankYou: "谢谢惠顾",
@@ -188,6 +206,12 @@ const receiptCopy = {
   PrintLocale,
   {
     color: string;
+    measurement: string;
+    chargedPrice: string;
+    standardPrice: string;
+    defect: string;
+    specialRequest: string;
+    identifier: string;
     expectedPickup: string;
     label: string;
     thankYou: string;

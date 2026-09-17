@@ -254,15 +254,15 @@ function buildOrderReceiptContent(
         ? Number(item.weight ?? item.quantity)
         : Number(item.quantity);
     const details = [
-      `计量 ${formatOrderItemMeasurement(item, locale)}`,
-      `成交价 ${formatOrderMoney(item.chargedUnitAmount, order.currency)}`,
+      `${copy.measurement} ${formatOrderItemMeasurement(item, locale)}`,
+      `${copy.chargedPrice} ${formatOrderMoney(item.chargedUnitAmount, order.currency)}`,
       item.standardUnitAmount !== item.chargedUnitAmount
-        ? `标准价 ${formatOrderMoney(item.standardUnitAmount, order.currency)}`
+        ? `${copy.standardPrice} ${formatOrderMoney(item.standardUnitAmount, order.currency)}`
         : null,
-      item.itemColor ? `颜色 ${item.itemColor}` : null,
-      item.defectNotes ? `瑕疵 ${item.defectNotes}` : null,
-      item.specialRequest ? `要求 ${item.specialRequest}` : null,
-      item.itemIdentifier ? `标识 ${item.itemIdentifier}` : null,
+      item.itemColor ? `${copy.color} ${item.itemColor}` : null,
+      item.defectNotes ? `${copy.defect} ${item.defectNotes}` : null,
+      item.specialRequest ? `${copy.specialRequest} ${item.specialRequest}` : null,
+      item.itemIdentifier ? `${copy.identifier} ${item.itemIdentifier}` : null,
     ].filter((value): value is string => Boolean(value));
 
     return {

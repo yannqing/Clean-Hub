@@ -42,6 +42,7 @@ import {
 } from "@cleanhub/ui";
 
 import { Icon } from "@/components/app-shell";
+import { posMessage } from "@/lib/pos-message";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import {
@@ -632,7 +633,9 @@ function OrderItemDialog({
                           {" · "}
                           {formatOrderMoney(product.amount, product.currency)}
                           {product.trackInventory
-                            ? ` · 库存 ${Number(product.availableQuantity ?? 0)}`
+                            ? ` · ${posMessage("pos.inline.stockCount", {
+                                count: Number(product.availableQuantity ?? 0),
+                              })}`
                             : ""}
                         </SelectItem>
                       );
@@ -886,9 +889,15 @@ function ItemHeading({
 
 function IntakeDetails({ item }: { item: PosOrderItem }) {
   const details = [
-    item.itemColor ? `颜色：${item.itemColor}` : null,
-    item.defectNotes ? `瑕疵：${item.defectNotes}` : null,
-    item.specialRequest ? `要求：${item.specialRequest}` : null,
+    item.itemColor
+      ? posMessage("pos.inline.colorLabeled", { value: item.itemColor })
+      : null,
+    item.defectNotes
+      ? posMessage("pos.inline.defectLabeled", { value: item.defectNotes })
+      : null,
+    item.specialRequest
+      ? posMessage("pos.inline.requestLabeled", { value: item.specialRequest })
+      : null,
   ].filter(Boolean);
   return details.length > 0 ? (
     <div className="mt-2 text-xs leading-5 text-muted-foreground">

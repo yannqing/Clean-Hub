@@ -687,6 +687,10 @@ export const enMessages = {
   },
   pos: {
     inline: {
+      colorLabeled: "Color: {value}",
+      defectLabeled: "Defect: {value}",
+      requestLabeled: "Request: {value}",
+      stockCount: "Stock {count}",
       receiptPrinted: "Receipt printed.",
       labelPrinted: "Label printed.",
       reprintReceipt: "Reprint receipt",
