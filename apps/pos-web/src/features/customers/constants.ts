@@ -114,13 +114,6 @@ export const CUSTOMER_TICKET_STATUS_TONES: Record<string, string> = {
 
 // ---- 订单 label maps (local) -----------------------------------------------
 
-export const CUSTOMER_ORDER_STATUS_LABELS: Record<string, string> = {
-  draft: "草稿",
-  received: "已接收",
-  paid: "已支付",
-  delivered: "已交付",
-  cancelled: "已取消",
-};
 
 export const CUSTOMER_ORDER_STATUS_TONES: Record<string, string> = {
   draft: "bg-muted text-muted-foreground",
@@ -130,12 +123,6 @@ export const CUSTOMER_ORDER_STATUS_TONES: Record<string, string> = {
   cancelled: "bg-red-50 text-red-700",
 };
 
-export const CUSTOMER_ORDER_PAYMENT_LABELS: Record<string, string> = {
-  unpaid: "未支付",
-  paid: "已支付",
-  partial: "部分支付",
-  refunded: "已退款",
-};
 
 export const CUSTOMER_ORDER_PAYMENT_TONES: Record<string, string> = {
   unpaid: "bg-red-50 text-red-700",
@@ -144,10 +131,6 @@ export const CUSTOMER_ORDER_PAYMENT_TONES: Record<string, string> = {
   refunded: "bg-muted text-muted-foreground",
 };
 
-export const CUSTOMER_ORDER_TYPE_LABELS: Record<string, string> = {
-  ticket: "工单订单",
-  manual: "手动订单",
-};
 
 // ---- 工单项目（服务项目）label maps (local) ---------------------------------
 // Powers the 服务项目 tab on the customer detail view.

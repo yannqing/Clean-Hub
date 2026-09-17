@@ -10,13 +10,15 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posToast as toast } from "@/lib/pos-toast";
 import { formatPosMoney } from "@/lib/money";
+import {
+  getOrderPaymentStatusLabel,
+  getOrderStatusLabel,
+  getOrderTypeLabel,
+} from "@/lib/order-labels";
 
 import {
-  CUSTOMER_ORDER_PAYMENT_LABELS,
   CUSTOMER_ORDER_PAYMENT_TONES,
-  CUSTOMER_ORDER_STATUS_LABELS,
   CUSTOMER_ORDER_STATUS_TONES,
-  CUSTOMER_ORDER_TYPE_LABELS,
 } from "../constants";
 import { fetchCustomerOrders } from "../queries";
 
@@ -164,23 +166,20 @@ export function CustomerOrderList({
                     </div>
                   </div>
                   <div className="text-foreground">
-                    {CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ??
-                      order.orderType}
+                    {getOrderTypeLabel(order.orderType)}
                   </div>
                   <div>
                     <span
                       className={`rounded-md px-2.5 py-1 text-xs font-semibold ${payTone}`}
                     >
-                      {CUSTOMER_ORDER_PAYMENT_LABELS[order.paymentStatus] ??
-                        order.paymentStatus}
+                      {getOrderPaymentStatusLabel(order.paymentStatus)}
                     </span>
                   </div>
                   <div>
                     <span
                       className={`rounded-md px-2.5 py-1 text-xs font-semibold ${statusTone}`}
                     >
-                      {CUSTOMER_ORDER_STATUS_LABELS[order.status] ??
-                        order.status}
+                      {getOrderStatusLabel(order.status)}
                     </span>
                   </div>
                   <div className="text-right font-semibold text-foreground">
@@ -272,7 +271,7 @@ function CustomerOrderCard({
             {order.id.slice(-8).toUpperCase()}
           </div>
           <div className="mt-1 text-sm font-medium text-foreground">
-            {CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ?? order.orderType}
+            {getOrderTypeLabel(order.orderType)}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {formatDate(order.createdAt, locale, timeZone)}
@@ -281,7 +280,7 @@ function CustomerOrderCard({
         <span
           className={`rounded-md px-2.5 py-1 text-xs font-semibold ${statusTone}`}
         >
-          {CUSTOMER_ORDER_STATUS_LABELS[order.status] ?? order.status}
+          {getOrderStatusLabel(order.status)}
         </span>
       </div>
 
@@ -292,8 +291,7 @@ function CustomerOrderCard({
             <span
               className={`rounded-md px-2.5 py-1 text-xs font-semibold ${payTone}`}
             >
-              {CUSTOMER_ORDER_PAYMENT_LABELS[order.paymentStatus] ??
-                order.paymentStatus}
+              {getOrderPaymentStatusLabel(order.paymentStatus)}
             </span>
           </dd>
         </div>

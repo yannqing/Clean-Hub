@@ -1,19 +1,19 @@
 "use client";
 
 import { Badge, cn } from "@cleanhub/ui";
-import { useTranslation } from "@cleanhub/i18n/react";
 import type {
   PosOrderPaymentStatus,
   PosOrderStatus,
 } from "@cleanhub/api-client";
 import type { ReactNode } from "react";
 
-import { translatePosText } from "@/components/i18n/pos-runtime-text";
+import {
+  getOrderPaymentStatusLabel,
+  getOrderStatusLabel,
+} from "@/lib/order-labels";
 
 import {
-  ORDER_PAYMENT_STATUS_LABELS,
   ORDER_PAYMENT_STATUS_TONES,
-  ORDER_STATUS_LABELS,
   ORDER_STATUS_TONES,
   type BadgeTone,
 } from "../constants";
@@ -49,11 +49,9 @@ export function OrderBadge({
 }
 
 export function OrderStatusBadge({ status }: { status: PosOrderStatus }) {
-  const { locale } = useTranslation();
-
   return (
     <OrderBadge tone={ORDER_STATUS_TONES[status]}>
-      {translatePosText(ORDER_STATUS_LABELS[status], locale)}
+      {getOrderStatusLabel(status)}
     </OrderBadge>
   );
 }
@@ -63,11 +61,9 @@ export function OrderPaymentStatusBadge({
 }: {
   status: PosOrderPaymentStatus;
 }) {
-  const { locale } = useTranslation();
-
   return (
     <OrderBadge tone={ORDER_PAYMENT_STATUS_TONES[status]}>
-      {translatePosText(ORDER_PAYMENT_STATUS_LABELS[status], locale)}
+      {getOrderPaymentStatusLabel(status)}
     </OrderBadge>
   );
 }

@@ -692,6 +692,51 @@ export const frMessages = {
     },
   },
   pos: {
+    order: {
+      title: "Commandes",
+      status: {
+        draft: "Brouillon",
+        received: "En attente de paiement",
+        paid: "Payée",
+        delivered: "Livrée",
+        cancelled: "Annulée",
+      },
+      paymentStatus: {
+        unpaid: "Impayée",
+        partial: "Partiellement payée",
+        paid: "Soldée",
+        refunded: "Remboursée",
+      },
+      type: {
+        ticket: "Commande sur ticket",
+        manual: "Commande manuelle",
+      },
+      paymentMethod: {
+        cash: "Espèces",
+        card: "Carte",
+        app: "Paiement mobile",
+      },
+      transactionStatus: {
+        pending: "En attente",
+        paid: "Payé",
+        refunded: "Remboursé",
+        failed: "Échoué",
+      },
+      sort: {
+        created_desc: "Création : plus récentes",
+        created_asc: "Création : plus anciennes",
+        amount_desc: "Montant : décroissant",
+        amount_asc: "Montant : croissant",
+      },
+      column: {
+        order: "Commande",
+        customer: "Client",
+        amount: "Montant",
+        status: "Statut commande",
+        payment: "Statut paiement",
+        createdAt: "Création",
+      },
+    },
     inline: {
       cardOutcome: "Résultat carte : {outcome}",
       verifyTerminalBeforeRetry: "{reason} Vérifiez le journal des transactions du terminal avant de réessayer ; ne facturez pas deux fois.",

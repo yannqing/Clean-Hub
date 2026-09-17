@@ -686,6 +686,51 @@ export const enMessages = {
     },
   },
   pos: {
+    order: {
+      title: "Orders",
+      status: {
+        draft: "Draft",
+        received: "Awaiting payment",
+        paid: "Paid",
+        delivered: "Delivered",
+        cancelled: "Cancelled",
+      },
+      paymentStatus: {
+        unpaid: "Unpaid",
+        partial: "Partially paid",
+        paid: "Settled",
+        refunded: "Refunded",
+      },
+      type: {
+        ticket: "Ticket order",
+        manual: "Manual order",
+      },
+      paymentMethod: {
+        cash: "Cash",
+        card: "Card",
+        app: "Mobile payment",
+      },
+      transactionStatus: {
+        pending: "Pending",
+        paid: "Paid",
+        refunded: "Refunded",
+        failed: "Failed",
+      },
+      sort: {
+        created_desc: "Created: newest first",
+        created_asc: "Created: oldest first",
+        amount_desc: "Amount: highest first",
+        amount_asc: "Amount: lowest first",
+      },
+      column: {
+        order: "Order",
+        customer: "Customer",
+        amount: "Amount",
+        status: "Order status",
+        payment: "Payment status",
+        createdAt: "Created",
+      },
+    },
     inline: {
       cardOutcome: "Card result: {outcome}",
       verifyTerminalBeforeRetry: "{reason} Check the terminal transaction log before retrying; do not charge twice.",

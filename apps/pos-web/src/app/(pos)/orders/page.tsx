@@ -11,9 +11,9 @@ import type {
 import {
   DEFAULT_ORDER_PAGE_SIZE,
   ORDER_FILTER_KEYS,
-  ORDER_SORT_OPTIONS,
   type OrderDateFilter,
 } from "@/features/orders/constants";
+import { ORDER_SORT_VALUES } from "@/lib/order-labels";
 import {
   OrderMetrics,
   OrdersPageHeader,
@@ -97,7 +97,7 @@ function buildOrderListQuery(
     | OrderDateFilter
     | undefined;
   const rawSort = getParam(params, ORDER_FILTER_KEYS.sort);
-  const sort = ORDER_SORT_OPTIONS.some((option) => option.value === rawSort)
+  const sort = ORDER_SORT_VALUES.some((value) => value === rawSort)
     ? (rawSort as PosOrderSort)
     : "created_desc";
 

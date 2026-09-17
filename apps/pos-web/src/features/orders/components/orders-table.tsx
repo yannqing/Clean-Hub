@@ -19,15 +19,17 @@ import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
+import {
+  getOrderColumnLabel,
+  getOrderTypeLabel,
+} from "@/lib/order-labels";
 
 import {
   displayOrderCode,
   formatOrderDateTime,
   formatOrderMoney,
   ORDER_COLUMN_KEYS,
-  ORDER_COLUMN_LABELS,
   ORDER_FILTER_KEYS,
-  ORDER_TYPE_LABELS,
   type OrderColumnKey,
 } from "../constants";
 import { OrderPagination } from "./order-pagination";
@@ -90,7 +92,7 @@ export function OrdersTable({ orders, total }: OrdersTableProps) {
               {ORDER_COLUMN_KEYS.map((column) =>
                 visibleColumns.has(column) ? (
                   <TableHead key={column}>
-                    {text(ORDER_COLUMN_LABELS[column])}
+                    {getOrderColumnLabel(column)}
                   </TableHead>
                 ) : null,
               )}
@@ -114,7 +116,7 @@ export function OrdersTable({ orders, total }: OrdersTableProps) {
                       {displayOrderCode(order.id)}
                     </span>
                     <span className="mt-0.5 block text-[10px] text-muted-foreground">
-                      {text(ORDER_TYPE_LABELS[order.orderType])}
+                      {getOrderTypeLabel(order.orderType)}
                     </span>
                   </TableCell>
                 ) : null}
@@ -198,7 +200,7 @@ function OrderCard({
             {order.customerName || text("散客")}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            {text(ORDER_TYPE_LABELS[order.orderType])} ·{" "}
+            {getOrderTypeLabel(order.orderType)} ·{" "}
             {formatOrderItemCount(order.itemCount, locale)}
           </div>
         </div>

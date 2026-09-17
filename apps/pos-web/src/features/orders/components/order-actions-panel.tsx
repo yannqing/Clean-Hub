@@ -46,12 +46,12 @@ import { loadPosHardwareDevices } from "@/features/hardware/lib/hardware-device-
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
+import { getOrderStatusLabel } from "@/lib/order-labels";
 
 import { deleteOrderAction, payOrderAction } from "../actions";
 import {
   formatOrderMoney,
   MOBILE_MONEY_PROVIDER_LABELS,
-  ORDER_STATUS_LABELS,
 } from "../constants";
 
 type PaymentOption = "cash" | PosMobileMoneyProvider;
@@ -313,10 +313,10 @@ export function OrderActionsPanel({
         toast.success(
           result.queued
             ? posMessage("pos.inline.statusQueuedOffline", {
-                status: ORDER_STATUS_LABELS[to],
+                status: getOrderStatusLabel(to),
               })
             : posMessage("pos.inline.orderStatusUpdated", {
-                status: ORDER_STATUS_LABELS[to],
+                status: getOrderStatusLabel(to),
               }),
         );
         setSensitiveAction(null);
@@ -598,7 +598,7 @@ export function OrderActionsPanel({
                   {status === "paid" && isZeroTotalReadyForConfirmation
                     ? text("确认零元订单")
                     : posMessage("pos.inline.setStatusTo", {
-                        status: ORDER_STATUS_LABELS[status],
+                        status: getOrderStatusLabel(status),
                       })}
                 </span>
                 <Icon

@@ -673,6 +673,51 @@ export const zhCNMessages = {
     },
   },
   pos: {
+    order: {
+      title: "订单管理",
+      status: {
+        draft: "草稿",
+        received: "待支付",
+        paid: "已付款",
+        delivered: "已交付",
+        cancelled: "已取消",
+      },
+      paymentStatus: {
+        unpaid: "未支付",
+        partial: "部分支付",
+        paid: "已结清",
+        refunded: "已退款",
+      },
+      type: {
+        ticket: "工单订单",
+        manual: "普通订单",
+      },
+      paymentMethod: {
+        cash: "现金",
+        card: "银行卡",
+        app: "移动支付",
+      },
+      transactionStatus: {
+        pending: "待确认",
+        paid: "已支付",
+        refunded: "已退款",
+        failed: "失败",
+      },
+      sort: {
+        created_desc: "创建时间：从新到旧",
+        created_asc: "创建时间：从旧到新",
+        amount_desc: "订单金额：从高到低",
+        amount_asc: "订单金额：从低到高",
+      },
+      column: {
+        order: "订单",
+        customer: "客户",
+        amount: "金额",
+        status: "订单状态",
+        payment: "支付状态",
+        createdAt: "创建时间",
+      },
+    },
     inline: {
       cardOutcome: "刷卡结果：{outcome}",
       verifyTerminalBeforeRetry: "{reason} 请先核对终端交易记录，勿重复收款。",

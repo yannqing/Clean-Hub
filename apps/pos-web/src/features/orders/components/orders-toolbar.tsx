@@ -16,15 +16,21 @@ import {
 
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
+import {
+  getOrderColumnLabel,
+  getOrderPaymentStatusLabel,
+  getOrderSortLabel,
+  getOrderStatusLabel,
+  getOrderTypeLabel,
+  ORDER_PAYMENT_STATUS_VALUES,
+  ORDER_SORT_VALUES,
+  ORDER_STATUS_VALUES,
+  ORDER_TYPE_VALUES,
+} from "@/lib/order-labels";
 
 import {
   ORDER_COLUMN_KEYS,
-  ORDER_COLUMN_LABELS,
   ORDER_FILTER_KEYS,
-  ORDER_PAYMENT_STATUS_OPTIONS,
-  ORDER_SORT_OPTIONS,
-  ORDER_STATUS_OPTIONS,
-  ORDER_TYPE_OPTIONS,
   type OrderColumnKey,
 } from "../constants";
 
@@ -121,9 +127,9 @@ export function OrdersToolbar() {
                 }
                 options={[
                   { value: "", label: text("全部") },
-                  ...ORDER_STATUS_OPTIONS.map((option) => ({
-                    value: option.value,
-                    label: text(option.label),
+                  ...ORDER_STATUS_VALUES.map((value) => ({
+                    value,
+                    label: getOrderStatusLabel(value),
                   })),
                 ]}
                 value={status}
@@ -138,9 +144,9 @@ export function OrdersToolbar() {
                 }
                 options={[
                   { value: "", label: text("全部") },
-                  ...ORDER_PAYMENT_STATUS_OPTIONS.map((option) => ({
-                    value: option.value,
-                    label: text(option.label),
+                  ...ORDER_PAYMENT_STATUS_VALUES.map((value) => ({
+                    value,
+                    label: getOrderPaymentStatusLabel(value),
                   })),
                 ]}
                 value={paymentStatus}
@@ -155,9 +161,9 @@ export function OrdersToolbar() {
                 }
                 options={[
                   { value: "", label: text("全部") },
-                  ...ORDER_TYPE_OPTIONS.map((option) => ({
-                    value: option.value,
-                    label: text(option.label),
+                  ...ORDER_TYPE_VALUES.map((value) => ({
+                    value,
+                    label: getOrderTypeLabel(value),
                   })),
                 ]}
                 value={orderType}
@@ -219,9 +225,9 @@ export function OrdersToolbar() {
                   [ORDER_FILTER_KEYS.sort]: value || undefined,
                 })
               }
-              options={ORDER_SORT_OPTIONS.map((option) => ({
-                value: option.value,
-                label: text(option.label),
+              options={ORDER_SORT_VALUES.map((value) => ({
+                value,
+                label: getOrderSortLabel(value),
               }))}
               value={sort}
             />
@@ -246,7 +252,7 @@ export function OrdersToolbar() {
                         }
                       />
                       <span className="truncate">
-                        {text(ORDER_COLUMN_LABELS[column])}
+                        {getOrderColumnLabel(column)}
                       </span>
                     </label>
                   );

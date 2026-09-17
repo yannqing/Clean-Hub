@@ -1,10 +1,7 @@
 import type {
   PosOrderPaymentStatus,
-  PosOrderSort,
   PosOrderStatus,
-  PosOrderType,
   PosMobileMoneyProvider,
-  PosPaymentMethod,
   PosPaymentTransactionStatus,
 } from "@cleanhub/api-client";
 import { formatPosOrderCode } from "@cleanhub/domain/order-codes";
@@ -34,13 +31,6 @@ export const BADGE_TONE_CLASSES: Record<BadgeTone, string> = {
   red: "bg-red-50 text-red-700",
 };
 
-export const ORDER_STATUS_LABELS: Record<PosOrderStatus, string> = {
-  draft: "草稿",
-  received: "待支付",
-  paid: "已付款",
-  delivered: "已交付",
-  cancelled: "已取消",
-};
 
 export const ORDER_STATUS_TONES: Record<PosOrderStatus, BadgeTone> = {
   draft: "slate",
@@ -50,15 +40,6 @@ export const ORDER_STATUS_TONES: Record<PosOrderStatus, BadgeTone> = {
   cancelled: "red",
 };
 
-export const ORDER_PAYMENT_STATUS_LABELS: Record<
-  PosOrderPaymentStatus,
-  string
-> = {
-  unpaid: "未支付",
-  partial: "部分支付",
-  paid: "已结清",
-  refunded: "已退款",
-};
 
 export const ORDER_PAYMENT_STATUS_TONES: Record<
   PosOrderPaymentStatus,
@@ -70,16 +51,7 @@ export const ORDER_PAYMENT_STATUS_TONES: Record<
   refunded: "violet",
 };
 
-export const ORDER_TYPE_LABELS: Record<PosOrderType, string> = {
-  ticket: "工单订单",
-  manual: "普通订单",
-};
 
-export const PAYMENT_METHOD_LABELS: Record<PosPaymentMethod, string> = {
-  cash: "现金",
-  card: "银行卡",
-  app: "移动支付",
-};
 
 export const MOBILE_MONEY_PROVIDER_LABELS: Record<
   PosMobileMoneyProvider,
@@ -89,15 +61,6 @@ export const MOBILE_MONEY_PROVIDER_LABELS: Record<
   orange_money: "Orange Money",
 };
 
-export const PAYMENT_TRANSACTION_STATUS_LABELS: Record<
-  PosPaymentTransactionStatus,
-  string
-> = {
-  pending: "待确认",
-  paid: "已支付",
-  refunded: "已退款",
-  failed: "失败",
-};
 
 export const PAYMENT_TRANSACTION_STATUS_TONES: Record<
   PosPaymentTransactionStatus,
@@ -108,18 +71,6 @@ export const PAYMENT_TRANSACTION_STATUS_TONES: Record<
   refunded: "bg-secondary text-secondary-foreground",
   failed: "bg-red-50 text-red-700",
 };
-
-export const ORDER_STATUS_OPTIONS = (
-  Object.keys(ORDER_STATUS_LABELS) as PosOrderStatus[]
-).map((value) => ({ value, label: ORDER_STATUS_LABELS[value] }));
-
-export const ORDER_PAYMENT_STATUS_OPTIONS = (
-  Object.keys(ORDER_PAYMENT_STATUS_LABELS) as PosOrderPaymentStatus[]
-).map((value) => ({ value, label: ORDER_PAYMENT_STATUS_LABELS[value] }));
-
-export const ORDER_TYPE_OPTIONS = (
-  Object.keys(ORDER_TYPE_LABELS) as PosOrderType[]
-).map((value) => ({ value, label: ORDER_TYPE_LABELS[value] }));
 
 export const ORDER_FILTER_KEYS = {
   q: "q",
@@ -135,15 +86,6 @@ export const ORDER_FILTER_KEYS = {
 
 export type OrderDateFilter = "all" | "today" | "last_7d" | "month";
 
-export const ORDER_SORT_OPTIONS: ReadonlyArray<{
-  value: PosOrderSort;
-  label: string;
-}> = [
-  { value: "created_desc", label: "创建时间：从新到旧" },
-  { value: "created_asc", label: "创建时间：从旧到新" },
-  { value: "amount_desc", label: "订单金额：从高到低" },
-  { value: "amount_asc", label: "订单金额：从低到高" },
-];
 
 export const ORDER_COLUMN_KEYS = [
   "order",
@@ -156,14 +98,6 @@ export const ORDER_COLUMN_KEYS = [
 
 export type OrderColumnKey = (typeof ORDER_COLUMN_KEYS)[number];
 
-export const ORDER_COLUMN_LABELS: Record<OrderColumnKey, string> = {
-  order: "订单",
-  customer: "客户",
-  amount: "金额",
-  status: "订单状态",
-  payment: "支付状态",
-  createdAt: "创建时间",
-};
 
 export function formatOrderMoney(
   amount: string | number | null | undefined,

@@ -18,6 +18,10 @@ import { posToast as toast } from "@/lib/pos-toast";
 import { formatPosMoney } from "@/lib/money";
 
 import { posApi } from "@/lib/api-client";
+import {
+  getOrderPaymentStatusLabel,
+  getOrderTypeLabel,
+} from "@/lib/order-labels";
 
 import {
   getTicketStatusLabel,
@@ -27,8 +31,6 @@ import {
 import {
   CUSTOMER_PROFILE_RELATIONSHIPS,
   CUSTOMER_TICKET_STATUS_TONES,
-  CUSTOMER_ORDER_PAYMENT_LABELS,
-  CUSTOMER_ORDER_TYPE_LABELS,
 } from "../constants";
 import {
   changeProfileStatus,
@@ -737,7 +739,7 @@ function RecentActivity({
       .slice(0, 3)
       .map<ActivityItem & { timestamp: string }>((order) => ({
         title: "订单记录",
-        detail: `${CUSTOMER_ORDER_TYPE_LABELS[order.orderType] ?? order.orderType} · ${CUSTOMER_ORDER_PAYMENT_LABELS[order.paymentStatus] ?? order.paymentStatus}`,
+        detail: `${getOrderTypeLabel(order.orderType)} · ${getOrderPaymentStatusLabel(order.paymentStatus)}`,
         time: formatDateShort(order.createdAt, locale, timeZone),
         timestamp: order.createdAt,
         amount: order.totalAmount

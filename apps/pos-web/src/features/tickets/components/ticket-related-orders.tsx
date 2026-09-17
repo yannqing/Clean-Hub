@@ -4,6 +4,7 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posMessage } from "@/lib/pos-message";
+import { getOrderStatusLabel } from "@/lib/order-labels";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@cleanhub/ui";
 
 import {
@@ -18,13 +19,6 @@ type TicketRelatedOrdersProps = {
   orders: RelatedOrderSummary[];
 };
 
-const ORDER_STATUS_LABELS: Record<string, string> = {
-  draft: "草稿",
-  received: "待支付",
-  paid: "已付款",
-  delivered: "已交付",
-  cancelled: "已取消",
-};
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
   unpaid: "未支付",
@@ -77,7 +71,7 @@ export function TicketRelatedOrders({
                     </div>
                   </div>
                   <Badge variant="secondary">
-                    {ORDER_STATUS_LABELS[order.status] ?? order.status}
+                    {getOrderStatusLabel(order.status)}
                   </Badge>
                 </div>
                 <div className="mt-3 flex items-center justify-between border-t pt-3 text-sm">

@@ -45,9 +45,6 @@ import {
   displayOrderCode,
   formatOrderDateTime,
   formatOrderMoney,
-  ORDER_TYPE_LABELS,
-  PAYMENT_METHOD_LABELS,
-  PAYMENT_TRANSACTION_STATUS_LABELS,
   PAYMENT_TRANSACTION_STATUS_TONES,
 } from "../constants";
 import {
@@ -57,6 +54,11 @@ import {
 } from "../actions";
 import { posMessage } from "@/lib/pos-message";
 import { posToast as toast } from "@/lib/pos-toast";
+import {
+  getOrderTypeLabel,
+  getPaymentMethodLabel,
+  getPaymentTransactionStatusLabel,
+} from "@/lib/order-labels";
 import { OrderActionsPanel } from "./order-actions-panel";
 import { OrderPaymentStatusBadge, OrderStatusBadge } from "./order-badges";
 import { OrderDiscountsCard } from "./order-discounts-card";
@@ -130,7 +132,7 @@ export function OrderDetailView({
             </CardTitle>
             <CardDescription className="mt-1">
               {order.customerName || "散客"} ·{" "}
-              {ORDER_TYPE_LABELS[order.orderType]}
+              {getOrderTypeLabel(order.orderType)}
             </CardDescription>
           </div>
           <CardAction className="col-span-2 col-start-1 row-start-3 flex flex-wrap items-center justify-self-stretch gap-2 sm:col-span-1 sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:justify-self-end">
@@ -166,7 +168,7 @@ export function OrderDetailView({
           />
           <OrderHeaderMetric
             label="订单类型"
-            value={ORDER_TYPE_LABELS[order.orderType]}
+            value={getOrderTypeLabel(order.orderType)}
           />
         </CardContent>
       </Card>
@@ -608,7 +610,7 @@ function OrderPaymentsCard({
                     className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${PAYMENT_TRANSACTION_STATUS_TONES[payment.paymentStatus]}`}
                     variant="secondary"
                   >
-                    {PAYMENT_TRANSACTION_STATUS_LABELS[payment.paymentStatus]}
+                    {getPaymentTransactionStatusLabel(payment.paymentStatus)}
                   </Badge>
                 </div>
                 {payment.externalReference ? (
@@ -798,5 +800,5 @@ function getPaymentDisplayName(
 ): string {
   return provider
     ? MOBILE_MONEY_PROVIDER_LABELS[provider]
-    : PAYMENT_METHOD_LABELS[paymentMethod];
+    : getPaymentMethodLabel(paymentMethod);
 }
