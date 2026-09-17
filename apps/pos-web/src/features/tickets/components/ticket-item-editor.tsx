@@ -1,5 +1,6 @@
 "use client";
 
+import { posMessage } from "@/lib/pos-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import {
   Button,
@@ -294,7 +295,11 @@ function ItemRow({
         to: next,
       });
       if (result.ok) {
-        toast.success(`项目状态已更新为「${getTicketItemStatusLabel(next)}」`);
+        toast.success(
+          posMessage("pos.inline.ticketItemStatusUpdated", {
+            status: getTicketItemStatusLabel(next),
+          }),
+        );
       } else {
         toast.error(result.message);
       }

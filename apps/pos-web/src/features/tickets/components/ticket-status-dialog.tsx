@@ -1,5 +1,6 @@
 "use client";
 
+import { posMessage } from "@/lib/pos-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import { usePosOfflineWrites } from "@/features/offline/lib";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
@@ -72,8 +73,12 @@ export function TicketStatusDialog({
         });
         toast.success(
           result.queued
-            ? `网络不可用，「${getTicketStatusLabel(next)}」状态已加入同步队列。`
-            : `工单状态已更新为「${getTicketStatusLabel(next)}」`,
+            ? posMessage("pos.inline.statusQueuedOffline", {
+                status: getTicketStatusLabel(next),
+              })
+            : posMessage("pos.inline.ticketStatusUpdated", {
+                status: getTicketStatusLabel(next),
+              }),
         );
         setCancelReason("");
         onClose();

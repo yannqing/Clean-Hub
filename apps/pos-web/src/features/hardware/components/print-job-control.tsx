@@ -29,6 +29,7 @@ import { Icon } from "@/components/app-shell/icons";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
+import { posMessage } from "@/lib/pos-message";
 import { posToast as toast } from "@/lib/pos-toast";
 
 import {
@@ -237,7 +238,11 @@ export function PrintJobControl({
         notifyPosPrintQueueUpdated();
         if (result.status === "printed") {
           toast.success(
-            `${documentType === "receipt" ? "小票" : "标签"}已打印。`,
+            posMessage(
+              documentType === "receipt"
+                ? "pos.inline.receiptPrinted"
+                : "pos.inline.labelPrinted",
+            ),
           );
         } else {
           toast.error(
@@ -347,8 +352,16 @@ export function PrintJobControl({
           : "打印结果待确认"
         : latestJob?.status === "printed"
           ? canReprint
-            ? `重打${documentType === "receipt" ? "小票" : "标签"}`
-            : `${documentType === "receipt" ? "小票" : "标签"}已打印`
+            ? posMessage(
+                documentType === "receipt"
+                  ? "pos.inline.reprintReceipt"
+                  : "pos.inline.reprintLabel",
+              )
+            : posMessage(
+                documentType === "receipt"
+                  ? "pos.inline.receiptPrintedShort"
+                  : "pos.inline.labelPrintedShort",
+              )
           : initialLabel;
   const statusTone =
     latestJob?.status === "failed"

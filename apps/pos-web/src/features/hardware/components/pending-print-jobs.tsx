@@ -21,6 +21,7 @@ import {
 } from "react";
 
 import { Icon } from "@/components/app-shell/icons";
+import { posMessage } from "@/lib/pos-message";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 
 import { getPosOfflineStorage } from "../lib/desktop-bridge";
@@ -175,8 +176,14 @@ function getPendingSummary({
   syncPending,
 }: PendingPrintJobCounts): string {
   const parts: string[] = [];
-  if (actionable > 0) parts.push(`${actionable} 个打印任务待处理`);
-  if (syncPending > 0) parts.push(`${syncPending} 条打印记录待同步`);
+  if (actionable > 0)
+    parts.push(
+      posMessage("pos.inline.printJobsPending", { count: actionable }),
+    );
+  if (syncPending > 0)
+    parts.push(
+      posMessage("pos.inline.printRecordsPendingSync", { count: syncPending }),
+    );
   return parts.join("，");
 }
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { posMessage } from "@/lib/pos-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
@@ -269,12 +270,18 @@ export function OrderActionsPanel({
           if (drawerOutcome.opened) {
             toast.success("钱箱已自动打开。");
           } else {
-            toast.error(`现金收款已记录，但${drawerOutcome.message}`);
+            toast.error(
+              posMessage("pos.inline.cashRecordedDrawerFailed", {
+                reason: drawerOutcome.message,
+              }),
+            );
           }
 
           if (drawerOutcome.auditWarning) {
             toast.warning(
-              `钱箱操作结果暂未同步审计：${drawerOutcome.auditWarning}`,
+              posMessage("pos.inline.drawerAuditNotSynced", {
+                reason: drawerOutcome.auditWarning,
+              }),
             );
           }
         } else if (paymentResult?.idempotent) {
@@ -284,7 +291,9 @@ export function OrderActionsPanel({
         }
       } else {
         toast.success(
-          `${MOBILE_MONEY_PROVIDER_LABELS[paymentOption]} 支付已记录，等待 Manager 确认。`,
+          posMessage("pos.inline.mobileMoneyRecorded", {
+            provider: MOBILE_MONEY_PROVIDER_LABELS[paymentOption],
+          }),
         );
       }
       idempotencyKeyRef.current = null;
@@ -303,8 +312,12 @@ export function OrderActionsPanel({
         });
         toast.success(
           result.queued
-            ? `网络不可用，「${ORDER_STATUS_LABELS[to]}」状态已加入同步队列。`
-            : `订单状态已更新为「${ORDER_STATUS_LABELS[to]}」。`,
+            ? posMessage("pos.inline.statusQueuedOffline", {
+                status: ORDER_STATUS_LABELS[to],
+              })
+            : posMessage("pos.inline.orderStatusUpdated", {
+                status: ORDER_STATUS_LABELS[to],
+              }),
         );
         setSensitiveAction(null);
         setSensitiveReason("");
@@ -527,7 +540,9 @@ export function OrderActionsPanel({
               <Icon className="h-4 w-4" name="wallet-cards" />
               {paymentOption === "cash"
                 ? "现金收款"
-                : `记录 ${MOBILE_MONEY_PROVIDER_LABELS[paymentOption]}`}
+                : posMessage("pos.inline.recordProvider", {
+                    provider: MOBILE_MONEY_PROVIDER_LABELS[paymentOption],
+                  })}
             </Button>
           </div>
           {paymentOption === "cash" ? (
@@ -582,7 +597,9 @@ export function OrderActionsPanel({
                 <span>
                   {status === "paid" && isZeroTotalReadyForConfirmation
                     ? text("确认零元订单")
-                    : `设为 ${ORDER_STATUS_LABELS[status]}`}
+                    : posMessage("pos.inline.setStatusTo", {
+                        status: ORDER_STATUS_LABELS[status],
+                      })}
                 </span>
                 <Icon
                   className="h-4 w-4 text-muted-foreground"
