@@ -85,6 +85,7 @@ import {
 } from "@cleanhub/domain/currency";
 
 import { posToast as toast } from "@/lib/pos-toast";
+import { posMessage } from "@/lib/pos-message";
 
 import type {
   PosCartCloudSyncState,
@@ -1324,7 +1325,9 @@ function CartPanel({
             if (result.status !== "succeeded") {
               toast.warning(
                 result.message ??
-                  `刷卡结果：${cardOutcomeLabel(result.status)}`,
+                  posMessage("pos.inline.cardOutcome", {
+                    outcome: cardOutcomeLabel(result.status),
+                  }),
               );
               if (result.status === "timed_out") {
                 await onClear();
@@ -1350,7 +1353,10 @@ function CartPanel({
               },
             );
             toast.warning(
-              `${error instanceof Error ? error.message : "TPE 状态未知。"} 请先核对终端交易记录，勿重复收款。`,
+              posMessage("pos.inline.verifyTerminalBeforeRetry", {
+                reason:
+                  error instanceof Error ? error.message : "TPE 状态未知。",
+              }),
             );
             await onClear();
             setCheckoutOpen(false);
@@ -1431,7 +1437,11 @@ function CartPanel({
             );
           }
         } catch (error) {
-          toast.warning(`小票交付记录失败：${getPosApiErrorMessage(error)}`);
+          toast.warning(
+            posMessage("pos.inline.receiptDeliveryLogFailed", {
+              reason: getPosApiErrorMessage(error),
+            }),
+          );
         }
         await onClear();
         setCheckoutOpen(false);
@@ -1524,10 +1534,12 @@ function CartPanel({
                 onClick={() => {
                   setParkName(
                     cart.customer?.name ??
-                      `挂单 ${new Date().toLocaleTimeString(locale, {
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}`,
+                      posMessage("pos.inline.parkedAt", {
+                        time: new Date().toLocaleTimeString(locale, {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        }),
+                      }),
                   );
                   setParkedOpen(true);
                 }}
@@ -2015,7 +2027,9 @@ function CartPanel({
               ) : null}
 
               <div
-                aria-label={`${paymentModeLabel(paymentMode)}支付信息`}
+                aria-label={posMessage("pos.inline.paymentPanelLabel", {
+                  mode: paymentModeLabel(paymentMode),
+                })}
                 className="space-y-3"
                 id="checkout-payment-panel"
                 role="tabpanel"

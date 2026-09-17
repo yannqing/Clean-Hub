@@ -3,11 +3,17 @@
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import { useEffect, useState } from "react";
+import {
+  createTranslator,
+  defaultLocale,
+  normalizeLocale,
+} from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { Icon } from "@/components/app-shell";
 import { usePosOfflineWrites } from "@/features/offline/lib";
+import { posMessage } from "@/lib/pos-message";
 
 import {
   Dialog,
@@ -276,7 +282,7 @@ export function IntakeCreateProfileDialog({
                         : account.syncState === "pending"
                           ? text("待同步")
                           : active
-                            ? `✓ ${text("已选择")}`
+                            ? posMessage("pos.inline.selectedMark")
                             : null}
                     </span>
                   </button>
@@ -374,13 +380,10 @@ function mergeAccountOptions(
 }
 
 function formatProfileAccountNote(accountName: string, locale: string): string {
-  if (locale === "en") {
-    return `A new profile will be created under “${accountName}”.`;
-  }
-  if (locale === "fr") {
-    return `Un nouveau profil sera créé sous « ${accountName} ».`;
-  }
-  return `将在「${accountName}」下新增档案。`;
+  return createTranslator({ locale: normalizeLocale(locale) ?? defaultLocale })(
+    "pos.inline.profileUnderAccount",
+    { account: accountName },
+  );
 }
 
 function RawText({ value }: { value: string }) {

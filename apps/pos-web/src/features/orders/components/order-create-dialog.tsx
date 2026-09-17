@@ -3,7 +3,7 @@
 import { posToast as toast } from "@/lib/pos-toast";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import type { SupportedLocale } from "@cleanhub/i18n";
+import { createTranslator, type SupportedLocale } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 import { buildPosReceiptText } from "@cleanhub/hardware";
 import { createId } from "@cleanhub/id";
@@ -40,6 +40,7 @@ import { usePosOfflineWrites } from "@/features/offline/lib";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 import { DEFAULT_POS_CURRENCY, normalizeCurrencyCode } from "@/lib/money";
+import { posMessage } from "@/lib/pos-message";
 
 import { formatOrderMoney } from "../constants";
 
@@ -906,7 +907,9 @@ function ManualOrderFields({
                             ·{" "}
                             {formatOrderMoney(product.amount, product.currency)}
                             {product.trackInventory
-                              ? ` · ${text("库存")} ${Number(product.availableQuantity ?? 0)}`
+                              ? ` · ${posMessage("pos.inline.stockLabeled", {
+                                  count: Number(product.availableQuantity ?? 0),
+                                })}`
                               : ""}
                           </option>
                         );
@@ -1409,11 +1412,10 @@ function formatTicketMeta(
   locale: SupportedLocale,
 ): string {
   const count = ticket.itemCount;
-  if (locale === "en") {
-    return `${ticket.customerName} · ${count} ${count === 1 ? "item" : "items"} · total ${ticket.totalAmount}`;
-  }
-  if (locale === "fr") {
-    return `${ticket.customerName} · ${count} ${count === 1 ? "article" : "articles"} · total ${ticket.totalAmount}`;
-  }
-  return `${ticket.customerName} · ${count} 个项目 · 合计 ${ticket.totalAmount}`;
+  return createTranslator({ locale })(
+    count === 1
+      ? "pos.inline.ticketSummaryLineOne"
+      : "pos.inline.ticketSummaryLine",
+    { customer: ticket.customerName, count, total: ticket.totalAmount },
+  );
 }

@@ -1,6 +1,7 @@
 import { isApiHttpError } from "@cleanhub/api-client";
 
 import { getPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
+import { posMessage } from "@/lib/pos-message";
 
 type PosErrorLocale = "zh-CN" | "en" | "fr";
 
@@ -137,7 +138,7 @@ const POS_ACCOUNT_LOCKED_UNTIL_MESSAGES: Record<
   (lockedUntil: string) => string
 > = {
   "zh-CN": (lockedUntil) =>
-    `登录失败次数过多，已锁定至 ${lockedUntil}，请在此时间后重试。`,
+    posMessage("pos.inline.loginLockedUntil", { time: lockedUntil }),
   en: (lockedUntil) =>
     `Too many failed sign-in attempts. Sign-in is locked until ${lockedUntil}.`,
   fr: (lockedUntil) =>

@@ -97,10 +97,17 @@ export function OrderTicketReferencesCard({
                 <p className="mt-1 text-xs text-muted-foreground">
                   {reference.itemCount} 件
                   {reference.assistantName
-                    ? ` · 接待 ${reference.assistantName}`
+                    ? ` · ${posMessage("pos.inline.assistantNamed", {
+                        name: reference.assistantName,
+                      })}`
                     : ""}
                   {reference.expectedPickupAt
-                    ? ` · 预计取件 ${formatOrderDateTime(reference.expectedPickupAt, locale)}`
+                    ? ` · ${posMessage("pos.inline.expectedPickupAt", {
+                        time: formatOrderDateTime(
+                          reference.expectedPickupAt,
+                          locale,
+                        ),
+                      })}`
                     : ""}
                 </p>
               </div>

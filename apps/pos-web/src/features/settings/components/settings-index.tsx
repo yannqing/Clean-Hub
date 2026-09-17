@@ -106,14 +106,26 @@ export function SettingsIndex({
     {
       description: loading
         ? "正在加载…"
-        : `${formValues.autoPrintReceipt ? "自动打印" : "手动打印"} · ${optionLabel(PRINT_COPIES_OPTIONS, formValues.printCopies)}`,
+        : posMessage("pos.inline.printingSummary", {
+            mode: posMessage(
+              formValues.autoPrintReceipt
+                ? "pos.inline.autoPrintOn"
+                : "pos.inline.autoPrintOff",
+            ),
+            copies: optionLabel(PRINT_COPIES_OPTIONS, formValues.printCopies),
+          }),
       href: posRoutes.settingsPrinting,
       title: "打印设置",
     },
     {
       description: loading
         ? "正在加载…"
-        : `自动锁屏：${optionLabel(LOCK_TIMEOUT_OPTIONS, formValues.lockTimeoutSeconds)}`,
+        : posMessage("pos.inline.autoLockSummary", {
+            value: optionLabel(
+              LOCK_TIMEOUT_OPTIONS,
+              formValues.lockTimeoutSeconds,
+            ),
+          }),
       href: posRoutes.settingsSecurity,
       title: "安全设置",
     },
