@@ -31,6 +31,7 @@ import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 import { posMessage } from "@/lib/pos-message";
 import { posToast as toast } from "@/lib/pos-toast";
+import type { TranslationKey } from "@cleanhub/i18n";
 
 import {
   getPosHardwareBridge,
@@ -55,13 +56,6 @@ type PrintJobControlProps = {
   qrCodeContent?: string;
   title: string;
 };
-
-const STATUS_COPY = {
-  pending: "待打印",
-  printing: "打印中",
-  printed: "已打印",
-  failed: "打印失败",
-} as const;
 
 const subscribeToClientRuntime = () => () => undefined;
 const getClientSnapshot = () => true;
@@ -402,7 +396,9 @@ export function PrintJobControl({
 
       {latestJob ? (
         <p className={`mt-1 max-w-64 text-xs ${statusTone}`} role="status">
-          {STATUS_COPY[latestJob.status]} · 第 {latestJob.attempt} 次
+          {posMessage(
+            `pos.printJob.status.${latestJob.status}` as TranslationKey,
+          )} · 第 {latestJob.attempt} 次
           {latestJob.lastError ? ` · ${latestJob.lastError}` : ""}
         </p>
       ) : null}

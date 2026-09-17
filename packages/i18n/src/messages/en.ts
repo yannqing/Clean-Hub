@@ -926,6 +926,52 @@ export const enMessages = {
       ticketCreated: "Ticket created",
       orderRecord: "Order",
     },
+    printJob: {
+      status: {
+        pending: "Queued",
+        printing: "Printing",
+        printed: "Printed",
+        failed: "Print failed",
+      },
+      pendingStatus: {
+        pending: "Queued",
+        printing: "Awaiting confirmation",
+        printed: "Printed, audit not yet synced",
+        failed: "Print failed",
+      },
+    },
+    discount: {
+      type: {
+        amount_off_items: "Item discount",
+        buy_x_get_y: "Buy X get Y",
+        amount_off_order: "Order discount",
+        free_shipping: "Free delivery",
+      },
+    },
+    cashHandling: {
+      none: "No cash accepted",
+      untracked: "Cash accepted, not counted",
+      shared_drawer: "One shared drawer",
+      cash_in_hand: "Each cashier holds their own cash",
+    },
+    ticketStat: {
+      inProgress: "In progress",
+      readyToPick: "Ready for pickup",
+      overdue: "Overdue",
+      newToday: "New today",
+    },
+    receiptChannelShort: {
+      print: "Print",
+      email: "Email",
+      sms: "SMS",
+      none: "No receipt",
+    },
+    cardOutcomeState: {
+      cancelled: "Cancelled",
+      timed_out: "Timed out",
+      succeeded: "Succeeded",
+      failed: "Failed",
+    },
     inline: {
       cardOutcome: "Card result: {outcome}",
       verifyTerminalBeforeRetry: "{reason} Check the terminal transaction log before retrying; do not charge twice.",

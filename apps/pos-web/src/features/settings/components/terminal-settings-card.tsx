@@ -16,6 +16,8 @@ import {
 import { getCurrencyPayableStep } from "@cleanhub/domain/currency";
 
 import { Icon, type PosIconName } from "@/components/app-shell";
+import { posMessage } from "@/lib/pos-message";
+import type { TranslationKey } from "@cleanhub/i18n";
 import {
   getSettingsSectionDescription,
   getSettingsSectionTitle,
@@ -23,7 +25,6 @@ import {
 
 import {
   LOCK_TIMEOUT_OPTIONS,
-  CASH_HANDLING_MODE_LABELS,
   PAYMENT_METHOD_OPTIONS,
   PRINT_COPIES_OPTIONS,
   ROUNDING_RULE_OPTIONS,
@@ -220,7 +221,9 @@ export function TerminalSettingsCard({
                 </p>
                 <p className="mt-1">
                   现金处理：
-                  {CASH_HANDLING_MODE_LABELS[initial.cashHandlingMode]}
+                  {posMessage(
+                    `pos.cashHandling.${initial.cashHandlingMode}` as TranslationKey,
+                  )}
                 </p>
               </div>
               <p className="text-xs text-muted-foreground">

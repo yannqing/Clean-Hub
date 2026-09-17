@@ -31,22 +31,14 @@ import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { posToast as toast } from "@/lib/pos-toast";
 import { getActionErrorMessage } from "@/lib/action-error-message";
+import { posMessage } from "@/lib/pos-message";
+import type { TranslationKey } from "@cleanhub/i18n";
 
 import {
   applyOrderDiscountAction,
   removeOrderDiscountAction,
 } from "../actions";
 import { formatOrderMoney } from "../constants";
-
-const DISCOUNT_TYPE_LABELS: Record<
-  PosOrderDiscountApplication["type"],
-  string
-> = {
-  amount_off_items: "商品或服务折扣",
-  buy_x_get_y: "买 X 送 Y",
-  amount_off_order: "订单折扣",
-  free_shipping: "免配送费",
-};
 
 export function OrderDiscountsCard({
   canManageSensitiveOperations,
@@ -260,7 +252,9 @@ export function OrderDiscountsCard({
                     </Badge>
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                    <span>{text(DISCOUNT_TYPE_LABELS[application.type])}</span>
+                    <span>{posMessage(
+                        `pos.discount.type.${application.type}` as TranslationKey,
+                      )}</span>
                     {application.code ? (
                       <code className="rounded bg-muted px-1.5 py-0.5 font-semibold text-foreground">
                         {application.code}

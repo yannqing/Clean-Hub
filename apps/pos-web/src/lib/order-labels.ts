@@ -72,10 +72,11 @@ export function getOrderStatusLabel(status: PosOrderStatus | string): string {
   return label(`pos.order.status.${status}` as TranslationKey, status);
 }
 
+/** Widened for the same reason as getOrderStatusLabel. */
 export function getOrderPaymentStatusLabel(
-  status: PosOrderPaymentStatus,
+  status: PosOrderPaymentStatus | string,
 ): string {
-  return label(`pos.order.paymentStatus.${status}`, status);
+  return label(`pos.order.paymentStatus.${status}` as TranslationKey, status);
 }
 
 export function getOrderTypeLabel(type: PosOrderType): string {

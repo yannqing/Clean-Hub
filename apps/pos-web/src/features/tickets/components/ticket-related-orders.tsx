@@ -4,7 +4,10 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import Link from "next/link";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posMessage } from "@/lib/pos-message";
-import { getOrderStatusLabel } from "@/lib/order-labels";
+import {
+  getOrderPaymentStatusLabel,
+  getOrderStatusLabel,
+} from "@/lib/order-labels";
 import { Badge, Card, CardContent, CardHeader, CardTitle } from "@cleanhub/ui";
 
 import {
@@ -19,13 +22,6 @@ type TicketRelatedOrdersProps = {
   orders: RelatedOrderSummary[];
 };
 
-
-const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  unpaid: "未支付",
-  paid: "已支付",
-  partial: "部分支付",
-  refunded: "已退款",
-};
 
 /**
  * Side panel listing the orders linked to a ticket. Read-only: creation and
@@ -77,8 +73,7 @@ export function TicketRelatedOrders({
                 <div className="mt-3 flex items-center justify-between border-t pt-3 text-sm">
                   <span className="text-muted-foreground">
                     支付：
-                    {PAYMENT_STATUS_LABELS[order.paymentStatus] ??
-                      order.paymentStatus}
+                    {getOrderPaymentStatusLabel(order.paymentStatus)}
                   </span>
                   <span className="font-semibold text-foreground">
                     {formatTicketMoney(order.paidAmount, order.currency)} /{" "}

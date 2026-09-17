@@ -913,6 +913,52 @@ export const zhCNMessages = {
       ticketCreated: "工单创建",
       orderRecord: "订单记录",
     },
+    printJob: {
+      status: {
+        pending: "待打印",
+        printing: "打印中",
+        printed: "已打印",
+        failed: "打印失败",
+      },
+      pendingStatus: {
+        pending: "待打印",
+        printing: "打印结果待确认",
+        printed: "已打印，审计记录待同步",
+        failed: "打印失败",
+      },
+    },
+    discount: {
+      type: {
+        amount_off_items: "商品或服务折扣",
+        buy_x_get_y: "买 X 送 Y",
+        amount_off_order: "订单折扣",
+        free_shipping: "免配送费",
+      },
+    },
+    cashHandling: {
+      none: "不接受现金",
+      untracked: "接受现金但不盘点",
+      shared_drawer: "多人共用一个钱箱",
+      cash_in_hand: "店员保管随身现金",
+    },
+    ticketStat: {
+      inProgress: "进行中工单",
+      readyToPick: "待取件",
+      overdue: "已逾期",
+      newToday: "今日新增",
+    },
+    receiptChannelShort: {
+      print: "打印",
+      email: "邮件",
+      sms: "短信",
+      none: "不出小票",
+    },
+    cardOutcomeState: {
+      cancelled: "已取消",
+      timed_out: "已超时",
+      succeeded: "成功",
+      failed: "失败",
+    },
     inline: {
       cardOutcome: "刷卡结果：{outcome}",
       verifyTerminalBeforeRetry: "{reason} 请先核对终端交易记录，勿重复收款。",

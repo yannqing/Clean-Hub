@@ -23,6 +23,7 @@ import {
 import { Icon } from "@/components/app-shell/icons";
 import { posMessage } from "@/lib/pos-message";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
+import type { TranslationKey } from "@cleanhub/i18n";
 
 import { getPosOfflineStorage } from "../lib/desktop-bridge";
 import {
@@ -45,13 +46,6 @@ export type PendingPrintJobsState = PendingPrintJobCounts & {
   jobs: PendingPrintJob[];
   refresh: () => Promise<void>;
   syncPendingJobs: PendingPrintJob[];
-};
-
-const STATUS_LABELS: Record<PendingPrintJob["status"], string> = {
-  pending: "待打印",
-  printing: "打印结果待确认",
-  printed: "已打印，审计记录待同步",
-  failed: "打印失败",
 };
 
 const subscribeToClientRuntime = () => () => undefined;
@@ -307,7 +301,9 @@ function PrintJobList({
                 {job.payload.title}
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
-                {STATUS_LABELS[job.status]} · 第 {job.attempt} 次
+                {posMessage(
+                  `pos.printJob.pendingStatus.${job.status}` as TranslationKey,
+                )} · 第 {job.attempt} 次
               </p>
             </div>
             <PrintJobControl

@@ -932,6 +932,52 @@ export const frMessages = {
       ticketCreated: "Ticket créé",
       orderRecord: "Commande",
     },
+    printJob: {
+      status: {
+        pending: "En file",
+        printing: "Impression",
+        printed: "Imprimé",
+        failed: "Échec d’impression",
+      },
+      pendingStatus: {
+        pending: "En file",
+        printing: "En attente de confirmation",
+        printed: "Imprimé, audit non synchronisé",
+        failed: "Échec d’impression",
+      },
+    },
+    discount: {
+      type: {
+        amount_off_items: "Remise sur article",
+        buy_x_get_y: "Achetez X, obtenez Y",
+        amount_off_order: "Remise sur commande",
+        free_shipping: "Livraison offerte",
+      },
+    },
+    cashHandling: {
+      none: "Espèces refusées",
+      untracked: "Espèces acceptées, sans comptage",
+      shared_drawer: "Un tiroir partagé",
+      cash_in_hand: "Chaque caissier garde ses espèces",
+    },
+    ticketStat: {
+      inProgress: "En cours",
+      readyToPick: "Prêts au retrait",
+      overdue: "En retard",
+      newToday: "Nouveaux",
+    },
+    receiptChannelShort: {
+      print: "Impression",
+      email: "E-mail",
+      sms: "SMS",
+      none: "Sans reçu",
+    },
+    cardOutcomeState: {
+      cancelled: "Annulé",
+      timed_out: "Délai dépassé",
+      succeeded: "Réussi",
+      failed: "Échec",
+    },
     inline: {
       cardOutcome: "Résultat carte : {outcome}",
       verifyTerminalBeforeRetry: "{reason} Vérifiez le journal des transactions du terminal avant de réessayer ; ne facturez pas deux fois.",

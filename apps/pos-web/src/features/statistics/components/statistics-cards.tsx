@@ -1,6 +1,7 @@
 "use client";
 
 import { type ServiceTicketOverview } from "@cleanhub/api-client";
+import { posMessage } from "@/lib/pos-message";
 
 type StatCard = {
   label: string;
@@ -13,19 +14,19 @@ function deriveStatCards(overview: ServiceTicketOverview): StatCard[] {
 
   return [
     {
-      label: "进行中工单",
+      label: posMessage("pos.ticketStat.inProgress"),
       value: inProgress,
     },
     {
-      label: "待取件",
+      label: posMessage("pos.ticketStat.readyToPick"),
       value: overview.byStatus.ready_to_pick ?? 0,
     },
     {
-      label: "已逾期",
+      label: posMessage("pos.ticketStat.overdue"),
       value: overview.overdueCount,
     },
     {
-      label: "今日新增",
+      label: posMessage("pos.ticketStat.newToday"),
       value: overview.todayCreatedCount,
     },
   ];

@@ -86,6 +86,7 @@ import {
 
 import { posToast as toast } from "@/lib/pos-toast";
 import { posMessage } from "@/lib/pos-message";
+import type { TranslationKey } from "@cleanhub/i18n";
 
 import type {
   PosCartCloudSyncState,
@@ -2407,23 +2408,15 @@ function paymentModeLabel(mode: CheckoutPaymentMode): string {
 }
 
 function receiptDeliveryLabel(choice: ReceiptDeliveryChoice): string {
-  return {
-    print: "打印",
-    email: "邮件",
-    sms: "短信",
-    none: "不出小票",
-  }[choice];
+  return posMessage(
+    `pos.receiptChannelShort.${choice}` as TranslationKey,
+  );
 }
 
 function cardOutcomeLabel(
   outcome: "succeeded" | "failed" | "cancelled" | "timed_out",
 ): string {
-  return {
-    succeeded: "成功",
-    failed: "失败",
-    cancelled: "已取消",
-    timed_out: "已超时",
-  }[outcome];
+  return posMessage(`pos.cardOutcomeState.${outcome}` as TranslationKey);
 }
 
 /**
