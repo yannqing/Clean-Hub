@@ -54,6 +54,7 @@ import {
 } from "../actions";
 import { posMessage } from "@/lib/pos-message";
 import { posToast as toast } from "@/lib/pos-toast";
+import { getActionErrorMessage } from "@/lib/action-error-message";
 import {
   getOrderTypeLabel,
   getPaymentMethodLabel,
@@ -560,7 +561,7 @@ function OrderPaymentsCard({
               });
 
       if (!result.ok) {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "order"));
         return;
       }
 

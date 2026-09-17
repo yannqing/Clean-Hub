@@ -19,7 +19,8 @@
     "smoke:cash-drawer": "tsx src/features/hardware/lib/cash-drawer.smoke.ts",
     "smoke:receipt": "tsx src/features/orders/lib/order-receipt.smoke.ts",
     "smoke:printer-binding": "tsx src/features/hardware/lib/printer-binding.smoke.ts && tsx src/features/hardware/lib/pos-print-job.smoke.ts && tsx src/features/hardware/lib/t1101-bridge.smoke.ts",
-    "smoke:order-labels": "tsx src/lib/order-labels.smoke.ts"
+    "smoke:order-labels": "tsx src/lib/order-labels.smoke.ts",
+    "smoke:action-errors": "tsx src/lib/action-error-message.smoke.ts"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.1",

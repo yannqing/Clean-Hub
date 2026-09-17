@@ -30,6 +30,7 @@ import { useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
 import { posToast as toast } from "@/lib/pos-toast";
+import { getActionErrorMessage } from "@/lib/action-error-message";
 
 import {
   applyOrderDiscountAction,
@@ -140,7 +141,7 @@ export function OrderDiscountsCard({
         setApplyConfirmationOpen(false);
         setApplyReason("");
       }
-      toast.error(result.message);
+      toast.error(getActionErrorMessage(result, "order"));
       if (result.code === "VERSION_CONFLICT") {
         router.refresh();
       }
@@ -175,7 +176,7 @@ export function OrderDiscountsCard({
         return;
       }
 
-      toast.error(result.message);
+      toast.error(getActionErrorMessage(result, "order"));
       if (result.code === "VERSION_CONFLICT") {
         setRemoveTarget(null);
         setRemoveReason("");

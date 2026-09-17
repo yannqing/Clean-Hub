@@ -47,6 +47,7 @@ import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
 import { posApi } from "@/lib/api-client";
 import { getOrderStatusLabel } from "@/lib/order-labels";
+import { getActionErrorMessage } from "@/lib/action-error-message";
 
 import { deleteOrderAction, payOrderAction } from "../actions";
 import {
@@ -335,7 +336,7 @@ export function OrderActionsPanel({
         toast.success("订单已删除。");
         router.replace("/orders");
       } else {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "order"));
       }
     });
   }

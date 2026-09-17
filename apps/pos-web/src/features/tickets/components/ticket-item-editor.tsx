@@ -24,6 +24,7 @@ import {
 import { useMemo, useState, useTransition } from "react";
 
 import { Icon } from "@/components/app-shell";
+import { getActionErrorMessage } from "@/lib/action-error-message";
 
 import {
   changeTicketItemStatusAction,
@@ -301,7 +302,7 @@ function ItemRow({
           }),
         );
       } else {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "ticket"));
       }
     });
   }
@@ -319,7 +320,7 @@ function ItemRow({
         setDeleteOpen(false);
         setDeleteReason("");
       } else {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "ticket"));
       }
     });
   }
@@ -653,7 +654,7 @@ function ItemForm({
         toast.success(onSubmit === "create" ? "项目已添加" : "项目已更新");
         onCancel();
       } else {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "ticket"));
       }
     });
   }

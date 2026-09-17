@@ -17,6 +17,7 @@ import {
 
 import { posRoutes } from "@/config";
 import { posMessage } from "@/lib/pos-message";
+import { getActionErrorMessage } from "@/lib/action-error-message";
 
 import { deleteTicketAction } from "../actions";
 
@@ -61,7 +62,7 @@ export function TicketDeleteDialog({
         router.refresh();
         onClose();
       } else {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "ticket"));
       }
     });
   }

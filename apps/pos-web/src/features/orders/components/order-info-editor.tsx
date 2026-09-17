@@ -23,6 +23,7 @@ import {
 
 import { Icon } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
+import { getActionErrorMessage } from "@/lib/action-error-message";
 
 import { updateOrderAction } from "../actions";
 import { formatOrderDateTime, formatOrderMoney } from "../constants";
@@ -56,7 +57,7 @@ export function OrderInfoEditor({ order }: { order: PosOrderDetail }) {
         setEditing(false);
         router.refresh();
       } else {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "order"));
       }
     });
   }

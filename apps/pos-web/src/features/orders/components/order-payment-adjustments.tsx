@@ -37,6 +37,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { Icon } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posToast as toast } from "@/lib/pos-toast";
+import { getActionErrorMessage } from "@/lib/action-error-message";
 
 import {
   createPaymentCorrectionAction,
@@ -179,7 +180,7 @@ export function OrderPaymentAdjustments({
             });
 
       if (!result.ok) {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "order"));
         return;
       }
 
@@ -228,7 +229,7 @@ export function OrderPaymentAdjustments({
         },
       );
       if (!result.ok) {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "order"));
         return;
       }
       toast.success(

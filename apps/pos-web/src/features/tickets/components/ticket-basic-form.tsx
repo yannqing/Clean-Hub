@@ -24,6 +24,7 @@ import {
 
 import { Icon } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
+import { getActionErrorMessage } from "@/lib/action-error-message";
 
 import { updateTicketAction } from "../actions";
 import {
@@ -99,7 +100,7 @@ export function TicketBasicForm({ ticket, onCancel }: TicketBasicFormProps) {
         toast.error("该工单已被他人修改，正在刷新…");
         onCancel();
       } else {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "ticket"));
       }
     });
   }

@@ -44,6 +44,7 @@ import {
 import { Icon } from "@/components/app-shell";
 import { posMessage } from "@/lib/pos-message";
 import { posToast as toast } from "@/lib/pos-toast";
+import { getActionErrorMessage } from "@/lib/action-error-message";
 
 import {
   createOrderItemAction,
@@ -124,7 +125,7 @@ export function OrderItemsManager({
         setDeleteReason("");
         router.refresh();
       } else {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "order"));
       }
     });
   }
@@ -562,7 +563,7 @@ function OrderItemDialog({
         toast.success(editingItem ? "订单条目已保存。" : "订单条目已添加。");
         onSaved();
       } else {
-        toast.error(result.message);
+        toast.error(getActionErrorMessage(result, "order"));
       }
     });
   }
