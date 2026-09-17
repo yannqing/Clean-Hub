@@ -33,11 +33,15 @@ for (const locale of ["en", "fr"] as const) {
  */
 const partiallyTranslatable = [
   "只有店长或管理员可以登记非销售现金进出。",
-  "该页面可能已经移动、被删除，或当前终端没有对应的访问入口。",
   "请输入有效金额，并填写至少 3 个字符的原因。",
-  "该客户档案可能已被删除，或不属于当前门店可访问的范围。",
   "现金入柜",
-  "客户未找到",
+  // Sentences the dictionary does not carry whole. Deliberately not real UI
+  // copy: a screen string gets translated sooner or later, and then it stops
+  // testing the fallback -- which is exactly what happened to the three
+  // entries this list used to hold.
+  "请把这件衣服单独存放并通知店长处理。",
+  "客户临时取消了本次预约并要求全额退款。",
+  "本月的营业额统计需要重新核对一遍。",
 ];
 
 for (const source of partiallyTranslatable) {
