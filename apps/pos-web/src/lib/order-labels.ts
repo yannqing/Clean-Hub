@@ -106,3 +106,7 @@ export const ORDER_SORT_VALUES = [
   "amount_desc",
   "amount_asc",
 ] as const satisfies ReadonlyArray<PosOrderSort>;
+
+export function getOrderPeriodLabel(period: string): string {
+  return label(`pos.order.period.${period}` as TranslationKey, period);
+}

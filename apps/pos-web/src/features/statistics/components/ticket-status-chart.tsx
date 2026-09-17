@@ -5,32 +5,17 @@ import {
   type ServiceTicketStatus,
 } from "@cleanhub/api-client";
 
-const STATUS_CONFIG: Record<
-  ServiceTicketStatus,
-  { label: string; barClassName: string }
-> = {
-  draft: { label: "草稿", barClassName: "bg-muted-foreground" },
-  pending: {
-    label: "待处理",
-    barClassName: "bg-amber-500",
-  },
-  in_progress: {
-    label: "处理中",
-    barClassName: "bg-foreground",
-  },
-  ready_to_pick: {
-    label: "待取件",
-    barClassName: "bg-accent-foreground",
-  },
-  picked_up: {
-    label: "已取件",
-    barClassName: "bg-emerald-500",
-  },
-  cancelled: {
-    label: "已取消",
-    barClassName: "bg-muted-foreground",
-  },
-  exception: { label: "异常", barClassName: "bg-destructive" },
+import { getTicketStatusLabel } from "@/lib/ticket-labels";
+
+/** Bar colours only; the wording comes from the shared ticket catalogue. */
+const STATUS_BAR_CLASSES: Record<ServiceTicketStatus, string> = {
+  draft: "bg-muted-foreground",
+  pending: "bg-amber-500",
+  in_progress: "bg-foreground",
+  ready_to_pick: "bg-accent-foreground",
+  picked_up: "bg-emerald-500",
+  cancelled: "bg-muted-foreground",
+  exception: "bg-destructive",
 };
 
 function StatusRow({
@@ -42,18 +27,18 @@ function StatusRow({
   count: number;
   total: number;
 }) {
-  const config = STATUS_CONFIG[status];
+  const barClassName = STATUS_BAR_CLASSES[status];
   const percentage = total > 0 ? Math.round((count / total) * 100) : 0;
 
   return (
     <div className="flex items-center gap-3">
       <div className="w-20 text-xs font-medium text-muted-foreground">
-        {config.label}
+        {getTicketStatusLabel(status)}
       </div>
       <div className="flex-1">
         <div className="h-2 rounded-full bg-muted">
           <div
-            className={`h-full rounded-full ${config.barClassName}`}
+            className={`h-full rounded-full ${barClassName}`}
             style={{ width: `${percentage}%` }}
           />
         </div>

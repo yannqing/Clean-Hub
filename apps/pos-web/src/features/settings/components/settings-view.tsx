@@ -12,6 +12,7 @@ import { posToast as toast } from "@/lib/pos-toast";
 import { posApi } from "@/lib/api-client";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { getOrCreatePosDeviceId } from "@/features/auth/utils/device-id";
+import { getSettingsSectionTitle } from "@/lib/settings-labels";
 
 import { TERMINAL_SETTINGS_DEFAULTS } from "../constants";
 import { fetchTerminalSettings, updateTerminalSettings } from "../queries";
@@ -32,15 +33,6 @@ export type SettingsSection =
   | TerminalSettingsMode
   | "store"
   | "hardware";
-
-const SETTINGS_SECTION_TITLES: Record<SettingsSection, string> = {
-  terminal: "终端信息",
-  checkout: "收银偏好",
-  printing: "打印设置",
-  security: "安全设置",
-  store: "门店信息",
-  hardware: "硬件设备",
-};
 
 type BranchInfo = {
   id: string;
@@ -226,7 +218,7 @@ export function SettingsView({ section }: SettingsViewProps = {}) {
   const isLoading = pageState !== "ready";
 
   if (section) {
-    const sectionTitle = SETTINGS_SECTION_TITLES[section];
+    const sectionTitle = getSettingsSectionTitle(section);
     const sectionContent =
       section === "store" ? (
         <GeneralSettingsCard

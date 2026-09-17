@@ -5,6 +5,7 @@ import { setPosRuntimeLocale } from "@/components/i18n/pos-runtime-text";
 import {
   getOrderColumnLabel,
   getOrderPaymentStatusLabel,
+  getOrderPeriodLabel,
   getOrderSortLabel,
   getOrderStatusLabel,
   getOrderTypeLabel,
@@ -54,6 +55,13 @@ for (const locale of ["zh-CN", "en", "fr"] as const) {
     assert.ok(
       label && !label.startsWith("pos.order."),
       `${locale}: sort ${sort} resolved to ${label}`,
+    );
+  }
+  for (const period of ["all", "today", "week", "month"] as const) {
+    const label = getOrderPeriodLabel(period);
+    assert.ok(
+      label && !label.startsWith("pos.order."),
+      `${locale}: period ${period} resolved to ${label}`,
     );
   }
   for (const method of ["cash", "card", "app"] as const) {

@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { Icon } from "@/components/app-shell";
 import { posRoutes } from "@/config";
 import { posMessage } from "@/lib/pos-message";
+import { getSettingsSectionTitle } from "@/lib/settings-labels";
 
 import {
   LOCK_TIMEOUT_OPTIONS,
@@ -94,14 +95,14 @@ export function SettingsIndex({
     {
       description: loading ? "正在加载…" : formValues.label || "未设置设备标签",
       href: posRoutes.settingsTerminal,
-      title: "终端信息",
+      title: getSettingsSectionTitle("terminal"),
     },
     {
       description: loading
         ? "正在加载…"
         : `${optionLabel(PAYMENT_METHOD_OPTIONS, formValues.defaultPaymentMethod)} · ${optionLabel(ROUNDING_RULE_OPTIONS, formValues.roundingRule)}`,
       href: posRoutes.settingsCheckout,
-      title: "收银偏好",
+      title: getSettingsSectionTitle("checkout"),
     },
     {
       description: loading
@@ -115,7 +116,7 @@ export function SettingsIndex({
             copies: optionLabel(PRINT_COPIES_OPTIONS, formValues.printCopies),
           }),
       href: posRoutes.settingsPrinting,
-      title: "打印设置",
+      title: getSettingsSectionTitle("printing"),
     },
     {
       description: loading
@@ -127,7 +128,7 @@ export function SettingsIndex({
             ),
           }),
       href: posRoutes.settingsSecurity,
-      title: "安全设置",
+      title: getSettingsSectionTitle("security"),
     },
   ];
 
@@ -135,7 +136,7 @@ export function SettingsIndex({
     {
       description: loading ? "正在加载…" : branchName || "未获取门店信息",
       href: posRoutes.settingsStore,
-      title: "门店信息",
+      title: getSettingsSectionTitle("store"),
     },
     {
       description: loading
@@ -144,7 +145,7 @@ export function SettingsIndex({
           ? posMessage("pos.inline.deviceCount", { count: hardwareCount })
           : "打开查看本机可用设备",
       href: posRoutes.settingsHardware,
-      title: "硬件设备",
+      title: getSettingsSectionTitle("hardware"),
     },
   ];
 

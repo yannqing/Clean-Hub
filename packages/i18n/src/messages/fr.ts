@@ -693,6 +693,12 @@ export const frMessages = {
   },
   pos: {
     order: {
+      period: {
+        all: "Toutes les commandes",
+        today: "Commandes du jour",
+        week: "7 derniers jours",
+        month: "Ce mois-ci",
+      },
       title: "Commandes",
       status: {
         draft: "Brouillon",

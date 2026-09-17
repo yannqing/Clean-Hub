@@ -16,6 +16,10 @@ import {
 import { getCurrencyPayableStep } from "@cleanhub/domain/currency";
 
 import { Icon, type PosIconName } from "@/components/app-shell";
+import {
+  getSettingsSectionDescription,
+  getSettingsSectionTitle,
+} from "@/lib/settings-labels";
 
 import {
   LOCK_TIMEOUT_OPTIONS,
@@ -54,30 +58,11 @@ export type TerminalSettingsMode =
   | "printing"
   | "security";
 
-const MODE_COPY: Record<
-  TerminalSettingsMode,
-  { description: string; icon: PosIconName; title: string }
-> = {
-  terminal: {
-    description: "设置当前收银终端在设备列表中显示的名称。",
-    icon: "monitor",
-    title: "终端信息",
-  },
-  checkout: {
-    description: "配置当前终端默认使用的支付方式和金额处理规则。",
-    icon: "wallet-cards",
-    title: "收银偏好",
-  },
-  printing: {
-    description: "配置收据的自动打印策略和默认打印联数。",
-    icon: "printer",
-    title: "打印设置",
-  },
-  security: {
-    description: "设置终端在无操作后自动锁屏的等待时间。",
-    icon: "lock",
-    title: "安全设置",
-  },
+const MODE_ICONS: Record<TerminalSettingsMode, PosIconName> = {
+  terminal: "monitor",
+  checkout: "wallet-cards",
+  printing: "printer",
+  security: "lock",
 };
 
 function MobileSettingSwitch({
@@ -126,7 +111,7 @@ export function TerminalSettingsCard({
   onSave,
 }: TerminalSettingsCardProps) {
   const [form, setForm] = useState<TerminalSettingsFormValues>(initial);
-  const copy = MODE_COPY[mode];
+  const modeIcon = MODE_ICONS[mode];
   // XOF and other zero-decimal currencies already round to a whole unit, which
   // is coarser than anything this rule can add. Offering the choice would
   // suggest the cashier can change a total that will not move.
@@ -155,10 +140,10 @@ export function TerminalSettingsCard({
           <div className="flex items-center gap-2">
             <Icon
               className="hidden h-4 w-4 text-muted-foreground lg:block"
-              name={copy.icon}
+              name={modeIcon}
             />
             <h2 className="text-3xl font-bold tracking-tight text-foreground lg:text-sm lg:font-semibold lg:tracking-normal">
-              {copy.title}
+              {getSettingsSectionTitle(mode)}
             </h2>
           </div>
           <p className="mt-2 text-sm text-muted-foreground lg:mt-1 lg:text-xs">
@@ -183,14 +168,14 @@ export function TerminalSettingsCard({
         <div className="flex items-center gap-2">
           <Icon
             className="hidden h-4 w-4 text-muted-foreground lg:block"
-            name={copy.icon}
+            name={modeIcon}
           />
           <h2 className="text-3xl font-bold tracking-tight text-foreground lg:text-sm lg:font-semibold lg:tracking-normal">
-            {copy.title}
+            {getSettingsSectionTitle(mode)}
           </h2>
         </div>
         <p className="mt-2 text-sm leading-6 text-muted-foreground lg:mt-1 lg:text-xs lg:leading-5">
-          {copy.description}
+          {getSettingsSectionDescription(mode)}
         </p>
       </header>
       <form onSubmit={handleSubmit}>

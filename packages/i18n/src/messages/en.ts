@@ -687,6 +687,12 @@ export const enMessages = {
   },
   pos: {
     order: {
+      period: {
+        all: "All orders",
+        today: "Today's orders",
+        week: "Last 7 days",
+        month: "This month",
+      },
       title: "Orders",
       status: {
         draft: "Draft",

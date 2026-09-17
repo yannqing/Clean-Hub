@@ -674,6 +674,12 @@ export const zhCNMessages = {
   },
   pos: {
     order: {
+      period: {
+        all: "全部订单",
+        today: "今日订单",
+        week: "近 7 天订单",
+        month: "本月订单",
+      },
       title: "订单管理",
       status: {
         draft: "草稿",

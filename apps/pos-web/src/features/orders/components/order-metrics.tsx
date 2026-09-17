@@ -5,6 +5,7 @@ import type { PosOrderOverview } from "@cleanhub/api-client";
 
 import { Icon } from "@/components/app-shell";
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
+import { getOrderPeriodLabel } from "@/lib/order-labels";
 
 import { formatOrderMoney } from "../constants";
 
@@ -12,13 +13,6 @@ type MetricCardProps = {
   label: string;
   value: string | number;
   icon: Parameters<typeof Icon>[0]["name"];
-};
-
-const PERIOD_LABELS: Record<PosOrderOverview["period"], string> = {
-  all: "全部订单",
-  today: "今日订单",
-  week: "近 7 天订单",
-  month: "本月订单",
 };
 
 function MetricCard({ label, value, icon }: MetricCardProps) {
@@ -47,7 +41,7 @@ export function OrderMetrics({ overview }: { overview: PosOrderOverview }) {
     <div className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
       <MetricCard
         icon="receipt"
-        label={text(PERIOD_LABELS[overview.period])}
+        label={getOrderPeriodLabel(overview.period)}
         value={overview.orderCount}
       />
       <MetricCard
