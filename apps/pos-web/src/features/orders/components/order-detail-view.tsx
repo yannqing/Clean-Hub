@@ -55,6 +55,7 @@ import {
   failManualPaymentAction,
   recordCardOutcomeAction,
 } from "../actions";
+import { posMessage } from "@/lib/pos-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import { OrderActionsPanel } from "./order-actions-panel";
 import { OrderPaymentStatusBadge, OrderStatusBadge } from "./order-badges";
@@ -159,7 +160,9 @@ export function OrderDetailView({
           />
           <OrderHeaderMetric
             label="条目数量"
-            value={`${order.items.length} 项`}
+            value={posMessage("pos.inline.itemCount", {
+              count: order.items.length,
+            })}
           />
           <OrderHeaderMetric
             label="订单类型"

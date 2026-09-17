@@ -41,6 +41,7 @@ import {
   PosChartTooltip,
 } from "@/components/charts/pos-chart";
 import { formatPosMoney } from "@/lib/money";
+import { posMessage } from "@/lib/pos-message";
 
 type StatisticsViewProps = {
   overview: PosStatisticsOverview | null;
@@ -1258,7 +1259,9 @@ export function StatisticsView({ overview }: StatisticsViewProps) {
             value={formatNumber(orderCount, locale)}
           />
           <MetricCard
-            helper={`已收金额 ${formatCurrency(paidAmount, locale, currency)}`}
+            helper={posMessage("pos.inline.collectedAmountHelper", {
+              value: formatCurrency(paidAmount, locale, currency),
+            })}
             icon="wallet-cards"
             label="今日销售额"
             value={formatCurrency(totalAmount, locale, currency)}

@@ -429,8 +429,14 @@ function ItemRow({
           </div>
           <div className="mt-1 text-sm font-medium text-foreground">
             {item.pricingUnit === "per_kg"
-              ? `${item.weight ?? "0"} kg${item.bagCount ? ` · ${item.bagCount} 袋` : ""}`
-              : `${item.quantity} 件`}{" "}
+              ? `${item.weight ?? "0"} kg${
+                  item.bagCount
+                    ? ` · ${posMessage("pos.inline.bagCount", { count: item.bagCount })}`
+                    : ""
+                }`
+              : posMessage("pos.inline.pieceCount", {
+                  count: item.quantity,
+                })}{" "}
             × {formatTicketMoney(item.chargedUnitAmount, currency)}
           </div>
           {item.chargedUnitAmount !== item.standardUnitAmount ? (

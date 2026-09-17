@@ -13,6 +13,7 @@ import { PosBreadcrumb, PosDetailPageSkeleton } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { buildNewIntakePath, posRoutes } from "@/config";
 import { getPosApiErrorMessage } from "@/lib/api-error-message";
+import { posMessage } from "@/lib/pos-message";
 import { posToast as toast } from "@/lib/pos-toast";
 import { formatPosMoney } from "@/lib/money";
 
@@ -722,7 +723,10 @@ function RecentActivity({
       .slice(0, 3)
       .map<ActivityItem & { timestamp: string }>((ticket) => ({
         title: "工单创建",
-        detail: `${getTicketTypeLabel(ticket.ticketType)} · ${ticket.itemCount} 个项目`,
+        detail: `${getTicketTypeLabel(ticket.ticketType)} · ${posMessage(
+          "pos.inline.projectCount",
+          { count: ticket.itemCount },
+        )}`,
         time: formatDateShort(ticket.createdAt, locale, timeZone),
         timestamp: ticket.createdAt,
         amount: ticket.totalAmount

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { Icon } from "@/components/app-shell";
 import { posRoutes } from "@/config";
+import { posMessage } from "@/lib/pos-message";
 
 import {
   LOCK_TIMEOUT_OPTIONS,
@@ -128,7 +129,7 @@ export function SettingsIndex({
       description: loading
         ? "正在加载…"
         : hardwareCount > 0
-          ? `${hardwareCount} 台已登记设备`
+          ? posMessage("pos.inline.deviceCount", { count: hardwareCount })
           : "打开查看本机可用设备",
       href: posRoutes.settingsHardware,
       title: "硬件设备",

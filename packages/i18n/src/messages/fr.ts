@@ -693,6 +693,15 @@ export const frMessages = {
   },
   pos: {
     inline: {
+      unpaidOrdersHelper: "Commandes impayées {value}",
+      collectedHelper: "Encaissé {value}",
+      collectedShareHelper: "Part encaissée {value}",
+      pickedUpTodayHelper: "Retraits aujourd’hui {value}",
+      totalCustomersHelper: "Clients au total {value}",
+      collectedAmountHelper: "Montant encaissé {value}",
+      bagCount: "{count} sacs",
+      accountProfiles: "{account} · {count} profils",
+      accountProfilesOne: "{account} · {count} profil",
       colorLabeled: "Couleur : {value}",
       defectLabeled: "Défaut : {value}",
       requestLabeled: "Demande : {value}",

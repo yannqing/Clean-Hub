@@ -1,6 +1,6 @@
 "use client";
 
-import type { SupportedLocale } from "@cleanhub/i18n";
+import { createTranslator, type SupportedLocale } from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 
 import { translatePosText } from "@/components/i18n/pos-runtime-text";
@@ -8,6 +8,7 @@ import { Icon } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { formatPosMoney } from "@/lib/money";
 import { buildPaginationWindow } from "@/lib/pagination";
+import { posMessage } from "@/lib/pos-message";
 
 import type {
   IntakeAccountRow,
@@ -146,7 +147,7 @@ export function IntakeProfileList({
                 )}
               />
             ) : (
-              `${total} 条匹配结果`
+              posMessage("pos.inline.matchCount", { count: total })
             )}
           </div>
           <div className="mt-0.5 text-xs text-muted-foreground">
@@ -498,13 +499,12 @@ function formatAccountProfileCount(
   count: number,
   locale: SupportedLocale,
 ): string {
-  if (locale === "en") {
-    return `${accountName} · ${count} ${count === 1 ? "profile" : "profiles"}`;
-  }
-  if (locale === "fr") {
-    return `${accountName} · ${count} ${count === 1 ? "profil" : "profils"}`;
-  }
-  return `${accountName} · ${count} 个档案`;
+  return createTranslator({ locale })(
+    count === 1
+      ? "pos.inline.accountProfilesOne"
+      : "pos.inline.accountProfiles",
+    { account: accountName, count },
+  );
 }
 
 function profileRelation(row: IntakeProfileRow): string {

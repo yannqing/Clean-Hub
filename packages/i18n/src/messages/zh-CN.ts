@@ -674,6 +674,15 @@ export const zhCNMessages = {
   },
   pos: {
     inline: {
+      unpaidOrdersHelper: "未付款订单 {value}",
+      collectedHelper: "已收款 {value}",
+      collectedShareHelper: "实收占比 {value}",
+      pickedUpTodayHelper: "今日取件 {value}",
+      totalCustomersHelper: "总客户 {value}",
+      collectedAmountHelper: "已收金额 {value}",
+      bagCount: "{count} 袋",
+      accountProfiles: "{account} · {count} 个档案",
+      accountProfilesOne: "{account} · {count} 个档案",
       colorLabeled: "颜色：{value}",
       defectLabeled: "瑕疵：{value}",
       requestLabeled: "要求：{value}",

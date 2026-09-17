@@ -687,6 +687,15 @@ export const enMessages = {
   },
   pos: {
     inline: {
+      unpaidOrdersHelper: "Unpaid orders {value}",
+      collectedHelper: "Collected {value}",
+      collectedShareHelper: "Collected share {value}",
+      pickedUpTodayHelper: "Picked up today {value}",
+      totalCustomersHelper: "Total customers {value}",
+      collectedAmountHelper: "Amount collected {value}",
+      bagCount: "{count} bags",
+      accountProfiles: "{account} · {count} profiles",
+      accountProfilesOne: "{account} · {count} profile",
       colorLabeled: "Color: {value}",
       defectLabeled: "Defect: {value}",
       requestLabeled: "Request: {value}",

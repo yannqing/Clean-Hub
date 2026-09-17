@@ -14,6 +14,11 @@ import {
 } from "recharts";
 
 import type { PosWorkspaceStatistics } from "@cleanhub/api-client";
+import {
+  createTranslator,
+  defaultLocale,
+  normalizeLocale,
+} from "@cleanhub/i18n";
 import { useTranslation } from "@cleanhub/i18n/react";
 
 import { Icon, type PosIconName } from "@/components/app-shell/icons";
@@ -23,6 +28,7 @@ import {
   PosChartTooltip,
 } from "@/components/charts/pos-chart";
 import { formatPosMoney } from "@/lib/money";
+import { posMessage } from "@/lib/pos-message";
 
 type WorkspaceStatisticsProps = {
   statistics: PosWorkspaceStatistics | null;
@@ -67,18 +73,11 @@ function formatPercent(value: number, locale: string): string {
   }).format(value / 100);
 }
 
-function formatOrderUnitCount(value: number, locale: string): string {
-  const count = formatNumber(value, locale);
-
-  if (locale === "en") {
-    return `${count} orders`;
-  }
-
-  if (locale === "fr") {
-    return `${count} commandes`;
-  }
-
-  return `${count} 单`;
+function formatOrderUnitCount(count: number, locale: string): string {
+  return createTranslator({ locale: normalizeLocale(locale) ?? defaultLocale })(
+    "pos.inline.orderCount",
+    { count },
+  );
 }
 
 function iconAccentStyle(color: string): CSSProperties {
@@ -181,7 +180,9 @@ function PaymentChart({
           {
             color: "#cbd5e1",
             displayValue: formatCurrency(unpaidAmount, locale, currency),
-            helper: `未付款订单 ${formatOrderUnitCount(unpaidCount, locale)}`,
+            helper: posMessage("pos.inline.unpaidOrdersHelper", {
+              value: formatOrderUnitCount(unpaidCount, locale),
+            }),
             label: "待收款",
             value: unpaidAmount,
           },
@@ -539,28 +540,36 @@ export function WorkspaceStatistics({ statistics }: WorkspaceStatisticsProps) {
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard
           color={CHART_COLORS.orders}
-          helper={`已收款 ${formatCurrency(paidAmount, locale, currency)}`}
+          helper={posMessage("pos.inline.collectedHelper", {
+            value: formatCurrency(paidAmount, locale, currency),
+          })}
           icon="receipt"
           label="订单数"
           value={formatNumber(orderCount, locale)}
         />
         <KpiCard
           color={CHART_COLORS.paid}
-          helper={`实收占比 ${formatPercent(paidPercent, locale)}`}
+          helper={posMessage("pos.inline.collectedShareHelper", {
+            value: formatPercent(paidPercent, locale),
+          })}
           icon="wallet-cards"
           label="销售额"
           value={formatCurrency(totalAmount, locale, currency)}
         />
         <KpiCard
           color={CHART_COLORS.tickets}
-          helper={`今日取件 ${formatNumber(todayPickedUpCount, locale)}`}
+          helper={posMessage("pos.inline.pickedUpTodayHelper", {
+            value: formatNumber(todayPickedUpCount, locale),
+          })}
           icon="clipboard-list"
           label="工单数"
           value={formatNumber(ticketTotal, locale)}
         />
         <KpiCard
           color={CHART_COLORS.customers}
-          helper={`总客户 ${formatNumber(totalCustomerCount, locale)}`}
+          helper={posMessage("pos.inline.totalCustomersHelper", {
+            value: formatNumber(totalCustomerCount, locale),
+          })}
           icon="user-plus"
           label="新增客户"
           value={formatNumber(todayNewCustomerCount, locale)}

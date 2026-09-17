@@ -14,6 +14,7 @@ import {
 } from "@/config";
 import { AddTicketToCartButton } from "@/features/cart/components";
 import { PrintJobControl } from "@/features/hardware/components";
+import { posMessage } from "@/lib/pos-message";
 
 import {
   formatTicketDateTime,
@@ -223,8 +224,12 @@ export function TicketDetailView({
           />
           <HeaderMetric
             label="项目数量"
-            value={`${ticket.itemCount} 件`}
-            note={`${ticket.items?.length ?? 0} 个工单项目`}
+            value={posMessage("pos.inline.pieceCount", {
+              count: ticket.itemCount,
+            })}
+            note={posMessage("pos.inline.ticketItemCount", {
+              count: ticket.items?.length ?? 0,
+            })}
           />
           <HeaderMetric
             label="预计取件"
