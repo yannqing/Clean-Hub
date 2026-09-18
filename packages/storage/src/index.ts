@@ -174,11 +174,41 @@ export function buildTenantObjectKey(input: BuildObjectKeyInput): string {
   return [prefix, ...segments, sanitizeFileName(input.fileName)].join("/");
 }
 
+/**
+ * Whether `objectKey` addresses an object inside this tenant's prefix.
+ *
+ * A prefix match alone is not enough. Keys checked here come from callers,
+ * not only from `buildTenantObjectKey`, so `tenant/<id>/../<other>/secret.pdf`
+ * would pass a `startsWith` test while a storage backend that normalises the
+ * path resolves it outside the tenant. Every segment is therefore validated,
+ * which rejects `..`, `.`, empty segments from doubled or trailing slashes,
+ * and absolute keys.
+ */
 export function isTenantObjectKey(
   objectKey: string,
   tenantId: string,
 ): boolean {
-  return objectKey === `tenant/${tenantId}` || objectKey.startsWith(`tenant/${tenantId}/`);
+  const prefix = `tenant/${tenantId}`;
+
+  if (objectKey === prefix) {
+    return true;
+  }
+
+  if (!objectKey.startsWith(`${prefix}/`)) {
+    return false;
+  }
+
+  const rest = objectKey.slice(prefix.length + 1);
+
+  return (
+    rest.length > 0 &&
+    rest
+      .split("/")
+      .every(
+        (segment) =>
+          segment !== "" && segment !== "." && segment !== "..",
+      )
+  );
 }
 
 export function assertTenantObjectKey(

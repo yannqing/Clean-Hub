@@ -92,6 +92,7 @@ jobs:
           sh -n deploy/postgres/backup-loop.sh deploy/postgres/cloud-backup-loop.sh deploy/postgres/cloud-object-storage-loop.sh deploy/postgres/restore-drill.sh
           node --check scripts/build-release.mjs
           pnpm --filter @cleanhub/offline smoke
+          pnpm --filter @cleanhub/storage smoke
           pnpm --filter @cleanhub/desktop smoke
           pnpm --filter @cleanhub/domain smoke:money
           pnpm --filter @cleanhub/api smoke:cron-schedule

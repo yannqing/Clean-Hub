@@ -52,4 +52,55 @@ assert.throws(
   StorageValidationError,
 );
 
+// A prefix match alone is not enough. Keys reaching this helper do not all
+// come from buildTenantObjectKey, and a backend that normalises the path would
+// resolve these outside the tenant's prefix.
+for (const traversalKey of [
+  "tenant/TENANT_01/../TENANT_02/secret.pdf",
+  "tenant/TENANT_01/media/../../TENANT_02/secret.pdf",
+  "tenant/TENANT_01/..",
+  "tenant/TENANT_01/./media/file.pdf",
+]) {
+  assert.throws(
+    () => assertTenantObjectKey(traversalKey, "TENANT_01"),
+    StorageValidationError,
+    `traversal must be rejected: ${traversalKey}`,
+  );
+}
+
+// Empty segments would also normalise unpredictably.
+for (const malformedKey of [
+  "tenant/TENANT_01//media/file.pdf",
+  "tenant/TENANT_01/media//file.pdf",
+  "tenant/TENANT_01/",
+]) {
+  assert.throws(
+    () => assertTenantObjectKey(malformedKey, "TENANT_01"),
+    StorageValidationError,
+    `malformed key must be rejected: ${malformedKey}`,
+  );
+}
+
+// A tenant whose id is a prefix of another must not reach across.
+assert.throws(
+  () => assertTenantObjectKey("tenant/TENANT_011/file.pdf", "TENANT_01"),
+  StorageValidationError,
+  "a longer tenant id must not match a shorter one's prefix",
+);
+
+// Legitimate keys still pass, including the bare prefix.
+assert.doesNotThrow(() =>
+  assertTenantObjectKey("tenant/TENANT_01", "TENANT_01"),
+);
+assert.doesNotThrow(() =>
+  assertTenantObjectKey(
+    "tenant/TENANT_01/media/2026/photo.jpg",
+    "TENANT_01",
+  ),
+);
+// "..." is a legal name, not traversal.
+assert.doesNotThrow(() =>
+  assertTenantObjectKey("tenant/TENANT_01/media/....jpg", "TENANT_01"),
+);
+
 console.log("storage smoke ok");
