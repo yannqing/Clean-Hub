@@ -180,9 +180,13 @@ export class OwnerRepository {
       isNull(roles.deletedAt),
     ];
 
+    // Both filters apply. An explicit branch narrows the result *within* the
+    // caller's allow-list; it must never replace it, or a future call path
+    // that forgets to check access first would read another branch's drivers.
     if (input.branchId) {
       filters.push(eq(userRoles.branchId, input.branchId));
-    } else if (input.allowedBranchIds) {
+    }
+    if (input.allowedBranchIds) {
       filters.push(inArray(userRoles.branchId, input.allowedBranchIds));
     }
 
