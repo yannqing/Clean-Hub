@@ -66,6 +66,24 @@ function assertReasonableClientTimestamp(value: string): void {
   }
 }
 
+/**
+ * Clamps a terminal's own clock reading to server time.
+ *
+ * Carts are merged by comparing `clientUpdatedAt`, so a terminal running fast
+ * — even by less than the 5 minutes `assertReasonableClientTimestamp` tolerates
+ * — would otherwise store a future timestamp that no correctly-clocked terminal
+ * can beat, and every later write from its colleagues would be silently
+ * rejected until real time caught up. Clamping keeps ordering intact between
+ * honest terminals while denying a skewed one a permanent advantage.
+ */
+export function clampClientTimestampToServer(
+  value: string,
+  now: number = Date.now(),
+): string {
+  const timestamp = new Date(value).getTime();
+  return timestamp > now ? new Date(now).toISOString() : value;
+}
+
 export function shouldAcceptPosCartUpdate(
   existingClientUpdatedAt: string | null,
   incomingClientUpdatedAt: string,
@@ -124,6 +142,14 @@ export async function saveCurrentPosCart(
     );
   }
 
+  // Never let a terminal's own clock run ahead of the server's: the merge rule
+  // below orders by this value, so a future-dated write would suppress every
+  // later update from a correctly-clocked terminal.
+  const incomingCart = {
+    ...input.data.cart,
+    updatedAt: clampClientTimestampToServer(input.data.cart.updatedAt),
+  };
+
   return db.transaction(async (tx) => {
     const scope = {
       tenantId: terminal.tenantId,
@@ -136,7 +162,7 @@ export async function saveCurrentPosCart(
       existing &&
       !shouldAcceptPosCartUpdate(
         existing.clientUpdatedAt,
-        input.data.cart.updatedAt,
+        incomingCart.updatedAt,
       )
     ) {
       return { accepted: false, cart: existing };
@@ -152,7 +178,7 @@ export async function saveCurrentPosCart(
           tenantId: terminal.tenantId,
           terminalId: terminal.terminalId,
           userId: input.authContext.userId,
-          cart: input.data.cart,
+          cart: incomingCart,
           expiresAt,
         })
       : await insertPosCart(tx, {
@@ -160,7 +186,7 @@ export async function saveCurrentPosCart(
           branchId: terminal.branchId,
           terminalId: terminal.terminalId,
           userId: input.authContext.userId,
-          cart: input.data.cart,
+          cart: incomingCart,
           expiresAt,
         });
     return { accepted: true, cart };
