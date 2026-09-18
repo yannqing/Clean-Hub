@@ -389,10 +389,13 @@ export const paymentTransactions = pgTable(
     version: integer("version").notNull().default(1),
   },
   (table) => [
-    uniqueIndex("payment_transactions_tenant_idempotency_key_unique").on(
-      table.tenantId,
-      table.idempotencyKey,
-    ),
+    // Excludes soft-deleted rows to match the lookup, which filters on
+    // `deleted_at is null`. Without the predicate a soft-deleted transaction
+    // permanently burns its idempotency key: the insert conflicts, the lookup
+    // that should return the original finds nothing, and the retry throws.
+    uniqueIndex("payment_transactions_tenant_idempotency_key_unique")
+      .on(table.tenantId, table.idempotencyKey)
+      .where(sql`${table.deletedAt} is null`),
     index("payment_transactions_order_id_idx").on(table.orderId),
     index("payment_transactions_shift_id_idx").on(table.shiftId),
     index("payment_transactions_register_session_id_idx").on(
