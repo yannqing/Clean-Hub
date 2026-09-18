@@ -162,6 +162,11 @@ export async function resolveOfflineSaleExceptionRecord(
       and(
         eq(posOfflineSaleExceptions.tenantId, input.tenantId),
         eq(posOfflineSaleExceptions.commandId, input.commandId),
+        // Only an open exception may be resolved. Two operators racing on the
+        // same commandId (or one double-clicking a slow request) must not both
+        // win: the loser gets zero rows back and is treated as already
+        // resolved, so cash is never both refunded and re-collected.
+        eq(posOfflineSaleExceptions.status, "open"),
       ),
     )
     .returning();

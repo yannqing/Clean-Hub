@@ -283,52 +283,64 @@ export async function resolvePosOfflineSaleException(
     "offline_cash_reconciliation",
     input.data.reason,
   );
-  const row = await findOfflineSaleException(db, { tenantId, commandId });
-  if (!row) {
-    throw new PosOrderError(
-      "PAYMENT_NOT_FOUND",
-      "Offline cash exception was not found.",
-      404,
-    );
-  }
-  requirePosBranchAccess(input.authContext, row.exception.branchId);
-  if (row.exception.status === "resolved") {
-    return { exception: row.exception, result: null };
-  }
-
-  const result =
-    input.data.action === "retry_latest"
-      ? await retryOfflineCashCommand(input.authContext, row.command, db)
-      : null;
-  const resolution =
-    input.data.action === "cash_refunded" ? "cash_refunded" : "recovered";
-  const exception = await resolveOfflineSaleExceptionRecord(db, {
-    tenantId,
-    commandId,
-    resolution,
-    reason,
-    actorUserId: input.authContext.userId,
-  });
-  if (!exception) throw new Error("Resolved offline cash exception was lost.");
-  await writeAuditLog(db, {
-    tenantId,
-    branchId: exception.branchId,
-    actorUserId: input.authContext.userId,
-    eventCategory: "pos.offline_cash",
-    eventType: `pos.offline_cash.${resolution}`,
-    entityType: "pos_offline_sale_exception",
-    entityId: exception.id,
-    reason,
-    before: row.exception,
-    after: exception,
-    metadata: createPosAuditMetadata(input.authContext, {
+  // This moves physical cash: a retry re-collects it and a refund hands it
+  // back. Both the read and the resolving write must happen under one
+  // transaction with the row locked, or two concurrent operators can each pass
+  // the "already resolved" check and settle the same exception twice.
+  return db.transaction(async (tx) => {
+    const row = await findOfflineSaleException(tx, {
+      tenantId,
       commandId,
-      orderId: exception.orderId,
-    }),
-    ipAddress: input.requestMeta?.ipAddress,
-    userAgent: input.requestMeta?.userAgent,
+      forUpdate: true,
+    });
+    if (!row) {
+      throw new PosOrderError(
+        "PAYMENT_NOT_FOUND",
+        "Offline cash exception was not found.",
+        404,
+      );
+    }
+    requirePosBranchAccess(input.authContext, row.exception.branchId);
+    if (row.exception.status === "resolved") {
+      return { exception: row.exception, result: null };
+    }
+
+    const result =
+      input.data.action === "retry_latest"
+        ? await retryOfflineCashCommand(input.authContext, row.command, tx)
+        : null;
+    const resolution =
+      input.data.action === "cash_refunded" ? "cash_refunded" : "recovered";
+    const exception = await resolveOfflineSaleExceptionRecord(tx, {
+      tenantId,
+      commandId,
+      resolution,
+      reason,
+      actorUserId: input.authContext.userId,
+    });
+    if (!exception) {
+      throw new Error("Resolved offline cash exception was lost.");
+    }
+    await writeAuditLog(tx, {
+      tenantId,
+      branchId: exception.branchId,
+      actorUserId: input.authContext.userId,
+      eventCategory: "pos.offline_cash",
+      eventType: `pos.offline_cash.${resolution}`,
+      entityType: "pos_offline_sale_exception",
+      entityId: exception.id,
+      reason,
+      before: row.exception,
+      after: exception,
+      metadata: createPosAuditMetadata(input.authContext, {
+        commandId,
+        orderId: exception.orderId,
+      }),
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+    return { exception, result };
   });
-  return { exception, result };
 }
 
 export async function acknowledgeRecoveredOfflineSaleException(
@@ -337,34 +349,43 @@ export async function acknowledgeRecoveredOfflineSaleException(
   db: Database = getDb(),
 ): Promise<PosOfflineSaleException | null> {
   const tenantId = requirePosTenantId(input.authContext);
-  const row = await findOfflineSaleException(db, { tenantId, commandId });
-  if (!row || row.exception.status === "resolved") {
-    return row?.exception ?? null;
-  }
-  requirePosBranchAccess(input.authContext, row.exception.branchId);
-  if (!canAccessException(row.exception.staffId, input.authContext)) {
-    throw new PosOrderError(
-      "PAYMENT_CONFIRMATION_FORBIDDEN",
-      "This exception belongs to another operator.",
-      403,
-    );
-  }
-  const payment = await findPaymentTransactionByIdempotencyKey(db, {
-    tenantId,
-    idempotencyKey: commandId,
-  });
-  if (!payment || payment.paymentStatus !== "paid") {
-    throw new PosOrderError(
-      "PAYMENT_NOT_FOUND",
-      "The recovered cash payment could not be verified.",
-      409,
-    );
-  }
-  return resolveOfflineSaleExceptionRecord(db, {
-    tenantId,
-    commandId,
-    resolution: "recovered",
-    reason: "Offline replay completed successfully.",
-    actorUserId: input.authContext.userId,
+  // Races resolvePosOfflineSaleException for the same row, so it needs the
+  // same transaction + row lock: a terminal auto-acknowledging a recovered
+  // replay must not silently overwrite a manager's concurrent cash decision.
+  return db.transaction(async (tx) => {
+    const row = await findOfflineSaleException(tx, {
+      tenantId,
+      commandId,
+      forUpdate: true,
+    });
+    if (!row || row.exception.status === "resolved") {
+      return row?.exception ?? null;
+    }
+    requirePosBranchAccess(input.authContext, row.exception.branchId);
+    if (!canAccessException(row.exception.staffId, input.authContext)) {
+      throw new PosOrderError(
+        "PAYMENT_CONFIRMATION_FORBIDDEN",
+        "This exception belongs to another operator.",
+        403,
+      );
+    }
+    const payment = await findPaymentTransactionByIdempotencyKey(tx, {
+      tenantId,
+      idempotencyKey: commandId,
+    });
+    if (!payment || payment.paymentStatus !== "paid") {
+      throw new PosOrderError(
+        "PAYMENT_NOT_FOUND",
+        "The recovered cash payment could not be verified.",
+        409,
+      );
+    }
+    return resolveOfflineSaleExceptionRecord(tx, {
+      tenantId,
+      commandId,
+      resolution: "recovered",
+      reason: "Offline replay completed successfully.",
+      actorUserId: input.authContext.userId,
+    });
   });
 }
