@@ -1,5 +1,10 @@
 import { getDb, type Database } from "@cleanhub/db";
 import { getCurrencyPayableStep } from "@cleanhub/domain/currency";
+import {
+  amountToCents,
+  centsToAmount,
+  subtractAmounts,
+} from "@cleanhub/domain/money";
 
 import { AuthError } from "../../auth/auth.errors.js";
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
@@ -391,7 +396,7 @@ export async function createRegisterCashMovement(
       registerSessionId: state.registerSession.id,
       cashDrawerSessionId: state.cashSession.id,
       movementType: input.data.movementType,
-      amount: Number(input.data.amount).toFixed(2),
+      amount: centsToAmount(amountToCents(input.data.amount)),
       currency: state.cashSession.currency,
       reason,
       idempotencyKey: input.data.idempotencyKey,
@@ -592,9 +597,9 @@ export async function closePosRegister(
         actorUserId: authContext.userId,
         expectedCash: snapshot.expectedCash,
         countedCash,
-        variance: (
-          Number(countedCash) - Number(snapshot.expectedCash)
-        ).toFixed(2),
+        // Exact: a float subtraction here can report a one-cent drawer
+        // variance that does not exist, which a manager then has to reconcile.
+        variance: subtractAmounts(countedCash, snapshot.expectedCash),
       });
       if (!closedCashSession) {
         throw new PosStaffError(

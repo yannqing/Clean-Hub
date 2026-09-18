@@ -6,6 +6,13 @@ import {
   type Database,
 } from "@cleanhub/db";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import {
+  addAmounts,
+  amountToCents,
+  centsToAmount,
+  compareAmounts,
+  subtractAmounts,
+} from "@cleanhub/domain/money";
 import { createId } from "@cleanhub/id";
 
 import type {
@@ -139,10 +146,16 @@ export async function findAdjustmentById(
   return row ? toAdjustment(row) : null;
 }
 
+/**
+ * Returns the already-refunded total as an exact decimal string. Postgres sums
+ * `numeric` losslessly, so the value must not be funnelled through a JS number
+ * on the way out: refund ceilings are compared against it, and a float cast
+ * lets 0.57 + 0.46 read as less than 1.03 and admit an over-refund.
+ */
 export async function sumRefundedForPayment(
   db: Database,
   input: { tenantId: string; paymentId: string },
-): Promise<number> {
+): Promise<string> {
   const rows = await db
     .select({
       total: sql<string>`coalesce(sum(${posPaymentAdjustments.amount}), 0)`,
@@ -157,7 +170,7 @@ export async function sumRefundedForPayment(
         inArray(posPaymentAdjustments.status, ["pending", "succeeded"]),
       ),
     );
-  return Number(rows[0]?.total ?? "0");
+  return rows[0]?.total ?? "0";
 }
 
 export async function insertPaymentAdjustment(
@@ -193,7 +206,9 @@ export async function insertPaymentAdjustment(
       direction: input.direction,
       status: input.status ?? "succeeded",
       salesReturnId: input.salesReturnId,
-      amount: Number(input.amount).toFixed(2),
+      // Already a validated <=2-decimal string; normalize it without a float
+      // round-trip so this write path matches the rest of the module.
+      amount: centsToAmount(amountToCents(input.amount)),
       currency: input.currency,
       idempotencyKey: input.idempotencyKey,
       reason: input.reason,
@@ -330,10 +345,14 @@ export async function recalculateOrderAfterAdjustment(
       ),
     );
 
-  const grossPaid = Number(paymentRows[0]?.total ?? "0");
-  const debit = Number(adjustmentRows[0]?.debit ?? "0");
-  const credit = Number(adjustmentRows[0]?.credit ?? "0");
-  const paid = Math.max(0, grossPaid - debit + credit);
+  // This persists the order's paid balance, so the arithmetic must be exact:
+  // a float round-trip here leaves the stored ledger a cent off the sum of the
+  // rows it was derived from.
+  const grossPaid = paymentRows[0]?.total ?? "0";
+  const debit = adjustmentRows[0]?.debit ?? "0";
+  const credit = adjustmentRows[0]?.credit ?? "0";
+  const settled = addAmounts(subtractAmounts(grossPaid, debit), credit);
+  const paid = compareAmounts(settled, "0") < 0 ? "0.00" : settled;
   const fulfilment = await findPosOrderFulfilmentState(db, {
     tenantId: input.tenantId,
     orderId: input.order.id,
@@ -344,11 +363,13 @@ export async function recalculateOrderAfterAdjustment(
       paidAt: null,
     },
     nextTotalAmount: input.order.totalAmount,
-    nextPaidAmount: paid.toFixed(2),
+    nextPaidAmount: paid,
     autoDeliverWhenPaid: fulfilment.isProductOnly,
   });
   const paymentStatus =
-    paid <= 0 && grossPaid > 0 ? "refunded" : projected.paymentStatus;
+    compareAmounts(paid, "0") <= 0 && compareAmounts(grossPaid, "0") > 0
+      ? "refunded"
+      : projected.paymentStatus;
   const nextOrderStatus =
     paymentStatus === "refunded" && input.order.status === "paid"
       ? "received"
@@ -357,7 +378,7 @@ export async function recalculateOrderAfterAdjustment(
   await db
     .update(orders)
     .set({
-      paidAmount: paid.toFixed(2),
+      paidAmount: paid,
       paymentStatus,
       paidAt: paymentStatus === "paid" ? projected.paidAt : null,
       status: nextOrderStatus,
@@ -373,5 +394,5 @@ export async function recalculateOrderAfterAdjustment(
       ),
     );
 
-  return { paidAmount: paid.toFixed(2), paymentStatus };
+  return { paidAmount: paid, paymentStatus };
 }

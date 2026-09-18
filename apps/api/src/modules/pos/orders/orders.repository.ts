@@ -37,6 +37,7 @@ import {
   POS_ORDER_CODE_SUFFIX_LENGTH,
   parsePosOrderCodeSuffix,
 } from "@cleanhub/domain/order-codes";
+import { addAmounts } from "@cleanhub/domain/money";
 
 import type {
   PosOrderDetail,
@@ -146,9 +147,9 @@ function toDate(value: string | null | undefined): Date | null {
   return value ? new Date(value) : null;
 }
 
-function addMoney(left: string, right: string): string {
-  return (Number(left) + Number(right)).toFixed(2);
-}
+// Exact: this accumulates across every line of an order, and repeated float
+// addition drifts (ten additions of 1.00 sum to 9.999999999999998).
+const addMoney = addAmounts;
 
 export function calculatePosOrderItemLineAmount(
   input: Pick<
@@ -960,7 +961,10 @@ export async function insertManualOrderItems(
 export function sumOrderItemAmounts(
   items: Array<{ lineAmount: string }>,
 ): string {
-  return items.reduce((total, item) => addMoney(total, item.lineAmount), "0");
+  return items.reduce(
+    (total, item) => addMoney(total, item.lineAmount),
+    "0.00",
+  );
 }
 
 export async function updateOrderRecord(

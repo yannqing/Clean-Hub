@@ -13,6 +13,8 @@ import {
   sql,
 } from "drizzle-orm";
 
+import { subtractAmounts } from "@cleanhub/domain/money";
+
 import {
   branches,
   orders,
@@ -210,7 +212,9 @@ export function calculateCashVariance(
   countedCash: string,
   expectedCash: string,
 ): string {
-  return money(Number(countedCash) - Number(expectedCash));
+  // Exact: a float subtraction can report a one-cent drawer variance that does
+  // not exist, which a manager then has to reconcile at shift close.
+  return subtractAmounts(countedCash, expectedCash);
 }
 
 export function calculateNetSales(

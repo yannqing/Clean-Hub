@@ -10,6 +10,7 @@ import {
   salesReturns,
   type Database,
 } from "@cleanhub/db";
+import { compareAmounts, subtractAmounts } from "@cleanhub/domain/money";
 import { createId } from "@cleanhub/id";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
@@ -100,7 +101,12 @@ async function allocateRefundAcrossPaidPayments(
       tenantId: input.tenantId,
       paymentId: payment.id,
     });
-    const available = Math.max(0, Number(payment.amount) - reservedOrRefunded);
+    // Compute the remaining refundable balance exactly before dropping to a
+    // number: a float subtraction here can report a cent of headroom that the
+    // payment does not actually have, which createPosRefund would then reject.
+    const availableAmount = subtractAmounts(payment.amount, reservedOrRefunded);
+    const available =
+      compareAmounts(availableAmount, "0") < 0 ? 0 : Number(availableAmount);
     const allocated = Math.min(available, remaining);
     if (allocated > 0) {
       allocations.push({

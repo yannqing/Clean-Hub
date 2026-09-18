@@ -1,4 +1,9 @@
 import { getDb, type Database } from "@cleanhub/db";
+import {
+  addAmounts,
+  compareAmounts,
+  subtractAmounts,
+} from "@cleanhub/domain/money";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
 import {
@@ -45,7 +50,7 @@ function assertIdempotentMatch(
     existing.orderId !== expected.orderId ||
     existing.adjustmentType !== expected.adjustmentType ||
     existing.direction !== expected.direction ||
-    Number(existing.amount) !== Number(expected.amount) ||
+    compareAmounts(existing.amount, expected.amount) !== 0 ||
     existing.originalPaymentId !== (expected.originalPaymentId ?? null) ||
     existing.reason !== expected.reason
   ) {
@@ -147,7 +152,7 @@ async function createAdjustment(
     }
 
     if (refundData) {
-      if (Number(refundData.amount) > Number(order.paidAmount)) {
+      if (compareAmounts(refundData.amount, order.paidAmount) > 0) {
         throw new PosOrderError(
           "PAYMENT_AMOUNT_EXCEEDED",
           "Refund amount exceeds the order's current paid amount.",
@@ -159,8 +164,10 @@ async function createAdjustment(
         paymentId: payment.id,
       });
       if (
-        alreadyRefunded + Number(refundData.amount) >
-        Number(payment.amount)
+        compareAmounts(
+          addAmounts(alreadyRefunded, refundData.amount),
+          payment.amount,
+        ) > 0
       ) {
         throw new PosOrderError(
           "PAYMENT_AMOUNT_EXCEEDED",
@@ -169,12 +176,14 @@ async function createAdjustment(
         );
       }
     } else {
-      const currentPaid = Number(order.paidAmount);
       const nextPaid =
         direction === "debit"
-          ? currentPaid - Number(input.data.amount)
-          : currentPaid + Number(input.data.amount);
-      if (nextPaid < 0 || nextPaid > Number(order.totalAmount)) {
+          ? subtractAmounts(order.paidAmount, input.data.amount)
+          : addAmounts(order.paidAmount, input.data.amount);
+      if (
+        compareAmounts(nextPaid, "0") < 0 ||
+        compareAmounts(nextPaid, order.totalAmount) > 0
+      ) {
         throw new PosOrderError(
           "PAYMENT_AMOUNT_EXCEEDED",
           "Correction would move the paid amount outside the order balance.",
@@ -330,8 +339,10 @@ export async function resolvePosRefund(
         paymentId: payment.id,
       });
       if (
-        alreadyRefunded + Number(adjustment.amount) >
-        Number(payment.amount)
+        compareAmounts(
+          addAmounts(alreadyRefunded, adjustment.amount),
+          payment.amount,
+        ) > 0
       ) {
         throw new PosOrderError(
           "PAYMENT_AMOUNT_EXCEEDED",

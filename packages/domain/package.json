@@ -6,16 +6,21 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
-    "smoke:currency": "tsx src/currency.smoke.ts"
+    "smoke:currency": "tsx src/currency.smoke.ts",
+    "smoke:money": "tsx src/money.smoke.ts"
   },
   "exports": {
     ".": "./src/index.ts",
     "./currency": "./src/currency.ts",
+    "./money": "./src/money.ts",
     "./order-codes": "./src/order-codes.ts",
     "./payment-methods": "./src/payment-methods.ts",
     "./pin": "./src/pin.ts",
     "./pos-terminal-status": "./src/pos-terminal-status.ts",
     "./receipt": "./src/receipt.ts",
     "./timezone": "./src/timezone.ts"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
   }
 }
