@@ -1,7 +1,22 @@
 import { createId } from "@cleanhub/id";
 
 export type OfflineOperation = "create" | "update" | "delete";
-export type OfflineQueueItemStatus = "pending" | "synced";
+/**
+ * `failed` is a dead letter: the operation exhausted its retries and is parked
+ * for an operator to review. It is skipped by replay so one permanently broken
+ * command (a 422 the server will never accept, a stale price) cannot starve
+ * the rest of a terminal's day of offline sales behind it.
+ */
+export type OfflineQueueItemStatus = "pending" | "synced" | "failed";
+
+/**
+ * How many times an operation is retried before it is parked as a dead letter.
+ *
+ * Transient failures are the normal case offline — the network is down, the
+ * API is briefly unreachable — so this is deliberately generous. It exists to
+ * bound *deterministic* failures, not to give up on a flaky connection.
+ */
+export const OFFLINE_QUEUE_MAX_ATTEMPTS = 25;
 
 export type AsyncKeyValueStorage = {
   getItem(key: string): Promise<string | null>;
@@ -776,7 +791,13 @@ export class OfflineQueue {
   > {
     return runQueueStateExclusive(this.queueKey, async () => {
       const queue = await this.readQueue<TPayload>();
-      return queue.find((item) => item.status === "pending");
+      // Order by sequence rather than trusting array order. Financial replay
+      // depends on this (a payment must not replay before the checkout that
+      // created its order), and markSynced/recordFailure both rewrite the
+      // array, so incidental ordering is not a guarantee worth resting on.
+      return queue
+        .filter((item) => item.status === "pending")
+        .sort((left, right) => left.sequence - right.sequence)[0];
     });
   }
 
@@ -784,6 +805,55 @@ export class OfflineQueue {
     return runQueueStateExclusive(this.queueKey, () =>
       this.readQueue<TPayload>(),
     );
+  }
+
+  /**
+   * Returns dead-lettered operations for operator review. These have stopped
+   * retrying, so nothing surfaces them unless something asks.
+   */
+  async listFailed<TPayload = unknown>(): Promise<OfflineQueueItem<TPayload>[]> {
+    return runQueueStateExclusive(this.queueKey, async () => {
+      const queue = await this.readQueue<TPayload>();
+      return queue
+        .filter((item) => item.status === "failed")
+        .sort((left, right) => left.sequence - right.sequence);
+    });
+  }
+
+  /**
+   * Returns a dead-lettered operation to the queue with its attempt counter
+   * reset, for once an operator has dealt with whatever made it fail. Its
+   * original `sequence` is kept so it replays in the order it was created.
+   */
+  async requeueFailed<TPayload = unknown>(
+    id: string,
+  ): Promise<OfflineQueueItem<TPayload> | undefined> {
+    return runQueueStateExclusive(this.queueKey, async () => {
+      const queue = await this.readQueue<TPayload>();
+      const now = new Date().toISOString();
+      let revived: OfflineQueueItem<TPayload> | undefined;
+
+      const nextQueue = queue.map((item) => {
+        if (item.id !== id || item.status !== "failed") {
+          return item;
+        }
+
+        revived = {
+          ...item,
+          status: "pending",
+          attempt: 0,
+          lastError: undefined,
+          updatedAt: now,
+        };
+        return revived;
+      });
+
+      if (revived) {
+        await this.writeQueue(nextQueue);
+      }
+
+      return revived;
+    });
   }
 
   async markSynced(id: string): Promise<void> {
@@ -883,9 +953,9 @@ export class OfflineQueue {
       const failedOperationIds = new Set<string>();
 
       while (true) {
-        const pending = (await this.list<TPayload>()).filter(
-          (item) => item.status === "pending",
-        );
+        const pending = (await this.list<TPayload>())
+          .filter((item) => item.status === "pending")
+          .sort((left, right) => left.sequence - right.sequence);
         const pendingOperationIds = new Set(pending.map((item) => item.id));
         const next = pending.find(
           (item) =>
@@ -955,10 +1025,14 @@ export class OfflineQueue {
           return item;
         }
 
+        const attempt = item.attempt + 1;
         failed = {
           ...item,
-          status: "pending",
-          attempt: item.attempt + 1,
+          // Park the operation once it has exhausted its retries. Leaving it
+          // `pending` means peek() hands back the same broken item on every
+          // call, and everything queued behind it never syncs.
+          status: attempt >= OFFLINE_QUEUE_MAX_ATTEMPTS ? "failed" : "pending",
+          attempt,
           lastError: message,
           updatedAt: now,
         };

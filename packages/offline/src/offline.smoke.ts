@@ -1,4 +1,5 @@
 import {
+  OFFLINE_QUEUE_MAX_ATTEMPTS,
   buildScopedOfflineQueueKey,
   buildScopedPrintJobQueueKey,
   createDeliveryTaskCache,
@@ -1011,5 +1012,114 @@ try {
     delete (navigator as unknown as { locks?: LockManager }).locks;
   }
 }
+
+// --- Dead letter: a deterministically failing operation must not starve the
+// queue behind it. Before this, recordFailure reset the item to "pending", so
+// replay() re-peeked the same broken item forever and everything queued behind
+// it never synced.
+const poisonStorage = createMemoryStorage();
+const poisonQueue = createOfflineQueue({ storage: poisonStorage });
+
+const poison = await poisonQueue.enqueue({
+  entity: "posSale",
+  operation: "create",
+  payload: { saleId: "poison" },
+});
+const behindPoison = await poisonQueue.enqueue({
+  entity: "posSale",
+  operation: "create",
+  payload: { saleId: "behind" },
+});
+
+let poisonAttempts = 0;
+for (let round = 0; round < OFFLINE_QUEUE_MAX_ATTEMPTS; round += 1) {
+  await poisonQueue.replay(async (item) => {
+    if (item.id === poison.id) {
+      poisonAttempts += 1;
+      throw new Error("server rejects this permanently");
+    }
+  });
+}
+
+assert(
+  poisonAttempts === OFFLINE_QUEUE_MAX_ATTEMPTS,
+  `the poison item must retry up to the cap (attempted ${poisonAttempts})`,
+);
+
+const parked = await poisonQueue.listFailed();
+assert(
+  parked.length === 1 && parked[0]?.id === poison.id,
+  "the exhausted operation must be parked as a dead letter",
+);
+assert(
+  (await poisonQueue.peek())?.id === behindPoison.id,
+  "work queued behind a dead letter must become reachable",
+);
+
+// The operation behind it now syncs instead of being starved forever.
+const unblocked = await poisonQueue.replay(async () => {});
+assert(
+  unblocked.replayed.length === 1 &&
+    unblocked.replayed[0]?.id === behindPoison.id,
+  "the operation behind the dead letter must replay",
+);
+
+// A dead letter stays parked until an operator revives it.
+assert(
+  (await poisonQueue.peek()) === undefined,
+  "a dead letter must not be handed back to replay on its own",
+);
+const revived = await poisonQueue.requeueFailed(poison.id);
+assert(
+  revived?.status === "pending" && revived.attempt === 0,
+  "requeueFailed must return the operation to the queue with a clean slate",
+);
+assert(
+  (await poisonQueue.peek())?.id === poison.id,
+  "a revived operation must be replayable again",
+);
+
+// --- Ordering: replay must follow `sequence`, not incidental array order.
+// markSynced and recordFailure both rewrite the array, so array order is not a
+// guarantee; a payment replaying before the checkout that created its order
+// would be a real financial bug.
+const orderStorage = createMemoryStorage();
+const orderQueue = createOfflineQueue({ storage: orderStorage });
+const checkout = await orderQueue.enqueue({
+  entity: "posCheckout",
+  operation: "create",
+  payload: { orderId: "order_1" },
+});
+const payment = await orderQueue.enqueue({
+  entity: "posPayment",
+  operation: "create",
+  payload: { orderId: "order_1" },
+});
+
+assert(
+  checkout.sequence < payment.sequence,
+  "enqueue must assign an increasing sequence",
+);
+
+// Shuffle the stored array so array order disagrees with sequence order.
+const storedKey = (await orderStorage.keys?.())?.[0];
+assert(Boolean(storedKey), "the queue must be persisted under a storage key");
+const storedRaw = await orderStorage.getItem(storedKey!);
+const storedItems = JSON.parse(storedRaw!) as Array<{ id: string }>;
+await orderStorage.setItem(storedKey!, JSON.stringify([...storedItems].reverse()));
+
+assert(
+  (await orderQueue.peek())?.id === checkout.id,
+  "peek must follow sequence even when array order disagrees",
+);
+
+const replayOrder: string[] = [];
+await orderQueue.replay(async (item) => {
+  replayOrder.push(item.entity);
+});
+assert(
+  replayOrder.join(",") === "posCheckout,posPayment",
+  `replay must follow sequence order (got ${replayOrder.join(",")})`,
+);
 
 console.log("offline smoke ok");

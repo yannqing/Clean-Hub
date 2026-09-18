@@ -171,9 +171,13 @@ export function OfflineSyncProvider({
       const summary = summarizePosOfflineQueueItems(items);
       setPendingSalesCount(summary.pendingSalesCount);
       setOldestPendingAt(summary.oldestPendingAt);
-      const failed = items.find(
-        (item) => item.status === "pending" && Boolean(item.lastError),
-      );
+      // A dead-lettered operation has stopped retrying, so its error must stay
+      // on screen until an operator deals with it — surface those first.
+      const failed =
+        items.find((item) => item.status === "failed") ??
+        items.find(
+          (item) => item.status === "pending" && Boolean(item.lastError),
+        );
       setSyncError(failed?.lastError ?? null);
     } catch (storageError) {
       if (activeScopeKeyRef.current === runtimeQueue.queueKey) {
