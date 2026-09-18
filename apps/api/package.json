@@ -15,6 +15,8 @@
     "smoke:auth-cookie-scope": "tsx src/modules/auth/auth-cookie-scope.smoke.ts",
     "smoke:pos-terminal-security": "tsx src/modules/auth/pos-terminal-security.smoke.ts",
     "smoke:cors-origin": "tsx src/http/cors-origin.smoke.ts",
+    "smoke:cron-schedule": "tsx src/cron/schedule.smoke.ts",
+    "smoke:payment-config": "tsx src/modules/mobile/payment/payment.config.smoke.ts",
     "smoke:web-session-boundary": "tsx src/http/web-session.middleware.smoke.ts",
     "smoke:pos-surface-boundary": "tsx src/http/pos-terminal.middleware.smoke.ts",
     "smoke:pos-terminal-lifecycle": "tsx src/modules/pos/auth/auth.lifecycle.repository.smoke.ts",

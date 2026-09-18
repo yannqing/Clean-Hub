@@ -389,6 +389,16 @@ export class PaymentRepository {
         rawPayload: input.rawPayload,
         processingStatus: "received",
       })
+      // NOTE: `event` is supplied by the caller, so this deduplicates only
+      // byte-identical retries — a provider (or an attacker with a valid
+      // signature) can vary `event` and get a fresh row. That is tolerated
+      // because `event` legitimately distinguishes successive callbacks for
+      // one payment (pending -> paid), so it cannot simply be dropped from the
+      // key. Replay safety therefore does NOT rest on this index: it rests on
+      // the terminal-state guards in reconcilePaymentCallback and
+      // reconcileRefundCallback, which refuse to re-drive a settled record.
+      // Tighten this to a provider-supplied event id if one ever becomes
+      // available.
       .onConflictDoNothing({
         target: [
           paymentCallbacks.gateway,
@@ -498,10 +508,25 @@ export class PaymentRepository {
         return transaction;
       }
 
+      // A paid transaction only moves on to `refunded`; anything else (a late
+      // `pending`, a stray `failed`) is a replay and must not walk it back.
       if (
         transaction.paymentStatus === "paid" &&
         input.verification.status !== "refunded"
       ) {
+        await repository.markCallback({
+          tenantId: input.verification.tenantId,
+          callbackId: input.callbackId,
+          status: "processed",
+        });
+        return transaction;
+      }
+
+      // `refunded` is terminal. Without this, a `refunded` -> `paid` callback
+      // pair would flip the transaction back to paid and re-run
+      // updateOrderAfterPayment, crediting the order for money that was
+      // already returned to the customer.
+      if (transaction.paymentStatus === "refunded") {
         await repository.markCallback({
           tenantId: input.verification.tenantId,
           callbackId: input.callbackId,
@@ -862,7 +887,17 @@ export class PaymentRepository {
         return null;
       }
 
-      if (refundRequest.status === "refunded") {
+      // `refunded` and `failed` are both terminal. Only `refunded` used to
+      // short-circuit here, so a `failed` callback could reopen a settled
+      // refund and a following `refunded` callback would run
+      // updateOrderAfterRefund a second time — debiting the order again for a
+      // refund that was only ever authorized once. A provider retrying with a
+      // different `event` value reaches this path, because `event` is part of
+      // the callback dedupe key.
+      if (
+        refundRequest.status === "refunded" ||
+        refundRequest.status === "failed"
+      ) {
         await repository.markCallback({
           tenantId: input.verification.tenantId,
           callbackId: input.callbackId,

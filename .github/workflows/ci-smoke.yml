@@ -36,6 +36,7 @@ jobs:
       NODE_ENV: production
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/cleanhub
       AUTH_TOKEN_SECRET: ci-smoke-test-secret-with-at-least-32-chars
+      PAYMENT_MOCK_SECRET: ci-smoke-payment-webhook-secret
       AUTH_ACCESS_TOKEN_TTL_SECONDS: "900"
       AUTH_REFRESH_TOKEN_TTL_SECONDS: "2592000"
       AUTH_COOKIE_SECURE: "false"
@@ -92,6 +93,10 @@ jobs:
           node --check scripts/build-release.mjs
           pnpm --filter @cleanhub/offline smoke
           pnpm --filter @cleanhub/desktop smoke
+          pnpm --filter @cleanhub/domain smoke:money
+          pnpm --filter @cleanhub/api smoke:cron-schedule
+          pnpm --filter @cleanhub/api smoke:payment-config
+          pnpm --filter @cleanhub/api smoke:pos-carts
           pnpm --filter @cleanhub/api smoke:pos-orders
           pnpm --filter @cleanhub/pos-web smoke:cart
           pnpm --filter @cleanhub/pos-web smoke:offline-operations
