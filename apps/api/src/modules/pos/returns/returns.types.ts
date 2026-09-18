@@ -23,10 +23,14 @@ export type CreatePosProductReturnRequest = {
     disposition: PosReturnDisposition;
     reason?: string;
   }>;
-  refundAllocations?: Array<{
+  /**
+   * Provider settlement references keyed by payment. Refund amounts are
+   * decided server-side against each payment's remaining refundable balance
+   * and are deliberately not accepted from the caller.
+   */
+  refundSettlements?: Array<{
     originalPaymentId: string;
-    amount: string;
-    settlementReference?: string;
+    settlementReference: string;
   }>;
   exchangeItems?: Array<{ productSkuId: string; quantity: string }>;
 };

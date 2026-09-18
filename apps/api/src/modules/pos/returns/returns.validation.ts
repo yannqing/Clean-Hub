@@ -1,10 +1,6 @@
 import { z } from "zod";
 
 const ulid = z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/);
-const amount = z
-  .string()
-  .regex(/^\d+(\.\d{1,2})?$/)
-  .refine((value) => Number(value) > 0);
 const quantity = z
   .string()
   .regex(/^\d+(\.\d{1,3})?$/)
@@ -32,12 +28,19 @@ export const createPosProductReturnBodySchema = z.object({
     )
     .min(1)
     .max(100),
-  refundAllocations: z
+  /**
+   * Provider settlement references, keyed by the payment being refunded.
+   *
+   * The amounts themselves are NOT accepted from the client: how much of a
+   * refund each payment can absorb is decided server-side against that
+   * payment's remaining refundable balance. A caller may only tell us that a
+   * non-cash refund has already settled, and with which provider reference.
+   */
+  refundSettlements: z
     .array(
       z.object({
         originalPaymentId: ulid,
-        amount,
-        settlementReference: z.string().trim().min(1).max(160).optional(),
+        settlementReference: z.string().trim().min(1).max(160),
       }),
     )
     .max(10)

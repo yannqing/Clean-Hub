@@ -10,7 +10,11 @@ import {
   salesReturns,
   type Database,
 } from "@cleanhub/db";
-import { compareAmounts, subtractAmounts } from "@cleanhub/domain/money";
+import {
+  addAmounts,
+  compareAmounts,
+  subtractAmounts,
+} from "@cleanhub/domain/money";
 import { createId } from "@cleanhub/id";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
@@ -458,20 +462,42 @@ export async function createPosProductReturn(
         returnValueAmount,
         Number(exchangeOrder?.totalAmount ?? 0),
       );
-    const refundAllocations: NonNullable<
-      CreatePosProductReturnRequest["refundAllocations"]
-    > =
-      input.data.refundAllocations ??
-      (await allocateRefundAcrossPaidPayments(tx, {
-        tenantId,
-        orderId: order.id,
-        amount: refundAmount,
-      }));
-    const allocatedRefund = refundAllocations.reduce(
-      (sum, allocation) => sum + Number(allocation.amount),
-      0,
+    // Allocation is always decided here, never taken from the request. The
+    // caller may say a refund has already settled with the provider, but not
+    // how much of it each payment absorbs -- that is capped by the payment's
+    // own remaining refundable balance.
+    const refundAllocations = await allocateRefundAcrossPaidPayments(tx, {
+      tenantId,
+      orderId: order.id,
+      amount: refundAmount,
+    });
+    const settlementReferences = new Map(
+      (input.data.refundSettlements ?? []).map((settlement) => [
+        settlement.originalPaymentId,
+        settlement.settlementReference,
+      ]),
     );
-    if (Math.abs(allocatedRefund - refundAmount) > 0.009) {
+    const unmatchedSettlement = [...settlementReferences.keys()].find(
+      (paymentId) =>
+        !refundAllocations.some(
+          (allocation) => allocation.originalPaymentId === paymentId,
+        ),
+    );
+    if (unmatchedSettlement) {
+      throw new PosOrderError(
+        "VALIDATION_ERROR",
+        "A settlement reference was supplied for a payment that is not part of this refund.",
+        422,
+      );
+    }
+
+    // Exact: the allocator builds this sum, so any mismatch is a real defect
+    // rather than a rounding artefact worth tolerating.
+    const allocatedRefund = refundAllocations.reduce(
+      (total, allocation) => addAmounts(total, allocation.amount),
+      "0.00",
+    );
+    if (compareAmounts(allocatedRefund, money(refundAmount)) !== 0) {
       throw new PosOrderError(
         "VALIDATION_ERROR",
         `Refund allocations must equal the cash-out amount ${money(refundAmount)} ${order.currency} after exchange credit.`,
@@ -510,6 +536,9 @@ export async function createPosProductReturn(
     const returnId = createId();
     const refundResults: CreatePosPaymentAdjustmentResponse[] = [];
     for (const [index, allocation] of refundAllocations.entries()) {
+      const settlementReference = settlementReferences.get(
+        allocation.originalPaymentId,
+      );
       refundResults.push(
         await createPosRefund(
           {
@@ -518,14 +547,12 @@ export async function createPosProductReturn(
             data: {
               orderId: order.id,
               originalPaymentId: allocation.originalPaymentId,
-              amount: money(Number(allocation.amount)),
+              amount: allocation.amount,
               idempotencyKey: `${input.data.idempotencyKey}:refund:${index}`,
               reason,
               salesReturnId: returnId,
-              settlementStatus: allocation.settlementReference
-                ? "succeeded"
-                : undefined,
-              settlementReference: allocation.settlementReference,
+              settlementStatus: settlementReference ? "succeeded" : undefined,
+              settlementReference,
             },
           },
           tx,
