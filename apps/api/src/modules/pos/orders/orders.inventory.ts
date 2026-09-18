@@ -379,7 +379,10 @@ export async function consumeProductInventoryForPaidOrder(
   input: { tenantId: string; orderId: string; actorUserId: string },
 ): Promise<void> {
   const orderRows = await db
-    .select({ paymentStatus: orders.paymentStatus })
+    .select({
+      paymentStatus: orders.paymentStatus,
+      branchId: orders.branchId,
+    })
     .from(orders)
     .where(
       and(
@@ -389,12 +392,19 @@ export async function consumeProductInventoryForPaidOrder(
       ),
     )
     .limit(1);
-  if (orderRows[0]?.paymentStatus !== "paid") {
+  const order = orderRows[0];
+  if (order?.paymentStatus !== "paid") {
     return;
   }
 
+  // Scope the sweep to this order's branch. Without branchId the SELECT ...
+  // FOR UPDATE inside covers every branch of the tenant, so each checkout
+  // serializes against every other branch's expired reservations — on the
+  // payment hot path, and in the opposite lock order to the per-branch balance
+  // locks taken below.
   await releaseExpiredProductReservations(db, {
     tenantId: input.tenantId,
+    branchId: order.branchId,
     actorUserId: input.actorUserId,
   });
   await ensureProductOrderReservations(db, input);
