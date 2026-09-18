@@ -872,14 +872,24 @@ export async function purgeElapsedTenants(
   const purged: string[] = [];
 
   for (const tenant of due) {
-    await db
+    // Two overlapping purge runs (or two API replicas) select the same due
+    // set. The isNull(deletedAt) guard already makes the soft delete
+    // idempotent, but the audit write must not be: only the run that actually
+    // claimed the row may record `tenant.purged`, or a destructive retention
+    // action ends up with duplicate compliance records.
+    const claimed = await db
       .update(tenants)
       .set({
         deletedAt: now,
         updatedAt: now,
         version: sql`${tenants.version} + 1`,
       })
-      .where(and(eq(tenants.id, tenant.id), isNull(tenants.deletedAt)));
+      .where(and(eq(tenants.id, tenant.id), isNull(tenants.deletedAt)))
+      .returning({ id: tenants.id });
+
+    if (claimed.length === 0) {
+      continue;
+    }
 
     await writeAuditLog(db, {
       tenantId: tenant.id,

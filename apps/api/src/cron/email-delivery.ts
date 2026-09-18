@@ -2,6 +2,7 @@ import { createLogger } from "@cleanhub/logger";
 import { runWithSystemDatabaseContext } from "@cleanhub/db";
 
 import { NotificationsService } from "../modules/notifications/index.js";
+import { scheduleNonOverlapping } from "./schedule.js";
 
 const logger = createLogger({
   name: "email-delivery",
@@ -75,11 +76,16 @@ async function main(): Promise<void> {
 
   await runEmailDeliveryOnce();
 
-  setInterval(() => {
-    runEmailDeliveryOnce().catch((error: unknown) => {
+  scheduleNonOverlapping(
+    intervalSeconds * 1000,
+    runEmailDeliveryOnce,
+    (error: unknown) => {
       logger.error({ error }, "Email delivery cron failed");
-    });
-  }, intervalSeconds * 1000);
+    },
+    () => {
+      logger.warn("Email delivery still running; skipping this tick");
+    },
+  );
 }
 
 if (process.argv[1]?.endsWith("email-delivery.ts")) {

@@ -2,6 +2,7 @@ import { createLogger } from "@cleanhub/logger";
 import { runWithSystemDatabaseContext } from "@cleanhub/db";
 
 import { MediaService } from "../modules/media/index.js";
+import { scheduleNonOverlapping } from "./schedule.js";
 
 const logger = createLogger({
   name: "media-cleanup",
@@ -53,11 +54,16 @@ async function main(): Promise<void> {
 
   await runMediaCleanupOnce();
 
-  setInterval(() => {
-    runMediaCleanupOnce().catch((error: unknown) => {
+  scheduleNonOverlapping(
+    intervalSeconds * 1000,
+    runMediaCleanupOnce,
+    (error: unknown) => {
       logger.error({ error }, "Media cleanup failed");
-    });
-  }, intervalSeconds * 1000);
+    },
+    () => {
+      logger.warn("Media cleanup still running; skipping this tick");
+    },
+  );
 }
 
 if (process.argv[1]?.endsWith("media-cleanup.ts")) {

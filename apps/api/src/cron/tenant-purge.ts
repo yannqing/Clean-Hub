@@ -2,6 +2,7 @@ import { createLogger } from "@cleanhub/logger";
 import { runWithSystemDatabaseContext } from "@cleanhub/db";
 
 import { purgeElapsedTenants } from "../modules/saas/tenants/tenants.repository.js";
+import { scheduleNonOverlapping } from "./schedule.js";
 
 const logger = createLogger({
   name: "tenant-purge",
@@ -64,11 +65,16 @@ async function main(): Promise<void> {
 
   await runTenantPurgeOnce();
 
-  setInterval(() => {
-    runTenantPurgeOnce().catch((error: unknown) => {
+  scheduleNonOverlapping(
+    intervalSeconds * 1000,
+    runTenantPurgeOnce,
+    (error: unknown) => {
       logger.error({ error }, "Tenant purge failed");
-    });
-  }, intervalSeconds * 1000);
+    },
+    () => {
+      logger.warn("Tenant purge still running; skipping this tick");
+    },
+  );
 }
 
 if (process.argv[1]?.endsWith("tenant-purge.ts")) {
