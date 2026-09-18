@@ -1002,11 +1002,6 @@ export const enMessages = {
       account: "Customer account",
       profile: "Customer profile",
     },
-    noticeError: {
-      NOTIFICATION_NOT_FOUND: "The notification does not exist or is not accessible.",
-      NOTIFICATION_ARCHIVED: "An archived notification cannot be marked read again.",
-      VALIDATION_ERROR: "The submitted data failed validation. Check it and retry.",
-    },
     drawer: {
       alreadyOpened: "The drawer is already open for this cash sale; it will not open again.",
       interrupted: "The last open was interrupted and its physical result is unknown. Check by hand rather than opening again.",

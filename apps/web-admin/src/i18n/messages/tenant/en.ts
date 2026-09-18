@@ -68,20 +68,6 @@ export const tenantMessagesEn: TenantMessages = {
       "The page you're looking for doesn't exist or may have moved.",
   },
 
-  navigationPlaceholders: {
-    orders: {
-      title: "Orders",
-      description: "Order management will be added to this page.",
-    },
-    customers: {
-      title: "Customers",
-      description: "Customer management will be added to this page.",
-    },
-    products: {
-      title: "Products",
-      description: "Product management will be added to this page.",
-    },
-  },
 
   orders: {
     title: "Orders",
@@ -2925,7 +2911,6 @@ export const tenantMessagesEn: TenantMessages = {
 
     templateVariables: {
       title: "Available variables",
-      availableVars: "Use these in your provider template body.",
     },
 
     log: {

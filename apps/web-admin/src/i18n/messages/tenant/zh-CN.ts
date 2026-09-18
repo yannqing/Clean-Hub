@@ -67,20 +67,6 @@ export const tenantMessagesZhCN: TenantMessages = {
     notFoundDescription: "您访问的页面不存在或已被移动。",
   },
 
-  navigationPlaceholders: {
-    orders: {
-      title: "订单",
-      description: "订单管理功能将在此页面中接入。",
-    },
-    customers: {
-      title: "顾客",
-      description: "顾客管理功能将在此页面中接入。",
-    },
-    products: {
-      title: "产品",
-      description: "产品管理功能将在此页面中接入。",
-    },
-  },
 
   orders: {
     title: "订单",
@@ -2767,7 +2753,6 @@ export const tenantMessagesZhCN: TenantMessages = {
 
     templateVariables: {
       title: "可用变量",
-      availableVars: "可在配送商模板正文中使用。",
     },
 
     log: {

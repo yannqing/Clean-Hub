@@ -78,20 +78,6 @@ export type TenantMessages = {
     notFoundDescription: string;
   };
 
-  navigationPlaceholders: {
-    orders: {
-      title: string;
-      description: string;
-    };
-    customers: {
-      title: string;
-      description: string;
-    };
-    products: {
-      title: string;
-      description: string;
-    };
-  };
 
   orders: {
     title: string;
@@ -2483,7 +2469,6 @@ export type TenantMessages = {
 
     templateVariables: {
       title: string;
-      availableVars: string;
     };
 
     log: {

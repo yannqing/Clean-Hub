@@ -989,11 +989,6 @@ export const zhCNMessages = {
       account: "客户账户",
       profile: "客户档案",
     },
-    noticeError: {
-      NOTIFICATION_NOT_FOUND: "通知不存在或无权访问。",
-      NOTIFICATION_ARCHIVED: "已归档通知不能再次标记为已读。",
-      VALIDATION_ERROR: "提交内容校验未通过，请检查后重试。",
-    },
     drawer: {
       alreadyOpened: "该现金交易的钱箱已打开，本次不会重复开箱。",
       interrupted: "上次开箱时发生中断，物理结果不确定；为避免重复开箱，请人工核对。",

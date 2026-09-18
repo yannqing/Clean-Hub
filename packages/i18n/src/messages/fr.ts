@@ -1008,11 +1008,6 @@ export const frMessages = {
       account: "Compte client",
       profile: "Profil client",
     },
-    noticeError: {
-      NOTIFICATION_NOT_FOUND: "La notification n’existe pas ou n’est pas accessible.",
-      NOTIFICATION_ARCHIVED: "Une notification archivée ne peut pas être remarquée comme lue.",
-      VALIDATION_ERROR: "Les données soumises n’ont pas passé la validation. Vérifiez puis réessayez.",
-    },
     drawer: {
       alreadyOpened: "Le tiroir est déjà ouvert pour cette vente ; il ne s’ouvrira pas à nouveau.",
       interrupted: "La dernière ouverture a été interrompue et son résultat est inconnu. Vérifiez manuellement plutôt que de rouvrir.",

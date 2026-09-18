@@ -65,20 +65,6 @@ export const tenantMessagesFr: TenantMessages = {
     notFoundDescription:
       "La page que vous recherchez n'existe pas ou a peut-être été déplacée.",
   },
-  navigationPlaceholders: {
-    orders: {
-      title: "Commandes",
-      description: "La gestion des commandes sera ajoutée à cette page.",
-    },
-    customers: {
-      title: "Clients",
-      description: "La gestion des clients sera ajoutée à cette page.",
-    },
-    products: {
-      title: "Produits",
-      description: "La gestion des produits sera ajoutée à cette page.",
-    },
-  },
   orders: {
     title: "Commandes",
     description:
@@ -2979,8 +2965,6 @@ export const tenantMessagesFr: TenantMessages = {
     },
     templateVariables: {
       title: "Variables disponibles",
-      availableVars:
-        "Utilisez-les dans le corps de votre modèle de fournisseur.",
     },
     log: {
       title: "Historique des envois",
