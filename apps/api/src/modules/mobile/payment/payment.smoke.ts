@@ -27,6 +27,13 @@ const gateway = new MockPaymentGateway({
   paymentBaseUrl: "http://localhost:3002",
 });
 
+/** Mock gateway whose refund call always fails, for the stranded-refund check. */
+class RefundFailingGateway extends MockPaymentGateway {
+  override createRefund(): never {
+    throw new Error("gateway refused the refund");
+  }
+}
+
 const customerContext: MobileAuthContext = {
   subjectType: "customer",
   subjectId: "account_1",
@@ -535,6 +542,29 @@ function createRepository(): PaymentRepositoryLike & {
         status: "processing" as const,
         approvedAt: new Date().toISOString(),
         approvedBy: operatorUserId,
+        updatedAt: new Date().toISOString(),
+      };
+
+      refunds.set(updated.id, updated);
+      return updated;
+    },
+    async releaseRefundProcessing({ tenantId, refundRequestId }) {
+      const refund = refunds.get(refundRequestId);
+
+      if (
+        !refund ||
+        refund.tenantId !== tenantId ||
+        refund.status !== "processing" ||
+        refund.externalId
+      ) {
+        return null;
+      }
+
+      const updated = {
+        ...refund,
+        status: "pending" as const,
+        approvedAt: null,
+        approvedBy: null,
         updatedAt: new Date().toISOString(),
       };
 
@@ -1134,6 +1164,88 @@ export async function runPaymentSmokeChecks(): Promise<void> {
   assert(
     rejectedDespiteNotificationFailure.status === "rejected",
     "notification failure should not block refund rejection",
+  );
+  // A refund request whose gateway call fails must not be left in
+  // `processing`. The partial unique index on ('pending', 'processing') would
+  // then block every future refund request for the order, and neither approve
+  // nor reject can move a `processing` row, so the customer would be locked
+  // out of refunds entirely with no recovery path through the API.
+  const strandedRepository = createRepository();
+  const strandedService = new PaymentService({
+    repository: strandedRepository,
+    // A real MockPaymentGateway with only the refund call made to fail, so the
+    // payment the refund hangs off still settles normally and the service's
+    // own `instanceof MockPaymentGateway` branch behaves as in production.
+    gateway: new RefundFailingGateway({
+      secret: mockSecret,
+      paymentBaseUrl: "http://localhost:3002",
+    }),
+    config: {
+      gateway: "mock",
+      mockSecret,
+      mockPaymentBaseUrl: "http://localhost:3002",
+    },
+    notificationPublisher: createNotificationPublisher(),
+  });
+
+  await strandedService.createPayment({
+    authContext: customerContext,
+    orderId: "order_1",
+    amount: "40.00",
+    idempotencyKey: "pay_stranded",
+  });
+  await sendSignedCallback(strandedService, {
+    action: "pay",
+    tenantId: "tenant_1",
+    externalId: "mock_pay_tx_1",
+    event: "mock.payment.paid.stranded",
+    status: "paid",
+    amount: "40.00",
+  });
+
+  const strandedRefund = await strandedService.createRefundRequest({
+    authContext: customerContext,
+    orderId: "order_1",
+    amount: "10.00",
+    reason: "Gateway will fail",
+  });
+
+  let gatewayErrorSurfaced = false;
+
+  try {
+    await strandedService.approveRefundRequest({
+      authContext: ownerContext,
+      refundRequestId: strandedRefund.id,
+    });
+  } catch {
+    gatewayErrorSurfaced = true;
+  }
+
+  assert(
+    gatewayErrorSurfaced,
+    "a failing gateway must surface its error to the caller",
+  );
+
+  const afterFailure = await strandedRepository.findRefundRequest({
+    tenantId: "tenant_1",
+    refundRequestId: strandedRefund.id,
+  });
+
+  assert(
+    afterFailure?.status === "pending",
+    `a refund whose gateway call failed must return to pending, got ${afterFailure?.status}`,
+  );
+
+  // Because it is pending again, the operator can still act on it.
+  const rejectedAfterFailure = await strandedService.rejectRefundRequest({
+    authContext: ownerContext,
+    refundRequestId: strandedRefund.id,
+    reason: "Gateway unavailable",
+  });
+
+  assert(
+    rejectedAfterFailure.status === "rejected",
+    "a released refund request must still be rejectable",
   );
 }
 

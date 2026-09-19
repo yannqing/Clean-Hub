@@ -60,6 +60,7 @@ export type PaymentRepositoryLike = Pick<
   | "findRefundRequest"
   | "getRefundOrderDetail"
   | "startRefundProcessing"
+  | "releaseRefundProcessing"
   | "attachRefundGateway"
   | "rejectRefundRequest"
   | "reconcileRefundCallback"
@@ -655,13 +656,52 @@ export class PaymentService {
       throw conflict("Refund request changed while approving.");
     }
 
-    const gateway = await this.gateway.createRefund({
-      tenantId: owner.tenantId,
-      refundRequestId: refundRequest.id,
-      transactionId: paymentTransactionId,
-      amount: refundRequest.amount,
-      currency: refundRequest.currency,
-    });
+    // The row is `processing` from here, which is what the partial unique
+    // index uses to keep a second operator out. If the gateway never accepts
+    // the refund, that claim has to be given back: leaving it set would strand
+    // the request in a status neither approve nor reject can act on, and the
+    // index would block the customer from ever asking again.
+    let gateway: Awaited<ReturnType<PaymentGateway["createRefund"]>>;
+
+    try {
+      gateway = await this.gateway.createRefund({
+        tenantId: owner.tenantId,
+        refundRequestId: refundRequest.id,
+        transactionId: paymentTransactionId,
+        amount: refundRequest.amount,
+        currency: refundRequest.currency,
+      });
+    } catch (error) {
+      const released = await this.repository
+        .releaseRefundProcessing({
+          tenantId: owner.tenantId,
+          refundRequestId: refundRequest.id,
+        })
+        .catch((releaseError: unknown) => {
+          this.logger.error(
+            {
+              tenantId: owner.tenantId,
+              refundRequestId: refundRequest.id,
+              err: releaseError,
+            },
+            "Failed to release a refund request after a gateway error",
+          );
+          return null;
+        });
+
+      this.logger.error(
+        {
+          tenantId: owner.tenantId,
+          refundRequestId: refundRequest.id,
+          operatorUserId: owner.subjectId,
+          released: Boolean(released),
+          err: error,
+        },
+        "Mobile refund gateway rejected the refund",
+      );
+
+      throw error;
+    }
     const approved = await this.repository.attachRefundGateway({
       tenantId: owner.tenantId,
       refundRequestId: refundRequest.id,

@@ -817,6 +817,48 @@ export class PaymentRepository {
     return row ? toRefundRequest(row) : null;
   }
 
+  /**
+   * Put a refund request that never reached the gateway back to `pending`.
+   *
+   * `approveRefundRequest` flips the row to `processing` before calling the
+   * gateway, because the partial unique index on ('pending', 'processing') is
+   * what stops a second operator approving the same refund concurrently. If
+   * the gateway call then fails, that protection becomes a trap: the row is
+   * stuck in `processing`, the index blocks any new refund request for the
+   * order, and both approve and reject require `pending`.
+   *
+   * Releasing is guarded on `external_id is null`, so a refund the gateway did
+   * accept can never be walked backwards -- only one that left no trace there
+   * is safe to retry.
+   */
+  async releaseRefundProcessing(input: {
+    tenantId: string;
+    refundRequestId: string;
+  }): Promise<RefundRequest | null> {
+    const now = new Date();
+    const [row] = await this.db
+      .update(refundRequests)
+      .set({
+        status: "pending",
+        approvedAt: null,
+        approvedBy: null,
+        updatedAt: now,
+        version: sql`${refundRequests.version} + 1`,
+      })
+      .where(
+        and(
+          eq(refundRequests.id, input.refundRequestId),
+          eq(refundRequests.tenantId, input.tenantId),
+          eq(refundRequests.status, "processing"),
+          isNull(refundRequests.externalId),
+          isNull(refundRequests.deletedAt),
+        ),
+      )
+      .returning({ ...getTableColumns(refundRequests) });
+
+    return row ? toRefundRequest(row) : null;
+  }
+
   async rejectRefundRequest(input: {
     tenantId: string;
     refundRequestId: string;
