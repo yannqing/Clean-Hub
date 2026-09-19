@@ -75,7 +75,9 @@ pnpm lint
 - `apps/web-admin`: Next.js admin app for SaaS admin and tenant back office.
 - `apps/pos-web`: Next.js POS frontend for in-store staff workflows. This should remain fast, offline-friendly, and optimized for cashier/scanner/printing usage.
 - `apps/desktop`: Electron shell for the official Windows/macOS in-store POS runtime and local hardware integration.
-- `apps/mobile`: Capacitor shell for customer-facing and delivery-facing Android/iOS workflows. Do not treat it as the default mobile cashier POS.
+- `apps/mobile`: Capacitor shell for customer-facing and delivery-facing Android/iOS workflows. Do not treat it as the default mobile cashier POS. It loads the static export of `apps/mobile-web`.
+- `apps/mobile-web`: Next.js customer/delivery web UI loaded by `apps/mobile`. It is a client-rendered SPA with no route-guard proxy; authentication is enforced by `apps/api`, and the session lives in Capacitor Preferences (falling back to `localStorage` in a plain browser).
+- `apps/pos-mobile`: Capacitor shell that wraps `apps/pos-web` for Android/iOS, plus the native plugin bridge for Bluetooth ESC/POS printing, scanning and haptics.
 - `apps/api`: standalone backend API service.
 
 ## Shared Packages
@@ -108,7 +110,7 @@ pnpm lint
 - `pos-web` is the in-store staff POS UI. It can run in a browser for development, but the store cashier entry point should normally be the desktop shell.
 - `desktop` owns Windows/macOS local hardware integration, including printing, scanners, cash drawer, local storage, offline sync runtime, and local device capabilities.
 - `mobile` owns customer-facing and delivery-facing Android/iOS capabilities such as appointment booking, order status, pickup/delivery tracking, proof photos, GPS, Bluetooth portable printing, and push-style mobile workflows.
-- If customer mobile UI becomes substantial, prefer a dedicated `apps/customer-web` or `apps/mobile-web` loaded by `apps/mobile`.
+- Customer-facing mobile UI lives in `apps/mobile-web`, which `apps/mobile` loads; keep it there rather than growing it inside the shell.
 - `apps/api` should own backend business APIs, payment webhooks, sync queues, audit logic, and third-party integrations.
 - Avoid placing all backend business logic in Next.js route handlers.
 - Use `@cleanhub/logger` for server-side logs. Do not add ad hoc file logging from business code.
