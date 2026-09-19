@@ -156,10 +156,17 @@ function redirectToLogin(
   return appendSetCookieHeaders(NextResponse.redirect(url), setCookieHeaders);
 }
 
+/**
+ * "unavailable" means the auth backend could not answer (5xx or network
+ * failure). Session cookies must be kept in that case: bouncing an admin to
+ * /login on an infrastructure hiccup would wrongly discard a valid session.
+ */
+type AuthOutcome = AuthResolution | null | "unavailable";
+
 async function requestAuthContext(
   path: "/auth/me" | "/auth/refresh",
   request: NextRequest,
-): Promise<AuthResolution | null> {
+): Promise<AuthOutcome> {
   const cookie = request.headers.get("cookie");
 
   if (!cookie) {
@@ -177,6 +184,10 @@ async function requestAuthContext(
       cache: "no-store",
     });
 
+    if (response.status >= 500) {
+      return "unavailable";
+    }
+
     if (!response.ok) {
       return null;
     }
@@ -186,21 +197,23 @@ async function requestAuthContext(
       setCookieHeaders: getSetCookieHeaders(response.headers),
     };
   } catch {
-    return null;
+    return "unavailable";
   }
 }
 
-async function resolveAuth(
-  request: NextRequest,
-): Promise<AuthResolution | null> {
+async function resolveAuth(request: NextRequest): Promise<AuthOutcome> {
   const accessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
   const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
 
   if (accessToken) {
-    const authContext = await requestAuthContext("/auth/me", request);
+    const outcome = await requestAuthContext("/auth/me", request);
 
-    if (authContext) {
-      return authContext;
+    if (outcome === "unavailable") {
+      return "unavailable";
+    }
+
+    if (outcome) {
+      return outcome;
     }
   }
 
@@ -213,7 +226,16 @@ async function resolveAuth(
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const auth = await resolveAuth(request);
+  const resolution = await resolveAuth(request);
+
+  if (resolution === "unavailable" && pathname !== "/login") {
+    // Auth backend is temporarily unreachable. Keep the session cookies and
+    // let the page-level error boundary surface the failure with a retry,
+    // rather than signing every admin out over one bad response.
+    return createNextResponse(request);
+  }
+
+  const auth = resolution === "unavailable" ? null : resolution;
 
   if (pathname === "/login") {
     if (!auth) {

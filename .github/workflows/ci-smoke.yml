@@ -95,6 +95,7 @@ jobs:
           pnpm --filter @cleanhub/storage smoke
           pnpm --filter @cleanhub/desktop smoke
           pnpm --filter @cleanhub/domain smoke:money
+          pnpm --filter @cleanhub/domain smoke:currency
           pnpm --filter @cleanhub/api smoke:cron-schedule
           pnpm --filter @cleanhub/api smoke:payment-config
           pnpm --filter @cleanhub/api smoke:pos-carts
@@ -102,6 +103,7 @@ jobs:
           pnpm --filter @cleanhub/pos-web smoke:cart
           pnpm --filter @cleanhub/pos-web smoke:offline-operations
           pnpm --filter @cleanhub/pos-web smoke:cash-drawer
+          pnpm --filter @cleanhub/web-admin smoke:proxy
 
       - name: Run realtime smoke tests
         run: |
