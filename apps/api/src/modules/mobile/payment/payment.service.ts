@@ -9,10 +9,12 @@ import {
 import type { MobileAuthContext } from "../auth/auth.types.js";
 import { MockPaymentGateway } from "./mock-payment.gateway.js";
 import {
+  amountToCents,
   compareAmounts,
   isPositiveAmount,
   subtractAmounts,
 } from "./payment-money.js";
+import { getCurrencyPayableStep } from "@cleanhub/domain/currency";
 import { loadPaymentConfig } from "./payment.config.js";
 import {
   PaymentRepository,
@@ -95,6 +97,32 @@ function validationError(
     422,
     details,
   );
+}
+
+/**
+ * Reject an amount the customer could not actually tender in this currency.
+ *
+ * Money is stored in hundredths whatever the currency, so nothing in the
+ * schema stops a request for 50.25 XOF -- an amount with no coin behind it,
+ * since the franc CFA has no minor unit. The POS path enforces this through
+ * `assertCashTendersArePayable`; mobile validated only that the string had at
+ * most two decimals, so it would hand the gateway an amount that cannot
+ * settle.
+ */
+function assertAmountIsPayable(
+  amount: string,
+  currency: string | null | undefined,
+): void {
+  const payableStep = getCurrencyPayableStep(currency);
+
+  if (payableStep <= BigInt(1)) return;
+
+  if (amountToCents(amount) % payableStep !== BigInt(0)) {
+    throw validationError(
+      `An amount of ${amount} cannot be paid in ${currency}.`,
+      { amount, currency },
+    );
+  }
 }
 
 function conflict(
@@ -271,6 +299,8 @@ export class PaymentService {
         paymentStatus: order.paymentStatus,
       });
     }
+
+    assertAmountIsPayable(input.amount, order.currency);
 
     const balance = calculateBalance(order);
 
@@ -492,6 +522,8 @@ export class PaymentService {
     if (!order) {
       throw orderNotFound();
     }
+
+    assertAmountIsPayable(input.amount, order.currency);
 
     const openRefundAmount = await this.repository.sumOpenRefundRequests({
       tenantId: customer.tenantId,

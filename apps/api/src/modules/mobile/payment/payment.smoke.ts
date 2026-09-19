@@ -1165,6 +1165,31 @@ export async function runPaymentSmokeChecks(): Promise<void> {
     rejectedDespiteNotificationFailure.status === "rejected",
     "notification failure should not block refund rejection",
   );
+  // XOF has no sub-franc coin, so an amount carrying centimes is one nobody
+  // can tender. Money is stored in hundredths whatever the currency, so only
+  // an explicit currency check rejects it -- the request schema cannot.
+  await assertRejectsPayment(
+    () =>
+      service.createPayment({
+        authContext: customerContext,
+        orderId: "order_1",
+        amount: "10.25",
+        idempotencyKey: "pay_unpayable",
+      }),
+    422,
+  );
+
+  await assertRejectsPayment(
+    () =>
+      service.createRefundRequest({
+        authContext: customerContext,
+        orderId: "order_1",
+        amount: "10.25",
+        reason: "Unpayable amount",
+      }),
+    422,
+  );
+
   // A refund request whose gateway call fails must not be left in
   // `processing`. The partial unique index on ('pending', 'processing') would
   // then block every future refund request for the order, and neither approve
