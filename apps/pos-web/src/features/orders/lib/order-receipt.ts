@@ -8,6 +8,10 @@ import {
   formatPosOrderCode,
   formatPosOrderQrPayload,
 } from "@cleanhub/domain/order-codes";
+import {
+  allocateReceiptLineMinor,
+  moneyToReceiptMinor,
+} from "@cleanhub/domain/currency";
 
 import { MOBILE_MONEY_PROVIDER_LABELS } from "../constants";
 import { formatOrderItemMeasurement } from "./order-measurement";
@@ -32,7 +36,19 @@ export function buildPosOrderReceipt(input: {
       reference.ticketNo,
     ]),
   );
-  const items = order.items.map((item) => {
+  // Lines are allocated against the order's own subtotal rather than rounded
+  // one by one: in a zero-decimal currency independent rounding leaves a
+  // column that does not add up to the total printed below it.
+  const subtotalMinor = moneyToReceiptMinor(
+    order.subtotalAmount,
+    order.currency,
+  );
+  const lineAmountsMinor = allocateReceiptLineMinor(
+    order.items.map((item) => item.lineAmount),
+    order.currency,
+    subtotalMinor,
+  );
+  const items = order.items.map((item, itemIndex) => {
     const quantity =
       item.pricingUnit === "per_kg"
         ? Number(item.weight ?? item.quantity)
@@ -50,8 +66,11 @@ export function buildPosOrderReceipt(input: {
     return {
       name: item.itemName,
       quantity: Number.isFinite(quantity) ? quantity : 0,
-      unitAmountMinor: toMinorUnits(item.chargedUnitAmount, order.currency),
-      totalAmountMinor: toMinorUnits(item.lineAmount, order.currency),
+      unitAmountMinor: moneyToReceiptMinor(
+        item.chargedUnitAmount,
+        order.currency,
+      ),
+      totalAmountMinor: lineAmountsMinor[itemIndex] ?? 0,
       sku: item.sku ?? undefined,
       barcode: item.barcode ?? undefined,
       note: details.length > 0 ? details.join(" · ") : undefined,
@@ -61,7 +80,7 @@ export function buildPosOrderReceipt(input: {
     .map((reference) => reference.expectedPickupAt)
     .filter((value): value is string => Boolean(value))
     .sort()[0];
-  const totalMinor = toMinorUnits(order.totalAmount, order.currency);
+  const totalMinor = moneyToReceiptMinor(order.totalAmount, order.currency);
   const paymentMethod = [
     ...new Set(
       payments
@@ -97,25 +116,25 @@ export function buildPosOrderReceipt(input: {
         customerName: order.customerName ?? copy.walkInCustomer,
         fields: branch?.receiptFields,
         items,
-        subtotalMinor: toMinorUnits(order.subtotalAmount, order.currency),
-        discountMinor: toMinorUnits(order.discountAmount, order.currency),
-        taxableMinor: toMinorUnits(order.taxableAmount, order.currency),
-        taxMinor: toMinorUnits(order.taxAmount, order.currency),
+        subtotalMinor,
+        discountMinor: moneyToReceiptMinor(order.discountAmount, order.currency),
+        taxableMinor: moneyToReceiptMinor(order.taxableAmount, order.currency),
+        taxMinor: moneyToReceiptMinor(order.taxAmount, order.currency),
         taxRate: order.taxRateSnapshot,
-        roundingMinor: toMinorUnits(
+        roundingMinor: moneyToReceiptMinor(
           order.roundingAdjustmentAmount,
           order.currency,
         ),
         taxRegistrationNumber: order.taxRegistrationNumberSnapshot ?? undefined,
         taxExemptionReason: order.taxExemptionReason ?? undefined,
         totalMinor,
-        paidMinor: toMinorUnits(order.paidAmount, order.currency),
+        paidMinor: moneyToReceiptMinor(order.paidAmount, order.currency),
         cashTenderedMinor:
           paidCash.length > 0
             ? paidCash.reduce(
                 (sum, payment) =>
                   sum +
-                  toMinorUnits(
+                  moneyToReceiptMinor(
                     payment.tenderedAmount ?? payment.amount,
                     payment.currency,
                   ),
@@ -127,13 +146,13 @@ export function buildPosOrderReceipt(input: {
             ? paidCash.reduce(
                 (sum, payment) =>
                   sum +
-                  toMinorUnits(payment.changeAmount ?? "0", payment.currency),
+                  moneyToReceiptMinor(payment.changeAmount ?? "0", payment.currency),
                 0,
               )
             : undefined,
         balanceMinor: Math.max(
           0,
-          totalMinor - toMinorUnits(order.paidAmount, order.currency),
+          totalMinor - moneyToReceiptMinor(order.paidAmount, order.currency),
         ),
         paymentMethod: paymentMethod || undefined,
         expectedPickup: earliestPickupAt
@@ -230,15 +249,6 @@ function formatReceiptPickup(iso: string, locale: PrintLocale): string {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function toMinorUnits(value: string, currency: string): number {
-  const fractionDigits =
-    new Intl.NumberFormat("en", {
-      style: "currency",
-      currency,
-    }).resolvedOptions().maximumFractionDigits ?? 2;
-  return Math.round(Number(value) * 10 ** fractionDigits);
 }
 
 function toPrintLocale(locale: string): PrintLocale {

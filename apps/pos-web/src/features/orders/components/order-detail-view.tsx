@@ -4,6 +4,10 @@ import { useTranslation } from "@cleanhub/i18n/react";
 import type { PosReceiptField } from "@cleanhub/domain/receipt";
 import { formatPosOrderQrPayload } from "@cleanhub/domain/order-codes";
 import {
+  allocateReceiptLineMinor,
+  moneyToReceiptMinor,
+} from "@cleanhub/domain/currency";
+import {
   Badge,
   Button,
   Card,
@@ -254,7 +258,19 @@ function buildOrderReceiptContent(
   },
 ): string {
   const copy = getPosReceiptCopy(locale);
-  const items = order.items.map((item) => {
+  const subtotalMinor = moneyToReceiptMinor(
+    order.subtotalAmount,
+    order.currency,
+  );
+  // Allocate the lines against the subtotal instead of rounding each one, so
+  // the printed column adds up to the printed total in a zero-decimal
+  // currency.
+  const lineAmountsMinor = allocateReceiptLineMinor(
+    order.items.map((item) => item.lineAmount),
+    order.currency,
+    subtotalMinor,
+  );
+  const items = order.items.map((item, itemIndex) => {
     const quantity =
       item.pricingUnit === "per_kg"
         ? Number(item.weight ?? item.quantity)
@@ -274,16 +290,21 @@ function buildOrderReceiptContent(
     return {
       name: item.itemName,
       quantity: Number.isFinite(quantity) ? quantity : 0,
-      unitAmountMinor: toMinorUnits(item.chargedUnitAmount, order.currency),
-      totalAmountMinor: toMinorUnits(item.lineAmount, order.currency),
+      unitAmountMinor: moneyToReceiptMinor(
+        item.chargedUnitAmount,
+        order.currency,
+      ),
+      totalAmountMinor: lineAmountsMinor[itemIndex] ?? 0,
       sku: item.sku ?? undefined,
       barcode: item.barcode ?? undefined,
       note: details.length > 0 ? details.join("; ") : undefined,
     };
   });
-  const subtotalMinor = toMinorUnits(order.subtotalAmount, order.currency);
-  const discountMinor = toMinorUnits(order.discountAmount, order.currency);
-  const totalMinor = toMinorUnits(order.totalAmount, order.currency);
+  const discountMinor = moneyToReceiptMinor(
+    order.discountAmount,
+    order.currency,
+  );
+  const totalMinor = moneyToReceiptMinor(order.totalAmount, order.currency);
   const paymentMethod = [
     ...new Set(
       payments
@@ -315,23 +336,23 @@ function buildOrderReceiptContent(
       items,
       subtotalMinor,
       discountMinor,
-      taxableMinor: toMinorUnits(order.taxableAmount, order.currency),
-      taxMinor: toMinorUnits(order.taxAmount, order.currency),
+      taxableMinor: moneyToReceiptMinor(order.taxableAmount, order.currency),
+      taxMinor: moneyToReceiptMinor(order.taxAmount, order.currency),
       taxRate: order.taxRateSnapshot,
-      roundingMinor: toMinorUnits(
+      roundingMinor: moneyToReceiptMinor(
         order.roundingAdjustmentAmount,
         order.currency,
       ),
       taxRegistrationNumber: order.taxRegistrationNumberSnapshot ?? undefined,
       taxExemptionReason: order.taxExemptionReason ?? undefined,
       totalMinor,
-      paidMinor: toMinorUnits(order.paidAmount, order.currency),
+      paidMinor: moneyToReceiptMinor(order.paidAmount, order.currency),
       cashTenderedMinor:
         paidCash.length > 0
           ? paidCash.reduce(
               (sum, payment) =>
                 sum +
-                toMinorUnits(
+                moneyToReceiptMinor(
                   payment.tenderedAmount ?? payment.amount,
                   payment.currency,
                 ),
@@ -343,13 +364,13 @@ function buildOrderReceiptContent(
           ? paidCash.reduce(
               (sum, payment) =>
                 sum +
-                toMinorUnits(payment.changeAmount ?? "0", payment.currency),
+                moneyToReceiptMinor(payment.changeAmount ?? "0", payment.currency),
               0,
             )
           : undefined,
       balanceMinor: Math.max(
         0,
-        totalMinor - toMinorUnits(order.paidAmount, order.currency),
+        totalMinor - moneyToReceiptMinor(order.paidAmount, order.currency),
       ),
       paymentMethod: paymentMethod || undefined,
       receiptAddress: config.receiptAddress ?? undefined,
@@ -358,15 +379,6 @@ function buildOrderReceiptContent(
     },
     { locale: toPrintLocale(locale) },
   );
-}
-
-function toMinorUnits(value: string, currency: string): number {
-  const fractionDigits =
-    new Intl.NumberFormat("en", {
-      style: "currency",
-      currency,
-    }).resolvedOptions().maximumFractionDigits ?? 2;
-  return Math.round(Number(value) * 10 ** fractionDigits);
 }
 
 function toPrintLocale(locale: string): PrintLocale {

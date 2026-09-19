@@ -9,6 +9,10 @@ import { buildPosReceiptText } from "@cleanhub/hardware";
 import { createId } from "@cleanhub/id";
 import { calendarDateEndToUtc } from "@cleanhub/domain/timezone";
 import type { PosReceiptField } from "@cleanhub/domain/receipt";
+import {
+  allocateReceiptLineMinor,
+  moneyToReceiptMinor,
+} from "@cleanhub/domain/currency";
 import { createScopedPrintJobQueue } from "@cleanhub/offline";
 import type {
   CreateManualOrderRequest,
@@ -580,21 +584,35 @@ function buildOfflineOrderReceipt(input: {
             ? `Ticket ${input.ticket.ticketNo}`
             : "Service ticket",
           quantity: Math.max(1, input.ticket?.itemCount ?? 1),
-          unitAmountMinor: toMinorUnits(
+          unitAmountMinor: moneyToReceiptMinor(
             Number(input.ticket?.totalAmount ?? 0) /
               Math.max(1, input.ticket?.itemCount ?? 1),
             currency,
           ),
-          totalAmountMinor: toMinorUnits(
-            Number(input.ticket?.totalAmount ?? 0),
-            currency,
-          ),
+          lineAmount: Number(input.ticket?.totalAmount ?? 0),
         },
       ];
-  const totalMinor = receiptItems.reduce(
-    (total, item) => total + item.totalAmountMinor,
-    0,
+  // Sum the exact amounts and round once, then allocate that total back over
+  // the lines. Adding up separately-rounded lines is what let a receipt's
+  // column disagree with its own total in a zero-decimal currency.
+  const totalMinor = moneyToReceiptMinor(
+    receiptItems.reduce((total, item) => total + item.lineAmount, 0),
+    currency,
   );
+  const lineAmountsMinor = allocateReceiptLineMinor(
+    receiptItems.map((item) => item.lineAmount),
+    currency,
+    totalMinor,
+  );
+  // `lineAmount` is the exact working value; the receipt carries the allocated
+  // minor-unit amount in its place.
+  const receiptLines = receiptItems.map(({ lineAmount, ...item }, index) => {
+    void lineAmount;
+    return {
+      ...item,
+      totalAmountMinor: lineAmountsMinor[index] ?? 0,
+    };
+  });
   const code = `OFF-${input.entityId.slice(-8).toUpperCase()}`;
 
   return {
@@ -621,7 +639,7 @@ function buildOfflineOrderReceipt(input: {
                 ? "Client de passage"
                 : "Walk-in customer"
             : undefined),
-        items: receiptItems,
+        items: receiptLines,
         subtotalMinor: totalMinor,
         discountMinor: 0,
         totalMinor,
@@ -702,7 +720,7 @@ function buildOfflineManualReceiptItems(
         name: `Ticket item ${item.ticketItemId.slice(-8).toUpperCase()}`,
         quantity: 1,
         unitAmountMinor: 0,
-        totalAmountMinor: 0,
+        lineAmount: 0,
         note: undefined,
       };
     }
@@ -723,8 +741,10 @@ function buildOfflineManualReceiptItems(
         ("productSkuId" in item ? item.productSkuId : item.serviceId) ??
         "Unknown item",
       quantity: safeQuantity,
-      unitAmountMinor: toMinorUnits(safeUnitAmount, currency),
-      totalAmountMinor: toMinorUnits(safeQuantity * safeUnitAmount, currency),
+      unitAmountMinor: moneyToReceiptMinor(safeUnitAmount, currency),
+      // Kept exact: the caller rounds the column as a whole so it sums to the
+      // total printed under it.
+      lineAmount: safeQuantity * safeUnitAmount,
       note:
         [item.itemColor, item.defectNotes, item.specialRequest]
           .filter(Boolean)
@@ -747,15 +767,6 @@ function resolveManualCatalogItem(
   return item.productSkuId
     ? products.find((product) => product.productSkuId === item.productSkuId)
     : catalog.find((service) => service.id === item.serviceId);
-}
-
-function toMinorUnits(value: number, currency: string): number {
-  const fractionDigits =
-    new Intl.NumberFormat("en", {
-      style: "currency",
-      currency,
-    }).resolvedOptions().maximumFractionDigits ?? 2;
-  return Math.round(value * 10 ** fractionDigits);
 }
 
 function ManualOrderFields({

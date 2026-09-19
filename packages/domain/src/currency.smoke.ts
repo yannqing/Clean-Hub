@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 
 import {
+  allocateReceiptLineMinor,
   CASH_ROUNDING_STEPS,
   cashRoundingStepToMinor,
   getCurrencyMinorUnits,
   getCurrencyPayableStep,
   isCashRoundingStep,
+  moneyToReceiptMinor,
   roundCashDown,
   roundToPayableAmount,
   roundToStep,
@@ -101,5 +103,53 @@ assert.equal(
   true,
   "every offered step converts to a usable minor-unit step",
 );
+
+// Receipts print in the currency's own minor units, so a stored "52.25" is 52
+// francs but 5225 cents. Deriving this from `Intl` per call site is what
+// printed a 52.25 order as 52.
+assert.equal(moneyToReceiptMinor("52.25", "XOF"), 52);
+assert.equal(moneyToReceiptMinor("52.25", "EUR"), 5225);
+assert.equal(moneyToReceiptMinor("1000.00", "XOF"), 1000);
+assert.equal(moneyToReceiptMinor("0.50", "XOF"), 1, "half a franc rounds up");
+assert.equal(moneyToReceiptMinor(null, "XOF"), 0);
+assert.equal(moneyToReceiptMinor("not-money", "EUR"), 0);
+
+// A receipt whose lines do not add up to its total is the bug this guards.
+// Rounding each line alone turns three 0.40 lines under a 1.20 total into
+// 0 + 0 + 0, and four 12.50 lines under a 50.00 total into 52.
+for (const [lines, total] of [
+  [["12.50", "12.50", "12.50", "12.50"], "50.00"],
+  [["0.40", "0.40", "0.40"], "1.20"],
+  [["2.25", "2.25", "2.25", "2.25"], "9.00"],
+  [["0.10", "0.10", "0.10", "0.10", "0.10"], "0.50"],
+] as const) {
+  const totalMinor = moneyToReceiptMinor(total, "XOF");
+  const allocated = allocateReceiptLineMinor(lines, "XOF", totalMinor);
+  assert.equal(
+    allocated.reduce((sum, value) => sum + value, 0),
+    totalMinor,
+    `XOF lines ${lines.join("+")} must sum to the printed total`,
+  );
+  // No line may drift more than a single franc from its true value.
+  for (const [index, value] of allocated.entries()) {
+    assert.ok(
+      Math.abs(value - moneyToReceiptMinor(lines[index], "XOF")) <= 1,
+      "allocation must stay within one minor unit of the line amount",
+    );
+  }
+}
+
+// A currency already at storage scale is exact, so allocation leaves it alone
+// rather than nudging lines to match a total they genuinely do not sum to.
+assert.deepEqual(
+  allocateReceiptLineMinor(["12.50", "12.50"], "EUR", 2500),
+  [1250, 1250],
+);
+assert.deepEqual(
+  allocateReceiptLineMinor(["1.00", "2.00"], "EUR", 9999),
+  [100, 200],
+  "an inconsistent total must not be papered over at storage scale",
+);
+assert.deepEqual(allocateReceiptLineMinor([], "XOF", 0), []);
 
 console.log("currency smoke passed.");

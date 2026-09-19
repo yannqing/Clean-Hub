@@ -138,3 +138,95 @@ export function cashRoundingStepToMinor(
   const scale = BigInt(10) ** BigInt(MONEY_STORAGE_DECIMALS);
   return BigInt(Math.floor(step)) * scale;
 }
+
+/**
+ * Convert a stored money string into the minor units a printed receipt uses.
+ *
+ * Receipts carry amounts in the *currency's* minor units, not the storage
+ * scale: `packages/hardware` divides by the same currency scale to format, so
+ * an XOF receipt prints 1000 as "1,000 F CFA" rather than "10.00". Reading
+ * that scale from `Intl` at each call site is what printed a 52.25 order as
+ * 52, so the scale comes from the currency table here instead.
+ */
+export function moneyToReceiptMinor(
+  value: string | number | null | undefined,
+  currency: string | null | undefined,
+): number {
+  const parsed = typeof value === "number" ? value : Number(value ?? 0);
+  if (!Number.isFinite(parsed)) return 0;
+
+  const decimals = getCurrencyMinorUnits(currency);
+  // Money arrives as a `numeric(_, 2)` string, so hundredths are the exact
+  // representation to round from.
+  const storageMinor = Math.round(parsed * 10 ** MONEY_STORAGE_DECIMALS);
+  const shift = MONEY_STORAGE_DECIMALS - decimals;
+  if (shift <= 0) return storageMinor;
+
+  return Math.round(storageMinor / 10 ** shift);
+}
+
+/**
+ * Split an already-rounded receipt total across its lines so the printed lines
+ * add up to the printed total.
+ *
+ * Rounding each line on its own is what breaks a receipt: three XOF lines of
+ * 0.40 each round to 0, 0, 0 under a total of 1, and four lines of 12.50 round
+ * up to 52 under a total of 50. The customer sees a column that does not sum.
+ *
+ * Largest-remainder allocation instead: floor every line, then hand the
+ * leftover units to the lines with the biggest discarded fraction. Every line
+ * stays within one minor unit of its true value and the column always totals
+ * exactly `totalMinor`.
+ *
+ * `values` are stored money strings; `totalMinor` is the authoritative total
+ * already converted with {@link moneyToReceiptMinor}.
+ */
+export function allocateReceiptLineMinor(
+  values: readonly (string | number | null | undefined)[],
+  currency: string | null | undefined,
+  totalMinor: number,
+): number[] {
+  if (values.length === 0) return [];
+
+  const decimals = getCurrencyMinorUnits(currency);
+  const shift = MONEY_STORAGE_DECIMALS - decimals;
+  const divisor = shift <= 0 ? 1 : 10 ** shift;
+
+  const storage = values.map((value) => {
+    const parsed = typeof value === "number" ? value : Number(value ?? 0);
+    return Number.isFinite(parsed)
+      ? Math.round(parsed * 10 ** MONEY_STORAGE_DECIMALS)
+      : 0;
+  });
+
+  // A currency already at storage scale needs no allocation: the lines are
+  // exact, and forcing them to match a total they do not sum to would hide a
+  // genuine pricing discrepancy.
+  if (divisor === 1) return storage;
+
+  const floors = storage.map((value) => Math.floor(value / divisor));
+  const allocated = floors.reduce((sum, value) => sum + value, 0);
+  let remaining = totalMinor - allocated;
+
+  if (remaining === 0) return floors;
+
+  // Hand out (or reclaim) one unit at a time, biggest discarded fraction
+  // first, so the lines that lost the most round up before the others.
+  const order = storage
+    .map((value, index) => ({
+      index,
+      remainder: value - Math.floor(value / divisor) * divisor,
+    }))
+    .sort((left, right) => right.remainder - left.remainder);
+
+  const result = [...floors];
+  const step = remaining > 0 ? 1 : -1;
+  for (let cursor = 0; remaining !== 0 && cursor < order.length; cursor += 1) {
+    const target = order[step > 0 ? cursor : order.length - 1 - cursor];
+    if (!target) break;
+    result[target.index] += step;
+    remaining -= step;
+  }
+
+  return result;
+}

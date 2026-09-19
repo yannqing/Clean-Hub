@@ -6,6 +6,10 @@ import type {
 import { createId } from "@cleanhub/id";
 import { createScopedPrintJobQueue } from "@cleanhub/offline";
 import { buildPosReceiptText, type PrintLocale } from "@cleanhub/hardware";
+import {
+  allocateReceiptLineMinor,
+  moneyToReceiptMinor,
+} from "@cleanhub/domain/currency";
 
 import type { PosCartSnapshot } from "@/features/cart/cart.types";
 import {
@@ -79,16 +83,24 @@ export async function queuePosOfflineCartReceipt(input: {
   terminalName?: string | null;
   scope: { tenantId: string; branchId: string; terminalId: string };
 }): Promise<"queued" | "printed" | "failed"> {
-  const totalMinor = input.cart.lines.reduce(
-    (sum, line) =>
-      sum +
-      toMinorUnits(
-        line.kind === "product"
-          ? String(Number(line.unitAmount) * line.quantity)
-          : line.lineAmount,
-        input.cart.currency,
-      ),
+  // An offline cart has no server-priced total, so it is summed here -- but
+  // summed from the exact line amounts and rounded once at the end. Rounding
+  // each line first and adding those up is what made a receipt's column
+  // disagree with its own total in a zero-decimal currency.
+  const lineAmounts = input.cart.lines.map((line) =>
+    line.kind === "product"
+      ? String(Number(line.unitAmount) * line.quantity)
+      : line.lineAmount,
+  );
+  const totalAmount = lineAmounts.reduce(
+    (sum, amount) => sum + Number(amount || 0),
     0,
+  );
+  const totalMinor = moneyToReceiptMinor(totalAmount, input.cart.currency);
+  const lineAmountsMinor = allocateReceiptLineMinor(
+    lineAmounts,
+    input.cart.currency,
+    totalMinor,
   );
   const title = `OFF-${input.cart.checkoutId.slice(-8).toUpperCase()}`;
   const copy = getPosReceiptCopy(input.locale);
@@ -104,19 +116,17 @@ export async function queuePosOfflineCartReceipt(input: {
       terminalName: input.terminalName ?? undefined,
       customerName: input.cart.customer?.name ?? copy.walkInCustomer,
       fields: input.branch?.receiptFields,
-      items: input.cart.lines.map((line) => ({
+      items: input.cart.lines.map((line, lineIndex) => ({
         name: line.name,
         quantity:
           line.kind === "product"
             ? line.quantity
             : Number(line.weight ?? line.quantity),
-        unitAmountMinor: toMinorUnits(line.unitAmount, input.cart.currency),
-        totalAmountMinor: toMinorUnits(
-          line.kind === "product"
-            ? String(Number(line.unitAmount) * line.quantity)
-            : line.lineAmount,
+        unitAmountMinor: moneyToReceiptMinor(
+          line.unitAmount,
           input.cart.currency,
         ),
+        totalAmountMinor: lineAmountsMinor[lineIndex] ?? 0,
         sku: line.kind === "product" ? line.sku : undefined,
         barcode:
           line.kind === "product" ? (line.barcode ?? undefined) : undefined,
@@ -127,11 +137,11 @@ export async function queuePosOfflineCartReceipt(input: {
       paidMinor: input.paymentMethod === "cash" ? totalMinor : 0,
       cashTenderedMinor:
         input.paymentMethod === "cash" && input.cashTendered
-          ? toMinorUnits(input.cashTendered, input.cart.currency)
+          ? moneyToReceiptMinor(input.cashTendered, input.cart.currency)
           : undefined,
       changeMinor:
         input.paymentMethod === "cash" && input.changeAmount
-          ? toMinorUnits(input.changeAmount, input.cart.currency)
+          ? moneyToReceiptMinor(input.changeAmount, input.cart.currency)
           : undefined,
       balanceMinor: input.paymentMethod === "cash" ? 0 : totalMinor,
       paymentMethod:
@@ -182,15 +192,6 @@ export async function queuePosOfflineCartReceipt(input: {
     notifyPosPrintQueueUpdated();
     return "failed";
   }
-}
-
-function toMinorUnits(value: string, currency: string): number {
-  const fractionDigits =
-    new Intl.NumberFormat("en", {
-      style: "currency",
-      currency,
-    }).resolvedOptions().maximumFractionDigits ?? 2;
-  return Math.round(Number(value) * 10 ** fractionDigits);
 }
 
 function toPrintLocale(locale: string): PrintLocale {
