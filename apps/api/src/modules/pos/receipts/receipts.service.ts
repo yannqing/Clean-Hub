@@ -5,6 +5,8 @@ import { EmailAdapter } from "../../notifications/email.adapter.js";
 import { loadEmailConfig } from "../../notifications/email-config.js";
 import type { AuthContext } from "../../auth/auth.types.js";
 import { requirePosTenantId } from "../access-control.helper.js";
+import { isEmailConfigured } from "../../notifications/email-config.js";
+import { findTenantEmailEnabled } from "../terminal-settings/terminal-settings.repository.js";
 import { PosOrderError } from "../orders/orders.errors.js";
 import { getPosOrder } from "../orders/orders.service.js";
 import type { PosOrderDetail } from "../orders/orders.types.js";
@@ -159,6 +161,23 @@ export async function deliverPosOrderReceipt(
   db: Database = getDb(),
 ): Promise<PosReceiptDelivery> {
   const tenantId = requirePosTenantId(input.authContext);
+
+  // Refuse before anything is recorded. The POS hides the email option when
+  // the capability is off, but the API is reachable directly and an offline
+  // till can replay a queued request made before an operator turned it off.
+  if (input.data.channel === "email") {
+    const emailEnabled =
+      isEmailConfigured() && (await findTenantEmailEnabled(db, tenantId));
+
+    if (!emailEnabled) {
+      throw new PosOrderError(
+        "EMAIL_RECEIPT_DISABLED",
+        "Email receipts are not enabled for this tenant.",
+        422,
+      );
+    }
+  }
+
   const existing = await findReceiptDeliveryByIdempotencyKey(db, {
     tenantId,
     idempotencyKey: input.data.idempotencyKey,

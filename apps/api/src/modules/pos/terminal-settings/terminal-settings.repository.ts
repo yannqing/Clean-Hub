@@ -4,6 +4,7 @@ import {
   branches,
   posChannelSettings,
   posTerminalSettings,
+  tenantFeatureFlags,
   type Database,
 } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
@@ -50,6 +51,11 @@ function toSummary(
     defaultTaxRate: "0.0000",
     pricesIncludeTax: true,
     taxRegistrationNumber: null,
+    // Safe placeholder: withTenantFinancialDefaults resolves the real value
+    // from the platform SMTP configuration and the tenant's feature flag.
+    // Defaulting to false means a path that somehow skips the overlay hides
+    // the email option rather than offering one that cannot send.
+    emailReceiptEnabled: false,
     autoPrintReceipt: row.autoPrintReceipt,
     printCopies: row.printCopies,
     lockTimeoutSeconds: row.lockTimeoutSeconds,
@@ -74,6 +80,25 @@ function toSummary(
     updatedBy: row.updatedBy,
     version: row.version,
   };
+}
+
+/**
+ * Whether this tenant is entitled to send email.
+ *
+ * Defaults to false when the tenant has no feature-flag row: email is opt-in,
+ * and a missing row must not silently grant it.
+ */
+export async function findTenantEmailEnabled(
+  db: Database,
+  tenantId: string,
+): Promise<boolean> {
+  const rows = await db
+    .select({ emailEnabled: tenantFeatureFlags.emailEnabled })
+    .from(tenantFeatureFlags)
+    .where(eq(tenantFeatureFlags.tenantId, tenantId))
+    .limit(1);
+
+  return rows[0]?.emailEnabled ?? false;
 }
 
 export async function findTenantPosTerminalDefaults(

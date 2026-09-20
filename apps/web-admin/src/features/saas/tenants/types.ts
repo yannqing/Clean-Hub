@@ -46,4 +46,5 @@ export type TenantFeatureFlagsFormValues = {
   retailProductsEnabled: boolean;
   deliveryEnabled: boolean;
   notificationsEnabled: boolean;
+  emailEnabled: boolean;
 };

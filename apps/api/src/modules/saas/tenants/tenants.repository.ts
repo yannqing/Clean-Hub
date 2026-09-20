@@ -155,6 +155,7 @@ function toTenantFeatureFlags(row: {
   retailProductsEnabled: boolean | null;
   deliveryEnabled: boolean | null;
   notificationsEnabled: boolean | null;
+  emailEnabled: boolean | null;
   updatedAt: Date | null;
   updatedBy: string | null;
   version: number | null;
@@ -167,6 +168,7 @@ function toTenantFeatureFlags(row: {
     retailProductsEnabled: row.retailProductsEnabled ?? false,
     deliveryEnabled: row.deliveryEnabled ?? false,
     notificationsEnabled: row.notificationsEnabled ?? true,
+    emailEnabled: row.emailEnabled ?? false,
     updatedAt: row.updatedAt?.toISOString() ?? null,
     updatedBy: row.updatedBy,
     version: row.version ?? 0,
@@ -419,6 +421,7 @@ export async function findSaasTenantFeatureFlagsByTenantId(
       retailProductsEnabled: tenantFeatureFlags.retailProductsEnabled,
       deliveryEnabled: tenantFeatureFlags.deliveryEnabled,
       notificationsEnabled: tenantFeatureFlags.notificationsEnabled,
+      emailEnabled: tenantFeatureFlags.emailEnabled,
       updatedAt: tenantFeatureFlags.updatedAt,
       updatedBy: tenantFeatureFlags.updatedBy,
       version: tenantFeatureFlags.version,
@@ -618,6 +621,8 @@ export async function updateSaasTenantFeatureFlagsRecord(
   const notificationsEnabled =
     input.data.notificationsEnabled ??
     input.currentFeatureFlags.notificationsEnabled;
+  const emailEnabled =
+    input.data.emailEnabled ?? input.currentFeatureFlags.emailEnabled;
 
   await db
     .insert(tenantFeatureFlags)
@@ -629,6 +634,7 @@ export async function updateSaasTenantFeatureFlagsRecord(
       retailProductsEnabled,
       deliveryEnabled,
       notificationsEnabled,
+      emailEnabled,
       updatedBy: input.actorUserId,
     })
     .onConflictDoUpdate({
@@ -639,6 +645,7 @@ export async function updateSaasTenantFeatureFlagsRecord(
         retailProductsEnabled,
         deliveryEnabled,
         notificationsEnabled,
+        emailEnabled,
         updatedAt: new Date(),
         updatedBy: input.actorUserId,
         version: sql`${tenantFeatureFlags.version} + 1`,

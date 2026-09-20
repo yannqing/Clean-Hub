@@ -33,6 +33,19 @@ function readBoolean(value: string | undefined, fallback = false): boolean {
   return ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 }
 
+/**
+ * Whether the platform has SMTP at all.
+ *
+ * SMTP is one platform-wide configuration, not per tenant, so this is the
+ * ceiling on every tenant's email capability: without it, `loadEmailConfig`
+ * throws and nothing can be sent for anybody.
+ */
+export function isEmailConfigured(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return Boolean((env.EMAIL_SMTP_HOST ?? env.SMTP_HOST)?.trim());
+}
+
 export function loadEmailConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): EmailConfig {

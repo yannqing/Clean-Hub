@@ -144,6 +144,7 @@ export const updateSaasTenantFeatureFlagsBodySchema = z
     retailProductsEnabled: z.boolean().optional(),
     deliveryEnabled: z.boolean().optional(),
     notificationsEnabled: z.boolean().optional(),
+  emailEnabled: z.boolean().optional(),
   })
   .refine(
     (data) => Object.values(data).some((value) => value !== undefined),

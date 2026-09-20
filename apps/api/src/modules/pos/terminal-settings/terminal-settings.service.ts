@@ -6,6 +6,7 @@ import {
   requirePosBranchId,
 } from "../../auth/permission.helper.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { isEmailConfigured } from "../../notifications/email-config.js";
 import { findEnabledTenantPaymentProviders } from "../../tenant/payment-integrations/payment-integrations.repository.js";
 import { requirePosTerminalContext } from "../access-control.helper.js";
 import { findOpenRegisterSession } from "../staff/staff.repository.js";
@@ -14,6 +15,7 @@ import {
   findAuthenticatedTerminalSettings,
   findTerminalSettingsByTenantAndDevice,
   findBranchPaymentPolicy,
+  findTenantEmailEnabled,
   findTenantPosTerminalDefaults,
   insertTerminalSettings,
   updateAuthenticatedTerminalLastSeen,
@@ -45,6 +47,12 @@ async function withTenantFinancialDefaults(
         branchId: settings.branchId,
       }),
     ]);
+  // Two conditions, both required: the platform must have SMTP at all (it is a
+  // single global configuration), and this tenant must be entitled to use it.
+  // Resolved here rather than in the POS so the till cannot offer a channel the
+  // server would refuse.
+  const emailReceiptEnabled =
+    isEmailConfigured() && (await findTenantEmailEnabled(db, settings.tenantId));
   const branchMethods = branchPolicy?.paymentMethodsEnabled ?? ["cash"];
   const paymentMethodsEnabled =
     mobileMoneyProvidersEnabled.length > 0
@@ -74,6 +82,7 @@ async function withTenantFinancialDefaults(
     defaultTaxRate: defaults.defaultTaxRate,
     pricesIncludeTax: defaults.pricesIncludeTax,
     taxRegistrationNumber: defaults.taxRegistrationNumber,
+    emailReceiptEnabled,
   };
 }
 

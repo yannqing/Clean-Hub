@@ -112,6 +112,7 @@ function toFeatureFlagsFormValues(
     retailProductsEnabled: featureFlags.retailProductsEnabled,
     deliveryEnabled: featureFlags.deliveryEnabled,
     notificationsEnabled: featureFlags.notificationsEnabled,
+    emailEnabled: featureFlags.emailEnabled,
   };
 }
 

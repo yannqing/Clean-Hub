@@ -51,6 +51,7 @@ export default async function PosLayout({
       mobileMoneyProvidersEnabled={
         terminalSettings?.mobileMoneyProvidersEnabled
       }
+      emailReceiptEnabled={terminalSettings?.emailReceiptEnabled}
       roundingRule={terminalSettings?.roundingRule}
       cashRoundingStep={branch?.cashRoundingStep}
       taxEnabled={terminalSettings?.taxEnabled}

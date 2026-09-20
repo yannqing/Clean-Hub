@@ -68,4 +68,10 @@ export const tenantFeatureFlagOptions = [
     label: "Notifications",
     description: "WhatsApp, SMS, email settings, and send records.",
   },
+  {
+    key: "emailEnabled",
+    label: "Email sending",
+    description:
+      "Emailed receipts and notifications. Needs platform SMTP; without it the option stays hidden at the till even when this is on.",
+  },
 ] as const;

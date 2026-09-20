@@ -679,6 +679,14 @@ function CartPanel({
     paymentMode === "cash" ||
     (tenders.length > 0 &&
       tenders.every((tender) => tender.paymentMethod === "cash"));
+  // Email is offered only when the API says this till may use it: the platform
+  // needs SMTP, and the tenant has to be entitled to it. Hidden rather than
+  // disabled, because a greyed-out button the cashier can never use is just
+  // clutter at the till.
+  const receiptDeliveryChoices = (
+    ["print", "email", "sms", "none"] as const
+  ).filter((choice) => choice !== "email" || runtime.emailReceiptEnabled);
+
   const cashRoundingStepMinor = cashRoundingStepToMinor(cashRoundingStep);
   // Offered whenever cash is being taken: the cashier decides the step here,
   // so there is no longer a branch setting to gate the control behind.
@@ -2282,7 +2290,7 @@ function CartPanel({
             <section className="space-y-3">
               <h3 className="text-sm font-semibold">{t("pos.cart.receiptDeliveryTitle")}</h3>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(["print", "email", "sms", "none"] as const).map((choice) => (
+                {receiptDeliveryChoices.map((choice) => (
                   <Button
                     disabled={choice === "print" && !configuredPrinter}
                     key={choice}

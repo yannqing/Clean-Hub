@@ -123,6 +123,16 @@ export const tenantFeatureFlags = pgTable(
     notificationsEnabled: boolean("notifications_enabled")
       .notNull()
       .default(true),
+    /**
+     * Whether this tenant may send receipts and notifications by email.
+     *
+     * Off by default: SMTP is a single platform-wide configuration, so a tenant
+     * can only use email once the platform has one. Turning this on without
+     * SMTP configured does nothing useful -- the POS hides the email option in
+     * both cases -- so the SaaS console is where an operator records that a
+     * tenant is entitled to it.
+     */
+    emailEnabled: boolean("email_enabled").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

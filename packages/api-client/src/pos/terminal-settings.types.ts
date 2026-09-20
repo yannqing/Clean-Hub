@@ -38,6 +38,11 @@ export type PosTerminalSettings = {
   defaultTaxRate: string;
   pricesIncludeTax: boolean;
   taxRegistrationNumber: string | null;
+  /**
+   * Whether this till may offer an emailed receipt. False when the platform has
+   * no SMTP configured, or when the tenant is not entitled to email.
+   */
+  emailReceiptEnabled: boolean;
   autoPrintReceipt: boolean;
   printCopies: number;
   lockTimeoutSeconds: number;

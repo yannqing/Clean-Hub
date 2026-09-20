@@ -50,6 +50,11 @@ type PosRuntimeConfig = {
   terminalName: string | null;
   autoPrintReceipt: boolean;
   printCopies: number;
+  /**
+   * Whether an emailed receipt may be offered at checkout. Resolved by the API
+   * from the platform SMTP configuration and this tenant's entitlement.
+   */
+  emailReceiptEnabled: boolean;
 };
 
 const PosRuntimeConfigContext = createContext<PosRuntimeConfig>({
@@ -82,6 +87,9 @@ const PosRuntimeConfigContext = createContext<PosRuntimeConfig>({
   terminalName: null,
   autoPrintReceipt: true,
   printCopies: 1,
+  // Default off: a context with no provider must not offer a channel that may
+  // not be configured.
+  emailReceiptEnabled: false,
 });
 
 export function PosRuntimeConfigProvider({
@@ -114,6 +122,7 @@ export function PosRuntimeConfigProvider({
   terminalName,
   autoPrintReceipt,
   printCopies,
+  emailReceiptEnabled,
   children,
 }: {
   tenantId?: string | null;
@@ -145,6 +154,7 @@ export function PosRuntimeConfigProvider({
   terminalName?: string | null;
   autoPrintReceipt?: boolean | null;
   printCopies?: number | null;
+  emailReceiptEnabled?: boolean | null;
   children: React.ReactNode;
 }) {
   const value = useMemo<PosRuntimeConfig>(
@@ -180,6 +190,7 @@ export function PosRuntimeConfigProvider({
       terminalName: terminalName ?? null,
       autoPrintReceipt: autoPrintReceipt ?? true,
       printCopies: printCopies ?? 1,
+      emailReceiptEnabled: emailReceiptEnabled ?? false,
     }),
     [
       branchId,
@@ -210,6 +221,7 @@ export function PosRuntimeConfigProvider({
       terminalName,
       autoPrintReceipt,
       printCopies,
+      emailReceiptEnabled,
       userId,
     ],
   );
