@@ -76,7 +76,7 @@ pnpm lint
 - `apps/pos-web`: Next.js POS frontend for in-store staff workflows. This should remain fast, offline-friendly, and optimized for cashier/scanner/printing usage.
 - `apps/desktop`: Electron shell for the official Windows/macOS in-store POS runtime and local hardware integration.
 - `apps/mobile`: Capacitor shell for customer-facing and delivery-facing Android/iOS workflows. Do not treat it as the default mobile cashier POS. It loads the static export of `apps/mobile-web`.
-- `apps/mobile-web`: Next.js customer/delivery web UI loaded by `apps/mobile`. It is a client-rendered SPA with no route-guard proxy; authentication is enforced by `apps/api`, and the session lives in Capacitor Preferences (falling back to `localStorage` in a plain browser).
+- `apps/mobile-web`: Next.js customer/delivery web UI loaded by `apps/mobile`. It is a client-rendered SPA with no route-guard proxy; authentication is enforced by `apps/api`. The session lives in Capacitor Preferences, which is native storage on a device. Do not serve this app as a website: in a browser Preferences resolves to `localStorage`, which does not meet the HttpOnly cookie rule the web apps follow.
 - `apps/pos-mobile`: Capacitor shell that wraps `apps/pos-web` for Android/iOS, plus the native plugin bridge for Bluetooth ESC/POS printing, scanning and haptics.
 - `apps/api`: standalone backend API service.
 
