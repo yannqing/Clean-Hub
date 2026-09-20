@@ -129,6 +129,47 @@ Rules:
 - Refresh token handling should go through backend auth endpoints.
 - Logout should call the backend logout endpoint so the API clears auth cookies.
 
+## Mobile Payment Model
+
+Customers do not pay through `apps/mobile` / `apps/mobile-web`. Staff collect
+payment at the counter through the POS, which is the only path that moves real
+money. The customer app is read-only about payment: it shows total, paid amount
+and payment status, and tells the customer to settle at the counter.
+
+Do not re-add a customer-facing payment entry point until a real PSP is
+integrated. `apps/api/src/modules/mobile/payment` still has only
+`MockPaymentGateway`, and `readGateway()` returns `"mock"` on every branch, so
+any "is this the mock gateway?" guard is always true.
+
+Customer-facing refund requests are unaffected and still supported.
+
+## Mobile Release Builds
+
+Both mobile shells validate their own release configuration and refuse to build
+an unsafe artifact.
+
+```bash
+pnpm --filter @cleanhub/mobile release:validate
+pnpm --filter @cleanhub/pos-mobile release:validate
+```
+
+For `apps/mobile`, a release build requires real values; the defaults are
+development placeholders and will be rejected:
+
+```bash
+CLEANHUB_MOBILE_ENV=prod
+CLEANHUB_MOBILE_API_BASE_URL=https://<real-api-host>
+CLEANHUB_MOBILE_UPDATE_URL=https://<real-update-host>
+```
+
+Android signing is supplied through `CLEANHUB_ANDROID_KEYSTORE_PATH`,
+`CLEANHUB_ANDROID_KEYSTORE_PASSWORD`, `CLEANHUB_ANDROID_KEY_ALIAS` and
+`CLEANHUB_ANDROID_KEY_PASSWORD`. Never commit a keystore or its passwords.
+
+Backups stay disabled on both Android apps. The session lives in Capacitor
+Preferences, which is backed by `SharedPreferences`, so enabling backup would
+sync auth tokens to the user's cloud account.
+
 ## High-Risk Product Areas
 
 Be extra careful around:
