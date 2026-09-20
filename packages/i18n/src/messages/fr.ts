@@ -1529,6 +1529,96 @@ export const frMessages = {
       offlineCashRefunded: "L’anomalie a été clôturée après remboursement.",
       offlineCashRecovered:
         "La vente hors ligne a été récupérée et comptabilisée.",
+      tenderExceedsTotal:
+        "Le total des paiements ne peut pas depasser le montant du.",
+      cardTerminalUnavailable: "Aucun TPE n'est connecte a cette caisse.",
+      taxExemptionReasonRequired:
+        "Une exoneration de taxe demande un motif du responsable d'au moins 3 caracteres.",
+      receiptDestinationRequired:
+        "Saisissez une adresse e-mail ou un numero valide pour le recu.",
+      printerNotConfigured:
+        "Cette caisse n'a pas d'imprimante connectee. Connectez-en une dans Parametres, Materiel.",
+      outstandingNeedsPayLater:
+        "Il reste un solde impaye. Choisissez de le conserver en dette avant de terminer.",
+      payLaterNeedsCustomerLink:
+        "Un paiement partiel ou differe doit etre rattache a un client.",
+      payLaterDetailsRequired:
+        "Indiquez le motif du solde et la date de paiement la plus tardive.",
+      offlineCashOnly:
+        "Hors ligne, seuls un paiement especes complet ou une dette sont possibles. Les paiements mixtes et partiels demandent une connexion.",
+      offlineReceiptQueued:
+        "Une commande hors ligne ne peut envoyer un recu electronique qu'apres synchronisation.",
+      cardBridgeUnavailable: "Le pont vers le TPE est indisponible.",
+      cardTerminalFailed: "Le paiement par carte a echoue.",
+      cardTerminalUnknown: "Le resultat du TPE est inconnu.",
+      externalPaymentPending:
+        "La commande est enregistree mais le paiement externe n'est pas confirme. Ne remettez pas la marchandise et aucun recu paye n'est emis tant qu'il n'est pas encaisse.",
+      paymentIncomplete:
+        "Le paiement n'a pas abouti. Reessayez ou changez de moyen de paiement.",
+      electronicReceiptFailed:
+        "Le recu electronique n'a pas pu etre envoye. Vous pouvez reessayer depuis la commande.",
+      parkNameRequired:
+        "Nommez le panier mis en attente pour que vos collegues le reconnaissent.",
+      parkSuccess:
+        "Panier mis en attente. Un collegue de ce magasin peut le reprendre.",
+      parkClaimed: "Le panier en attente a ete repris dans ce panier.",
+      parkClaimSource: "Repris depuis le POS",
+      parkedList: "Paniers en attente",
+      parkAction: "Mettre en attente",
+      clearConfirm:
+        "Vider ce panier ? Les articles, le client, les remises et les notes seront supprimes.",
+      cancel: "Annuler",
+      parkCurrent: "Mettre ce panier en attente",
+      parkStoreTitle: "Paniers en attente du magasin",
+      parkHint:
+        "Un panier en attente conserve son nom, l'employe d'origine et sa date d'expiration. Un collegue du magasin peut le reprendre, une seule fois.",
+      parkNameLabel: "Nom du panier",
+      parkHandoverNote: "Note de passation (facultatif)",
+      viewParkedList: "Voir la liste",
+      confirmPark: "Mettre en attente",
+      parkedLoading: "Chargement des paniers en attente...",
+      parkedEmpty: "Ce magasin n'a aucun panier en attente non expire.",
+      parkedUnnamed: "Panier sans nom",
+      parkedUnknownOwner: "Employe inconnu",
+      parkedItemCount: "{count} articles",
+      parkedExpires: "expire",
+      claim: "Reprendre",
+      claimNeedsEmptyCart:
+        "Ce panier n'est pas vide. Mettez-le en attente ou videz-le avant d'en reprendre un autre.",
+      taxInclusiveSuffix: " (taxe comprise)",
+      amountDueNow: "A encaisser",
+      unpaidLabel: "Impaye",
+      choosePaymentMethod: "Choisir un moyen de paiement",
+      mixedPayment: "Paiement mixte",
+      mixedPaymentHint:
+        "Combinez especes et un moyen electronique. Ajustez chaque montant separement.",
+      paymentAmount: "Montant du paiement",
+      cardTerminalHint:
+        "A la validation, le POS envoie la transaction au TPE et attend le succes, l'echec, l'annulation ou le delai depasse.",
+      outstandingRemains: "Solde impaye",
+      payLaterNeedsApproval:
+        "Conserver un solde exige un client rattache et l'accord d'un responsable ou d'un administrateur.",
+      cancelPayLater: "Annuler le solde conserve",
+      keepOutstanding: "Conserver le solde",
+      payLaterReasonPlaceholder:
+        "Motif du solde, par exemple : le client paie au retrait",
+      taxExemptionLabel:
+        "Motif d'exoneration de taxe (laisser vide pour taxer normalement)",
+      receiptDeliveryTitle: "Remise du recu",
+      printerNotAssigned:
+        "Aucun administrateur n'a attribue d'imprimante a cette caisse, l'impression ne peut donc pas etre choisie.",
+      printerNotConnected:
+        "L'imprimante n'est pas connectee a cette machine. Demandez a un Owner ou Manager de la tester et de la connecter dans Parametres, Materiel.",
+      printerUnreachable:
+        "L'imprimante attribuee ne repond pas. Vous pouvez encaisser ; l'impression sera conservee et reessayee.",
+      printerInUse: "Utilisee : {printer}",
+      customerEmail: "E-mail du client",
+      customerPhone: "Telephone du client",
+      methodCash: "Especes",
+      methodCard: "TPE",
+      methodMobileMoney: "Mobile money",
+      methodMixed: "Mixte",
+      methodPayLater: "Paiement differe",
     },
     catalog: {
       title: "Produits et services",

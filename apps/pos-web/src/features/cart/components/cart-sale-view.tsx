@@ -1058,7 +1058,7 @@ function CartPanel({
     }
     const activeTenders = tenders.filter((tender) => Number(tender.amount) > 0);
     if (paidNowAmount > Number(total) + 0.0001) {
-      toast.error("支付金额合计不能超过订单应收金额。");
+      toast.error(t("pos.cart.tenderExceedsTotal"));
       return;
     }
     for (const tender of activeTenders) {
@@ -1083,7 +1083,7 @@ function CartPanel({
         tender.paymentMethod === "card" &&
         !hardwareCapabilities.cardTerminal
       ) {
-        toast.error("当前终端未连接可用的 TPE 刷卡设备。");
+        toast.error(t("pos.cart.cardTerminalUnavailable"));
         return;
       }
     }
@@ -1091,28 +1091,28 @@ function CartPanel({
       taxExemptionReason.trim() &&
       (!canManageSensitiveOperations || taxExemptionReason.trim().length < 3)
     ) {
-      toast.error("税务豁免必须由经理填写至少 3 个字符的原因。");
+      toast.error(t("pos.cart.taxExemptionReasonRequired"));
       return;
     }
     if (
       (receiptDelivery === "email" || receiptDelivery === "sms") &&
       receiptDestination.trim().length < 3
     ) {
-      toast.error("请填写有效的小票接收地址或手机号。");
+      toast.error(t("pos.cart.receiptDestinationRequired"));
       return;
     }
     if (receiptDelivery === "print" && !configuredPrinter) {
-      toast.error("当前终端尚未连接打印机，请先在设置的硬件设备中完成连接。");
+      toast.error(t("pos.cart.printerNotConfigured"));
       return;
     }
     const hasOutstandingBalance = outstandingAmount > 0.0001;
     if (hasOutstandingBalance) {
       if (!payLater) {
-        toast.error("仍有未收余额，请明确选择保留欠款后再完成订单。");
+        toast.error(t("pos.cart.outstandingNeedsPayLater"));
         return;
       }
       if (!cart.customer) {
-        toast.error("部分付款或稍后付款必须绑定客户。");
+        toast.error(t("pos.cart.payLaterNeedsCustomerLink"));
         return;
       }
       if (
@@ -1120,7 +1120,7 @@ function CartPanel({
         !balanceDueAt ||
         Date.parse(balanceDueAt) <= Date.now()
       ) {
-        toast.error("请填写欠款原因和未来的最晚付款时间。");
+        toast.error(t("pos.cart.payLaterDetailsRequired"));
         return;
       }
     }
@@ -1131,7 +1131,7 @@ function CartPanel({
         activeTenders[0]?.paymentMethod === "cash" &&
         Math.abs(Number(activeTenders[0].amount) - Number(total)) < 0.0001);
     if (!isOnline && !offlineTenderEligible) {
-      toast.error("离线状态仅支持全额现金或记账；混合与部分支付需要联网。");
+      toast.error(t("pos.cart.offlineCashOnly"));
       return;
     }
 
@@ -1264,7 +1264,7 @@ function CartPanel({
               toast.warning(t("pos.cart.receiptQueued"));
             }
           } else if (receiptDelivery !== "none") {
-            toast.warning("离线订单将在同步后才能发送电子小票。");
+            toast.warning(t("pos.cart.offlineReceiptQueued"));
           }
           await onClear();
           setCheckoutOpen(false);
@@ -1303,7 +1303,7 @@ function CartPanel({
         if (cardPayment) {
           const hardware = getPosHardwareBridge();
           try {
-            if (!hardware) throw new Error("银行卡支付终端桥接不可用。");
+            if (!hardware) throw new Error(t("pos.cart.cardBridgeUnavailable"));
             const result = await hardware.processCardPayment({
               paymentId: cardPayment.id,
               orderId: finalOrder.id,
@@ -1350,13 +1350,13 @@ function CartPanel({
                 outcome: "timed_out",
                 failureCode: "TPE_BRIDGE_ERROR",
                 failureReason:
-                  error instanceof Error ? error.message : "TPE 刷卡失败。",
+                  error instanceof Error ? error.message : t("pos.cart.cardTerminalFailed"),
               },
             );
             toast.warning(
               posMessage("pos.inline.verifyTerminalBeforeRetry", {
                 reason:
-                  error instanceof Error ? error.message : "TPE 状态未知。",
+                  error instanceof Error ? error.message : t("pos.cart.cardTerminalUnknown"),
               }),
             );
             await onClear();
@@ -1378,7 +1378,7 @@ function CartPanel({
           await onClear();
           setCheckoutOpen(false);
           toast.warning(
-            "订单已保存，但外部支付仍待确认。确认到账前不要交付商品，也不会生成正式已付款小票。",
+            t("pos.cart.externalPaymentPending"),
           );
           router.push(posRoutes.orderDetail(finalOrder.id));
           router.refresh();
@@ -1388,7 +1388,7 @@ function CartPanel({
           settlementIntent === "pay_now" &&
           finalOrder.paymentStatus !== "paid"
         ) {
-          toast.error("支付尚未完成，请重试或更换支付方式。");
+          toast.error(t("pos.cart.paymentIncomplete"));
           return;
         }
 
@@ -1434,7 +1434,7 @@ function CartPanel({
           );
           if (delivery.status === "failed") {
             toast.warning(
-              delivery.failureReason ?? "电子小票发送失败，可在订单页重试。",
+              delivery.failureReason ?? t("pos.cart.electronicReceiptFailed"),
             );
           }
         } catch (error) {
@@ -1473,7 +1473,7 @@ function CartPanel({
 
   function submitParkCart() {
     if (!parkName.trim()) {
-      toast.error("请为挂单填写名称，方便其他员工识别。");
+      toast.error(t("pos.cart.parkNameRequired"));
       return;
     }
     startTransition(async () => {
@@ -1481,7 +1481,7 @@ function CartPanel({
         await onPark(parkName, parkNote);
         setParkName("");
         setParkNote("");
-        toast.success("购物车已挂起，可由本门店其他员工认领。");
+        toast.success(t("pos.cart.parkSuccess"));
       } catch (error) {
         toast.error(getPosApiErrorMessage(error));
       }
@@ -1491,9 +1491,9 @@ function CartPanel({
   function claimCart(cartId: string) {
     startTransition(async () => {
       try {
-        await onClaimParked(cartId, "POS 端认领");
+        await onClaimParked(cartId, t("pos.cart.parkClaimSource"));
         setParkedOpen(false);
-        toast.success("挂单已认领到当前购物车。");
+        toast.success(t("pos.cart.parkClaimed"));
       } catch (error) {
         toast.error(getPosApiErrorMessage(error));
       }
@@ -1527,7 +1527,7 @@ function CartPanel({
             type="button"
             variant="ghost"
           >
-            挂单列表
+            {t("pos.cart.parkedList")}
           </Button>
           {cart.lines.length > 0 ? (
             <>
@@ -1548,7 +1548,7 @@ function CartPanel({
                 type="button"
                 variant="ghost"
               >
-                挂起
+                {t("pos.cart.parkAction")}
               </Button>
               <Button
                 onClick={() => setClearOpen(true)}
@@ -1735,7 +1735,7 @@ function CartPanel({
           <DialogHeader>
             <DialogTitle>{t("pos.cart.clear")}</DialogTitle>
             <DialogDescription>
-              确认清空当前购物车吗？商品、客户、折扣和备注都会被移除。
+              {t("pos.cart.clearConfirm")}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -1744,7 +1744,7 @@ function CartPanel({
               type="button"
               variant="outline"
             >
-              取消
+              {t("pos.cart.cancel")}
             </Button>
             <Button
               onClick={() => {
@@ -1772,16 +1772,16 @@ function CartPanel({
         <DialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain p-4 sm:max-w-lg sm:p-6">
           <DialogHeader className="pr-7 text-left">
             <DialogTitle>
-              {parkName ? "挂起当前购物车" : "门店挂单"}
+              {parkName ? t("pos.cart.parkCurrent") : t("pos.cart.parkStoreTitle")}
             </DialogTitle>
             <DialogDescription>
-              挂单会保留名称、原员工和过期时间；同门店员工可认领，但同一挂单只能成功认领一次。
+              {t("pos.cart.parkHint")}
             </DialogDescription>
           </DialogHeader>
           {parkName ? (
             <div className="space-y-3">
               <label className="block text-xs font-semibold text-muted-foreground">
-                挂单名称
+                {t("pos.cart.parkNameLabel")}
                 <Input
                   className="mt-1.5 h-10"
                   maxLength={120}
@@ -1790,7 +1790,7 @@ function CartPanel({
                 />
               </label>
               <label className="block text-xs font-semibold text-muted-foreground">
-                交接备注（可选）
+                {t("pos.cart.parkHandoverNote")}
                 <Input
                   className="mt-1.5 h-10"
                   maxLength={500}
@@ -1807,24 +1807,24 @@ function CartPanel({
                   type="button"
                   variant="outline"
                 >
-                  查看列表
+                  {t("pos.cart.viewParkedList")}
                 </Button>
                 <Button
                   disabled={isPending}
                   onClick={submitParkCart}
                   type="button"
                 >
-                  确认挂单
+                  {t("pos.cart.confirmPark")}
                 </Button>
               </DialogFooter>
             </div>
           ) : parkedLoading ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              正在读取挂单…
+              {t("pos.cart.parkedLoading")}
             </p>
           ) : parkedCarts.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
-              当前门店没有未过期的挂单。
+              {t("pos.cart.parkedEmpty")}
             </p>
           ) : (
             <div className="space-y-2">
@@ -1833,11 +1833,11 @@ function CartPanel({
                   <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold">
-                        {saved.name ?? "未命名挂单"}
+                        {saved.name ?? t("pos.cart.parkedUnnamed")}
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        {saved.ownerName ?? "未知员工"} ·{" "}
-                        {saved.cart.lines.length} 项 · 过期{" "}
+                        {saved.ownerName ?? t("pos.cart.parkedUnknownOwner")} ·{" "}
+                        {t("pos.cart.parkedItemCount", { count: String(saved.cart.lines.length) })} · {t("pos.cart.parkedExpires")}{" "}
                         {new Date(saved.expiresAt).toLocaleString(locale)}
                       </p>
                       {saved.handoffNote ? (
@@ -1852,14 +1852,14 @@ function CartPanel({
                       onClick={() => claimCart(saved.id)}
                       type="button"
                     >
-                      认领
+                      {t("pos.cart.claim")}
                     </Button>
                   </div>
                 </div>
               ))}
               {cart.lines.length > 0 ? (
                 <p className="text-xs text-amber-700">
-                  当前购物车非空，请先挂起或清空后再认领。
+                  {t("pos.cart.claimNeedsEmptyCart")}
                 </p>
               ) : null}
             </div>
@@ -1929,7 +1929,7 @@ function CartPanel({
                 <div className="flex justify-between text-xs text-muted-foreground">
                   <span>
                     VAT {Number(effectivePreview.taxRate) * 100}%
-                    {effectivePreview.pricesIncludeTax ? "（含税）" : ""}
+                    {effectivePreview.pricesIncludeTax ? t("pos.cart.taxInclusiveSuffix") : ""}
                   </span>
                   <span>
                     {formatPosMoney(
@@ -1961,14 +1961,14 @@ function CartPanel({
 
             <section className="space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">本次收款</h3>
+                <h3 className="text-sm font-semibold">{t("pos.cart.amountDueNow")}</h3>
                 <span className="text-xs text-muted-foreground">
-                  未收{" "}
+                  {t("pos.cart.unpaidLabel")}{" "}
                   {formatPosMoney(outstandingAmount, cart.currency, locale)}
                 </span>
               </div>
               <div
-                aria-label="选择支付方式"
+                aria-label={t("pos.cart.choosePaymentMethod")}
                 className="grid grid-cols-2 gap-2 rounded-xl bg-muted/55 p-1.5 sm:flex sm:flex-wrap"
                 role="tablist"
               >
@@ -2003,7 +2003,7 @@ function CartPanel({
                   type="button"
                   variant={paymentMode === "mixed" ? "secondary" : "ghost"}
                 >
-                  混合支付
+                  {t("pos.cart.mixedPayment")}
                 </Button>
                 <Button
                   aria-controls="checkout-payment-panel"
@@ -2038,7 +2038,7 @@ function CartPanel({
                 {paymentMode === "mixed" ? (
                   <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed px-3 py-2.5">
                     <p className="text-xs leading-5 text-muted-foreground">
-                      可组合现金与一种电子支付；请分别调整每笔支付金额。
+                      {t("pos.cart.mixedPaymentHint")}
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {runtime.paymentMethodsEnabled.map((method) => {
@@ -2099,12 +2099,12 @@ function CartPanel({
                             type="button"
                             variant="ghost"
                           >
-                            移除
+                            {t("pos.cart.remove")}
                           </Button>
                         ) : null}
                       </div>
                       <label className="block text-xs font-semibold text-muted-foreground">
-                        支付金额
+                        {t("pos.cart.paymentAmount")}
                         <span className="relative mt-1.5 block">
                           <Input
                             className="h-10 pr-16"
@@ -2214,8 +2214,7 @@ function CartPanel({
                       ) : null}
                       {tender.paymentMethod === "card" ? (
                         <p className="text-xs leading-5 text-muted-foreground">
-                          下单后 POS 会向 TPE
-                          发起交易，并等待成功、失败、取消或超时结果。
+                          {t("pos.cart.cardTerminalHint")}
                         </p>
                       ) : null}
                     </div>
@@ -2225,7 +2224,7 @@ function CartPanel({
                   <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50/70 p-3 dark:border-amber-900 dark:bg-amber-950/25">
                     <div>
                       <p className="text-sm font-semibold text-foreground">
-                        仍有未收余额{" "}
+                        {t("pos.cart.outstandingRemains")}{" "}
                         {formatPosMoney(
                           outstandingAmount,
                           cart.currency,
@@ -2233,7 +2232,7 @@ function CartPanel({
                         )}
                       </p>
                       <p className="mt-0.5 text-xs text-muted-foreground">
-                        保留欠款需要先关联客户，并由店长或管理员确认。
+                        {t("pos.cart.payLaterNeedsApproval")}
                       </p>
                     </div>
                     <Button
@@ -2242,7 +2241,7 @@ function CartPanel({
                       type="button"
                       variant={payLater ? "default" : "outline"}
                     >
-                      {payLater ? "取消保留欠款" : "保留未收余额"}
+                      {payLater ? t("pos.cart.cancelPayLater") : t("pos.cart.keepOutstanding")}
                     </Button>
                   </div>
                 ) : null}
@@ -2257,7 +2256,7 @@ function CartPanel({
                     />
                     <Input
                       onChange={(event) => setUnpaidReason(event.target.value)}
-                      placeholder="欠款原因，例如：客户取件时支付"
+                      placeholder={t("pos.cart.payLaterReasonPlaceholder")}
                       value={unpaidReason}
                     />
                   </div>
@@ -2268,7 +2267,7 @@ function CartPanel({
             {canManageSensitiveOperations &&
             effectivePreview?.taxRate !== "0.000000" ? (
               <label className="block text-xs font-semibold text-muted-foreground">
-                税务豁免原因（留空则正常计税）
+                {t("pos.cart.taxExemptionLabel")}
                 <Input
                   className="mt-1.5 h-10"
                   maxLength={500}
@@ -2281,7 +2280,7 @@ function CartPanel({
             ) : null}
 
             <section className="space-y-3">
-              <h3 className="text-sm font-semibold">小票交付</h3>
+              <h3 className="text-sm font-semibold">{t("pos.cart.receiptDeliveryTitle")}</h3>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {(["print", "email", "sms", "none"] as const).map((choice) => (
                   <Button
@@ -2297,20 +2296,19 @@ function CartPanel({
               </div>
               {printerBinding.state === "not_configured" ? (
                 <p className="text-xs leading-5 text-amber-700">
-                  管理员尚未给当前终端配置打印机，因此不能选择打印。
+                  {t("pos.cart.printerNotAssigned")}
                 </p>
               ) : printerBinding.state === "not_bound" ? (
                 <p className="text-xs leading-5 text-amber-700">
-                  打印机尚未连接本机，请由 Owner 或 Manager 在“设置 →
-                  硬件设备”中完成测试和连接。
+                  {t("pos.cart.printerNotConnected")}
                 </p>
               ) : printerBinding.state === "not_detected" ? (
                 <p className="text-xs leading-5 text-amber-700">
-                  已绑定的打印机当前未检测到；仍可结账，打印任务会保留并等待重试。
+                  {t("pos.cart.printerUnreachable")}
                 </p>
               ) : printerBinding.localPrinter ? (
                 <p className="text-xs leading-5 text-emerald-700">
-                  将使用：{printerBinding.localPrinter.name}
+                  {t("pos.cart.printerInUse", { printer: printerBinding.localPrinter.name })}
                 </p>
               ) : null}
               {receiptDelivery === "email" || receiptDelivery === "sms" ? (
@@ -2321,7 +2319,9 @@ function CartPanel({
                     setReceiptDestination(event.target.value)
                   }
                   placeholder={
-                    receiptDelivery === "email" ? "客户邮箱" : "客户手机号"
+                    receiptDelivery === "email"
+                      ? t("pos.cart.customerEmail")
+                      : t("pos.cart.customerPhone")
                   }
                   value={receiptDestination}
                 />
@@ -2392,18 +2392,20 @@ function createCheckoutTender(
 }
 
 function paymentMethodLabel(method: PosPaymentMethod): string {
-  return method === "cash"
-    ? "现金"
-    : method === "card"
-      ? "TPE 刷卡"
-      : "移动支付";
+  return posMessage(
+    method === "cash"
+      ? "pos.cart.methodCash"
+      : method === "card"
+        ? "pos.cart.methodCard"
+        : "pos.cart.methodMobileMoney",
+  );
 }
 
 function paymentModeLabel(mode: CheckoutPaymentMode): string {
   return mode === "mixed"
-    ? "混合"
+    ? posMessage("pos.cart.methodMixed")
     : mode === "pay_later"
-      ? "稍后付款"
+      ? posMessage("pos.cart.methodPayLater")
       : paymentMethodLabel(mode);
 }
 

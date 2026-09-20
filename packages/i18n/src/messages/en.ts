@@ -1511,6 +1511,91 @@ export const enMessages = {
         "Enter the reconciliation reason (it will be written to the audit log):",
       offlineCashRefunded: "The exception was closed after the cash return.",
       offlineCashRecovered: "The offline cash sale was recovered and posted.",
+      tenderExceedsTotal: "Total payments cannot exceed the amount due.",
+      cardTerminalUnavailable: "No card terminal is connected to this till.",
+      taxExemptionReasonRequired:
+        "A tax exemption needs a manager's reason of at least 3 characters.",
+      receiptDestinationRequired:
+        "Enter a valid email address or phone number for the receipt.",
+      printerNotConfigured:
+        "This till has no printer connected. Connect one under Settings, Hardware.",
+      outstandingNeedsPayLater:
+        "There is still an unpaid balance. Choose to keep it as a debt before finishing.",
+      payLaterNeedsCustomerLink:
+        "A part payment or pay later must be linked to a customer.",
+      payLaterDetailsRequired:
+        "Enter the reason for the balance and the latest payment date.",
+      offlineCashOnly:
+        "Offline checkout takes full cash or a debt only. Mixed and part payments need a connection.",
+      offlineReceiptQueued:
+        "An offline order can only send an electronic receipt after it syncs.",
+      cardBridgeUnavailable: "The card terminal bridge is unavailable.",
+      cardTerminalFailed: "The card payment failed.",
+      cardTerminalUnknown: "The card terminal result is unknown.",
+      externalPaymentPending:
+        "The order is saved but the external payment is still unconfirmed. Do not hand over the goods, and no paid receipt is issued, until it settles.",
+      paymentIncomplete: "Payment did not complete. Retry or use another method.",
+      electronicReceiptFailed:
+        "The electronic receipt could not be sent. You can retry it from the order page.",
+      parkNameRequired: "Name the parked cart so colleagues can recognise it.",
+      parkSuccess: "Cart parked. Any colleague in this store can claim it.",
+      parkClaimed: "The parked cart has been claimed into this cart.",
+      parkClaimSource: "Claimed from POS",
+      parkedList: "Parked carts",
+      parkAction: "Park",
+      clearConfirm:
+        "Clear this cart? Items, customer, discounts and notes are all removed.",
+      cancel: "Cancel",
+      parkCurrent: "Park this cart",
+      parkStoreTitle: "Store parked carts",
+      parkHint:
+        "A parked cart keeps its name, original staff member and expiry. Colleagues in this store can claim it, but only once.",
+      parkNameLabel: "Cart name",
+      parkHandoverNote: "Handover note (optional)",
+      viewParkedList: "View list",
+      confirmPark: "Park cart",
+      parkedLoading: "Loading parked carts...",
+      parkedEmpty: "This store has no unexpired parked carts.",
+      parkedUnnamed: "Unnamed cart",
+      parkedUnknownOwner: "Unknown staff",
+      parkedItemCount: "{count} items",
+      parkedExpires: "expires",
+      claim: "Claim",
+      claimNeedsEmptyCart:
+        "This cart is not empty. Park or clear it before claiming another.",
+      taxInclusiveSuffix: " (tax included)",
+      amountDueNow: "Due now",
+      unpaidLabel: "Unpaid",
+      choosePaymentMethod: "Choose a payment method",
+      mixedPayment: "Mixed payment",
+      mixedPaymentHint:
+        "Combine cash with one electronic method. Set each amount separately.",
+      paymentAmount: "Payment amount",
+      cardTerminalHint:
+        "On checkout the POS sends the transaction to the card terminal and waits for success, failure, cancellation or timeout.",
+      outstandingRemains: "Outstanding balance",
+      payLaterNeedsApproval:
+        "Keeping a balance needs a linked customer and approval by a manager or administrator.",
+      cancelPayLater: "Cancel the kept balance",
+      keepOutstanding: "Keep the balance",
+      payLaterReasonPlaceholder:
+        "Reason for the balance, e.g. customer pays at pickup",
+      taxExemptionLabel: "Tax exemption reason (leave empty to charge tax)",
+      receiptDeliveryTitle: "Receipt delivery",
+      printerNotAssigned:
+        "An administrator has not assigned a printer to this till, so printing cannot be selected.",
+      printerNotConnected:
+        "The printer is not connected to this machine. Ask an Owner or Manager to test and connect it under Settings, Hardware.",
+      printerUnreachable:
+        "The assigned printer is not responding. You can still check out; the print job waits and retries.",
+      printerInUse: "Using: {printer}",
+      customerEmail: "Customer email",
+      customerPhone: "Customer phone",
+      methodCash: "Cash",
+      methodCard: "Card terminal",
+      methodMobileMoney: "Mobile money",
+      methodMixed: "Mixed",
+      methodPayLater: "Pay later",
     },
     catalog: {
       title: "Products & services",
