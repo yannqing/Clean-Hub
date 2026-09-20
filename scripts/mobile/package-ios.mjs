@@ -5,6 +5,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveMobileReleaseEnv } from "./mobile-release-env.mjs";
+import { assertProductionReleaseEnv } from "./mobile-release-validation.mjs";
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const iosDir = join(rootDir, "apps", "mobile", "ios", "App");
@@ -76,6 +77,11 @@ const exportOptions = `<?xml version="1.0" encoding="UTF-8"?>
 const tempDir = await mkdtemp(join(tmpdir(), "cleanhub-ios-export-"));
 const exportOptionsPath = join(tempDir, "ExportOptions.plist");
 await writeFile(exportOptionsPath, exportOptions);
+
+// The Android-only manifest checks do not apply here, but the environment
+// gate does: an archive built without CLEANHUB_MOBILE_ENV would ship pointing
+// at localhost.
+assertProductionReleaseEnv(releaseEnv);
 
 console.log(`Building iOS archive for ${releaseEnv.appEnvironment}.`);
 

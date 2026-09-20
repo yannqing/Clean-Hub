@@ -16,6 +16,8 @@
     "sync:android": "pnpm --filter @cleanhub/mobile-web build && cap sync android",
     "sync:ios": "pnpm --filter @cleanhub/mobile-web build && cap sync ios",
     "package:android": "node ../../scripts/mobile/package-android.mjs",
+    "release:validate": "node ../../scripts/mobile/validate-mobile-release.mjs",
+    "smoke:release-validation": "node ../../scripts/mobile/mobile-release-validation.smoke.mjs",
     "package:ios": "node ../../scripts/mobile/package-ios.mjs",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit"

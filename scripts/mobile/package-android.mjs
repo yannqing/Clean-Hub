@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { resolveMobileReleaseEnv } from "./mobile-release-env.mjs";
+import { validateMobileRelease } from "./mobile-release-validation.mjs";
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const androidDir = join(rootDir, "apps", "mobile", "android");
@@ -46,6 +47,12 @@ const signingEnv = {
   CLEANHUB_ANDROID_VERSION_CODE: releaseEnv.buildNumber,
   CLEANHUB_ANDROID_VERSION_NAME: releaseEnv.version,
 };
+
+// A signed APK is the artefact that reaches real phones, so the unsafe
+// combinations are refused here rather than reported. Without this, omitting
+// CLEANHUB_MOBILE_ENV produced a signed release build pointing at
+// http://localhost:4000 over cleartext.
+await validateMobileRelease(releaseEnv);
 
 console.log(`Building signed Android release for ${releaseEnv.appEnvironment}.`);
 
