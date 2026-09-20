@@ -223,7 +223,7 @@ export function TenantCustomerAccountDetailView({
       return;
     }
 
-    setAppPassword(result.data.temporaryPassword);
+    setAppPassword(result.data.password);
     toast.success(copy.appPasswordSuccess);
   }
 
@@ -554,6 +554,9 @@ export function TenantCustomerAccountDetailView({
                   >
                     {appPassword}
                   </code>
+                  <p className="text-xs text-muted-foreground">
+                    {copy.appPasswordHint}
+                  </p>
                   <div className="flex flex-wrap gap-2">
                     <Button
                       className="gap-2"

@@ -298,6 +298,10 @@ export const frMessages = {
       phone: "Telephone",
       email: "Email",
       currentPassword: "Mot de passe actuel",
+      firstLoginTitle: "Choisissez votre mot de passe",
+      firstLoginBody:
+        "Votre compte utilise encore le mot de passe initial du magasin. Choisissez le votre pour continuer.",
+      firstLoginSubmit: "Enregistrer et continuer",
       newPassword: "Nouveau mot de passe",
       confirmPassword: "Confirmer",
       label: "Libelle",

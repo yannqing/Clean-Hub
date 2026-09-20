@@ -821,6 +821,7 @@ export async function upsertTenantCustomerCredentialRecord(
     tenantId: string;
     customerAccountId: string;
     passwordHash: string;
+    mustChangePassword: boolean;
     actorUserId: string;
   },
 ): Promise<void> {
@@ -833,6 +834,7 @@ export async function upsertTenantCustomerCredentialRecord(
       tenantId: input.tenantId,
       customerAccountId: input.customerAccountId,
       passwordHash: input.passwordHash,
+      mustChangePassword: input.mustChangePassword,
       createdBy: input.actorUserId,
       updatedBy: input.actorUserId,
     })
@@ -840,6 +842,7 @@ export async function upsertTenantCustomerCredentialRecord(
       target: customerCredentials.customerAccountId,
       set: {
         passwordHash: input.passwordHash,
+        mustChangePassword: input.mustChangePassword,
         // Clear any lockout: the point of a reset is to let them back in.
         failedAttempts: 0,
         lockedUntil: null,

@@ -487,11 +487,13 @@ export const tenantMessagesFr: TenantMessages = {
         openAccount: "Ouvrir le compte {account}",
         editAction: "Modifier le compte",
         appPasswordTitle: "Acces a l'application mobile",
+        appPasswordHint:
+          "Le client devra choisir un nouveau mot de passe a sa premiere connexion.",
         appPasswordDescription:
-          "Le client se connecte a l'application avec un mot de passe emis ici. Notez-le ou lisez-le au client avant de fermer \u2014 il ne pourra plus etre affiche.",
-        appPasswordAction: "Emettre un mot de passe",
+          "Communiquez ce mot de passe initial au client pour qu'il puisse se connecter. Il devra choisir son propre mot de passe avant de pouvoir utiliser l'application.",
+        appPasswordAction: "Definir le mot de passe initial",
         appPasswordPending: "Emission\u2026",
-        appPasswordSuccess: "Mot de passe emis. Remettez-le au client maintenant.",
+        appPasswordSuccess: "Mot de passe initial defini. Communiquez-le au client.",
         appPasswordCopied: "Mot de passe copie.",
         appPasswordCopy: "Copier",
         appPasswordDone: "Termine",

@@ -9,6 +9,8 @@ import { Building2, ChevronRight, Loader2, PackageCheck, ShieldCheck } from "luc
 
 import { LanguageSwitcher } from "@/components/language-switcher";
 import { CustomerHome } from "@/features/customer";
+
+import { CustomerFirstPassword } from "./customer-first-password";
 import { DeliveryHome } from "@/features/delivery";
 import { OwnerHome } from "@/features/owner";
 import { apiClient } from "@/lib/api-client";
@@ -261,6 +263,33 @@ export function MobileAuthShell() {
           {t("auth.loading")}
         </div>
       </main>
+    );
+  }
+
+  // An account still on the starter password can only choose a new one. The API
+  // refuses everything else, so showing the normal home would be a screen full
+  // of failed requests.
+  if (
+    tenantCode &&
+    session &&
+    session.authContext.role === "customer" &&
+    session.authContext.mustChangePassword
+  ) {
+    return (
+      <CustomerFirstPassword
+        isLoggingOut={isPending}
+        onChanged={async () => {
+          // Re-read the context so the cleared flag is picked up; the password
+          // change revokes refresh tokens, so a failure here means the session
+          // is gone and signing out is the honest outcome.
+          try {
+            setSession({ authContext: await apiClient.mobile.auth.me() });
+          } catch {
+            handleLogout();
+          }
+        }}
+        onLogout={handleLogout}
+      />
     );
   }
 

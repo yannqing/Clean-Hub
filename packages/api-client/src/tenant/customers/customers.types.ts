@@ -227,5 +227,6 @@ export type TenantCustomerOverview = {
 
 export type ResetTenantCustomerAccountPasswordResponse = {
   accountId: string;
-  temporaryPassword: string;
+  /** The shared starter password the customer must change on first sign-in. */
+  password: string;
 };

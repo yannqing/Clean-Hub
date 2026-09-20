@@ -665,6 +665,9 @@ export class CustomerRepository {
       .update(customerCredentials)
       .set({
         passwordHash: input.passwordHash,
+        // The customer has chosen their own password, so the starter-password
+        // hold is released. This is the only place that clears it.
+        mustChangePassword: false,
         failedAttempts: 0,
         lockedUntil: null,
         updatedAt: now,

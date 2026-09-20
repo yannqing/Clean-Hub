@@ -721,9 +721,18 @@ export class MobileAuthService {
       throw new AuthError("TOKEN_INVALID", "Failed to create refresh token.");
     }
 
+    // The login and refresh responses are what the app reads before it makes
+    // its first authenticated call, so the starter-password hold has to be
+    // visible here too -- not only from /me.
+    const credential = await this.repository.findCustomerCredential({
+      tenantId: tenant.id,
+      customerAccountId: customer.id,
+    });
+
     return {
       authContext: {
         ...contextBase,
+        mustChangePassword: credential?.mustChangePassword ?? false,
         accessTokenExpiresAt: tokens.accessTokenExpiresAt.toISOString(),
       },
       tokens,
@@ -859,6 +868,13 @@ export class MobileAuthService {
 
     assertActiveCustomer(resolvedCustomer);
     const tenant = await this.resolveTenantById(resolvedCustomer.tenantId);
+    // Read live rather than from the token: the customer changes their password
+    // mid-session, and a flag baked into the JWT would keep them locked to the
+    // change-password screen until the access token expired.
+    const credential = await this.repository.findCustomerCredential({
+      tenantId: resolvedCustomer.tenantId,
+      customerAccountId: resolvedCustomer.id,
+    });
 
     return {
       subjectType: "customer",
@@ -871,6 +887,7 @@ export class MobileAuthService {
       role: "customer",
       roles: ["customer"],
       permissions: [],
+      mustChangePassword: credential?.mustChangePassword ?? false,
       accessTokenExpiresAt: claims.expiresAt.toISOString(),
     };
   }

@@ -1,10 +1,8 @@
 import { getDb, type Database } from "@cleanhub/db";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
-import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js";
 import { hashPassword } from "../../auth/password.service.js";
-import { generateTemporaryPassword } from "../../auth/temporary-password.helper.js";
-import { resolveEffectiveSecurityPolicy } from "../../saas/security/security-policy.js";
+import { CUSTOMER_STARTER_PASSWORD } from "../../auth/customer-starter-password.helper.js";
 import { resolveAllowedBranchIds } from "../../auth/branch-scope.helper.js";
 import { AuthError } from "../../auth/auth.errors.js";
 import {
@@ -461,20 +459,18 @@ export async function resetTenantCustomerAccountPassword(
     );
   }
 
-  const policy = await resolveEffectiveSecurityPolicy(db);
-  const temporaryPassword = generateTemporaryPassword();
-
-  // Built to satisfy the policy, but asserted so a future policy change fails
-  // loudly instead of silently producing an unusable credential.
-  assertPasswordMeetsPolicy(temporaryPassword, policy);
-
-  const passwordHash = await hashPassword(temporaryPassword);
+  // Not checked against the security policy, and not generated: the starter is
+  // a fixed value staff read out at the counter. `mustChangePassword` is what
+  // protects the account until the customer picks a real one, and that new
+  // password IS policy-checked when they set it.
+  const passwordHash = await hashPassword(CUSTOMER_STARTER_PASSWORD);
 
   return db.transaction(async (tx) => {
     await upsertTenantCustomerCredentialRecord(tx, {
       tenantId: scope.tenantId,
       customerAccountId: input.accountId,
       passwordHash,
+      mustChangePassword: true,
       actorUserId: input.authContext.userId,
     });
 
@@ -496,6 +492,6 @@ export async function resetTenantCustomerAccountPassword(
       userAgent: input.requestMeta?.userAgent,
     });
 
-    return { accountId: input.accountId, temporaryPassword };
+    return { accountId: input.accountId, password: CUSTOMER_STARTER_PASSWORD };
   });
 }

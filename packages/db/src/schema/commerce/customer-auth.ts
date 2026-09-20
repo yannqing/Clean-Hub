@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   pgEnum,
@@ -30,6 +31,15 @@ export const customerCredentials = pgTable(
       .notNull()
       .references(() => customerAccounts.id, { onDelete: "cascade" }),
     passwordHash: text("password_hash").notNull(),
+    /**
+     * Set when staff issue the shared starter password at the counter. While
+     * true the app lets the customer do nothing but choose a new password:
+     * the starter is the same for everyone, so an account still carrying it is
+     * effectively unprotected.
+     */
+    mustChangePassword: boolean("must_change_password")
+      .notNull()
+      .default(false),
     failedAttempts: integer("failed_attempts").notNull().default(0),
     lockedUntil: timestamp("locked_until", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true })

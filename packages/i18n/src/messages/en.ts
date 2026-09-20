@@ -296,6 +296,10 @@ export const enMessages = {
       phone: "Phone",
       email: "Email",
       currentPassword: "Current password",
+      firstLoginTitle: "Choose your password",
+      firstLoginBody:
+        "Your account is using the starter password from the store. Pick your own password to continue.",
+      firstLoginSubmit: "Save and continue",
       newPassword: "New password",
       confirmPassword: "Confirm",
       label: "Label",

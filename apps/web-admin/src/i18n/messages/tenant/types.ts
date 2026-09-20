@@ -479,6 +479,7 @@ export type TenantMessages = {
         editAction: string;
         appPasswordTitle: string;
         appPasswordDescription: string;
+        appPasswordHint: string;
         appPasswordAction: string;
         appPasswordPending: string;
         appPasswordSuccess: string;

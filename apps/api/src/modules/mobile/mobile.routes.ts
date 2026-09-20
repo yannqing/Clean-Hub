@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { createMobileTenantDatabaseContextMiddleware } from "../../http/database-context.middleware.js";
 import type { AppBindings } from "../../http/types.js";
 import { createMobileAuthMiddleware } from "../../http/mobile-auth.middleware.js";
+import { createCustomerPasswordChangeMiddleware } from "../../http/customer-password-change.middleware.js";
 import { createMobileAuthRoutes } from "./auth/auth.routes.js";
 import type { MobileAuthService } from "./auth/auth.service.js";
 import { createCustomerRoutes } from "./customer/index.js";
@@ -42,6 +43,7 @@ export function createMobileRoutes({
 
   routes.route("/payment", createPaymentWebhookRoutes({ paymentService }));
   routes.use("/*", createMobileAuthMiddleware(mobileAuthService));
+  routes.use("/*", createCustomerPasswordChangeMiddleware());
   routes.use("/*", createMobileTenantDatabaseContextMiddleware());
   const ownerService = new OwnerService({
     notificationPublisher: notificationsService,

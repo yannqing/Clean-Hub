@@ -486,11 +486,13 @@ export const tenantMessagesEn: TenantMessages = {
         openAccount: "Open account {account}",
         editAction: "Edit account",
         appPasswordTitle: "Mobile app access",
+        appPasswordHint:
+          "The customer is asked to choose a new password the first time they sign in.",
         appPasswordDescription:
-          "Customers sign in to the app with a password you issue here. Read it out or write it down before closing this box \u2014 it cannot be shown again.",
-        appPasswordAction: "Issue app password",
+          "Give the customer the starter password so they can sign in to the app. They must choose their own password before they can use it.",
+        appPasswordAction: "Set starter password",
         appPasswordPending: "Issuing\u2026",
-        appPasswordSuccess: "Password issued. Give it to the customer now.",
+        appPasswordSuccess: "Starter password set. Give it to the customer.",
         appPasswordCopied: "Password copied.",
         appPasswordCopy: "Copy",
         appPasswordDone: "Done",

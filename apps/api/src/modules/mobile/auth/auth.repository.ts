@@ -176,6 +176,7 @@ export class MobileAuthRepository {
         tenantId: customerCredentials.tenantId,
         customerAccountId: customerCredentials.customerAccountId,
         passwordHash: customerCredentials.passwordHash,
+        mustChangePassword: customerCredentials.mustChangePassword,
         failedAttempts: customerCredentials.failedAttempts,
         lockedUntil: customerCredentials.lockedUntil,
       })

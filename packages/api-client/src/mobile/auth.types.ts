@@ -12,6 +12,12 @@ export type MobileAuthContext = {
   role: MobileRole;
   roles: MobileRole[];
   permissions: string[];
+  /**
+   * True while a customer still carries the shared starter password issued at
+   * the counter. The API refuses every customer endpoint except
+   * `POST /mobile/customer/password` until it is false.
+   */
+  mustChangePassword?: boolean;
   accessTokenExpiresAt: string;
 };
 

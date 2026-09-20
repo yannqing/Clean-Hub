@@ -18,6 +18,11 @@ function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 422 | 500 {
     case "POS_TERMINAL_CREDENTIAL_INVALID":
     case "POS_TERMINAL_DISABLED":
     case "POS_TERMINAL_ENROLLMENT_REQUIRED":
+    case "PASSWORD_CHANGE_REQUIRED":
+      // PASSWORD_CHANGE_REQUIRED is 403, not 401: the session is valid, it is
+      // simply not allowed anywhere else until the starter password is
+      // replaced. A 401 would make the app sign the customer out instead of
+      // sending them to the change-password screen.
       return 403;
     case "PASSWORD_POLICY_VIOLATION":
     case "TENANT_CODE_REQUIRED":

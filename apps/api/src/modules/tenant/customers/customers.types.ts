@@ -363,5 +363,6 @@ export type ResetTenantCustomerAccountPasswordInput = {
 
 export type ResetTenantCustomerAccountPasswordResult = {
   accountId: string;
-  temporaryPassword: string;
+  /** The shared starter password, returned so staff can read it out. */
+  password: string;
 };

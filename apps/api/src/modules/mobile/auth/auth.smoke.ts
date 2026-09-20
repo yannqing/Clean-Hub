@@ -170,6 +170,7 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
       tenantId: customer.tenantId,
       customerAccountId: customer.id,
       passwordHash,
+      mustChangePassword: false,
       failedAttempts: 0,
       lockedUntil: null,
     });

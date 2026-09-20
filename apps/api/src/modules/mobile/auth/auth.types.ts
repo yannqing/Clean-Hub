@@ -16,6 +16,12 @@ export type MobileAuthContext = {
   role: MobileRole;
   roles: MobileRole[];
   permissions: string[];
+  /**
+   * True while the account still carries the shared starter password. Read
+   * live from the credential on every request rather than carried in the JWT,
+   * so it cannot go stale between the change and the next token refresh.
+   */
+  mustChangePassword?: boolean;
   accessTokenExpiresAt: string;
 };
 
@@ -79,6 +85,7 @@ export type MobileCustomerCredential = {
   tenantId: string;
   customerAccountId: string;
   passwordHash: string;
+  mustChangePassword: boolean;
   failedAttempts: number;
   lockedUntil: Date | null;
 };
