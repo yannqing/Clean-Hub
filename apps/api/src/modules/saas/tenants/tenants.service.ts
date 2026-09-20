@@ -14,6 +14,14 @@ import {
   securityForceClosePosTerminalRegisterSessions,
   securityForceClosePosTerminalShifts,
 } from "../../pos/terminal-lifecycle/terminal-lifecycle.repository.js";
+import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js";
+import { hashPassword } from "../../auth/password.service.js";
+import { generateTemporaryPassword } from "../../auth/temporary-password.helper.js";
+import {
+  revokeTenantUserRefreshTokens,
+  updateTenantUserPasswordRecord,
+} from "../../tenant/users/tenant-users.repository.js";
+import { resolveEffectiveSecurityPolicy } from "../security/security-policy.js";
 import {
   createTenantOwnerUser,
   TenantOwnerUserHelperError,
@@ -28,6 +36,8 @@ import {
   findSaasTenantDetailById,
   findSaasTenantSettingsByTenantId,
   findSaasTenants,
+  findSaasTenantUserById,
+  findSaasTenantUsers,
   findTenantByPressingCode,
   revokeTenantRefreshTokens,
   updateSaasTenantFeatureFlagsRecord,
@@ -43,6 +53,8 @@ import {
   writeSaasTenantOffboardedAuditLog,
   writeSaasTenantRestoredAuditLog,
   writeSaasTenantStatusChangedAuditLog,
+  writeSaasTenantUserPasswordResetAuditLog,
+  type SaasTenantUserSummary,
   writeSaasTenantUpdatedAuditLog,
 } from "./tenants.repository.js";
 import { buildTenantExportArchive } from "./tenant-export.service.js";
@@ -54,6 +66,9 @@ import type {
   GetSaasTenantSettingsInput,
   GetSaasTenantDetailInput,
   ListSaasTenantsInput,
+  ListSaasTenantUsersInput,
+  ResetSaasTenantUserPasswordInput,
+  ResetSaasTenantUserPasswordResult,
   OffboardSaasTenantInput,
   RestoreSaasTenantInput,
   SaasTenantDetail,
@@ -813,5 +828,110 @@ export async function restoreSaasTenant(
     });
 
     return tenant;
+  });
+}
+
+/**
+ * Tenant staff a SaaS operator can see, for recovery purposes.
+ *
+ * Read-only and deliberately narrow: enough to find the right person to reset,
+ * not a general window into a tenant's staff records.
+ */
+export async function listSaasTenantUsers(
+  input: ListSaasTenantUsersInput,
+  db: Database = getDb(),
+): Promise<SaasTenantUserSummary[]> {
+  requireSaasTenantsAccess(input.authContext, ["super_admin", "support"]);
+
+  const tenant = await findSaasTenantDetailById(db, input.tenantId);
+
+  if (!tenant) {
+    throw new SaasTenantsError(
+      "SAAS_TENANT_NOT_FOUND",
+      "Tenant was not found.",
+      404,
+    );
+  }
+
+  return findSaasTenantUsers(db, { tenantId: input.tenantId });
+}
+
+/**
+ * Reset a tenant user's password from the SaaS console.
+ *
+ * Tenant-side password reset needs an owner or manager *inside* that tenant,
+ * so a single-owner store that loses its password has nobody who can help it.
+ * This is the platform's way back in, and it is restricted to super admins:
+ * it hands out a credential for somebody else's business.
+ *
+ * Mirrors resetSaasUserPassword -- generate, assert against policy, hash,
+ * revoke the target's sessions, and audit with a mandatory reason -- so both
+ * reset paths behave the same way.
+ */
+export async function resetSaasTenantUserPassword(
+  input: ResetSaasTenantUserPasswordInput,
+  db: Database = getDb(),
+): Promise<ResetSaasTenantUserPasswordResult> {
+  requireSaasTenantsAccess(input.authContext, ["super_admin"]);
+
+  return db.transaction(async (tx) => {
+    const tenant = await findSaasTenantDetailById(tx, input.tenantId);
+
+    if (!tenant) {
+      throw new SaasTenantsError(
+        "SAAS_TENANT_NOT_FOUND",
+        "Tenant was not found.",
+        404,
+      );
+    }
+
+    // Scoped by tenant as well as id, so a user id from one tenant cannot be
+    // reset through another tenant's URL.
+    const target = await findSaasTenantUserById(tx, {
+      tenantId: input.tenantId,
+      userId: input.userId,
+    });
+
+    if (!target) {
+      throw new SaasTenantsError(
+        "SAAS_TENANT_USER_NOT_FOUND",
+        "Tenant user was not found.",
+        404,
+      );
+    }
+
+    const securityPolicy = await resolveEffectiveSecurityPolicy(tx);
+    const temporaryPassword = generateTemporaryPassword();
+
+    // The generated password is built to satisfy the policy, but assert it so a
+    // future policy change fails loudly instead of silently producing an
+    // unusable credential.
+    assertPasswordMeetsPolicy(temporaryPassword, securityPolicy);
+
+    const passwordHash = await hashPassword(temporaryPassword);
+
+    await updateTenantUserPasswordRecord(tx, {
+      tenantId: input.tenantId,
+      userId: input.userId,
+      passwordHash,
+    });
+
+    // Invalidate existing sessions so the new password takes effect on the next
+    // sign-in, and so a stolen session cannot outlive the reset.
+    await revokeTenantUserRefreshTokens(tx, {
+      tenantId: input.tenantId,
+      userId: input.userId,
+    });
+
+    await writeSaasTenantUserPasswordResetAuditLog(tx, {
+      actorUserId: input.authContext.userId,
+      tenantId: input.tenantId,
+      userId: input.userId,
+      reason: input.reason,
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return { userId: target.id, temporaryPassword };
   });
 }

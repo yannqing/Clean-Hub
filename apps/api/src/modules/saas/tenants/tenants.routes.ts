@@ -6,6 +6,8 @@ import {
   exportSaasTenantController,
   getSaasTenantFeatureFlagsController,
   getSaasTenantController,
+  listSaasTenantUsersController,
+  resetSaasTenantUserPasswordController,
   getSaasTenantSettingsController,
   listSaasTenantsController,
   offboardSaasTenantController,
@@ -25,6 +27,14 @@ export function createSaasTenantsRoutes() {
   routes.patch(
     "/:tenantId/feature-flags",
     updateSaasTenantFeatureFlagsController,
+  );
+  // Recovery path for a tenant that has locked itself out: tenant-side reset
+  // needs an owner or manager inside that tenant, so a single-owner store has
+  // nobody who can help it.
+  routes.get("/:tenantId/users", listSaasTenantUsersController);
+  routes.patch(
+    "/:tenantId/users/:userId/password",
+    resetSaasTenantUserPasswordController,
   );
   routes.get("/:tenantId/settings", getSaasTenantSettingsController);
   routes.patch("/:tenantId/settings", updateSaasTenantSettingsController);

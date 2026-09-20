@@ -9,6 +9,8 @@ import {
   getSaasTenantFeatureFlags,
   getSaasTenantSettings,
   listSaasTenants,
+  listSaasTenantUsers,
+  resetSaasTenantUserPassword,
   offboardSaasTenant,
   restoreSaasTenant,
   updateSaasTenant,
@@ -21,7 +23,9 @@ import {
   getSaasTenantParamsSchema,
   listSaasTenantsQuerySchema,
   offboardSaasTenantBodySchema,
+  resetSaasTenantUserPasswordBodySchema,
   restoreSaasTenantBodySchema,
+  saasTenantUserParamsSchema,
   updateSaasTenantBodySchema,
   updateSaasTenantFeatureFlagsBodySchema,
   updateSaasTenantSettingsBodySchema,
@@ -336,6 +340,54 @@ export async function exportSaasTenantController(c: Context<AppBindings>) {
     );
 
     return c.body(result.content as unknown as ArrayBuffer);
+  } catch (error) {
+    if (error instanceof SaasTenantsError) {
+      return createSaasTenantsErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function listSaasTenantUsersController(c: Context<AppBindings>) {
+  const params = getSaasTenantParamsSchema.parse(c.req.param());
+
+  try {
+    const users = await listSaasTenantUsers({
+      authContext: c.get("authContext"),
+      tenantId: params.tenantId,
+    });
+
+    return c.json({ data: users });
+  } catch (error) {
+    if (error instanceof SaasTenantsError) {
+      return createSaasTenantsErrorResponse(c, error);
+    }
+
+    throw error;
+  }
+}
+
+export async function resetSaasTenantUserPasswordController(
+  c: Context<AppBindings>,
+) {
+  const params = saasTenantUserParamsSchema.parse(c.req.param());
+  const rawBody = await c.req.json().catch(() => ({}));
+  const body = resetSaasTenantUserPasswordBodySchema.parse(rawBody);
+
+  try {
+    const result = await resetSaasTenantUserPassword({
+      authContext: c.get("authContext"),
+      tenantId: params.tenantId,
+      userId: params.userId,
+      reason: body.reason,
+      requestMeta: {
+        ipAddress: getClientIp(c),
+        userAgent: c.req.header("user-agent"),
+      },
+    });
+
+    return c.json(result);
   } catch (error) {
     if (error instanceof SaasTenantsError) {
       return createSaasTenantsErrorResponse(c, error);

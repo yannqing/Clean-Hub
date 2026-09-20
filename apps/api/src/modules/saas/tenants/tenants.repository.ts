@@ -18,9 +18,12 @@ import {
   branches,
   getDb,
   platformSettings,
+  roles,
   tenantFeatureFlags,
   tenantSettings,
   tenants,
+  userProfiles,
+  userRoles,
   users,
 } from "@cleanhub/db";
 
@@ -985,5 +988,134 @@ export async function writeSaasTenantExportedAuditLog(
     ipAddress: input.ipAddress,
     userAgent: input.userAgent,
     metadata: { tableCount: input.tables.length, tables: input.tables },
+  });
+}
+
+/**
+ * A tenant user a SaaS operator may act on, with the roles they hold.
+ *
+ * Deliberately minimal: this exists to support password recovery when a store
+ * has locked itself out, not to give the platform a general window into tenant
+ * staff records.
+ */
+export type SaasTenantUserSummary = {
+  id: string;
+  tenantId: string;
+  email: string | null;
+  phone: string | null;
+  displayName: string;
+  status: string;
+  roleCodes: string[];
+};
+
+function tenantUserRoleCodesSql(tenantId: string) {
+  return sql<string[]>`coalesce(
+    (
+      select array_agg(distinct ${roles.code} order by ${roles.code})
+      from ${userRoles}
+      inner join ${roles} on ${roles.id} = ${userRoles.roleId}
+      where ${userRoles.userId} = ${users.id}
+        and ${userRoles.tenantId} = ${tenantId}
+        and ${userRoles.revokedAt} is null
+        and ${roles.tenantId} = ${tenantId}
+        and ${roles.scope} = 'tenant'
+        and ${roles.status} = 'active'
+        and ${roles.deletedAt} is null
+    ),
+    '{}'
+  )`;
+}
+
+/** Tenant users a SaaS operator can see for recovery, newest first. */
+export async function findSaasTenantUsers(
+  db: Database,
+  input: { tenantId: string },
+): Promise<SaasTenantUserSummary[]> {
+  const rows = await db
+    .select({
+      id: users.id,
+      tenantId: users.tenantId,
+      email: users.email,
+      phone: users.phone,
+      displayName: userProfiles.displayName,
+      status: users.status,
+      roleCodes: tenantUserRoleCodesSql(input.tenantId),
+    })
+    .from(users)
+    .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(
+      and(
+        eq(users.tenantId, input.tenantId),
+        eq(users.userType, "tenant"),
+        isNull(users.deletedAt),
+      ),
+    )
+    .orderBy(desc(users.createdAt));
+
+  return rows.map((row) => ({
+    ...row,
+    tenantId: row.tenantId ?? input.tenantId,
+    roleCodes: row.roleCodes ?? [],
+  }));
+}
+
+/** One tenant user, scoped to the tenant so an id alone cannot cross tenants. */
+export async function findSaasTenantUserById(
+  db: Database,
+  input: { tenantId: string; userId: string },
+): Promise<SaasTenantUserSummary | null> {
+  const [row] = await db
+    .select({
+      id: users.id,
+      tenantId: users.tenantId,
+      email: users.email,
+      phone: users.phone,
+      displayName: userProfiles.displayName,
+      status: users.status,
+      roleCodes: tenantUserRoleCodesSql(input.tenantId),
+    })
+    .from(users)
+    .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(
+      and(
+        eq(users.id, input.userId),
+        eq(users.tenantId, input.tenantId),
+        eq(users.userType, "tenant"),
+        isNull(users.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  if (!row) return null;
+
+  return {
+    ...row,
+    tenantId: row.tenantId ?? input.tenantId,
+    roleCodes: row.roleCodes ?? [],
+  };
+}
+
+export async function writeSaasTenantUserPasswordResetAuditLog(
+  db: Database,
+  input: {
+    actorUserId: string;
+    tenantId: string;
+    userId: string;
+    reason: string;
+    ipAddress?: string;
+    userAgent?: string;
+  },
+): Promise<void> {
+  await writeAuditLog(db, {
+    tenantId: input.tenantId,
+    actorUserId: input.actorUserId,
+    eventCategory: "saas_tenant",
+    eventType: "saas_tenant.user_password_reset",
+    entityType: "user",
+    entityId: input.userId,
+    success: true,
+    reason: input.reason,
+    ipAddress: input.ipAddress,
+    userAgent: input.userAgent,
   });
 }

@@ -228,3 +228,21 @@ export type SaasTenantAuditSnapshot = {
   contactPhone: string | null;
   contactEmail: string | null;
 };
+
+export type ListSaasTenantUsersInput = {
+  authContext: AuthContext;
+  tenantId: string;
+};
+
+export type ResetSaasTenantUserPasswordInput = {
+  authContext: AuthContext;
+  tenantId: string;
+  userId: string;
+  reason: string;
+  requestMeta?: AuthRequestMeta;
+};
+
+export type ResetSaasTenantUserPasswordResult = {
+  userId: string;
+  temporaryPassword: string;
+};

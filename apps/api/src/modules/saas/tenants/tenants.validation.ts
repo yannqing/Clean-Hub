@@ -49,6 +49,20 @@ export const getSaasTenantParamsSchema = z.object({
   tenantId: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/),
 });
 
+export const saasTenantUserParamsSchema = z.object({
+  tenantId: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+  userId: z.string().regex(/^[0-9A-HJKMNP-TV-Z]{26}$/),
+});
+
+/**
+ * A reason is mandatory: handing out a credential for somebody else's business
+ * must leave a record of why, and the audit log is what a tenant would be shown
+ * if they ever asked.
+ */
+export const resetSaasTenantUserPasswordBodySchema = z.object({
+  reason: z.string().trim().min(1).max(500),
+});
+
 export const createSaasTenantBodySchema = z.object({
   name: z.string().trim().min(1).max(160),
   pressingCode: z.string().trim().min(1).max(80),
