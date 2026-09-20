@@ -39,8 +39,11 @@ async function main(): Promise<void> {
   );
 
   for (const failure of failed) {
+    // `err`, not `error`: Pino's standard serializer only unpacks the former,
+    // so an Error logged as `error` arrives as an empty object and the reason
+    // the job died is lost.
     logger.error(
-      { error: failure.error, job: failure.job },
+      { err: failure.error, job: failure.job },
       "Background job failed to start",
     );
   }
@@ -63,6 +66,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  logger.error({ error }, "Background jobs crashed");
+  logger.error({ err: error }, "Background jobs crashed");
   process.exitCode = 1;
 });

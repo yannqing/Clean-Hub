@@ -2,7 +2,11 @@ import { createLogger, type AppLogger } from "@cleanhub/logger";
 
 import type { ChannelAdapter } from "./channel-adapter.js";
 import { EmailAdapter } from "./email.adapter.js";
-import { loadEmailConfig, type EmailConfig } from "./email-config.js";
+import {
+  loadEmailConfig,
+  loadEmailRetrySettings,
+  type EmailConfig,
+} from "./email-config.js";
 import {
   buildLocaleCandidates,
   normalizeLocale,
@@ -716,7 +720,12 @@ export class NotificationsService implements NotificationPublisher {
       return loadPushRetrySettings(this.env);
     }
 
-    return this.getEmailConfig();
+    // Deliberately not getEmailConfig(): this runs while recording a FAILED
+    // delivery, and the most common failure is that SMTP is not configured at
+    // all. Reading the full config here would throw a second time, escape the
+    // per-item catch, and kill the whole delivery loop -- taking push with it,
+    // since both channels are processed in the same pass.
+    return loadEmailRetrySettings(this.env);
   }
 
   private resolveRecipientId(

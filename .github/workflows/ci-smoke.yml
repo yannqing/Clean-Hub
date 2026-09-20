@@ -105,6 +105,7 @@ jobs:
           pnpm --filter @cleanhub/api smoke:temporary-password
           pnpm --filter @cleanhub/api smoke:customer-password-gate
           pnpm --filter @cleanhub/api smoke:email-capability
+          pnpm --filter @cleanhub/api smoke:email-retry
           pnpm --filter @cleanhub/pos-web smoke:cart
           pnpm --filter @cleanhub/pos-web smoke:offline-operations
           pnpm --filter @cleanhub/pos-web smoke:cash-drawer

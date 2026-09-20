@@ -12,6 +12,7 @@
     "e2e:mobile": "tsx src/e2e/mobile.e2e.ts",
     "test:integration:tenant-orders": "tsx src/modules/tenant/orders/orders.integration.ts",
     "smoke:auth-concurrency": "tsx src/modules/auth/auth.concurrency.repository.smoke.ts",
+    "smoke:email-retry": "tsx src/modules/notifications/email-retry.smoke.ts",
     "smoke:email-capability": "tsx src/modules/notifications/email-capability.smoke.ts",
     "smoke:customer-password-gate": "tsx src/http/customer-password-change.smoke.ts",
     "smoke:temporary-password": "tsx src/modules/auth/temporary-password.smoke.ts",

@@ -40,6 +40,29 @@ function readBoolean(value: string | undefined, fallback = false): boolean {
  * ceiling on every tenant's email capability: without it, `loadEmailConfig`
  * throws and nothing can be sent for anybody.
  */
+/**
+ * Email retry backoff, independent of whether SMTP is configured.
+ *
+ * Recording a failed delivery needs these numbers, and a delivery that failed
+ * *because* there is no SMTP host still has to be recorded. Reading them from
+ * the full config would throw again inside the failure handler and take the
+ * whole delivery loop down with it.
+ */
+export function loadEmailRetrySettings(
+  env: NodeJS.ProcessEnv = process.env,
+): { retryBaseSeconds: number; retryMaxSeconds: number } {
+  return {
+    retryBaseSeconds: readPositiveInteger(
+      env.EMAIL_DELIVERY_RETRY_BASE_SECONDS,
+      60,
+    ),
+    retryMaxSeconds: readPositiveInteger(
+      env.EMAIL_DELIVERY_RETRY_MAX_SECONDS,
+      3600,
+    ),
+  };
+}
+
 export function isEmailConfigured(
   env: NodeJS.ProcessEnv = process.env,
 ): boolean {
