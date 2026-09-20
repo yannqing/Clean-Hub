@@ -1,46 +1,27 @@
 import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   MobileApproveRefundResponse,
-  MobileCreatePaymentRequest,
-  MobileCreatePaymentResponse,
   MobileCreateRefundRequest,
   MobilePaymentStatusResponse,
-  MobilePaymentWebhookResponse,
   MobileRefundOrderDetail,
   MobileRefundRequest,
   MobileRefundRequestListQuery,
   MobileRefundRequestListResponse,
   MobileRejectRefundRequest,
-  MobileSimulateMockPaymentRequest,
 } from "./payment.types";
 
 type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
 
+/**
+ * Customers do not pay through the app: staff collect payment at the counter
+ * through the POS. Payment status is readable here; initiating a payment and
+ * confirming a mock one are intentionally not exposed.
+ */
 export function createMobilePaymentApi(client: ApiClient) {
   return {
-    createPayment: (
-      orderId: string,
-      input: MobileCreatePaymentRequest,
-      options?: RequestOptions,
-    ) =>
-      client.post<MobileCreatePaymentResponse>(
-        `/mobile/payment/orders/${encodeURIComponent(orderId)}/payments`,
-        input,
-        options,
-      ),
     getPaymentStatus: (paymentId: string, options?: RequestOptions) =>
       client.get<MobilePaymentStatusResponse>(
         `/mobile/payment/payments/${encodeURIComponent(paymentId)}`,
-        options,
-      ),
-    simulateMockPayment: (
-      paymentId: string,
-      input: MobileSimulateMockPaymentRequest,
-      options?: RequestOptions,
-    ) =>
-      client.post<MobilePaymentWebhookResponse>(
-        `/mobile/payment/payments/${encodeURIComponent(paymentId)}/mock-callback`,
-        input,
         options,
       ),
     createRefundRequest: (

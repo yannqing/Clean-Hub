@@ -31,7 +31,6 @@ import { getCurrentAddressCoordinates } from "../lib/capacitor";
 import { getDeviceCountry } from "../lib/country";
 import {
   CUSTOM_APPOINTMENT_ADDRESS_ID,
-  amountToCents,
   emptyActivity,
   emptyAddressForm,
   emptyContactForm,
@@ -47,7 +46,6 @@ import {
   getDefaultExpectedAt,
   getErrorMessage,
   getMinimumAppointmentDate,
-  getOrderBalance,
   getPrimaryAddress,
   sortAppointments,
   toAddressForm,
@@ -68,7 +66,6 @@ import type {
   CustomerPasswordFormState,
   CustomerProfileFormState,
 } from "../lib/format";
-import { openExternalUrl } from "../lib/open-external";
 import {
   AddressFormSheet,
   AppointmentFormSheet,
@@ -95,7 +92,6 @@ import {
   createCustomerAddress,
   createCustomerAppointment,
   createCustomerContact,
-  createCustomerPayment,
   createCustomerRefundRequest,
   deleteCustomerAddress,
   deleteCustomerContact,
@@ -290,8 +286,6 @@ export function CustomerHome({
   const [isSubmittingAddress, setIsSubmittingAddress] = useState(false);
   const [isLocatingAddress, setIsLocatingAddress] = useState(false);
   const [isSubmittingPassword, setIsSubmittingPassword] = useState(false);
-  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
-  const [pendingPaymentOrderId, setPendingPaymentOrderId] = useState<string | null>(null);
   const [isSubmittingRefund, setIsSubmittingRefund] = useState(false);
   const [cancellingAppointmentId, setCancellingAppointmentId] = useState<string | null>(null);
   const [contactActionId, setContactActionId] = useState<string | null>(null);
@@ -551,73 +545,33 @@ export function CustomerHome({
     return orderDetail;
   }, []);
 
+  // Payment is taken at the counter, so the customer's phone learns about it
+  // only by asking again. Refresh the open order when the app comes back to
+  // the foreground, which is exactly when someone looks down to check that
+  // the cashier's payment went through.
   useEffect(() => {
-    const refreshPendingPayment = () => {
+    const refreshOpenOrder = () => {
       if (
         document.visibilityState !== "visible" ||
-        !pendingPaymentOrderId ||
         !detailOpen ||
-        selectedActivity?.kind !== "order" ||
-        selectedActivity.id !== pendingPaymentOrderId
+        selectedActivity?.kind !== "order"
       ) {
         return;
       }
 
-      void refreshSelectedOrder(pendingPaymentOrderId)
-        .then((order) => {
-          if (order.paymentStatus === "paid") {
-            setPendingPaymentOrderId(null);
-            toast.success(t("customer.paymentMock.paidTitle"));
-          } else if (order.paymentStatus === "failed") {
-            setPendingPaymentOrderId(null);
-            setError(t("customer.paymentMock.failedTitle"));
-          }
-        })
-        .catch((nextError) => {
-          setError(getErrorMessage(nextError, t("common.errors.genericAction")));
-        });
+      void refreshSelectedOrder(selectedActivity.id).catch((nextError) => {
+        setError(getErrorMessage(nextError, t("common.errors.genericAction")));
+      });
     };
 
-    window.addEventListener("focus", refreshPendingPayment);
-    document.addEventListener("visibilitychange", refreshPendingPayment);
+    window.addEventListener("focus", refreshOpenOrder);
+    document.addEventListener("visibilitychange", refreshOpenOrder);
 
     return () => {
-      window.removeEventListener("focus", refreshPendingPayment);
-      document.removeEventListener("visibilitychange", refreshPendingPayment);
+      window.removeEventListener("focus", refreshOpenOrder);
+      document.removeEventListener("visibilitychange", refreshOpenOrder);
     };
-  }, [detailOpen, pendingPaymentOrderId, refreshSelectedOrder, selectedActivity, t]);
-
-  async function handleCreatePayment(order: MobileCustomerOrderDetail) {
-    const amount = getOrderBalance(order);
-
-    if (amountToCents(amount) <= 0) {
-      setError(t("customer.messages.orderSettled"));
-      return;
-    }
-
-    setError(null);
-    setIsSubmittingPayment(true);
-
-    try {
-      const result = await createCustomerPayment({
-        orderId: order.id,
-        amount,
-      });
-
-      setPendingPaymentOrderId(order.id);
-      await openExternalUrl(result.gateway.paymentUrl);
-      await refreshSelectedOrder(order.id);
-      toast.success(
-        result.idempotent
-          ? t("customer.messages.paymentAlreadyInitiated")
-          : t("customer.messages.paymentCreated"),
-      );
-    } catch (nextError) {
-      setError(getErrorMessage(nextError, t("common.errors.genericAction")));
-    } finally {
-      setIsSubmittingPayment(false);
-    }
-  }
+  }, [detailOpen, refreshSelectedOrder, selectedActivity, t]);
 
   function openRefundSheet(order: MobileCustomerOrderDetail) {
     setError(null);
@@ -1123,13 +1077,11 @@ export function CustomerHome({
         currency={tenantCurrency}
         detail={activityDetail}
         refundRequests={refundRequests}
-        isPaymentSubmitting={isSubmittingPayment}
         isLoading={isDetailLoading}
         item={activityItems.find(
           (item) => item.kind === selectedActivity?.kind && item.id === selectedActivity.id,
         ) ?? null}
         open={detailOpen}
-        onCreatePayment={(order) => void handleCreatePayment(order)}
         onOpenChange={(open) => {
           if (!open) {
             closeActivityDetail();

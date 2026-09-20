@@ -424,10 +424,8 @@ export function ActivityView({
 export function ActivityDetailSheet({
   currency,
   detail,
-  isPaymentSubmitting,
   isLoading,
   item,
-  onCreatePayment,
   open,
   onOpenChange,
   onOpenRefund,
@@ -435,10 +433,8 @@ export function ActivityDetailSheet({
 }: {
   currency: string;
   detail: ActivityDetail | null;
-  isPaymentSubmitting: boolean;
   isLoading: boolean;
   item: ActivityListItem | null;
-  onCreatePayment: (order: MobileCustomerOrderDetail) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenRefund: (order: MobileCustomerOrderDetail) => void;
@@ -467,8 +463,6 @@ export function ActivityDetailSheet({
           <ActivityDetailPanel
             currency={currency}
             detail={detail}
-            isPaymentSubmitting={isPaymentSubmitting}
-            onCreatePayment={onCreatePayment}
             onOpenRefund={onOpenRefund}
             refundRequests={refundRequests}
           />
@@ -493,15 +487,11 @@ export function ActivityDetailSheet({
 function ActivityDetailPanel({
   currency,
   detail,
-  isPaymentSubmitting,
-  onCreatePayment,
   onOpenRefund,
   refundRequests,
 }: {
   currency: string;
   detail: ActivityDetail;
-  isPaymentSubmitting: boolean;
-  onCreatePayment: (order: MobileCustomerOrderDetail) => void;
   onOpenRefund: (order: MobileCustomerOrderDetail) => void;
   refundRequests: MobileRefundRequest[];
 }) {
@@ -516,7 +506,10 @@ function ActivityDetailPanel({
     const activeRefund = orderRefundRequests.find(
       (request) => request.status === "pending" || request.status === "processing",
     );
-    const canPay =
+    // Payment is collected at the counter, so the app never offers to pay.
+    // It still says that an amount is outstanding, otherwise a customer sees a
+    // balance with no explanation of how to clear it.
+    const hasOutstandingBalance =
       amountToCents(balance) > 0 &&
       detail.data.paymentStatus !== "paid" &&
       detail.data.paymentStatus !== "refunded";
@@ -559,22 +552,18 @@ function ActivityDetailPanel({
           </p>
         ) : null}
 
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        {hasOutstandingBalance ? (
+          <p className="mt-4 flex items-start gap-2 rounded-md bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+            <CreditCard className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            {t("customer.detail.payAtCounter", {
+              amount: formatMoney(balance),
+            })}
+          </p>
+        ) : null}
+
+        <div className="mt-4">
           <Button
-            className="h-11"
-            disabled={!canPay || isPaymentSubmitting}
-            type="button"
-            onClick={() => onCreatePayment(detail.data)}
-          >
-            {isPaymentSubmitting ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <CreditCard className="size-4" aria-hidden="true" />
-            )}
-            {t("customer.actions.pay")}
-          </Button>
-          <Button
-            className="h-11"
+            className="h-11 w-full"
             disabled={!canRefund}
             type="button"
             variant="outline"

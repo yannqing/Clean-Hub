@@ -389,6 +389,20 @@ export class PaymentService {
   async simulateMockPayment(
     input: SimulateMockPaymentInput,
   ): Promise<PaymentWebhookResult> {
+    // Defence in depth. The customer-facing route for this was removed --
+    // staff collect payment at the counter -- but the method survives for
+    // tests and local development, so it must refuse to run in production
+    // rather than rely on nothing calling it. The gateway check alone is not
+    // enough: `readGateway` returns "mock" on every branch today, so
+    // `instanceof MockPaymentGateway` is always true.
+    if (process.env.NODE_ENV === "production") {
+      throw new MobilePaymentError(
+        "PAYMENT_GATEWAY_UNAVAILABLE",
+        "Mock payment simulation is not available.",
+        502,
+      );
+    }
+
     if (!(this.gateway instanceof MockPaymentGateway)) {
       throw new MobilePaymentError(
         "PAYMENT_GATEWAY_UNAVAILABLE",

@@ -206,6 +206,7 @@ export const zhCNMessages = {
       total: "总计",
       paid: "已付",
       payment: "支付",
+      payAtCounter: "仍需支付 {amount}，请到店内前台付款。店员录入后，此处会自动更新。",
       created: "创建时间",
       priority: "优先级",
       pickup: "取件",

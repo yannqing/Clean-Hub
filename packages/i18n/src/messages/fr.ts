@@ -210,6 +210,8 @@ export const frMessages = {
       total: "Total",
       paid: "Paye",
       payment: "Paiement",
+      payAtCounter:
+        "Il reste {amount} a regler. Merci de payer au comptoir -- votre commande sera mise a jour ici des que le personnel l'aura enregistre.",
       created: "Cree",
       priority: "Priorite",
       pickup: "Retrait",

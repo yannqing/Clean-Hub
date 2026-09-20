@@ -208,6 +208,8 @@ export const enMessages = {
       total: "Total",
       paid: "Paid",
       payment: "Payment",
+      payAtCounter:
+        "{amount} is still due. Please pay at the counter -- your order updates here once the staff records it.",
       created: "Created",
       priority: "Priority",
       pickup: "Pickup",
