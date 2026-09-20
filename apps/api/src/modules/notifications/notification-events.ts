@@ -91,6 +91,44 @@ export function orderCompletedEvent(input: {
   };
 }
 
+/**
+ * The garments are washed and waiting on the shelf.
+ *
+ * The single most useful message a laundry sends: without it a walk-in
+ * customer has no way to know their order is ready, which is what leaves
+ * finished work sitting on the shelf. `ticket.overdue` is a later, separate
+ * reminder for items nobody came back for.
+ */
+export function ticketReadyForPickupEvent(input: {
+  tenantId: string;
+  branchId: string;
+  customerId: string;
+  ticketId: string;
+  ticketNo?: string | null;
+  customerName?: string | null;
+  expectedPickupAt?: string | null;
+  locale?: string | null;
+}): NotificationEvent {
+  return {
+    name: "ticket.ready_for_pickup",
+    tenantId: input.tenantId,
+    branchId: input.branchId,
+    customerId: input.customerId,
+    relatedType: "ticket",
+    relatedId: input.ticketId,
+    locale: input.locale,
+    // A ticket can leave and re-enter ready_to_pick when an item goes back for
+    // rework, and the customer should not be told twice for the same ticket.
+    idempotencyKey: `ticket.ready_for_pickup:${input.ticketId}`,
+    payload: {
+      ticketId: input.ticketId,
+      ticketNo: input.ticketNo ?? input.ticketId,
+      customerName: input.customerName ?? null,
+      expectedPickupAt: input.expectedPickupAt ?? null,
+    },
+  };
+}
+
 export function appointmentAcceptedEvent(input: {
   tenantId: string;
   branchId: string;

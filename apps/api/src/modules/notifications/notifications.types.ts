@@ -9,6 +9,7 @@ export type NotificationTriggerEvent =
   | "appointment.rejected"
   | "refund.approved"
   | "refund.rejected"
+  | "ticket.ready_for_pickup"
   | "ticket.overdue"
   | "delivery.status_changed";
 

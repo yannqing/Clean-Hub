@@ -138,7 +138,35 @@ VALUES
   ('01SEED0200TPLRFDPSH0000003', NULL, 'push.refund.approved', '退款批准推送', 'business', 'zh-CN',
    '退款已批准',
    '您的退款 {{amount}} 已批准。',
-   '[{"name":"amount"}]'::jsonb, true, true)
+   '[{"name":"amount"}]'::jsonb, true, true),
+
+  -- Ready for pickup. Sent once when the ticket reaches ready_to_pick, unlike
+  -- ticket.overdue which chases items nobody has collected.
+  ('01SEED0200TPLTKTRDY0000001', NULL, 'email.ticket.ready_for_pickup', 'Ready for pickup email', 'business', 'en',
+   'Your order {{ticketNo}} is ready',
+   'Hi {{customerName}}, your order {{ticketNo}} is clean and ready to collect.',
+   '[{"name":"ticketNo"},{"name":"customerName"},{"name":"expectedPickupAt"}]'::jsonb, true, true),
+  ('01SEED0200TPLTKTRDY0000002', NULL, 'email.ticket.ready_for_pickup', 'Email pret a retirer', 'business', 'fr',
+   'Votre commande {{ticketNo}} est prete',
+   'Bonjour {{customerName}}, votre commande {{ticketNo}} est propre et prete a etre retiree.',
+   '[{"name":"ticketNo"},{"name":"customerName"},{"name":"expectedPickupAt"}]'::jsonb, true, true),
+  ('01SEED0200TPLTKTRDY0000003', NULL, 'email.ticket.ready_for_pickup', '可取件邮件', 'business', 'zh-CN',
+   '您的订单 {{ticketNo}} 已可取件',
+   '{{customerName}}，您的订单 {{ticketNo}} 已清洗完成，可以取件了。',
+   '[{"name":"ticketNo"},{"name":"customerName"},{"name":"expectedPickupAt"}]'::jsonb, true, true),
+
+  ('01SEED0200TPLTKTRPS0000001', NULL, 'push.ticket.ready_for_pickup', 'Ready for pickup push', 'business', 'en',
+   'Ready for pickup',
+   'Order {{ticketNo}} is clean and ready to collect.',
+   '[{"name":"ticketNo"}]'::jsonb, true, true),
+  ('01SEED0200TPLTKTRPS0000002', NULL, 'push.ticket.ready_for_pickup', 'Push pret a retirer', 'business', 'fr',
+   'Pret a retirer',
+   'La commande {{ticketNo}} est prete a etre retiree.',
+   '[{"name":"ticketNo"}]'::jsonb, true, true),
+  ('01SEED0200TPLTKTRPS0000003', NULL, 'push.ticket.ready_for_pickup', '可取件推送', 'business', 'zh-CN',
+   '可以取件了',
+   '订单 {{ticketNo}} 已清洗完成，可以取件了。',
+   '[{"name":"ticketNo"}]'::jsonb, true, true)
 ON CONFLICT (id) DO UPDATE SET
   template_name = EXCLUDED.template_name,
   locale = EXCLUDED.locale,
@@ -173,6 +201,10 @@ VALUES
    'Refund rejected customer email', 'business', 'event', 'refund.rejected', 'email', 'customer', 3, 60, true),
   ('01SEED0200CFGDLVPSH0000001', '01KRERJN800000000000000001', '01SEED0200TPLDLVPSH0000001',
    'Delivery status customer push', 'business', 'event', 'delivery.status_changed', 'push', 'customer', 10, 60, true),
+  ('01SEED0200CFGTKTRDY0000001', '01KRERJN800000000000000001', '01SEED0200TPLTKTRDY0000001',
+   'Ready for pickup customer email', 'business', 'event', 'ticket.ready_for_pickup', 'email', 'customer', 3, 60, true),
+  ('01SEED0200CFGTKTRPS0000001', '01KRERJN800000000000000001', '01SEED0200TPLTKTRPS0000001',
+   'Ready for pickup customer push', 'business', 'event', 'ticket.ready_for_pickup', 'push', 'customer', 3, 60, true),
   ('01SEED0200CFGRFDPSH0000001', '01KRERJN800000000000000001', '01SEED0200TPLRFDPSH0000001',
    'Refund approved customer push', 'business', 'event', 'refund.approved', 'push', 'customer', 3, 60, true)
 ON CONFLICT (id) DO UPDATE SET

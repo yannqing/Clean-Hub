@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 
 import type { AppBindings } from "../../../http/types.js";
+import type { NotificationPublisher } from "../../notifications/index.js";
 import {
   changeServiceTicketItemStatusController,
   changeServiceTicketStatusController,
@@ -25,7 +26,13 @@ import {
  * be declared before the generic `/:ticketId` so Hono's first-match router
  * picks them up.
  */
-export function createPosServiceTicketsRoutes() {
+export type CreatePosServiceTicketsRoutesOptions = {
+  notificationPublisher?: NotificationPublisher;
+};
+
+export function createPosServiceTicketsRoutes({
+  notificationPublisher,
+}: CreatePosServiceTicketsRoutesOptions = {}) {
   const routes = new Hono<AppBindings>();
 
   routes.get("/", listServiceTicketsController);
@@ -35,7 +42,10 @@ export function createPosServiceTicketsRoutes() {
   routes.get("/:ticketId", getServiceTicketController);
   routes.patch("/:ticketId", updateServiceTicketController);
   routes.delete("/:ticketId", deleteServiceTicketController);
-  routes.post("/:ticketId/status-changes", changeServiceTicketStatusController);
+  routes.post(
+    "/:ticketId/status-changes",
+    changeServiceTicketStatusController({ notificationPublisher }),
+  );
   routes.get("/:ticketId/orders", getServiceTicketRelatedOrdersController);
 
   routes.post("/:ticketId/items", createServiceTicketItemController);

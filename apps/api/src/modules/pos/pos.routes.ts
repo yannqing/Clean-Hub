@@ -47,7 +47,10 @@ export function createPosRoutes({
   routes.route("/customers", createPosCustomersRoutes());
   routes.route("/catalog", createPosCatalogRoutes());
   routes.route("/carts", createPosCartsRoutes());
-  routes.route("/service-tickets", createPosServiceTicketsRoutes());
+  routes.route(
+    "/service-tickets",
+    createPosServiceTicketsRoutes({ notificationPublisher }),
+  );
   routes.route("/accounts", createPosAccountsRoutes());
   routes.route("/orders", createPosOrdersRoutes({ notificationPublisher }));
   routes.route("/payment-adjustments", createPosPaymentAdjustmentRoutes());

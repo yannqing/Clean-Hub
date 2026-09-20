@@ -101,6 +101,7 @@ jobs:
           pnpm --filter @cleanhub/api smoke:payment-config
           pnpm --filter @cleanhub/api smoke:pos-carts
           pnpm --filter @cleanhub/api smoke:pos-orders
+          pnpm --filter @cleanhub/api smoke:pos-service-tickets
           pnpm --filter @cleanhub/pos-web smoke:cart
           pnpm --filter @cleanhub/pos-web smoke:offline-operations
           pnpm --filter @cleanhub/pos-web smoke:cash-drawer

@@ -1,6 +1,12 @@
 import type { Context } from "hono";
 
+import { logger } from "@cleanhub/logger";
+
 import type { AppBindings } from "../../../http/types.js";
+import {
+  ticketReadyForPickupEvent,
+  type NotificationPublisher,
+} from "../../notifications/index.js";
 import { ServiceTicketError } from "./service-tickets.errors.js";
 import {
   changePosServiceTicketItemStatus,
@@ -118,27 +124,62 @@ export async function updateServiceTicketController(c: Context<AppBindings>) {
   }
 }
 
-export async function changeServiceTicketStatusController(
-  c: Context<AppBindings>,
-) {
-  const params = serviceTicketParamsSchema.parse(c.req.param());
-  const rawBody = await c.req.json().catch(() => ({}));
-  const data = changeServiceTicketStatusBodySchema.parse(rawBody);
+export type ChangeServiceTicketStatusControllerOptions = {
+  notificationPublisher?: NotificationPublisher;
+};
 
-  try {
-    const ticket = await changePosServiceTicketStatus(
-      c.get("authContext"),
-      params.ticketId,
-      data,
-      getRequestMeta(c),
-    );
-    return c.json(ticket);
-  } catch (error) {
-    if (error instanceof ServiceTicketError) {
-      return createErrorResponse(c, error);
+export function changeServiceTicketStatusController({
+  notificationPublisher,
+}: ChangeServiceTicketStatusControllerOptions = {}) {
+  return async (c: Context<AppBindings>) => {
+    const params = serviceTicketParamsSchema.parse(c.req.param());
+    const rawBody = await c.req.json().catch(() => ({}));
+    const data = changeServiceTicketStatusBodySchema.parse(rawBody);
+
+    try {
+      const ticket = await changePosServiceTicketStatus(
+        c.get("authContext"),
+        params.ticketId,
+        data,
+        getRequestMeta(c),
+      );
+
+      // Tell the customer their garments are waiting. Published after the
+      // status change has committed, and never allowed to fail the request:
+      // the ticket really is ready whether or not the message goes out.
+      if (ticket.ticketStatus === "ready_to_pick" && ticket.customerId) {
+        try {
+          await notificationPublisher?.publish(
+            ticketReadyForPickupEvent({
+              tenantId: ticket.tenantId,
+              branchId: ticket.branchId,
+              customerId: ticket.customerId,
+              ticketId: ticket.id,
+              ticketNo: ticket.ticketNo,
+              customerName: ticket.customerName,
+              expectedPickupAt: ticket.expectedPickupAt,
+            }),
+          );
+        } catch (publishError) {
+          logger.error(
+            {
+              error: publishError,
+              tenantId: ticket.tenantId,
+              ticketId: ticket.id,
+            },
+            "Service ticket ready-for-pickup notification failed",
+          );
+        }
+      }
+
+      return c.json(ticket);
+    } catch (error) {
+      if (error instanceof ServiceTicketError) {
+        return createErrorResponse(c, error);
+      }
+      throw error;
     }
-    throw error;
-  }
+  };
 }
 
 export async function deleteServiceTicketController(c: Context<AppBindings>) {
