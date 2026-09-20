@@ -477,6 +477,16 @@ export type TenantMessages = {
         backToAccounts: string;
         openAccount: string;
         editAction: string;
+        appPasswordTitle: string;
+        appPasswordDescription: string;
+        appPasswordAction: string;
+        appPasswordPending: string;
+        appPasswordSuccess: string;
+        appPasswordCopied: string;
+        appPasswordCopy: string;
+        appPasswordDone: string;
+        appPasswordDisabled: string;
+        appPasswordError: string;
         summaryTitle: string;
         linkedCustomersTitle: string;
         linkedCustomersDescription: string;

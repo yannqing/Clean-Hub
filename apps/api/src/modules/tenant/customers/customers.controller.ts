@@ -19,6 +19,7 @@ import {
   listTenantCustomerAccounts,
   listTenantCustomers,
   updateTenantCustomer,
+  resetTenantCustomerAccountPassword,
   updateTenantCustomerAccount,
 } from "./customers.service.js";
 import {
@@ -345,6 +346,28 @@ export async function deleteTenantCustomerCommentController(
     if (error instanceof TenantCustomersError) {
       return createTenantCustomersErrorResponse(c, error);
     }
+    throw error;
+  }
+}
+
+export async function resetTenantCustomerAccountPasswordController(
+  c: Context<AppBindings>,
+) {
+  const { accountId } = tenantCustomerAccountParamsSchema.parse(c.req.param());
+
+  try {
+    const result = await resetTenantCustomerAccountPassword({
+      authContext: c.get("authContext"),
+      requestMeta: getRequestMeta(c),
+      accountId,
+    });
+
+    return c.json(result);
+  } catch (error) {
+    if (error instanceof TenantCustomersError) {
+      return createTenantCustomersErrorResponse(c, error);
+    }
+
     throw error;
   }
 }

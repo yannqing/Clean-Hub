@@ -14,8 +14,12 @@ import {
   type SQL,
 } from "drizzle-orm";
 
+import { createId } from "@cleanhub/id";
+
 import {
   customerAccounts,
+  customerAuthRefreshTokens,
+  customerCredentials,
   customers,
   orders,
   serviceTickets,
@@ -800,4 +804,70 @@ export async function findTenantCustomerOverview(
     disabledCustomers: row?.disabledCustomers ?? 0,
     linkedAccounts: row?.linkedAccounts ?? 0,
   };
+}
+
+/**
+ * Give a customer account a password, creating the credential if it has none.
+ *
+ * An upsert rather than an update: the common case at launch is a customer who
+ * has never had a credential at all, because accounts are created by staff at
+ * the counter and the OTP that would otherwise bootstrap one is not delivered
+ * anywhere yet. The unique index on customer_account_id is what makes this
+ * safe against two operators resetting at once.
+ */
+export async function upsertTenantCustomerCredentialRecord(
+  db: Database,
+  input: {
+    tenantId: string;
+    customerAccountId: string;
+    passwordHash: string;
+    actorUserId: string;
+  },
+): Promise<void> {
+  const now = new Date();
+
+  await db
+    .insert(customerCredentials)
+    .values({
+      id: createId(),
+      tenantId: input.tenantId,
+      customerAccountId: input.customerAccountId,
+      passwordHash: input.passwordHash,
+      createdBy: input.actorUserId,
+      updatedBy: input.actorUserId,
+    })
+    .onConflictDoUpdate({
+      target: customerCredentials.customerAccountId,
+      set: {
+        passwordHash: input.passwordHash,
+        // Clear any lockout: the point of a reset is to let them back in.
+        failedAttempts: 0,
+        lockedUntil: null,
+        deletedAt: null,
+        deletedBy: null,
+        updatedAt: now,
+        updatedBy: input.actorUserId,
+        version: sql`${customerCredentials.version} + 1`,
+      },
+    });
+}
+
+/** Drop the customer's sessions so a reset credential takes effect at once. */
+export async function revokeTenantCustomerRefreshTokens(
+  db: Database,
+  input: { tenantId: string; customerAccountId: string },
+): Promise<void> {
+  await db
+    .update(customerAuthRefreshTokens)
+    .set({ revokedAt: new Date() })
+    .where(
+      and(
+        eq(customerAuthRefreshTokens.tenantId, input.tenantId),
+        eq(
+          customerAuthRefreshTokens.customerAccountId,
+          input.customerAccountId,
+        ),
+        isNull(customerAuthRefreshTokens.revokedAt),
+      ),
+    );
 }

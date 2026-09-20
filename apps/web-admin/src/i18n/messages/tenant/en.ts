@@ -485,6 +485,18 @@ export const tenantMessagesEn: TenantMessages = {
         backToAccounts: "Back to accounts",
         openAccount: "Open account {account}",
         editAction: "Edit account",
+        appPasswordTitle: "Mobile app access",
+        appPasswordDescription:
+          "Customers sign in to the app with a password you issue here. Read it out or write it down before closing this box \u2014 it cannot be shown again.",
+        appPasswordAction: "Issue app password",
+        appPasswordPending: "Issuing\u2026",
+        appPasswordSuccess: "Password issued. Give it to the customer now.",
+        appPasswordCopied: "Password copied.",
+        appPasswordCopy: "Copy",
+        appPasswordDone: "Done",
+        appPasswordDisabled:
+          "Enable this account before issuing an app password.",
+        appPasswordError: "The password could not be issued.",
         summaryTitle: "Account details",
         linkedCustomersTitle: "Linked customers",
         linkedCustomersDescription:

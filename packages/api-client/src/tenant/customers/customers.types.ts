@@ -224,3 +224,8 @@ export type TenantCustomerOverview = {
   disabledCustomers: number;
   linkedAccounts: number;
 };
+
+export type ResetTenantCustomerAccountPasswordResponse = {
+  accountId: string;
+  temporaryPassword: string;
+};

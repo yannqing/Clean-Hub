@@ -486,6 +486,18 @@ export const tenantMessagesFr: TenantMessages = {
         backToAccounts: "Retour aux comptes",
         openAccount: "Ouvrir le compte {account}",
         editAction: "Modifier le compte",
+        appPasswordTitle: "Acces a l'application mobile",
+        appPasswordDescription:
+          "Le client se connecte a l'application avec un mot de passe emis ici. Notez-le ou lisez-le au client avant de fermer \u2014 il ne pourra plus etre affiche.",
+        appPasswordAction: "Emettre un mot de passe",
+        appPasswordPending: "Emission\u2026",
+        appPasswordSuccess: "Mot de passe emis. Remettez-le au client maintenant.",
+        appPasswordCopied: "Mot de passe copie.",
+        appPasswordCopy: "Copier",
+        appPasswordDone: "Termine",
+        appPasswordDisabled:
+          "Activez ce compte avant d'emettre un mot de passe.",
+        appPasswordError: "Le mot de passe n'a pas pu etre emis.",
         summaryTitle: "Informations du compte",
         linkedCustomersTitle: "Clients associés",
         linkedCustomersDescription:

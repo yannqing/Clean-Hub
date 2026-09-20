@@ -354,3 +354,14 @@ export type DeleteTenantCustomerCommentInput = {
   commentId: string;
   data: DeleteTenantCustomerCommentRequest;
 };
+
+export type ResetTenantCustomerAccountPasswordInput = {
+  authContext: AuthContext;
+  requestMeta?: AuthRequestMeta;
+  accountId: string;
+};
+
+export type ResetTenantCustomerAccountPasswordResult = {
+  accountId: string;
+  temporaryPassword: string;
+};

@@ -19,6 +19,7 @@ import type {
   TenantCustomerTimelineQuery,
   TenantCustomerTimelineResponse,
   UpdateTenantCustomerCommentRequest,
+  ResetTenantCustomerAccountPasswordResponse,
   UpdateTenantCustomerAccountRequest,
   UpdateTenantCustomerRequest,
 } from "./customers.types";
@@ -87,6 +88,18 @@ export function createTenantCustomersApi(client: ApiClient) {
       client.patch<TenantCustomerAccountDetail>(
         `/tenant/customers/accounts/${encodeURIComponent(accountId)}`,
         input,
+        options,
+      ),
+    /**
+     * Issue the customer a password for the mobile app.
+     *
+     * Returns the generated password, which is shown to staff once so they can
+     * hand it over; it is never retrievable afterwards.
+     */
+    resetAccountPassword: (accountId: string, options?: RequestOptions) =>
+      client.post<ResetTenantCustomerAccountPasswordResponse>(
+        `/tenant/customers/accounts/${encodeURIComponent(accountId)}/password`,
+        {},
         options,
       ),
     timeline: (

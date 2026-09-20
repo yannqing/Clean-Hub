@@ -1,6 +1,10 @@
 import { getDb, type Database } from "@cleanhub/db";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import { assertPasswordMeetsPolicy } from "../../auth/password-policy.helper.js";
+import { hashPassword } from "../../auth/password.service.js";
+import { generateTemporaryPassword } from "../../auth/temporary-password.helper.js";
+import { resolveEffectiveSecurityPolicy } from "../../saas/security/security-policy.js";
 import { resolveAllowedBranchIds } from "../../auth/branch-scope.helper.js";
 import { AuthError } from "../../auth/auth.errors.js";
 import {
@@ -11,6 +15,8 @@ import {
   findTenantCustomerAccountConflict,
   findTenantCustomerAccountCustomers,
   findTenantCustomerAccountDetail,
+  revokeTenantCustomerRefreshTokens,
+  upsertTenantCustomerCredentialRecord,
   findTenantCustomerAccountOverview,
   findTenantCustomerAccounts,
   findTenantCustomerDetail,
@@ -35,6 +41,8 @@ import type {
   TenantCustomerOverviewInput,
   UpdateTenantCustomerInput,
   UpdateTenantCustomerAccountInput,
+  ResetTenantCustomerAccountPasswordInput,
+  ResetTenantCustomerAccountPasswordResult,
 } from "./customers.types.js";
 import { TenantCustomersError } from "./customers.errors.js";
 
@@ -406,5 +414,88 @@ export async function updateTenantCustomerAccount(
     });
 
     return result;
+  });
+}
+
+/**
+ * Issue a customer a password so they can sign in to the mobile app.
+ *
+ * Customer sign-in is otherwise OTP-first, and the OTP is generated but never
+ * delivered -- there is no SMS provider -- so a customer who has never had a
+ * password has no way into the app at all. Staff create the account at the
+ * counter, so staff hand over the first credential too; the customer changes it
+ * from the app afterwards.
+ *
+ * Owner or manager only, through the same branch-scoped guard as the rest of
+ * this module, and always audited: this is a credential for someone else's
+ * account.
+ */
+export async function resetTenantCustomerAccountPassword(
+  input: ResetTenantCustomerAccountPasswordInput,
+  db: Database = getDb(),
+): Promise<ResetTenantCustomerAccountPasswordResult> {
+  const scope = await resolveTenantCustomerScope(
+    input.authContext,
+    undefined,
+    db,
+  );
+  const existing = await findTenantCustomerAccountDetail(db, {
+    ...scope,
+    accountId: input.accountId,
+  });
+
+  if (!existing) {
+    throw new TenantCustomersError(
+      "ACCOUNT_NOT_FOUND",
+      "Customer account was not found.",
+    );
+  }
+
+  // A disabled account must not be handed a working credential; re-enable it
+  // first so the decision to restore access is explicit and separately audited.
+  if (existing.status === "disabled") {
+    throw new TenantCustomersError(
+      "ACCOUNT_DISABLED",
+      "Enable the customer account before issuing a password.",
+      422,
+    );
+  }
+
+  const policy = await resolveEffectiveSecurityPolicy(db);
+  const temporaryPassword = generateTemporaryPassword();
+
+  // Built to satisfy the policy, but asserted so a future policy change fails
+  // loudly instead of silently producing an unusable credential.
+  assertPasswordMeetsPolicy(temporaryPassword, policy);
+
+  const passwordHash = await hashPassword(temporaryPassword);
+
+  return db.transaction(async (tx) => {
+    await upsertTenantCustomerCredentialRecord(tx, {
+      tenantId: scope.tenantId,
+      customerAccountId: input.accountId,
+      passwordHash,
+      actorUserId: input.authContext.userId,
+    });
+
+    // Any session opened with the old credential stops here.
+    await revokeTenantCustomerRefreshTokens(tx, {
+      tenantId: scope.tenantId,
+      customerAccountId: input.accountId,
+    });
+
+    await writeAuditLog(tx, {
+      tenantId: scope.tenantId,
+      actorUserId: input.authContext.userId,
+      eventCategory: "pos_customer",
+      eventType: "pos_customer.account_password_reset",
+      entityType: "customer_account",
+      entityId: input.accountId,
+      success: true,
+      ipAddress: input.requestMeta?.ipAddress,
+      userAgent: input.requestMeta?.userAgent,
+    });
+
+    return { accountId: input.accountId, temporaryPassword };
   });
 }

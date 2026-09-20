@@ -29,6 +29,8 @@ import { DataTable, DataTablePagePagination } from "@cleanhub/ui/data-table";
 import {
   ChevronRight,
   ContactRound,
+  Copy,
+  KeyRound,
   LoaderCircle,
   Mail,
   Pencil,
@@ -43,7 +45,10 @@ import { useEffect, useState } from "react";
 import { webAdminRoutes } from "@/config/routes";
 import { interpolate, useTenantI18n } from "@/i18n";
 
-import { updateTenantCustomerAccountAction } from "../actions";
+import {
+  resetTenantCustomerAccountPasswordAction,
+  updateTenantCustomerAccountAction,
+} from "../actions";
 import { getTenantCustomerAccountCustomersQuery } from "../queries";
 
 const PAGE_SIZE = 10;
@@ -87,6 +92,10 @@ export function TenantCustomerAccountDetailView({
   const [form, setForm] = useState<AccountForm>(() => toAccountForm(account));
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  // The issued password lives only in this state: the API returns it once and
+  // never stores anything readable, so closing the panel really does discard it.
+  const [appPassword, setAppPassword] = useState<string | null>(null);
+  const [issuingPassword, setIssuingPassword] = useState(false);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -198,6 +207,35 @@ export function TenantCustomerAccountDetailView({
       scroll: false,
     });
     router.refresh();
+  }
+
+  async function issueAppPassword() {
+    setIssuingPassword(true);
+    const result = await resetTenantCustomerAccountPasswordAction(account.id);
+    setIssuingPassword(false);
+
+    if (!result.ok) {
+      toast.error(
+        result.code === "ACCOUNT_DISABLED"
+          ? copy.appPasswordDisabled
+          : result.message || copy.appPasswordError,
+      );
+      return;
+    }
+
+    setAppPassword(result.data.temporaryPassword);
+    toast.success(copy.appPasswordSuccess);
+  }
+
+  async function copyAppPassword() {
+    if (!appPassword) return;
+
+    try {
+      await navigator.clipboard.writeText(appPassword);
+      toast.success(copy.appPasswordCopied);
+    } catch {
+      // Clipboard access can be blocked; the password stays on screen to read.
+    }
   }
 
   return (
@@ -496,7 +534,79 @@ export function TenantCustomerAccountDetailView({
           </Card>
         </main>
 
-        <aside>
+        <aside className="grid gap-5">
+          <Card className="gap-0 rounded-xl py-0 shadow-none">
+            <CardContent className="py-5">
+              <div className="flex items-center gap-2">
+                <Icon aria-hidden icon={KeyRound} size={17} />
+                <h2 className="text-sm font-semibold">
+                  {copy.appPasswordTitle}
+                </h2>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                {copy.appPasswordDescription}
+              </p>
+              {appPassword ? (
+                <div className="mt-4 grid gap-3">
+                  <code
+                    className="rounded-md bg-muted px-3 py-2 font-mono text-sm break-all select-all"
+                    data-testid="customer-app-password"
+                  >
+                    {appPassword}
+                  </code>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      className="gap-2"
+                      onClick={() => void copyAppPassword()}
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <Icon aria-hidden icon={Copy} size={14} />
+                      {copy.appPasswordCopy}
+                    </Button>
+                    <Button
+                      onClick={() => setAppPassword(null)}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      {copy.appPasswordDone}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  className="mt-4 gap-2"
+                  disabled={issuingPassword || account.status === "disabled"}
+                  onClick={() => void issueAppPassword()}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {issuingPassword ? (
+                    <Icon
+                      aria-hidden
+                      className="animate-spin"
+                      icon={LoaderCircle}
+                      size={14}
+                    />
+                  ) : (
+                    <Icon aria-hidden icon={KeyRound} size={14} />
+                  )}
+                  {issuingPassword
+                    ? copy.appPasswordPending
+                    : copy.appPasswordAction}
+                </Button>
+              )}
+              {account.status === "disabled" ? (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  {copy.appPasswordDisabled}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+
           <Card className="gap-0 rounded-xl py-0 shadow-none">
             <CardContent className="py-5">
               <h2 className="text-sm font-semibold">{copy.recordDetailsTitle}</h2>

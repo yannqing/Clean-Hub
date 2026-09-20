@@ -15,6 +15,7 @@ import {
   requestTenantCustomerAttachmentUploadController,
   updateTenantCustomerCommentController,
   updateTenantCustomerController,
+  resetTenantCustomerAccountPasswordController,
   updateTenantCustomerAccountController,
 } from "./customers.controller.js";
 
@@ -35,6 +36,12 @@ export function createTenantCustomerRoutes() {
   routes.patch(
     "/accounts/:accountId",
     updateTenantCustomerAccountController,
+  );
+  // Staff hand the customer their first app password at the counter: customer
+  // sign-in is OTP-first and the OTP is not delivered anywhere yet.
+  routes.post(
+    "/accounts/:accountId/password",
+    resetTenantCustomerAccountPasswordController,
   );
   routes.get("/", listTenantCustomersController);
   routes.get("/:customerId/timeline", getTenantCustomerTimelineController);
