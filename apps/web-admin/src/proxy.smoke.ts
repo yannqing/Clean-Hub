@@ -26,6 +26,25 @@ function stubFetch(responder: () => Promise<Response> | Response): void {
   globalThis.fetch = (async () => responder()) as typeof globalThis.fetch;
 }
 
+/** Records which API paths the proxy called, so logout can be asserted on. */
+function stubFetchByPath(
+  handlers: Record<string, () => Response>,
+): { calls: string[] } {
+  const calls: string[] = [];
+
+  globalThis.fetch = (async (input: unknown) => {
+    const url = String(input);
+    calls.push(url);
+    const match = Object.keys(handlers).find((path) => url.endsWith(path));
+
+    return match
+      ? handlers[match]!()
+      : new Response("not stubbed", { status: 404 });
+  }) as typeof globalThis.fetch;
+
+  return { calls };
+}
+
 function authenticatedCookies(): string {
   return `${ACCESS_COOKIE}=access-token; ${REFRESH_COOKIE}=refresh-token`;
 }
@@ -105,6 +124,51 @@ async function run(): Promise<void> {
     response.headers.get("location") ?? "",
     /\/saas/,
     "a platform role must be redirected away from /tenant",
+  );
+
+  // A role with no home in this app -- a cashier, or an owner demoted
+  // mid-session -- used to be parked on /login still holding valid cookies,
+  // with no way to sign out, because /login is the one route an authenticated
+  // user is allowed to sit on.
+  const cashierLogout = stubFetchByPath({
+    "/auth/me": () => okAuthResponse("cashier", "tenant-1"),
+    "/auth/logout": () =>
+      new Response(null, {
+        status: 204,
+        headers: {
+          "set-cookie":
+            "cleanhub_access_token=; Path=/; Max-Age=0, cleanhub_refresh_token=; Path=/; Max-Age=0",
+        },
+      }),
+  });
+  response = await proxy(createRequest("/tenant", authenticatedCookies()));
+
+  assert.match(
+    response.headers.get("location") ?? "",
+    /\/login/,
+    "a role with no home must be sent to /login",
+  );
+  assert.ok(
+    cashierLogout.calls.some((url) => url.endsWith("/auth/logout")),
+    "the session must be ended rather than left alive on /login",
+  );
+  assert.match(
+    response.headers.get("set-cookie") ?? "",
+    /Max-Age=0/,
+    "the API's cookie-clearing headers must reach the browser",
+  );
+
+  // The logout is best effort: a failure there must not swallow the redirect,
+  // or the user would be left on a page they cannot use.
+  stubFetchByPath({
+    "/auth/me": () => okAuthResponse("cashier", "tenant-1"),
+    "/auth/logout": () => new Response("boom", { status: 500 }),
+  });
+  response = await proxy(createRequest("/tenant", authenticatedCookies()));
+  assert.match(
+    response.headers.get("location") ?? "",
+    /\/login/,
+    "a failed logout must still redirect to /login",
   );
 
   globalThis.fetch = originalFetch;

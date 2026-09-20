@@ -201,6 +201,39 @@ async function requestAuthContext(
   }
 }
 
+/**
+ * Ask the API to end the session and return the cookie-clearing headers.
+ *
+ * The API owns these cookies, so it is the only thing that can delete them
+ * with attributes that match what it set. Forging expired cookies here would
+ * silently miss on any domain or path difference and leave the session alive.
+ */
+async function requestLogoutCookies(request: NextRequest): Promise<string[]> {
+  const cookie = request.headers.get("cookie");
+
+  if (!cookie) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        cookie,
+        "x-request-id": request.headers.get("x-request-id") ?? "",
+      },
+      cache: "no-store",
+    });
+
+    return response.ok ? getSetCookieHeaders(response.headers) : [];
+  } catch {
+    // The redirect to /login still happens; the stale session simply outlives
+    // this request, which is the same position we were in before.
+    return [];
+  }
+}
+
 async function resolveAuth(request: NextRequest): Promise<AuthOutcome> {
   const accessToken = request.cookies.get(ACCESS_COOKIE_NAME)?.value;
   const refreshToken = request.cookies.get(REFRESH_COOKIE_NAME)?.value;
@@ -257,9 +290,14 @@ export async function proxy(request: NextRequest) {
   const defaultPath = getWebAdminHomePath(auth.authContext);
 
   if (!defaultPath) {
+    // The account authenticates but has no home in this app -- a cashier, or an
+    // owner demoted mid-session. Without ending the session here they would be
+    // parked on /login still holding valid cookies, with no way to sign out:
+    // the login page is the one route this proxy lets an authenticated user
+    // sit on.
     return redirectToLogin(
       request,
-      auth.setCookieHeaders,
+      await requestLogoutCookies(request),
       AUTH_REDIRECT_REASONS.tenantAccessDenied,
     );
   }
