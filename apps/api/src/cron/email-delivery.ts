@@ -63,7 +63,14 @@ export async function runEmailDeliveryOnce(
   });
 }
 
-async function main(): Promise<void> {
+/**
+ * Start the cron loop: run once now, then on its interval.
+ *
+ * Exported so the packaged release can start it without relying on the
+ * `process.argv[1]` check below, which only matches when this file is run
+ * directly as TypeScript and is false in the bundled output.
+ */
+export async function startEmailDeliveryCron(): Promise<void> {
   if (isDisabled(process.env.EMAIL_DELIVERY_DISABLED)) {
     logger.info("Email delivery cron disabled");
     return;
@@ -89,7 +96,7 @@ async function main(): Promise<void> {
 }
 
 if (process.argv[1]?.endsWith("email-delivery.ts")) {
-  main().catch((error: unknown) => {
+  startEmailDeliveryCron().catch((error: unknown) => {
     logger.error({ error }, "Email delivery cron crashed");
     process.exitCode = 1;
   });

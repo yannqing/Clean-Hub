@@ -79,6 +79,10 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \\
   CMD node -e "fetch('http://127.0.0.1:4000/health/ready').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "api/index.js"]
 
+FROM base AS cron
+COPY api ./api
+CMD ["node", "api/cron.js"]
+
 FROM base AS migrate
 COPY api ./api
 COPY db ./db
@@ -397,6 +401,63 @@ async function writeReleaseCompose() {
     networks:
       - cleanhub
 
+  # Background jobs. Kept out of the api container so a slow batch cannot
+  # compete with request handling, and so restarting one does not drop POS
+  # WebSocket connections. Notification delivery lives here: without this
+  # service, events are enqueued and never sent.
+  cron:
+    image: cleanhub-cron:latest
+    container_name: cleanhub-cron
+    restart: unless-stopped
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: cron
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: \${DATABASE_URL:?DATABASE_URL for the restricted app role is required}
+      DATABASE_POOL_MAX: \${CRON_DATABASE_POOL_MAX:-4}
+      DATABASE_POOL_IDLE_TIMEOUT_MS: \${DATABASE_POOL_IDLE_TIMEOUT_MS:-30000}
+      DATABASE_POOL_CONNECTION_TIMEOUT_MS: \${DATABASE_POOL_CONNECTION_TIMEOUT_MS:-10000}
+      DATABASE_POOL_QUERY_TIMEOUT_MS: \${DATABASE_POOL_QUERY_TIMEOUT_MS:-30000}
+      DATABASE_POOL_KEEP_ALIVE_INITIAL_DELAY_MS: \${DATABASE_POOL_KEEP_ALIVE_INITIAL_DELAY_MS:-10000}
+      DATABASE_APPLICATION_NAME: \${DATABASE_APPLICATION_NAME:-cleanhub}-cron
+      DATABASE_REQUIRE_RLS: "true"
+      LOG_LEVEL: \${LOG_LEVEL:-info}
+      SERVICE_NAME: \${SERVICE_NAME:-cleanhub}-cron
+      OBJECT_STORAGE_ENDPOINT: \${OBJECT_STORAGE_ENDPOINT:?OBJECT_STORAGE_ENDPOINT is required}
+      OBJECT_STORAGE_REGION: \${OBJECT_STORAGE_REGION:-us-east-1}
+      OBJECT_STORAGE_BUCKET: \${OBJECT_STORAGE_BUCKET:?OBJECT_STORAGE_BUCKET is required}
+      OBJECT_STORAGE_ACCESS_KEY: \${OBJECT_STORAGE_ACCESS_KEY:?OBJECT_STORAGE_ACCESS_KEY is required}
+      OBJECT_STORAGE_SECRET_KEY: \${OBJECT_STORAGE_SECRET_KEY:?OBJECT_STORAGE_SECRET_KEY is required}
+      OBJECT_STORAGE_FORCE_PATH_STYLE: \${OBJECT_STORAGE_FORCE_PATH_STYLE:-true}
+      EMAIL_DELIVERY_DISABLED: \${EMAIL_DELIVERY_DISABLED:-true}
+      EMAIL_DELIVERY_INTERVAL_SECONDS: \${EMAIL_DELIVERY_INTERVAL_SECONDS:-60}
+      EMAIL_OVERDUE_TICKET_DISABLED: \${EMAIL_OVERDUE_TICKET_DISABLED:-false}
+      EMAIL_SMTP_HOST: \${EMAIL_SMTP_HOST:-}
+      EMAIL_SMTP_PORT: \${EMAIL_SMTP_PORT:-587}
+      EMAIL_SMTP_SECURE: \${EMAIL_SMTP_SECURE:-false}
+      EMAIL_SMTP_USER: \${EMAIL_SMTP_USER:-}
+      EMAIL_SMTP_PASS: \${EMAIL_SMTP_PASS:-}
+      EMAIL_FROM: \${EMAIL_FROM:-}
+      PUSH_DELIVERY_DISABLED: \${PUSH_DELIVERY_DISABLED:-true}
+      FCM_PROJECT_ID: \${FCM_PROJECT_ID:-}
+      FCM_CLIENT_EMAIL: \${FCM_CLIENT_EMAIL:-}
+      FCM_PRIVATE_KEY: \${FCM_PRIVATE_KEY:-}
+      MEDIA_CLEANUP_DISABLED: \${MEDIA_CLEANUP_DISABLED:-false}
+      MEDIA_CLEANUP_INTERVAL_SECONDS: \${MEDIA_CLEANUP_INTERVAL_SECONDS:-900}
+      TENANT_PURGE_DISABLED: \${TENANT_PURGE_DISABLED:-false}
+      TENANT_PURGE_INTERVAL_SECONDS: \${TENANT_PURGE_INTERVAL_SECONDS:-3600}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-role-init:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      - cleanhub
+
   web-admin:
     image: cleanhub-web-admin:latest
     container_name: cleanhub-web-admin
@@ -559,6 +620,12 @@ async function bundleApi() {
     ...commonOptions,
     entryPoints: [join(rootDir, "apps", "api", "src", "index.ts")],
     outfile: join(artifactDir, "api", "index.js"),
+  });
+
+  await build({
+    ...commonOptions,
+    entryPoints: [join(rootDir, "scripts", "release-cron.ts")],
+    outfile: join(artifactDir, "api", "cron.js"),
   });
 
   await build({

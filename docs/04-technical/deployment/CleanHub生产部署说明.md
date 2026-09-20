@@ -24,6 +24,7 @@ release/cleanhub/
   manifest.json
   api/
     index.js
+    cron.js
     migrate.js
   web-admin/
     server.js
@@ -48,6 +49,7 @@ release/cleanhub/
 其中：
 
 - `api/index.js` 是通过 esbuild 生成的 API standalone bundle。
+- `api/cron.js` 是后台任务 runner：通知投递、媒体清理和租户清除。
 - `api/migrate.js` 是 release 包内的数据库迁移 runner。
 - `web-admin/` 是 Next.js `output: "standalone"` 产物。
 - `pos-web/` 是 POS Next.js `output: "standalone"` 产物。
@@ -165,9 +167,31 @@ docker compose --env-file .env.production --profile tools run --rm migrate
 
 ```bash
 docker compose --env-file .env.production up -d \
-  api web-admin pos-web gateway \
+  api web-admin pos-web cron gateway \
   postgres-backup postgres-backup-cloud object-storage-backup-cloud
 ```
+
+`cron` 运行全部后台任务：通知投递（邮件与推送）、逾期取件事件、媒体清理和
+租户清除。它与 `api` 分开部署，使批量任务不会与请求处理争抢资源，重启它也不会
+断开 POS 的 WebSocket 连接。
+
+**没有 `cron` 服务，通知只会入队、永远不会发出。**「可取件」提醒因此不会送达
+顾客，而代码路径看起来一切正常。投递还需要以下环境变量：
+
+- `EMAIL_DELIVERY_DISABLED=false`，并配置 `EMAIL_SMTP_HOST` 等 SMTP 变量。
+  注意这个开关会关闭**整个**投递循环，推送也在同一轮处理，所以它必须为 false，
+  推送才有可能发出。
+- 需要推送时再设 `PUSH_DELIVERY_DISABLED=false`，并填入 `FCM_PROJECT_ID`、
+  `FCM_CLIENT_EMAIL`、`FCM_PRIVATE_KEY`（Firebase 服务账号）。
+
+确认后台任务已经启动：
+
+```bash
+docker compose --env-file .env.production logs --tail 20 cron
+```
+
+日志中应出现 `Background jobs started`，且被禁用的任务会各自打印
+`... cron disabled`。
 
 本机检查：
 

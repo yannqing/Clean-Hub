@@ -41,7 +41,14 @@ export async function runMediaCleanupOnce(
   });
 }
 
-async function main(): Promise<void> {
+/**
+ * Start the cron loop: run once now, then on its interval.
+ *
+ * Exported so the packaged release can start it without relying on the
+ * `process.argv[1]` check below, which only matches when this file is run
+ * directly as TypeScript and is false in the bundled output.
+ */
+export async function startMediaCleanupCron(): Promise<void> {
   if (isDisabled(process.env.MEDIA_CLEANUP_DISABLED)) {
     logger.info("Media cleanup cron disabled");
     return;
@@ -67,7 +74,7 @@ async function main(): Promise<void> {
 }
 
 if (process.argv[1]?.endsWith("media-cleanup.ts")) {
-  main().catch((error: unknown) => {
+  startMediaCleanupCron().catch((error: unknown) => {
     logger.error({ error }, "Media cleanup crashed");
     process.exitCode = 1;
   });
