@@ -187,6 +187,17 @@ Rules that must hold when touching the offline path:
   the rest of the queue replaying.
 - A replay is bounded by `NATIVE_REPLAY_MAX_ATTEMPTS`, matching
   `OFFLINE_QUEUE_MAX_ATTEMPTS` in `packages/offline`.
+- Transport failures reach callers as `NativePosApiException` with status 0.
+  `NativePosApiClient` wraps `IOException` for this: the replay loop classifies
+  by status, and a raw `IOException` would slip past it.
+- Offline work is stamped with `NativeServerClock.now()`, not the device clock.
+  The server rejects cash payments dated more than five minutes ahead, so a fast
+  tablet clock would write sales that can never be uploaded.
+- Offline PINs are per user id (`NativeOfflinePinRoster` bounds the roster).
+  One slot for the device locks the outgoing cashier out after a handover.
+- The idle lock is enforced by the app (`NativeIdleLock`), and
+  `lockTimeoutSeconds` is cached with the checkout settings so it still works
+  offline.
 
 Android unit tests live in `android/app/src/test` and run with:
 
