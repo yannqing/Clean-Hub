@@ -18,6 +18,6 @@ public class T1101PrinterResultTest {
     @Test
     public void preservesUnknownVendorCodeInMessage() {
         assertEquals("VENDOR_ERROR", T1101PrinterResult.code(-1999));
-        assertTrue(T1101PrinterResult.message(-1999).contains("-1999"));
+        assertTrue(T1101PrinterResult.message(-1999, "T1101").contains("-1999"));
     }
 }
