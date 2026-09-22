@@ -6748,10 +6748,7 @@ private fun calculateNativeLocalPricing(
     }
     val taxable = if (settings.pricesIncludeTax) subtotal - tax else subtotal
     val beforeRounding = if (settings.pricesIncludeTax) subtotal else subtotal + tax
-    val currencyStep = when (cart.currency.uppercase(java.util.Locale.ROOT)) {
-        "XOF", "XAF" -> 100L
-        else -> 1L
-    }
+    val currencyStep = nativeCurrencyPayableStep(cart.currency)
     val configuredStep = when (settings.roundingRule) {
         "round_yuan" -> 100L
         "round_jiao" -> 10L
@@ -6795,10 +6792,7 @@ private fun formatNativeTaxRate(value: String): String = runCatching {
 /** Suggested notes are rounded up from the amount due, while exact tender is always first. */
 private fun cashTenderPresets(totalMinor: Long, currency: String): List<Long> {
     if (totalMinor <= 0) return listOf(0)
-    val notesInMajor = when (currency.uppercase(java.util.Locale.ROOT)) {
-        "XOF", "XAF" -> listOf(100L, 500L, 1_000L, 5_000L)
-        else -> listOf(1L, 5L, 10L, 20L, 50L)
-    }
+    val notesInMajor = nativeCashNoteLadder(currency)
     return buildList {
         add(totalMinor)
         notesInMajor.forEach { note ->
