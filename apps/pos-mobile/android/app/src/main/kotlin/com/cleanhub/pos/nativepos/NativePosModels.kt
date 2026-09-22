@@ -281,6 +281,12 @@ data class NativeCheckoutSettings(
     val taxRegistrationNumber: String? = null,
     val emailReceiptEnabled: Boolean = false,
     val autoPrintReceipt: Boolean = true,
+    /**
+     * Idle seconds before the till locks itself. Cached with the other checkout
+     * settings so the lock still works on a terminal that has been offline for
+     * days; 0 disables it.
+     */
+    val lockTimeoutSeconds: Int = 0,
 )
 
 data class NativeCartPricingDiscount(

@@ -9,7 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val DATABASE_NAME = "cleanhub_native_pos.db"
-private const val DATABASE_VERSION = 17
+private const val DATABASE_VERSION = 18
 private const val MAX_RUNTIME_AGE_MS = 8 * 60 * 60 * 1_000L
 private const val MAX_CATALOG_AGE_MS = 24 * 60 * 60 * 1_000L
 private const val MAX_CASH_STATE_AGE_MS = 2 * 60 * 60 * 1_000L
@@ -166,6 +166,12 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
         } else if (oldVersion < 15) {
             db.execSQL("ALTER TABLE checkout_settings ADD COLUMN auto_print_receipt INTEGER NOT NULL DEFAULT 1")
         }
+        if (oldVersion < 18) {
+            // The idle lock needs its timeout on a terminal that has been
+            // offline for days, so it is cached with the checkout settings
+            // rather than read from the online-only terminal settings call.
+            db.execSQL("ALTER TABLE checkout_settings ADD COLUMN lock_timeout_seconds INTEGER NOT NULL DEFAULT 0")
+        }
         if (oldVersion < 17) {
             // Replays had no attempt counter, so a command the server will
             // never accept could be retried forever and hold the queue.
@@ -233,12 +239,13 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
             if (settings.taxRegistrationNumber.isNullOrBlank()) putNull("tax_registration_number") else put("tax_registration_number", settings.taxRegistrationNumber)
             put("email_receipt_enabled", if (settings.emailReceiptEnabled) 1 else 0)
             put("auto_print_receipt", if (settings.autoPrintReceipt) 1 else 0)
+            put("lock_timeout_seconds", settings.lockTimeoutSeconds.coerceAtLeast(0))
             put("updated_at", System.currentTimeMillis())
         }, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
     fun checkoutSettings(): NativeCheckoutSettings = readableDatabase.rawQuery(
-        "SELECT rounding_rule, cash_rounding_step, tax_enabled, default_tax_rate, prices_include_tax, tax_registration_number, email_receipt_enabled, auto_print_receipt FROM checkout_settings WHERE singleton = 1",
+        "SELECT rounding_rule, cash_rounding_step, tax_enabled, default_tax_rate, prices_include_tax, tax_registration_number, email_receipt_enabled, auto_print_receipt, lock_timeout_seconds FROM checkout_settings WHERE singleton = 1",
         null,
     ).use { cursor ->
         if (!cursor.moveToFirst()) return@use NativeCheckoutSettings()
@@ -251,6 +258,7 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
             taxRegistrationNumber = cursor.getStringOrNull(5),
             emailReceiptEnabled = cursor.getInt(6) == 1,
             autoPrintReceipt = cursor.getInt(7) == 1,
+            lockTimeoutSeconds = cursor.getInt(8).coerceAtLeast(0),
         )
     }
 
@@ -1155,6 +1163,7 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
               tax_registration_number TEXT,
               email_receipt_enabled INTEGER NOT NULL DEFAULT 0,
               auto_print_receipt INTEGER NOT NULL DEFAULT 1,
+              lock_timeout_seconds INTEGER NOT NULL DEFAULT 0,
               updated_at INTEGER NOT NULL
             )
             """.trimIndent(),

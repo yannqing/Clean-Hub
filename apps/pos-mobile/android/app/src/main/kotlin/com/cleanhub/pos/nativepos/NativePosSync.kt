@@ -173,6 +173,7 @@ class NativePosSyncEngine(context: Context) {
                         .takeIf { it.isNotBlank() && it != "null" },
                     emailReceiptEnabled = settings.optBoolean("emailReceiptEnabled"),
                     autoPrintReceipt = settings.optBoolean("autoPrintReceipt", true),
+                    lockTimeoutSeconds = settings.optInt("lockTimeoutSeconds", 0),
                 ),
             )
         }

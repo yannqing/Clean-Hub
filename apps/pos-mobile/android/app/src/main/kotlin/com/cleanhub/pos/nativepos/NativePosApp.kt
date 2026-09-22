@@ -64,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
@@ -73,8 +74,12 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.ActivityCompat
 import com.cleanhub.pos.BuildConfig
+import com.cleanhub.pos.NativePosActivityClock
 import com.cleanhub.pos.NativeScannerKeyboardBridge
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -1843,6 +1848,44 @@ fun NativePosApp(applicationContext: Context) {
                 message = error.userMessage()
             } finally {
                 busy = false
+            }
+        }
+    }
+
+    // Lock an unattended till. The timeout is a terminal setting an
+    // administrator configures; until now the app stored and displayed it but
+    // never enforced it, so a cashier who walked away left the register open to
+    // anyone. Also locks when the app leaves the foreground, which a phone or
+    // tablet can do at any moment and a desktop browser cannot.
+    if (unlocked) {
+        val lockTimeoutSeconds = checkoutSettings.lockTimeoutSeconds
+        val lifecycleOwner = LocalLifecycleOwner.current
+
+        DisposableEffect(lifecycleOwner) {
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> NativePosActivityClock.mark()
+                    Lifecycle.Event.ON_STOP -> unlocked = false
+                    else -> Unit
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+
+        if (lockTimeoutSeconds > 0) {
+            LaunchedEffect(lockTimeoutSeconds) {
+                while (true) {
+                    val now = System.currentTimeMillis()
+                    val lastInteractionAt = NativePosActivityClock.lastInteractionAt
+                    if (shouldLockForIdle(lockTimeoutSeconds, lastInteractionAt, now)) {
+                        unlocked = false
+                        break
+                    }
+                    // Sleep exactly the remaining budget rather than polling, so
+                    // a busy till does no periodic work.
+                    delay(idleLockDelayMs(lockTimeoutSeconds, lastInteractionAt, now))
+                }
             }
         }
     }
