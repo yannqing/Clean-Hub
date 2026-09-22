@@ -1424,8 +1424,8 @@ fun NativePosApp(applicationContext: Context) {
             busy = true
             try {
                 val result = withContext(Dispatchers.Default) {
-                    if (!session.canAttemptOfflinePin()) {
-                        NativeOfflinePinResult(verified = false, lockedForSeconds = session.offlinePinLockedForSeconds())
+                    if (!session.canAttemptOfflinePin(userId)) {
+                        NativeOfflinePinResult(verified = false, lockedForSeconds = session.offlinePinLockedForSeconds(userId))
                     } else {
                         NativeOfflinePinResult(verified = session.verifyOfflinePin(userId, pin))
                     }
