@@ -336,6 +336,13 @@ private val POS_PANEL_BACKGROUND = Color(0xFFFFFFFF)
 private val POS_ACCENT = Color(0xFF6546A3)
 private val POS_INK = Color(0xFF211D29)
 private val POS_MUTED = Color(0xFF716A7D)
+/**
+ * Ticket and customer work is server-owned: unlike a cash sale there is no
+ * local queue to replay it from, so the app refuses it up front rather than
+ * letting the cashier fill in a whole form and fail on submit.
+ */
+private const val TICKET_REQUIRES_NETWORK = "该操作需要联网；恢复网络后即可继续。"
+
 private val TICKET_STATUS_TRANSITIONS: Map<String, List<String>> = mapOf(
     "draft" to listOf("pending", "cancelled"),
     "pending" to listOf("in_progress", "cancelled"),
@@ -378,6 +385,8 @@ fun NativePosApp(applicationContext: Context) {
     var moreDestination by remember { mutableStateOf(NativeMoreDestination.Menu) }
     var moreOrders by remember { mutableStateOf<List<NativeMoreOrder>>(emptyList()) }
     var moreOrderDetail by remember { mutableStateOf<NativeMoreOrderDetail?>(null) }
+    // Ids for a customer creation that may need retrying; see createCustomer.
+    var pendingCustomerDraft by remember { mutableStateOf<NativeCustomerDraft?>(null) }
     val moreOrderCashKeys = remember { NativePaymentIdempotency() }
     var moreSearchResults by remember { mutableStateOf<List<NativeMoreSearchResult>>(emptyList()) }
     var moreStatistics by remember { mutableStateOf<NativeMoreStatistics?>(null) }
@@ -1552,24 +1561,43 @@ fun NativePosApp(applicationContext: Context) {
     }
 
     fun createCustomer(fullName: String, phone: String) {
+        if (!internetAvailable) {
+            message = "创建客户需要联网；恢复网络后即可继续。"
+            return
+        }
+        // Creating a customer is two calls -- the account, then the profile
+        // under it -- with no transaction spanning them. Both ids are minted
+        // once and reused on every retry, because the server returns the
+        // existing record when it is given an id it has already seen. Minting
+        // fresh ids per attempt left an account with no profile behind and
+        // created a second account on the next tap.
+        val attempt = pendingCustomerDraft
+            ?.takeIf { it.fullName == fullName.trim() && it.phone == phone.trim() }
+            ?: NativeCustomerDraft(
+                accountId = NativeUlid.create(),
+                profileId = NativeUlid.create(),
+                fullName = fullName.trim(),
+                phone = phone.trim(),
+            ).also { pendingCustomerDraft = it }
+
         scope.launch {
             busy = true
             try {
                 withContext(Dispatchers.IO) {
-                    val accountId = NativeUlid.create()
-                    val profileId = NativeUlid.create()
                     val account = api.post("/pos/accounts", JSONObject().apply {
-                        put("id", accountId)
-                        put("accountName", fullName.trim())
-                        put("phone", phone.trim())
+                        put("id", attempt.accountId)
+                        put("accountName", attempt.fullName)
+                        put("phone", attempt.phone)
                     })
                     api.post("/pos/accounts/${account.getString("id")}/customers", JSONObject().apply {
-                        put("id", profileId)
-                        put("fullName", fullName.trim())
-                        put("phone", phone.trim())
+                        put("id", attempt.profileId)
+                        put("fullName", attempt.fullName)
+                        put("phone", attempt.phone)
                     })
                     NativePosSyncEngine(applicationContext).synchronize()
                 }
+                // Both halves landed, so the next customer starts fresh.
+                pendingCustomerDraft = null
                 reload()
                 message = "客户已创建并同步到本机。"
             } catch (error: Exception) {
@@ -1587,6 +1615,10 @@ fun NativePosApp(applicationContext: Context) {
         remark: String,
         expectedPickupText: String,
     ) {
+        if (!internetAvailable) {
+            message = TICKET_REQUIRES_NETWORK
+            return
+        }
         scope.launch {
             busy = true
             try {
@@ -1658,6 +1690,10 @@ fun NativePosApp(applicationContext: Context) {
         ticket: NativeServiceTicket,
         draft: NativeTicketItemDraft,
     ) {
+        if (!internetAvailable) {
+            message = TICKET_REQUIRES_NETWORK
+            return
+        }
         scope.launch {
             busy = true
             try {
@@ -1696,6 +1732,10 @@ fun NativePosApp(applicationContext: Context) {
         item: NativeTicketItem,
         update: NativeTicketItemUpdate,
     ) {
+        if (!internetAvailable) {
+            message = TICKET_REQUIRES_NETWORK
+            return
+        }
         scope.launch {
             busy = true
             try {
@@ -1730,6 +1770,10 @@ fun NativePosApp(applicationContext: Context) {
     }
 
     fun deleteServiceTicketItem(ticket: NativeServiceTicket, item: NativeTicketItem, reason: String) {
+        if (!internetAvailable) {
+            message = TICKET_REQUIRES_NETWORK
+            return
+        }
         if (reason.isBlank()) {
             message = "删除服务项目时必须填写原因。"
             return
@@ -1753,6 +1797,10 @@ fun NativePosApp(applicationContext: Context) {
     }
 
     fun changeTicketItemStatus(ticket: NativeServiceTicket, item: NativeTicketItem, nextStatus: String) {
+        if (!internetAvailable) {
+            message = TICKET_REQUIRES_NETWORK
+            return
+        }
         if (nextStatus !in TICKET_ITEM_STATUS_TRANSITIONS[item.itemStatus].orEmpty()) {
             message = "该服务项目当前不能继续流转。"
             return
@@ -1823,6 +1871,10 @@ fun NativePosApp(applicationContext: Context) {
     }
 
     fun changeTicketStatus(ticket: NativeServiceTicket, nextStatus: String, reason: String?) {
+        if (!internetAvailable) {
+            message = TICKET_REQUIRES_NETWORK
+            return
+        }
         if (nextStatus !in TICKET_STATUS_TRANSITIONS[ticket.ticketStatus].orEmpty()) {
             message = "该工单当前不能继续流转。"
             return

@@ -353,3 +353,18 @@ data class NativePendingCheckout(
 )
 
 class NativePosValidationException(message: String) : IllegalStateException(message)
+
+/**
+ * Ids held across retries of a customer creation.
+ *
+ * Creating a customer is two calls with no transaction spanning them. Both
+ * `/pos/accounts` and `/pos/accounts/:id/customers` return the existing record
+ * when handed an id they have already seen, so reusing these ids turns a retry
+ * into a no-op instead of a second account.
+ */
+data class NativeCustomerDraft(
+    val accountId: String,
+    val profileId: String,
+    val fullName: String,
+    val phone: String,
+)
