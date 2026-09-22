@@ -569,7 +569,7 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                     put("shiftId", cashState.shiftId)
                     put("registerSessionId", cashState.registerSessionId)
                     cashState.cashSessionId?.let { put("cashDrawerSessionId", it) }
-                    put("occurredAt", java.time.Instant.ofEpochMilli(now).toString())
+                    put("occurredAt", java.time.Instant.ofEpochMilli(NativeServerClock.now(now)).toString())
                     put("idempotencyKey", paymentIdempotencyKey)
                 })
             }.toString()
@@ -658,7 +658,7 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                     put("shiftId", cashState.shiftId)
                     put("registerSessionId", cashState.registerSessionId)
                     cashState.cashSessionId?.let { put("cashDrawerSessionId", it) }
-                    put("occurredAt", Instant.ofEpochMilli(now).toString())
+                    put("occurredAt", Instant.ofEpochMilli(NativeServerClock.now(now)).toString())
                     put("idempotencyKey", "$orderId:cash")
                 })
             }.toString()

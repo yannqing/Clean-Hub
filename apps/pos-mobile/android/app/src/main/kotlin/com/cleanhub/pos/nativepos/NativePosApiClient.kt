@@ -99,6 +99,11 @@ class NativePosApiClient(private val session: NativePosSession) {
                 .filter { it.key?.equals("Set-Cookie", ignoreCase = true) == true }
                 .flatMap { it.value.orEmpty() }
             session.saveSetCookieHeaders(headers)
+            // Learn the server's clock for free on every call, so offline work
+            // can be stamped with a time the server will accept.
+            connection.getHeaderFieldDate("Date", 0L)
+                .takeIf { it > 0L }
+                ?.let(NativeServerClock::observeServerTime)
             val stream = if (status in 200..399) connection.inputStream else connection.errorStream
             val text = stream?.bufferedReader(StandardCharsets.UTF_8)?.use(BufferedReader::readText).orEmpty()
             return NativeHttpResponse(status, text)

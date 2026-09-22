@@ -1270,7 +1270,7 @@ fun NativePosApp(applicationContext: Context) {
         // saw. `occurredAt` is captured alongside it for the same reason: a
         // replay must not look like a different payment.
         val idempotencyKey = moreOrderCashKeys.keyFor(order.id)
-        val occurredAt = java.time.Instant.now().toString()
+        val occurredAt = java.time.Instant.ofEpochMilli(NativeServerClock.now()).toString()
         scope.launch {
             busy = true
             try {
