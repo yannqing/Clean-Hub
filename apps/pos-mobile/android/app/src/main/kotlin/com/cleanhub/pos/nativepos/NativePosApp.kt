@@ -6888,7 +6888,14 @@ private fun Throwable.administratorLoginMessage(): String {
 }
 
 private fun Throwable.userMessage(): String = when (this) {
-    is NativePosApiException -> if (code == "INVALID_CREDENTIALS") "PIN 错误，请重试。" else message ?: "无法连接 POS 服务。"
+    // A transport failure now arrives as a NETWORK_ERROR rather than a raw
+    // IOException, so it has to be recognised here or the cashier sees the
+    // underlying socket message instead of something actionable.
+    is NativePosApiException -> when {
+        code == "INVALID_CREDENTIALS" -> "PIN 错误，请重试。"
+        code == "NETWORK_ERROR" -> "网络错误，请检查本机网络后重试。"
+        else -> message ?: "无法连接 POS 服务。"
+    }
     is IOException -> "网络错误，请检查本机网络后重试。"
     is NativePosValidationException -> message ?: "输入无效。"
     else -> "操作未完成：请检查网络或稍后重试。"

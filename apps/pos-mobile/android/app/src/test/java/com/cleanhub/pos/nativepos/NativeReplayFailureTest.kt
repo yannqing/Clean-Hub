@@ -17,6 +17,17 @@ class NativeReplayFailureTest {
         assertTrue("terminal rejected", isTransientReplayFailure(error(403)))
     }
 
+    /**
+     * A dropped connection or a timeout reaches the replay loop as a
+     * NETWORK_ERROR with status 0. Before the client wrapped IOException, it
+     * arrived as a raw IOException and slipped past this classification
+     * entirely -- the loop caught only NativePosApiException.
+     */
+    @Test
+    fun aWrappedTransportFailureIsRetried() {
+        assertTrue(isTransientReplayFailure(error(0, "NETWORK_ERROR")))
+    }
+
     @Test
     fun aServerFaultIsRetried() {
         assertTrue(isTransientReplayFailure(error(500)))
