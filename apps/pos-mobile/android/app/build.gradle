@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
 
 def envOrProperty = { String name ->
     if (project.hasProperty(name)) {
@@ -10,6 +11,8 @@ def envOrProperty = { String name ->
 
 def androidVersionCode = (envOrProperty('CLEANHUB_POS_BUILD_NUMBER') ?: envOrProperty('CLEANHUB_ANDROID_VERSION_CODE') ?: '1') as Integer
 def androidVersionName = envOrProperty('CLEANHUB_POS_VERSION') ?: envOrProperty('CLEANHUB_ANDROID_VERSION_NAME') ?: '0.1.0'
+def posApiBaseUrl = (envOrProperty('CLEANHUB_POS_API_BASE_URL') ?: envOrProperty('CLEANHUB_POS_SERVER_URL') ?: '').trim()
+def escapedPosApiBaseUrl = posApiBaseUrl.replace('\\', '\\\\').replace('"', '\\"')
 def releaseKeystorePath = envOrProperty('CLEANHUB_ANDROID_KEYSTORE_PATH')
 def releaseKeystorePassword = envOrProperty('CLEANHUB_ANDROID_KEYSTORE_PASSWORD')
 def releaseKeyAlias = envOrProperty('CLEANHUB_ANDROID_KEY_ALIAS')
@@ -21,6 +24,18 @@ android {
     compileSdk = rootProject.ext.compileSdkVersion
     buildFeatures {
         aidl = true
+        compose true
+        buildConfig true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion '1.5.15'
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+    kotlinOptions {
+        jvmTarget = '21'
     }
     defaultConfig {
         applicationId "com.cleanhub.pos"
@@ -29,6 +44,7 @@ android {
         versionCode androidVersionCode
         versionName androidVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField "String", "CLEANHUB_POS_API_BASE_URL", "\"${escapedPosApiBaseUrl}\""
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
@@ -67,12 +83,25 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation "androidx.core:core-ktx:$androidxCoreVersion"
+    implementation 'androidx.activity:activity-compose:1.10.1'
+    implementation platform('androidx.compose:compose-bom:2025.02.00')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.ui:ui-tooling-preview'
+    implementation 'androidx.compose.material3:material3'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
+    implementation 'androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7'
+    implementation 'androidx.work:work-runtime-ktx:2.10.0'
+    implementation 'androidx.security:security-crypto:1.1.0-alpha06'
     implementation "com.google.zxing:core:3.5.4"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
     implementation project(':capacitor-cordova-android-plugins')
+    debugImplementation 'androidx.compose.ui:ui-tooling'
+    debugImplementation 'androidx.compose.ui:ui-test-manifest'
 }
 
 apply from: 'capacitor.build.gradle'

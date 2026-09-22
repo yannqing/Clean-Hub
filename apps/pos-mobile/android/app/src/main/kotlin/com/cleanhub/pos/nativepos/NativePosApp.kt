@@ -93,18 +93,34 @@ private data class NativeSetupBranch(val id: String, val name: String)
 private data class NativeAdministrator(val branches: List<NativeSetupBranch>, val requiresReenrollment: Boolean = false)
 private data class NativePosBootstrapIdentity(val tenantName: String, val branchName: String?)
 private data class NativeOfflinePinResult(val verified: Boolean, val lockedForSeconds: Long? = null)
-private enum class NativeMoreDestination(val title: String) {
-    Menu("更多"),
-    Customers("客户管理"),
-    Catalog("商品与服务目录"),
-    Scan("扫码查询"),
-    Orders("订单管理"),
-    OrderDetail("订单详情"),
-    Statistics("经营数据"),
-    Notifications("通知中心"),
-    Shift("班次与收银"),
-    Settings("终端设置"),
-    Hardware("打印与硬件"),
+private enum class NativeMoreDestination {
+    Menu,
+    Customers,
+    Catalog,
+    Scan,
+    Orders,
+    OrderDetail,
+    Statistics,
+    Notifications,
+    Shift,
+    Settings,
+    Hardware,
+    ;
+
+    /** Titles come from the catalogue: an enum constant cannot read the terminal's language. */
+    fun title(copy: NativePosCopy): String = when (this) {
+        Menu -> copy.menuMore
+        Customers -> copy.menuCustomers
+        Catalog -> copy.menuCatalog
+        Scan -> copy.menuScan
+        Orders -> copy.menuOrders
+        OrderDetail -> copy.menuOrderDetail
+        Statistics -> copy.menuStatistics
+        Notifications -> copy.menuNotifications
+        Shift -> copy.menuShift
+        Settings -> copy.menuSettings
+        Hardware -> copy.menuHardware
+    }
 }
 private data class NativeMoreOrder(
     val id: String,
@@ -243,12 +259,21 @@ private data class NativeMoreZReport(
     val currency: String,
 )
 
-private enum class NativePosTab(val label: String, val symbol: String) {
-    Workspace("工作台", "⌂"),
-    Sale("收银", "▣"),
-    Intake("开单", "＋"),
-    Tickets("工单", "▤"),
-    More("更多", "⋯"),
+private enum class NativePosTab(val symbol: String) {
+    Workspace("⌂"),
+    Sale("▣"),
+    Intake("＋"),
+    Tickets("▤"),
+    More("⋯"),
+    ;
+
+    fun label(copy: NativePosCopy): String = when (this) {
+        Workspace -> copy.tabWorkspace
+        Sale -> copy.tabSale
+        Intake -> copy.tabIntake
+        Tickets -> copy.tabTickets
+        More -> copy.tabMore
+    }
 }
 
 private enum class NativePosScreenClass {
@@ -615,7 +640,7 @@ fun NativePosApp(applicationContext: Context) {
         val reports = runCatching {
             api.get("/pos/staff/z-reports?limit=10&offset=0")
         }.getOrDefault(JSONObject())
-        toNativeMoreShiftData(shift, register, reconciliation, movements, reports)
+        toNativeMoreShiftData(copy, shift, register, reconciliation, movements, reports)
     }
 
     suspend fun refreshMoreShiftData() {
@@ -1001,7 +1026,7 @@ fun NativePosApp(applicationContext: Context) {
             destination == NativeMoreDestination.Scan
         ) return
         if (!internetAvailable) {
-            message = "${destination.title} 需要联网加载；当前仍可使用本机缓存的客户、目录和工单。"
+            message = copy.moreNeedsNetwork.format(destination.title(copy))
             return
         }
         scope.launch {
@@ -1898,7 +1923,7 @@ fun NativePosApp(applicationContext: Context) {
                     NativePosSyncEngine(applicationContext).synchronize()
                 }
                 refreshSelectedTicket(ticket.id, ticket.currency)
-                message = "工单状态已更新为“${ticketStatusLabel(nextStatus)}”。"
+                message = "工单状态已更新为“${ticketStatusLabel(nextStatus, copy)}”。"
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -2001,14 +2026,14 @@ fun NativePosApp(applicationContext: Context) {
             )
             current.terminal == null -> {
                 if (setupAdministrator == null) {
-                    FirstLaunchView(
+                    FirstLaunchView(copy,
                         apiConfigured = api.configured(),
                         busy = busy,
                         message = message,
                         onStart = { setupAdministrator = NativeAdministrator(emptyList()); message = null },
                     )
                 } else if (setupAdministrator!!.branches.isEmpty()) {
-                    AdministratorLoginView(
+                    AdministratorLoginView(copy,
                         internetAvailable = internetAvailable,
                         busy = busy,
                         message = message,
@@ -2043,7 +2068,7 @@ fun NativePosApp(applicationContext: Context) {
                         },
                     )
                 } else {
-                    TerminalEnrollmentView(
+                    TerminalEnrollmentView(copy,
                         branches = setupAdministrator!!.branches,
                         requiresReenrollment = setupAdministrator!!.requiresReenrollment,
                         busy = busy,
@@ -2083,7 +2108,7 @@ fun NativePosApp(applicationContext: Context) {
                     )
                 }
             }
-            !session.hasTerminalCredential() -> TerminalCredentialRecoveryView(
+            !session.hasTerminalCredential() -> TerminalCredentialRecoveryView(copy,
                 internetAvailable = internetAvailable,
                 busy = busy,
                 message = message,
@@ -2126,8 +2151,8 @@ fun NativePosApp(applicationContext: Context) {
                 onUnlockOffline = { pin -> unlockWithOfflinePin(current.terminal.userId, pin) },
                 onOnlineLogin = ::loginWithStaffPin,
             )
-            current.products.isEmpty() -> CachedDataExpiredView(busy, message, ::synchronize)
-            else -> NativePosShell(
+            current.products.isEmpty() -> CachedDataExpiredView(copy, busy, message, ::synchronize)
+            else -> NativePosShell(copy,
         current = current,
         activeTab = activeTab,
         internetAvailable = internetAvailable,
@@ -2155,7 +2180,7 @@ fun NativePosApp(applicationContext: Context) {
                 onAddTicketItemsToCart = ::addTicketItemsToCart,
                 saleContent = {
                     if (!internetAvailable && current.cashState?.isOfflineCashReady() != true) {
-                        CashOperationsView(
+                        CashOperationsView(copy,
                             cashState = current.cashState,
                             internetAvailable = false,
                             busy = busy,
@@ -2261,7 +2286,7 @@ fun NativePosApp(applicationContext: Context) {
                                                     checkoutRequest = checkoutRequest,
                                                     reserveOfflineStock = !internetAvailable,
                                                     receiptPrintDraft = if (checkoutRequest.receiptDelivery == NativeReceiptDelivery.Print) {
-                                                        buildNativeCashReceiptDraft(
+                                                        buildNativeCashReceiptDraft(copy,
                                                             terminal = terminalAtCheckout,
                                                             cart = cartAtCheckout,
                                                             amountDueMinor = checkoutRequest.expectedTotalMinor,
@@ -2344,6 +2369,7 @@ fun NativePosApp(applicationContext: Context) {
                 },
                 moreContent = {
                     NativeMoreView(
+                        copy,
                         current = current,
                         destination = moreDestination,
                         orders = moreOrders,
@@ -2409,14 +2435,14 @@ fun NativePosApp(applicationContext: Context) {
             )
         }
         scannerSession?.let { currentSession ->
-            NativeHardwareScannerSessionView(
+            NativeHardwareScannerSessionView(copy,
                 session = currentSession,
                 busy = busy,
                 onClose = ::closeHardwareScannerSession,
             )
         }
         checkoutFailure?.let { failure ->
-            NativeCashCheckoutFailureDialog(
+            NativeCashCheckoutFailureDialog(copy,
                 message = failure,
                 onDismiss = { checkoutFailure = null },
             )
@@ -2425,7 +2451,7 @@ fun NativePosApp(applicationContext: Context) {
 }
 
 @Composable
-private fun NativeCashCheckoutFailureDialog(message: String, onDismiss: () -> Unit) {
+private fun NativeCashCheckoutFailureDialog(copy: NativePosCopy, message: String, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier.fillMaxWidth().widthIn(max = 420.dp),
@@ -2475,6 +2501,7 @@ private fun NativeCashCheckoutFailureDialog(message: String, onDismiss: () -> Un
 
 @Composable
 private fun NativeHardwareScannerSessionView(
+    copy: NativePosCopy,
     session: NativeHardwareScannerSession,
     busy: Boolean,
     onClose: () -> Unit,
@@ -2597,6 +2624,7 @@ private fun NativeHardwareScannerSessionView(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NativePosShell(
+    copy: NativePosCopy,
     current: NativePosSnapshot,
     activeTab: NativePosTab,
     internetAvailable: Boolean,
@@ -2629,7 +2657,7 @@ private fun NativePosShell(
 
     Row(Modifier.fillMaxSize().background(POS_PAGE_BACKGROUND)) {
         if (showNavigationRail) {
-            NativePosNavigationRail(activeTab = activeTab, onSelectTab = onSelectTab)
+            NativePosNavigationRail(copy, activeTab = activeTab, onSelectTab = onSelectTab)
         }
         Column(Modifier.weight(1f).fillMaxHeight()) {
             TopAppBar(
@@ -2650,7 +2678,7 @@ private fun NativePosShell(
             )
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                 when (activeTab) {
-                    NativePosTab.Workspace -> NativeWorkspaceView(
+                    NativePosTab.Workspace -> NativeWorkspaceView(copy,
                         current = current,
                         internetAvailable = internetAvailable,
                         busy = busy,
@@ -2659,7 +2687,7 @@ private fun NativePosShell(
                         onSynchronize = onSynchronize,
                     )
                     NativePosTab.Sale -> saleContent()
-                    NativePosTab.Intake -> NativeIntakeView(
+                    NativePosTab.Intake -> NativeIntakeView(copy,
                         customers = current.customers,
                         tickets = current.tickets,
                         preselectedCustomer = intakeCustomer,
@@ -2673,7 +2701,7 @@ private fun NativePosShell(
                             onOpenTicket(ticket)
                         },
                     )
-                    NativePosTab.Tickets -> NativeTicketsView(
+                    NativePosTab.Tickets -> NativeTicketsView(copy,
                         tickets = current.tickets,
                         services = current.services,
                         selectedDetail = selectedTicketDetail,
@@ -2694,14 +2722,14 @@ private fun NativePosShell(
                 }
             }
             if (!showNavigationRail) {
-                NativeBottomNavigation(activeTab = activeTab, onSelectTab = onSelectTab)
+                NativeBottomNavigation(copy, activeTab = activeTab, onSelectTab = onSelectTab)
             }
         }
     }
 }
 
 @Composable
-private fun NativePosNavigationRail(activeTab: NativePosTab, onSelectTab: (NativePosTab) -> Unit) {
+private fun NativePosNavigationRail(copy: NativePosCopy, activeTab: NativePosTab, onSelectTab: (NativePosTab) -> Unit) {
     NavigationRail(
         modifier = Modifier.fillMaxHeight(),
         containerColor = POS_PANEL_BACKGROUND,
@@ -2719,7 +2747,7 @@ private fun NativePosNavigationRail(activeTab: NativePosTab, onSelectTab: (Nativ
                         fontWeight = FontWeight.Bold,
                     )
                 },
-                label = { Text(tab.label) },
+                label = { Text(tab.label(copy)) },
                 alwaysShowLabel = true,
             )
         }
@@ -2728,6 +2756,7 @@ private fun NativePosNavigationRail(activeTab: NativePosTab, onSelectTab: (Nativ
 
 @Composable
 private fun NativeWorkspaceView(
+    copy: NativePosCopy,
     current: NativePosSnapshot,
     internetAvailable: Boolean,
     busy: Boolean,
@@ -2740,20 +2769,20 @@ private fun NativeWorkspaceView(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("工作台", color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text(if (internetAvailable) "设备已联网，可实时核验收银状态" else "设备离线，使用本机已缓存的收银数据", color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
+        Text(copy.workspaceTitle, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(if (internetAvailable) copy.workspaceOnlineHint else copy.workspaceOfflineHint, color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
         if (expanded) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                WorkspaceMetric("商品目录", current.products.size.toString(), Modifier.weight(1f))
-                WorkspaceMetric("待同步订单", current.pendingSales.toString(), Modifier.weight(1f))
-                WorkspaceMetric("异常订单", current.failedSales.toString(), Modifier.weight(1f), warning = current.failedSales > 0)
+                WorkspaceMetric(copy.metricCatalog, current.products.size.toString(), Modifier.weight(1f))
+                WorkspaceMetric(copy.metricPendingOrders, current.pendingSales.toString(), Modifier.weight(1f))
+                WorkspaceMetric(copy.metricFailedOrders, current.failedSales.toString(), Modifier.weight(1f), warning = current.failedSales > 0)
             }
         } else {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                WorkspaceMetric("商品目录", current.products.size.toString(), Modifier.weight(1f))
-                WorkspaceMetric("待同步订单", current.pendingSales.toString(), Modifier.weight(1f))
+                WorkspaceMetric(copy.metricCatalog, current.products.size.toString(), Modifier.weight(1f))
+                WorkspaceMetric(copy.metricPendingOrders, current.pendingSales.toString(), Modifier.weight(1f))
             }
-            WorkspaceMetric("异常订单", current.failedSales.toString(), Modifier.fillMaxWidth(), warning = current.failedSales > 0)
+            WorkspaceMetric(copy.metricFailedOrders, current.failedSales.toString(), Modifier.fillMaxWidth(), warning = current.failedSales > 0)
         }
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -2761,12 +2790,12 @@ private fun NativeWorkspaceView(
             colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
         ) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("现金收银", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(copy.cashSectionTitle, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
                     when {
-                        current.cashState?.isOfflineCashReady() == true -> "班次和钱箱已就绪，可以安全离线收取现金。"
-                        internetAvailable -> "进入收银后会实时核验班次和钱箱状态。"
-                        else -> "恢复网络并同步班次和钱箱后，即可继续离线收银。"
+                        current.cashState?.isOfflineCashReady() == true -> copy.cashReadyOffline
+                        internetAvailable -> copy.cashCheckedOnline
+                        else -> copy.cashNeedsSync
                     },
                     color = POS_MUTED,
                     style = MaterialTheme.typography.bodyMedium,
@@ -2776,10 +2805,10 @@ private fun NativeWorkspaceView(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                ) { Text("进入收银") }
+                ) { Text(copy.openTill) }
             }
         }
-        OutlinedButton(onClick = onSynchronize, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "正在同步…" else "同步本机数据") }
+        OutlinedButton(onClick = onSynchronize, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.synchronizing else copy.syncLocalData) }
         message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
@@ -2805,6 +2834,7 @@ private fun WorkspaceMetric(label: String, value: String, modifier: Modifier, wa
 
 @Composable
 private fun NativeIntakeView(
+    copy: NativePosCopy,
     customers: List<NativeCustomer>,
     tickets: List<NativeServiceTicket>,
     preselectedCustomer: NativeCustomer?,
@@ -2844,10 +2874,10 @@ private fun NativeIntakeView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("客户接待", color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(copy.intakeTitle, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text(
-                    if (internetAvailable) "查询客户档案，选择客户后创建服务工单。"
-                    else "离线时可查询已缓存客户；创建客户和工单需要联网。",
+                    if (internetAvailable) copy.intakeOnlineHint
+                    else copy.intakeOfflineHint,
                     color = POS_MUTED,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -2856,7 +2886,7 @@ private fun NativeIntakeView(
                 onClick = { customerDialogOpen = true },
                 enabled = internetAvailable && !busy,
                 shape = RoundedCornerShape(12.dp),
-            ) { Text("＋ 新建客户") }
+            ) { Text(copy.newCustomer) }
         }
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -2864,8 +2894,8 @@ private fun NativeIntakeView(
             colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
         ) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("查询客户档案", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("输入客户姓名、手机号或账户名称。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                Text(copy.lookupTitle, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(copy.lookupHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -2874,8 +2904,8 @@ private fun NativeIntakeView(
                     TextField(
                         value = draftQuery,
                         onValueChange = { draftQuery = it },
-                        label = { Text("姓名、电话或账户") },
-                        placeholder = { Text("例如：Awa Diop / 77 000 0000") },
+                        label = { Text(copy.lookupLabel) },
+                        placeholder = { Text(copy.lookupPlaceholder) },
                         singleLine = true,
                         enabled = !busy,
                         modifier = Modifier.weight(1f),
@@ -2888,7 +2918,7 @@ private fun NativeIntakeView(
                         enabled = !busy,
                         shape = RoundedCornerShape(12.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                    ) { Text("查询") }
+                    ) { Text(copy.search) }
                 }
             }
         }
@@ -2922,35 +2952,35 @@ private fun NativeIntakeView(
                                 Text(customer.fullName.trim().take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
                             }
                             Column {
-                                Text("客户档案", color = POS_ACCENT, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                                Text(copy.customerRecord, color = POS_ACCENT, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
                                 Text(customer.fullName, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
                                 Text(customer.accountName, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                             }
                         }
-                        TextButton(onClick = { selectedCustomer = null }, enabled = !busy) { Text("更换") }
+                        TextButton(onClick = { selectedCustomer = null }, enabled = !busy) { Text(copy.change) }
                     }
                     HorizontalDivider(color = Color(0xFFDCD3E9))
-                    Text("联系方式", color = POS_MUTED, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+                    Text(copy.contactDetails, color = POS_MUTED, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
                     Text(
-                        listOfNotNull(customer.phone, customer.email).joinToString("  ·  ").ifBlank { "未填写联系电话或邮箱" },
+                        listOfNotNull(customer.phone, customer.email).joinToString("  ·  ").ifBlank { copy.noContactDetails },
                         color = POS_INK,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Text(
-                        if (customer.status == "active") "客户状态：正常" else "客户状态：${customer.status}",
+                        if (customer.status == "active") copy.customerStatusActive else copy.customerStatusPrefix.format(customer.status),
                         color = POS_MUTED,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     HorizontalDivider(color = Color(0xFFDCD3E9))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                        Text("最近处理", color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text("最新在上", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+                        Text(copy.recentWork, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(copy.newestFirst, color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
                     }
                     if (recentTickets.isEmpty()) {
-                        Text("暂无已缓存的服务订单。创建第一笔订单后会显示在这里。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(copy.noCachedTickets, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     } else {
                         recentTickets.forEach { ticket ->
-                            NativeIntakeRecentTicketRow(ticket = ticket, onOpen = { onOpenTicket(ticket) })
+                            NativeIntakeRecentTicketRow(copy, ticket = ticket, onOpen = { onOpenTicket(ticket) })
                         }
                     }
                     Button(
@@ -2959,21 +2989,21 @@ private fun NativeIntakeView(
                         modifier = Modifier.fillMaxWidth().height(50.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                    ) { Text("＋ 新增订单") }
+                    ) { Text(copy.newOrder) }
                 }
             }
         } ?: when {
             submittedQuery.isBlank() -> NativeIntakeEmptyState(
-                title = "输入客户信息开始查询",
-                description = "默认不会展示全部客户资料。请输入姓名、手机号或账户名称查找客户。",
-                actionLabel = "新建客户",
+                title = copy.intakeEmptyTitle,
+                description = copy.intakeEmptyDescription,
+                actionLabel = copy.newCustomerShort,
                 actionEnabled = internetAvailable && !busy,
                 onAction = { customerDialogOpen = true },
             )
             filteredCustomers.isEmpty() -> NativeIntakeEmptyState(
-                title = "未找到客户",
-                description = "没有与“$submittedQuery”匹配的已缓存客户。请核对信息或新建客户。",
-                actionLabel = "新建客户",
+                title = copy.intakeNoMatchTitle,
+                description = copy.intakeNoMatchDescription.format(submittedQuery),
+                actionLabel = copy.newCustomerShort,
                 actionEnabled = internetAvailable && !busy,
                 onAction = { customerDialogOpen = true },
             )
@@ -2984,12 +3014,12 @@ private fun NativeIntakeView(
             ) {
                 Column(Modifier.fillMaxWidth()) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-                        Text("匹配客户", color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text("${filteredCustomers.size} 条本机匹配结果，点击后继续开单。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(copy.matchingCustomers, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Text(copy.matchingCustomersCount.format(filteredCustomers.size), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     }
                     HorizontalDivider(color = Color(0xFFE9E5EE))
                     filteredCustomers.forEach { customer ->
-                        NativeIntakeCustomerRow(customer = customer, onClick = { selectedCustomer = customer })
+                        NativeIntakeCustomerRow(copy, customer = customer, onClick = { selectedCustomer = customer })
                         HorizontalDivider(color = Color(0xFFF0EDF3))
                     }
                 }
@@ -2999,7 +3029,7 @@ private fun NativeIntakeView(
     }
 
     if (customerDialogOpen) {
-        NativeCreateCustomerDialog(
+        NativeCreateCustomerDialog(copy,
             busy = busy,
             onDismiss = { customerDialogOpen = false },
             onCreate = { name, phone ->
@@ -3013,7 +3043,7 @@ private fun NativeIntakeView(
     }
     val ticketCustomer = selectedCustomer
     if (ticketDialogOpen && ticketCustomer != null) {
-        NativeCreateTicketDialog(
+        NativeCreateTicketDialog(copy,
             customer = ticketCustomer,
             busy = busy,
             internetAvailable = internetAvailable,
@@ -3056,7 +3086,7 @@ private fun NativeIntakeEmptyState(
 }
 
 @Composable
-private fun NativeIntakeCustomerRow(customer: NativeCustomer, onClick: () -> Unit) {
+private fun NativeIntakeCustomerRow(copy: NativePosCopy, customer: NativeCustomer, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 13.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -3069,16 +3099,16 @@ private fun NativeIntakeCustomerRow(customer: NativeCustomer, onClick: () -> Uni
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(customer.fullName, color = POS_INK, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             Text(customer.accountName, color = POS_MUTED, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(customer.phone ?: "未填写手机号", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+            Text(customer.phone ?: copy.noPhoneOnFile, color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
         }
-        Text("选择", color = POS_ACCENT, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+        Text(copy.select, color = POS_ACCENT, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
     }
 }
 
 /** The selected customer's operational history stays on the intake page so a
  * clerk can see the latest handling state before adding another order. */
 @Composable
-private fun NativeIntakeRecentTicketRow(ticket: NativeServiceTicket, onOpen: () -> Unit) {
+private fun NativeIntakeRecentTicketRow(copy: NativePosCopy, ticket: NativeServiceTicket, onOpen: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -3091,31 +3121,32 @@ private fun NativeIntakeRecentTicketRow(ticket: NativeServiceTicket, onOpen: () 
     ) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
-                ticket.ticketNo ?: "服务订单",
+                ticket.ticketNo ?: copy.serviceOrder,
                 color = POS_INK,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
             )
             Text(
-                "${ticketStatusLabel(ticket.ticketStatus)} · ${ticket.itemCount} 项 · ${formatNativeActivityTime(ticket.updatedAt.ifBlank { ticket.createdAt })}",
+                "${ticketStatusLabel(ticket.ticketStatus, copy)} · ${copy.itemsCountSuffix.format(ticket.itemCount)} · ${formatNativeActivityTime(ticket.updatedAt.ifBlank { ticket.createdAt })}",
                 color = POS_MUTED,
                 style = MaterialTheme.typography.labelSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
             ticket.expectedPickupAt?.let { pickupAt ->
-                Text("预计取件：${formatNativeActivityTime(pickupAt)}", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+                Text(copy.expectedPickup.format(formatNativeActivityTime(pickupAt)), color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
             }
         }
         Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(formatMoney(ticket.totalMinor, ticket.currency), color = POS_INK, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-            Text("继续处理 ›", color = POS_ACCENT, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
+            Text(copy.continueProcessing, color = POS_ACCENT, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
         }
     }
 }
 
 @Composable
 private fun NativeCreateCustomerDialog(
+    copy: NativePosCopy,
     busy: Boolean,
     onDismiss: () -> Unit,
     onCreate: (String, String) -> Unit,
@@ -3165,6 +3196,7 @@ private fun NativeCreateCustomerDialog(
 
 @Composable
 private fun NativeCreateTicketDialog(
+    copy: NativePosCopy,
     customer: NativeCustomer,
     busy: Boolean,
     internetAvailable: Boolean,
@@ -3260,7 +3292,7 @@ private fun NativeIntakeChoiceButton(
 }
 
 @Composable
-private fun ReferenceRow(primary: String, secondary: String, selected: Boolean, onClick: () -> Unit) {
+private fun ReferenceRow(copy: NativePosCopy, primary: String, secondary: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -3275,12 +3307,12 @@ private fun ReferenceRow(primary: String, secondary: String, selected: Boolean, 
             Text(primary, color = POS_INK, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             Text(secondary, color = POS_MUTED, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Text("选择", color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
+        Text(copy.select, color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
     }
 }
 
 @Composable
-private fun SelectedReferenceCard(label: String, primary: String, secondary: String, onClear: () -> Unit) {
+private fun SelectedReferenceCard(copy: NativePosCopy, label: String, primary: String, secondary: String, onClear: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0xFFECE6F7)).padding(12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -3291,12 +3323,13 @@ private fun SelectedReferenceCard(label: String, primary: String, secondary: Str
             Text(primary, color = POS_INK, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             Text(secondary, color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
         }
-        OutlinedButton(onClick = onClear) { Text("更换") }
+        OutlinedButton(onClick = onClear) { Text(copy.change) }
     }
 }
 
 @Composable
 private fun NativeTicketsView(
+    copy: NativePosCopy,
     tickets: List<NativeServiceTicket>,
     services: List<NativeService>,
     selectedDetail: NativeTicketDetail?,
@@ -3314,7 +3347,7 @@ private fun NativeTicketsView(
     onAddTicketItemsToCart: (NativeServiceTicket, List<NativeTicketItem>) -> Unit,
 ) {
     if (selectedDetail != null) {
-        NativeTicketDetailView(
+        NativeTicketDetailView(copy,
             detail = selectedDetail,
             services = services,
             internetAvailable = internetAvailable,
@@ -3335,19 +3368,19 @@ private fun NativeTicketsView(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("工单", color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(copy.ticketsTitle, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         if (tickets.isEmpty()) {
-            Text("本机暂时没有已同步工单。", color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
+            Text(copy.ticketsEmpty, color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
         }
         tickets.forEach { ticket ->
-            TicketCard(ticket = ticket, busy = busy, onOpen = { onOpenTicket(ticket) })
+            TicketCard(copy, ticket = ticket, busy = busy, onOpen = { onOpenTicket(ticket) })
         }
         message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
 
 @Composable
-private fun TicketCard(ticket: NativeServiceTicket, busy: Boolean, onOpen: () -> Unit) {
+private fun TicketCard(copy: NativePosCopy, ticket: NativeServiceTicket, busy: Boolean, onOpen: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -3355,18 +3388,19 @@ private fun TicketCard(ticket: NativeServiceTicket, busy: Boolean, onOpen: () ->
     ) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(ticket.ticketNo ?: "服务工单", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(ticketStatusLabel(ticket.ticketStatus), color = POS_ACCENT, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
+                Text(ticket.ticketNo ?: copy.serviceTicket, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(ticketStatusLabel(ticket.ticketStatus, copy), color = POS_ACCENT, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
             }
             Text(ticket.customerName, color = POS_INK, style = MaterialTheme.typography.bodyMedium)
-            Text("${ticket.itemCount} 项 · ${formatMoney(ticket.totalMinor, ticket.currency)} · ${ticket.priorityLabel()}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-            OutlinedButton(onClick = onOpen, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("查看并处理工单") }
+            Text("${copy.itemsCountSuffix.format(ticket.itemCount)} · ${formatMoney(ticket.totalMinor, ticket.currency)} · ${ticket.priorityLabel(copy)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+            OutlinedButton(onClick = onOpen, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.openTicket) }
         }
     }
 }
 
 @Composable
 private fun NativeTicketDetailView(
+    copy: NativePosCopy,
     detail: NativeTicketDetail,
     services: List<NativeService>,
     internetAvailable: Boolean,
@@ -3422,12 +3456,12 @@ private fun NativeTicketDetailView(
         OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("返回工单列表") }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
-                Text(ticket.ticketNo ?: "服务工单", color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                Text(ticket.ticketNo ?: copy.serviceTicket, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                 Text(ticket.customerName, color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
             }
-            Text(ticketStatusLabel(ticket.ticketStatus), color = POS_ACCENT, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
+            Text(ticketStatusLabel(ticket.ticketStatus, copy), color = POS_ACCENT, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }
-        Text("${ticket.priorityLabel()} · ${detail.items.size} 个服务项目 · ${formatMoney(totalMinor, ticket.currency)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+        Text("${ticket.priorityLabel(copy)} · ${detail.items.size} 个服务项目 · ${formatMoney(totalMinor, ticket.currency)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         if (!internetAvailable) {
             Text("离线模式：可查看已缓存的项目和收款队列；项目处理与取件需恢复网络。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         }
@@ -3457,7 +3491,7 @@ private fun NativeTicketDetailView(
                             Text(
                                 when (target) {
                                     "picked_up" -> "确认客户已取件（需校验结算）"
-                                    else -> "更新为“${ticketStatusLabel(target)}”"
+                                    else -> "更新为“${ticketStatusLabel(target, copy)}”"
                                 },
                             )
                         }
@@ -3477,7 +3511,7 @@ private fun NativeTicketDetailView(
                     Text("此工单尚未添加服务项目。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 }
                 detail.items.forEach { item ->
-                    TicketItemCard(
+                    TicketItemCard(copy,
                         ticketStatus = ticket.ticketStatus,
                         item = item,
                         busy = busy,
@@ -3494,7 +3528,7 @@ private fun NativeTicketDetailView(
                     )
                 }
                 detail.items.firstOrNull { it.id == editingItemId }?.let { item ->
-                    NativeTicketItemEditView(
+                    NativeTicketItemEditView(copy,
                         ticket = ticket,
                         item = item,
                         services = services,
@@ -3523,14 +3557,14 @@ private fun NativeTicketDetailView(
                     } else if (ticketServices.isEmpty()) {
                         Text("当前工单类型没有可追加的服务项目，请先在后台配置服务目录。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     } else if (appendService != null) {
-                        SelectedReferenceCard(
+                        SelectedReferenceCard(copy,
                             "待追加服务",
                             appendService.name,
                             formatMoney(appendService.amountMinor, appendService.currency),
                         ) {
                             appendServiceId = null
                         }
-                        Text("物品类型：${ticketItemTypeLabel(appendItemType)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text("物品类型：${ticketItemTypeLabel(appendItemType, copy)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                         TextButton(onClick = {
                             appendServiceId = null
                             appendItemType = ""
@@ -3600,10 +3634,10 @@ private fun NativeTicketDetailView(
                                 onClick = { appendItemType = itemType },
                                 enabled = internetAvailable && !busy,
                                 modifier = Modifier.fillMaxWidth(),
-                            ) { Text(ticketItemTypeLabel(itemType)) }
+                            ) { Text(ticketItemTypeLabel(itemType, copy)) }
                         }
                     } else {
-                        Text("已选择“${ticketItemTypeLabel(appendItemType)}”，请选择适用服务。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text("已选择“${ticketItemTypeLabel(appendItemType, copy)}”，请选择适用服务。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                         TextButton(onClick = { appendItemType = "" }) { Text("更换物品类型") }
                         compatibleServices.forEach { service ->
                             Row(
@@ -3688,6 +3722,7 @@ private fun NativeTicketDetailView(
 
 @Composable
 private fun TicketItemCard(
+    copy: NativePosCopy,
     ticketStatus: String,
     item: NativeTicketItem,
     busy: Boolean,
@@ -3709,7 +3744,7 @@ private fun TicketItemCard(
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(item.itemName, color = POS_INK, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-            Text(ticketItemStatusLabel(item.itemStatus), color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
+            Text(ticketItemStatusLabel(item.itemStatus, copy), color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
         }
         val meta = buildList {
             if (item.pricingUnit == "per_kg") {
@@ -3757,7 +3792,7 @@ private fun TicketItemCard(
                 onClick = { onChangeStatus(target) },
                 enabled = internetAvailable && !busy,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("更新为“${ticketItemStatusLabel(target)}”") }
+            ) { Text("更新为“${ticketItemStatusLabel(target, copy)}”") }
         }
     }
 }
@@ -3765,6 +3800,7 @@ private fun TicketItemCard(
 /** Same editable fields and item-type-first service selection as the existing POS Web editor. */
 @Composable
 private fun NativeTicketItemEditView(
+    copy: NativePosCopy,
     ticket: NativeServiceTicket,
     item: NativeTicketItem,
     services: List<NativeService>,
@@ -3801,10 +3837,10 @@ private fun NativeTicketItemEditView(
         Text("先选物品类型，再选择该类型可用的服务。收费单价和改价权限仍由后台规则校验。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         if (itemType.isBlank()) {
             itemTypes.forEach { type ->
-                OutlinedButton(onClick = { itemType = type }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(ticketItemTypeLabel(type)) }
+                OutlinedButton(onClick = { itemType = type }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(ticketItemTypeLabel(type, copy)) }
             }
         } else {
-            Text("物品类型：${ticketItemTypeLabel(itemType)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+            Text("物品类型：${ticketItemTypeLabel(itemType, copy)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
             TextButton(onClick = { itemType = ""; serviceId = "" }, enabled = internetAvailable && !busy) { Text("更换物品类型") }
             compatibleServices.forEach { service ->
                 OutlinedButton(
@@ -3857,40 +3893,41 @@ private fun NativeTicketItemEditView(
     }
 }
 
-private fun ticketStatusLabel(status: String): String = when (status) {
-    "draft" -> "草稿"
-    "pending" -> "待处理"
-    "in_progress" -> "处理中"
-    "ready_to_pick" -> "待取件"
-    "picked_up" -> "已取件"
-    "cancelled" -> "已取消"
-    else -> "异常"
+private fun ticketStatusLabel(status: String, copy: NativePosCopy): String = when (status) {
+    "draft" -> copy.ticketDraft
+    "pending" -> copy.ticketPending
+    "in_progress" -> copy.ticketInProgress
+    "ready_to_pick" -> copy.ticketReadyToPick
+    "picked_up" -> copy.ticketPickedUp
+    "cancelled" -> copy.ticketCancelled
+    else -> copy.ticketUnknown
 }
 
-private fun ticketItemStatusLabel(status: String): String = when (status) {
-    "pending_wash" -> "待处理"
-    "washing" -> "处理中"
-    "done" -> "已完成"
-    "ready_to_pick" -> "待取件"
-    else -> "异常"
+private fun ticketItemStatusLabel(status: String, copy: NativePosCopy): String = when (status) {
+    "pending_wash" -> copy.itemPendingWash
+    "washing" -> copy.itemWashing
+    "done" -> copy.itemDone
+    "ready_to_pick" -> copy.itemReadyToPick
+    else -> copy.ticketUnknown
 }
 
-private fun ticketItemTypeLabel(type: String): String = when (type) {
-    "cloth" -> "衣物"
-    "car" -> "车辆"
-    "shoe" -> "鞋类"
-    "carpet" -> "地毯"
+private fun ticketItemTypeLabel(type: String, copy: NativePosCopy): String = when (type) {
+    "cloth" -> copy.typeCloth
+    "car" -> copy.typeCar
+    "shoe" -> copy.typeShoe
+    "carpet" -> copy.typeCarpet
     else -> type
 }
 
-private fun NativeServiceTicket.priorityLabel(): String = when (priority) {
-    "critical" -> "紧急"
-    "urgent" -> "加急"
-    else -> "普通"
+private fun NativeServiceTicket.priorityLabel(copy: NativePosCopy): String = when (priority) {
+    "critical" -> copy.priorityCritical
+    "urgent" -> copy.priorityUrgent
+    else -> copy.priorityNormal
 }
 
 @Composable
 private fun NativeMoreView(
+    copy: NativePosCopy,
     current: NativePosSnapshot,
     destination: NativeMoreDestination,
     orders: List<NativeMoreOrder>,
@@ -3944,13 +3981,13 @@ private fun NativeMoreView(
     onStatisticsPeriodChange: (String) -> Unit,
 ) {
     when (destination) {
-        NativeMoreDestination.Menu -> NativeMoreMenuView(
+        NativeMoreDestination.Menu -> NativeMoreMenuView(copy,
             current = current,
             busy = busy,
             message = message,
             onNavigate = onNavigate,
         )
-        NativeMoreDestination.Customers -> NativeMoreCustomersView(
+        NativeMoreDestination.Customers -> NativeMoreCustomersView(copy,
             customers = current.customers,
             busy = busy,
             message = message,
@@ -3959,7 +3996,7 @@ private fun NativeMoreView(
             onStartIntakeForCustomer = onStartIntakeForCustomer,
             onCreateCustomer = onCreateCustomer,
         )
-        NativeMoreDestination.Catalog -> NativeMoreCatalogView(
+        NativeMoreDestination.Catalog -> NativeMoreCatalogView(copy,
             products = current.products,
             services = current.services,
             internetAvailable = internetAvailable,
@@ -3969,7 +4006,7 @@ private fun NativeMoreView(
             onStartSale = onStartSale,
             onAddProduct = onAddProduct,
         )
-        NativeMoreDestination.Scan -> NativeMoreScanView(
+        NativeMoreDestination.Scan -> NativeMoreScanView(copy,
             current = current,
             busy = busy,
             message = message,
@@ -3983,7 +4020,7 @@ private fun NativeMoreView(
             onOpenSearchResult = onOpenSearchResult,
             onTriggerHardwareScanner = onTriggerHardwareScanner,
         )
-        NativeMoreDestination.Orders -> NativeMoreOrdersView(
+        NativeMoreDestination.Orders -> NativeMoreOrdersView(copy,
             orders = orders,
             busy = busy,
             message = message,
@@ -3991,7 +4028,7 @@ private fun NativeMoreView(
             onRefresh = { onNavigate(NativeMoreDestination.Orders) },
             onOpenOrder = onOpenOrder,
         )
-        NativeMoreDestination.OrderDetail -> NativeMoreOrderDetailView(
+        NativeMoreDestination.OrderDetail -> NativeMoreOrderDetailView(copy,
             order = orderDetail,
             internetAvailable = internetAvailable,
             busy = busy,
@@ -4001,7 +4038,7 @@ private fun NativeMoreView(
             onRecordCash = onRecordOrderCash,
             onChangeStatus = onChangeOrderStatus,
         )
-        NativeMoreDestination.Statistics -> NativeMoreStatisticsView(
+        NativeMoreDestination.Statistics -> NativeMoreStatisticsView(copy,
             statistics = statistics,
             busy = busy,
             message = message,
@@ -4010,7 +4047,7 @@ private fun NativeMoreView(
             period = statisticsPeriod,
             onPeriodChange = onStatisticsPeriodChange,
         )
-        NativeMoreDestination.Notifications -> NativeMoreNotificationsView(
+        NativeMoreDestination.Notifications -> NativeMoreNotificationsView(copy,
             notifications = notifications,
             internetAvailable = internetAvailable,
             busy = busy,
@@ -4030,7 +4067,7 @@ private fun NativeMoreView(
                 }
             },
         )
-        NativeMoreDestination.Shift -> NativeShiftHandoverView(
+        NativeMoreDestination.Shift -> NativeShiftHandoverView(copy,
             current = current,
             busy = busy,
             message = message,
@@ -4045,7 +4082,7 @@ private fun NativeMoreView(
             onCloseRegister = onCloseRegister,
             onClockOut = onClockOut,
         )
-        NativeMoreDestination.Settings -> NativeMoreSettingsView(
+        NativeMoreDestination.Settings -> NativeMoreSettingsView(copy,
             terminal = current.terminal,
             settings = terminalSettings,
             busy = busy,
@@ -4055,7 +4092,7 @@ private fun NativeMoreView(
             onSave = onSaveTerminalSettings,
             onOpenHardware = { onNavigate(NativeMoreDestination.Hardware) },
         )
-        NativeMoreDestination.Hardware -> NativeMoreHardwareView(
+        NativeMoreDestination.Hardware -> NativeMoreHardwareView(copy,
             hardwareStatus = hardwareStatus,
             configuredDevices = hardwareDevices,
             bluetoothPrinters = bluetoothPrinters,
@@ -4080,6 +4117,7 @@ private fun NativeMoreView(
 
 @Composable
 private fun NativeShiftHandoverView(
+    copy: NativePosCopy,
     current: NativePosSnapshot,
     shiftData: NativeMoreShiftData?,
     internetAvailable: Boolean,
@@ -4112,16 +4150,16 @@ private fun NativeShiftHandoverView(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onBack, enabled = !busy, modifier = Modifier.weight(1f)) { Text("返回更多") }
+            OutlinedButton(onClick = onBack, enabled = !busy, modifier = Modifier.weight(1f)) { Text(copy.backToMore) }
             OutlinedButton(onClick = onRefresh, enabled = internetAvailable && !busy, modifier = Modifier.weight(1f)) {
-                Text(if (busy) "正在刷新…" else "刷新状态")
+                Text(if (busy) copy.refreshing else copy.refreshStatus)
             }
         }
-        Text("班次与收银", color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-        Text("班次、收银台和现金盘点分别记录；开始班次后，再开启收银台即可安全进行现金收款。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+        Text(copy.shiftTitle, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(copy.shiftIntro, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
 
         if (!internetAvailable) {
-            NativeShiftFeedback("当前离线：可继续销售已缓存商品，但班次、收银台和现金流水必须恢复联网后操作。")
+            NativeShiftFeedback(copy.shiftOfflineNotice)
         }
         (localFeedback ?: message)?.let { feedback ->
             NativeShiftFeedback(feedback)
@@ -4135,9 +4173,9 @@ private fun NativeShiftHandoverView(
                 colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
             ) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("正在读取班次与收银台状态", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("若加载失败，请确认设备联网后点击“刷新状态”。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    OutlinedButton(onClick = onRefresh, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text("重新加载") }
+                    Text(copy.shiftLoading, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(copy.shiftLoadFailed, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    OutlinedButton(onClick = onRefresh, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.reload) }
                 }
             }
         } else {
@@ -4153,12 +4191,12 @@ private fun NativeShiftHandoverView(
                 colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
             ) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("员工班次", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(copy.staffShift, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
                         when (status) {
-                            "open" -> "当前上班中。可以开始休息，或继续收银。"
-                            "on_break" -> "当前处于休息中。结束休息后才能继续收银。"
-                            else -> "当前未开始班次。开始班次后，现金销售才能关联到本次交接。"
+                            "open" -> copy.shiftOpen
+                            "on_break" -> copy.shiftOnBreak
+                            else -> copy.shiftClosed
                         },
                         color = POS_MUTED,
                         style = MaterialTheme.typography.bodySmall,
@@ -4172,7 +4210,7 @@ private fun NativeShiftHandoverView(
                             },
                             enabled = internetAvailable && !busy,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text(if (runningAction == "clock_in") "正在开始班次…" else "开始班次") }
+                        ) { Text(if (runningAction == "clock_in") copy.clockingIn else copy.clockIn) }
                         "open" -> Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             OutlinedButton(
                                 onClick = {
@@ -4182,12 +4220,12 @@ private fun NativeShiftHandoverView(
                                 },
                                 enabled = internetAvailable && !busy,
                                 modifier = Modifier.weight(1f),
-                            ) { Text(if (runningAction == "break_start") "正在开始…" else "开始休息") }
+                            ) { Text(if (runningAction == "break_start") copy.breakStarting else copy.breakStart) }
                             OutlinedButton(
                                 onClick = { clockOutConfirmationVisible = true },
                                 enabled = internetAvailable && !busy,
                                 modifier = Modifier.weight(1f),
-                            ) { Text("结束班次") }
+                            ) { Text(copy.clockOut) }
                         }
                         "on_break" -> Button(
                             onClick = {
@@ -4197,7 +4235,7 @@ private fun NativeShiftHandoverView(
                             },
                             enabled = internetAvailable && !busy,
                             modifier = Modifier.fillMaxWidth(),
-                        ) { Text(if (runningAction == "break_end") "正在结束休息…" else "结束休息") }
+                        ) { Text(if (runningAction == "break_end") copy.breakEnding else copy.breakEnd) }
                     }
                 }
             }
@@ -4208,13 +4246,13 @@ private fun NativeShiftHandoverView(
                 colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
             ) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("收银台", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(copy.registerTitle, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(
                         when {
-                            data.cashHandlingMode == "none" -> "此终端未启用现金收款。可以查看收银台状态，但不能收取现金。"
-                            data.cashHandlingMode == "untracked" -> "本终端接受现金，但门店不跟踪钱箱金额。"
-                            personalCash -> "本终端使用员工随身现金；每位员工需要开启自己的现金会话。"
-                            else -> "本终端使用共享钱箱；开启后可记录备用金、现金存入和现金支出。"
+                            data.cashHandlingMode == "none" -> copy.cashModeNone
+                            data.cashHandlingMode == "untracked" -> copy.cashModeUntracked
+                            personalCash -> copy.cashModePersonal
+                            else -> copy.cashModeShared
                         },
                         color = POS_MUTED,
                         style = MaterialTheme.typography.bodySmall,
@@ -4228,7 +4266,7 @@ private fun NativeShiftHandoverView(
                                     openingFloat = it.filter { char -> char.isDigit() || char == '.' }
                                     localFeedback = null
                                 },
-                                label = { Text(if (data.requireOpeningFloat) "开柜备用金 *" else "开柜备用金（可选）") },
+                                label = { Text(if (data.requireOpeningFloat) copy.openingFloatRequired else copy.openingFloatOptional) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
@@ -4236,7 +4274,7 @@ private fun NativeShiftHandoverView(
                         Button(
                             onClick = {
                                 if (data.requireOpeningFloat && openingFloat.isBlank()) {
-                                    localFeedback = "此门店要求填写开柜备用金后才能开启收银台。"
+                                    localFeedback = copy.openingFloatNeeded
                                 } else {
                                     localFeedback = null
                                     runningAction = "open_register"
@@ -4247,24 +4285,24 @@ private fun NativeShiftHandoverView(
                             modifier = Modifier.fillMaxWidth(),
                         ) {
                             Text(
-                                if (runningAction == "open_register") "正在开启…"
-                                else if (personalCash && data.registerOpen) "开启我的现金会话"
-                                else "开启收银台",
+                                if (runningAction == "open_register") copy.registerOpening
+                                else if (personalCash && data.registerOpen) copy.openMyCashSession
+                                else copy.openRegister,
                             )
                         }
                     } else {
-                        NativeReferenceRow("收银台状态", "本终端", "已开启")
+                        NativeReferenceRow(copy.registerStatus, copy.thisTerminal, copy.opened)
                         if (trackedCash) {
-                            NativeReferenceRow("现金会话", if (personalCash) "我的随身现金" else "共享钱箱", if (data.cashSessionOpen) "已开启" else "未开启")
+                            NativeReferenceRow(copy.cashSession, if (personalCash) copy.myPersonalCash else copy.sharedDrawer, if (data.cashSessionOpen) copy.opened else copy.notOpened)
                         }
-                        data.expectedCash?.let { NativeReferenceRow("系统应有现金", "本次收银台", "$it ${data.currency}") }
-                        data.netSales?.let { NativeReferenceRow("净销售额", "本次收银台", "$it ${data.currency}") }
-                        NativeReferenceRow("待收订单", "等待处理", data.outstandingOrders.toString())
+                        data.expectedCash?.let { NativeReferenceRow(copy.expectedCash, copy.thisRegister, "$it ${data.currency}") }
+                        data.netSales?.let { NativeReferenceRow(copy.netSales, copy.thisRegister, "$it ${data.currency}") }
+                        NativeReferenceRow(copy.outstandingOrders, copy.awaitingProcessing, data.outstandingOrders.toString())
 
                         if (data.cashSessionOpen) {
-                            Text("现金存入 / 支出", color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                            TextField(value = movementAmount, onValueChange = { movementAmount = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text("金额") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                            TextField(value = movementReason, onValueChange = { movementReason = it; localFeedback = null }, label = { Text("原因（至少 3 个字）") }, modifier = Modifier.fillMaxWidth())
+                            Text(copy.cashInOut, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                            TextField(value = movementAmount, onValueChange = { movementAmount = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.amountLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                            TextField(value = movementReason, onValueChange = { movementReason = it; localFeedback = null }, label = { Text(copy.reasonLabel) }, modifier = Modifier.fillMaxWidth())
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 OutlinedButton(
                                     onClick = {
@@ -4274,7 +4312,7 @@ private fun NativeShiftHandoverView(
                                     },
                                     enabled = internetAvailable && !busy,
                                     modifier = Modifier.weight(1f),
-                                ) { Text(if (runningAction == "pay_in") "正在记录…" else "现金存入") }
+                                ) { Text(if (runningAction == "pay_in") copy.recording else copy.payIn) }
                                 OutlinedButton(
                                     onClick = {
                                         localFeedback = null
@@ -4283,11 +4321,11 @@ private fun NativeShiftHandoverView(
                                     },
                                     enabled = internetAvailable && !busy,
                                     modifier = Modifier.weight(1f),
-                                ) { Text(if (runningAction == "pay_out") "正在记录…" else "现金支出") }
+                                ) { Text(if (runningAction == "pay_out") copy.recording else copy.payOut) }
                             }
                             data.movements.forEach { movement ->
                                 NativeReferenceRow(
-                                    if (movement.type == "pay_in") "现金存入" else "现金支出",
+                                    if (movement.type == "pay_in") copy.payIn else copy.payOut,
                                     movement.reason,
                                     "${movement.amount} ${movement.currency}",
                                 )
@@ -4303,28 +4341,28 @@ private fun NativeShiftHandoverView(
                                 ) {
                                     Text(
                                         when {
-                                            personalCash && data.cashSessionOpen -> "盘点并关闭我的现金"
-                                            personalCash -> "关闭收银台并生成 Z Report"
-                                            else -> "关闭收银台并生成 Z Report"
+                                            personalCash && data.cashSessionOpen -> copy.countAndCloseMyCash
+                                            personalCash -> copy.closeRegisterZReport
+                                            else -> copy.closeRegisterZReport
                                         },
                                     )
                                 }
                             } else {
-                                Text("关闭后会生成或更新本次交接记录。请确认实点金额。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                                Text(copy.closeRegisterHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                                 if (data.cashSessionOpen) {
                                     TextField(
                                         value = countedCash,
                                         onValueChange = { countedCash = it.filter { char -> char.isDigit() || char == '.' }; localFeedback = null },
-                                        label = { Text(if (data.requireClosingCount) "实点现金 *" else "实点现金（可选）") },
+                                        label = { Text(if (data.requireClosingCount) copy.countedCashRequired else copy.countedCashOptional) },
                                         singleLine = true,
                                         modifier = Modifier.fillMaxWidth(),
                                     )
                                 }
-                                TextField(value = closeNotes, onValueChange = { closeNotes = it }, label = { Text("交接备注（可选）") }, modifier = Modifier.fillMaxWidth())
+                                TextField(value = closeNotes, onValueChange = { closeNotes = it }, label = { Text(copy.handoverNotes) }, modifier = Modifier.fillMaxWidth())
                                 Button(
                                     onClick = {
                                         if (data.cashSessionOpen && data.requireClosingCount && countedCash.isBlank()) {
-                                            localFeedback = "此门店要求填写实点现金后才能关闭。"
+                                            localFeedback = copy.countedCashNeeded
                                         } else {
                                             localFeedback = null
                                             runningAction = "close_register"
@@ -4335,11 +4373,11 @@ private fun NativeShiftHandoverView(
                                     modifier = Modifier.fillMaxWidth(),
                                     shape = RoundedCornerShape(14.dp),
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                                ) { Text(if (runningAction == "close_register") "正在关闭…" else "确认关闭") }
-                                OutlinedButton(onClick = { closeConfirmationVisible = false }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("暂不关闭") }
+                                ) { Text(if (runningAction == "close_register") copy.closing else copy.confirmClose) }
+                                OutlinedButton(onClick = { closeConfirmationVisible = false }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.notYet) }
                             }
                         } else if (personalCash && data.registerOpen) {
-                            Text("请先由当前员工开启或关闭自己的现金会话；只有店主或经理可以最终关闭收银台。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                            Text(copy.closeNeedsManager, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -4352,9 +4390,9 @@ private fun NativeShiftHandoverView(
                     colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("最近 Z Report", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(copy.recentZReports, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         data.zReports.forEach { report ->
-                            NativeReferenceRow("${report.netSales} ${report.currency}", "${report.cutoffAt} · 差额 ${report.variance}", "")
+                            NativeReferenceRow("${report.netSales} ${report.currency}", "${report.cutoffAt} · ${copy.varianceLabel} ${report.variance}", "")
                         }
                     }
                 }
@@ -4367,9 +4405,9 @@ private fun NativeShiftHandoverView(
             colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
         ) {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("本机数据", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("已缓存 ${current.products.size} 个商品；${current.pendingSales} 笔现金订单等待同步。", color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
-                OutlinedButton(onClick = onSynchronize, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "正在同步…" else "同步本机数据") }
+                Text(copy.localData, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(copy.cachedSummary.format(current.products.size, current.pendingSales), color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
+                OutlinedButton(onClick = onSynchronize, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.synchronizing else copy.syncLocalData) }
             }
         }
     }
@@ -4382,10 +4420,10 @@ private fun NativeShiftHandoverView(
                 color = Color.White,
             ) {
                 Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text("确认结束班次？", color = POS_INK, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Text("结束后需要重新输入 PIN 并开始班次，才能继续收银。", color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
+                    Text(copy.confirmClockOutTitle, color = POS_INK, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    Text(copy.confirmClockOutBody, color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedButton(onClick = { clockOutConfirmationVisible = false }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("再检查一下") }
+                        OutlinedButton(onClick = { clockOutConfirmationVisible = false }, enabled = !busy, modifier = Modifier.weight(1f)) { Text(copy.checkAgain) }
                         Button(
                             onClick = {
                                 clockOutConfirmationVisible = false
@@ -4395,7 +4433,7 @@ private fun NativeShiftHandoverView(
                             enabled = !busy,
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                        ) { Text("确认结束") }
+                        ) { Text(copy.confirmClockOut) }
                     }
                 }
             }
@@ -4421,6 +4459,7 @@ private fun NativeShiftFeedback(message: String) {
 
 @Composable
 private fun NativeMoreMenuView(
+    copy: NativePosCopy,
     current: NativePosSnapshot,
     busy: Boolean,
     message: String?,
@@ -4505,6 +4544,7 @@ private fun NativeMoreNavigationRow(
 
 @Composable
 private fun NativeMoreCustomersView(
+    copy: NativePosCopy,
     customers: List<NativeCustomer>,
     busy: Boolean,
     message: String?,
@@ -4522,7 +4562,7 @@ private fun NativeMoreCustomersView(
         normalized.isBlank() || it.fullName.lowercase().contains(normalized) ||
             it.accountName.lowercase().contains(normalized) || it.phone.orEmpty().contains(normalized)
     }
-    NativeMorePage("客户管理", onBack) {
+    NativeMorePage(copy, "客户管理", onBack) {
         Text("客户档案保存在本机；联网时新建客户会立即同步。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         TextField(value = query, onValueChange = { query = it }, label = { Text("姓名、账户或手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -4564,6 +4604,7 @@ private fun NativeMoreCustomersView(
 
 @Composable
 private fun NativeMoreCatalogView(
+    copy: NativePosCopy,
     products: List<NativeProduct>,
     services: List<NativeService>,
     internetAvailable: Boolean,
@@ -4573,7 +4614,7 @@ private fun NativeMoreCatalogView(
     onStartSale: () -> Unit,
     onAddProduct: (NativeProduct) -> Unit,
 ) {
-    NativeMorePage("商品与服务目录", onBack) {
+    NativeMorePage(copy, "商品与服务目录", onBack) {
         Button(onClick = onStartSale, enabled = !busy, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT)) { Text("前往收银") }
         Text("商品", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         products.forEach { product ->
@@ -4606,6 +4647,7 @@ private fun NativeMoreCatalogView(
 
 @Composable
 private fun NativeMoreScanView(
+    copy: NativePosCopy,
     current: NativePosSnapshot,
     busy: Boolean,
     message: String?,
@@ -4630,7 +4672,7 @@ private fun NativeMoreScanView(
     val ticketMatches = current.tickets.filter { keyword.isNotBlank() && (it.ticketNo.orEmpty().lowercase().contains(keyword) || it.customerName.lowercase().contains(keyword)) }
     val productMatches = current.products.filter { keyword.isNotBlank() && (it.sku.lowercase().contains(keyword) || it.name.lowercase().contains(keyword)) }
     val customerMatches = current.customers.filter { keyword.isNotBlank() && (it.fullName.lowercase().contains(keyword) || it.phone.orEmpty().contains(keyword)) }
-    NativeMorePage("扫码查询", onBack) {
+    NativeMorePage(copy, "扫码查询", onBack) {
         Text("支持内置扫码器、扫码枪键盘输入，也可手动输入工单号、订单号、手机号或客户名。联网时会调用和 POS Web 相同的全局检索。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         TextField(value = query, onValueChange = { query = it }, label = { Text("扫描或输入关键词") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -4669,6 +4711,7 @@ private fun NativeMoreScanView(
 
 @Composable
 private fun NativeMoreOrdersView(
+    copy: NativePosCopy,
     orders: List<NativeMoreOrder>,
     busy: Boolean,
     message: String?,
@@ -4676,7 +4719,7 @@ private fun NativeMoreOrdersView(
     onRefresh: () -> Unit,
     onOpenOrder: (String) -> Unit,
 ) {
-    NativeMorePage("订单管理", onBack) {
+    NativeMorePage(copy, "订单管理", onBack) {
         OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "正在加载…" else "刷新订单") }
         if (!busy && orders.isEmpty()) Text("当前没有可显示订单，联网后点击刷新。", color = POS_MUTED)
         orders.forEach { order ->
@@ -4698,6 +4741,7 @@ private fun NativeMoreOrdersView(
 
 @Composable
 private fun NativeMoreOrderDetailView(
+    copy: NativePosCopy,
     order: NativeMoreOrderDetail?,
     internetAvailable: Boolean,
     busy: Boolean,
@@ -4709,7 +4753,7 @@ private fun NativeMoreOrderDetailView(
 ) {
     var tendered by remember(order?.id) { mutableStateOf("") }
     var showTenderInput by remember(order?.id) { mutableStateOf(false) }
-    NativeMorePage("订单详情", onBack) {
+    NativeMorePage(copy, "订单详情", onBack) {
         OutlinedButton(onClick = onRefresh, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "正在加载…" else "刷新订单") }
         if (order == null) {
             Text("联网后打开一张订单查看详情。", color = POS_MUTED)
@@ -4768,6 +4812,7 @@ private fun NativeMoreOrderDetailView(
 
 @Composable
 private fun NativeMoreStatisticsView(
+    copy: NativePosCopy,
     statistics: NativeMoreStatistics?,
     busy: Boolean,
     message: String?,
@@ -4776,7 +4821,7 @@ private fun NativeMoreStatisticsView(
     period: String,
     onPeriodChange: (String) -> Unit,
 ) {
-    NativeMorePage("经营数据", onBack) {
+    NativeMorePage(copy, "经营数据", onBack) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("today" to "今天", "week" to "本周", "month" to "本月", "all" to "全部").forEach { (value, label) ->
                 OutlinedButton(onClick = { onPeriodChange(value) }, enabled = !busy) { Text(if (period == value) "✓ $label" else label) }
@@ -4797,6 +4842,7 @@ private fun NativeMoreStatisticsView(
 
 @Composable
 private fun NativeMoreNotificationsView(
+    copy: NativePosCopy,
     notifications: List<NativeMoreNotification>,
     internetAvailable: Boolean,
     busy: Boolean,
@@ -4808,7 +4854,7 @@ private fun NativeMoreNotificationsView(
     onArchive: (String) -> Unit,
     onOpenRelated: (NativeMoreNotification) -> Unit,
 ) {
-    NativeMorePage("通知中心", onBack) {
+    NativeMorePage(copy, "通知中心", onBack) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.weight(1f)) { Text(if (busy) "正在加载…" else "刷新通知") }
             OutlinedButton(onClick = onMarkAllRead, enabled = internetAvailable && !busy && notifications.any { it.readStatus == "unread" }, modifier = Modifier.weight(1f)) { Text("全部已读") }
@@ -4838,6 +4884,7 @@ private fun NativeMoreNotificationsView(
 
 @Composable
 private fun NativeMoreSettingsView(
+    copy: NativePosCopy,
     terminal: NativeTerminal?,
     settings: NativeTerminalSettingsSummary?,
     busy: Boolean,
@@ -4861,7 +4908,7 @@ private fun NativeMoreSettingsView(
             roundingRule = it.roundingRule
         }
     }
-    NativeMorePage("终端设置", onBack) {
+    NativeMorePage(copy, "终端设置", onBack) {
         OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "正在加载…" else "刷新终端设置") }
         terminal?.let { NativeReferenceRow("终端", it.terminalId, it.branchName) }
         Card(
@@ -4917,6 +4964,7 @@ private fun NativeMoreSettingsView(
 
 @Composable
 private fun NativeMoreHardwareView(
+    copy: NativePosCopy,
     hardwareStatus: NativeHardwareStatus?,
     configuredDevices: List<NativeHardwareDevice>,
     bluetoothPrinters: List<NativeBluetoothPrinter>,
@@ -4943,7 +4991,7 @@ private fun NativeMoreHardwareView(
     val externalPrinterTargets = configuredDevices.filter {
         it.deviceType == "printer" && it.status == "active" && it.provisioningMode != "built_in"
     }
-    NativeMorePage("打印与硬件", onBack) {
+    NativeMorePage(copy, "打印与硬件", onBack) {
         Text("这里直接读取 Android POS 的原生硬件服务；设备登记会沿用原 POS Web 的终端级配置。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
             Text(if (busy) "正在检测…" else "刷新硬件状态")
@@ -5038,7 +5086,7 @@ private fun NativeMoreHardwareView(
                     device.config.optBoolean("printerIsDefault")
                 NativeReferenceRow(
                     title = device.name,
-                    detail = "${nativeHardwareDeviceTypeLabel(device.deviceType)} · ${device.provisioningMode} · ${device.connectionType}",
+                    detail = "${nativeHardwareDeviceTypeLabel(device.deviceType, copy)} · ${device.provisioningMode} · ${device.connectionType}",
                     amount = when {
                         isDefaultReceiptPrinter -> "默认收据机"
                         device.status == "active" -> "已启用"
@@ -5107,20 +5155,20 @@ private fun NativeMoreHardwareView(
     }
 }
 
-private fun nativeHardwareDeviceTypeLabel(type: String): String = when (type) {
-    "printer" -> "打印机"
-    "scanner" -> "扫码器"
-    "cash_drawer" -> "钱箱"
+private fun nativeHardwareDeviceTypeLabel(type: String, copy: NativePosCopy): String = when (type) {
+    "printer" -> copy.devicePrinter
+    "scanner" -> copy.deviceScanner
+    "cash_drawer" -> copy.deviceCashDrawer
     else -> type
 }
 
 @Composable
-private fun NativeMorePage(title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+private fun NativeMorePage(copy: NativePosCopy, title: String, onBack: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("返回更多") }
+        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(copy.backToMore) }
         Text(title, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         content()
     }
@@ -5140,7 +5188,7 @@ private fun NativeReferenceRow(title: String, detail: String, amount: String?) {
 }
 
 @Composable
-private fun NativeBottomNavigation(activeTab: NativePosTab, onSelectTab: (NativePosTab) -> Unit) {
+private fun NativeBottomNavigation(copy: NativePosCopy, activeTab: NativePosTab, onSelectTab: (NativePosTab) -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -5162,7 +5210,7 @@ private fun NativeBottomNavigation(activeTab: NativePosTab, onSelectTab: (Native
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(tab.symbol, color = if (selected) POS_ACCENT else POS_MUTED, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(tab.label, color = if (selected) POS_ACCENT else POS_MUTED, style = MaterialTheme.typography.labelSmall, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                Text(tab.label(copy), color = if (selected) POS_ACCENT else POS_MUTED, style = MaterialTheme.typography.labelSmall, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
             }
         }
     }
@@ -5171,7 +5219,7 @@ private fun NativeBottomNavigation(activeTab: NativePosTab, onSelectTab: (Native
 @Composable private fun LoadingView() = Text("正在加载本地 POS 数据…", Modifier.padding(24.dp))
 
 @Composable
-private fun FirstLaunchView(apiConfigured: Boolean, busy: Boolean, message: String?, onStart: () -> Unit) {
+private fun FirstLaunchView(copy: NativePosCopy, apiConfigured: Boolean, busy: Boolean, message: String?, onStart: () -> Unit) {
     FormColumn("初始化此 POS 终端") {
         Text("首次需联网，由店主或经理绑定门店。完成后，收银界面、商品、现金订单和同步队列都运行在此 APK 的本地数据库中。")
         if (!apiConfigured) Text("此安装包没有 POS API 地址，无法完成初始化。", color = MaterialTheme.colorScheme.error)
@@ -5181,7 +5229,7 @@ private fun FirstLaunchView(apiConfigured: Boolean, busy: Boolean, message: Stri
 }
 
 @Composable
-private fun AdministratorLoginView(internetAvailable: Boolean, busy: Boolean, message: String?, onSubmit: (String, String) -> Unit) {
+private fun AdministratorLoginView(copy: NativePosCopy, internetAvailable: Boolean, busy: Boolean, message: String?, onSubmit: (String, String) -> Unit) {
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     FormColumn("店主或经理登录") {
@@ -5196,6 +5244,7 @@ private fun AdministratorLoginView(internetAvailable: Boolean, busy: Boolean, me
 
 @Composable
 private fun TerminalEnrollmentView(
+    copy: NativePosCopy,
     branches: List<NativeSetupBranch>,
     requiresReenrollment: Boolean,
     busy: Boolean,
@@ -5226,7 +5275,7 @@ private fun TerminalEnrollmentView(
 }
 
 @Composable
-private fun TerminalCredentialRecoveryView(internetAvailable: Boolean, busy: Boolean, message: String?, onRecover: (String, String) -> Unit) {
+private fun TerminalCredentialRecoveryView(copy: NativePosCopy, internetAvailable: Boolean, busy: Boolean, message: String?, onRecover: (String, String) -> Unit) {
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     FormColumn("恢复此终端的凭证") {
@@ -5497,7 +5546,7 @@ private fun PinKey(label: String, enabled: Boolean, control: Boolean = false, on
 }
 
 @Composable
-private fun CachedDataExpiredView(busy: Boolean, message: String?, onSynchronize: () -> Unit) {
+private fun CachedDataExpiredView(copy: NativePosCopy, busy: Boolean, message: String?, onSynchronize: () -> Unit) {
     FormColumn("本地目录需要更新") {
         Text("离线目录超过有效期。恢复网络并同步后，才能继续销售；已保存的现金订单仍保留在本机。")
         Button(onClick = onSynchronize, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("立即同步") }
@@ -5612,7 +5661,7 @@ private fun NativeSaleView(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            SaleStatusPill(internetAvailable, current.pendingSales)
+            SaleStatusPill(copy, internetAvailable, current.pendingSales)
             if (current.failedSales > 0) {
                 Text(
                     "${current.failedSales} 笔待处理",
@@ -5650,6 +5699,7 @@ private fun NativeSaleView(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 NativeProductCatalogGrid(
+                    copy,
                     products = current.products,
                     cart = cart,
                     offlineMode = !internetAvailable,
@@ -5666,6 +5716,7 @@ private fun NativeSaleView(
             }
         } else {
             NativeProductCatalogGrid(
+                copy,
                 products = current.products,
                 cart = cart,
                 offlineMode = !internetAvailable,
@@ -5682,6 +5733,7 @@ private fun NativeSaleView(
 
 @Composable
 private fun NativeProductCatalogGrid(
+    copy: NativePosCopy,
     products: List<NativeProduct>,
     cart: NativePosCart,
     offlineMode: Boolean,
@@ -5700,7 +5752,7 @@ private fun NativeProductCatalogGrid(
     ) {
         gridItems(products, key = { it.skuId }) { product ->
             val quantity = cart.products.firstOrNull { it.skuId == product.skuId }?.quantity ?: 0
-            ProductCatalogCard(
+            ProductCatalogCard(copy,
                 product = product,
                 cartQuantity = quantity,
                 offlineMode = offlineMode,
@@ -5714,6 +5766,7 @@ private fun NativeProductCatalogGrid(
 
 @Composable
 private fun CashOperationsView(
+    copy: NativePosCopy,
     cashState: NativeCashState?,
     internetAvailable: Boolean,
     busy: Boolean,
@@ -5722,24 +5775,24 @@ private fun CashOperationsView(
     onOpenRegister: (String) -> Unit,
 ) {
     var openingFloat by remember { mutableStateOf("0") }
-    FormColumn(if (internetAvailable) "准备在线现金收银" else "准备离线现金收银") {
+    FormColumn(if (internetAvailable) copy.readyOnlineCash else copy.readyOfflineCash) {
         if (cashState == null) {
-            Text("此门店当前没有启用现金收款。请由管理员在门店 POS 设置中启用现金支付后重新同步。")
+            Text(copy.cashDisabledStore)
         } else {
             Text(
-                if (internetAvailable) "现金订单需要关联已开始的班次和已打开的钱箱。" else "离线现金订单必须关联已开始的班次和已打开的钱箱，避免断网时的现金记录失去归属。",
+                if (internetAvailable) copy.cashNeedsShiftOnline else copy.cashNeedsShiftOffline,
             )
             if (cashState.shiftId == null) {
-                Button(onClick = onStartShift, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("开始我的班次") }
+                Button(onClick = onStartShift, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.startMyShift) }
             } else {
-                Text("班次已开始。")
+                Text(copy.shiftStarted)
             }
             if (cashState.shiftId != null && !cashState.isOfflineCashReady()) {
                 if (cashState.needsCashSession()) {
                     TextField(
                         value = openingFloat,
                         onValueChange = { openingFloat = it.filter { char -> char.isDigit() || char == '.' } },
-                        label = { Text("开箱现金") },
+                        label = { Text(copy.drawerOpeningCash) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -5748,7 +5801,7 @@ private fun CashOperationsView(
                     onClick = { onOpenRegister(openingFloat.ifBlank { "0" }) },
                     enabled = !busy && parseMoney(openingFloat.ifBlank { "0" }) != null,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("打开钱箱并同步") }
+                ) { Text(copy.openDrawerAndSync) }
             }
         }
         ErrorText(message)
@@ -5756,7 +5809,7 @@ private fun CashOperationsView(
 }
 
 @Composable
-private fun SaleStatusPill(internetAvailable: Boolean, pendingSales: Int) {
+private fun SaleStatusPill(copy: NativePosCopy, internetAvailable: Boolean, pendingSales: Int) {
     val statusColor = if (internetAvailable) Color(0xFF16803A) else Color(0xFFD06B16)
     val statusLabel = if (internetAvailable) "已联网" else "离线收银"
     Row(
@@ -5779,6 +5832,7 @@ private fun SaleStatusPill(internetAvailable: Boolean, pendingSales: Int) {
 
 @Composable
 private fun ProductCatalogCard(
+    copy: NativePosCopy,
     product: NativeProduct,
     cartQuantity: Long,
     offlineMode: Boolean,
@@ -5928,7 +5982,7 @@ private fun CheckoutPanel(
         }
     }
     if (cartDrawerOpen) {
-        NativeCartDrawer(
+        NativeCartDrawer(copy,
             cart = cart,
             busy = busy,
             onDismiss = { cartDrawerOpen = false },
@@ -5964,6 +6018,7 @@ private fun CheckoutPanel(
 /** Compact checkout stays on the sales screen; all editable cart lines live in this drawer. */
 @Composable
 private fun NativeCartDrawer(
+    copy: NativePosCopy,
     cart: NativePosCart,
     busy: Boolean,
     onDismiss: () -> Unit,
@@ -6354,14 +6409,14 @@ private fun NativeCashCheckoutDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        NativeReceiptDeliveryButton(
+                        NativeReceiptDeliveryButton(copy,
                             label = "打印小票",
                             selected = receiptDelivery == NativeReceiptDelivery.Print,
                             enabled = !busy && receiptPrinterConfigured,
                             onClick = { receiptDelivery = NativeReceiptDelivery.Print },
                             modifier = Modifier.weight(1f),
                         )
-                        NativeReceiptDeliveryButton(
+                        NativeReceiptDeliveryButton(copy,
                             label = "不发送",
                             selected = receiptDelivery == NativeReceiptDelivery.None,
                             enabled = !busy,
@@ -6373,14 +6428,14 @@ private fun NativeCashCheckoutDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        NativeReceiptDeliveryButton(
+                        NativeReceiptDeliveryButton(copy,
                             label = if (checkoutSettings.emailReceiptEnabled) "邮件小票" else "邮件未配置",
                             selected = receiptDelivery == NativeReceiptDelivery.Email,
                             enabled = !busy && checkoutSettings.emailReceiptEnabled,
                             onClick = { receiptDelivery = NativeReceiptDelivery.Email },
                             modifier = Modifier.weight(1f),
                         )
-                        NativeReceiptDeliveryButton(
+                        NativeReceiptDeliveryButton(copy,
                             label = "短信未配置",
                             selected = receiptDelivery == NativeReceiptDelivery.Sms,
                             enabled = false,
@@ -6464,6 +6519,7 @@ private fun NativeCheckoutAmountRow(label: String, amountMinor: Long, currency: 
 
 @Composable
 private fun NativeReceiptDeliveryButton(
+    copy: NativePosCopy,
     label: String,
     selected: Boolean,
     enabled: Boolean,
@@ -6626,6 +6682,7 @@ private fun JSONObject.toNativeMoreCustomer(): NativeCustomer = NativeCustomer(
 )
 
 private fun toNativeMoreShiftData(
+    copy: NativePosCopy,
     shift: JSONObject,
     register: JSONObject,
     reconciliation: JSONObject,
@@ -6886,6 +6943,7 @@ private fun localTicketDateTimeToIso(value: String, timeZone: String): String? =
 }.getOrNull()
 
 private fun buildNativeCashReceiptDraft(
+    copy: NativePosCopy,
     terminal: NativeTerminal?,
     cart: NativePosCart,
     amountDueMinor: Long,
