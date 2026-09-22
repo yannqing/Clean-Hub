@@ -59,6 +59,40 @@ class NativeReplayFailureTest {
         assertFalse(deferred)
     }
 
+    /**
+     * The decision the replay loop makes for one command: keep it pending, or
+     * give up and park it. Without the cap, a command that keeps failing
+     * transiently -- an endpoint returning 500 forever -- stays pending for
+     * good and nobody is told the sale never landed.
+     */
+    private fun keepsRetrying(error: NativePosApiException, attempt: Int): Boolean =
+        isTransientReplayFailure(error) && attempt < NATIVE_REPLAY_MAX_ATTEMPTS
+
+    @Test
+    fun anExhaustedCommandIsParkedEvenWhenTheFailureLooksTransient() {
+        val outage = error(503)
+
+        assertTrue("first attempt", keepsRetrying(outage, 1))
+        assertTrue("well within the cap", keepsRetrying(outage, NATIVE_REPLAY_MAX_ATTEMPTS - 1))
+        assertFalse("at the cap", keepsRetrying(outage, NATIVE_REPLAY_MAX_ATTEMPTS))
+        assertFalse("past the cap", keepsRetrying(outage, NATIVE_REPLAY_MAX_ATTEMPTS + 1))
+    }
+
+    @Test
+    fun aRejectedSaleIsParkedOnItsFirstAttempt() {
+        // The cap is for transient failures. A sale the server has rejected on
+        // its merits should not be retried 25 times first.
+        assertFalse(keepsRetrying(error(422), 1))
+    }
+
+    @Test
+    fun theAttemptCapIsGenerousEnoughForABadNetworkDay() {
+        // A failing network is the normal offline case, so the cap must not be
+        // so tight that an ordinary outage abandons a real sale. Matches
+        // OFFLINE_QUEUE_MAX_ATTEMPTS in packages/offline.
+        assertEquals(25, NATIVE_REPLAY_MAX_ATTEMPTS)
+    }
+
     @Test
     fun aTransientFailureStopsTheRunButKeepsEarlierWork() {
         val queue = listOf(200, 503, 200)

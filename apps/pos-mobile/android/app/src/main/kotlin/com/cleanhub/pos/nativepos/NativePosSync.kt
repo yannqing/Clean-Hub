@@ -17,6 +17,17 @@ import org.json.JSONObject
 data class NativeSyncResult(val replayedSales: Int, val failedSales: Int)
 
 /**
+ * How many times one offline sale is replayed before it is parked.
+ *
+ * Deliberately generous, because a failing network is the *normal* offline
+ * case and a sale must not be abandoned over a bad afternoon. The cap only
+ * bounds a command the server will never accept, which would otherwise be
+ * retried forever with nobody told. Matches OFFLINE_QUEUE_MAX_ATTEMPTS in
+ * packages/offline, which the web terminal uses for the same purpose.
+ */
+internal const val NATIVE_REPLAY_MAX_ATTEMPTS = 25
+
+/**
  * Whether a failed replay should be retried rather than parked.
  *
  * A lost connection (status 0), an expired session (401/403) or a server fault
@@ -43,13 +54,14 @@ class NativePosSyncEngine(context: Context) {
             // command would fail the same way. Stop asking, but keep whatever
             // already replayed rather than discarding the run.
             if (deferred != null) break
+            val attempt = database.recordCheckoutAttempt(command.operationId)
             try {
                 api.post("/pos/orders/checkout", JSONObject(command.payloadJson))
                 database.markCheckoutSynced(command.operationId)
                 markReplayedTicketItemsBilled(command.payloadJson)
                 replayed += 1
             } catch (error: NativePosApiException) {
-                if (isTransientReplayFailure(error)) {
+                if (isTransientReplayFailure(error) && attempt < NATIVE_REPLAY_MAX_ATTEMPTS) {
                     // Transient: the command stays pending and is retried on the
                     // next run. Recorded rather than thrown immediately so the
                     // sales replayed before it are still committed locally.
@@ -59,8 +71,13 @@ class NativePosSyncEngine(context: Context) {
                     // deleted product. Park it and carry on: one bad sale must
                     // not hold up every other sale in the queue, which is what
                     // aborting the loop used to do.
+                    val reason = if (attempt >= NATIVE_REPLAY_MAX_ATTEMPTS) {
+                        "Offline cash replay gave up after $attempt attempts: ${error.message.orEmpty()}".trim()
+                    } else {
+                        error.message ?: "Offline cash replay failed."
+                    }
                     reportCashException(command, error)
-                    database.markCheckoutFailed(command.operationId, error.message ?: "Offline cash replay failed.")
+                    database.markCheckoutFailed(command.operationId, reason)
                     failed += 1
                 }
             }
