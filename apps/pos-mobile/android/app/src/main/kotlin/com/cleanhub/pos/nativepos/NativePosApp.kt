@@ -3166,10 +3166,10 @@ private fun NativeCreateCustomerDialog(
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("新建客户", color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                        Text("先建立客户账户，随后可立即创建服务工单。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(copy.newCustomerTitle, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(copy.newCustomerHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     }
-                    TextButton(onClick = onDismiss, enabled = !busy) { Text("返回") }
+                    TextButton(onClick = onDismiss, enabled = !busy) { Text(copy.back) }
                 }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -3177,9 +3177,9 @@ private fun NativeCreateCustomerDialog(
                     colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("客户信息", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        TextField(value = name, onValueChange = { name = it }, label = { Text("客户姓名") }, placeholder = { Text("例如：Awa Diop") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextField(value = phone, onValueChange = { phone = it }, label = { Text("手机号码") }, placeholder = { Text("例如：77 000 0000") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        Text(copy.customerInfo, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        TextField(value = name, onValueChange = { name = it }, label = { Text(copy.customerName) }, placeholder = { Text(copy.customerNamePlaceholder) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        TextField(value = phone, onValueChange = { phone = it }, label = { Text(copy.phoneNumber) }, placeholder = { Text(copy.phonePlaceholder) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     }
                 }
                 Button(
@@ -3188,7 +3188,7 @@ private fun NativeCreateCustomerDialog(
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                ) { Text(if (busy) "正在保存…" else "保存客户") }
+                ) { Text(if (busy) copy.saving else copy.saveCustomer) }
             }
         }
     }
@@ -3220,10 +3220,10 @@ private fun NativeCreateTicketDialog(
             ) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("新建服务工单", color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                        Text("项目与价格将在下一步录入。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(copy.newTicketTitle, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(copy.newTicketHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     }
-                    TextButton(onClick = onDismiss, enabled = !busy) { Text("返回") }
+                    TextButton(onClick = onDismiss, enabled = !busy) { Text(copy.back) }
                 }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -3231,24 +3231,24 @@ private fun NativeCreateTicketDialog(
                     colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("服务客户", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
+                        Text(copy.ticketCustomer, color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
                         Text(customer.fullName, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(customer.phone ?: customer.accountName, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Text("工单类型", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(copy.ticketType, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NativeIntakeChoiceButton("洗衣护理", ticketType == "laundry", !busy && internetAvailable, { ticketType = "laundry" }, Modifier.weight(1f))
-                        NativeIntakeChoiceButton("车辆清洗", ticketType == "car_wash", !busy && internetAvailable, { ticketType = "car_wash" }, Modifier.weight(1f))
+                        NativeIntakeChoiceButton(copy.typeLaundry, ticketType == "laundry", !busy && internetAvailable, { ticketType = "laundry" }, Modifier.weight(1f))
+                        NativeIntakeChoiceButton(copy.typeCarWash, ticketType == "car_wash", !busy && internetAvailable, { ticketType = "car_wash" }, Modifier.weight(1f))
                     }
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    Text("优先级", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(copy.priorityTitle, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        NativeIntakeChoiceButton("普通", priority == "normal", !busy && internetAvailable, { priority = "normal" }, Modifier.weight(1f))
-                        NativeIntakeChoiceButton("加急", priority == "urgent", !busy && internetAvailable, { priority = "urgent" }, Modifier.weight(1f))
-                        NativeIntakeChoiceButton("紧急", priority == "critical", !busy && internetAvailable, { priority = "critical" }, Modifier.weight(1f))
+                        NativeIntakeChoiceButton(copy.priorityNormal, priority == "normal", !busy && internetAvailable, { priority = "normal" }, Modifier.weight(1f))
+                        NativeIntakeChoiceButton(copy.priorityUrgent, priority == "urgent", !busy && internetAvailable, { priority = "urgent" }, Modifier.weight(1f))
+                        NativeIntakeChoiceButton(copy.priorityCritical, priority == "critical", !busy && internetAvailable, { priority = "critical" }, Modifier.weight(1f))
                     }
                 }
                 Card(
@@ -3257,18 +3257,18 @@ private fun NativeCreateTicketDialog(
                     colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
                 ) {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        TextField(value = expectedPickupText, onValueChange = { expectedPickupText = it }, label = { Text("预计取件时间（可选）") }, placeholder = { Text("YYYY-MM-DD HH:mm") }, singleLine = true, enabled = !busy && internetAvailable, modifier = Modifier.fillMaxWidth())
-                        TextField(value = remark, onValueChange = { remark = it }, label = { Text("备注（可选）") }, placeholder = { Text("通用服务备注") }, enabled = !busy && internetAvailable, modifier = Modifier.fillMaxWidth())
+                        TextField(value = expectedPickupText, onValueChange = { expectedPickupText = it }, label = { Text(copy.expectedPickupField) }, placeholder = { Text("YYYY-MM-DD HH:mm") }, singleLine = true, enabled = !busy && internetAvailable, modifier = Modifier.fillMaxWidth())
+                        TextField(value = remark, onValueChange = { remark = it }, label = { Text(copy.remarkOptional) }, placeholder = { Text(copy.remarkPlaceholder) }, enabled = !busy && internetAvailable, modifier = Modifier.fillMaxWidth())
                     }
                 }
-                if (!internetAvailable) Text("创建工单需要联网；恢复网络后即可继续。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                if (!internetAvailable) Text(copy.ticketNeedsNetwork, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 Button(
                     onClick = { onCreate(ticketType, priority, remark.trim(), expectedPickupText.trim()) },
                     enabled = !busy && internetAvailable,
                     modifier = Modifier.fillMaxWidth().height(52.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                ) { Text(if (busy) "正在创建…" else "创建工单") }
+                ) { Text(if (busy) copy.creating else copy.createTicket) }
             }
         }
     }
@@ -3453,7 +3453,7 @@ private fun NativeTicketDetailView(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text("返回工单列表") }
+        OutlinedButton(onClick = onBack, modifier = Modifier.fillMaxWidth()) { Text(copy.backToTickets) }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Column(Modifier.weight(1f)) {
                 Text(ticket.ticketNo ?: copy.serviceTicket, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
@@ -3461,9 +3461,9 @@ private fun NativeTicketDetailView(
             }
             Text(ticketStatusLabel(ticket.ticketStatus, copy), color = POS_ACCENT, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.SemiBold)
         }
-        Text("${ticket.priorityLabel(copy)} · ${detail.items.size} 个服务项目 · ${formatMoney(totalMinor, ticket.currency)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+        Text("${ticket.priorityLabel(copy)} · ${copy.serviceItemsCount.format(detail.items.size)} · ${formatMoney(totalMinor, ticket.currency)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         if (!internetAvailable) {
-            Text("离线模式：可查看已缓存的项目和收款队列；项目处理与取件需恢复网络。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+            Text(copy.ticketOfflineNotice, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         }
         TICKET_STATUS_TRANSITIONS[ticket.ticketStatus].orEmpty().takeIf { it.isNotEmpty() }?.let { targets ->
             Card(
@@ -3472,12 +3472,12 @@ private fun NativeTicketDetailView(
                 colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
             ) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("工单流转", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(copy.ticketFlow, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     if ("cancelled" in targets) {
                         TextField(
                             value = cancelReason,
                             onValueChange = { cancelReason = it },
-                            label = { Text("取消原因（选择取消时必填）") },
+                            label = { Text(copy.cancelReasonRequired) },
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
@@ -3490,8 +3490,8 @@ private fun NativeTicketDetailView(
                         ) {
                             Text(
                                 when (target) {
-                                    "picked_up" -> "确认客户已取件（需校验结算）"
-                                    else -> "更新为“${ticketStatusLabel(target, copy)}”"
+                                    "picked_up" -> copy.confirmPickedUp
+                                    else -> copy.updateToStatus.format(ticketStatusLabel(target, copy))
                                 },
                             )
                         }
@@ -3506,9 +3506,9 @@ private fun NativeTicketDetailView(
             colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
         ) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("服务项目", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(copy.serviceItems, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 if (detail.items.isEmpty()) {
-                    Text("此工单尚未添加服务项目。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.noServiceItems, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 }
                 detail.items.forEach { item ->
                     TicketItemCard(copy,
@@ -3520,8 +3520,8 @@ private fun NativeTicketDetailView(
                         canManageSensitiveOperations = canManageSensitiveOperations,
                         onDelete = onDeleteItem,
                         settlementState = when {
-                            item.id in detail.billedTicketItemIds -> "已加入订单，不能重复结算"
-                            item.id in detail.pendingTicketItemIds -> "本机收款待同步，不能重复结算"
+                            item.id in detail.billedTicketItemIds -> copy.alreadyBilled
+                            item.id in detail.pendingTicketItemIds -> copy.pendingSyncNoBill
                             else -> null
                         },
                         onChangeStatus = { target -> onChangeItemStatus(item, target) },
@@ -3551,36 +3551,36 @@ private fun NativeTicketDetailView(
                 colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
             ) {
                 Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("追加服务项目", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(copy.appendServiceItem, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     if (services.isEmpty()) {
-                        Text("没有已缓存的服务项目，请先同步。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(copy.noCachedServices, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     } else if (ticketServices.isEmpty()) {
-                        Text("当前工单类型没有可追加的服务项目，请先在后台配置服务目录。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(copy.noServicesForType, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     } else if (appendService != null) {
                         SelectedReferenceCard(copy,
-                            "待追加服务",
+                            copy.pendingService,
                             appendService.name,
                             formatMoney(appendService.amountMinor, appendService.currency),
                         ) {
                             appendServiceId = null
                         }
-                        Text("物品类型：${ticketItemTypeLabel(appendItemType, copy)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(copy.itemTypePrefix.format(ticketItemTypeLabel(appendItemType, copy)), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                         TextButton(onClick = {
                             appendServiceId = null
                             appendItemType = ""
-                        }) { Text("更换物品类型") }
+                        }) { Text(copy.changeItemType) }
                         if (appendService.pricingUnit == "per_kg") {
                             TextField(
                                 value = appendWeightText,
                                 onValueChange = { appendWeightText = it.filter { char -> char.isDigit() || char == '.' } },
-                                label = { Text("重量（kg）") },
+                                label = { Text(copy.weightKg) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                             TextField(
                                 value = appendBagCountText,
                                 onValueChange = { appendBagCountText = it.filter(Char::isDigit) },
-                                label = { Text("袋数") },
+                                label = { Text(copy.bagCount) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
@@ -3588,18 +3588,18 @@ private fun NativeTicketDetailView(
                             TextField(
                                 value = appendQuantityText,
                                 onValueChange = { appendQuantityText = it.filter(Char::isDigit) },
-                                label = { Text("数量（件）") },
+                                label = { Text(copy.quantityPieces) },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
-                        TextField(value = appendCategory, onValueChange = { appendCategory = it }, label = { Text("分类（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendColor, onValueChange = { appendColor = it }, label = { Text("颜色（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendBrand, onValueChange = { appendBrand = it }, label = { Text("品牌（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendMaterial, onValueChange = { appendMaterial = it }, label = { Text("材质（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendDefectNotes, onValueChange = { appendDefectNotes = it }, label = { Text("瑕疵（可选）") }, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendSpecialRequest, onValueChange = { appendSpecialRequest = it }, label = { Text("特殊要求（可选）") }, modifier = Modifier.fillMaxWidth())
-                        TextField(value = appendRemark, onValueChange = { appendRemark = it }, label = { Text("项目备注（可选）") }, modifier = Modifier.fillMaxWidth())
+                        TextField(value = appendCategory, onValueChange = { appendCategory = it }, label = { Text(copy.categoryOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        TextField(value = appendColor, onValueChange = { appendColor = it }, label = { Text(copy.colorOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        TextField(value = appendBrand, onValueChange = { appendBrand = it }, label = { Text(copy.brandOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        TextField(value = appendMaterial, onValueChange = { appendMaterial = it }, label = { Text(copy.materialOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        TextField(value = appendDefectNotes, onValueChange = { appendDefectNotes = it }, label = { Text(copy.defectsOptional) }, modifier = Modifier.fillMaxWidth())
+                        TextField(value = appendSpecialRequest, onValueChange = { appendSpecialRequest = it }, label = { Text(copy.specialRequestOptional) }, modifier = Modifier.fillMaxWidth())
+                        TextField(value = appendRemark, onValueChange = { appendRemark = it }, label = { Text(copy.itemNoteOptional) }, modifier = Modifier.fillMaxWidth())
                         Button(
                             onClick = {
                                 onAddService(
@@ -3626,9 +3626,9 @@ private fun NativeTicketDetailView(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                        ) { Text(if (busy) "正在添加…" else "确认添加项目") }
+                        ) { Text(if (busy) copy.adding else copy.confirmAddItem) }
                     } else if (appendItemType.isBlank()) {
-                        Text("先选择物品类型，再选择可提供该服务的价目。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(copy.pickTypeThenService, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                         appendItemTypes.forEach { itemType ->
                             OutlinedButton(
                                 onClick = { appendItemType = itemType },
@@ -3637,8 +3637,8 @@ private fun NativeTicketDetailView(
                             ) { Text(ticketItemTypeLabel(itemType, copy)) }
                         }
                     } else {
-                        Text("已选择“${ticketItemTypeLabel(appendItemType, copy)}”，请选择适用服务。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                        TextButton(onClick = { appendItemType = "" }) { Text("更换物品类型") }
+                        Text(copy.pickedTypeNowService.format(ticketItemTypeLabel(appendItemType, copy)), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        TextButton(onClick = { appendItemType = "" }) { Text(copy.changeItemType) }
                         compatibleServices.forEach { service ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFFF8F7FB)).padding(10.dp),
@@ -3652,7 +3652,7 @@ private fun NativeTicketDetailView(
                                 OutlinedButton(
                                     onClick = { appendServiceId = service.id },
                                     enabled = internetAvailable && !busy,
-                                ) { Text("选择") }
+                                ) { Text(copy.select) }
                             }
                         }
                     }
@@ -3666,8 +3666,8 @@ private fun NativeTicketDetailView(
             colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
         ) {
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("加入收银购物车", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text("选择本次要结算的项目。已加入订单、待同步项目和当前购物车项目会自动排除。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                Text(copy.addToCartTitle, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(copy.addToCartHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 if (detail.items.isNotEmpty()) {
                     detail.items.forEach { item ->
                         val unavailable = item.id in detail.billedTicketItemIds ||
@@ -3689,30 +3689,30 @@ private fun NativeTicketDetailView(
                             ),
                         ) {
                             val state = when {
-                                item.id in detail.billedTicketItemIds -> "已关联订单"
-                                item.id in detail.pendingTicketItemIds -> "等待同步"
-                                item.id in detail.cartTicketItemIds -> "已在购物车"
-                                selected -> "已选择"
-                                else -> "未选择"
+                                item.id in detail.billedTicketItemIds -> copy.linkedToOrder
+                                item.id in detail.pendingTicketItemIds -> copy.awaitingSync
+                                item.id in detail.cartTicketItemIds -> copy.inCart
+                                selected -> copy.selected
+                                else -> copy.notSelected
                             }
                             Text("$state · ${item.itemName} · ${formatMoney(item.lineAmountMinor, item.currency)}")
                         }
                     }
                 }
                 if (detail.hasPendingCashCheckout) {
-                    Text("部分项目的现金收款仍在本机队列中；其余未结算项目可以单独收款。", color = POS_ACCENT, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                    Text(copy.somePaymentsQueued, color = POS_ACCENT, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
                 }
                 if (selectedCheckoutItems.isNotEmpty()) {
-                    Text("本次加入 ${formatMoney(selectedCheckoutTotalMinor, ticket.currency)}；可与零售商品或同一客户的其他工单一起现金结算。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.addingTotalHint.format(formatMoney(selectedCheckoutTotalMinor, ticket.currency)), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     Button(
                         onClick = { onAddToCart(selectedCheckoutItems) },
                         enabled = !busy && selectedCheckoutItems.isNotEmpty(),
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                    ) { Text(if (busy) "正在加入…" else "加入收银购物车") }
+                    ) { Text(if (busy) copy.addingToCart else copy.addToCartTitle) }
                 } else if (detail.items.isNotEmpty()) {
-                    Text("没有可在本次结算的项目。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.nothingToCharge, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -3749,9 +3749,9 @@ private fun TicketItemCard(
         val meta = buildList {
             if (item.pricingUnit == "per_kg") {
                 item.weight?.let { add("${it} kg") }
-                item.bagCount?.let { add("${it} 袋") }
+                item.bagCount?.let { add(copy.bagsSuffix.format(it)) }
             } else {
-                add("${item.quantity} 件")
+                add(copy.piecesSuffix.format(item.quantity))
             }
             item.labelCode?.let { add(it) }
             add(formatMoney(item.lineAmountMinor, item.currency))
@@ -3762,14 +3762,14 @@ private fun TicketItemCard(
             .filterNotNull()
             .takeIf { it.isNotEmpty() }
             ?.let { Text(it.joinToString(" · "), color = POS_MUTED, style = MaterialTheme.typography.labelSmall) }
-        item.defectNotes?.let { Text("瑕疵：$it", color = POS_MUTED, style = MaterialTheme.typography.labelSmall) }
-        item.specialRequest?.let { Text("特殊要求：$it", color = POS_MUTED, style = MaterialTheme.typography.labelSmall) }
-        item.remark?.let { Text("备注：$it", color = POS_MUTED, style = MaterialTheme.typography.labelSmall) }
+        item.defectNotes?.let { Text(copy.defectsPrefix.format(it), color = POS_MUTED, style = MaterialTheme.typography.labelSmall) }
+        item.specialRequest?.let { Text(copy.specialRequestPrefix.format(it), color = POS_MUTED, style = MaterialTheme.typography.labelSmall) }
+        item.remark?.let { Text(copy.notePrefix.format(it), color = POS_MUTED, style = MaterialTheme.typography.labelSmall) }
         if (editable) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onEdit, enabled = internetAvailable && !busy, modifier = Modifier.weight(1f)) { Text("编辑项目") }
+                OutlinedButton(onClick = onEdit, enabled = internetAvailable && !busy, modifier = Modifier.weight(1f)) { Text(copy.editItem) }
                 if (canManageSensitiveOperations) {
-                    OutlinedButton(onClick = { deletionOpen = !deletionOpen }, enabled = internetAvailable && !busy, modifier = Modifier.weight(1f)) { Text("删除项目") }
+                    OutlinedButton(onClick = { deletionOpen = !deletionOpen }, enabled = internetAvailable && !busy, modifier = Modifier.weight(1f)) { Text(copy.deleteItem) }
                 }
             }
         }
@@ -3777,7 +3777,7 @@ private fun TicketItemCard(
             TextField(
                 value = deletionReason,
                 onValueChange = { deletionReason = it },
-                label = { Text("删除原因（必填）") },
+                label = { Text(copy.deleteReasonRequired) },
                 modifier = Modifier.fillMaxWidth(),
             )
             Button(
@@ -3785,14 +3785,14 @@ private fun TicketItemCard(
                 enabled = internetAvailable && !busy && deletionReason.isNotBlank(),
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-            ) { Text("确认删除项目") }
+            ) { Text(copy.confirmDeleteItem) }
         }
         targets.forEach { target ->
             OutlinedButton(
                 onClick = { onChangeStatus(target) },
                 enabled = internetAvailable && !busy,
                 modifier = Modifier.fillMaxWidth(),
-            ) { Text("更新为“${ticketItemStatusLabel(target, copy)}”") }
+            ) { Text(copy.updateToStatus.format(ticketItemStatusLabel(target, copy))) }
         }
     }
 }
@@ -3833,15 +3833,15 @@ private fun NativeTicketItemEditView(
         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Color(0xFFF1EDF7)).padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text("编辑服务项目", color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        Text("先选物品类型，再选择该类型可用的服务。收费单价和改价权限仍由后台规则校验。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+        Text(copy.editServiceItem, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Text(copy.editServiceItemHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         if (itemType.isBlank()) {
             itemTypes.forEach { type ->
                 OutlinedButton(onClick = { itemType = type }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(ticketItemTypeLabel(type, copy)) }
             }
         } else {
-            Text("物品类型：${ticketItemTypeLabel(itemType, copy)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-            TextButton(onClick = { itemType = ""; serviceId = "" }, enabled = internetAvailable && !busy) { Text("更换物品类型") }
+            Text(copy.itemTypePrefix.format(ticketItemTypeLabel(itemType, copy)), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = { itemType = ""; serviceId = "" }, enabled = internetAvailable && !busy) { Text(copy.changeItemType) }
             compatibleServices.forEach { service ->
                 OutlinedButton(
                     onClick = { serviceId = service.id },
@@ -3853,19 +3853,19 @@ private fun NativeTicketItemEditView(
         }
         selectedService?.let { service ->
             if (service.pricingUnit == "per_kg") {
-                TextField(value = weightText, onValueChange = { weightText = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text("重量（kg）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                TextField(value = bagCountText, onValueChange = { bagCountText = it.filter(Char::isDigit) }, label = { Text("袋数") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                TextField(value = weightText, onValueChange = { weightText = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.weightKg) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                TextField(value = bagCountText, onValueChange = { bagCountText = it.filter(Char::isDigit) }, label = { Text(copy.bagCount) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             } else {
-                TextField(value = quantityText, onValueChange = { quantityText = it.filter(Char::isDigit) }, label = { Text("数量（件）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                TextField(value = quantityText, onValueChange = { quantityText = it.filter(Char::isDigit) }, label = { Text(copy.quantityPieces) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             }
         }
-        TextField(value = category, onValueChange = { category = it }, label = { Text("分类（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(value = color, onValueChange = { color = it }, label = { Text("颜色（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(value = brand, onValueChange = { brand = it }, label = { Text("品牌（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(value = material, onValueChange = { material = it }, label = { Text("材质（可选）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(value = defectNotes, onValueChange = { defectNotes = it }, label = { Text("瑕疵（可选）") }, modifier = Modifier.fillMaxWidth())
-        TextField(value = specialRequest, onValueChange = { specialRequest = it }, label = { Text("特殊要求（可选）") }, modifier = Modifier.fillMaxWidth())
-        TextField(value = remark, onValueChange = { remark = it }, label = { Text("项目备注（可选）") }, modifier = Modifier.fillMaxWidth())
+        TextField(value = category, onValueChange = { category = it }, label = { Text(copy.categoryOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        TextField(value = color, onValueChange = { color = it }, label = { Text(copy.colorOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        TextField(value = brand, onValueChange = { brand = it }, label = { Text(copy.brandOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        TextField(value = material, onValueChange = { material = it }, label = { Text(copy.materialOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        TextField(value = defectNotes, onValueChange = { defectNotes = it }, label = { Text(copy.defectsOptional) }, modifier = Modifier.fillMaxWidth())
+        TextField(value = specialRequest, onValueChange = { specialRequest = it }, label = { Text(copy.specialRequestOptional) }, modifier = Modifier.fillMaxWidth())
+        TextField(value = remark, onValueChange = { remark = it }, label = { Text(copy.itemNoteOptional) }, modifier = Modifier.fillMaxWidth())
         Button(
             onClick = {
                 selectedService?.let { service ->
@@ -3888,8 +3888,8 @@ private fun NativeTicketItemEditView(
             enabled = internetAvailable && !busy && selectedService != null && validMeasurement,
             modifier = Modifier.fillMaxWidth(),
             colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-        ) { Text(if (busy) "正在保存…" else "保存项目") }
-        OutlinedButton(onClick = onCancel, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("取消编辑") }
+        ) { Text(if (busy) copy.saving else copy.saveItem) }
+        OutlinedButton(onClick = onCancel, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.cancelEdit) }
     }
 }
 
@@ -4488,18 +4488,18 @@ private fun NativeMoreMenuView(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            Text("更多", color = POS_MUTED, style = MaterialTheme.typography.labelLarge)
+            Text(copy.tabMore, color = POS_MUTED, style = MaterialTheme.typography.labelLarge)
         }
         Spacer(Modifier.height(8.dp))
-        NativeMoreNavigationRow("扫描标签", "▣", NativeMoreDestination.Scan, busy, onNavigate)
-        NativeMoreNavigationRow("客户管理", "◉", NativeMoreDestination.Customers, busy, onNavigate)
-        NativeMoreNavigationRow("产品服务", "□", NativeMoreDestination.Catalog, busy, onNavigate)
-        NativeMoreNavigationRow("订单管理", "▤", NativeMoreDestination.Orders, busy, onNavigate)
-        NativeMoreNavigationRow("统计数据", "◫", NativeMoreDestination.Statistics, busy, onNavigate)
-        NativeMoreNavigationRow("班次与收银", "⇄", NativeMoreDestination.Shift, busy, onNavigate)
-        NativeMoreNavigationRow("通知中心", "●", NativeMoreDestination.Notifications, busy, onNavigate)
+        NativeMoreNavigationRow(copy.scanLabel, "▣", NativeMoreDestination.Scan, busy, onNavigate)
+        NativeMoreNavigationRow(copy.menuCustomers, "◉", NativeMoreDestination.Customers, busy, onNavigate)
+        NativeMoreNavigationRow(copy.productsServices, "□", NativeMoreDestination.Catalog, busy, onNavigate)
+        NativeMoreNavigationRow(copy.menuOrders, "▤", NativeMoreDestination.Orders, busy, onNavigate)
+        NativeMoreNavigationRow(copy.statisticsShort, "◫", NativeMoreDestination.Statistics, busy, onNavigate)
+        NativeMoreNavigationRow(copy.menuShift, "⇄", NativeMoreDestination.Shift, busy, onNavigate)
+        NativeMoreNavigationRow(copy.menuNotifications, "●", NativeMoreDestination.Notifications, busy, onNavigate)
         HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = Color(0xFFE5DFE8))
-        NativeMoreNavigationRow("设置", "⚙", NativeMoreDestination.Settings, busy, onNavigate)
+        NativeMoreNavigationRow(copy.settingsShort, "⚙", NativeMoreDestination.Settings, busy, onNavigate)
         message?.let {
             Text(
                 it,
@@ -4562,28 +4562,28 @@ private fun NativeMoreCustomersView(
         normalized.isBlank() || it.fullName.lowercase().contains(normalized) ||
             it.accountName.lowercase().contains(normalized) || it.phone.orEmpty().contains(normalized)
     }
-    NativeMorePage(copy, "客户管理", onBack) {
-        Text("客户档案保存在本机；联网时新建客户会立即同步。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-        TextField(value = query, onValueChange = { query = it }, label = { Text("姓名、账户或手机号") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    NativeMorePage(copy, copy.menuCustomers, onBack) {
+        Text(copy.customersCachedHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+        TextField(value = query, onValueChange = { query = it }, label = { Text(copy.nameAccountOrPhone) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { creating = !creating }, enabled = !busy, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT)) { Text(if (creating) "收起建档" else "新建客户") }
-            OutlinedButton(onClick = onStartIntake, enabled = !busy, modifier = Modifier.weight(1f)) { Text("新建服务工单") }
+            OutlinedButton(onClick = onStartIntake, enabled = !busy, modifier = Modifier.weight(1f)) { Text(copy.newServiceTicket) }
         }
         if (creating) {
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("客户建档", color = POS_INK, fontWeight = FontWeight.SemiBold)
-                    TextField(value = name, onValueChange = { name = it }, label = { Text("客户姓名") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    TextField(value = phone, onValueChange = { phone = it }, label = { Text("手机号码") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Text(copy.customerRegistration, color = POS_INK, fontWeight = FontWeight.SemiBold)
+                    TextField(value = name, onValueChange = { name = it }, label = { Text(copy.customerName) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    TextField(value = phone, onValueChange = { phone = it }, label = { Text(copy.phoneNumber) }, singleLine = true, modifier = Modifier.fillMaxWidth())
                     Button(
                         onClick = { onCreateCustomer(name, phone) },
                         enabled = !busy && name.isNotBlank() && phone.isNotBlank(),
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("创建客户") }
+                    ) { Text(copy.createCustomer) }
                 }
             }
         }
-        if (matches.isEmpty()) Text("没有匹配的已缓存客户。", color = POS_MUTED)
+        if (matches.isEmpty()) Text(copy.noCachedMatches, color = POS_MUTED)
         matches.forEach { customer ->
             Card(
                 modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { onStartIntakeForCustomer(customer) },
@@ -4593,8 +4593,8 @@ private fun NativeMoreCustomersView(
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(customer.fullName, color = POS_INK, fontWeight = FontWeight.SemiBold)
                     Text(customer.accountName, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    Text(customer.phone ?: customer.email ?: "未填写联系方式", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    Text("点击后直接带入服务开单", color = POS_ACCENT, style = MaterialTheme.typography.labelSmall)
+                    Text(customer.phone ?: customer.email ?: copy.noContactOnFile, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.tapToStartIntake, color = POS_ACCENT, style = MaterialTheme.typography.labelSmall)
                 }
             }
         }
@@ -4614,26 +4614,26 @@ private fun NativeMoreCatalogView(
     onStartSale: () -> Unit,
     onAddProduct: (NativeProduct) -> Unit,
 ) {
-    NativeMorePage(copy, "商品与服务目录", onBack) {
+    NativeMorePage(copy, copy.menuCatalog, onBack) {
         Button(onClick = onStartSale, enabled = !busy, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT)) { Text("前往收银") }
-        Text("商品", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(copy.productsHeading, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         products.forEach { product ->
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     NativeReferenceRow(
                         product.name,
-                        "${product.sku} · ${if (internetAvailable) "已同步，可离线销售" else "使用本地商品目录"}",
+                        "${product.sku} · ${if (internetAvailable) copy.syncedSellOffline else copy.usingLocalCatalog}",
                         formatMoney(product.amountMinor, product.currency),
                     )
                     Button(
                         onClick = { onAddProduct(product) },
                         enabled = !busy,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("加入收银清单") }
+                    ) { Text(copy.addToTillList) }
                 }
             }
         }
-        Text("服务价目", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text(copy.servicePrices, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         services.forEach { service ->
             NativeReferenceRow(
                 title = service.name,
@@ -4672,25 +4672,25 @@ private fun NativeMoreScanView(
     val ticketMatches = current.tickets.filter { keyword.isNotBlank() && (it.ticketNo.orEmpty().lowercase().contains(keyword) || it.customerName.lowercase().contains(keyword)) }
     val productMatches = current.products.filter { keyword.isNotBlank() && (it.sku.lowercase().contains(keyword) || it.name.lowercase().contains(keyword)) }
     val customerMatches = current.customers.filter { keyword.isNotBlank() && (it.fullName.lowercase().contains(keyword) || it.phone.orEmpty().contains(keyword)) }
-    NativeMorePage(copy, "扫码查询", onBack) {
-        Text("支持内置扫码器、扫码枪键盘输入，也可手动输入工单号、订单号、手机号或客户名。联网时会调用和 POS Web 相同的全局检索。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-        TextField(value = query, onValueChange = { query = it }, label = { Text("扫描或输入关键词") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    NativeMorePage(copy, copy.menuScan, onBack) {
+        Text(copy.scanIntro, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+        TextField(value = query, onValueChange = { query = it }, label = { Text(copy.scanOrType) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { onSearch(query) }, enabled = !busy && keyword.isNotBlank(), modifier = Modifier.weight(1f)) { Text(if (busy) "正在查询…" else "联网查询") }
-            OutlinedButton(onClick = onTriggerHardwareScanner, enabled = !busy, modifier = Modifier.weight(1f)) { Text("启动内置扫码器") }
+            Button(onClick = { onSearch(query) }, enabled = !busy && keyword.isNotBlank(), modifier = Modifier.weight(1f)) { Text(if (busy) copy.searching else copy.searchOnline) }
+            OutlinedButton(onClick = onTriggerHardwareScanner, enabled = !busy, modifier = Modifier.weight(1f)) { Text(copy.startBuiltInScanner) }
         }
-        if (keyword.isBlank()) Text("输入后可查询本机缓存，也可联网查询完整订单、工单和客户。", color = POS_MUTED)
+        if (keyword.isBlank()) Text(copy.scanEmptyHint, color = POS_MUTED)
         ticketMatches.forEach { ticket ->
-            OutlinedButton(onClick = { onOpenTicket(ticket) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("工单 ${ticket.ticketNo ?: ticket.id.takeLast(8)} · ${ticket.customerName}") }
+            OutlinedButton(onClick = { onOpenTicket(ticket) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("${copy.ticketPrefix.format(ticket.ticketNo ?: ticket.id.takeLast(8))} · ${ticket.customerName}") }
         }
         productMatches.forEach { product ->
-            OutlinedButton(onClick = { onAddProduct(product) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("商品 ${product.name} · 加入收银") }
+            OutlinedButton(onClick = { onAddProduct(product) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.productAddToTill.format(product.name)) }
         }
         customerMatches.forEach { customer ->
             OutlinedButton(onClick = { onStartIntakeForCustomer(customer) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("客户 ${customer.fullName} · 服务开单") }
         }
         if (searchResults.isNotEmpty()) {
-            Text("联网查询结果", color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(copy.onlineSearchResults, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             searchResults.forEach { result ->
                 Card(
                     modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { onOpenSearchResult(result) },
@@ -4704,7 +4704,7 @@ private fun NativeMoreScanView(
                 }
             }
         }
-        if (keyword.isNotBlank() && ticketMatches.isEmpty() && productMatches.isEmpty() && customerMatches.isEmpty() && searchResults.isEmpty()) Text("未找到已缓存记录；可点击联网查询。", color = POS_MUTED)
+        if (keyword.isNotBlank() && ticketMatches.isEmpty() && productMatches.isEmpty() && customerMatches.isEmpty() && searchResults.isEmpty()) Text(copy.noMatchFound, color = POS_MUTED)
         message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
 }
@@ -4719,9 +4719,9 @@ private fun NativeMoreOrdersView(
     onRefresh: () -> Unit,
     onOpenOrder: (String) -> Unit,
 ) {
-    NativeMorePage(copy, "订单管理", onBack) {
-        OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "正在加载…" else "刷新订单") }
-        if (!busy && orders.isEmpty()) Text("当前没有可显示订单，联网后点击刷新。", color = POS_MUTED)
+    NativeMorePage(copy, copy.menuOrders, onBack) {
+        OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.refreshOrders) }
+        if (!busy && orders.isEmpty()) Text(copy.noOrdersToShow, color = POS_MUTED)
         orders.forEach { order ->
             Card(
                 modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { onOpenOrder(order.id) },
@@ -4729,9 +4729,9 @@ private fun NativeMoreOrdersView(
                 colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
             ) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("订单 ${order.id.takeLast(8).uppercase()}", color = POS_INK, fontWeight = FontWeight.SemiBold)
+                    Text(copy.orderPrefix.format(order.id.takeLast(8).uppercase()), color = POS_INK, fontWeight = FontWeight.SemiBold)
                     Text("${order.customerName ?: "散客"} · ${order.itemCount} 项 · ${order.status} · ${order.paymentStatus}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                    Text("${order.totalAmount} ${order.currency} · 点击处理订单", color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
+                    Text("${order.totalAmount} ${order.currency} · ${copy.tapToProcessOrder}", color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
                 }
             }
         }
@@ -4753,35 +4753,35 @@ private fun NativeMoreOrderDetailView(
 ) {
     var tendered by remember(order?.id) { mutableStateOf("") }
     var showTenderInput by remember(order?.id) { mutableStateOf(false) }
-    NativeMorePage(copy, "订单详情", onBack) {
-        OutlinedButton(onClick = onRefresh, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "正在加载…" else "刷新订单") }
+    NativeMorePage(copy, copy.menuOrderDetail, onBack) {
+        OutlinedButton(onClick = onRefresh, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.refreshOrders) }
         if (order == null) {
-            Text("联网后打开一张订单查看详情。", color = POS_MUTED)
+            Text(copy.openOrderWhenOnline, color = POS_MUTED)
             message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
             return@NativeMorePage
         }
         val outstanding = outstandingAmount(order.totalAmount, order.paidAmount)
-        NativeReferenceRow("客户", order.customerName ?: "散客", null)
-        NativeReferenceRow("订单状态", "${order.status} · ${order.paymentStatus}", null)
-        NativeReferenceRow("订单金额", "已收 ${order.paidAmount} ${order.currency}", "${order.totalAmount} ${order.currency}")
+        NativeReferenceRow(copy.customerLabel, order.customerName ?: copy.walkInCustomer, null)
+        NativeReferenceRow(copy.orderStatus, "${order.status} · ${order.paymentStatus}", null)
+        NativeReferenceRow(copy.orderAmount, copy.paidPrefix.format("${order.paidAmount} ${order.currency}"), "${order.totalAmount} ${order.currency}")
         if (isPositiveDecimal(outstanding) && order.status != "cancelled" && order.status != "delivered") {
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("现金收款", color = POS_INK, fontWeight = FontWeight.SemiBold)
-                    Text("待收 $outstanding ${order.currency}。线上订单收款会使用当前班次与钱箱。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.cashCollection, color = POS_INK, fontWeight = FontWeight.SemiBold)
+                    Text(copy.outstandingHint.format("$outstanding ${order.currency}"), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     if (showTenderInput) {
-                        TextField(value = tendered, onValueChange = { tendered = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text("实收现金（用于找零）") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                        TextButton(onClick = { tendered = ""; showTenderInput = false }) { Text("按待收金额收款") }
+                        TextField(value = tendered, onValueChange = { tendered = it.filter { char -> char.isDigit() || char == '.' } }, label = { Text(copy.tenderedForChange) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                        TextButton(onClick = { tendered = ""; showTenderInput = false }) { Text(copy.chargeOutstanding) }
                     } else {
-                        Text("现金收款将默认按待收金额入账。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                        OutlinedButton(onClick = { showTenderInput = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("输入实收金额并找零") }
+                        Text(copy.defaultChargeOutstanding, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        OutlinedButton(onClick = { showTenderInput = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.enterTenderAndChange) }
                     }
                     Button(
                         onClick = { onRecordCash(order, tendered) },
                         enabled = internetAvailable && !busy && (tendered.isBlank() || isAtLeast(tendered, outstanding)),
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                    ) { Text("确认收取现金") }
+                    ) { Text(copy.confirmTakeCash) }
                 }
             }
         }
@@ -4791,17 +4791,17 @@ private fun NativeMoreOrderDetailView(
             else -> emptyList()
         }
         if (transitions.isNotEmpty()) {
-            Text("订单处理", color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(copy.orderProcessing, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             transitions.forEach { target ->
                 OutlinedButton(onClick = { onChangeStatus(order, target) }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) {
-                    Text(if (target == "received") "确认接单" else "确认交付")
+                    Text(if (target == "received") copy.confirmReceived else copy.confirmDelivered)
                 }
             }
         }
-        Text("订单项目", color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        order.items.forEach { item -> NativeReferenceRow(item.name, "数量 ${item.quantity}", "${item.lineAmount} ${order.currency}") }
+        Text(copy.orderItems, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        order.items.forEach { item -> NativeReferenceRow(item.name, copy.quantityPrefix.format(item.quantity), "${item.lineAmount} ${order.currency}") }
         if (order.payments.isNotEmpty()) {
-            Text("收款记录", color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(copy.paymentRecords, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             order.payments.forEach { payment ->
                 NativeReferenceRow(payment.method, "${payment.status} · ${payment.createdAt}", "${payment.amount} ${order.currency}")
             }
@@ -4821,20 +4821,20 @@ private fun NativeMoreStatisticsView(
     period: String,
     onPeriodChange: (String) -> Unit,
 ) {
-    NativeMorePage(copy, "经营数据", onBack) {
+    NativeMorePage(copy, copy.menuStatistics, onBack) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("today" to "今天", "week" to "本周", "month" to "本月", "all" to "全部").forEach { (value, label) ->
+            listOf("today" to copy.periodToday, "week" to copy.periodWeek, "month" to copy.periodMonth, "all" to copy.periodAll).forEach { (value, label) ->
                 OutlinedButton(onClick = { onPeriodChange(value) }, enabled = !busy) { Text(if (period == value) "✓ $label" else label) }
             }
         }
-        OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "正在加载…" else "刷新数据") }
+        OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.refreshData) }
         if (statistics != null) {
             val data = statistics
-            NativeReferenceRow("订单", "${data.orderCount} 笔 · 未结 ${data.unpaidCount} 笔", data.paidAmount)
-            NativeReferenceRow("工单", "${data.ticketTotal} 张 · 超期 ${data.ticketOverdue} 张", null)
-            NativeReferenceRow("客户", "${data.customerTotal} 位 · 今日新增 ${data.todayNewCustomers} 位", null)
+            NativeReferenceRow(copy.ordersLabel, copy.ordersSummary.format(data.orderCount, data.unpaidCount), data.paidAmount)
+            NativeReferenceRow(copy.ticketsLabel, copy.ticketsSummary.format(data.ticketTotal, data.ticketOverdue), null)
+            NativeReferenceRow(copy.customerLabel, copy.customersSummary.format(data.customerTotal, data.todayNewCustomers), null)
         } else if (!busy) {
-            Text("联网后点击刷新加载经营数据。", color = POS_MUTED)
+            Text(copy.statisticsWhenOnline, color = POS_MUTED)
         }
         message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
@@ -4854,12 +4854,12 @@ private fun NativeMoreNotificationsView(
     onArchive: (String) -> Unit,
     onOpenRelated: (NativeMoreNotification) -> Unit,
 ) {
-    NativeMorePage(copy, "通知中心", onBack) {
+    NativeMorePage(copy, copy.menuNotifications, onBack) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.weight(1f)) { Text(if (busy) "正在加载…" else "刷新通知") }
+            OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.weight(1f)) { Text(if (busy) copy.loading else copy.refreshNotifications) }
             OutlinedButton(onClick = onMarkAllRead, enabled = internetAvailable && !busy && notifications.any { it.readStatus == "unread" }, modifier = Modifier.weight(1f)) { Text("全部已读") }
         }
-        if (!busy && notifications.isEmpty()) Text("当前没有可显示通知，联网后点击刷新。", color = POS_MUTED)
+        if (!busy && notifications.isEmpty()) Text(copy.noNotifications, color = POS_MUTED)
         notifications.forEach { notification ->
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -4873,7 +4873,7 @@ private fun NativeMoreNotificationsView(
                         OutlinedButton(onClick = { onOpenRelated(notification) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (notification.relatedType == "order") "打开关联订单" else "打开关联工单") }
                     }
                     if (notification.readStatus != "archived") {
-                        TextButton(onClick = { onArchive(notification.deliveryId) }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text("归档通知") }
+                        TextButton(onClick = { onArchive(notification.deliveryId) }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.archiveNotification) }
                     }
                 }
             }
@@ -4908,55 +4908,56 @@ private fun NativeMoreSettingsView(
             roundingRule = it.roundingRule
         }
     }
-    NativeMorePage(copy, "终端设置", onBack) {
-        OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "正在加载…" else "刷新终端设置") }
-        terminal?.let { NativeReferenceRow("终端", it.terminalId, it.branchName) }
+    NativeMorePage(copy, copy.menuSettings, onBack) {
+        OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) copy.loading else copy.refreshTerminalSettings) }
+        terminal?.let { NativeReferenceRow(copy.terminalLabel, it.terminalId, it.branchName) }
         Card(
             modifier = Modifier.fillMaxWidth().clickable(enabled = !busy) { onOpenHardware() },
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND),
         ) {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text("打印、钱箱与扫码器", color = POS_INK, fontWeight = FontWeight.SemiBold)
-                Text("查看本机内置设备状态，测试并登记收据打印机与扫码器。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
-                Text("打开硬件设置", color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
+                Text(copy.printerDrawerScanner, color = POS_INK, fontWeight = FontWeight.SemiBold)
+                Text(copy.hardwareSettingsHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                Text(copy.openHardwareSettings, color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
             }
         }
         if (settings != null) {
             val value = settings
-            NativeReferenceRow("收银方式", value.cashHandlingMode, null)
+            NativeReferenceRow(copy.cashHandlingMode, value.cashHandlingMode, null)
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("本机终端偏好", color = POS_INK, fontWeight = FontWeight.SemiBold)
-                    TextField(value = label, onValueChange = { label = it }, label = { Text("终端名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    TextField(value = lockTimeout, onValueChange = { lockTimeout = it.filter(Char::isDigit) }, label = { Text("自动锁定秒数") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    Text("自动打印份数", color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
+                    Text(copy.terminalPreferences, color = POS_INK, fontWeight = FontWeight.SemiBold)
+                    TextField(value = label, onValueChange = { label = it }, label = { Text(copy.terminalName) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    TextField(value = lockTimeout, onValueChange = { lockTimeout = it.filter(Char::isDigit) }, label = { Text(copy.autoLockSeconds) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+                    Text(copy.autoPrintCopies, color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("1" to "1 联", "2" to "2 联", "3" to "3 联").forEach { (value, copy) ->
-                            OutlinedButton(onClick = { printCopies = value }, modifier = Modifier.weight(1f)) { Text(if (printCopies == value) "✓ $copy" else copy) }
+                        listOf("1", "2", "3").forEach { value ->
+                            val optionLabel = copy.copiesSuffix.format(value)
+                            OutlinedButton(onClick = { printCopies = value }, modifier = Modifier.weight(1f)) { Text(if (printCopies == value) "✓ $optionLabel" else optionLabel) }
                         }
                     }
-                    Text("收据打印", color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
+                    Text(copy.receiptPrinting, color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { autoPrint = true }, modifier = Modifier.weight(1f)) { Text(if (autoPrint) "✓ 自动打印" else "自动打印") }
-                        OutlinedButton(onClick = { autoPrint = false }, modifier = Modifier.weight(1f)) { Text(if (!autoPrint) "✓ 手动打印" else "手动打印") }
+                        OutlinedButton(onClick = { autoPrint = true }, modifier = Modifier.weight(1f)) { Text(if (autoPrint) "✓ ${copy.autoPrintOption}" else copy.autoPrintOption) }
+                        OutlinedButton(onClick = { autoPrint = false }, modifier = Modifier.weight(1f)) { Text(if (!autoPrint) "✓ ${copy.manualPrintOption}" else copy.manualPrintOption) }
                     }
-                    Text("现金取整", color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
+                    Text(copy.cashRounding, color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        listOf("none" to "不取整", "round_jiao" to "取整到角", "round_yuan" to "取整到元").forEach { (rule, copy) ->
-                            OutlinedButton(onClick = { roundingRule = rule }) { Text(if (roundingRule == rule) "✓ $copy" else copy) }
+                        listOf("none" to copy.roundingNone, "round_jiao" to copy.roundingJiao, "round_yuan" to copy.roundingYuan).forEach { (rule, optionLabel) ->
+                            OutlinedButton(onClick = { roundingRule = rule }) { Text(if (roundingRule == rule) "✓ $optionLabel" else optionLabel) }
                         }
                     }
                     Button(
                         onClick = { onSave(label, lockTimeout, autoPrint, printCopies, roundingRule) },
                         enabled = !busy,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text(if (busy) "正在保存…" else "保存终端设置") }
+                    ) { Text(if (busy) copy.saving else copy.saveTerminalSettings) }
                 }
             }
-            NativeReferenceRow("同步状态", value.syncStatus, value.lastSyncError)
+            NativeReferenceRow(copy.syncStatus, value.syncStatus, value.lastSyncError)
         } else if (!busy) {
-            Text("联网后点击刷新加载终端设置。", color = POS_MUTED)
+            Text(copy.settingsWhenOnline, color = POS_MUTED)
         }
         message?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
     }
@@ -4991,26 +4992,26 @@ private fun NativeMoreHardwareView(
     val externalPrinterTargets = configuredDevices.filter {
         it.deviceType == "printer" && it.status == "active" && it.provisioningMode != "built_in"
     }
-    NativeMorePage(copy, "打印与硬件", onBack) {
-        Text("这里直接读取 Android POS 的原生硬件服务；设备登记会沿用原 POS Web 的终端级配置。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+    NativeMorePage(copy, copy.menuHardware, onBack) {
+        Text(copy.hardwareIntro, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
-            Text(if (busy) "正在检测…" else "刷新硬件状态")
+            Text(if (busy) copy.detecting else copy.refreshHardware)
         }
         if (hardwareStatus == null) {
-            Text("正在读取本机硬件状态。", color = POS_MUTED)
+            Text(copy.readingHardware, color = POS_MUTED)
         } else {
-            NativeReferenceRow("硬件型号", hardwareStatus.hardwareModel, hardwareStatus.host)
+            NativeReferenceRow(copy.hardwareModel, hardwareStatus.hardwareModel, hardwareStatus.host)
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("内置收据打印机", color = POS_INK, fontWeight = FontWeight.SemiBold)
+                    Text(copy.builtInPrinter, color = POS_INK, fontWeight = FontWeight.SemiBold)
                     Text(
-                        hardwareStatus.printerName ?: "当前设备未检测到受支持的内置打印机",
+                        hardwareStatus.printerName ?: copy.noBuiltInPrinter,
                         color = POS_MUTED,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     NativeReferenceRow(
                         "状态",
-                        if (hardwareStatus.printerConnected) hardwareStatus.printerStatus ?: "已连接" else "未连接",
+                        if (hardwareStatus.printerConnected) hardwareStatus.printerStatus ?: copy.connected else copy.notConnected,
                         hardwareStatus.printerId,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -5018,27 +5019,27 @@ private fun NativeMoreHardwareView(
                             onClick = onTestPrinter,
                             enabled = !busy && hardwareStatus.printerConnected && hardwareStatus.printerStatusCode == 0,
                             modifier = Modifier.weight(1f),
-                        ) { Text("打印测试页") }
+                        ) { Text(copy.printTestPage) }
                         Button(
                             onClick = { onConnectBuiltIn("printer") },
                             enabled = !busy && canManageSensitiveHardware && internetAvailable && hardwareStatus.printerConnected && hardwareStatus.printerStatusCode == 0,
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                        ) { Text("测试并登记") }
+                        ) { Text(copy.testAndRegister) }
                     }
                 }
             }
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("内置扫码器", color = POS_INK, fontWeight = FontWeight.SemiBold)
+                    Text(copy.builtInScanner, color = POS_INK, fontWeight = FontWeight.SemiBold)
                     Text(
-                        hardwareStatus.scannerName ?: "当前设备未检测到受支持的内置扫码器",
+                        hardwareStatus.scannerName ?: copy.noBuiltInScanner,
                         color = POS_MUTED,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     NativeReferenceRow(
                         "状态",
-                        if (hardwareStatus.scannerConnected) "已连接，可开始扫描" else "未连接",
+                        if (hardwareStatus.scannerConnected) copy.connectedReadyToScan else copy.notConnected,
                         hardwareStatus.scannerId,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -5046,21 +5047,21 @@ private fun NativeMoreHardwareView(
                             onClick = onTriggerScanner,
                             enabled = !busy && hardwareStatus.scannerConnected,
                             modifier = Modifier.weight(1f),
-                        ) { Text("启动扫码测试") }
+                        ) { Text(copy.startScanTest) }
                         Button(
                             onClick = { onConnectBuiltIn("scanner") },
                             enabled = !busy && canManageSensitiveHardware && internetAvailable && hardwareStatus.scannerConnected,
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                        ) { Text("测试并登记") }
+                        ) { Text(copy.testAndRegister) }
                     }
                 }
             }
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("钱箱", color = POS_INK, fontWeight = FontWeight.SemiBold)
+                    Text(copy.drawerTitle, color = POS_INK, fontWeight = FontWeight.SemiBold)
                     Text(
-                        if (hardwareStatus.cashDrawerConnected) "本机钱箱服务已连接；手动测试会先向服务端申请审计授权。" else "当前设备没有可用的钱箱服务。",
+                        if (hardwareStatus.cashDrawerConnected) copy.drawerConnectedHint else copy.drawerUnavailable,
                         color = POS_MUTED,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -5068,16 +5069,16 @@ private fun NativeMoreHardwareView(
                         onClick = onOpenDrawer,
                         enabled = !busy && canManageSensitiveHardware && internetAvailable && hardwareStatus.cashDrawerConnected,
                         modifier = Modifier.fillMaxWidth(),
-                    ) { Text("申请授权并测试开钱箱") }
+                    ) { Text(copy.authoriseAndTestDrawer) }
                 }
             }
         }
         if (!canManageSensitiveHardware) {
-            Text("只有店主或经理可以登记设备、修改默认打印机和手动测试钱箱。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+            Text(copy.hardwareManagerOnly, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         }
-        Text("已登记设备", color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Text(copy.registeredDevices, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         if (configuredDevices.isEmpty()) {
-            Text(if (internetAvailable) "尚未读取到本终端已登记的设备。" else "恢复网络后可读取终端已登记的设备。", color = POS_MUTED)
+            Text(if (internetAvailable) copy.noRegisteredDevicesOnline else copy.noRegisteredDevicesOffline, color = POS_MUTED)
         } else {
             configuredDevices.forEach { device ->
                 val isDefaultReceiptPrinter = device.deviceType == "printer" &&
@@ -5088,55 +5089,55 @@ private fun NativeMoreHardwareView(
                     title = device.name,
                     detail = "${nativeHardwareDeviceTypeLabel(device.deviceType, copy)} · ${device.provisioningMode} · ${device.connectionType}",
                     amount = when {
-                        isDefaultReceiptPrinter -> "默认收据机"
-                        device.status == "active" -> "已启用"
-                        else -> "未启用"
+                        isDefaultReceiptPrinter -> copy.defaultReceiptPrinter
+                        device.status == "active" -> copy.deviceEnabled
+                        else -> copy.deviceDisabled
                     },
                 )
             }
         }
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("外接蓝牙打印机", color = POS_INK, fontWeight = FontWeight.SemiBold)
-                Text("先在 Android 系统蓝牙中完成配对，再在这里测试并绑定到后台登记的打印机。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                Text(copy.bluetoothPrinter, color = POS_INK, fontWeight = FontWeight.SemiBold)
+                Text(copy.bluetoothIntro, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = onRequestBluetoothPermissions,
                         enabled = !busy,
                         modifier = Modifier.weight(1f),
-                    ) { Text("授权蓝牙") }
+                    ) { Text(copy.authoriseBluetooth) }
                     Button(
                         onClick = onRefreshBluetoothPrinters,
                         enabled = !busy,
                         modifier = Modifier.weight(1f),
                         colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                    ) { Text("读取已配对设备") }
+                    ) { Text(copy.readPairedDevices) }
                 }
                 if (bluetoothPrinters.isEmpty()) {
-                    Text("尚未读取到已配对蓝牙打印机。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.noPairedPrinters, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 }
                 bluetoothPrinters.forEach { printer ->
-                    NativeReferenceRow("${printer.name}", printer.id.removePrefix("bluetooth:"), "已配对")
+                    NativeReferenceRow("${printer.name}", printer.id.removePrefix("bluetooth:"), copy.paired)
                     if (canManageSensitiveHardware && externalPrinterTargets.isNotEmpty()) {
                         externalPrinterTargets.forEach { target ->
                             OutlinedButton(
                                 onClick = { onBindBluetoothPrinter(target, printer) },
                                 enabled = !busy && internetAvailable,
                                 modifier = Modifier.fillMaxWidth(),
-                            ) { Text("测试并绑定到 ${target.name}") }
+                            ) { Text(copy.testAndBindTo.format(target.name)) }
                         }
                     }
                 }
                 if (canManageSensitiveHardware && externalPrinterTargets.isEmpty()) {
-                    Text("请先在租户后台为当前终端创建并启用一个外接打印机设备。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.needRegisteredPrinter, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
         Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
             Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("本地收据队列", color = POS_INK, fontWeight = FontWeight.SemiBold)
+                Text(copy.localReceiptQueue, color = POS_INK, fontWeight = FontWeight.SemiBold)
                 Text(
-                    "待打印 ${receiptPrintQueue.pending} 张；失败 ${receiptPrintQueue.failed} 张（为避免重复出纸，失败任务不会自动重试）。",
+                    copy.receiptQueueSummary.format(receiptPrintQueue.pending, receiptPrintQueue.failed),
                     color = POS_MUTED,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -5145,9 +5146,9 @@ private fun NativeMoreHardwareView(
                     enabled = !busy && hardwareStatus?.printerConnected == true && hardwareStatus.printerStatusCode == 0 &&
                         isCurrentPrinterSelected && receiptPrintQueue.pending > 0,
                     modifier = Modifier.fillMaxWidth(),
-                ) { Text("打印下一张收据") }
+                ) { Text(copy.printNextReceipt) }
                 if (receiptPrintQueue.pending > 0 && !isCurrentPrinterSelected) {
-                    Text("请使用后台登记的默认收据打印机打印，队列会保留在本机。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.useDefaultPrinterHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -5266,7 +5267,7 @@ private fun TerminalEnrollmentView(
                 Text(if (branch.id == branchId) "✓ ${branch.name}" else branch.name)
             }
         }
-        TextField(label, { label = it }, label = { Text("终端名称") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        TextField(label, { label = it }, label = { Text(copy.terminalName) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Button(onClick = { onEnroll(branchId, label) }, enabled = label.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) {
             Text(if (requiresReenrollment) "撤销旧终端并重新绑定" else "绑定并继续")
         }
@@ -6245,7 +6246,7 @@ private fun NativeCashCheckoutDialog(
                         Text("确认结款", color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         Text("本期仅支持现金收款；金额以服务端价格预览为准。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     }
-                    TextButton(onClick = onDismiss, enabled = !busy) { Text("返回") }
+                    TextButton(onClick = onDismiss, enabled = !busy) { Text(copy.back) }
                 }
 
                 Card(
