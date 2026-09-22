@@ -374,6 +374,9 @@ fun NativePosApp(applicationContext: Context) {
     var snapshot by remember { mutableStateOf<NativePosSnapshot?>(null) }
     var bootstrapIdentity by remember { mutableStateOf<NativePosBootstrapIdentity?>(null) }
     var pinLanguage by remember { mutableStateOf(NativePinLanguage.fromCode(session.pinLanguageCode())) }
+    // The terminal's chosen language now reaches the whole POS, not just the
+    // PIN screen it was previously limited to.
+    val copy = nativePosCopy(pinLanguage.code)
     var cart by remember { mutableStateOf(NativePosCart.empty("XOF")) }
     var message by remember { mutableStateOf<String?>(null) }
     var checkoutFailure by remember { mutableStateOf<String?>(null) }
@@ -474,8 +477,8 @@ fun NativePosApp(applicationContext: Context) {
                         status = "内置扫码器已登记，可在收银、开单和查询页直接使用。",
                     )
                 } catch (error: Exception) {
-                    message = error.userMessage()
-                    scannerSession = scannerSession?.copy(status = error.userMessage())
+                    message = error.userMessage(copy)
+                    scannerSession = scannerSession?.copy(status = error.userMessage(copy))
                 } finally {
                     busy = false
                 }
@@ -678,7 +681,7 @@ fun NativePosApp(applicationContext: Context) {
                 message = executeReceiptPrint() ?: "没有待打印的收据。"
                 receiptPrintQueue = withContext(Dispatchers.IO) { database.receiptPrintQueueState() }
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -755,7 +758,7 @@ fun NativePosApp(applicationContext: Context) {
                     else -> "目录、班次和钱箱状态已同步。"
                 }
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -796,7 +799,7 @@ fun NativePosApp(applicationContext: Context) {
                 refreshed.second?.let { hardwareDevices = it }
                 message = if (internetAvailable) "已刷新本机硬件和已登记设备。" else "已刷新本机硬件状态。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -825,7 +828,7 @@ fun NativePosApp(applicationContext: Context) {
                 bluetoothPrinters = withContext(Dispatchers.IO) { hardware.pairedBluetoothPrinters() }
                 message = if (bluetoothPrinters.isEmpty()) "没有读取到已配对的蓝牙打印机。" else "已读取 ${bluetoothPrinters.size} 台已配对蓝牙打印机。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -874,7 +877,7 @@ fun NativePosApp(applicationContext: Context) {
                 hardwareDevices = devices
                 message = "已测试并绑定 ${printer.name}。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -900,7 +903,7 @@ fun NativePosApp(applicationContext: Context) {
                 hardwareStatus = withContext(Dispatchers.IO) { hardware.status() }
                 message = result.message
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -925,7 +928,7 @@ fun NativePosApp(applicationContext: Context) {
                 hardwareStatus = withContext(Dispatchers.IO) { hardware.status() }
                 message = result.message
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -954,7 +957,7 @@ fun NativePosApp(applicationContext: Context) {
             try {
                 registerBuiltInHardware(deviceType, scannerAlreadyTested = false)
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -979,7 +982,7 @@ fun NativePosApp(applicationContext: Context) {
                 hardwareStatus = withContext(Dispatchers.IO) { hardware.status() }
                 message = result.message
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1043,7 +1046,7 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 message = null
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1066,7 +1069,7 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 message = null
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1092,7 +1095,7 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 message = null
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1122,7 +1125,7 @@ fun NativePosApp(applicationContext: Context) {
                             selectedTicketDetail = NativeTicketDetail(ticket, emptyList())
                             refreshSelectedTicket(ticket.id, ticket.currency)
                         } catch (error: Exception) {
-                            message = error.userMessage()
+                            message = error.userMessage(copy)
                         } finally {
                             busy = false
                         }
@@ -1145,7 +1148,7 @@ fun NativePosApp(applicationContext: Context) {
                             }
                             activeTab = NativePosTab.Intake
                         } catch (error: Exception) {
-                            message = error.userMessage()
+                            message = error.userMessage(copy)
                         } finally {
                             busy = false
                         }
@@ -1193,7 +1196,7 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 message = "终端设置已保存。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1220,7 +1223,7 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 message = if (refreshWarning == null) successMessage else "$successMessage 本机缓存稍后会自动刷新。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1251,7 +1254,7 @@ fun NativePosApp(applicationContext: Context) {
                 val successMessage = if (type == "pay_in") "现金存入已记录。" else "现金支出已记录。"
                 message = if (refreshWarning == null) successMessage else "$successMessage 本机缓存稍后会自动刷新。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1311,9 +1314,9 @@ fun NativePosApp(applicationContext: Context) {
                     }
                 }
                 reload()
-                message = "现金收款已记录。"
+                message = copy.cashPaymentRecorded
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1340,7 +1343,7 @@ fun NativePosApp(applicationContext: Context) {
                 reload()
                 message = "订单状态已更新。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1360,7 +1363,7 @@ fun NativePosApp(applicationContext: Context) {
                     if (it.deliveryId == deliveryId) it.copy(readStatus = "read") else it
                 }
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1379,7 +1382,7 @@ fun NativePosApp(applicationContext: Context) {
                 moreNotifications = moreNotifications.map { it.copy(readStatus = "read") }
                 message = "全部通知已标记为已读。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1399,7 +1402,7 @@ fun NativePosApp(applicationContext: Context) {
                     if (it.deliveryId == deliveryId) it.copy(readStatus = "archived") else it
                 }
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1421,7 +1424,7 @@ fun NativePosApp(applicationContext: Context) {
                 activeTab = NativePosTab.Workspace
                 message = "员工登录成功，本地目录与收银状态已更新。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1451,7 +1454,7 @@ fun NativePosApp(applicationContext: Context) {
                     else -> message = "PIN 不正确，请重试。"
                 }
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1469,7 +1472,7 @@ fun NativePosApp(applicationContext: Context) {
                 reload()
                 message = "班次已开始，请打开钱箱后收银。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1503,7 +1506,7 @@ fun NativePosApp(applicationContext: Context) {
                     "收银台已开启；本机缓存稍后会自动刷新。"
                 }
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1531,7 +1534,7 @@ fun NativePosApp(applicationContext: Context) {
                     "收银台已关闭；本机缓存稍后会自动刷新。"
                 }
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1553,7 +1556,7 @@ fun NativePosApp(applicationContext: Context) {
                 activeTab = NativePosTab.Workspace
                 message = "班次已结束，请由下一位员工输入 PIN 登录。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1601,7 +1604,7 @@ fun NativePosApp(applicationContext: Context) {
                 reload()
                 message = "客户已创建并同步到本机。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1616,7 +1619,7 @@ fun NativePosApp(applicationContext: Context) {
         expectedPickupText: String,
     ) {
         if (!internetAvailable) {
-            message = TICKET_REQUIRES_NETWORK
+            message = copy.requiresNetwork
             return
         }
         scope.launch {
@@ -1649,7 +1652,7 @@ fun NativePosApp(applicationContext: Context) {
                     ?.let { NativeTicketDetail(it, emptyList()) }
                 message = "服务工单已创建。请在工单详情中录入服务项目。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1679,7 +1682,7 @@ fun NativePosApp(applicationContext: Context) {
                 refreshSelectedTicket(ticket.id, ticket.currency)
                 message = null
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1691,7 +1694,7 @@ fun NativePosApp(applicationContext: Context) {
         draft: NativeTicketItemDraft,
     ) {
         if (!internetAvailable) {
-            message = TICKET_REQUIRES_NETWORK
+            message = copy.requiresNetwork
             return
         }
         scope.launch {
@@ -1720,7 +1723,7 @@ fun NativePosApp(applicationContext: Context) {
                 refreshSelectedTicket(ticket.id, ticket.currency)
                 message = "服务项目已加入工单。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1733,7 +1736,7 @@ fun NativePosApp(applicationContext: Context) {
         update: NativeTicketItemUpdate,
     ) {
         if (!internetAvailable) {
-            message = TICKET_REQUIRES_NETWORK
+            message = copy.requiresNetwork
             return
         }
         scope.launch {
@@ -1762,7 +1765,7 @@ fun NativePosApp(applicationContext: Context) {
                 refreshSelectedTicket(ticket.id, ticket.currency)
                 message = "服务项目已更新。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1771,7 +1774,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun deleteServiceTicketItem(ticket: NativeServiceTicket, item: NativeTicketItem, reason: String) {
         if (!internetAvailable) {
-            message = TICKET_REQUIRES_NETWORK
+            message = copy.requiresNetwork
             return
         }
         if (reason.isBlank()) {
@@ -1789,7 +1792,7 @@ fun NativePosApp(applicationContext: Context) {
                 refreshSelectedTicket(ticket.id, ticket.currency)
                 message = "服务项目已删除。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1798,7 +1801,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun changeTicketItemStatus(ticket: NativeServiceTicket, item: NativeTicketItem, nextStatus: String) {
         if (!internetAvailable) {
-            message = TICKET_REQUIRES_NETWORK
+            message = copy.requiresNetwork
             return
         }
         if (nextStatus !in TICKET_ITEM_STATUS_TRANSITIONS[item.itemStatus].orEmpty()) {
@@ -1815,7 +1818,7 @@ fun NativePosApp(applicationContext: Context) {
                 refreshSelectedTicket(ticket.id, ticket.currency)
                 message = "服务项目状态已更新。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -1872,7 +1875,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun changeTicketStatus(ticket: NativeServiceTicket, nextStatus: String, reason: String?) {
         if (!internetAvailable) {
-            message = TICKET_REQUIRES_NETWORK
+            message = copy.requiresNetwork
             return
         }
         if (nextStatus !in TICKET_STATUS_TRANSITIONS[ticket.ticketStatus].orEmpty()) {
@@ -1897,7 +1900,7 @@ fun NativePosApp(applicationContext: Context) {
                 refreshSelectedTicket(ticket.id, ticket.currency)
                 message = "工单状态已更新为“${ticketStatusLabel(nextStatus)}”。"
             } catch (error: Exception) {
-                message = error.userMessage()
+                message = error.userMessage(copy)
             } finally {
                 busy = false
             }
@@ -2071,7 +2074,7 @@ fun NativePosApp(applicationContext: Context) {
                                     setupAdministrator = null
                                     reload()
                                 } catch (error: Exception) {
-                                    message = error.userMessage()
+                                    message = error.userMessage(copy)
                                 } finally {
                                     busy = false
                                 }
@@ -2164,6 +2167,7 @@ fun NativePosApp(applicationContext: Context) {
                         NativeSaleView(
                             current = current,
                             cart = cart,
+                            copy = copy,
                             internetAvailable = internetAvailable,
                             busy = busy,
                             message = message,
@@ -2213,7 +2217,7 @@ fun NativePosApp(applicationContext: Context) {
                                 val cartAtCheckout = cart
                                 val terminalAtCheckout = current.terminal
                                 if (checkoutRequest.tenderedMinor < checkoutRequest.expectedTotalMinor) {
-                                    checkoutFailure = "实收金额不能少于应收金额。"
+                                    checkoutFailure = copy.tenderBelowTotal
                                     message = checkoutFailure
                                     return@NativeSaleView
                                 }
@@ -2249,7 +2253,7 @@ fun NativePosApp(applicationContext: Context) {
                                                 checkoutRequest.cashRoundingStep,
                                             )
                                             if (freshExpectedTotal != checkoutRequest.expectedTotalMinor) {
-                                                throw NativePosValidationException("价格、优惠或税费已更新，请重新确认结款。")
+                                                throw NativePosValidationException(copy.priceChanged)
                                             }
                                             val checkout = cartWriteMutex.withLock {
                                                 database.enqueueCheckout(
@@ -2315,18 +2319,18 @@ fun NativePosApp(applicationContext: Context) {
                                         }
                                         reload()
                                         val saleMessage = if (internetAvailable) {
-                                            "现金订单已提交；如网络在响应中断开，将使用同一订单号安全补传。"
+                                            copy.saleSubmittedOnline
                                         } else {
-                                            "现金订单已写入本地 SQLite 队列；联网后将使用同一订单号安全同步。"
+                                            copy.saleQueuedOffline
                                         }
                                         message = when {
                                             drawerMessage != null -> "$saleMessage $drawerMessage"
                                             autoPrintMessage != null -> "$saleMessage $autoPrintMessage"
-                                            checkout.printJobId != null -> "$saleMessage 收据已加入本地打印队列。"
+                                            checkout.printJobId != null -> "$saleMessage ${copy.receiptQueued}"
                                             else -> saleMessage
                                         }
                                     } catch (error: Exception) {
-                                        val failure = error.userMessage()
+                                        val failure = error.userMessage(copy)
                                         message = failure
                                         checkoutFailure = failure
                                     } finally {
@@ -5546,6 +5550,7 @@ private fun NetworkStatusIndicator(internetAvailable: Boolean) {
 private fun NativeSaleView(
     current: NativePosSnapshot,
     cart: NativePosCart,
+    copy: NativePosCopy,
     internetAvailable: Boolean,
     busy: Boolean,
     message: String?,
@@ -5568,6 +5573,7 @@ private fun NativeSaleView(
         CheckoutPanel(
             cart = cart,
             busy = busy,
+            copy = copy,
             message = message,
             checkoutSettings = checkoutSettings,
             receiptPrinterConfigured = receiptPrinterConfigured,
@@ -5595,10 +5601,10 @@ private fun NativeSaleView(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text("商品目录", color = POS_INK, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(copy.catalogTitle, color = POS_INK, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text(terminal.branchName, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
             }
-            OutlinedButton(onClick = onSynchronize, enabled = !busy) { Text(if (busy) "同步中" else "同步") }
+            OutlinedButton(onClick = onSynchronize, enabled = !busy) { Text(if (busy) copy.syncing else copy.synchronize) }
         }
 
         Row(
@@ -5621,7 +5627,9 @@ private fun NativeSaleView(
         val cacheSyncedAt = current.terminal.lastSyncedAt
         if (nativeCacheFreshness(cacheSyncedAt, System.currentTimeMillis()) == NativeCacheFreshness.Stale) {
             Text(
-                "本机商品与价格已有 ${nativeCacheAgeHours(cacheSyncedAt, System.currentTimeMillis())} 小时未更新，请尽快同步后再继续销售。",
+                copy.staleCatalogWarning.format(
+                    nativeCacheAgeHours(cacheSyncedAt, System.currentTimeMillis()),
+                ),
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = MaterialTheme.colorScheme.error,
                 style = MaterialTheme.typography.bodySmall,
@@ -5856,6 +5864,7 @@ private fun CartQuantityStepper(quantity: Long, onAdd: () -> Unit, onRemove: () 
 private fun CheckoutPanel(
     cart: NativePosCart,
     busy: Boolean,
+    copy: NativePosCopy,
     message: String?,
     checkoutSettings: NativeCheckoutSettings,
     receiptPrinterConfigured: Boolean,
@@ -5937,6 +5946,7 @@ private fun CheckoutPanel(
         NativeCashCheckoutDialog(
             cart = cart,
             busy = busy,
+            copy = copy,
             checkoutSettings = checkoutSettings,
             receiptPrinterConfigured = receiptPrinterConfigured,
             internetAvailable = internetAvailable,
@@ -6093,6 +6103,7 @@ private fun NativeCheckoutProductLine(
 private fun NativeCashCheckoutDialog(
     cart: NativePosCart,
     busy: Boolean,
+    copy: NativePosCopy,
     checkoutSettings: NativeCheckoutSettings,
     receiptPrinterConfigured: Boolean,
     internetAvailable: Boolean,
@@ -6127,7 +6138,7 @@ private fun NativeCashCheckoutDialog(
         }.onSuccess { refreshed ->
             pricing = refreshed
         }.onFailure { error ->
-            pricingError = error.userMessage()
+            pricingError = error.userMessage(copy)
         }
         pricingLoading = false
     }
@@ -6405,7 +6416,7 @@ private fun NativeCashCheckoutDialog(
                 if (useCustomTender && customTenderedMinor == null) {
                     Text("请输入有效的实收金额。", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 } else if (tenderedMinor != null && tenderedMinor < totalMinor) {
-                    Text("实收金额不能少于应收金额。", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.tenderBelowTotal, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
 
                 Button(
@@ -6945,16 +6956,24 @@ private fun Throwable.administratorLoginMessage(): String {
     return userMessage()
 }
 
-private fun Throwable.userMessage(): String = when (this) {
+/**
+ * A message the cashier can act on.
+ *
+ * `copy` carries the terminal's language. A server-supplied `message` is passed
+ * through as-is: the API is not localised per terminal, so translating only the
+ * device's own failures is the honest half of the job -- the rest is listed in
+ * the review as still outstanding.
+ */
+private fun Throwable.userMessage(copy: NativePosCopy = nativePosCopy(null)): String = when (this) {
     // A transport failure now arrives as a NETWORK_ERROR rather than a raw
     // IOException, so it has to be recognised here or the cashier sees the
     // underlying socket message instead of something actionable.
     is NativePosApiException -> when {
         code == "INVALID_CREDENTIALS" -> "PIN 错误，请重试。"
-        code == "NETWORK_ERROR" -> "网络错误，请检查本机网络后重试。"
+        code == "NETWORK_ERROR" -> copy.networkError
         else -> message ?: "无法连接 POS 服务。"
     }
-    is IOException -> "网络错误，请检查本机网络后重试。"
+    is IOException -> copy.networkError
     is NativePosValidationException -> message ?: "输入无效。"
-    else -> "操作未完成：请检查网络或稍后重试。"
+    else -> copy.genericFailure
 }
