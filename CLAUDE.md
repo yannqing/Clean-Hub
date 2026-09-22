@@ -77,7 +77,17 @@ pnpm lint
 - `apps/desktop`: Electron shell for the official Windows/macOS in-store POS runtime and local hardware integration.
 - `apps/mobile`: Capacitor shell for customer-facing and delivery-facing Android/iOS workflows. Do not treat it as the default mobile cashier POS. It loads the static export of `apps/mobile-web`.
 - `apps/mobile-web`: Next.js customer/delivery web UI loaded by `apps/mobile`. It is a client-rendered SPA with no route-guard proxy; authentication is enforced by `apps/api`. The session lives in Capacitor Preferences, which is native storage on a device. Do not serve this app as a website: in a browser Preferences resolves to `localStorage`, which does not meet the HttpOnly cookie rule the web apps follow.
-- `apps/pos-mobile`: Capacitor shell that wraps `apps/pos-web` for Android/iOS, plus the native plugin bridge for Bluetooth ESC/POS printing, scanning and haptics.
+- `apps/pos-mobile`: the Android and iOS POS, whose two platforms are built
+  differently. **Android is a native Jetpack Compose app**, not a WebView:
+  `MainActivity` is a plain `ComponentActivity` that starts `NativePosApp`, and
+  the whole POS lives in
+  `android/app/src/main/kotlin/com/cleanhub/pos/nativepos/` with its own API
+  client, SQLite store, offline replay queue and hardware bridge. Its API origin
+  is compiled into `BuildConfig.CLEANHUB_POS_API_BASE_URL`, and
+  `CLEANHUB_POS_NATIVE_ANDROID=true` drops Capacitor's `server` field for a
+  native package. **iOS is still a Capacitor shell** around the server-rendered
+  `apps/pos-web`. See "Native Android POS" below before changing POS business
+  rules.
 - `apps/api`: standalone backend API service.
 
 ## Shared Packages
@@ -142,6 +152,47 @@ integrated. `apps/api/src/modules/mobile/payment` still has only
 any "is this the mock gateway?" guard is always true.
 
 Customer-facing refund requests are unaffected and still supported.
+
+## Native Android POS
+
+`apps/pos-mobile` on Android does not run `apps/pos-web`. It is a separate
+implementation of the same POS in Kotlin, roughly 10k lines under
+`android/app/src/main/kotlin/com/cleanhub/pos/nativepos/`:
+
+- `NativePosApp.kt` — the entire UI and its view-model logic
+- `NativePosDatabase.kt` — local SQLite: catalog cache, cart, offline queue
+- `NativePosSync.kt` — snapshot refresh and offline checkout replay
+- `NativePosHardware.kt` — T1101 printer, scanner and cash drawer
+- `NativePosApiClient.kt` / `NativePosSession.kt` — transport and credentials
+
+**Server business rules are duplicated here.** Changing any of these in
+`apps/api` or `packages/domain` without changing the Kotlin lets the two drift
+apart silently, and no test catches it:
+
+- ticket and ticket-item state machines — `TICKET_STATUS_TRANSITIONS` and
+  `TICKET_ITEM_STATUS_TRANSITIONS` mirror
+  `pos/service-tickets/service-tickets.state-machine.ts`
+- offline pricing, tax and rounding — `calculateNativeLocalPricing` mirrors
+  `pos/orders/orders.financial.ts`
+- currency minor units — the native code currently special-cases XOF/XAF only,
+  while `packages/domain/src/currency.ts` lists sixteen zero-decimal currencies
+
+Rules that must hold when touching the offline path:
+
+- Money is `Long` minor units or `BigDecimal`. Never `Double`.
+- A request that can be retried carries an idempotency key that survives the
+  retry. Queued checkouts use a deterministic `"$orderId:cash"`; an online
+  payment holds its key until the payment lands (`NativePaymentIdempotency`).
+- Queued sales are independent of each other. One rejected sale must not stop
+  the rest of the queue replaying.
+- A replay is bounded by `NATIVE_REPLAY_MAX_ATTEMPTS`, matching
+  `OFFLINE_QUEUE_MAX_ATTEMPTS` in `packages/offline`.
+
+Android unit tests live in `android/app/src/test` and run with:
+
+```bash
+cd apps/pos-mobile/android && ./gradlew :app:testDebugUnitTest
+```
 
 ## Mobile Release Builds
 

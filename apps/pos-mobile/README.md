@@ -1,9 +1,22 @@
 # CleanHub POS Mobile
 
-这是面向 iPad、iPhone 和 Android 设备的 Capacitor POS 壳。iOS 与 Android
-工程均已纳入仓库，实际业务界面由 `apps/pos-web` 提供。
+面向 iPad、iPhone 和 Android 设备的 POS 客户端。**两个平台的运行模型已经不同**：
 
-## 运行模型
+- **Android 是原生 Jetpack Compose 应用，不是 WebView。** 收银界面由 APK 自身
+  提供，全部代码在 `android/app/src/main/kotlin/com/cleanhub/pos/nativepos/`，
+  有独立的 API 客户端、SQLite 缓存、离线重放队列和硬件桥接。
+  `MainActivity` 是普通 `ComponentActivity`，直接 `setContent { NativePosApp(...) }`，
+  不会启动 Capacitor 的 `BridgeActivity`。API 地址编译进
+  `BuildConfig.CLEANHUB_POS_API_BASE_URL`；打包时 `CLEANHUB_POS_NATIVE_ANDROID=true`
+  会让 `capacitor.config.ts` 省略 `server` 字段。
+  改动收银、订单、工单等业务规则前，请先阅读仓库根目录 `CLAUDE.md` 的
+  「Native Android POS」一节——服务端的部分业务规则在 Kotlin 里有**第二份实现**。
+- **iOS 仍然是 Capacitor 壳**，业务界面由 `apps/pos-web` 提供。
+
+本文件「运行模型」及之后的章节描述的是 **iOS 壳**（以及 Android 在启用原生
+打包之前的旧模式）。
+
+## 运行模型（iOS）
 
 `pos-web` 使用 Next.js Proxy、Server Components、`cookies()` 和 `headers()`，
 不能静态导出。因此本壳的生产模式不是复制 `out/`，而是加载已部署的 HTTPS
