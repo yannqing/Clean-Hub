@@ -5563,6 +5563,18 @@ private fun NativeSaleView(
                 )
             }
         }
+        // Selling from an old catalog is allowed -- a store that lost its
+        // network still has to take money -- but the cashier should know the
+        // prices may have moved.
+        val cacheSyncedAt = current.terminal.lastSyncedAt
+        if (nativeCacheFreshness(cacheSyncedAt, System.currentTimeMillis()) == NativeCacheFreshness.Stale) {
+            Text(
+                "本机商品与价格已有 ${nativeCacheAgeHours(cacheSyncedAt, System.currentTimeMillis())} 小时未更新，请尽快同步后再继续销售。",
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
         if (internetAvailable && current.cashState?.isOfflineCashReady() != true) {
             Text(
                 "本次收款会先联网核验班次和钱箱状态。",
