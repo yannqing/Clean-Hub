@@ -181,8 +181,14 @@ through `copy.<key>`. Two rules follow from how that file is built:
   not a fixed language. The cashier can switch language at the PIN screen
   at any time, and a handover must change the printer's error text too.
 
-Server-supplied error messages are still shown as the API sends them; the
-API is not localised per terminal.
+The API localises the errors it raises for POS and auth paths, so a
+server-supplied message arrives in the terminal's language. The POS sends
+`Accept-Language` on every request from `session.pinLanguageCode()`; the
+catalogue is `apps/api/src/http/error-messages.ts`, keyed by the **English
+message text**, not by the error code. When adding or rewording an error
+message on a POS or auth path, add its `fr`/`zh-CN` translations there —
+`pnpm --filter @cleanhub/api smoke:error-messages` names any message that
+has drifted. Back-office modules keep English messages.
 
 **Server business rules are duplicated here.** Changing any of these in
 `apps/api` or `packages/domain` without changing the Kotlin lets the two drift
