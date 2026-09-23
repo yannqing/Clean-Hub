@@ -15,6 +15,7 @@ import {
   resolveCredentialedCorsOrigin,
 } from "./http/cors-origin.js";
 import { createRequirePosTerminalMiddleware } from "./http/pos-terminal.middleware.js";
+import { createTenantMaintenanceMiddleware } from "./http/maintenance.middleware.js";
 import { createRequestContextMiddleware } from "./http/request-context.middleware.js";
 import type { AppBindings } from "./http/types.js";
 import { requireNonTerminalWebSession } from "./http/web-session.middleware.js";
@@ -250,9 +251,11 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
   app.use("/saas/*", createSystemDatabaseContextMiddleware());
   app.use("/tenant/*", createRequireAuthMiddleware(authService));
   app.use("/tenant/*", requireNonTerminalWebSession());
+  app.use("/tenant/*", createTenantMaintenanceMiddleware());
   app.use("/tenant/*", createTenantDatabaseContextMiddleware());
   app.use("/pos/*", createRequireAuthMiddleware(authService));
   app.use("/pos/*", createRequirePosTerminalMiddleware());
+  app.use("/pos/*", createTenantMaintenanceMiddleware());
   app.use("/pos/*", createTenantDatabaseContextMiddleware());
 
   // SaaS 平台 - 公共模块
