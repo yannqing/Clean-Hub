@@ -11,6 +11,7 @@ const allowedOrigins = [
   "https://cleanhub.example.test",
   "https://pos.cleanhub.example.test",
 ];
+const mobileNativeOrigins = ["https://localhost"];
 
 assert.equal(
   resolveCredentialedCorsOrigin({
@@ -35,6 +36,33 @@ assert.equal(
   }),
   null,
   "the POS origin must not use credentialed CORS against the admin origin",
+);
+assert.equal(
+  resolveCredentialedCorsOrigin({
+    origin: "https://localhost",
+    allowedOrigins: [...allowedOrigins, "https://localhost"],
+    mobileNativeOrigins,
+    authClient: "mobile",
+    enforceSameOrigin: true,
+    requestUrl: "http://api:4000/mobile/customer/orders",
+    forwardedProto: "https",
+    forwardedHost: "api.cleanhub.example.test",
+  }),
+  "https://localhost",
+  "a Capacitor mobile bundle may use its explicit native origin",
+);
+assert.equal(
+  resolveCredentialedCorsOrigin({
+    origin: "https://localhost",
+    allowedOrigins: [...allowedOrigins, "https://localhost"],
+    mobileNativeOrigins,
+    enforceSameOrigin: true,
+    requestUrl: "http://api:4000/mobile/customer/orders",
+    forwardedProto: "https",
+    forwardedHost: "api.cleanhub.example.test",
+  }),
+  null,
+  "the native origin still requires the mobile client marker",
 );
 assert.equal(
   resolveCredentialedCorsOrigin({
@@ -93,6 +121,22 @@ assert.equal(
   }),
   true,
   "same-origin unsafe requests remain allowed",
+);
+assert.equal(
+  isUnsafeRequestOriginAllowed({
+    method: "POST",
+    origin: "https://localhost",
+    allowedOrigins: [...allowedOrigins, "https://localhost"],
+    mobileNativeOrigins,
+    authClient: "mobile",
+    enforceSameOrigin: true,
+    requestUrl: "http://api:4000/mobile/auth/customer/refresh",
+    forwardedProto: "https",
+    forwardedHost: "api.cleanhub.example.test",
+    secFetchSite: "cross-site",
+  }),
+  true,
+  "a marked Capacitor client may make its bearer-token writes",
 );
 assert.equal(
   isUnsafeRequestOriginAllowed({

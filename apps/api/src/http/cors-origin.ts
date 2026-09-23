@@ -1,6 +1,8 @@
 type ResolveCorsOriginInput = {
   origin: string | undefined;
   allowedOrigins: readonly string[];
+  mobileNativeOrigins?: readonly string[];
+  authClient?: string;
   enforceSameOrigin: boolean;
   requestUrl: string;
   forwardedProto?: string;
@@ -13,6 +15,16 @@ type ValidateUnsafeRequestOriginInput = ResolveCorsOriginInput & {
 };
 
 const UNSAFE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+
+function isMobileNativeRequest(
+  input: ResolveCorsOriginInput,
+  normalizedOrigin: string,
+): boolean {
+  return (
+    input.authClient?.trim().toLowerCase() === "mobile" &&
+    input.mobileNativeOrigins?.includes(normalizedOrigin) === true
+  );
+}
 
 function firstForwardedValue(value: string | undefined): string | undefined {
   return value?.split(",", 1)[0]?.trim();
@@ -83,6 +95,13 @@ export function resolveCredentialedCorsOrigin(
     return normalizedOrigin;
   }
 
+  // Capacitor serves the signed mobile bundle from https://localhost while it
+  // talks to the public API with bearer tokens. It cannot use the web apps'
+  // same-origin reverse proxy, so allow this explicit mobile-client origin.
+  if (isMobileNativeRequest(input, normalizedOrigin)) {
+    return normalizedOrigin;
+  }
+
   const requestOrigin = resolvePublicRequestOrigin(input);
   return requestOrigin === normalizedOrigin ? normalizedOrigin : null;
 }
@@ -111,18 +130,27 @@ export function isUnsafeRequestOriginAllowed(
     return true;
   }
 
-  const requestOrigin = resolvePublicRequestOrigin(input);
-  if (!requestOrigin || !input.allowedOrigins.includes(requestOrigin)) {
-    return false;
-  }
-
   if (input.origin) {
     const normalizedOrigin = normalizeOrigin(input.origin);
+    if (normalizedOrigin && isMobileNativeRequest(input, normalizedOrigin)) {
+      return true;
+    }
+
+    const requestOrigin = resolvePublicRequestOrigin(input);
+    if (!requestOrigin || !input.allowedOrigins.includes(requestOrigin)) {
+      return false;
+    }
+
     return (
       normalizedOrigin !== null &&
       input.allowedOrigins.includes(normalizedOrigin) &&
       normalizedOrigin === requestOrigin
     );
+  }
+
+  const requestOrigin = resolvePublicRequestOrigin(input);
+  if (!requestOrigin || !input.allowedOrigins.includes(requestOrigin)) {
+    return false;
   }
 
   return input.secFetchSite?.trim().toLowerCase() === "same-origin";

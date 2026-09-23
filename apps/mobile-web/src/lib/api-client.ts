@@ -36,6 +36,9 @@ async function refreshSessionOnce(): Promise<"retry" | "logout"> {
 export const apiClient = createCleanHubApiClient({
   baseUrl: mobileReleaseConfig.apiBaseUrl,
   credentials: "omit",
+  defaultHeaders: {
+    "X-CleanHub-Auth-Client": "mobile",
+  },
   tokenProvider: getAccessToken,
   onUnauthorized: async () => {
     refreshInFlight ??= refreshSessionOnce().finally(() => {

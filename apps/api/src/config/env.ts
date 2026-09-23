@@ -7,6 +7,7 @@ config({ path: resolve(process.cwd(), "../../.env") });
 export type ApiEnv = {
   port: number;
   corsOrigins: string[];
+  mobileNativeOrigins: string[];
   corsEnforceSameOrigin: boolean;
   databaseRequireRls: boolean;
   nodeEnv: string;
@@ -49,6 +50,9 @@ export function loadApiEnv(env: NodeJS.ProcessEnv = process.env): ApiEnv {
   return {
     port: readPort(env.PORT),
     corsOrigins: readCorsOrigins(env.CORS_ORIGINS),
+    mobileNativeOrigins: readCorsOrigins(
+      env.MOBILE_NATIVE_ORIGINS ?? "https://localhost",
+    ),
     corsEnforceSameOrigin: readBoolean(
       env.CORS_ENFORCE_SAME_ORIGIN,
       nodeEnv === "production",

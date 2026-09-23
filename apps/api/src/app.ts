@@ -148,6 +148,8 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
         method: c.req.method,
         origin: c.req.header("origin"),
         allowedOrigins: apiEnv.corsOrigins,
+        mobileNativeOrigins: apiEnv.mobileNativeOrigins,
+        authClient: c.req.header("x-cleanhub-auth-client"),
         enforceSameOrigin: apiEnv.corsEnforceSameOrigin,
         requestUrl: c.req.url,
         forwardedProto: c.req.header("x-forwarded-proto"),
@@ -175,6 +177,8 @@ export function createApiApp({ env = process.env }: CreateApiAppOptions = {}) {
         resolveCredentialedCorsOrigin({
           origin,
           allowedOrigins: apiEnv.corsOrigins,
+          mobileNativeOrigins: apiEnv.mobileNativeOrigins,
+          authClient: c.req.header("x-cleanhub-auth-client"),
           enforceSameOrigin: apiEnv.corsEnforceSameOrigin,
           requestUrl: c.req.url,
           forwardedProto: c.req.header("x-forwarded-proto"),
