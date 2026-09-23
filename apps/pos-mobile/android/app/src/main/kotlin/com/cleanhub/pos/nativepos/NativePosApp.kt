@@ -402,6 +402,10 @@ fun NativePosApp(applicationContext: Context) {
     // The terminal's chosen language now reaches the whole POS, not just the
     // PIN screen it was previously limited to.
     val copy = nativePosCopy(pinLanguage.code)
+    fun selectLanguage(language: NativePinLanguage) {
+        pinLanguage = language
+        session.savePinLanguageCode(language.code)
+    }
     var cart by remember { mutableStateOf(NativePosCart.empty("XOF")) }
     var message by remember { mutableStateOf<String?>(null) }
     var checkoutFailure by remember { mutableStateOf<String?>(null) }
@@ -1448,16 +1452,19 @@ fun NativePosApp(applicationContext: Context) {
         scope.launch {
             busy = true
             try {
-                withContext(Dispatchers.IO) {
+                val effectiveLanguage = withContext(Dispatchers.IO) {
                     val auth = api.loginWithPin(pin).getJSONObject("authContext")
+                    session.saveTenantDefaultLanguageCode(auth.optString("language"))
                     session.saveOfflinePin(auth.getString("userId"), pin)
                     NativePosSyncEngine(applicationContext).synchronize()
+                    session.pinLanguageCode()
                 }
                 NativePosSyncWorker.schedule(applicationContext)
                 reload()
+                pinLanguage = NativePinLanguage.fromCode(effectiveLanguage)
                 unlocked = true
                 activeTab = NativePosTab.Workspace
-                message = copy.loginSucceeded
+                message = nativePosCopy(effectiveLanguage).loginSucceeded
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -2017,13 +2024,10 @@ fun NativePosApp(applicationContext: Context) {
             .systemBarsPadding(),
     ) {
         when {
-            current == null -> LoadingView()
+            current == null -> LoadingView(copy)
     current.terminal == null && session.hasTerminalCredential() && setupAdministrator == null -> StaffPinGate(
         language = pinLanguage,
-        onLanguageSelected = { language ->
-            pinLanguage = language
-            session.savePinLanguageCode(language.code)
-        },
+        onLanguageSelected = ::selectLanguage,
         tenantName = bootstrapIdentity?.tenantName,
         branchName = bootstrapIdentity?.branchName,
         offlineAvailable = false,
@@ -2037,6 +2041,8 @@ fun NativePosApp(applicationContext: Context) {
             current.terminal == null -> {
                 if (setupAdministrator == null) {
                     FirstLaunchView(copy,
+                        language = pinLanguage,
+                        onLanguageSelected = ::selectLanguage,
                         apiConfigured = api.configured(),
                         busy = busy,
                         message = message,
@@ -2044,6 +2050,8 @@ fun NativePosApp(applicationContext: Context) {
                     )
                 } else if (setupAdministrator!!.branches.isEmpty()) {
                     AdministratorLoginView(copy,
+                        language = pinLanguage,
+                        onLanguageSelected = ::selectLanguage,
                         internetAvailable = internetAvailable,
                         busy = busy,
                         message = message,
@@ -2058,6 +2066,7 @@ fun NativePosApp(applicationContext: Context) {
                                             session.clearAdministratorSession()
                                             throw NativePosValidationException(copy.managerOnlyEnroll)
                                         }
+                                        session.saveTenantDefaultLanguageCode(auth.optString("language"))
                                         val profile = api.get("/tenant/profile")
                                         val branches = profile.optJSONArray("accessibleBranches").toSetupBranches()
                                         if (branches.isEmpty()) throw NativePosValidationException(copy.noBranchesAvailable)
@@ -2068,9 +2077,10 @@ fun NativePosApp(applicationContext: Context) {
                                         )
                                     }
                                     setupAdministrator = admin
+                                    pinLanguage = NativePinLanguage.fromCode(session.pinLanguageCode())
                                     message = null
                                 } catch (error: Exception) {
-                                    message = error.administratorLoginMessage()
+                                    message = error.administratorLoginMessage(copy)
                                 } finally {
                                     busy = false
                                 }
@@ -2079,6 +2089,8 @@ fun NativePosApp(applicationContext: Context) {
                     )
                 } else {
                     TerminalEnrollmentView(copy,
+                        language = pinLanguage,
+                        onLanguageSelected = ::selectLanguage,
                         branches = setupAdministrator!!.branches,
                         requiresReenrollment = setupAdministrator!!.requiresReenrollment,
                         busy = busy,
@@ -2119,6 +2131,8 @@ fun NativePosApp(applicationContext: Context) {
                 }
             }
             !session.hasTerminalCredential() -> TerminalCredentialRecoveryView(copy,
+                language = pinLanguage,
+                onLanguageSelected = ::selectLanguage,
                 internetAvailable = internetAvailable,
                 busy = busy,
                 message = message,
@@ -2133,12 +2147,14 @@ fun NativePosApp(applicationContext: Context) {
                                     session.clearAdministratorSession()
                                     throw NativePosValidationException(copy.managerOnlyRecover)
                                 }
+                                session.saveTenantDefaultLanguageCode(auth.optString("language"))
                                 api.post("/pos/auth/devices/${session.deviceId()}/credential-rotation", JSONObject().put("reason", "Move this POS installation to the native Android app"))
                                 session.clearAdministratorSession()
                             }
-                            message = copy.terminalRecovered
+                            pinLanguage = NativePinLanguage.fromCode(session.pinLanguageCode())
+                            message = nativePosCopy(pinLanguage.code).terminalRecovered
                         } catch (error: Exception) {
-                            message = error.administratorLoginMessage()
+                            message = error.administratorLoginMessage(copy)
                         } finally {
                             busy = false
                         }
@@ -2147,10 +2163,7 @@ fun NativePosApp(applicationContext: Context) {
             )
             !unlocked -> StaffPinGate(
                 language = pinLanguage,
-                onLanguageSelected = { language ->
-                    pinLanguage = language
-                    session.savePinLanguageCode(language.code)
-                },
+                onLanguageSelected = ::selectLanguage,
                 tenantName = current.terminal.merchantName,
                 branchName = current.terminal.branchName,
                 offlineAvailable = session.canUnlockOffline(current.terminal.userId),
@@ -5229,11 +5242,19 @@ private fun NativeBottomNavigation(copy: NativePosCopy, activeTab: NativePosTab,
     }
 }
 
-@Composable private fun LoadingView() = Text(nativePosCopy(null).loadingLocalData, Modifier.padding(24.dp))
+@Composable private fun LoadingView(copy: NativePosCopy) = Text(copy.loadingLocalData, Modifier.padding(24.dp))
 
 @Composable
-private fun FirstLaunchView(copy: NativePosCopy, apiConfigured: Boolean, busy: Boolean, message: String?, onStart: () -> Unit) {
-    FormColumn(copy.initialiseTerminal) {
+private fun FirstLaunchView(
+    copy: NativePosCopy,
+    language: NativePinLanguage,
+    onLanguageSelected: (NativePinLanguage) -> Unit,
+    apiConfigured: Boolean,
+    busy: Boolean,
+    message: String?,
+    onStart: () -> Unit,
+) {
+    FormColumn(copy.initialiseTerminal, language, onLanguageSelected) {
         Text(copy.initialiseIntro)
         if (!apiConfigured) Text(copy.noApiUrl, color = MaterialTheme.colorScheme.error)
         Button(onClick = onStart, enabled = apiConfigured && !busy) { Text(copy.startInitialisation) }
@@ -5242,10 +5263,18 @@ private fun FirstLaunchView(copy: NativePosCopy, apiConfigured: Boolean, busy: B
 }
 
 @Composable
-private fun AdministratorLoginView(copy: NativePosCopy, internetAvailable: Boolean, busy: Boolean, message: String?, onSubmit: (String, String) -> Unit) {
+private fun AdministratorLoginView(
+    copy: NativePosCopy,
+    language: NativePinLanguage,
+    onLanguageSelected: (NativePinLanguage) -> Unit,
+    internetAvailable: Boolean,
+    busy: Boolean,
+    message: String?,
+    onSubmit: (String, String) -> Unit,
+) {
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    FormColumn(copy.managerLogin) {
+    FormColumn(copy.managerLogin, language, onLanguageSelected) {
         Text(copy.managerLoginIntro)
         NetworkStatusIndicator(copy, internetAvailable)
         TextField(identifier, { identifier = it }, label = { Text(copy.emailLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -5258,6 +5287,8 @@ private fun AdministratorLoginView(copy: NativePosCopy, internetAvailable: Boole
 @Composable
 private fun TerminalEnrollmentView(
     copy: NativePosCopy,
+    language: NativePinLanguage,
+    onLanguageSelected: (NativePinLanguage) -> Unit,
     branches: List<NativeSetupBranch>,
     requiresReenrollment: Boolean,
     busy: Boolean,
@@ -5266,7 +5297,7 @@ private fun TerminalEnrollmentView(
 ) {
     var branchId by remember { mutableStateOf(branches.first().id) }
     var label by remember { mutableStateOf("${branches.first().name} POS") }
-    FormColumn(if (requiresReenrollment) copy.rebindTerminal else copy.bindTerminal) {
+    FormColumn(if (requiresReenrollment) copy.rebindTerminal else copy.bindTerminal, language, onLanguageSelected) {
         if (requiresReenrollment) {
             Text(
                 copy.rebindWarning,
@@ -5288,10 +5319,18 @@ private fun TerminalEnrollmentView(
 }
 
 @Composable
-private fun TerminalCredentialRecoveryView(copy: NativePosCopy, internetAvailable: Boolean, busy: Boolean, message: String?, onRecover: (String, String) -> Unit) {
+private fun TerminalCredentialRecoveryView(
+    copy: NativePosCopy,
+    language: NativePinLanguage,
+    onLanguageSelected: (NativePinLanguage) -> Unit,
+    internetAvailable: Boolean,
+    busy: Boolean,
+    message: String?,
+    onRecover: (String, String) -> Unit,
+) {
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    FormColumn(copy.recoverCredential) {
+    FormColumn(copy.recoverCredential, language, onLanguageSelected) {
         Text(copy.recoverIntro)
         NetworkStatusIndicator(copy, internetAvailable)
         TextField(identifier, { identifier = it }, label = { Text(copy.emailLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
@@ -5568,7 +5607,12 @@ private fun CachedDataExpiredView(copy: NativePosCopy, busy: Boolean, message: S
 }
 
 @Composable
-private fun FormColumn(title: String, content: @Composable ColumnScope.() -> Unit) {
+private fun FormColumn(
+    title: String,
+    language: NativePinLanguage? = null,
+    onLanguageSelected: ((NativePinLanguage) -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
     Box(
         Modifier
             .fillMaxSize()
@@ -5582,7 +5626,18 @@ private fun FormColumn(title: String, content: @Composable ColumnScope.() -> Uni
                 .align(Alignment.TopCenter),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.headlineSmall)
+            if (language != null && onLanguageSelected != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(title, modifier = Modifier.weight(1f), style = MaterialTheme.typography.headlineSmall)
+                    PinLanguageMenu(language, onLanguageSelected)
+                }
+            } else {
+                Text(title, style = MaterialTheme.typography.headlineSmall)
+            }
             content()
         }
     }

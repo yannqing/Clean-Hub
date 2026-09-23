@@ -178,8 +178,10 @@ through `copy.<key>`. Two rules follow from how that file is built:
   languages, every accessor resolving, matching `%s`/`%d` placeholders.
 - Classes built once and kept — `NativePosHardware`, `NativePosDatabase`,
   `NativePosApiClient` — take a **language supplier** (`() -> String?`),
-  not a fixed language. The cashier can switch language at the PIN screen
-  at any time, and a handover must change the printer's error text too.
+  not a fixed language. The operator can switch language during setup or at
+  the PIN screen; an explicit device choice takes precedence over the SaaS
+  tenant default received at login. A handover must change the printer's
+  error text too.
 
 The API localises the errors it raises for POS and auth paths, so a
 server-supplied message arrives in the terminal's language. The POS sends

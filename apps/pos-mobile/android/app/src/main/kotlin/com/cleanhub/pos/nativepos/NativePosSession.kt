@@ -65,10 +65,20 @@ class NativePosSession(context: Context) {
             .apply()
     }
 
-    fun pinLanguageCode(): String = preferences.getString(KEY_PIN_LANGUAGE, "zh-CN") ?: "zh-CN"
+    fun pinLanguageCode(): String = resolvePosLanguageCode(
+        selectedLanguage = preferences.getString(KEY_PIN_LANGUAGE, null),
+        tenantDefaultLanguage = preferences.getString(KEY_TENANT_LANGUAGE, null),
+        deviceLanguage = applicationContext.resources.configuration.locales[0].language,
+    )
 
     fun savePinLanguageCode(code: String) {
-        preferences.edit().putString(KEY_PIN_LANGUAGE, code).apply()
+        val language = supportedPosLanguageCode(code) ?: return
+        preferences.edit().putString(KEY_PIN_LANGUAGE, language).apply()
+    }
+
+    fun saveTenantDefaultLanguageCode(code: String?) {
+        val language = supportedPosLanguageCode(code) ?: return
+        preferences.edit().putString(KEY_TENANT_LANGUAGE, language).apply()
     }
 
     /**
@@ -209,6 +219,7 @@ class NativePosSession(context: Context) {
         val COOKIE_NAMES = listOf(ACCESS_COOKIE, REFRESH_COOKIE, TERMINAL_COOKIE)
         const val KEY_DEVICE_ID = "device_id"
         const val KEY_PIN_LANGUAGE = "pin_language"
+        const val KEY_TENANT_LANGUAGE = "tenant_language"
         const val PIN_PREFIX = "offline_pin:"
         const val SUFFIX_SALT = "salt"
         const val SUFFIX_HASH = "hash"
@@ -233,3 +244,20 @@ class NativePosSession(context: Context) {
         const val MAX_OFFLINE_PIN_USERS = 8
     }
 }
+
+private fun supportedPosLanguageCode(code: String?): String? = when (code?.trim()?.lowercase()) {
+    "zh", "zh-cn" -> "zh-CN"
+    "en" -> "en"
+    "fr" -> "fr"
+    else -> null
+}
+
+/** A device choice wins over the SaaS default; before login, use the Android locale. */
+internal fun resolvePosLanguageCode(
+    selectedLanguage: String?,
+    tenantDefaultLanguage: String?,
+    deviceLanguage: String?,
+): String = supportedPosLanguageCode(selectedLanguage)
+    ?: supportedPosLanguageCode(tenantDefaultLanguage)
+    ?: supportedPosLanguageCode(deviceLanguage)
+    ?: "en"
