@@ -60,6 +60,7 @@ import {
 import { Icon, PosPageHeader } from "@/components/app-shell";
 import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { posRoutes } from "@/config";
+import { usePosOfflineCatalog } from "@/features/catalog/lib/use-pos-offline-catalog";
 import { openCashDrawerForPaymentOnce } from "@/features/hardware/lib/cash-drawer";
 import { getPosHardwareBridge } from "@/features/hardware/lib/desktop-bridge";
 import { loadPosHardwareDevices } from "@/features/hardware/lib/hardware-device-cache";
@@ -99,6 +100,7 @@ import {
   tendersMatchSeededTotal,
   usePosCart,
 } from "../lib";
+import { usePosOfflineCashState } from "../lib/pos-offline-cash-state";
 
 type CatalogFilter = "all" | "products" | "services";
 
@@ -106,7 +108,13 @@ type CartSaleViewProps = {
   branch: PosBranchSummary | null;
   canManageSensitiveOperations: boolean;
   currentShift: ShiftRecord | null;
-  register: PosRegisterState;
+  /** False when the server could not determine the current shift. */
+  shiftAvailable: boolean;
+  register: PosRegisterState | null;
+  /** False when the server could not determine the active register session. */
+  registerAvailable: boolean;
+  /** True when the initial server request returned a current catalog. */
+  catalogAvailable: boolean;
   products: PosCatalogProduct[];
   services: PosCatalogService[];
 };
@@ -115,7 +123,10 @@ export function CartSaleView({
   branch,
   canManageSensitiveOperations,
   currentShift,
+  shiftAvailable,
   register,
+  registerAvailable,
+  catalogAvailable,
   products,
   services,
 }: CartSaleViewProps) {
@@ -124,6 +135,17 @@ export function CartSaleView({
   const [filter, setFilter] = useState<CatalogFilter>("all");
   const [query, setQuery] = useState("");
   const [cartOpen, setCartOpen] = useState(false);
+  const catalog = usePosOfflineCatalog({
+    catalogAvailable,
+    products,
+    services,
+  });
+  const cashState = usePosOfflineCashState({
+    currentShift,
+    register,
+    registerAvailable,
+    shiftAvailable,
+  });
   const {
     addProduct,
     cart,
@@ -146,7 +168,7 @@ export function CartSaleView({
     () =>
       filter === "services"
         ? []
-        : products.filter((product) =>
+        : catalog.products.filter((product) =>
             [
               product.name,
               product.variantName,
@@ -156,18 +178,18 @@ export function CartSaleView({
               product.barcode,
             ].some((value) => value?.toLowerCase().includes(normalizedQuery)),
           ),
-    [filter, normalizedQuery, products],
+    [catalog.products, filter, normalizedQuery],
   );
   const visibleServices = useMemo(
     () =>
       filter === "products"
         ? []
-        : services.filter((service) =>
+        : catalog.services.filter((service) =>
             [service.name, service.shortName, service.categoryName].some(
               (value) => value?.toLowerCase().includes(normalizedQuery),
             ),
           ),
-    [filter, normalizedQuery, services],
+    [catalog.services, filter, normalizedQuery],
   );
 
   const handleAddProduct = useCallback(
@@ -194,7 +216,7 @@ export function CartSaleView({
         return;
       }
       const code = event.value.trim().toLowerCase();
-      const product = products.find(
+      const product = catalog.products.find(
         (entry) =>
           entry.barcode?.trim().toLowerCase() === code ||
           entry.sku.trim().toLowerCase() === code,
@@ -205,18 +227,21 @@ export function CartSaleView({
         toast.error(t("pos.cart.scanNotFound", { code: event.value }));
       }
     });
-  }, [handleAddProduct, loaded, products, router, t]);
+  }, [catalog.products, handleAddProduct, loaded, router, t]);
 
   const cartPanel = (
     <CartPanel
       branch={branch}
       cart={cart}
       branchId={scope?.branchId ?? null}
+      initialApiAvailable={
+        catalogAvailable && registerAvailable && shiftAvailable
+      }
       loaded={loaded}
       canManageSensitiveOperations={canManageSensitiveOperations}
       cloudSyncState={cloudSyncState}
-      currentShift={currentShift}
-      register={register}
+      currentShift={cashState.currentShift}
+      register={cashState.register}
       onCheckoutComplete={() => setCartOpen(false)}
       onClaimParked={claimParked}
       onClear={clear}
@@ -235,10 +260,27 @@ export function CartSaleView({
     <section className="space-y-4 pb-28 sm:space-y-5 xl:flex xl:h-full xl:min-h-0 xl:flex-col xl:overflow-hidden xl:pb-0">
       <PosPageHeader
         actions={
-          <Badge className="gap-1.5" variant="outline">
-            <Icon className="size-3.5" name="store" />
-            {t("pos.cart.branchScope", { branch: branch?.name ?? "—" })}
-          </Badge>
+          <>
+            {catalog.source === "cache" ? (
+              <Badge
+                className="gap-1.5"
+                title={t("pos.cart.offlineCatalogHint", {
+                  updatedAt: formatOfflineCatalogUpdatedAt(
+                    catalog.updatedAt,
+                    locale,
+                  ),
+                })}
+                variant="secondary"
+              >
+                <Icon className="size-3.5" name="alert" />
+                {t("pos.cart.offlineCatalog")}
+              </Badge>
+            ) : null}
+            <Badge className="gap-1.5" variant="outline">
+              <Icon className="size-3.5" name="store" />
+              {t("pos.cart.branchScope", { branch: branch?.name ?? "—" })}
+            </Badge>
+          </>
         }
         description={t("pos.cart.description")}
         icon="shopping-cart"
@@ -365,6 +407,19 @@ export function CartSaleView({
       </Sheet>
     </section>
   );
+}
+
+function formatOfflineCatalogUpdatedAt(
+  value: string | null,
+  locale: string,
+): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
 }
 
 function CatalogSection({
@@ -537,6 +592,7 @@ const NO_HARDWARE_CAPABILITIES: PosHardwareCapabilities = {
 function CartPanel({
   branch,
   branchId,
+  initialApiAvailable,
   canManageSensitiveOperations,
   cart,
   cloudSyncState,
@@ -557,6 +613,7 @@ function CartPanel({
 }: {
   branch: PosBranchSummary | null;
   branchId: string | null;
+  initialApiAvailable: boolean;
   canManageSensitiveOperations: boolean;
   cart: PosCartSnapshot;
   cloudSyncState: PosCartCloudSyncState;
@@ -592,9 +649,16 @@ function CartPanel({
   const { locale, t } = useTranslation();
   const router = useRouter();
   const runtime = usePosRuntimeConfig();
-  const { checkoutOrder } = usePosOfflineWrites();
+  const {
+    checkoutOrder,
+    connectionStatusResolved,
+    isConnectionAvailable,
+  } = usePosOfflineWrites();
   const [isPending, startTransition] = useTransition();
-  const [isOnline, setIsOnline] = useState(true);
+  const [browserOnline, setBrowserOnline] = useState(true);
+  const isOnline = connectionStatusResolved
+    ? browserOnline && isConnectionAvailable
+    : browserOnline && initialApiAvailable;
   const [preview, setPreview] = useState<PosCartPricePreview | null>(null);
   const [previewUpdatedAt, setPreviewUpdatedAt] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -670,6 +734,7 @@ function CartPanel({
         Boolean(register.cashSession) ||
         (trackedCashMode && !register.requireOpeningFloat)
       : Boolean(register.registerSession) &&
+        Boolean(currentShift) &&
         (register.cashHandlingMode === "untracked" ||
           Boolean(register.cashSession)));
   // Cash rounding is only meaningful when the whole tender is cash and the
@@ -774,7 +839,7 @@ function CartPanel({
   const configuredPrinter = printerBinding.configured;
 
   useEffect(() => {
-    const update = () => setIsOnline(navigator.onLine);
+    const update = () => setBrowserOnline(navigator.onLine);
     update();
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
@@ -1225,6 +1290,7 @@ function CartPanel({
               settlementIntent === "pay_now" &&
               offlineProductEligible &&
               offlineTenderEligible,
+            forceOffline: !isOnline,
           },
         );
         if (checkoutResult.queued) {

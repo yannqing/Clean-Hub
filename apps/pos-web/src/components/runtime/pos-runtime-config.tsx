@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { resolveTimeZone } from "@cleanhub/domain/timezone";
 import {
   DEFAULT_POS_RECEIPT_FIELDS,
@@ -15,8 +15,14 @@ import type {
   PosPaymentMethod,
   PosRoundingRule,
 } from "@cleanhub/api-client";
+import { getPosOfflineStorage } from "@/features/hardware/lib/desktop-bridge";
 
-type PosRuntimeConfig = {
+import {
+  readPosOfflineRuntime,
+  writePosOfflineRuntime,
+} from "./pos-offline-runtime";
+
+export type PosRuntimeConfig = {
   tenantId: string | null;
   branchId: string | null;
   terminalId: string | null;
@@ -157,7 +163,7 @@ export function PosRuntimeConfigProvider({
   emailReceiptEnabled?: boolean | null;
   children: React.ReactNode;
 }) {
-  const value = useMemo<PosRuntimeConfig>(
+  const serverValue = useMemo<PosRuntimeConfig>(
     () => ({
       tenantId: tenantId ?? null,
       branchId: branchId ?? null,
@@ -225,6 +231,38 @@ export function PosRuntimeConfigProvider({
       userId,
     ],
   );
+  const [offlineValue, setOfflineValue] = useState<PosRuntimeConfig | null>(
+    null,
+  );
+  const serverScopeReady = Boolean(
+    serverValue.tenantId &&
+      serverValue.branchId &&
+      serverValue.terminalId &&
+      serverValue.userId &&
+      serverValue.terminalCredentialVersion,
+  );
+
+  useEffect(() => {
+    let active = true;
+    if (serverScopeReady) {
+      void writePosOfflineRuntime(getPosOfflineStorage(), serverValue).catch(
+        () => undefined,
+      );
+    } else {
+      void readPosOfflineRuntime(getPosOfflineStorage())
+        .then((cached) => {
+          if (active) setOfflineValue(cached);
+        })
+        .catch(() => {
+          if (active) setOfflineValue(null);
+        });
+    }
+    return () => {
+      active = false;
+    };
+  }, [serverScopeReady, serverValue]);
+
+  const value = serverScopeReady ? serverValue : offlineValue ?? serverValue;
 
   return (
     <PosRuntimeConfigContext.Provider value={value}>

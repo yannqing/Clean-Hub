@@ -20,10 +20,14 @@ import {
   useState,
 } from "react";
 
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { getPosOfflineStorage } from "@/features/hardware/lib/desktop-bridge";
 import { replayCurrentPosOfflineQueueItem } from "@/features/offline/lib/replay-pos-offline-queue-item";
 import { summarizePosOfflineQueueItems } from "@/features/offline/lib/pos-offline-operations";
-import { verifyPosTerminalSession } from "@/features/terminal-setup/session-health";
+import {
+  type PosTerminalHealthResult,
+  verifyPosTerminalSession,
+} from "@/features/terminal-setup/session-health";
 import { posMessage } from "@/lib/pos-message";
 import {
   isPosTerminalSessionInvalidated,
@@ -41,6 +45,10 @@ type OfflineReplayHandlers = Map<string, ReplayHandler>;
 
 type OfflineSyncContextValue = {
   queue: OfflineQueue | null;
+  /** Browser connectivity plus a recent terminal-session health check. */
+  isConnectionAvailable: boolean;
+  /** False only while the first health check for this mounted POS is running. */
+  connectionStatusResolved: boolean;
   status: OfflineSyncStatus;
   pendingCount: number;
   pendingSalesCount: number;
@@ -107,10 +115,22 @@ export function OfflineSyncProvider({
   terminalCredentialVersion?: number | null;
   children: React.ReactNode;
 }) {
+  const runtime = usePosRuntimeConfig();
+  // Server Components cannot resolve the session while the API is unavailable.
+  // The runtime provider then restores a short-lived, terminal-scoped snapshot
+  // so this provider can still access the pre-existing durable queue.
+  const resolvedTenantId = tenantId ?? runtime.tenantId;
+  const resolvedBranchId = branchId ?? runtime.branchId;
+  const resolvedTerminalId = terminalId ?? runtime.terminalId;
+  const resolvedUserId = userId ?? runtime.userId;
+  const resolvedTerminalCredentialVersion =
+    terminalCredentialVersion ?? runtime.terminalCredentialVersion;
   const handlersRef = useRef<OfflineReplayHandlers>(new Map());
   const replayPromisesRef = useRef(new Map<string, Promise<void>>());
   const activeScopeKeyRef = useRef<string | null>(null);
   const [online, setOnline] = useState(true);
+  const [connectionStatusResolved, setConnectionStatusResolved] =
+    useState(false);
   const [currentPendingCount, setCurrentPendingCount] = useState(0);
   const [pendingSalesCount, setPendingSalesCount] = useState(0);
   const [oldestPendingAt, setOldestPendingAt] = useState<string | null>(null);
@@ -123,22 +143,22 @@ export function OfflineSyncProvider({
 
   const runtimeQueue = useMemo<ScopedRuntimeQueue | null>(() => {
     if (
-      !tenantId ||
-      !branchId ||
-      !terminalId ||
-      !userId ||
-      !terminalCredentialVersion
+      !resolvedTenantId ||
+      !resolvedBranchId ||
+      !resolvedTerminalId ||
+      !resolvedUserId ||
+      !resolvedTerminalCredentialVersion
     ) {
       return null;
     }
 
     const storage = getPosOfflineStorage();
     const scope: OfflineQueueScope = {
-      tenantId,
-      branchId,
-      terminalId,
-      userId,
-      terminalCredentialVersion,
+      tenantId: resolvedTenantId,
+      branchId: resolvedBranchId,
+      terminalId: resolvedTerminalId,
+      userId: resolvedUserId,
+      terminalCredentialVersion: resolvedTerminalCredentialVersion,
     };
     return {
       queue: createScopedOfflineQueue({ storage, scope }),
@@ -146,7 +166,13 @@ export function OfflineSyncProvider({
       scope,
       storage,
     };
-  }, [branchId, tenantId, terminalCredentialVersion, terminalId, userId]);
+  }, [
+    resolvedBranchId,
+    resolvedTenantId,
+    resolvedTerminalCredentialVersion,
+    resolvedTerminalId,
+    resolvedUserId,
+  ]);
   const queue = runtimeQueue?.queue ?? null;
   const pendingCount = currentPendingCount + quarantinedPendingCount;
   const error = syncError ?? quarantineWarning;
@@ -320,8 +346,17 @@ export function OfflineSyncProvider({
   useEffect(() => {
     activeScopeKeyRef.current = runtimeQueue?.queueKey ?? null;
 
+    const applyTerminalHealth = (health: PosTerminalHealthResult) => {
+      setConnectionStatusResolved(true);
+      setOnline(health === "ready");
+      if (health === "ready") {
+        void replayQueue();
+      }
+    };
+
     const initialRefresh = window.setTimeout(() => {
       setOnline(navigator.onLine);
+      setConnectionStatusResolved(!navigator.onLine);
       setCurrentPendingCount(0);
       setPendingSalesCount(0);
       setOldestPendingAt(null);
@@ -330,21 +365,20 @@ export function OfflineSyncProvider({
       setSyncError(null);
       setReplaying(false);
       void refresh().then(() => {
-        if (navigator.onLine) {
-          return replayQueue();
-        }
+        if (!navigator.onLine) return;
+        void verifyPosTerminalSession({ force: true }).then(applyTerminalHealth);
       });
     }, 0);
 
     const handleOnline = () => {
-      setOnline(true);
-      void verifyPosTerminalSession({ force: true }).then((health) => {
-        if (health === "ready") {
-          void replayQueue();
-        }
-      });
+      setOnline(false);
+      setConnectionStatusResolved(false);
+      void verifyPosTerminalSession({ force: true }).then(applyTerminalHealth);
     };
-    const handleOffline = () => setOnline(false);
+    const handleOffline = () => {
+      setOnline(false);
+      setConnectionStatusResolved(true);
+    };
     const handleTerminalInvalidated = () => {
       setReplaying(false);
       setSyncError("The enrolled terminal session is no longer active.");
@@ -355,8 +389,16 @@ export function OfflineSyncProvider({
       POS_TERMINAL_SESSION_INVALIDATED_EVENT,
       handleTerminalInvalidated,
     );
+    const healthInterval = window.setInterval(() => {
+      if (!navigator.onLine) {
+        handleOffline();
+        return;
+      }
+      void verifyPosTerminalSession({ force: true }).then(applyTerminalHealth);
+    }, 30_000);
     return () => {
       window.clearTimeout(initialRefresh);
+      window.clearInterval(healthInterval);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener(
@@ -391,6 +433,8 @@ export function OfflineSyncProvider({
   const value = useMemo<OfflineSyncContextValue>(
     () => ({
       queue,
+      isConnectionAvailable: online,
+      connectionStatusResolved,
       status,
       pendingCount,
       pendingSalesCount,
@@ -410,6 +454,8 @@ export function OfflineSyncProvider({
       registerReplayHandler,
       replayQueue,
       status,
+      connectionStatusResolved,
+      online,
     ],
   );
 

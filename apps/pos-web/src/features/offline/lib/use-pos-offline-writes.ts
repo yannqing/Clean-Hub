@@ -58,6 +58,8 @@ export type PosOfflinePayOrderWrite = (
 
 export type PosOfflineOrderWriteOptions = {
   allowOffline?: boolean;
+  /** A terminal health check already established that the API is unreachable. */
+  forceOffline?: boolean;
 };
 
 function isUncertainWriteOutcome(error: unknown): boolean {
@@ -77,13 +79,19 @@ function isUncertainWriteOutcome(error: unknown): boolean {
 }
 
 export function usePosOfflineWrites() {
-  const { pendingCount, queue, refresh } = useOfflineSync();
+  const {
+    connectionStatusResolved,
+    isConnectionAvailable,
+    pendingCount,
+    queue,
+    refresh,
+  } = useOfflineSync();
 
   const execute = useCallback(
     async <TData, TPayload extends PosOfflinePayload>(
       mutation: PosOfflineMutation<TPayload>,
       write: () => Promise<TData>,
-      options: { allowOffline?: boolean } = {},
+      options: PosOfflineOrderWriteOptions = {},
     ): Promise<
       | { queued: false; data: TData }
       | { queued: true; entityId: string; operationId: string }
@@ -97,7 +105,9 @@ export function usePosOfflineWrites() {
       }
 
       const isOffline =
-        typeof navigator !== "undefined" && !navigator.onLine;
+        options.forceOffline ||
+        !isConnectionAvailable ||
+        (typeof navigator !== "undefined" && !navigator.onLine);
       if (isOffline && options.allowOffline === false) {
         throw new Error(
           "该订单包含不允许离线销售的商品，请恢复网络后再提交。",
@@ -159,7 +169,7 @@ export function usePosOfflineWrites() {
         await refresh();
         return { queued: false, data };
       } catch (error) {
-        if (isUncertainWriteOutcome(error)) {
+        if (isUncertainWriteOutcome(error) && options.allowOffline !== false) {
           // A timeout, malformed success response, rate limit, or 5xx can be
           // observed after the server has already committed. Keep the durable
           // journal entry so recovery asks the idempotent endpoint instead of
@@ -174,7 +184,7 @@ export function usePosOfflineWrites() {
         throw error;
       }
     },
-    [queue, refresh],
+    [isConnectionAvailable, queue, refresh],
   );
 
   const createCustomerAccount = useCallback(
@@ -398,6 +408,8 @@ export function usePosOfflineWrites() {
     listQueuedCustomerProfiles,
     payOrder,
     pendingCount,
+    isConnectionAvailable,
+    connectionStatusResolved,
     changeOrderStatus,
     changeTicketStatus,
   };

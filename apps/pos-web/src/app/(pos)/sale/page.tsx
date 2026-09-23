@@ -8,19 +8,25 @@ import {
 } from "@/features/shift-handover/queries";
 
 export default async function SalePage() {
-  const [branch, user, currentShift, register] = await Promise.all([
+  const [branch, user, currentShiftResult, registerResult] = await Promise.all([
     getMyBranchQuery().catch(() => null),
     getCurrentUser(),
-    getCurrentShiftQuery().catch(() => null),
-    getCurrentRegisterQuery(),
+    getCurrentShiftQuery().then(
+      (value) => ({ available: true, value }),
+      () => ({ available: false, value: null }),
+    ),
+    getCurrentRegisterQuery().then(
+      (value) => ({ available: true, value }),
+      () => ({ available: false, value: null }),
+    ),
   ]);
   const branchId = user?.terminalBranchId ?? branch?.id;
-  const catalog = branchId
-    ? await getPosCatalogQuery({ branchId, includeAll: true }).catch(() => ({
-        data: [],
-        products: [],
-      }))
-    : { data: [], products: [] };
+  const catalogResult = branchId
+    ? await getPosCatalogQuery({ branchId, includeAll: true }).catch(
+        () => null,
+      )
+    : null;
+  const catalog = catalogResult ?? { data: [], products: [] };
 
   return (
     <CartSaleView
@@ -28,8 +34,11 @@ export default async function SalePage() {
       canManageSensitiveOperations={
         user?.role === "owner" || user?.role === "manager"
       }
-      currentShift={currentShift}
-      register={register}
+      catalogAvailable={catalogResult !== null}
+      currentShift={currentShiftResult.value}
+      shiftAvailable={currentShiftResult.available}
+      register={registerResult.value}
+      registerAvailable={registerResult.available}
       products={catalog.products}
       services={catalog.data}
     />

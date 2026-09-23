@@ -80,7 +80,9 @@ export default async function PosLayout({
         userId={user?.userId}
         terminalCredentialVersion={user?.terminalCredentialVersion}
       >
-        <PosTerminalRealtimeProvider enabled={Boolean(user?.terminalId)}>
+        <PosTerminalRealtimeProvider
+          enabled={user?.terminalId ? true : undefined}
+        >
           <PosIdleLock
             lockTimeoutSeconds={
               user ? (terminalSettings?.lockTimeoutSeconds ?? null) : null

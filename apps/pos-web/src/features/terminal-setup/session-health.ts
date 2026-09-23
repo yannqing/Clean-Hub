@@ -12,6 +12,7 @@ import {
 } from "./api";
 
 const HEALTH_CHECK_COOLDOWN_MS = 5_000;
+const HEALTH_CHECK_TIMEOUT_MS = 5_000;
 
 export type PosTerminalHealthResult = "ready" | "unavailable" | "invalid";
 
@@ -38,9 +39,11 @@ async function runHealthCheck(): Promise<PosTerminalHealthResult> {
     // Resolve `/auth/me` first so the shared client can refresh a legitimate
     // long-running cashier session before bootstrap makes its decision.
     await fetchSetupAuthContext({
+      timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
       metadata: { posTerminalHealthCheck: true },
     });
     const bootstrap = await fetchTerminalBootstrap(deviceId, {
+      timeoutMs: HEALTH_CHECK_TIMEOUT_MS,
       metadata: { posTerminalHealthCheck: true },
     });
 

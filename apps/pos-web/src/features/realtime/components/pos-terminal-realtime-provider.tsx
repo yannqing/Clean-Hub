@@ -20,6 +20,7 @@ import {
   useState,
 } from "react";
 
+import { usePosRuntimeConfig } from "@/components/runtime/pos-runtime-config";
 import { useOfflineSync } from "@/features/offline/components";
 import { getPosTerminalRuntimeMetadata } from "@/features/terminal-setup/terminal-runtime";
 import { getPosRealtimeUrl, posApi } from "@/lib/api-client";
@@ -94,8 +95,10 @@ export function PosTerminalRealtimeProvider({
   enabled,
 }: {
   children: React.ReactNode;
-  enabled: boolean;
+  enabled?: boolean;
 }) {
+  const runtime = usePosRuntimeConfig();
+  const terminalEnabled = enabled ?? Boolean(runtime.terminalId);
   const offline = useOfflineSync();
   const syncState = toRuntimeSyncState(offline.status, offline.pendingCount);
   const [connectionState, setConnectionState] =
@@ -201,7 +204,7 @@ export function PosTerminalRealtimeProvider({
   const scheduleReconnect = useCallback(() => {
     if (
       !mountedRef.current ||
-      !enabled ||
+      !terminalEnabled ||
       isPosTerminalSessionInvalidated() ||
       reconnectTimerRef.current !== null ||
       !navigator.onLine
@@ -214,13 +217,13 @@ export function PosTerminalRealtimeProvider({
       reconnectTimerRef.current = null;
       connectRef.current();
     }, delay);
-  }, [enabled]);
+  }, [terminalEnabled]);
 
   useEffect(() => {
     connectRef.current = () => {
       if (
         !mountedRef.current ||
-        !enabled ||
+        !terminalEnabled ||
         isPosTerminalSessionInvalidated() ||
         socketRef.current?.readyState === WebSocket.OPEN ||
         socketRef.current?.readyState === WebSocket.CONNECTING
@@ -322,7 +325,7 @@ export function PosTerminalRealtimeProvider({
     return () => {
       connectRef.current = () => undefined;
     };
-  }, [clearTimer, enabled, scheduleReconnect, sendStatusReport]);
+  }, [clearTimer, scheduleReconnect, sendStatusReport, terminalEnabled]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -397,7 +400,7 @@ export function PosTerminalRealtimeProvider({
   useEffect(() => {
     const reportHttpFallback = async () => {
       if (
-        !enabled ||
+        !terminalEnabled ||
         !navigator.onLine ||
         socketRef.current?.readyState === WebSocket.OPEN ||
         isPosTerminalSessionInvalidated()
@@ -449,7 +452,7 @@ export function PosTerminalRealtimeProvider({
       window.clearTimeout(initialFallback);
       window.clearInterval(fallbackTimer);
     };
-  }, [enabled]);
+  }, [terminalEnabled]);
 
   const operationalStatus = derivePosTerminalOperationalStatus({
     administrativeStatus: "active",
