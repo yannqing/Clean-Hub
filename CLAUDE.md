@@ -252,6 +252,20 @@ CLEANHUB_MOBILE_UPDATE_URL=https://<real-update-host>
 Android signing is supplied through `CLEANHUB_ANDROID_KEYSTORE_PATH`,
 `CLEANHUB_ANDROID_KEYSTORE_PASSWORD`, `CLEANHUB_ANDROID_KEY_ALIAS` and
 `CLEANHUB_ANDROID_KEY_PASSWORD`. Never commit a keystore or its passwords.
+A release build without them now fails at Gradle configuration time rather
+than producing an uninstallable unsigned APK.
+
+The POS APK is published by `.github/workflows/release-pos-apk.yml` — push a
+`pos-v*` tag or run it from the Actions tab. It signs from repository secrets
+and verifies the artifact (signature, not debuggable, cleartext disabled, API
+origin actually compiled in) before publishing a GitHub Release. The runbook,
+including the one-time keystore and secret setup, is
+`docs/06-delivery/rollout/CleanHub_POS安卓APK发布操作手册.md`.
+
+An Android-only package does not need `CLEANHUB_POS_SERVER_URL`: that origin
+is the iOS WebView's, and `capacitor.config.ts` drops it when
+`CLEANHUB_POS_NATIVE_ANDROID=true`. Requiring it used to fail Android
+releases for a value nothing reads.
 
 Backups stay disabled on both Android apps. The session lives in Capacitor
 Preferences, which is backed by `SharedPreferences`, so enabling backup would

@@ -15,22 +15,31 @@ type PosRuntimeConfig = {
 const { resolvePosRuntimeConfig } = require("./scripts/runtime-config.cjs") as {
   resolvePosRuntimeConfig: (
     environment: NodeJS.ProcessEnv,
+    options?: { allowMissingServer?: boolean },
   ) => PosRuntimeConfig;
 };
 
 /**
- * CleanHub POS is a native shell around the server-rendered pos-web app.
- * pos-web relies on Next.js proxy/middleware, Server Components and HttpOnly
- * cookies, so it cannot be exported into `www/` as a static production app.
+ * iOS remains a shell around the server-rendered pos-web app. Android starts
+ * its Compose `MainActivity` directly; its API origin is compiled into the
+ * Android BuildConfig and Capacitor's `server` field is omitted for Android
+ * native-only packaging.
  *
- * Development uses a LAN-accessible URL. Production uses the hosted HTTPS POS
- * origin; that origin must also reverse-proxy API requests under the same host
- * so Next.js and the WebView receive the same host-only auth cookies.
+ * The server URL remains for iOS and development of the legacy shell.
  */
 loadEnv({ path: resolve(__dirname, ".env"), quiet: true });
 
-const { isProduction, allowCleartext, serverUrl } =
-  resolvePosRuntimeConfig(process.env);
+const nativeAndroidBuild = process.env.CLEANHUB_POS_NATIVE_ANDROID === "true";
+// A native Android package drops Capacitor's `server` field entirely and
+// compiles its API origin into BuildConfig, so the pos-web origin is not just
+// unused -- requiring it would fail an Android-only release for the sake of a
+// value nothing reads. iOS, still a WebView shell, keeps needing it.
+const { isProduction, allowCleartext, serverUrl } = resolvePosRuntimeConfig(
+  nativeAndroidBuild
+    ? { ...process.env, CLEANHUB_POS_SERVER_URL: undefined }
+    : process.env,
+  { allowMissingServer: nativeAndroidBuild },
+);
 
 const config: CapacitorConfig = {
   appId: "com.cleanhub.pos",
@@ -39,7 +48,7 @@ const config: CapacitorConfig = {
   appendUserAgent: " CleanHubPOS/0.1",
   backgroundColor: "#000000",
   loggingBehavior: isProduction ? "none" : "debug",
-  ...(serverUrl
+  ...(!nativeAndroidBuild && serverUrl
     ? {
         server: {
           url: serverUrl,
