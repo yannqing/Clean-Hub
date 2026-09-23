@@ -28,8 +28,11 @@ import {
   products,
   productSkus,
   type Database,
+  taxRates,
 } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
+
+import { checkTaxRateAssignment } from "../../tax/tax.assignment.js";
 
 import type { AuthRequestMeta } from "../../auth/auth.types.js";
 import { writeAuditLog } from "../../audit/audit.helper.js";
@@ -1009,6 +1012,31 @@ async function resolveProductCategoryAttributes(
   });
 }
 
+async function requireAssignableProductTaxRate(
+  db: Database,
+  input: {
+    tenantId: string;
+    taxRateId: string | null | undefined;
+    currentTaxRateId?: string | null;
+  },
+): Promise<void> {
+  const problem = await checkTaxRateAssignment(db, input);
+  if (problem === "not_found") {
+    throw new TenantProductsError(
+      "PRODUCT_TAX_RATE_NOT_FOUND",
+      "Tax rate was not found.",
+      404,
+    );
+  }
+  if (problem === "archived") {
+    throw new TenantProductsError(
+      "PRODUCT_TAX_RATE_ARCHIVED",
+      "Archived tax rates cannot be assigned.",
+      422,
+    );
+  }
+}
+
 export async function createTenantProductRecord(
   db: Database,
   input: CreateTenantProductRecordInput,
@@ -1026,6 +1054,10 @@ export async function createTenantProductRecord(
         branchIds,
       });
       await requireUniqueSkuIdentifiers(tx, input);
+      await requireAssignableProductTaxRate(tx, {
+        tenantId: input.tenantId,
+        taxRateId: input.taxRateId,
+      });
       const lockedMediaObjects = await lockPendingProductMediaObjects(tx, {
         tenantId: input.tenantId,
         actorUserId: input.actorUserId,
@@ -1056,6 +1088,7 @@ export async function createTenantProductRecord(
         description: normalizeNullable(input.description),
         tags: input.tags,
         status: input.status,
+        taxRateId: input.taxRateId ?? null,
         createdAt: now,
         updatedAt: now,
         createdBy: input.actorUserId,
@@ -1297,6 +1330,7 @@ export async function createTenantProductRecord(
           })),
           tags: input.tags,
           status: input.status,
+          taxRateId: input.taxRateId ?? null,
           productSkuId,
           skuCode: input.skuCode,
           barcode: normalizeNullable(input.barcode),
@@ -1388,6 +1422,7 @@ export async function updateTenantProductRecord(
         .select({
           id: products.id,
           version: products.version,
+          taxRateId: products.taxRateId,
         })
         .from(products)
         .where(
@@ -1417,6 +1452,11 @@ export async function updateTenantProductRecord(
           409,
         );
       }
+      await requireAssignableProductTaxRate(tx, {
+        tenantId: input.tenantId,
+        taxRateId: input.taxRateId,
+        currentTaxRateId: product.taxRateId,
+      });
 
       const skuBranchScopeFilter = buildSkuBranchScopeFilter(
         input.allowedBranchIds,
@@ -1570,6 +1610,8 @@ export async function updateTenantProductRecord(
           description: normalizeNullable(input.description),
           tags: input.tags,
           status: input.status,
+          taxRateId:
+            input.taxRateId === undefined ? product.taxRateId : input.taxRateId,
           updatedAt: now,
           updatedBy: input.actorUserId,
           version: sql`${products.version} + 1`,
@@ -2611,6 +2653,9 @@ export async function findTenantProductDetailRecord(
       description: products.description,
       tags: products.tags,
       status: products.status,
+      taxRateId: products.taxRateId,
+      taxRateName: taxRates.name,
+      taxRate: taxRates.rate,
     })
     .from(products)
     .leftJoin(
@@ -2619,6 +2664,14 @@ export async function findTenantProductDetailRecord(
         eq(productCategories.tenantId, products.tenantId),
         eq(productCategories.id, products.categoryId),
         isNull(productCategories.deletedAt),
+      ),
+    )
+    .leftJoin(
+      taxRates,
+      and(
+        eq(taxRates.tenantId, products.tenantId),
+        eq(taxRates.id, products.taxRateId),
+        isNull(taxRates.deletedAt),
       ),
     )
     .where(
@@ -2873,6 +2926,9 @@ export async function findTenantProductDetailRecord(
     description: product.description,
     tags: product.tags,
     status: product.status,
+    taxRateId: product.taxRateId,
+    taxRateName: product.taxRateName ?? null,
+    taxRate: product.taxRate ?? null,
     skuCount: skuCountRows[0]?.count ?? skuRows.length,
     sku: {
       id: primarySku.id,
@@ -3053,6 +3109,9 @@ export async function findTenantProducts(
         categoryName: productCategories.name,
         tags: products.tags,
         status: products.status,
+        taxRateId: products.taxRateId,
+        taxRateName: taxRates.name,
+        taxRate: taxRates.rate,
         createdAt: products.createdAt,
         updatedAt: products.updatedAt,
         version: products.version,
@@ -3064,6 +3123,14 @@ export async function findTenantProducts(
           eq(productCategories.tenantId, products.tenantId),
           eq(productCategories.id, products.categoryId),
           isNull(productCategories.deletedAt),
+        ),
+      )
+      .leftJoin(
+        taxRates,
+        and(
+          eq(taxRates.tenantId, products.tenantId),
+          eq(taxRates.id, products.taxRateId),
+          isNull(taxRates.deletedAt),
         ),
       )
       .where(and(...filters))
@@ -3282,6 +3349,9 @@ export async function findTenantProducts(
       categoryName: product.categoryName,
       tags: product.tags,
       status: product.status,
+      taxRateId: product.taxRateId,
+      taxRateName: product.taxRateName ?? null,
+      taxRate: product.taxRate ?? null,
       skuCount: skus.length,
       activeSkuCount: skus.filter((sku) => sku.status === "active").length,
       trackedSkuCount: skus.filter((sku) => sku.trackInventory).length,

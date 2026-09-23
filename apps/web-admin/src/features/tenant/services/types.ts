@@ -47,6 +47,7 @@ export type ServiceFormErrorCode =
   | "displayOrderInvalid"
   | "pricingUnitInvalid"
   | "labelRuleInvalid"
+  | "taxRateInvalid"
   | "applicableItemTypesRequired"
   | "applicableItemTypesInvalid"
   | "standardPriceInvalid"
@@ -73,6 +74,10 @@ export type ServiceSummary = {
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   applicableItemTypes: ServiceApplicableItemType[];
+  /** The service's own tax rate; null sells it at the default rate. */
+  taxRateId: string | null;
+  taxRateName: string | null;
+  taxRate: string | null;
   standardPrice: string;
   compareAtPrice: string | null;
   costPrice: string | null;
@@ -123,6 +128,8 @@ export type ServiceFormValues = {
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   applicableItemTypes: ServiceApplicableItemType[];
+  /** Rate id, or "" for the tenant default. */
+  taxRateId: string;
   standardPrice: string;
   compareAtPrice: string;
   costPrice: string;

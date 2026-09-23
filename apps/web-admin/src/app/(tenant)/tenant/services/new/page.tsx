@@ -7,15 +7,17 @@ import {
   getServiceDefaultCurrencyQuery,
 } from "@/features/tenant/services/queries";
 import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
+import { getTaxRateOptionsQuery } from "@/features/tenant/tax-rates/queries";
 
 export default async function NewServicePage() {
   const requestOptions = await getTenantServerApiRequestOptions();
   const [categoryResult, currencyResult, branchResult] =
     await Promise.allSettled([
-    getServiceCategoryDatasetQuery({ status: "active" }, requestOptions),
-    getServiceDefaultCurrencyQuery(requestOptions),
+      getServiceCategoryDatasetQuery({ status: "active" }, requestOptions),
+      getServiceDefaultCurrencyQuery(requestOptions),
       getBranchListQuery({}, requestOptions),
     ]);
+  const taxRateOptions = await getTaxRateOptionsQuery(requestOptions);
 
   return (
     <ServiceCreateView
@@ -29,6 +31,7 @@ export default async function NewServicePage() {
         currencyResult.status === "fulfilled" ? currencyResult.value : null
       }
       initialCode={`SVC-${createId().slice(-10)}`}
+      taxRateOptions={taxRateOptions}
     />
   );
 }

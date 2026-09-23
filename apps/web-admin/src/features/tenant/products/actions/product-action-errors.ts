@@ -74,6 +74,13 @@ export function getProductActionError(
     }
 
     if (
+      error.code === "PRODUCT_TAX_RATE_NOT_FOUND" ||
+      error.code === "PRODUCT_TAX_RATE_ARCHIVED"
+    ) {
+      errors.taxRateId = "taxRateInvalid";
+    }
+
+    if (
       error.code === "PRODUCT_CATEGORY_NOT_FOUND" ||
       error.code === "PRODUCT_CATEGORY_INACTIVE"
     ) {

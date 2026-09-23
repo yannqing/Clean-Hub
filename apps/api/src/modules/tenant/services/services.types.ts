@@ -69,6 +69,11 @@ export type ServiceSummary = {
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   applicableItemTypes: ServiceApplicableItemType[];
+  /** The service's own tax rate; null sells it at the tenant default. */
+  taxRateId: string | null;
+  taxRateName: string | null;
+  /** Fraction, e.g. "0.1800" for 18%. */
+  taxRate: string | null;
   standardPrice: string;
   compareAtPrice: string | null;
   costPrice: string | null;
@@ -105,6 +110,7 @@ export type CreateServiceRequest = {
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   applicableItemTypes: ServiceApplicableItemType[];
+  taxRateId?: string | null;
   standardPrice: string;
   compareAtPrice?: string | null;
   costPrice?: string | null;
@@ -175,6 +181,8 @@ export type ServiceAuditSnapshot = {
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   applicableItemTypes: ServiceApplicableItemType[];
+  taxRateId: string | null;
+  taxRateName: string | null;
   standardPrice: string;
   compareAtPrice: string | null;
   costPrice: string | null;

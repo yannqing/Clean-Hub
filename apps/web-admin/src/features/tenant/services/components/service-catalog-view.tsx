@@ -171,6 +171,7 @@ const defaultFormValues: ServiceFormValues = {
   pricingUnit: "per_item",
   labelRule: "per_order_item",
   applicableItemTypes: ["cloth"],
+  taxRateId: "",
   standardPrice: "",
   compareAtPrice: "",
   costPrice: "",

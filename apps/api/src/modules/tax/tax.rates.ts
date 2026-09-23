@@ -37,10 +37,12 @@ export async function resolveCatalogTaxRates(
   const productSkuIds = unique(input.productSkuIds);
   const productIds = unique(input.productIds);
 
-  const [serviceRows, skuRows, productRows] = await Promise.all([
+  // Sequential, not Promise.all: this runs inside checkout transactions, and
+  // one transaction is one connection that cannot run queries concurrently.
+  const serviceRows =
     serviceIds.length === 0
-      ? Promise.resolve([])
-      : db
+      ? []
+      : await db
           .select({ id: services.id, rate: taxRates.rate })
           .from(services)
           .leftJoin(
@@ -51,10 +53,11 @@ export async function resolveCatalogTaxRates(
               isNull(taxRates.deletedAt),
             ),
           )
-          .where(and(eq(services.tenantId, input.tenantId), inArray(services.id, serviceIds))),
+          .where(and(eq(services.tenantId, input.tenantId), inArray(services.id, serviceIds)));
+  const skuRows =
     productSkuIds.length === 0
-      ? Promise.resolve([])
-      : db
+      ? []
+      : await db
           .select({ id: productSkus.id, rate: taxRates.rate })
           .from(productSkus)
           .innerJoin(
@@ -74,10 +77,11 @@ export async function resolveCatalogTaxRates(
           )
           .where(
             and(eq(productSkus.tenantId, input.tenantId), inArray(productSkus.id, productSkuIds)),
-          ),
+          );
+  const productRows =
     productIds.length === 0
-      ? Promise.resolve([])
-      : db
+      ? []
+      : await db
           .select({ id: products.id, rate: taxRates.rate })
           .from(products)
           .leftJoin(
@@ -88,8 +92,7 @@ export async function resolveCatalogTaxRates(
               isNull(taxRates.deletedAt),
             ),
           )
-          .where(and(eq(products.tenantId, input.tenantId), inArray(products.id, productIds))),
-  ]);
+          .where(and(eq(products.tenantId, input.tenantId), inArray(products.id, productIds)));
 
   return {
     byServiceId: new Map(serviceRows.map((row) => [row.id, row.rate ?? null])),

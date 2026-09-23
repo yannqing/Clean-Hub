@@ -8,6 +8,7 @@ import {
   getServiceDetailQuery,
 } from "@/features/tenant/services/queries";
 import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
+import { getTaxRateOptionsQuery } from "@/features/tenant/tax-rates/queries";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 
@@ -43,6 +44,7 @@ export default async function EditServicePage({
     getServiceCategoryDatasetQuery({}, requestOptions),
     getBranchListQuery({}, requestOptions),
   ]);
+  const taxRateOptions = await getTaxRateOptionsQuery(requestOptions);
 
   return (
     <ServiceCreateView
@@ -54,6 +56,7 @@ export default async function EditServicePage({
       branchesLoadFailed={branchResult.status === "rejected"}
       defaultCurrency={service.currency}
       initialService={service}
+      taxRateOptions={taxRateOptions}
     />
   );
 }

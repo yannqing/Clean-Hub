@@ -44,6 +44,8 @@ import {
 } from "react";
 
 import { webAdminRoutes } from "@/config/routes";
+import { TaxRateSelect } from "@/features/tenant/tax-rates/components";
+import type { TaxRateOptions } from "@/features/tenant/tax-rates/types";
 import { BranchSelectionCard } from "@/components/forms";
 import { useTenantI18n } from "@/i18n";
 
@@ -185,6 +187,7 @@ type ProductCreateViewProps = {
   defaultCurrency?: string | null;
   initialProduct?: TenantProductDetail;
   mode?: "create" | "edit";
+  taxRateOptions: TaxRateOptions;
 };
 
 export function ProductCreateView({
@@ -197,6 +200,7 @@ export function ProductCreateView({
   defaultCurrency = null,
   initialProduct,
   mode = "create",
+  taxRateOptions,
 }: ProductCreateViewProps) {
   const router = useRouter();
   const { m } = useTenantI18n();
@@ -310,6 +314,9 @@ export function ProductCreateView({
   const currency = initialProduct?.currency ?? defaultCurrency ?? "";
   const [referenceCost, setReferenceCost] = useState(
     () => initialProduct?.sku.referenceCost ?? "",
+  );
+  const [taxRateId, setTaxRateId] = useState(
+    () => initialProduct?.taxRateId ?? "",
   );
   const [showMoreInventorySettings, setShowMoreInventorySettings] = useState(
     () =>
@@ -820,6 +827,7 @@ export function ProductCreateView({
       trackInventory,
       allowNegativeStock: trackInventory && allowNegativeStock,
       allowOfflineSale,
+      taxRateId,
       branchSettings: selectedBranches.map((branch) => {
         const inventory = branchInventory[branch.id] ?? {
           openingStock: "0",
@@ -1249,6 +1257,17 @@ export function ProductCreateView({
                     />
                     <FieldError message={getErrorMessage("referenceCost")} />
                   </div>
+
+                  <TaxRateSelect
+                    error={getErrorMessage("taxRateId")}
+                    id="product-tax-rate"
+                    onChange={(value) => {
+                      setTaxRateId(value);
+                      markChanged("taxRateId");
+                    }}
+                    options={taxRateOptions}
+                    value={taxRateId}
+                  />
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-md bg-muted/60 px-3 py-2.5">

@@ -32,18 +32,16 @@ async function countUsage(
   db: Database,
   tenantId: string,
 ): Promise<Map<string, { serviceCount: number; productCount: number }>> {
-  const [serviceRows, productRows] = await Promise.all([
-    db
-      .select({ taxRateId: services.taxRateId, count: sql<number>`count(*)::int` })
-      .from(services)
-      .where(and(eq(services.tenantId, tenantId), isNull(services.deletedAt)))
-      .groupBy(services.taxRateId),
-    db
-      .select({ taxRateId: products.taxRateId, count: sql<number>`count(*)::int` })
-      .from(products)
-      .where(and(eq(products.tenantId, tenantId), isNull(products.deletedAt)))
-      .groupBy(products.taxRateId),
-  ]);
+  const serviceRows = await db
+    .select({ taxRateId: services.taxRateId, count: sql<number>`count(*)::int` })
+    .from(services)
+    .where(and(eq(services.tenantId, tenantId), isNull(services.deletedAt)))
+    .groupBy(services.taxRateId);
+  const productRows = await db
+    .select({ taxRateId: products.taxRateId, count: sql<number>`count(*)::int` })
+    .from(products)
+    .where(and(eq(products.tenantId, tenantId), isNull(products.deletedAt)))
+    .groupBy(products.taxRateId);
   const usage = new Map<string, { serviceCount: number; productCount: number }>();
   for (const row of serviceRows) {
     if (!row.taxRateId) continue;
@@ -70,14 +68,12 @@ export async function findTenantTaxRates(
   ];
   if (!input.includeArchived) conditions.push(isNull(taxRates.archivedAt));
 
-  const [rows, usage] = await Promise.all([
-    db
-      .select()
-      .from(taxRates)
-      .where(and(...conditions))
-      .orderBy(asc(taxRates.displayOrder), asc(taxRates.name)),
-    countUsage(db, input.tenantId),
-  ]);
+  const rows = await db
+    .select()
+    .from(taxRates)
+    .where(and(...conditions))
+    .orderBy(asc(taxRates.displayOrder), asc(taxRates.name));
+  const usage = await countUsage(db, input.tenantId);
   return rows.map((row) => toTenantTaxRate(row, usage.get(row.id) ?? NO_USAGE));
 }
 

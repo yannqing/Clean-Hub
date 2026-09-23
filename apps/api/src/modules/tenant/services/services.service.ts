@@ -12,6 +12,7 @@ import {
   MediaService,
   type MediaUploadTicket,
 } from "../../media/index.js";
+import { checkTaxRateAssignment } from "../../tax/tax.assignment.js";
 import { findBranchById } from "../branches/branches.repository.js";
 import { findServiceCategoryById } from "../service-categories/service-categories.repository.js";
 import { TenantServicesError } from "./services.errors.js";
@@ -220,6 +221,31 @@ async function requireCompatibleServiceCategory(
     throw new TenantServicesError(
       "SERVICE_CATEGORY_INACTIVE",
       "Inactive service categories cannot be assigned.",
+      422,
+    );
+  }
+}
+
+async function requireAssignableServiceTaxRate(
+  db: Database,
+  input: {
+    tenantId: string;
+    taxRateId: string | null | undefined;
+    currentTaxRateId?: string | null;
+  },
+): Promise<void> {
+  const problem = await checkTaxRateAssignment(db, input);
+  if (problem === "not_found") {
+    throw new TenantServicesError(
+      "SERVICE_TAX_RATE_NOT_FOUND",
+      "Tax rate was not found.",
+      404,
+    );
+  }
+  if (problem === "archived") {
+    throw new TenantServicesError(
+      "SERVICE_TAX_RATE_ARCHIVED",
+      "Archived tax rates cannot be assigned.",
       422,
     );
   }
@@ -440,6 +466,10 @@ export async function createTenantService(
     businessLine: data.businessLine,
     allowInactive: false,
   });
+  await requireAssignableServiceTaxRate(db, {
+    tenantId,
+    taxRateId: data.taxRateId,
+  });
 
   const duplicate = await findServiceByName(db, {
     tenantId,
@@ -631,6 +661,11 @@ export async function updateTenantService(
       categoryId,
       businessLine: data.businessLine ?? before.businessLine,
       allowInactive: categoryId === before.categoryId,
+    });
+    await requireAssignableServiceTaxRate(tx, {
+      tenantId,
+      taxRateId: data.taxRateId,
+      currentTaxRateId: before.taxRateId,
     });
 
     const service = await updateServiceRecord(tx, {

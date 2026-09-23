@@ -3,6 +3,8 @@ import { webAdminApi } from "@/lib/api-client";
 import type { ApiRequestOptions } from "@cleanhub/api-client";
 
 import type { BranchSummary } from "../../branches/types";
+import { getTaxRateOptionsQuery } from "../../tax-rates/queries";
+import type { TaxRateOptions } from "../../tax-rates/types";
 import type { TenantProductCategorySummary } from "../types";
 import { getProductCurrencyDatasetQuery } from "./get-product-currency-dataset.query";
 
@@ -16,6 +18,7 @@ export type ProductFormDataset = {
   categoryLoadFailed: boolean;
   currencyLoadFailed: boolean;
   defaultCurrency: string | null;
+  taxRateOptions: TaxRateOptions;
 };
 
 async function getAllActiveBranches(
@@ -54,7 +57,7 @@ async function getAllActiveBranches(
 export async function getProductFormDatasetQuery(
   requestOptions: ApiRequestOptions,
 ): Promise<ProductFormDataset> {
-  const [branchResult, categoryResult, currencyResult] = await Promise.all([
+  const [branchResult, categoryResult, currencyResult, taxRateOptions] = await Promise.all([
     getAllActiveBranches(requestOptions)
       .then((branches) => ({ branches, branchLoadFailed: false }))
       .catch(() => ({ branches: [], branchLoadFailed: true })),
@@ -79,11 +82,13 @@ export async function getProductFormDatasetQuery(
         availableCurrencies: [],
         currencyLoadFailed: true,
       })),
+    getTaxRateOptionsQuery(requestOptions),
   ]);
 
   return {
     ...branchResult,
     ...categoryResult,
     ...currencyResult,
+    taxRateOptions,
   };
 }

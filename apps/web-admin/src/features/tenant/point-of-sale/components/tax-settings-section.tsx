@@ -4,6 +4,10 @@ import { Badge, Button, Checkbox, Input, Label, toast } from "@cleanhub/ui";
 import { Receipt } from "lucide-react";
 import { useState } from "react";
 
+import {
+  fractionToPercent,
+  percentToFraction,
+} from "@/features/tenant/tax-rates/percent";
 import { useTenantI18n } from "@/i18n";
 
 import { updateTaxSettingsAction } from "../actions/update-tax-settings.action";
@@ -18,6 +22,7 @@ type Copy = {
   inclusiveHint: string;
   rate: string;
   rateHint: string;
+  rateInvalid: string;
   registration: string;
   registrationHint: string;
   save: string;
@@ -38,7 +43,9 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     inclusiveHint:
       "On, listed prices already contain tax. Off, tax is added on top of the subtotal.",
     rate: "Default VAT rate (%)",
-    rateHint: "Applied to new orders unless a service overrides it.",
+    rateHint:
+      "Used for every service and product without a tax rate of its own.",
+    rateInvalid: "Enter a rate between 0 and 100 with up to two decimals.",
     registration: "Tax registration number",
     registrationHint: "Printed on receipts when VAT is enabled.",
     save: "Save changes",
@@ -59,7 +66,9 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
       "Activé, les prix affichés incluent la taxe. Désactivé, la taxe s'ajoute au sous-total.",
     rate: "Taux de TVA par défaut (%)",
     rateHint:
-      "Appliqué aux nouvelles commandes, sauf si un service le remplace.",
+      "Utilisé pour tout service ou produit sans taux de taxe propre.",
+    rateInvalid:
+      "Saisissez un taux entre 0 et 100, avec deux décimales au plus.",
     registration: "Numéro d'identification fiscale",
     registrationHint: "Imprimé sur les reçus lorsque la TVA est activée.",
     save: "Enregistrer",
@@ -77,7 +86,8 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
     inclusive: "标价含税",
     inclusiveHint: "开启表示商品标价已含税；关闭表示税额在小计之外增加。",
     rate: "默认 VAT 税率（%）",
-    rateHint: "新订单默认使用该税率，服务可单独覆盖。",
+    rateHint: "没有单独设置税率的服务和商品都按此税率计税。",
+    rateInvalid: "请输入 0 到 100 之间、最多两位小数的税率。",
     registration: "税务登记号",
     registrationHint: "启用 VAT 后会打印在小票上。",
     save: "保存修改",
@@ -91,7 +101,8 @@ const copy: Record<"en" | "fr" | "zh-CN", Copy> = {
 type TaxForm = {
   taxEnabled: boolean;
   pricesIncludeTax: boolean;
-  defaultTaxRate: string;
+  /** Edited as a percent; stored and sent as a fraction. */
+  defaultTaxRatePercent: string;
   taxRegistrationNumber: string | null;
 };
 
@@ -99,7 +110,7 @@ function toForm(settings: PointOfSaleSettings): TaxForm {
   return {
     taxEnabled: settings.taxEnabled,
     pricesIncludeTax: settings.pricesIncludeTax,
-    defaultTaxRate: settings.defaultTaxRate,
+    defaultTaxRatePercent: fractionToPercent(settings.defaultTaxRate),
     taxRegistrationNumber: settings.taxRegistrationNumber,
   };
 }
@@ -125,12 +136,20 @@ export function TaxSettingsSection({
 
   async function save() {
     if (!settings || !form) return;
+    const defaultTaxRate = percentToFraction(form.defaultTaxRatePercent);
+    if (defaultTaxRate === null) {
+      toast.error(text.rateInvalid);
+      return;
+    }
     setSaving(true);
 
     try {
       const result = await updateTaxSettingsAction({
         version: settings.version,
-        ...form,
+        taxEnabled: form.taxEnabled,
+        pricesIncludeTax: form.pricesIncludeTax,
+        defaultTaxRate,
+        taxRegistrationNumber: form.taxRegistrationNumber,
       });
 
       if (!result.ok) {
@@ -230,19 +249,11 @@ export function TaxSettingsSection({
             <Input
               disabled={disabled || !form.taxEnabled}
               id="pricing-tax-rate"
-              max={100}
-              min={0}
+              inputMode="decimal"
               onChange={(event) =>
-                setForm({
-                  ...form,
-                  defaultTaxRate: String(
-                    Number(event.target.value || 0) / 100,
-                  ),
-                })
+                setForm({ ...form, defaultTaxRatePercent: event.target.value })
               }
-              step="0.01"
-              type="number"
-              value={Number(form.defaultTaxRate) * 100}
+              value={form.defaultTaxRatePercent}
             />
             <p className="text-xs leading-5 text-slate-500">{text.rateHint}</p>
           </div>

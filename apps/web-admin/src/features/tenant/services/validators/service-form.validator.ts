@@ -205,6 +205,7 @@ function validateBase(input: ServiceFormValues) {
       pricingUnit: input.pricingUnit,
       labelRule: input.labelRule,
       applicableItemTypes: input.applicableItemTypes,
+      taxRateId: input.taxRateId || null,
       status: input.status,
     },
   };

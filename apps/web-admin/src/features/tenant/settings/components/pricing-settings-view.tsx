@@ -14,6 +14,8 @@ import { webAdminRoutes } from "@/config/routes";
 import { updateTenantDefaultCurrencyAction } from "@/features/tenant/settings/actions";
 import { TaxSettingsSection } from "@/features/tenant/point-of-sale/components";
 import type { PointOfSaleSettings } from "@/features/tenant/point-of-sale/types";
+import { TaxRatesSection } from "@/features/tenant/tax-rates/components";
+import type { TaxRate } from "@/features/tenant/tax-rates/types";
 
 import { TenantDefaultCurrencyField } from "./tenant-default-currency-field";
 import { TenantSettingsSurface } from "./tenant-settings-surface";
@@ -23,9 +25,13 @@ import { useTenantI18n } from "@/i18n";
 export function PricingSettingsView({
   taxSettings,
   taxError,
+  taxRates,
+  taxRatesLoadFailed,
 }: {
   taxSettings?: PointOfSaleSettings;
   taxError?: string;
+  taxRates: TaxRate[];
+  taxRatesLoadFailed: boolean;
 }) {
   const { m } = useTenantI18n();
   const { authLoaded, canUpdateSettings, settings, updateSettings } =
@@ -139,6 +145,12 @@ export function PricingSettingsView({
           canManage={canUpdateSettings}
           initialError={taxError}
           initialSettings={taxSettings}
+        />
+
+        <TaxRatesSection
+          canManage={canUpdateSettings}
+          initialRates={taxRates}
+          loadFailed={taxRatesLoadFailed}
         />
 
         <section className="flex flex-col gap-4 px-4 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-5">

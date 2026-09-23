@@ -719,6 +719,7 @@ export type TenantMessages = {
       validation: {
         nameRequired: string;
         nameTooLong: string;
+        taxRateInvalid: string;
         categoryInvalid: string;
         categoryAttributeValueRequired: string;
         categoryAttributesInvalid: string;
@@ -1357,6 +1358,7 @@ export type TenantMessages = {
       codeDuplicate: string;
       shortNameTooLong: string;
       categoryRequired: string;
+      taxRateInvalid: string;
       categoryInvalid: string;
       descriptionTooLong: string;
       mediaInvalid: string;
@@ -2690,6 +2692,54 @@ export type TenantMessages = {
         status: string;
         reason: string;
       };
+    };
+  };
+  taxRates: {
+    title: string;
+    description: string;
+    empty: string;
+    add: string;
+    name: string;
+    namePlaceholder: string;
+    rate: string;
+    rateHint: string;
+    usage: string;
+    unused: string;
+    archivedBadge: string;
+    archive: string;
+    restore: string;
+    edit: string;
+    delete: string;
+    deleteConfirm: string;
+    save: string;
+    cancel: string;
+    saving: string;
+    createTitle: string;
+    editTitle: string;
+    created: string;
+    updated: string;
+    deleted: string;
+    archivedToast: string;
+    restoredToast: string;
+    readOnly: string;
+    loadFailed: string;
+    nameRequired: string;
+    rateInvalid: string;
+    errors: {
+      nameConflict: string;
+      inUse: string;
+      versionConflict: string;
+      generic: string;
+    };
+    field: {
+      label: string;
+      useDefault: string;
+      useDefaultUnknown: string;
+      hint: string;
+      archivedSuffix: string;
+      taxDisabled: string;
+      loadFailed: string;
+      manage: string;
     };
   };
 };

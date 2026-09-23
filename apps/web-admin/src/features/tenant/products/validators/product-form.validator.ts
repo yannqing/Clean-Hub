@@ -293,6 +293,7 @@ export function validateProductForm(
       allowNegativeStock: input.allowNegativeStock,
       allowOfflineSale: input.allowOfflineSale,
       branchSettings,
+      taxRateId: input.taxRateId || null,
     },
   };
 }

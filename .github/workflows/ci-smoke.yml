@@ -118,6 +118,7 @@ jobs:
           pnpm --filter @cleanhub/pos-web smoke:offline-operations
           pnpm --filter @cleanhub/pos-web smoke:cash-drawer
           pnpm --filter @cleanhub/web-admin smoke:proxy
+          pnpm --filter @cleanhub/web-admin smoke:tax-rate-percent
           pnpm --filter @cleanhub/mobile smoke:release-validation
           pnpm --filter @cleanhub/pos-mobile smoke:native-release-validation
 

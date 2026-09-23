@@ -18,6 +18,7 @@ import {
   serviceCategories,
   serviceMedia,
   services,
+  taxRates,
   type Database,
 } from "@cleanhub/db";
 import { createId } from "@cleanhub/id";
@@ -70,6 +71,9 @@ type ServiceJoinedRow = {
   pricingUnit: ServiceSummary["pricingUnit"];
   labelRule: ServiceSummary["labelRule"];
   applicableItemTypes: ServiceSummary["applicableItemTypes"];
+  taxRateId: string | null;
+  taxRateName: string | null;
+  taxRate: string | null;
   standardPrice: string;
   compareAtPrice: string | null;
   costPrice: string | null;
@@ -116,6 +120,9 @@ function buildServiceSelect() {
     pricingUnit: services.pricingUnit,
     labelRule: services.labelRule,
     applicableItemTypes: services.applicableItemTypes,
+    taxRateId: services.taxRateId,
+    taxRateName: taxRates.name,
+    taxRate: taxRates.rate,
     standardPrice: prices.amount,
     compareAtPrice: prices.compareAtAmount,
     costPrice: prices.costAmount,
@@ -166,6 +173,9 @@ function toServiceSummary(row: ServiceJoinedRow): ServiceSummary {
     pricingUnit: row.pricingUnit,
     labelRule: row.labelRule,
     applicableItemTypes: row.applicableItemTypes,
+    taxRateId: row.taxRateId,
+    taxRateName: row.taxRateName,
+    taxRate: row.taxRate,
     standardPrice: row.standardPrice,
     compareAtPrice: row.compareAtPrice,
     costPrice: row.costPrice,
@@ -197,6 +207,8 @@ function toAuditSnapshot(row: ServiceDetailRecord): ServiceAuditSnapshot {
     pricingUnit: row.pricingUnit,
     labelRule: row.labelRule,
     applicableItemTypes: row.applicableItemTypes,
+    taxRateId: row.taxRateId,
+    taxRateName: row.taxRateName,
     standardPrice: row.standardPrice,
     compareAtPrice: row.compareAtPrice,
     costPrice: row.costPrice,
@@ -655,6 +667,14 @@ export async function findServices(
         eq(prices.tenantId, services.tenantId),
       ),
     )
+    .leftJoin(
+      taxRates,
+      and(
+        eq(taxRates.tenantId, services.tenantId),
+        eq(taxRates.id, services.taxRateId),
+        isNull(taxRates.deletedAt),
+      ),
+    )
     .where(and(...filters))
     .orderBy(
       asc(serviceCategories.sortOrder),
@@ -687,6 +707,14 @@ export async function findServiceById(
       and(
         eq(prices.serviceId, services.id),
         eq(prices.tenantId, services.tenantId),
+      ),
+    )
+    .leftJoin(
+      taxRates,
+      and(
+        eq(taxRates.tenantId, services.tenantId),
+        eq(taxRates.id, services.taxRateId),
+        isNull(taxRates.deletedAt),
       ),
     )
     .where(
@@ -856,6 +884,7 @@ export async function createServiceRecord(
     pricingUnit: input.pricingUnit,
     labelRule: input.labelRule,
     applicableItemTypes: input.applicableItemTypes,
+    taxRateId: input.taxRateId ?? null,
     status: input.status ?? "active",
     createdBy: input.actorUserId,
     updatedBy: input.actorUserId,
@@ -946,6 +975,8 @@ export async function updateServiceRecord(
       labelRule: input.labelRule ?? existing.labelRule,
       applicableItemTypes:
         input.applicableItemTypes ?? existing.applicableItemTypes,
+      taxRateId:
+        input.taxRateId === undefined ? existing.taxRateId : input.taxRateId,
       status: input.status ?? existing.status,
       updatedAt: new Date(),
       updatedBy: input.actorUserId,

@@ -51,10 +51,13 @@ export type ProductFormValues = {
   allowNegativeStock: boolean;
   allowOfflineSale: boolean;
   branchSettings: CreateTenantProductBranchSetting[];
+  /** Rate id, or "" for the tenant default. */
+  taxRateId: string;
 };
 
 export type ProductFormErrorCode =
   | "nameRequired"
+  | "taxRateInvalid"
   | "nameTooLong"
   | "categoryInvalid"
   | "categoryAttributeValueRequired"

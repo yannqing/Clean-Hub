@@ -54,6 +54,11 @@ export type ServiceSummary = {
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   applicableItemTypes: ServiceApplicableItemType[];
+  /** The service's own tax rate; null sells it at the POS default rate. */
+  taxRateId: string | null;
+  taxRateName: string | null;
+  /** Fraction, e.g. "0.1800" for 18%. */
+  taxRate: string | null;
   standardPrice: string;
   compareAtPrice: string | null;
   costPrice: string | null;
@@ -85,6 +90,8 @@ export type CreateServiceRequest = {
   pricingUnit: ServicePricingUnit;
   labelRule: ServiceLabelRule;
   applicableItemTypes: ServiceApplicableItemType[];
+  /** null sells the service at the POS default rate. */
+  taxRateId?: string | null;
   standardPrice: string;
   compareAtPrice?: string | null;
   costPrice?: string | null;

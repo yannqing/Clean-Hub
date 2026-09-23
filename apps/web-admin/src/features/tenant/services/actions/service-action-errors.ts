@@ -33,6 +33,7 @@ const serviceFormFields = new Set<ServiceFieldName>([
   "pricingUnit",
   "labelRule",
   "applicableItemTypes",
+  "taxRateId",
   "standardPrice",
   "compareAtPrice",
   "costPrice",
@@ -58,6 +59,7 @@ const serviceFieldMap: Record<string, ServiceFieldName> = {
   pricingUnit: "pricingUnit",
   labelRule: "labelRule",
   applicableItemTypes: "applicableItemTypes",
+  taxRateId: "taxRateId",
   standardPrice: "standardPrice",
   compareAtPrice: "compareAtPrice",
   costPrice: "costPrice",
@@ -100,6 +102,13 @@ export function getServiceActionError(
       ].includes(error.code ?? "")
     ) {
       errors.categoryId = "categoryInvalid";
+    }
+
+    if (
+      error.code === "SERVICE_TAX_RATE_NOT_FOUND" ||
+      error.code === "SERVICE_TAX_RATE_ARCHIVED"
+    ) {
+      errors.taxRateId = "taxRateInvalid";
     }
 
     if (error.code === "SERVICE_CODE_DUPLICATE") {

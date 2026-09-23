@@ -22,6 +22,7 @@ import { createTenantPosChannelApi } from "./pos-channel";
 import { createTenantProfileApi } from "./profile";
 import { createTenantSettingsApi } from "./settings";
 import { createTenantSearchApi } from "./search";
+import { createTenantTaxRatesApi } from "./tax-rates";
 
 export * from "./insights";
 export * from "./backups";
@@ -38,6 +39,7 @@ export * from "./payment-integrations";
 export * from "./pos-channel";
 export * from "./profile";
 export * from "./search";
+export * from "./tax-rates";
 // NOTE: settings types are exported explicitly below (not via `export *`),
 // because `TenantSettings` / `UpdateTenantSettingsRequest` collide with the
 // SaaS-domain types of the same name (see ../saas/tenants). They are re-exported
@@ -70,6 +72,7 @@ export function createTenantApi(client: ApiClient) {
   const profile = createTenantProfileApi(client);
   const reports = createTenantReportsApi(client);
   const search = createTenantSearchApi(client);
+  const taxRates = createTenantTaxRatesApi(client);
 
   return {
     auditLogs,
@@ -91,5 +94,6 @@ export function createTenantApi(client: ApiClient) {
     profile,
     reports,
     search,
+    taxRates,
   };
 }

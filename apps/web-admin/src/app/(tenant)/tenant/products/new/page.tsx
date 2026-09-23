@@ -15,6 +15,7 @@ export default async function NewProductPage() {
       categoryLoadFailed={dataset.categoryLoadFailed}
       currencyLoadFailed={dataset.currencyLoadFailed}
       defaultCurrency={dataset.defaultCurrency}
+      taxRateOptions={dataset.taxRateOptions}
     />
   );
 }

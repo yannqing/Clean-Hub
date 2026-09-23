@@ -186,6 +186,8 @@ const serviceProfileBodySchema = z.object({
     .refine((values) => new Set(values).size === values.length, {
       message: "Applicable item types must be unique.",
     }),
+  // null sells the service at the tenant's default rate.
+  taxRateId: z.string().regex(ULID_PATTERN).nullable().optional(),
   status: serviceStatusSchema.optional(),
   mediaObjectKeys: serviceMediaObjectKeysSchema.optional(),
 });

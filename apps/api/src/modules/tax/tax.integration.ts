@@ -27,11 +27,14 @@ import { createId } from "@cleanhub/id";
 import type { AuthContext } from "../auth/auth.types.js";
 import { applyPosOrderFinancialRules } from "../pos/orders/orders.financial.js";
 import { createPosOrder } from "../pos/orders/orders.service.js";
+import { TenantServicesError } from "../tenant/services/services.errors.js";
+import { updateTenantService } from "../tenant/services/services.service.js";
 import { TenantTaxRateError } from "../tenant/tax-rates/tax-rates.errors.js";
 import {
   createTenantTaxRate,
   deleteTenantTaxRate,
   listTenantTaxRates,
+  updateTenantTaxRate,
 } from "../tenant/tax-rates/tax-rates.service.js";
 
 /**
@@ -225,15 +228,47 @@ async function runAssertions(db: Database): Promise<void> {
       error instanceof TenantTaxRateError && error.code === "TAX_RATE_NAME_CONFLICT",
   );
 
-  await db
-    .update(services)
-    .set({ taxRateId: standard.id })
-    .where(eq(services.id, ids.standardServiceId));
-  await db
-    .update(services)
-    .set({ taxRateId: exempt.id })
-    .where(eq(services.id, ids.exemptServiceId));
+  const assigned = await updateTenantService(
+    owner,
+    ids.standardServiceId,
+    { taxRateId: standard.id, version: 1 },
+    meta,
+    db,
+  );
+  assert.equal(assigned.taxRateName, "TVA 18%", "the service reports the rate it carries");
+  assert.equal(assigned.taxRate, "0.1800");
+  await updateTenantService(owner, ids.exemptServiceId, { taxRateId: exempt.id, version: 1 }, meta, db);
   // ids.defaultServiceId carries no rate: it must fall back to the 18% default.
+
+  // A retired rate is not offered for new assignments.
+  const retired = await createTenantTaxRate(
+    { authContext: owner, data: { name: "Ancien taux", rate: "0.2000" }, requestMeta: meta },
+    db,
+  );
+  await updateTenantTaxRate(
+    {
+      authContext: owner,
+      taxRateId: retired.id,
+      data: { archived: true, expectedVersion: retired.version },
+      requestMeta: meta,
+    },
+    db,
+  );
+  await expectRejectedInSavepoint(
+    db,
+    () =>
+      updateTenantService(owner, ids.defaultServiceId, { taxRateId: retired.id, version: 1 }, meta, db),
+    (error: unknown) =>
+      error instanceof TenantServicesError && error.code === "SERVICE_TAX_RATE_ARCHIVED",
+  );
+  // Nor can a service point at a rate id that is not this tenant's.
+  await expectRejectedInSavepoint(
+    db,
+    () =>
+      updateTenantService(owner, ids.defaultServiceId, { taxRateId: createId(), version: 1 }, meta, db),
+    (error: unknown) =>
+      error instanceof TenantServicesError && error.code === "SERVICE_TAX_RATE_NOT_FOUND",
+  );
 
   // 10,000 at 18% + 5,000 exempt + 2,000 at the default 18%, tax-exclusive:
   // tax is 1,800 + 0 + 360 = 2,160; the customer pays 19,160.

@@ -47,6 +47,8 @@ import { webAdminRoutes } from "@/config/routes";
 import { BranchSelectionCard } from "@/components/forms";
 import { isVersionConflict } from "@/features/tenant/shared/version-conflict";
 import type { BranchSummary } from "@/features/tenant/branches/types";
+import { TaxRateSelect } from "@/features/tenant/tax-rates/components";
+import type { TaxRateOptions } from "@/features/tenant/tax-rates/types";
 import { interpolate, useTenantI18n } from "@/i18n";
 
 import {
@@ -83,6 +85,7 @@ const DEFAULT_FORM_VALUES: ServiceFormValues = {
   pricingUnit: "per_item",
   labelRule: "per_order_item",
   applicableItemTypes: ["cloth"],
+  taxRateId: "",
   standardPrice: "",
   compareAtPrice: "",
   costPrice: "",
@@ -147,6 +150,7 @@ type ServiceCreateViewProps = {
   defaultCurrency: string | null;
   initialCode?: string;
   initialService?: ServiceDetail;
+  taxRateOptions: TaxRateOptions;
 };
 
 type ServiceBranchOption = Pick<
@@ -215,6 +219,7 @@ function getInitialFormValues(
     pricingUnit: initialService.pricingUnit,
     labelRule: initialService.labelRule,
     applicableItemTypes: initialService.applicableItemTypes,
+    taxRateId: initialService.taxRateId ?? "",
     standardPrice: initialService.standardPrice,
     compareAtPrice: initialService.compareAtPrice ?? "",
     costPrice: initialService.costPrice ?? "",
@@ -248,6 +253,7 @@ export function ServiceCreateView({
   defaultCurrency,
   initialCode,
   initialService,
+  taxRateOptions,
 }: ServiceCreateViewProps) {
   const router = useRouter();
   const { m } = useTenantI18n();
@@ -1385,6 +1391,14 @@ export function ServiceCreateView({
                       {m.services.create.displayOrderHint}
                     </p>
                   </div>
+
+                  <TaxRateSelect
+                    error={getFieldError("taxRateId")}
+                    id="service-tax-rate"
+                    onChange={(value) => updateField("taxRateId", value)}
+                    options={taxRateOptions}
+                    value={formValues.taxRateId}
+                  />
                 </CardContent>
               </Card>
             </div>

@@ -28,6 +28,8 @@ export type CreateTenantProductRequest = {
   tags: string[];
   mediaObjectKeys: string[];
   status: TenantProductStatus;
+  /** null sells the product at the POS default rate; omitted on update keeps it. */
+  taxRateId?: string | null;
   skuCode: string;
   barcode?: string;
   variantName?: string;
@@ -107,6 +109,10 @@ export type TenantProductDetail = {
   description: string | null;
   tags: string[];
   status: TenantProductStatus;
+  taxRateId: string | null;
+  taxRateName: string | null;
+  /** Fraction, e.g. "0.1800" for 18%. */
+  taxRate: string | null;
   skuCount: number;
   sku: TenantProductDetailSku;
   salePrice: string;
@@ -212,6 +218,9 @@ export type TenantProductSummary = {
   categoryName: string | null;
   tags: string[];
   status: TenantProductStatus;
+  taxRateId: string | null;
+  taxRateName: string | null;
+  taxRate: string | null;
   skuCount: number;
   activeSkuCount: number;
   trackedSkuCount: number;
