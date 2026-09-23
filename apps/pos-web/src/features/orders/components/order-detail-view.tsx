@@ -339,6 +339,11 @@ function buildOrderReceiptContent(
       taxableMinor: moneyToReceiptMinor(order.taxableAmount, order.currency),
       taxMinor: moneyToReceiptMinor(order.taxAmount, order.currency),
       taxRate: order.taxRateSnapshot,
+      taxBreakdown: (order.taxBreakdown ?? []).map((entry) => ({
+        taxRate: entry.taxRate,
+        taxableMinor: moneyToReceiptMinor(entry.taxableAmount, order.currency),
+        taxMinor: moneyToReceiptMinor(entry.taxAmount, order.currency),
+      })),
       roundingMinor: moneyToReceiptMinor(
         order.roundingAdjustmentAmount,
         order.currency,

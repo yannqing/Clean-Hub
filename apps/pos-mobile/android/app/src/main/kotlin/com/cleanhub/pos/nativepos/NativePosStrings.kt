@@ -652,6 +652,8 @@ internal class NativePosCopy(
     val receiptDuePrefix: String get() = get("receiptDuePrefix")
     val receiptSubtotalPrefix: String get() = get("receiptSubtotalPrefix")
     val receiptTaxLine: String get() = get("receiptTaxLine")
+    val receiptTaxableLine: String get() = get("receiptTaxableLine")
+    val receiptTaxExemptionPrefix: String get() = get("receiptTaxExemptionPrefix")
     val receiptRoundingPrefix: String get() = get("receiptRoundingPrefix")
     val receiptTaxNumberPrefix: String get() = get("receiptTaxNumberPrefix")
     val receiptTenderedPrefix: String get() = get("receiptTenderedPrefix")
@@ -916,6 +918,8 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
     "receiptDuePrefix" to "应收：%s",
     "receiptSubtotalPrefix" to "小计：%s",
     "receiptTaxLine" to "增值税 %s：%s",
+    "receiptTaxableLine" to "应税金额 %s：%s",
+    "receiptTaxExemptionPrefix" to "免税原因：%s",
     "receiptRoundingPrefix" to "抹零：%s",
     "receiptTaxNumberPrefix" to "税号：%s",
     "receiptTenderedPrefix" to "实收现金：%s",
@@ -1619,6 +1623,8 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
     "receiptDuePrefix" to "Due: %s",
     "receiptSubtotalPrefix" to "Subtotal: %s",
     "receiptTaxLine" to "VAT %s: %s",
+    "receiptTaxableLine" to "Taxable base %s: %s",
+    "receiptTaxExemptionPrefix" to "Tax exemption: %s",
     "receiptRoundingPrefix" to "Rounding: %s",
     "receiptTaxNumberPrefix" to "Tax ID: %s",
     "receiptTenderedPrefix" to "Cash received: %s",
@@ -2322,6 +2328,8 @@ private val COPY_FR_VALUES: Map<String, String> = mapOf(
     "receiptDuePrefix" to "Dû : %s",
     "receiptSubtotalPrefix" to "Sous-total : %s",
     "receiptTaxLine" to "TVA %s : %s",
+    "receiptTaxableLine" to "Base imposable %s : %s",
+    "receiptTaxExemptionPrefix" to "Exonération : %s",
     "receiptRoundingPrefix" to "Arrondi : %s",
     "receiptTaxNumberPrefix" to "N° fiscal : %s",
     "receiptTenderedPrefix" to "Espèces reçues : %s",

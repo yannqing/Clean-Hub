@@ -1,4 +1,5 @@
 import { getDb, type Database } from "@cleanhub/db";
+import { formatTaxRatePercent } from "@cleanhub/domain/tax";
 import { createId } from "@cleanhub/id";
 
 import { EmailAdapter } from "../../notifications/email.adapter.js";
@@ -35,16 +36,17 @@ function buildFiscalReceipt(order: PosOrderDetail): {
     "",
     ...order.items.map(
       (item) =>
-        `${item.itemName} x ${item.quantity}  ${item.lineAmount} ${order.currency}` +
-        (Number(item.taxAmount) !== 0
-          ? `  VAT ${Number(item.taxRateSnapshot) * 100}%: ${item.taxAmount}`
-          : ""),
+        `${item.itemName} x ${item.quantity}  ${item.lineAmount} ${order.currency}`,
     ),
     "",
     `Subtotal: ${order.subtotalAmount} ${order.currency}`,
     `Discount: ${order.discountAmount} ${order.currency}`,
-    `Taxable: ${order.taxableAmount} ${order.currency}`,
-    `VAT: ${order.taxAmount} ${order.currency}`,
+    // One line per rate, as a VAT receipt states them.
+    ...order.taxBreakdown.map(
+        (entry) =>
+          `VAT ${formatTaxRatePercent(entry.taxRate)} on ${entry.taxableAmount}: ${entry.taxAmount} ${order.currency}`,
+      ),
+    `VAT total: ${order.taxAmount} ${order.currency}`,
     ...(order.taxExemptionReason
       ? [`Tax exemption: ${order.taxExemptionReason}`]
       : []),

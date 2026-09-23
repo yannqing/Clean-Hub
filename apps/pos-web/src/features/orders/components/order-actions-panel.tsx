@@ -15,6 +15,7 @@ import {
   type ShiftRecord,
 } from "@cleanhub/api-client";
 import { createId } from "@cleanhub/id";
+import { formatTaxRatePercent } from "@cleanhub/domain/tax";
 import { useTranslation } from "@cleanhub/i18n/react";
 import {
   Button,
@@ -78,7 +79,7 @@ export function OrderActionsPanel({
   currentShift: ShiftRecord | null;
   register: PosRegisterState;
 }) {
-  const { locale } = useTranslation();
+  const { locale, t } = useTranslation();
   const router = useRouter();
   const runtime = usePosRuntimeConfig();
   const text = (value: string) => translatePosText(value, locale);
@@ -386,20 +387,33 @@ export function OrderActionsPanel({
                 {formatOrderMoney(order.discountAmount, order.currency, locale)}
               </span>
             </div>
-            {Number(order.taxAmount) !== 0 ? (
-              <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                <span>
-                  VAT {Number(order.taxRateSnapshot) * 100}%
-                  {order.pricesIncludeTax ? "（含税）" : ""}
-                </span>
-                <span className="font-semibold text-foreground">
-                  {formatOrderMoney(order.taxAmount, order.currency, locale)}
-                </span>
-              </div>
-            ) : null}
+            {(order.taxBreakdown ?? [
+              {
+                taxRate: order.taxRateSnapshot,
+                taxableAmount: order.taxableAmount,
+                taxAmount: order.taxAmount,
+              },
+            ])
+              .filter((entry) => Number(entry.taxAmount) !== 0)
+              .map((entry) => (
+                <div
+                  className="flex items-center justify-between gap-3 text-muted-foreground"
+                  key={entry.taxRate}
+                >
+                  <span>
+                    {t("pos.cart.taxLine", {
+                      rate: formatTaxRatePercent(entry.taxRate),
+                    })}
+                    {order.pricesIncludeTax ? t("pos.cart.taxInclusiveSuffix") : ""}
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {formatOrderMoney(entry.taxAmount, order.currency, locale)}
+                  </span>
+                </div>
+              ))}
             {order.taxExemptionReason ? (
               <div className="flex items-center justify-between gap-3 text-muted-foreground">
-                <span>税务豁免</span>
+                <span>{text("税务豁免原因")}</span>
                 <span className="max-w-40 truncate font-semibold text-foreground">
                   {order.taxExemptionReason}
                 </span>

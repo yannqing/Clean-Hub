@@ -2302,6 +2302,7 @@ fun NativePosApp(applicationContext: Context) {
                                                             pricing = freshPricing,
                                                             amountDueMinor = checkoutRequest.expectedTotalMinor,
                                                             tenderedMinor = checkoutRequest.tenderedMinor,
+                                                            taxExemptionReason = checkoutRequest.taxExemptionReason,
                                                             printSettings = printSettings,
                                                         )
                                                     } else null,
@@ -6925,6 +6926,7 @@ private fun buildNativeCashReceiptDraft(
     pricing: NativeCartPricing,
     amountDueMinor: Long,
     tenderedMinor: Long,
+    taxExemptionReason: String?,
     printSettings: NativeReceiptPrintSettings,
 ): NativeReceiptPrintDraft {
     val total = amountDueMinor
@@ -6957,9 +6959,12 @@ private fun buildNativeCashReceiptDraft(
             pricing.discounts.forEach { discount ->
                 add("${discount.title}  -${formatMoney(discount.amountMinor, cart.currency)}")
             }
-            // A VAT receipt states the tax per rate. Exempt lines pay none, so
-            // only rates that charged something are printed.
-            pricing.taxBreakdown.filter { it.taxMinor != 0L }.forEach { entry ->
+            // Include the base for every rate, including zero-rated items.
+            pricing.taxBreakdown.forEach { entry ->
+                add(copy.receiptTaxableLine.format(
+                    formatNativeTaxRate(entry.taxRate),
+                    formatMoney(entry.taxableMinor, cart.currency),
+                ))
                 add(
                     copy.receiptTaxLine.format(
                         formatNativeTaxRate(entry.taxRate),
@@ -6976,8 +6981,9 @@ private fun buildNativeCashReceiptDraft(
             add(copy.receiptDuePrefix.format(formatMoney(total, cart.currency)))
             add(copy.receiptTenderedPrefix.format(formatMoney(tenderedMinor, cart.currency)))
             if (change > 0) add(copy.receiptChangePrefix.format(formatMoney(change, cart.currency)))
-            if (pricing.taxBreakdown.any { it.taxMinor != 0L }) {
-                pricing.taxRegistrationNumber?.let { add(copy.receiptTaxNumberPrefix.format(it)) }
+            pricing.taxRegistrationNumber?.let { add(copy.receiptTaxNumberPrefix.format(it)) }
+            taxExemptionReason?.takeIf { it.isNotBlank() }?.let {
+                add(copy.receiptTaxExemptionPrefix.format(it))
             }
             add(copy.thankYou)
             add("")

@@ -147,4 +147,27 @@ assert(
   "ESC/POS receipt should include control bytes",
 );
 
+// A basket of standard-rated and exempt items prints tax per rate, as a VAT
+// receipt must, and never a float such as "VAT 7.000000000000001%".
+const mixedRateText = buildPosReceiptText(
+  {
+    ...receipt,
+    fields: undefined,
+    taxRate: "0.0700",
+    taxBreakdown: [
+      { taxRate: "0.1800", taxableMinor: 1_200_000, taxMinor: 216_000 },
+      { taxRate: "0.0000", taxableMinor: 500_000, taxMinor: 0 },
+    ],
+  },
+  { locale: "fr" },
+);
+assert(mixedRateText.includes("TVA 18%"), "each rate is labelled with its percentage");
+assert(mixedRateText.includes("TVA 0%"), "the exempt base is shown too");
+assert(!mixedRateText.includes("0000000"), "rates never print as floats");
+const singleRateText = buildPosReceiptText(
+  { ...receipt, fields: undefined, taxRate: "0.0700", taxMinor: 700, taxBreakdown: undefined },
+  { locale: "en" },
+);
+assert(singleRateText.includes("VAT 7%"), `single rate prints exactly, got:\n${singleRateText}`);
+
 console.log("hardware smoke ok");

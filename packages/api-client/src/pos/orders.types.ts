@@ -1,3 +1,4 @@
+import type { PosTaxBreakdownEntry } from "./carts.types";
 import type { PosPaymentMethod } from "./terminal-settings.types";
 import type { ServiceTicketStatus } from "./service-tickets.types";
 
@@ -211,6 +212,11 @@ export type PosOrderTicketReference = {
 
 export type PosOrderDetail = PosOrderSummary & {
   items: PosOrderItem[];
+  /**
+   * Taxable base and tax per rate, dominant first. Optional only so a client
+   * talking to an API from before per-item tax still type-checks.
+   */
+  taxBreakdown?: PosTaxBreakdownEntry[];
   discountApplications: PosOrderDiscountApplication[];
   ticketReferences: PosOrderTicketReference[];
 };

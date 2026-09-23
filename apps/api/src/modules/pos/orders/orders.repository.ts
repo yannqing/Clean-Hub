@@ -58,6 +58,7 @@ import type {
 import { listPosOrderDiscountApplications } from "../discounts/discounts.repository.js";
 import { minorToMoney, moneyToMinor } from "../discounts/pricing-engine.js";
 import { projectPosOrderPaymentState } from "./order-payment-state.js";
+import { orderTaxBreakdown } from "../../tax/tax.breakdown.js";
 
 export type ResolvedPosOrderItemInput = {
   itemKind: "service" | "product";
@@ -457,9 +458,11 @@ export async function findPosOrderDetail(
   );
   const ticketReferences = await listPosOrderTicketReferences(db, input);
 
+  const items = itemRows.map(toOrderItem);
   return {
     ...summary,
-    items: itemRows.map(toOrderItem),
+    items,
+    taxBreakdown: orderTaxBreakdown(summary, items),
     discountApplications,
     ticketReferences,
   };

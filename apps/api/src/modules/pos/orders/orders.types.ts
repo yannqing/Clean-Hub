@@ -1,5 +1,6 @@
 import type { AuthContext, AuthRequestMeta } from "../../auth/auth.types.js";
 import type { ServiceTicketStatus } from "../service-tickets/service-tickets.types.js";
+import type { TaxBreakdownAmount } from "../../tax/tax.breakdown.js";
 
 export type PosOrderType = "ticket" | "manual";
 
@@ -192,6 +193,8 @@ export type PosOrderTicketReference = {
 
 export type PosOrderDetail = PosOrderSummary & {
   items: PosOrderItem[];
+  /** Taxable base and tax per rate, dominant first, as a receipt prints them. */
+  taxBreakdown: TaxBreakdownAmount[];
   discountApplications: PosOrderDiscountApplication[];
   ticketReferences: PosOrderTicketReference[];
 };

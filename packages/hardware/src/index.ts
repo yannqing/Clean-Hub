@@ -2,8 +2,17 @@ import {
   normalizePosReceiptFields,
   type PosReceiptField,
 } from "@cleanhub/domain/receipt";
+import { formatTaxRatePercent } from "@cleanhub/domain/tax";
 
 export type PrinterConnection = "usb" | "bluetooth" | "wifi";
+
+/** One rate's taxable base and tax on a receipt, in receipt minor units. */
+export type PosReceiptTaxLine = {
+  /** Fraction, e.g. "0.1800". */
+  taxRate: string;
+  taxableMinor: number;
+  taxMinor: number;
+};
 
 export type PrintJob = {
   id: string;
@@ -392,6 +401,11 @@ export type PosReceiptDocument = {
   taxableMinor?: number;
   taxMinor?: number;
   taxRate?: string;
+  /**
+   * Taxable base and tax per rate. With more than one rate the receipt prints
+   * each, as a VAT receipt must; with one it prints the single pair as before.
+   */
+  taxBreakdown?: readonly PosReceiptTaxLine[];
   roundingMinor?: number;
   taxRegistrationNumber?: string;
   taxExemptionReason?: string;
@@ -986,15 +1000,29 @@ function buildPosReceiptLines(
     has("discount") && receipt.discountMinor !== undefined
       ? keyValue(labels.discount, `-${amount(receipt.discountMinor)}`)
       : undefined,
-    has("taxable_amount") && receipt.taxableMinor !== undefined
-      ? keyValue(labels.taxable, amount(receipt.taxableMinor))
-      : undefined,
-    has("tax") && receipt.taxMinor !== undefined
-      ? keyValue(
-          `${labels.tax}${receipt.taxRate ? ` ${Number(receipt.taxRate) * 100}%` : ""}`,
-          amount(receipt.taxMinor),
-        )
-      : undefined,
+    ...((receipt.taxBreakdown?.length ?? 0) > 1
+      ? (receipt.taxBreakdown ?? []).flatMap((entry) => {
+          const rate = formatTaxRatePercent(entry.taxRate);
+          return [
+            has("taxable_amount")
+              ? keyValue(`${labels.taxable} ${rate}`, amount(entry.taxableMinor))
+              : undefined,
+            has("tax")
+              ? keyValue(`${labels.tax} ${rate}`, amount(entry.taxMinor))
+              : undefined,
+          ];
+        })
+      : [
+          has("taxable_amount") && receipt.taxableMinor !== undefined
+            ? keyValue(labels.taxable, amount(receipt.taxableMinor))
+            : undefined,
+          has("tax") && receipt.taxMinor !== undefined
+            ? keyValue(
+                `${labels.tax}${receipt.taxRate ? ` ${formatTaxRatePercent(receipt.taxRate)}` : ""}`,
+                amount(receipt.taxMinor),
+              )
+            : undefined,
+        ]),
     has("tax_exemption_reason")
       ? keyValue(
           labels.taxExemption,
