@@ -376,6 +376,11 @@ async function writeReleaseCompose() {
       DATABASE_APPLICATION_NAME: \${DATABASE_APPLICATION_NAME:-cleanhub}
       DATABASE_REQUIRE_RLS: "true"
       AUTH_TOKEN_SECRET: \${AUTH_TOKEN_SECRET:?AUTH_TOKEN_SECRET is required}
+      # The API refuses to start in production without the webhook HMAC secret,
+      # and the payment credential key decrypts tenant PSP settings. Neither was
+      # passed through, so a clean deploy could not boot.
+      PAYMENT_MOCK_SECRET: \${PAYMENT_MOCK_SECRET:?PAYMENT_MOCK_SECRET is required in production}
+      PAYMENT_CREDENTIALS_ENCRYPTION_KEY: \${PAYMENT_CREDENTIALS_ENCRYPTION_KEY:?PAYMENT_CREDENTIALS_ENCRYPTION_KEY is required}
       AUTH_ACCESS_TOKEN_TTL_SECONDS: \${AUTH_ACCESS_TOKEN_TTL_SECONDS:-900}
       AUTH_REFRESH_TOKEN_TTL_SECONDS: \${AUTH_REFRESH_TOKEN_TTL_SECONDS:-2592000}
       AUTH_COOKIE_SECURE: "true"
