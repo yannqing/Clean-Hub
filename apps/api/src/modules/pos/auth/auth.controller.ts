@@ -21,6 +21,7 @@ import {
   setTerminalLockBodySchema,
   updatePosDeviceBodySchema,
 } from "./auth.validation.js";
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 
 function terminalErrorResponse(
   c: Context<AppBindings>,
@@ -28,7 +29,7 @@ function terminalErrorResponse(
 ) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
     },

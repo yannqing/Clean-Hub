@@ -21,6 +21,7 @@ import {
   recordCashPaymentDrawerResultBodySchema,
   recordPosPrintJobResultBodySchema,
 } from "./hardware.validation.js";
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 
 function createPosHardwareErrorResponse(
   c: Context<AppBindings>,
@@ -28,7 +29,7 @@ function createPosHardwareErrorResponse(
 ) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
     },

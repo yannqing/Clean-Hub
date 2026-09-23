@@ -7,8 +7,8 @@ export {
   resolveLocale,
   supportedLocales,
   type SupportedLocale,
-} from "./locales";
-export { messages, type Messages } from "./messages/index";
+} from "./locales.js";
+export { messages, type Messages } from "./messages/index.js";
 export {
   createTranslator,
   hasMessage,
@@ -18,7 +18,7 @@ export {
   type TranslationKey,
   type TranslationParams,
   type TranslatorOptions,
-} from "./translate";
+} from "./translate.js";
 
 export const businessLineLabels = {
   en: {
@@ -40,6 +40,6 @@ export const businessLineLabels = {
     delivery: "配送",
   },
 } as const satisfies Record<
-  import("./locales").SupportedLocale,
+  import("./locales.js").SupportedLocale,
   Record<"laundry" | "car_wash" | "retail" | "delivery", string>
 >;

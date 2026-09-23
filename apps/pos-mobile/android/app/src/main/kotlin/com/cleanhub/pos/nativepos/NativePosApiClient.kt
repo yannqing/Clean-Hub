@@ -84,6 +84,9 @@ class NativePosApiClient(private val session: NativePosSession) {
             doInput = true
             setRequestProperty("Accept", "application/json")
             setRequestProperty("X-CleanHub-Auth-Client", "pos")
+            // The server localises the errors it raises from this. Without it
+            // a French till is refused a sale in English.
+            setRequestProperty("Accept-Language", session.pinLanguageCode())
             session.cookieHeader().takeIf { it.isNotBlank() }?.let { setRequestProperty("Cookie", it) }
             if (body != null) {
                 doOutput = true

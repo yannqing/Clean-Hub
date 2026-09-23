@@ -12,6 +12,7 @@ import {
   terminalHeartbeatBodySchema,
   updateTerminalSettingsBodySchema,
 } from "./terminal-settings.validation.js";
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 
 function createErrorResponse(
   c: Context<AppBindings>,
@@ -19,7 +20,7 @@ function createErrorResponse(
 ) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
     },

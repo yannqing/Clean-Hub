@@ -32,6 +32,7 @@ import {
   updatePosAccountBodySchema,
   updatePosProfileBodySchema,
 } from "./customers.validation.js";
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 
 function createPosCustomerErrorResponse(
   c: Context<AppBindings>,
@@ -39,7 +40,7 @@ function createPosCustomerErrorResponse(
 ) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
     },

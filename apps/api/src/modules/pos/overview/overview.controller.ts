@@ -4,6 +4,7 @@ import type { AppBindings } from "../../../http/types.js";
 import { PosNotImplementedError } from "../not-implemented.errors.js";
 import { getPosOverview } from "./overview.service.js";
 import type { PosOverviewQuery } from "./overview.types.js";
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 
 export async function getPosOverviewController(c: Context<AppBindings>) {
   const query = c.req.query() as PosOverviewQuery;
@@ -18,7 +19,7 @@ export async function getPosOverviewController(c: Context<AppBindings>) {
     if (error instanceof PosNotImplementedError) {
       return c.json(
         {
-          message: error.message,
+          message: localizeErrorMessage(error.message, c.get("locale")),
           code: error.code,
           requestId: c.get("requestId"),
         },

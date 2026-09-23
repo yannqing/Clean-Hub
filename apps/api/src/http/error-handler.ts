@@ -1,6 +1,7 @@
 import { ZodError } from "zod";
 
 import { AuthError } from "../modules/auth/auth.errors.js";
+import { localizeErrorMessage } from "./error-messages.js";
 import type { AppBindings, ApiErrorResponse } from "./types.js";
 
 function getAuthErrorStatus(error: AuthError): 400 | 401 | 403 | 422 | 500 {
@@ -38,10 +39,12 @@ export function handleApiError(error: Error, c: import("hono").Context<AppBindin
   const requestId = c.get("requestId");
   const logger = c.get("logger");
 
+  const locale = c.get("locale");
+
   if (error instanceof ZodError) {
     return c.json<ApiErrorResponse>(
       {
-        message: "Request validation failed.",
+        message: localizeErrorMessage("Request validation failed.", locale),
         code: "VALIDATION_ERROR",
         requestId,
         validationErrors: error.flatten(),
@@ -53,7 +56,7 @@ export function handleApiError(error: Error, c: import("hono").Context<AppBindin
   if (error instanceof AuthError) {
     return c.json<ApiErrorResponse>(
       {
-        message: error.message,
+        message: localizeErrorMessage(error.message, locale),
         code: error.code,
         ...(error.code === "ACCOUNT_LOCKED" &&
         error.lockedUntil &&
@@ -87,7 +90,7 @@ export function handleApiError(error: Error, c: import("hono").Context<AppBindin
 
   return c.json<ApiErrorResponse>(
     {
-      message: "Internal server error.",
+      message: localizeErrorMessage("Internal server error.", locale),
       code: "INTERNAL_SERVER_ERROR",
       requestId,
     },

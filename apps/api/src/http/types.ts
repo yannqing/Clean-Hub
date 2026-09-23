@@ -1,3 +1,4 @@
+import type { SupportedLocale } from "@cleanhub/i18n";
 import type { AppLogger } from "@cleanhub/logger";
 
 import type { AuthContext } from "../modules/auth/auth.types.js";
@@ -9,6 +10,7 @@ export type AppBindings = {
     mobileAuthContext: MobileAuthContext;
     logger: AppLogger;
     requestId: string;
+    locale: SupportedLocale;
   };
 };
 

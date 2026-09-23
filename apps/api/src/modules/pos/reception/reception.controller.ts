@@ -12,11 +12,12 @@ import type {
   CreatePosReceptionEventRequest,
   PosReceptionEventListQuery,
 } from "./reception.types.js";
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 
 function notImplementedResponse(c: Context<AppBindings>, error: PosNotImplementedError) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
     },

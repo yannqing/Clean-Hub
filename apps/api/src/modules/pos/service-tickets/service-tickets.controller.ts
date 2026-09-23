@@ -36,11 +36,12 @@ import {
   updateServiceTicketBodySchema,
   updateServiceTicketItemBodySchema,
 } from "./service-tickets.validation.js";
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 
 function createErrorResponse(c: Context<AppBindings>, error: ServiceTicketError) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
     },

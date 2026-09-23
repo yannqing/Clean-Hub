@@ -13,11 +13,12 @@ import {
   posOrderDiscountParamsSchema,
   removePosOrderDiscountBodySchema,
 } from "./discounts.validation.js";
+import { localizeErrorMessage } from "../../../http/error-messages.js";
 
 function createErrorResponse(c: Context<AppBindings>, error: PosOrderError) {
   return c.json(
     {
-      message: error.message,
+      message: localizeErrorMessage(error.message, c.get("locale")),
       code: error.code,
       requestId: c.get("requestId"),
     },
