@@ -34,7 +34,7 @@ pnpm pos:create-release-keystore
 | `ANDROID_KEYSTORE_PASSWORD` | `.secrets.txt` |
 | `ANDROID_KEY_PASSWORD` | `.secrets.txt`（PKCS12 格式下与上一个相同，这是正常的） |
 | `ANDROID_KEYSTORE_BASE64` | `.secrets.txt`，很长的一段，整段复制 |
-| `POS_API_BASE_URL` | 你的 API 域名，必须 `https://`、不带路径 |
+| `POS_API_BASE_URL` | API 地址，必须 `https://`、结尾不能有 `/`。当前生产环境是 `https://pos-clean.yannqing.ai/api` |
 
 配完之后：
 
@@ -47,9 +47,14 @@ rm ~/.cleanhub-release/cleanhub-pos-release.jks.secrets.txt
 
 ### 3. 域名与证书
 
-- 必须是公共 CA 签发的证书（Let's Encrypt 可以）。应用没有配置自定义 CA，
-  **自签证书连不上**。
+当前生产环境：**`https://pos-clean.yannqing.ai`**（Caddy 网关，根路径是 pos-web，
+`/api/*` 反代到 API）。所以终端要填的是带路径的 `https://pos-clean.yannqing.ai/api`。
+
+- 必须是公共 CA 签发的证书。应用没有配置自定义 CA，**自签证书连不上**。
+  当前证书由 Google Trust Services 签发，有效。
 - 必须 HTTPS。应用禁用了明文流量，发布校验也会拒绝非 HTTPS 的 origin。
+- 允许带基础路径（如 `/api`），但**结尾不能有斜杠**——客户端用
+  `base.trimEnd('/') + path` 拼接，多一个斜杠会拼出 `//`。
 
 ### 4. 服务端生产配置
 

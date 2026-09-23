@@ -151,6 +151,68 @@ export function assertIosPrivacyManifest({
   }
 }
 
+/**
+ * Android POS is a Compose application. Its API origin is compiled into
+ * BuildConfig; it must never depend on Capacitor's remote WebView server.
+ */
+export async function validateNativeAndroidRelease(apiOrigin) {
+  if (!apiOrigin) {
+    throw new Error("CLEANHUB_POS_API_BASE_URL is required for a native Android POS release.");
+  }
+  let url;
+  try {
+    url = new URL(apiOrigin);
+  } catch {
+    throw new Error("CLEANHUB_POS_API_BASE_URL must be a valid absolute URL.");
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.search || url.hash) {
+    throw new Error("The native Android POS API origin must be a credential-free HTTPS origin.");
+  }
+  if (["localhost", "127.0.0.1", "0.0.0.0", "::1"].includes(url.hostname)) {
+    throw new Error("The native Android POS API origin must not be a loopback address.");
+  }
+  // A base path is allowed: the production gateway serves the POS web app at
+  // the root and the API under /api on one host, so the terminal's base is
+  // https://host/api. What must not appear is a trailing slash or a path
+  // segment that would make the client build a double slash -- it joins with
+  // `base.trimEnd('/') + path`, and the server routes are absolute.
+  if (url.pathname !== "/" && url.pathname.endsWith("/")) {
+    throw new Error(
+      "The native Android POS API base path must not end with a slash; use https://host/api rather than https://host/api/.",
+    );
+  }
+
+  const androidRoot = join(paths.appRoot, "android", "app", "src", "main");
+  const mainActivityPath = join(
+    androidRoot,
+    "kotlin",
+    "com",
+    "cleanhub",
+    "pos",
+    "MainActivity.kt",
+  );
+  const manifestPath = join(androidRoot, "AndroidManifest.xml");
+  const rulesPath = join(androidRoot, "res", "xml", "data_extraction_rules.xml");
+  const buildPath = join(paths.appRoot, "android", "app", "build.gradle");
+  const [activity, manifest, rules, build] = await Promise.all([
+    readFile(mainActivityPath, "utf8"),
+    readFile(manifestPath, "utf8"),
+    readFile(rulesPath, "utf8"),
+    readFile(buildPath, "utf8"),
+  ]);
+  if (!activity.includes("ComponentActivity") || !activity.includes("NativePosApp") || activity.includes("BridgeActivity")) {
+    throw new Error(`Native Android POS activity at ${mainActivityPath} must launch NativePosApp directly.`);
+  }
+  if (!build.includes('CLEANHUB_POS_API_BASE_URL')) {
+    throw new Error(`Native Android POS build config at ${buildPath} must compile the API origin into BuildConfig.`);
+  }
+  if (!manifest.includes('android:usesCleartextTraffic="false"')) {
+    throw new Error(`Native Android POS manifest at ${manifestPath} must disable cleartext traffic for release builds.`);
+  }
+  assertAndroidTerminalBackupProtection({ manifest, manifestPath, rules, rulesPath });
+  return url.toString();
+}
+
 export async function validateNativeRelease(platform, expectedServerUrl) {
   if (platform !== "android" && platform !== "ios") {
     throw new Error("Native release platform must be android or ios.");
