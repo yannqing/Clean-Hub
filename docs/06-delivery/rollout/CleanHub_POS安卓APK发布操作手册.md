@@ -10,28 +10,40 @@
 用户只能卸载重装，终端本地数据和离线队列里未同步的销售会全部丢失。
 
 ```bash
-keytool -genkeypair -v \
-  -keystore cleanhub-pos-release.jks \
-  -keyalg RSA -keysize 4096 -validity 10000 \
-  -alias cleanhub-pos
+pnpm pos:create-release-keystore
 ```
 
-把这个文件离线备份两份。**它不进 git**（`.gitignore` 已覆盖 `release/`，但
-keystore 不要放进仓库任何位置）。丢失等于这个应用再也无法发布更新。
+会问你组织名和两位国家代码，然后：
+
+- 在 `~/.cleanhub-release/cleanhub-pos-release.jks` 生成 4096 位 RSA 密钥
+  （有效期 27 年，权限 600，**在仓库之外**）
+- 随机生成密码——不需要你自己想，也不会进 shell 历史
+- 把四个 GitHub Secret 的值连同 base64 一起写到同目录的 `.secrets.txt`
+
+脚本拒绝覆盖已存在的密钥库。
 
 ### 2. 配置 GitHub Secrets
 
-仓库 → Settings → Secrets and variables → Actions → New repository secret：
+仓库 → Settings → Secrets and variables → Actions → New repository secret。
 
-| Secret | 值 |
+上一步生成的 `.secrets.txt` 里已经按 Secret 名分好段，逐个复制粘贴即可：
+
+| Secret | 来源 |
 |---|---|
-| `POS_API_BASE_URL` | API 域名，必须 `https://`，不带路径，例：`https://api.example.com` |
-| `ANDROID_KEYSTORE_BASE64` | keystore 的 base64：`base64 -i cleanhub-pos-release.jks \| pbcopy` |
-| `ANDROID_KEYSTORE_PASSWORD` | keystore 密码 |
-| `ANDROID_KEY_ALIAS` | 别名（上面用的 `cleanhub-pos`） |
-| `ANDROID_KEY_PASSWORD` | key 密码 |
+| `ANDROID_KEY_ALIAS` | `.secrets.txt` |
+| `ANDROID_KEYSTORE_PASSWORD` | `.secrets.txt` |
+| `ANDROID_KEY_PASSWORD` | `.secrets.txt`（PKCS12 格式下与上一个相同，这是正常的） |
+| `ANDROID_KEYSTORE_BASE64` | `.secrets.txt`，很长的一段，整段复制 |
+| `POS_API_BASE_URL` | 你的 API 域名，必须 `https://`、不带路径 |
 
-Linux 下生成 base64 用 `base64 -w0 cleanhub-pos-release.jks`。
+配完之后：
+
+```bash
+# 备份密钥库和 secrets 文件到离线位置（两份），然后删掉本机的明文密码
+rm ~/.cleanhub-release/cleanhub-pos-release.jks.secrets.txt
+```
+
+**密钥库文件本身要长期保留并离线备份两份。** 丢了它，这个应用就再也无法发布更新。
 
 ### 3. 域名与证书
 

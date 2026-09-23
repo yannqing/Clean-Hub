@@ -37,6 +37,7 @@
     "openapi:generate": "node scripts/generate-openapi-from-routes.mjs",
     "release:build": "node scripts/build-release.mjs",
     "check:native-pos-parity": "node scripts/check-native-pos-parity.mjs",
+    "pos:create-release-keystore": "node scripts/mobile/create-pos-release-keystore.mjs",
     "package:pos-android": "pnpm --filter @cleanhub/pos-mobile package:android",
     "package:pos-android:debug": "pnpm --filter @cleanhub/pos-mobile package:android:debug",
     "format": "prettier --write ."
