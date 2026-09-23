@@ -259,6 +259,7 @@ class NativePosSyncEngine(context: Context) {
                 allowOfflineSale = product.optBoolean("allowOfflineSale"),
                 offlineStockBuffer = parseNativeWholeQuantity(product.optString("offlineStockBuffer", "0")) ?: 0,
                 reservedOfflineQuantity = 0,
+                taxRate = product.optNativeTaxRate(),
             ))
         }
     }
@@ -288,6 +289,7 @@ class NativePosSyncEngine(context: Context) {
                     }
                     if (isEmpty()) add(defaultItemType)
                 },
+                taxRate = service.optNativeTaxRate(),
             ))
         }
     }

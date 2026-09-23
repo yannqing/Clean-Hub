@@ -47,6 +47,8 @@ data class NativeProduct(
     val allowOfflineSale: Boolean,
     val offlineStockBuffer: Long,
     val reservedOfflineQuantity: Long,
+    /** The product's own tax rate as a fraction; null sells it at the tenant default. */
+    val taxRate: String?,
 )
 
 data class NativeService(
@@ -58,6 +60,8 @@ data class NativeService(
     val currency: String,
     val defaultItemType: String,
     val applicableItemTypes: List<String>,
+    /** The service's own tax rate as a fraction; null sells it at the tenant default. */
+    val taxRate: String?,
 )
 
 data class NativeCustomer(
@@ -187,6 +191,8 @@ data class NativeCartLine(
     val name: String,
     val amountMinor: Long,
     val quantity: Long,
+    /** Captured from the catalogue when the line was added; null = tenant default. */
+    val taxRate: String?,
 )
 
 /** Customer identity is mandatory as soon as a ticket item enters a POS cart. */
@@ -301,8 +307,11 @@ data class NativeCartPricing(
     val discountMinor: Long,
     val taxableMinor: Long,
     val taxMinor: Long,
+    /** The dominant rate (largest taxable base); taxBreakdown holds every rate. */
     val taxRate: String,
+    val taxBreakdown: List<NativeTaxBreakdownEntry>,
     val pricesIncludeTax: Boolean,
+    val taxRegistrationNumber: String?,
     val roundingAdjustmentMinor: Long,
     val totalMinor: Long,
 )

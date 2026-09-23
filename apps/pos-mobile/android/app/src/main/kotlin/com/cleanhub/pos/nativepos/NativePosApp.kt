@@ -2299,6 +2299,7 @@ fun NativePosApp(applicationContext: Context) {
                                                         buildNativeCashReceiptDraft(copy,
                                                             terminal = terminalAtCheckout,
                                                             cart = cartAtCheckout,
+                                                            pricing = freshPricing,
                                                             amountDueMinor = checkoutRequest.expectedTotalMinor,
                                                             tenderedMinor = checkoutRequest.tenderedMinor,
                                                             printSettings = printSettings,
@@ -6294,9 +6295,11 @@ private fun NativeCashCheckoutDialog(
                             pricing.discounts.forEach { discount ->
                                 NativeCheckoutAmountRow(discount.title, -discount.amountMinor, cart.currency, Color(0xFF16803A))
                             }
-                            if (pricing.taxMinor != 0L) {
-                                val taxLabel = copy.taxLabelWithRate.format(formatNativeTaxRate(pricing.taxRate)) + if (pricing.pricesIncludeTax) copy.taxIncluded else ""
-                                NativeCheckoutAmountRow(taxLabel, pricing.taxMinor, cart.currency)
+                            // One row per rate, as the receipt prints them: a basket of
+                            // standard-rated and exempt items shows only the tax it pays.
+                            pricing.taxBreakdown.filter { it.taxMinor != 0L }.forEach { entry ->
+                                val taxLabel = copy.taxLabelWithRate.format(formatNativeTaxRate(entry.taxRate)) + if (pricing.pricesIncludeTax) copy.taxIncluded else ""
+                                NativeCheckoutAmountRow(taxLabel, entry.taxMinor, cart.currency)
                             }
                             if (pricing.roundingAdjustmentMinor != 0L) {
                                 NativeCheckoutAmountRow(copy.systemRounding, pricing.roundingAdjustmentMinor, cart.currency)
@@ -6553,7 +6556,7 @@ private fun NativeReceiptDeliveryButton(
 }
 
 private fun List<NativeCartLine>.upsert(product: NativeProduct, quantity: Long): List<NativeCartLine> {
-    val line = NativeCartLine(product.skuId, product.name, product.amountMinor, quantity)
+    val line = NativeCartLine(product.skuId, product.name, product.amountMinor, quantity, product.taxRate)
     return if (any { it.skuId == product.skuId }) map { if (it.skuId == product.skuId) line else it } else this + line
 }
 
@@ -6854,59 +6857,24 @@ private fun JSONObject.toNativeCartPricing(): NativeCartPricing = NativeCartPric
     taxableMinor = parseMoney(optString("taxableAmount", "0")) ?: 0,
     taxMinor = parseMoney(optString("taxAmount", "0")) ?: 0,
     taxRate = optString("taxRate", "0.0000"),
+    taxBreakdown = buildList {
+        val source = optJSONArray("taxBreakdown") ?: return@buildList
+        for (index in 0 until source.length()) {
+            val entry = source.optJSONObject(index) ?: continue
+            add(
+                NativeTaxBreakdownEntry(
+                    taxRate = entry.optString("taxRate", "0.0000"),
+                    taxableMinor = parseMoney(entry.optString("taxableAmount", "0")) ?: 0,
+                    taxMinor = parseMoney(entry.optString("taxAmount", "0")) ?: 0,
+                ),
+            )
+        }
+    },
     pricesIncludeTax = optBoolean("pricesIncludeTax", true),
+    taxRegistrationNumber = if (isNull("taxRegistrationNumber")) null else optString("taxRegistrationNumber").ifBlank { null },
     roundingAdjustmentMinor = parseSignedMoney(optString("roundingAdjustmentAmount", "0")),
     totalMinor = parseMoney(optString("totalAmount", "0")) ?: 0,
 )
-
-/** Offline cash never invents a discount; it applies the cached tax and rounding rules used by the server. */
-private fun calculateNativeLocalPricing(
-    cart: NativePosCart,
-    settings: NativeCheckoutSettings,
-    taxExemptionReason: String?,
-): NativeCartPricing {
-    val subtotal = cart.totalMinor.coerceAtLeast(0)
-    val taxRate = if (settings.taxEnabled && taxExemptionReason.isNullOrBlank()) {
-        settings.defaultTaxRate
-    } else {
-        "0.0000"
-    }
-    val percentage = runCatching { java.math.BigDecimal(taxRate) }.getOrDefault(java.math.BigDecimal.ZERO)
-    val base = java.math.BigDecimal(subtotal)
-    val tax = if (percentage.signum() == 0) {
-        0L
-    } else {
-        // The rate is a fraction -- 0.18 is 18% -- as the owner's settings form
-        // stores it and the receipt displays it. Dividing by 100 here read it
-        // as 0.18% and priced every taxed offline sale with a hundredth of its tax.
-        val divisor = if (settings.pricesIncludeTax) java.math.BigDecimal.ONE.add(percentage) else java.math.BigDecimal.ONE
-        base.multiply(percentage).divide(divisor, 0, java.math.RoundingMode.HALF_UP).longValueExact()
-    }
-    val taxable = if (settings.pricesIncludeTax) subtotal - tax else subtotal
-    val beforeRounding = if (settings.pricesIncludeTax) subtotal else subtotal + tax
-    val currencyStep = nativeCurrencyPayableStep(cart.currency)
-    val configuredStep = when (settings.roundingRule) {
-        "round_yuan" -> 100L
-        "round_jiao" -> 10L
-        else -> 1L
-    }
-    val step = maxOf(currencyStep, configuredStep)
-    val total = nativeRoundToIncrement(beforeRounding, step)
-    return NativeCartPricing(
-        subtotalMinor = subtotal,
-        discounts = emptyList(),
-        discountMinor = 0,
-        taxableMinor = taxable,
-        taxMinor = tax,
-        taxRate = if (percentage.signum() == 0) "0.0000" else taxRate,
-        pricesIncludeTax = settings.pricesIncludeTax,
-        roundingAdjustmentMinor = total - beforeRounding,
-        totalMinor = total,
-    )
-}
-
-private fun nativeRoundToIncrement(value: Long, increment: Long): Long =
-    if (increment <= 1) value else ((value + increment / 2) / increment) * increment
 
 private fun applyNativeCashRounding(totalMinor: Long, cashRoundingStep: Int?): Long {
     val step = cashRoundingStep?.takeIf { it > 1 }?.toLong()?.times(100L) ?: return totalMinor
@@ -6916,14 +6884,6 @@ private fun applyNativeCashRounding(totalMinor: Long, cashRoundingStep: Int?): L
 private fun parseSignedMoney(value: String): Long = runCatching {
     java.math.BigDecimal(value).movePointRight(2).setScale(0, java.math.RoundingMode.UNNECESSARY).longValueExact()
 }.getOrDefault(0)
-
-private fun formatNativeTaxRate(value: String): String = runCatching {
-    java.math.BigDecimal(value)
-        .movePointRight(2)
-        .stripTrailingZeros()
-        .toPlainString()
-        .plus("%")
-}.getOrDefault("0%")
 
 /** Suggested notes are rounded up from the amount due, while exact tender is always first. */
 private fun cashTenderPresets(totalMinor: Long, currency: String): List<Long> {
@@ -6962,6 +6922,7 @@ private fun buildNativeCashReceiptDraft(
     copy: NativePosCopy,
     terminal: NativeTerminal?,
     cart: NativePosCart,
+    pricing: NativeCartPricing,
     amountDueMinor: Long,
     tenderedMinor: Long,
     printSettings: NativeReceiptPrintSettings,
@@ -6992,9 +6953,32 @@ private fun buildNativeCashReceiptDraft(
                 add("${line.name} ×${line.quantity}  ${formatMoney(line.lineAmountMinor, cart.currency)}")
             }
             add("------------------------------")
+            add(copy.receiptSubtotalPrefix.format(formatMoney(pricing.subtotalMinor, cart.currency)))
+            pricing.discounts.forEach { discount ->
+                add("${discount.title}  -${formatMoney(discount.amountMinor, cart.currency)}")
+            }
+            // A VAT receipt states the tax per rate. Exempt lines pay none, so
+            // only rates that charged something are printed.
+            pricing.taxBreakdown.filter { it.taxMinor != 0L }.forEach { entry ->
+                add(
+                    copy.receiptTaxLine.format(
+                        formatNativeTaxRate(entry.taxRate),
+                        formatMoney(entry.taxMinor, cart.currency),
+                    ) + if (pricing.pricesIncludeTax) copy.taxIncluded else "",
+                )
+            }
+            // System rounding plus any cash rounding the cashier chose: the
+            // amount due is what was actually collected against the total.
+            val roundingMinor = total - (pricing.totalMinor - pricing.roundingAdjustmentMinor)
+            if (roundingMinor != 0L) {
+                add(copy.receiptRoundingPrefix.format(formatSignedMoney(roundingMinor, cart.currency)))
+            }
             add(copy.receiptDuePrefix.format(formatMoney(total, cart.currency)))
             add(copy.receiptTenderedPrefix.format(formatMoney(tenderedMinor, cart.currency)))
             if (change > 0) add(copy.receiptChangePrefix.format(formatMoney(change, cart.currency)))
+            if (pricing.taxBreakdown.any { it.taxMinor != 0L }) {
+                pricing.taxRegistrationNumber?.let { add(copy.receiptTaxNumberPrefix.format(it)) }
+            }
             add(copy.thankYou)
             add("")
         }.filter { it.isNotBlank() }.joinToString("\n"),
@@ -7002,6 +6986,9 @@ private fun buildNativeCashReceiptDraft(
 }
 
 private fun formatMoney(minor: Long, currency: String): String = "%s %d.%02d".format(java.util.Locale.ROOT, currency, minor / 100, minor % 100)
+
+private fun formatSignedMoney(minor: Long, currency: String): String =
+    if (minor < 0) "-${formatMoney(-minor, currency)}" else formatMoney(minor, currency)
 
 private fun formatNativeActivityTime(value: String): String {
     if (value.isBlank()) return nativePosCopy(null).justUpdated

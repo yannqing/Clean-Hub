@@ -9,7 +9,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private const val DATABASE_NAME = "cleanhub_native_pos.db"
-private const val DATABASE_VERSION = 18
+private const val DATABASE_VERSION = 19
 private const val MAX_RUNTIME_AGE_MS = 8 * 60 * 60 * 1_000L
 private const val MAX_CATALOG_AGE_MS = 24 * 60 * 60 * 1_000L
 private const val MAX_CASH_STATE_AGE_MS = 2 * 60 * 60 * 1_000L
@@ -83,7 +83,8 @@ class NativePosDatabase(
               allow_negative_stock INTEGER NOT NULL,
               allow_offline_sale INTEGER NOT NULL,
               offline_stock_buffer INTEGER NOT NULL,
-              reserved_offline_quantity INTEGER NOT NULL DEFAULT 0
+              reserved_offline_quantity INTEGER NOT NULL DEFAULT 0,
+              tax_rate TEXT
             )
             """.trimIndent(),
         )
@@ -182,6 +183,19 @@ class NativePosDatabase(
             // Replays had no attempt counter, so a command the server will
             // never accept could be retried forever and hold the queue.
             db.execSQL("ALTER TABLE pending_operation ADD COLUMN attempt INTEGER NOT NULL DEFAULT 0")
+        }
+        // Per-item tax: each product and service may carry its own rate (null
+        // is the tenant default). Tables created above at this version already
+        // have the column, so only extend those that existed before: the
+        // catalogue since version 1, services since 3, cart lines since 10.
+        if (oldVersion < 19) {
+            db.execSQL("ALTER TABLE catalog_product ADD COLUMN tax_rate TEXT")
+        }
+        if (oldVersion in 3..18) {
+            db.execSQL("ALTER TABLE catalog_service ADD COLUMN tax_rate TEXT")
+        }
+        if (oldVersion in 10..18) {
+            db.execSQL("ALTER TABLE pos_cart_line ADD COLUMN tax_rate TEXT")
         }
         if (oldVersion in 3..15) {
             // Keep server timestamps with the offline ticket cache. Row order
@@ -713,7 +727,7 @@ class NativePosDatabase(
     }
 
     private fun cartProductLines(terminal: NativeTerminal): List<NativeCartLine> = readableDatabase.rawQuery(
-        "SELECT sku_id, name, amount_minor, quantity FROM pos_cart_line WHERE tenant_id = ? AND branch_id = ? AND terminal_id = ? AND user_id = ? ORDER BY rowid ASC",
+        "SELECT sku_id, name, amount_minor, quantity, tax_rate FROM pos_cart_line WHERE tenant_id = ? AND branch_id = ? AND terminal_id = ? AND user_id = ? ORDER BY rowid ASC",
         cartScopeArgs(terminal),
     ).use { cursor ->
         buildList {
@@ -723,6 +737,7 @@ class NativePosDatabase(
                     name = cursor.getString(1),
                     amountMinor = cursor.getLong(2),
                     quantity = cursor.getLong(3),
+                    taxRate = cursor.getStringOrNull(4),
                 ))
             }
         }
@@ -970,7 +985,8 @@ class NativePosDatabase(
               amount_minor INTEGER NOT NULL,
               currency TEXT NOT NULL,
               default_item_type TEXT NOT NULL,
-              applicable_item_types TEXT NOT NULL DEFAULT '[]'
+              applicable_item_types TEXT NOT NULL DEFAULT '[]',
+              tax_rate TEXT
             )
             """.trimIndent(),
         )
@@ -1065,6 +1081,7 @@ class NativePosDatabase(
               name TEXT NOT NULL,
               amount_minor INTEGER NOT NULL,
               quantity INTEGER NOT NULL CHECK (quantity > 0),
+              tax_rate TEXT,
               PRIMARY KEY (tenant_id, branch_id, terminal_id, user_id, sku_id)
             )
             """.trimIndent(),
@@ -1196,6 +1213,7 @@ class NativePosDatabase(
                 put("name", line.name)
                 put("amount_minor", line.amountMinor)
                 put("quantity", line.quantity)
+                if (line.taxRate == null) putNull("tax_rate") else put("tax_rate", line.taxRate)
             })
         }
     }
@@ -1316,6 +1334,7 @@ class NativePosDatabase(
             put("allow_offline_sale", if (product.allowOfflineSale) 1 else 0)
             put("offline_stock_buffer", product.offlineStockBuffer)
             put("reserved_offline_quantity", product.reservedOfflineQuantity)
+            if (product.taxRate == null) putNull("tax_rate") else put("tax_rate", product.taxRate)
         })
     }
 
@@ -1331,6 +1350,7 @@ class NativePosDatabase(
             put("applicable_item_types", JSONArray().apply {
                 service.applicableItemTypes.forEach(::put)
             }.toString())
+            if (service.taxRate == null) putNull("tax_rate") else put("tax_rate", service.taxRate)
         })
     }
 
@@ -1407,15 +1427,15 @@ class NativePosDatabase(
     }
 
     private fun readProducts(): List<NativeProduct> = readableDatabase.rawQuery(
-        "SELECT sku_id, product_id, price_id, name, sku, amount_minor, currency, track_inventory, available_quantity, allow_negative_stock, allow_offline_sale, offline_stock_buffer, reserved_offline_quantity FROM catalog_product ORDER BY name COLLATE NOCASE", null,
+        "SELECT sku_id, product_id, price_id, name, sku, amount_minor, currency, track_inventory, available_quantity, allow_negative_stock, allow_offline_sale, offline_stock_buffer, reserved_offline_quantity, tax_rate FROM catalog_product ORDER BY name COLLATE NOCASE", null,
     ).use { cursor ->
         buildList {
-            while (cursor.moveToNext()) add(NativeProduct(cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3), cursor.getString(4), cursor.getLong(5), cursor.getString(6), cursor.getInt(7) == 1, if (cursor.isNull(8)) null else cursor.getLong(8), cursor.getInt(9) == 1, cursor.getInt(10) == 1, cursor.getLong(11), cursor.getLong(12)))
+            while (cursor.moveToNext()) add(NativeProduct(cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3), cursor.getString(4), cursor.getLong(5), cursor.getString(6), cursor.getInt(7) == 1, if (cursor.isNull(8)) null else cursor.getLong(8), cursor.getInt(9) == 1, cursor.getInt(10) == 1, cursor.getLong(11), cursor.getLong(12), cursor.getStringOrNull(13)))
         }
     }
 
     private fun readServices(): List<NativeService> = readableDatabase.rawQuery(
-        "SELECT id, name, business_line, pricing_unit, amount_minor, currency, default_item_type, applicable_item_types FROM catalog_service ORDER BY name COLLATE NOCASE", null,
+        "SELECT id, name, business_line, pricing_unit, amount_minor, currency, default_item_type, applicable_item_types, tax_rate FROM catalog_service ORDER BY name COLLATE NOCASE", null,
     ).use { cursor ->
         buildList {
             while (cursor.moveToNext()) add(NativeService(
@@ -1424,6 +1444,7 @@ class NativePosDatabase(
                     val values = JSONArray(cursor.getString(7))
                     buildList { for (index in 0 until values.length()) values.optString(index).takeIf { it.isNotBlank() }?.let(::add) }
                 }.getOrElse { listOf(cursor.getString(6)) },
+                cursor.getStringOrNull(8),
             ))
         }
     }
@@ -1517,6 +1538,7 @@ class NativePosDatabase(
                     allowOfflineSale = product.optBoolean("allowOfflineSale"),
                     offlineStockBuffer = parseNativeWholeQuantity(product.optString("offlineStockBuffer", "0")) ?: 0,
                     reservedOfflineQuantity = 0,
+                    taxRate = product.optNativeTaxRate(),
                 ),
             )
         }

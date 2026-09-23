@@ -650,6 +650,10 @@ internal class NativePosCopy(
     val orderLinePrefix: String get() = get("orderLinePrefix")
     val receiptCustomerPrefix: String get() = get("receiptCustomerPrefix")
     val receiptDuePrefix: String get() = get("receiptDuePrefix")
+    val receiptSubtotalPrefix: String get() = get("receiptSubtotalPrefix")
+    val receiptTaxLine: String get() = get("receiptTaxLine")
+    val receiptRoundingPrefix: String get() = get("receiptRoundingPrefix")
+    val receiptTaxNumberPrefix: String get() = get("receiptTaxNumberPrefix")
     val receiptTenderedPrefix: String get() = get("receiptTenderedPrefix")
     val receiptChangePrefix: String get() = get("receiptChangePrefix")
     val thankYou: String get() = get("thankYou")
@@ -910,6 +914,10 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
     "orderLinePrefix" to "订单：%s",
     "receiptCustomerPrefix" to "客户：%s",
     "receiptDuePrefix" to "应收：%s",
+    "receiptSubtotalPrefix" to "小计：%s",
+    "receiptTaxLine" to "增值税 %s：%s",
+    "receiptRoundingPrefix" to "抹零：%s",
+    "receiptTaxNumberPrefix" to "税号：%s",
     "receiptTenderedPrefix" to "实收现金：%s",
     "receiptChangePrefix" to "找零：%s",
     "thankYou" to "谢谢惠顾",
@@ -1609,6 +1617,10 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
     "orderLinePrefix" to "Order: %s",
     "receiptCustomerPrefix" to "Customer: %s",
     "receiptDuePrefix" to "Due: %s",
+    "receiptSubtotalPrefix" to "Subtotal: %s",
+    "receiptTaxLine" to "VAT %s: %s",
+    "receiptRoundingPrefix" to "Rounding: %s",
+    "receiptTaxNumberPrefix" to "Tax ID: %s",
     "receiptTenderedPrefix" to "Cash received: %s",
     "receiptChangePrefix" to "Change: %s",
     "thankYou" to "Thank you",
@@ -2308,6 +2320,10 @@ private val COPY_FR_VALUES: Map<String, String> = mapOf(
     "orderLinePrefix" to "Commande : %s",
     "receiptCustomerPrefix" to "Client : %s",
     "receiptDuePrefix" to "Dû : %s",
+    "receiptSubtotalPrefix" to "Sous-total : %s",
+    "receiptTaxLine" to "TVA %s : %s",
+    "receiptRoundingPrefix" to "Arrondi : %s",
+    "receiptTaxNumberPrefix" to "N° fiscal : %s",
     "receiptTenderedPrefix" to "Espèces reçues : %s",
     "receiptChangePrefix" to "Monnaie : %s",
     "thankYou" to "Merci de votre visite",
