@@ -22,6 +22,7 @@ import { ConfirmSheet } from "@/components/confirm-sheet";
 import { MobilePageSkeleton } from "@/components/mobile-skeleton";
 import { MobilePullToRefresh } from "@/components/mobile-pull-to-refresh";
 import { WorkspaceHeader } from "@/components/workspace-header";
+import { PushNotificationSetupCard } from "@/components/push-notification-setup-card";
 import { resolveTenantCurrency } from "@/lib/currency";
 import {
   readMobileDetailUrlState,
@@ -1021,6 +1022,8 @@ export function CustomerHome({
       </span>
 
       {error && !appointmentSheetOpen ? <AlertMessage tone="error" message={error} /> : null}
+
+      <PushNotificationSetupCard />
 
       {activeTab === "resume" ? (
         <CustomerOverviewView

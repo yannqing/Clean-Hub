@@ -15,10 +15,10 @@ import {
 import { getOrCreateDeviceId } from "./token-storage";
 
 /**
- * Everything in this module is best-effort: on the plain web build (no
- * Capacitor runtime, no PushNotifications plugin) every function is a silent
- * no-op, and any failure is logged with console.warn without ever blocking
- * login/logout flows.
+ * This module only uses the native Firebase Messaging plugin. The plugin
+ * returns an FCM registration token on both Android and iOS, which is the
+ * token type accepted by the API delivery service. It is deliberately a
+ * no-op for the plain web build.
  */
 
 type PushPermissionState = "prompt" | "prompt-with-rationale" | "granted" | "denied";
@@ -33,25 +33,22 @@ type PushNotificationSchema = {
   data?: Record<string, unknown>;
 };
 
-type PushNotificationsPlugin = {
+type FirebaseMessagingPlugin = {
   checkPermissions(): Promise<{ receive: PushPermissionState }>;
   requestPermissions(): Promise<{ receive: PushPermissionState }>;
-  register(): Promise<void>;
+  getToken(): Promise<{ token: string }>;
+  deleteToken(): Promise<void>;
   removeAllListeners(): Promise<void>;
   addListener(
-    eventName: "registration",
-    listener: (token: { value: string }) => void,
+    eventName: "tokenReceived",
+    listener: (token: { token: string }) => void,
   ): Promise<PluginListenerHandle>;
   addListener(
-    eventName: "registrationError",
-    listener: (error: { error: string }) => void,
-  ): Promise<PluginListenerHandle>;
-  addListener(
-    eventName: "pushNotificationReceived",
+    eventName: "notificationReceived",
     listener: (notification: PushNotificationSchema) => void,
   ): Promise<PluginListenerHandle>;
   addListener(
-    eventName: "pushNotificationActionPerformed",
+    eventName: "notificationActionPerformed",
     listener: (action: { notification: PushNotificationSchema }) => void,
   ): Promise<PluginListenerHandle>;
 };
@@ -74,8 +71,37 @@ type CapacitorGlobal = {
   getPlatform?: () => string;
 };
 
+export type PushNotificationSetupState =
+  | "unsupported"
+  | "prompt"
+  | "denied"
+  | "granted"
+  | "error";
+
+const PUSH_TOKEN_STORAGE_KEY = "cleanhub.mobile.push-token";
+const FCM_TOKEN_TIMEOUT_MS = 15_000;
+
 let registeredToken: string | null = null;
 let listenersReady = false;
+let pendingFcmTokenRequest: Promise<PushNotificationSetupState> | null = null;
+const pendingTokenSyncs = new Map<string, Promise<PushNotificationSetupState>>();
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeoutId: number | undefined;
+
+  return Promise.race([
+    promise,
+    new Promise<never>((_resolve, reject) => {
+      timeoutId = window.setTimeout(() => {
+        reject(new Error("FCM token request timed out."));
+      }, timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timeoutId !== undefined) {
+      window.clearTimeout(timeoutId);
+    }
+  });
+}
 
 function getCapacitorGlobal(): CapacitorGlobal | null {
   if (typeof window === "undefined") {
@@ -87,10 +113,10 @@ function getCapacitorGlobal(): CapacitorGlobal | null {
   return candidate.Capacitor ?? null;
 }
 
-function getPushPlugin(): PushNotificationsPlugin | null {
-  const plugin = getCapacitorGlobal()?.Plugins?.PushNotifications;
+function getPushPlugin(): FirebaseMessagingPlugin | null {
+  const plugin = getCapacitorGlobal()?.Plugins?.FirebaseMessaging;
 
-  return plugin ? (plugin as PushNotificationsPlugin) : null;
+  return plugin ? (plugin as FirebaseMessagingPlugin) : null;
 }
 
 function getPlatform(): MobilePushPlatform {
@@ -115,6 +141,51 @@ async function getStoredLocale(): Promise<string | null> {
     return window.localStorage.getItem(localeStorageKey);
   } catch {
     return null;
+  }
+}
+
+async function getStoredPushToken(): Promise<string | null> {
+  try {
+    const preferences = await import("@capacitor/preferences");
+    const result = await preferences.Preferences.get({ key: PUSH_TOKEN_STORAGE_KEY });
+
+    if (result.value) {
+      return result.value;
+    }
+  } catch {
+    // Fall through to localStorage below.
+  }
+
+  try {
+    return window.localStorage.getItem(PUSH_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+async function storePushToken(token: string | null): Promise<void> {
+  try {
+    const preferences = await import("@capacitor/preferences");
+
+    if (token) {
+      await preferences.Preferences.set({ key: PUSH_TOKEN_STORAGE_KEY, value: token });
+    } else {
+      await preferences.Preferences.remove({ key: PUSH_TOKEN_STORAGE_KEY });
+    }
+
+    return;
+  } catch {
+    // Fall through to localStorage below.
+  }
+
+  try {
+    if (token) {
+      window.localStorage.setItem(PUSH_TOKEN_STORAGE_KEY, token);
+    } else {
+      window.localStorage.removeItem(PUSH_TOKEN_STORAGE_KEY);
+    }
+  } catch {
+    // Best effort only.
   }
 }
 
@@ -184,15 +255,50 @@ function handleNotificationAction(notification: PushNotificationSchema): void {
     return;
   }
 
-  // The home screens restore detail views from the URL and listen to
-  // popstate, so writing the deep-link state and replaying the event is
-  // enough to open the matching detail sheet.
   writeMobileDetailUrlState(detailState, "push");
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 
+async function syncDeviceToken(
+  token: string,
+  apiClient: PushApiClient,
+): Promise<PushNotificationSetupState> {
+  const existing = pendingTokenSyncs.get(token);
+
+  if (existing) {
+    return existing;
+  }
+
+  const sync = (async (): Promise<PushNotificationSetupState> => {
+    try {
+      const [deviceId, locale] = await Promise.all([
+        getOrCreateDeviceId(),
+        getStoredLocale(),
+      ]);
+
+      await apiClient.mobile.notifications.registerDeviceToken({
+        token,
+        platform: getPlatform(),
+        deviceId,
+        locale,
+      });
+      registeredToken = token;
+      await storePushToken(token);
+      return "granted";
+    } catch (error) {
+      console.warn("[push] device token registration failed", error);
+      return "error";
+    } finally {
+      pendingTokenSyncs.delete(token);
+    }
+  })();
+
+  pendingTokenSyncs.set(token, sync);
+  return sync;
+}
+
 async function attachListeners(
-  plugin: PushNotificationsPlugin,
+  plugin: FirebaseMessagingPlugin,
   apiClient: PushApiClient,
 ): Promise<void> {
   if (listenersReady) {
@@ -201,49 +307,65 @@ async function attachListeners(
 
   listenersReady = true;
 
-  await plugin.addListener("registration", (token) => {
-    registeredToken = token.value;
-
-    void (async () => {
-      try {
-        const [deviceId, locale] = await Promise.all([
-          getOrCreateDeviceId(),
-          getStoredLocale(),
-        ]);
-
-        await apiClient.mobile.notifications.registerDeviceToken({
-          token: token.value,
-          platform: getPlatform(),
-          deviceId,
-          locale,
-        });
-      } catch (error) {
-        console.warn("[push] device token registration failed", error);
+  try {
+    await plugin.addListener("tokenReceived", (event) => {
+      if (event.token) {
+        void syncDeviceToken(event.token, apiClient);
       }
-    })();
-  });
+    });
 
-  await plugin.addListener("registrationError", (error) => {
-    console.warn("[push] native registration failed", error);
-  });
+    await plugin.addListener("notificationReceived", (notification) => {
+      showForegroundToast(notification);
+    });
 
-  await plugin.addListener("pushNotificationReceived", (notification) => {
-    showForegroundToast(notification);
-  });
+    await plugin.addListener("notificationActionPerformed", (action) => {
+      handleNotificationAction(action.notification);
+    });
+  } catch (error) {
+    listenersReady = false;
+    throw error;
+  }
+}
 
-  await plugin.addListener("pushNotificationActionPerformed", (action) => {
-    handleNotificationAction(action.notification);
-  });
+async function registerDeviceToken(
+  plugin: FirebaseMessagingPlugin,
+  apiClient: PushApiClient,
+): Promise<PushNotificationSetupState> {
+  if (pendingFcmTokenRequest) {
+    return pendingFcmTokenRequest;
+  }
+
+  pendingFcmTokenRequest = (async () => {
+    try {
+      // Firebase Installation Service may be unreachable on a newly configured
+      // device. Do not leave the setup button in a permanent loading state.
+      const result = await withTimeout(plugin.getToken(), FCM_TOKEN_TIMEOUT_MS);
+
+      if (!result.token) {
+        console.warn("[push] Firebase Messaging returned an empty token");
+        return "error";
+      }
+
+      return syncDeviceToken(result.token, apiClient);
+    } catch (error) {
+      console.warn("[push] could not retrieve FCM token", error);
+      return "error";
+    } finally {
+      pendingFcmTokenRequest = null;
+    }
+  })();
+
+  return pendingFcmTokenRequest;
 }
 
 export async function enablePushNotifications(
   apiClient: PushApiClient,
-): Promise<void> {
+): Promise<PushNotificationSetupState> {
   try {
     const plugin = getPushPlugin();
 
     if (!plugin) {
-      return;
+      return "unsupported";
     }
 
     let permission = await plugin.checkPermissions();
@@ -254,38 +376,98 @@ export async function enablePushNotifications(
 
     if (permission.receive !== "granted") {
       console.warn("[push] notification permission not granted");
-      return;
+      return "denied";
     }
 
     await attachListeners(plugin, apiClient);
-    await plugin.register();
+    return registerDeviceToken(plugin, apiClient);
   } catch (error) {
     console.warn("[push] enabling push notifications failed", error);
+    return "error";
+  }
+}
+
+export async function getPushNotificationSetupState(): Promise<PushNotificationSetupState> {
+  try {
+    const plugin = getPushPlugin();
+
+    if (!plugin) {
+      return "unsupported";
+    }
+
+    const permission = await plugin.checkPermissions();
+
+    if (permission.receive === "granted") {
+      return "granted";
+    }
+
+    if (permission.receive === "denied") {
+      return "denied";
+    }
+
+    return "prompt";
+  } catch (error) {
+    console.warn("[push] checking notification permission failed", error);
+    return "error";
+  }
+}
+
+/**
+ * Refresh the device token after the user has already granted native
+ * notification permission. This deliberately never opens a system prompt.
+ */
+export async function registerPushNotificationsIfPermitted(
+  apiClient: PushApiClient,
+): Promise<PushNotificationSetupState> {
+  const state = await getPushNotificationSetupState();
+
+  if (state !== "granted") {
+    return state;
+  }
+
+  try {
+    const plugin = getPushPlugin();
+
+    if (!plugin) {
+      return "unsupported";
+    }
+
+    await attachListeners(plugin, apiClient);
+    return registerDeviceToken(plugin, apiClient);
+  } catch (error) {
+    console.warn("[push] refreshing device token failed", error);
+    return "error";
   }
 }
 
 export async function disablePushNotifications(
   apiClient: PushApiClient,
 ): Promise<void> {
+  const plugin = getPushPlugin();
+
+  if (!plugin) {
+    return;
+  }
+
+  const token = registeredToken ?? (await getStoredPushToken());
+
   try {
-    const plugin = getPushPlugin();
-
-    if (!plugin) {
-      return;
+    if (token) {
+      await apiClient.mobile.notifications.unregisterDeviceToken({ token });
     }
-
-    if (registeredToken) {
-      await apiClient.mobile.notifications
-        .unregisterDeviceToken({ token: registeredToken })
-        .catch((error: unknown) => {
-          console.warn("[push] device token unregister failed", error);
-        });
-      registeredToken = null;
-    }
-
-    await plugin.removeAllListeners();
-    listenersReady = false;
   } catch (error) {
-    console.warn("[push] disabling push notifications failed", error);
+    console.warn("[push] device token unregister failed", error);
+  } finally {
+    // Deleting the FCM token prevents delivery to this signed-out device even
+    // if it was offline when the API unregister request was attempted.
+    await plugin.deleteToken().catch((error: unknown) => {
+      console.warn("[push] native FCM token deletion failed", error);
+    });
+    await storePushToken(null);
+    registeredToken = null;
+    await plugin.removeAllListeners().catch((error: unknown) => {
+      console.warn("[push] listener cleanup failed", error);
+    });
+    listenersReady = false;
   }
 }
