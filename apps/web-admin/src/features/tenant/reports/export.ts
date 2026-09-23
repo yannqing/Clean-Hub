@@ -19,6 +19,7 @@ export type ReportExportLabels = {
   from: string;
   to: string;
   branchId: string;
+  currency: string;
   generatedAt: string;
   metricHeader: string;
   valueHeader: string;
@@ -54,6 +55,8 @@ export function buildReportCsv(
     query.to ?? "",
     `${labels.branchId}:`,
     query.branchId ?? "",
+    `${labels.currency}:`,
+    summary.currency,
     `${labels.generatedAt}:`,
     now.toISOString(),
   ];
