@@ -40,6 +40,7 @@ import { tenantDefaultValues } from "../constants";
 import { getTenantDetailQuery } from "../queries";
 import type { TenantDetail, TenantFormValues, TenantStatus } from "../types";
 import { TenantForm } from "./tenant-form";
+import { TenantTaxSettingsCard } from "./tenant-tax-settings-card";
 
 export type TenantDetailPresentation = "page" | "dialog";
 
@@ -101,7 +102,12 @@ export function TenantDetailView({
   onTenantUpdated,
 }: TenantDetailViewProps) {
   const isDialog = presentation === "dialog";
-  const { m, formatDate } = useSaasI18n();
+  const { locale, m, formatDate } = useSaasI18n();
+  const readinessCopy = locale === "zh-CN"
+    ? { title: "开店就绪检查", owner: "店主账号", branch: "营业门店", catalog: "商品或服务", terminal: "已绑定终端", tax: "已启用税务", taxNumber: "税务登记号" }
+    : locale === "fr"
+      ? { title: "Préparation du magasin", owner: "Compte propriétaire", branch: "Magasin actif", catalog: "Produit ou service", terminal: "Terminal inscrit", tax: "Taxe activée", taxNumber: "Numéro fiscal" }
+      : { title: "Store readiness", owner: "Owner account", branch: "Active branch", catalog: "Product or service", terminal: "Enrolled terminal", tax: "Tax enabled", taxNumber: "Tax registration number" };
   const [authContext, setAuthContext] = useState<AuthContext | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [tenant, setTenant] = useState<TenantDetail | null>(null);
@@ -451,6 +457,31 @@ export function TenantDetailView({
                         </dd>
                       </div>
                     </dl>
+                  </CardContent>
+                </Card>
+
+                <TenantTaxSettingsCard
+                  canEdit={authContext?.role === "super_admin"}
+                  onSaved={() => { void getTenantDetailQuery(tenantId).then(setTenant); }}
+                  tenantId={tenantId}
+                />
+
+                <Card className="gap-0 rounded-lg py-0 shadow-none">
+                  <CardContent className="grid gap-3 py-5">
+                    <h2 className="text-sm font-semibold">{readinessCopy.title}</h2>
+                    {([
+                      [readinessCopy.owner, tenant.readiness.activeOwnerCount > 0, tenant.readiness.activeOwnerCount],
+                      [readinessCopy.branch, tenant.readiness.activeBranchCount > 0, tenant.readiness.activeBranchCount],
+                      [readinessCopy.catalog, tenant.readiness.activeCatalogItemCount > 0, tenant.readiness.activeCatalogItemCount],
+                      [readinessCopy.terminal, tenant.readiness.enrolledTerminalCount > 0, tenant.readiness.enrolledTerminalCount],
+                      [readinessCopy.tax, tenant.readiness.taxEnabled, null],
+                      [readinessCopy.taxNumber, tenant.readiness.taxRegistrationNumberSet, null],
+                    ] as const).map(([label, ready, count]) => (
+                      <div className="flex items-center justify-between gap-3 text-sm" key={label}>
+                        <span>{label}{count === null ? "" : ` (${count})`}</span>
+                        <Badge variant={ready ? "default" : "secondary"}>{ready ? "✓" : "—"}</Badge>
+                      </div>
+                    ))}
                   </CardContent>
                 </Card>
 

@@ -18,7 +18,13 @@ import {
   branches,
   getDb,
   platformSettings,
+  platformTaxTemplates,
+  posChannelSettings,
+  posTerminalSettings,
+  products,
   roles,
+  services,
+  taxRates,
   tenantFeatureFlags,
   tenantSettings,
   tenants,
@@ -48,11 +54,21 @@ export type TenantPressingCodeRecord = {
   id: string;
 };
 
-export type CreateSaasTenantRecordInput = CreateSaasTenantRequest & {
+export type CreateSaasTenantRecordInput = Omit<CreateSaasTenantRequest, "defaultCurrency"> & {
   actorUserId: string;
   pressingCode: string;
   defaultLanguage: SaasTenantLanguage;
+  defaultCurrency: string;
+  timezone: string;
 };
+
+function countryCodeForTaxTemplate(country: string): string | null {
+  const normalized = country.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z]/g, "");
+  if (normalized === "sn" || normalized === "senegal") return "SN";
+  if (["ci", "cotedivoire", "ivorycoast"].includes(normalized)) return "CI";
+  return /^[a-z]{2}$/.test(normalized) ? normalized.toUpperCase() : null;
+}
 
 export type UpdateSaasTenantRecordInput = {
   actorUserId: string;
@@ -308,8 +324,39 @@ export async function createSaasTenantRecord(
     tenantId,
     defaultLanguage: input.defaultLanguage,
     defaultCurrency: input.defaultCurrency,
+    timezone: input.timezone,
     updatedBy: input.actorUserId,
   });
+
+  const countryCode = countryCodeForTaxTemplate(input.country);
+  const [taxTemplate] = countryCode
+    ? await db.select().from(platformTaxTemplates)
+      .where(eq(platformTaxTemplates.countryCode, countryCode)).limit(1)
+    : [];
+  if (taxTemplate) {
+    const defaultRate = taxTemplate.rates.find((rate) => rate.isDefault)
+      ?? taxTemplate.rates[0];
+    await db.insert(posChannelSettings).values({
+      id: createId(),
+      tenantId,
+      taxEnabled: taxTemplate.taxEnabled,
+      defaultTaxRate: defaultRate?.rate ?? "0",
+      pricesIncludeTax: taxTemplate.pricesIncludeTax,
+      createdBy: input.actorUserId,
+      updatedBy: input.actorUserId,
+    });
+    if (taxTemplate.rates.length > 0) {
+      await db.insert(taxRates).values(taxTemplate.rates.map((rate, index) => ({
+        id: createId(),
+        tenantId,
+        name: rate.name,
+        rate: rate.rate,
+        displayOrder: index,
+        createdBy: input.actorUserId,
+        updatedBy: input.actorUserId,
+      })));
+    }
+  }
 
   await db.insert(tenantFeatureFlags).values({
     id: featureFlagsId,
@@ -365,6 +412,30 @@ export async function findSaasTenantDetailById(
     .from(users)
     .where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt)));
 
+  const [ownerRows, branchRows, serviceRows, productRows, terminalRows, taxRows] = await Promise.all([
+    db.select({ value: count() }).from(users)
+      .innerJoin(userRoles, and(eq(userRoles.userId, users.id), eq(userRoles.tenantId, tenantId), isNull(userRoles.revokedAt)))
+      .innerJoin(roles, and(eq(roles.id, userRoles.roleId), eq(roles.code, "owner"), eq(roles.status, "active"), isNull(roles.deletedAt)))
+      .where(and(eq(users.tenantId, tenantId), eq(users.status, "active"), isNull(users.deletedAt))),
+    db.select({ value: count() }).from(branches).where(and(
+      eq(branches.tenantId, tenantId), eq(branches.status, "active"), isNull(branches.deletedAt),
+    )),
+    db.select({ value: count() }).from(services).where(and(
+      eq(services.tenantId, tenantId), eq(services.status, "active"), isNull(services.deletedAt),
+    )),
+    db.select({ value: count() }).from(products).where(and(
+      eq(products.tenantId, tenantId), eq(products.status, "active"), isNull(products.deletedAt),
+    )),
+    db.select({ value: count() }).from(posTerminalSettings).where(and(
+      eq(posTerminalSettings.tenantId, tenantId), eq(posTerminalSettings.status, "active"),
+      sql`${posTerminalSettings.credentialDigest} is not null`,
+    )),
+    db.select({
+      taxEnabled: posChannelSettings.taxEnabled,
+      taxRegistrationNumber: posChannelSettings.taxRegistrationNumber,
+    }).from(posChannelSettings).where(eq(posChannelSettings.tenantId, tenantId)).limit(1),
+  ]);
+
   return {
     ...toTenantSummary(tenant),
     defaultLanguage: resolveTenantLanguage(tenant.defaultLanguage),
@@ -373,6 +444,14 @@ export async function findSaasTenantDetailById(
     contactPhone: tenant.contactPhone,
     contactEmail: tenant.contactEmail,
     userCount: userCountRows[0]?.value ?? 0,
+    readiness: {
+      activeOwnerCount: ownerRows[0]?.value ?? 0,
+      activeBranchCount: branchRows[0]?.value ?? 0,
+      activeCatalogItemCount: (serviceRows[0]?.value ?? 0) + (productRows[0]?.value ?? 0),
+      enrolledTerminalCount: terminalRows[0]?.value ?? 0,
+      taxEnabled: taxRows[0]?.taxEnabled ?? false,
+      taxRegistrationNumberSet: Boolean(taxRows[0]?.taxRegistrationNumber?.trim()),
+    },
     // The CHECK constraint keeps these three either all set or all null, so a
     // single guard is enough to decide whether the tenant is offboarded.
     offboarding:

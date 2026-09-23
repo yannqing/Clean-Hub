@@ -24,6 +24,7 @@ import {
 } from "../constants";
 import { getPlatformSettingsQuery } from "../queries";
 import type { PlatformSettings, PlatformSettingsFormValues } from "../types";
+import { PlatformTaxTemplatesView } from "./platform-tax-templates-view";
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "";
@@ -276,6 +277,7 @@ export function PlatformSettingsView() {
           </div>
         </form>
       )}
+      <PlatformTaxTemplatesView />
     </section>
   );
 }

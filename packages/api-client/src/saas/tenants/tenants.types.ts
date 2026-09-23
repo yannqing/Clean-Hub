@@ -68,6 +68,14 @@ export type TenantDetail = TenantSummary & {
   contactPhone: string | null;
   contactEmail: string | null;
   userCount: number;
+  readiness: {
+    activeOwnerCount: number;
+    activeBranchCount: number;
+    activeCatalogItemCount: number;
+    enrolledTerminalCount: number;
+    taxEnabled: boolean;
+    taxRegistrationNumberSet: boolean;
+  };
   /** Null while the tenant is active. */
   offboarding: TenantOffboarding | null;
 };
@@ -137,6 +145,14 @@ export type TenantSettings = {
   defaultCurrency: string;
   updatedAt: string | null;
   updatedBy: string | null;
+  version: number;
+};
+
+export type SaasTenantTaxSettings = {
+  taxEnabled: boolean;
+  defaultTaxRate: string;
+  pricesIncludeTax: boolean;
+  taxRegistrationNumber: string | null;
   version: number;
 };
 

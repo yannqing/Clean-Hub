@@ -481,6 +481,7 @@ export function TenantForm({
                       disabled={disabled || submitting}
                       id="default-currency"
                       maxLength={3}
+                      placeholder="Platform default"
                       onChange={(event) =>
                         updateValue("defaultCurrency", event.target.value)
                       }

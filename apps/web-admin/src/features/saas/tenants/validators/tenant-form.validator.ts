@@ -152,7 +152,7 @@ function validateSettings(input: TenantSettingsFormValues): {
 function validateCreateDefaults(input: TenantFormValues): {
   errors: Partial<Record<keyof TenantFormValues, string>>;
   defaultLanguage?: TenantLanguage;
-  defaultCurrency: string;
+  defaultCurrency?: string;
 } {
   const errors: Partial<Record<keyof TenantFormValues, string>> = {};
   const defaultCurrency = input.defaultCurrency.trim().toUpperCase();
@@ -165,7 +165,7 @@ function validateCreateDefaults(input: TenantFormValues): {
     errors.defaultLanguage = "Select a valid default language.";
   }
 
-  if (!/^[A-Z]{3}$/.test(defaultCurrency)) {
+  if (defaultCurrency && !/^[A-Z]{3}$/.test(defaultCurrency)) {
     errors.defaultCurrency = "Currency must be a 3-letter code.";
   }
 
@@ -173,7 +173,7 @@ function validateCreateDefaults(input: TenantFormValues): {
     errors,
     defaultLanguage:
       defaultLanguage === "platform-default" ? undefined : defaultLanguage,
-    defaultCurrency,
+    defaultCurrency: defaultCurrency || undefined,
   };
 }
 

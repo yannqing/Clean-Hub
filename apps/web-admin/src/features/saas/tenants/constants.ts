@@ -31,7 +31,7 @@ export const tenantDefaultValues = {
   contactName: "",
   contactPhone: "",
   country: "Senegal",
-  defaultCurrency: "XOF",
+  defaultCurrency: "",
   defaultLanguage: "platform-default",
   initialOwnerDisplayName: "",
   initialOwnerEmail: "",

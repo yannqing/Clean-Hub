@@ -83,6 +83,7 @@ import type {
   UpdateSaasTenantStatusInput,
 } from "./tenants.types.js";
 import { DEFAULT_TENANT_RETENTION_DAYS } from "./tenants.validation.js";
+import { findPlatformSettings } from "../platform-settings/platform-settings.repository.js";
 
 function requireSaasTenantsAccess(
   authContext: AuthContext,
@@ -217,6 +218,7 @@ export async function createSaasTenant(
         throw createPressingCodeConflictError();
       }
 
+      const platformDefaults = await findPlatformSettings(tx);
       const defaultLanguage = await resolveDefaultLanguage(
         tx,
         input.data.defaultLanguage,
@@ -226,6 +228,8 @@ export async function createSaasTenant(
         actorUserId: input.authContext.userId,
         pressingCode,
         defaultLanguage,
+        defaultCurrency: input.data.defaultCurrency ?? platformDefaults?.defaultCurrency ?? "XOF",
+        timezone: platformDefaults?.timezone ?? "UTC",
       });
       const initialOwner = input.data.initialOwner
         ? await createTenantOwnerUser(tx, {

@@ -17,3 +17,16 @@ export type UpdatePlatformSettingsRequest = {
   timezone?: string;
   maintenanceMode?: boolean;
 };
+
+export type PlatformTaxTemplate = {
+  id: string;
+  countryCode: string;
+  name: string;
+  taxEnabled: boolean;
+  pricesIncludeTax: boolean;
+  rates: Array<{ name: string; rate: string; isDefault: boolean }>;
+  version: number;
+  updatedAt: string;
+};
+
+export type UpsertPlatformTaxTemplateRequest = Omit<PlatformTaxTemplate, "id" | "version" | "updatedAt">;

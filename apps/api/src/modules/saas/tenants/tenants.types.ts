@@ -34,7 +34,7 @@ export type CreateSaasTenantRequest = {
   country: string;
   city?: string;
   defaultLanguage?: SaasTenantLanguage;
-  defaultCurrency: string;
+  defaultCurrency?: string;
   contactName?: string;
   contactPhone?: string;
   contactEmail?: string;
@@ -175,6 +175,14 @@ export type SaasTenantDetail = SaasTenantListItem & {
   contactPhone: string | null;
   contactEmail: string | null;
   userCount: number;
+  readiness: {
+    activeOwnerCount: number;
+    activeBranchCount: number;
+    activeCatalogItemCount: number;
+    enrolledTerminalCount: number;
+    taxEnabled: boolean;
+    taxRegistrationNumberSet: boolean;
+  };
   /** Null while the tenant is active. */
   offboarding: SaasTenantOffboarding | null;
 };

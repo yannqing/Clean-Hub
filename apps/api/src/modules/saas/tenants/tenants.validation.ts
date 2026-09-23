@@ -69,7 +69,7 @@ export const createSaasTenantBodySchema = z.object({
   country: z.string().trim().min(1).max(80),
   city: optionalStringSchema(120),
   defaultLanguage: saasTenantLanguageSchema.optional(),
-  defaultCurrency: currencyCodeSchema.default("XOF"),
+  defaultCurrency: currencyCodeSchema.optional(),
   contactName: optionalStringSchema(120),
   contactPhone: optionalStringSchema(32),
   contactEmail: z

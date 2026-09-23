@@ -17,6 +17,10 @@ import {
   updateSaasTenantSettingsController,
   updateSaasTenantStatusController,
 } from "./tenants.controller.js";
+import {
+  getSaasTenantTaxSettingsController,
+  updateSaasTenantTaxSettingsController,
+} from "./tenant-tax-settings.controller.js";
 
 export function createSaasTenantsRoutes() {
   const routes = new Hono<AppBindings>();
@@ -37,6 +41,8 @@ export function createSaasTenantsRoutes() {
     resetSaasTenantUserPasswordController,
   );
   routes.get("/:tenantId/settings", getSaasTenantSettingsController);
+  routes.get("/:tenantId/tax-settings", getSaasTenantTaxSettingsController);
+  routes.patch("/:tenantId/tax-settings", updateSaasTenantTaxSettingsController);
   routes.patch("/:tenantId/settings", updateSaasTenantSettingsController);
   routes.patch("/:tenantId/status", updateSaasTenantStatusController);
   routes.get("/:tenantId/export", exportSaasTenantController);

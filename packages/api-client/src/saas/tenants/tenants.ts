@@ -5,6 +5,7 @@ import type {
   OffboardTenantRequest,
   OffboardTenantResponse,
   RestoreTenantRequest,
+  SaasTenantTaxSettings,
   TenantDetail,
   TenantFeatureFlags,
   TenantListResponse,
@@ -55,6 +56,10 @@ export function createSaasTenantsApi(client: ApiClient) {
         `/saas/tenants/${tenantId}/settings`,
         options,
       ),
+    getTaxSettings: (tenantId: string, options?: RequestOptions) =>
+      client.get<SaasTenantTaxSettings>(`/saas/tenants/${tenantId}/tax-settings`, options),
+    updateTaxSettings: (tenantId: string, input: SaasTenantTaxSettings, options?: RequestOptions) =>
+      client.patch<SaasTenantTaxSettings>(`/saas/tenants/${tenantId}/tax-settings`, input, options),
     updateSettings: (
       tenantId: string,
       input: UpdateTenantSettingsRequest,
