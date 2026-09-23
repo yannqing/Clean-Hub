@@ -194,3 +194,68 @@ jobs:
               kill "$(cat "$pid_file")" 2>/dev/null || true
             fi
           done
+
+  android:
+    name: Native Android POS tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: pnpm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('apps/pos-mobile/android/**/*.gradle', 'apps/pos-mobile/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: gradle-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Android unit tests
+        working-directory: apps/pos-mobile/android
+        # The POS duplicates server business rules in Kotlin -- ticket state
+        # machines, offline pricing, currency minor units, replay bounds. These
+        # tests are what notices when the two drift apart, and until now they
+        # only ran at release time, long after the change that broke them.
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
+      - name: Compile the release variant
+        working-directory: apps/pos-mobile/android
+        # Release differs from debug in more than signing: it applies ProGuard
+        # rules and merges its own manifest. Compiling it here keeps a
+        # release-only break from first surfacing during a version tag.
+        env:
+          CLEANHUB_POS_API_BASE_URL: https://ci.invalid
+        run: ./gradlew :app:compileReleaseKotlin --no-daemon
+
+      - name: Publish test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-results
+          path: apps/pos-mobile/android/app/build/test-results/testDebugUnitTest/*.xml
+          retention-days: 14
+          if-no-files-found: warn
