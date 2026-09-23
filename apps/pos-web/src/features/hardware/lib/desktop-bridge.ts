@@ -17,6 +17,10 @@ import {
 } from "@cleanhub/offline";
 
 import { createPosIndexedDbStorage } from "./indexed-db-storage";
+import {
+  createPosNativeSqliteStorage,
+  isPosNativeSqliteAvailable,
+} from "./capacitor-sqlite-storage";
 import { getAndroidPosHardwareBridge } from "./t1101-bridge";
 
 export type PosHardwareBridge = {
@@ -62,6 +66,7 @@ export function getPosHardwareBridge(): PosHardwareBridge | null {
 }
 
 let browserOfflineStorage: AsyncKeyValueStorage | null = null;
+let nativeOfflineStorage: AsyncKeyValueStorage | null = null;
 
 export function getPosOfflineStorage(): AsyncKeyValueStorage {
   const desktopStorage = getDesktopBridge()?.offlineStorage;
@@ -70,6 +75,10 @@ export function getPosOfflineStorage(): AsyncKeyValueStorage {
   }
   if (typeof window === "undefined") {
     return createMemoryStorage();
+  }
+  if (isPosNativeSqliteAvailable()) {
+    nativeOfflineStorage ??= createPosNativeSqliteStorage();
+    return nativeOfflineStorage;
   }
   browserOfflineStorage ??= createPosIndexedDbStorage(
     createWebStorageAdapter(window.localStorage),
