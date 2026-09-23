@@ -151,6 +151,9 @@ jobs:
       - name: Check the native POS still matches the server rules
         run: pnpm check:native-pos-parity
 
+      - name: Synchronize Android Capacitor plugins
+        run: pnpm --filter @cleanhub/pos-mobile cap:sync:android
+
       - name: Run Android unit tests
         working-directory: apps/pos-mobile/android
         run: ./gradlew :app:testDebugUnitTest --no-daemon
