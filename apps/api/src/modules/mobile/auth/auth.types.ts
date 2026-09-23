@@ -39,6 +39,17 @@ export type MobileAuthResult = {
   tokens: AuthTokenPair;
 };
 
+export type MobileTenant = {
+  id: string;
+  defaultCurrency: string;
+  timezone?: string;
+  customerOtpEnabled: boolean;
+};
+
+export type MobileCustomerLoginOptions = {
+  customerOtpEnabled: boolean;
+};
+
 export type MobileRequestOtpInput = MobileAuthRequestMeta & {
   tenantCode: string;
   phone: string;

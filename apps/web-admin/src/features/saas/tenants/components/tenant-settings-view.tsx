@@ -113,6 +113,7 @@ function toFeatureFlagsFormValues(
     deliveryEnabled: featureFlags.deliveryEnabled,
     notificationsEnabled: featureFlags.notificationsEnabled,
     emailEnabled: featureFlags.emailEnabled,
+    customerOtpEnabled: featureFlags.customerOtpEnabled,
   };
 }
 

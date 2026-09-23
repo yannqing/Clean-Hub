@@ -133,6 +133,13 @@ export const tenantFeatureFlags = pgTable(
      * tenant is entitled to it.
      */
     emailEnabled: boolean("email_enabled").notNull().default(false),
+    /**
+     * Whether customers of this tenant can sign in with a one-time code.
+     *
+     * Disabled by default until the platform has an actual SMS or email
+     * delivery provider. The mobile API enforces this flag as well as the UI.
+     */
+    customerOtpEnabled: boolean("customer_otp_enabled").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

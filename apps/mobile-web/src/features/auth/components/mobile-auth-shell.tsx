@@ -18,7 +18,7 @@ import { mobileReleaseConfig } from "@/lib/mobile-release-config";
 import { clearMobileSession } from "@/lib/token-storage";
 import {
   disablePushNotifications,
-  enablePushNotifications,
+  registerPushNotificationsIfPermitted,
 } from "@/lib/push-notifications";
 import {
   enterTenantContext,
@@ -61,7 +61,8 @@ export function MobileAuthShell() {
   const [tenantCode, setTenantCode] = useState<string | null>(null);
   const [session, setSession] = useState<SessionView | null>(null);
   const [tenantInput, setTenantInput] = useState("");
-  const [mode, setMode] = useState<LoginMode>("customer-otp");
+  const [mode, setMode] = useState<LoginMode>("customer-password");
+  const [customerOtpEnabled, setCustomerOtpEnabled] = useState(false);
   const [phone, setPhone] = useState("");
   const [otp, setOtp] = useState("");
   const [testOtp, setTestOtp] = useState<string | null>(null);
@@ -106,16 +107,23 @@ export function MobileAuthShell() {
           }
         }
 
+        const loginOptions = state.tenantCode
+          ? await apiClient.mobile.auth
+              .getCustomerLoginOptions({ tenantCode: state.tenantCode })
+              .catch(() => null)
+          : null;
+
         if (!mounted) {
           return;
         }
 
         setTenantCode(state.tenantCode);
         setTenantInput(state.tenantCode ?? "");
+        setCustomerOtpEnabled(loginOptions?.customerOtpEnabled ?? false);
         setSession(nextSession);
         if (nextSession) {
           // Best effort: never blocks session restore.
-          void enablePushNotifications(apiClient);
+          void registerPushNotificationsIfPermitted(apiClient);
         }
       })
       .catch(() => {
@@ -174,14 +182,20 @@ export function MobileAuthShell() {
   function handleTenantSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     runAction(async () => {
-      const nextTenantCode = await enterTenantContext(tenantInput);
+      const requestedTenantCode = tenantInput.trim();
+      const loginOptions = await apiClient.mobile.auth.getCustomerLoginOptions({
+        tenantCode: requestedTenantCode,
+      });
+      const nextTenantCode = await enterTenantContext(requestedTenantCode);
       setTenantCode(nextTenantCode);
+      setCustomerOtpEnabled(loginOptions.customerOtpEnabled);
+      setMode("customer-password");
       setMessage(t("auth.tenant.saved"));
     });
   }
 
   function handleOtpRequest() {
-    if (!tenantCode || otpCooldownSeconds > 0) {
+    if (!tenantCode || !customerOtpEnabled || otpCooldownSeconds > 0) {
       return;
     }
 
@@ -226,7 +240,7 @@ export function MobileAuthShell() {
       setSession(nextSession);
       setMessage(t("auth.login.success"));
       // Best effort: never blocks login.
-      void enablePushNotifications(apiClient);
+      void registerPushNotificationsIfPermitted(apiClient);
     });
   }
 
@@ -249,6 +263,8 @@ export function MobileAuthShell() {
       setTenantCode(null);
       setTenantInput("");
       setSession(null);
+      setCustomerOtpEnabled(false);
+      setMode("customer-password");
       setTestOtp(null);
       setOtpCooldownSeconds(0);
       setMessage(t("auth.tenant.reset"));
@@ -429,7 +445,7 @@ export function MobileAuthShell() {
             })}
           </div>
 
-          {mode === "customer-password" || mode === "customer-otp" ? (
+          {customerOtpEnabled && (mode === "customer-password" || mode === "customer-otp") ? (
             <div className="mt-5 grid grid-cols-2 border-b border-slate-200" role="tablist">
               {(["customer-otp", "customer-password"] as const).map((loginMode) => (
                 <button

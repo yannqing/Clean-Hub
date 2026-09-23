@@ -30,6 +30,10 @@ export type MobileTokenResponse = {
   tokenType: "Bearer";
 };
 
+export type MobileCustomerLoginOptions = {
+  customerOtpEnabled: boolean;
+};
+
 export type MobileRequestOtpRequest = {
   tenantCode: string;
   phone: string;

@@ -1,6 +1,7 @@
 import type { ApiClient, ApiRequestOptions } from "../types";
 import type {
   MobileAuthContext,
+  MobileCustomerLoginOptions,
   MobileLogoutRequest,
   MobilePasswordLoginRequest,
   MobileRefreshRequest,
@@ -14,6 +15,14 @@ type RequestOptions = Omit<ApiRequestOptions, "method" | "body" | "query">;
 
 export function createMobileAuthApi(client: ApiClient) {
   return {
+    getCustomerLoginOptions: (
+      query: Pick<MobileRequestOtpRequest, "tenantCode">,
+      options?: RequestOptions,
+    ) =>
+      client.get<MobileCustomerLoginOptions>("/mobile/auth/customer/login-options", {
+        ...options,
+        query,
+      }),
     requestCustomerOtp: (
       input: MobileRequestOtpRequest,
       options?: RequestOptions,

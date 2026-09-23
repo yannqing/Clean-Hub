@@ -39,6 +39,8 @@ export const tenantFeatureFlagFieldNames = [
   "retailProductsEnabled",
   "deliveryEnabled",
   "notificationsEnabled",
+  "emailEnabled",
+  "customerOtpEnabled",
 ] as const satisfies ReadonlyArray<keyof TenantFeatureFlagsFormValues>;
 
 const tenantStatusFieldNames = ["status", "reason"] as const;

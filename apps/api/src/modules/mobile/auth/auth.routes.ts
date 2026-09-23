@@ -14,6 +14,7 @@ export function createMobileAuthRoutes({
   const routes = new Hono<AppBindings>();
   const controller = createMobileAuthController({ mobileAuthService });
 
+  routes.get("/customer/login-options", controller.getCustomerLoginOptions);
   routes.post("/customer/otp/request", controller.requestCustomerOtp);
   if (mobileAuthService.isTestOtpEnabled()) {
     routes.get("/customer/otp/test", controller.getCustomerTestOtp);

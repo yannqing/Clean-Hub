@@ -38,7 +38,7 @@ export async function loadStoredAuthState() {
 }
 
 export async function enterTenantContext(input: string): Promise<string> {
-  const tenantCode = input.trim().toUpperCase();
+  const tenantCode = input.normalize("NFKC").trim().toUpperCase();
 
   if (!/^[A-Z0-9][A-Z0-9-]{2,31}$/.test(tenantCode)) {
     throw new Error("auth.tenant.invalidCode");

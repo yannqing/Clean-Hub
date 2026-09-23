@@ -22,6 +22,7 @@ import type {
   MobileAuthContext,
   MobileAuthResult,
   MobileCustomerAccount,
+  MobileCustomerLoginOptions,
   MobileCustomerPasswordLoginInput,
   MobileLogoutInput,
   MobileRefreshInput,
@@ -30,6 +31,7 @@ import type {
   MobileStaffLoginInput,
   MobileStaffUser,
   MobileStoredRefreshToken,
+  MobileTenant,
   MobileTestOtpResult,
   MobileVerifyOtpInput,
 } from "./auth.types.js";
@@ -89,7 +91,7 @@ function normalizeIdentifier(identifier: string): string {
 }
 
 function normalizeTenantCode(tenantCode: string): string {
-  return tenantCode.trim();
+  return tenantCode.normalize("NFKC").trim().toUpperCase();
 }
 
 function normalizePhone(phone: string): string {
@@ -103,6 +105,15 @@ function generateOtpCode(): string {
 function assertActiveCustomer(customer: MobileCustomerAccount): void {
   if (customer.status !== "active") {
     throw invalidCredentials();
+  }
+}
+
+function assertCustomerOtpEnabled(tenant: MobileTenant): void {
+  if (!tenant.customerOtpEnabled) {
+    throw new AuthError(
+      "FEATURE_DISABLED",
+      "Customer one-time-code login is disabled for this tenant.",
+    );
   }
 }
 
@@ -230,10 +241,19 @@ export class MobileAuthService {
     return this.testOtpEnabled;
   }
 
+  async getCustomerLoginOptions(
+    tenantCode: string,
+  ): Promise<MobileCustomerLoginOptions> {
+    const tenant = await this.resolveTenant(tenantCode);
+
+    return { customerOtpEnabled: tenant.customerOtpEnabled };
+  }
+
   async requestCustomerOtp(
     input: MobileRequestOtpInput,
   ): Promise<MobileTestOtpResult> {
     const tenant = await this.resolveTenant(input.tenantCode);
+    assertCustomerOtpEnabled(tenant);
     const phone = normalizePhone(input.phone);
     const customer = await this.repository.findCustomerByPhone({
       tenantId: tenant.id,
@@ -271,6 +291,7 @@ export class MobileAuthService {
     }
 
     const tenant = await this.resolveTenant(input.tenantCode);
+    assertCustomerOtpEnabled(tenant);
     const phone = normalizePhone(input.phone);
     const customer = await this.repository.findCustomerByPhone({
       tenantId: tenant.id,
@@ -303,6 +324,7 @@ export class MobileAuthService {
     input: MobileVerifyOtpInput,
   ): Promise<MobileAuthResult> {
     const tenant = await this.resolveTenant(input.tenantCode);
+    assertCustomerOtpEnabled(tenant);
     const phone = normalizePhone(input.phone);
     const customer = await this.repository.findCustomerByPhone({
       tenantId: tenant.id,
@@ -816,7 +838,7 @@ export class MobileAuthService {
 
   private async resolveTenant(
     tenantCode: string,
-  ): Promise<{ id: string; defaultCurrency: string; timezone?: string }> {
+  ): Promise<MobileTenant> {
     const tenant = await this.repository.findActiveTenantByCode(
       normalizeTenantCode(tenantCode),
     );
@@ -830,7 +852,7 @@ export class MobileAuthService {
 
   private async resolveTenantById(
     tenantId: string,
-  ): Promise<{ id: string; defaultCurrency: string; timezone?: string }> {
+  ): Promise<MobileTenant> {
     const tenant = await this.repository.findTenantById(tenantId);
 
     if (!tenant) {

@@ -26,6 +26,10 @@ const testOtpQuerySchema = z.object({
   phone: phoneSchema,
 });
 
+const customerLoginOptionsQuerySchema = z.object({
+  tenantCode: tenantCodeSchema,
+});
+
 const verifyOtpBodySchema = requestOtpBodySchema.extend({
   code: otpCodeSchema,
 });
@@ -79,6 +83,14 @@ export function createMobileAuthController({
   mobileAuthService,
 }: MobileAuthControllerOptions) {
   return {
+    getCustomerLoginOptions: async (c: Context<AppBindings>) => {
+      const query = customerLoginOptionsQuerySchema.parse(c.req.query());
+
+      return c.json(
+        await mobileAuthService.getCustomerLoginOptions(query.tenantCode),
+      );
+    },
+
     requestCustomerOtp: async (c: Context<AppBindings>) => {
       const body = requestOtpBodySchema.parse(await readJson(c));
       const result = await mobileAuthService.requestCustomerOtp({

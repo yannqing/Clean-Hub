@@ -329,6 +329,8 @@ export function validateTenantFeatureFlagsForm(
     input.retailProductsEnabled,
     input.deliveryEnabled,
     input.notificationsEnabled,
+    input.emailEnabled,
+    input.customerOtpEnabled,
   ];
 
   if (values.some((value) => typeof value !== "boolean")) {
@@ -346,6 +348,8 @@ export function validateTenantFeatureFlagsForm(
       retailProductsEnabled: input.retailProductsEnabled,
       deliveryEnabled: input.deliveryEnabled,
       notificationsEnabled: input.notificationsEnabled,
+      emailEnabled: input.emailEnabled,
+      customerOtpEnabled: input.customerOtpEnabled,
     },
   };
 }

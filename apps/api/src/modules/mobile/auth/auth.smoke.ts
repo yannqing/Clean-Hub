@@ -138,6 +138,7 @@ function makeStaffUser(
 }
 
 class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
+  customerOtpEnabled = true;
   private readonly customers = new Map<string, MobileCustomerAccount>();
   private readonly customerCredentials = new Map<
     string,
@@ -196,13 +197,25 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
 
   async findActiveTenantByCode(
     tenantCode: string,
-  ): Promise<{ id: string; defaultCurrency: string } | null> {
+  ): Promise<{
+    id: string;
+    defaultCurrency: string;
+    customerOtpEnabled: boolean;
+  } | null> {
     if (tenantCode === "CLEAN-001") {
-      return { id: "tenant_1", defaultCurrency: "XOF" };
+      return {
+        id: "tenant_1",
+        defaultCurrency: "XOF",
+        customerOtpEnabled: this.customerOtpEnabled,
+      };
     }
 
     if (tenantCode === "CLEAN-002") {
-      return { id: "tenant_2", defaultCurrency: "EUR" };
+      return {
+        id: "tenant_2",
+        defaultCurrency: "EUR",
+        customerOtpEnabled: this.customerOtpEnabled,
+      };
     }
 
     return null;
@@ -210,13 +223,25 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
 
   async findTenantById(
     tenantId: string,
-  ): Promise<{ id: string; defaultCurrency: string } | null> {
+  ): Promise<{
+    id: string;
+    defaultCurrency: string;
+    customerOtpEnabled: boolean;
+  } | null> {
     if (tenantId === "tenant_1") {
-      return { id: "tenant_1", defaultCurrency: "XOF" };
+      return {
+        id: "tenant_1",
+        defaultCurrency: "XOF",
+        customerOtpEnabled: this.customerOtpEnabled,
+      };
     }
 
     if (tenantId === "tenant_2") {
-      return { id: "tenant_2", defaultCurrency: "EUR" };
+      return {
+        id: "tenant_2",
+        defaultCurrency: "EUR",
+        customerOtpEnabled: this.customerOtpEnabled,
+      };
     }
 
     return null;
@@ -599,20 +624,16 @@ class FakeMobileAuthRepository implements MobileAuthRepositoryLike {
   }
 }
 
-async function createService(): Promise<{
-  service: MobileAuthService;
-  repository: FakeMobileAuthRepository;
-}>;
-async function createService(options: { testOtpEnabled: true }): Promise<{
-  service: MobileAuthService;
-  repository: FakeMobileAuthRepository;
-}>;
-async function createService(options?: { testOtpEnabled?: boolean }): Promise<{
+async function createService(options: {
+  testOtpEnabled?: boolean;
+  customerOtpEnabled?: boolean;
+} = {}): Promise<{
   service: MobileAuthService;
   repository: FakeMobileAuthRepository;
 }> {
   const passwordHash = await hashPassword(GOOD_PASSWORD);
   const repository = new FakeMobileAuthRepository(passwordHash);
+  repository.customerOtpEnabled = options.customerOtpEnabled ?? true;
   const service = new MobileAuthService({
     db: fakeDb,
     repository,
@@ -620,10 +641,32 @@ async function createService(options?: { testOtpEnabled?: boolean }): Promise<{
     accessTokenSecret: TEST_SECRET,
     accessTokenTtlSeconds: 60,
     refreshTokenTtlSeconds: 60 * 60,
-    testOtpEnabled: options?.testOtpEnabled ?? false,
+    testOtpEnabled: options.testOtpEnabled ?? false,
   });
 
   return { service, repository };
+}
+
+async function assertCustomerOtpCanBeDisabled(): Promise<void> {
+  const { service } = await createService({ customerOtpEnabled: false });
+  const options = await service.getCustomerLoginOptions("CLEAN-001");
+
+  assert(!options.customerOtpEnabled, "OTP options report a disabled tenant");
+  await assertRejectsAuth(
+    () =>
+      service.requestCustomerOtp({
+        tenantCode: "CLEAN-001",
+        phone: "+100000000",
+      }),
+    "FEATURE_DISABLED",
+  );
+
+  const passwordLogin = await service.loginCustomerWithPassword({
+    tenantCode: "CLEAN-001",
+    identifier: "customer@example.com",
+    password: GOOD_PASSWORD,
+  });
+  assert(passwordLogin.authContext.role === "customer", "password login remains available");
 }
 
 async function assertCustomerOtpDoesNotExposeCodeByDefault(): Promise<void> {
@@ -937,6 +980,7 @@ async function assertRefreshAndLogout(): Promise<void> {
 }
 
 export async function runMobileAuthSmokeChecks(): Promise<void> {
+  await assertCustomerOtpCanBeDisabled();
   await assertCustomerOtpDoesNotExposeCodeByDefault();
   await assertCustomerOtpSuccess();
   await assertCustomerOtpAttemptLimit();

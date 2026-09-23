@@ -59,12 +59,14 @@ INSERT INTO tenant_feature_flags (
   car_wash_enabled,
   retail_products_enabled,
   delivery_enabled,
-  notifications_enabled
+  notifications_enabled,
+  customer_otp_enabled
 )
 VALUES
   (
     '01SEEDM0B0TFF00000000001',
     '01KRERJN800000000000000001',
+    true,
     true,
     true,
     true,
@@ -78,6 +80,7 @@ VALUES
     false,
     false,
     true,
+    true,
     true
   )
 ON CONFLICT (tenant_id) DO UPDATE SET
@@ -86,6 +89,7 @@ ON CONFLICT (tenant_id) DO UPDATE SET
   retail_products_enabled = EXCLUDED.retail_products_enabled,
   delivery_enabled = EXCLUDED.delivery_enabled,
   notifications_enabled = EXCLUDED.notifications_enabled,
+  customer_otp_enabled = EXCLUDED.customer_otp_enabled,
   updated_at = now();
 
 INSERT INTO branches (

@@ -119,6 +119,7 @@ export type SaasTenantFeatureFlags = {
   deliveryEnabled: boolean;
   notificationsEnabled: boolean;
   emailEnabled: boolean;
+  customerOtpEnabled: boolean;
   updatedAt: string | null;
   updatedBy: string | null;
   version: number;
@@ -131,6 +132,7 @@ export type UpdateSaasTenantFeatureFlagsRequest = {
   deliveryEnabled?: boolean;
   notificationsEnabled?: boolean;
   emailEnabled?: boolean;
+  customerOtpEnabled?: boolean;
 };
 
 export type GetSaasTenantFeatureFlagsInput = {

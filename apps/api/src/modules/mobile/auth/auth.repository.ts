@@ -10,6 +10,7 @@ import {
   permissions,
   rolePermissions,
   roles,
+  tenantFeatureFlags,
   tenantSettings,
   tenants,
   userProfiles,
@@ -23,6 +24,7 @@ import type {
   MobileCustomerAccount,
   MobileCustomerCredential,
   MobileCustomerOtp,
+  MobileTenant,
   MobileStaffUser,
   MobileStoredRefreshToken,
 } from "./auth.types.js";
@@ -30,19 +32,17 @@ import type {
 export class MobileAuthRepository {
   constructor(private readonly db: Database) {}
 
-  async findActiveTenantByCode(tenantCode: string): Promise<{
-    id: string;
-    defaultCurrency: string;
-    timezone?: string;
-  } | null> {
+  async findActiveTenantByCode(tenantCode: string): Promise<MobileTenant | null> {
     const rows = await this.db
       .select({
         id: tenants.id,
         defaultCurrency: sql<string>`coalesce(${tenantSettings.defaultCurrency}, 'XOF')`,
         timezone: sql<string>`coalesce(${tenantSettings.timezone}, 'UTC')`,
+        customerOtpEnabled: sql<boolean>`coalesce(${tenantFeatureFlags.customerOtpEnabled}, false)`,
       })
       .from(tenants)
       .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))
+      .leftJoin(tenantFeatureFlags, eq(tenantFeatureFlags.tenantId, tenants.id))
       .where(
         and(
           eq(tenants.pressingCode, tenantCode.trim()),
@@ -55,19 +55,17 @@ export class MobileAuthRepository {
     return rows[0] ?? null;
   }
 
-  async findTenantById(tenantId: string): Promise<{
-    id: string;
-    defaultCurrency: string;
-    timezone?: string;
-  } | null> {
+  async findTenantById(tenantId: string): Promise<MobileTenant | null> {
     const rows = await this.db
       .select({
         id: tenants.id,
         defaultCurrency: sql<string>`coalesce(${tenantSettings.defaultCurrency}, 'XOF')`,
         timezone: sql<string>`coalesce(${tenantSettings.timezone}, 'UTC')`,
+        customerOtpEnabled: sql<boolean>`coalesce(${tenantFeatureFlags.customerOtpEnabled}, false)`,
       })
       .from(tenants)
       .leftJoin(tenantSettings, eq(tenantSettings.tenantId, tenants.id))
+      .leftJoin(tenantFeatureFlags, eq(tenantFeatureFlags.tenantId, tenants.id))
       .where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
       .limit(1);
 

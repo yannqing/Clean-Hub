@@ -162,7 +162,7 @@ export async function clearMobileSession(): Promise<void> {
 }
 
 export async function saveTenantCode(tenantCode: string): Promise<void> {
-  await writeValue(STORAGE_KEYS.tenantCode, tenantCode.trim().toUpperCase());
+  await writeValue(STORAGE_KEYS.tenantCode, tenantCode.normalize("NFKC").trim().toUpperCase());
 }
 
 export async function getTenantCode(): Promise<string | null> {

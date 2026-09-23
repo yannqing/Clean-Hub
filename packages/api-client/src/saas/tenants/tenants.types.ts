@@ -154,6 +154,7 @@ export type TenantFeatureFlags = {
   deliveryEnabled: boolean;
   notificationsEnabled: boolean;
   emailEnabled: boolean;
+  customerOtpEnabled: boolean;
   updatedAt: string | null;
   updatedBy: string | null;
   version: number;
@@ -166,4 +167,5 @@ export type UpdateTenantFeatureFlagsRequest = {
   deliveryEnabled?: boolean;
   notificationsEnabled?: boolean;
   emailEnabled?: boolean;
+  customerOtpEnabled?: boolean;
 };

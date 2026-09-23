@@ -156,6 +156,7 @@ function toTenantFeatureFlags(row: {
   deliveryEnabled: boolean | null;
   notificationsEnabled: boolean | null;
   emailEnabled: boolean | null;
+  customerOtpEnabled: boolean | null;
   updatedAt: Date | null;
   updatedBy: string | null;
   version: number | null;
@@ -169,6 +170,7 @@ function toTenantFeatureFlags(row: {
     deliveryEnabled: row.deliveryEnabled ?? false,
     notificationsEnabled: row.notificationsEnabled ?? true,
     emailEnabled: row.emailEnabled ?? false,
+    customerOtpEnabled: row.customerOtpEnabled ?? false,
     updatedAt: row.updatedAt?.toISOString() ?? null,
     updatedBy: row.updatedBy,
     version: row.version ?? 0,
@@ -422,6 +424,7 @@ export async function findSaasTenantFeatureFlagsByTenantId(
       deliveryEnabled: tenantFeatureFlags.deliveryEnabled,
       notificationsEnabled: tenantFeatureFlags.notificationsEnabled,
       emailEnabled: tenantFeatureFlags.emailEnabled,
+      customerOtpEnabled: tenantFeatureFlags.customerOtpEnabled,
       updatedAt: tenantFeatureFlags.updatedAt,
       updatedBy: tenantFeatureFlags.updatedBy,
       version: tenantFeatureFlags.version,
@@ -623,6 +626,8 @@ export async function updateSaasTenantFeatureFlagsRecord(
     input.currentFeatureFlags.notificationsEnabled;
   const emailEnabled =
     input.data.emailEnabled ?? input.currentFeatureFlags.emailEnabled;
+  const customerOtpEnabled =
+    input.data.customerOtpEnabled ?? input.currentFeatureFlags.customerOtpEnabled;
 
   await db
     .insert(tenantFeatureFlags)
@@ -635,6 +640,7 @@ export async function updateSaasTenantFeatureFlagsRecord(
       deliveryEnabled,
       notificationsEnabled,
       emailEnabled,
+      customerOtpEnabled,
       updatedBy: input.actorUserId,
     })
     .onConflictDoUpdate({
@@ -646,6 +652,7 @@ export async function updateSaasTenantFeatureFlagsRecord(
         deliveryEnabled,
         notificationsEnabled,
         emailEnabled,
+        customerOtpEnabled,
         updatedAt: new Date(),
         updatedBy: input.actorUserId,
         version: sql`${tenantFeatureFlags.version} + 1`,
