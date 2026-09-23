@@ -34,6 +34,7 @@ import {
   ChartNoAxesCombined,
   Clock3,
   CreditCard,
+  Download,
   PackageCheck,
   ReceiptText,
   ShoppingBag,
@@ -52,6 +53,7 @@ import { useMemo, useState, useTransition } from "react";
 import { webAdminRoutes } from "@/config/routes";
 import { interpolate, useTenantI18n } from "@/i18n";
 import { formatMoney } from "@/lib/format";
+import { downloadCsv } from "@/lib/csv";
 
 import {
   reportDatePresets,
@@ -59,6 +61,7 @@ import {
   type ReportDatePresetId,
 } from "../date-presets";
 import type { ReportSummary, ReportSummaryQuery } from "../types";
+import { buildReportCsv, buildReportFilename } from "../export";
 
 type ReportSummaryViewProps = {
   defaultCurrency: string;
@@ -380,6 +383,11 @@ export function ReportSummaryView({
   const [customFrom, setCustomFrom] = useState(query.from ?? "");
   const [customTo, setCustomTo] = useState(query.to ?? "");
   const currency = summary?.currency ?? query.currency ?? defaultCurrency;
+  const taxCopy = locale === "zh-CN"
+    ? { taxable: "订单应税金额", tax: "订单原始税额（未扣退款）", export: "下载 CSV", metric: "指标", value: "数值", generated: "生成时间" }
+    : locale === "fr"
+      ? { taxable: "Base imposable", tax: "TVA brute (avant remboursements)", export: "Télécharger CSV", metric: "Indicateur", value: "Valeur", generated: "Généré le" }
+      : { taxable: "Taxable amount", tax: "Gross tax (before refunds)", export: "Download CSV", metric: "Metric", value: "Value", generated: "Generated at" };
   const trend = useMemo(
     () => buildTrendSeries(summary?.salesTrend ?? [], query),
     [query, summary?.salesTrend],
@@ -650,6 +658,42 @@ export function ReportSummaryView({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {summary ? (
+              <Button
+                onClick={() => {
+                  const exportQuery = {
+                    ...query,
+                    from: query.from ?? summary.filters.from ?? undefined,
+                    to: query.to ?? summary.filters.to ?? undefined,
+                  };
+                  downloadCsv(
+                    buildReportFilename("report", exportQuery),
+                    buildReportCsv(summary, exportQuery, {
+                      grossSales: m.reports.metrics.grossSales,
+                      taxableAmount: taxCopy.taxable,
+                      taxAmount: taxCopy.tax,
+                      orderCount: m.reports.metrics.orders,
+                      pendingPickup: m.reports.orderStatus.labels.received,
+                      inProgress: m.reports.orderStatus.labels.paid,
+                      paymentBreakdown: m.reports.paymentMethods.cash,
+                      paymentMethodLabels: m.reports.paymentMethods,
+                      from: m.reports.customRange.from,
+                      to: m.reports.customRange.to,
+                      branchId: m.reports.performance.branch,
+                      generatedAt: taxCopy.generated,
+                      metricHeader: taxCopy.metric,
+                      valueHeader: taxCopy.value,
+                    }),
+                  );
+                }}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                <Icon icon={Download} size={14} />
+                {taxCopy.export}
+              </Button>
+            ) : null}
             <Select
               disabled={isPending}
               onValueChange={handlePresetChange}
@@ -829,6 +873,11 @@ export function ReportSummaryView({
                 locale={locale}
                 value={formatCount(summary.uniqueCustomerCount, locale)}
               />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Metric change={null} icon={ReceiptText} label={taxCopy.taxable} locale={locale} value={formatMoney(summary.taxableAmount, currency, locale)} />
+              <Metric change={null} icon={ReceiptText} label={taxCopy.tax} locale={locale} value={formatMoney(summary.taxAmount, currency, locale)} />
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">

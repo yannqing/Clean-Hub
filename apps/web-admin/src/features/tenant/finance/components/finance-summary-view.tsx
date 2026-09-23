@@ -52,6 +52,7 @@ import { useMemo, useState, useTransition } from "react";
 import { webAdminRoutes } from "@/config/routes";
 import { interpolate, useTenantI18n } from "@/i18n";
 import { formatMoney } from "@/lib/format";
+import { downloadCsv, toCsvDocument } from "@/lib/csv";
 
 import {
   financeDatePresets,
@@ -325,6 +326,11 @@ export function FinanceSummaryView({
   const pathname = usePathname();
   const router = useRouter();
   const { locale, m } = useTenantI18n();
+  const taxCopy = locale === "zh-CN"
+    ? { taxable: "订单应税金额", tax: "订单原始税额", export: "下载税务 CSV", basis: "按订单创建日期统计，尚未扣除退款税额；与实收款口径不同。" }
+    : locale === "fr"
+      ? { taxable: "Base imposable des commandes", tax: "TVA brute des commandes", export: "Exporter la taxe CSV", basis: "Selon la date de création des commandes, avant déduction des remboursements; distinct des encaissements." }
+      : { taxable: "Order taxable amount", tax: "Gross order tax", export: "Download tax CSV", basis: "Based on order creation date, before refund tax deductions; separate from cash collected." };
   const [isPending, startTransition] = useTransition();
   const [isExporting, setIsExporting] = useState(false);
   const [customRangeOpen, setCustomRangeOpen] = useState(false);
@@ -496,6 +502,18 @@ export function FinanceSummaryView({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <Button disabled={!summary} onClick={() => {
+            if (!summary) return;
+            downloadCsv(
+              `cleanhub-tax-${summary.filters.from}-${summary.filters.to}.csv`,
+              toCsvDocument(["Metric", "Amount", "Currency", "From", "To", "Branch"], [
+                [taxCopy.taxable, summary.summary.orderTaxableAmount, summary.currency, summary.filters.from, summary.filters.to, summary.filters.branchId],
+                [taxCopy.tax, summary.summary.orderTaxAmount, summary.currency, summary.filters.from, summary.filters.to, summary.filters.branchId],
+              ]),
+            );
+          }} size="sm" type="button" variant="outline">
+            <Icon icon={Download} size={14} />{taxCopy.export}
+          </Button>
           <Button asChild size="sm" variant="outline">
             <a href="#finance-methodology">
               <Icon icon={FileText} size={14} />
@@ -776,6 +794,11 @@ export function FinanceSummaryView({
                       )}
                     />
                   </div>
+                  <div className="mt-5 grid gap-2.5 sm:grid-cols-2">
+                    <SmallMetric icon={ReceiptText} label={taxCopy.taxable} value={formatMoney(summary.summary.orderTaxableAmount, currency, locale)} />
+                    <SmallMetric icon={ReceiptText} label={taxCopy.tax} value={formatMoney(summary.summary.orderTaxAmount, currency, locale)} />
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">{taxCopy.basis}</p>
                 </div>
                 <div className="px-5 py-5 sm:px-6">
                   <div className="flex items-start justify-between gap-3">

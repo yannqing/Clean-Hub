@@ -58,6 +58,8 @@ type PaymentMetrics = {
 
 type OrderMetrics = {
   orderCount: number;
+  taxableAmount: number;
+  taxAmount: number;
   orderStatusBreakdown: OrderStatusBreakdown;
 };
 
@@ -303,6 +305,8 @@ async function findOrderMetrics(
   const rows = await db
     .select({
       orderCount: sql<number>`count(*) filter (where ${orders.status} in ('received', 'paid', 'delivered'))::int`,
+      taxableAmount: sql<string>`coalesce(sum(${orders.taxableAmount}) filter (where ${orders.status} in ('received', 'paid', 'delivered')), 0)::text`,
+      taxAmount: sql<string>`coalesce(sum(${orders.taxAmount}) filter (where ${orders.status} in ('received', 'paid', 'delivered')), 0)::text`,
       draft: sql<number>`count(*) filter (where ${orders.status} = 'draft')::int`,
       received: sql<number>`count(*) filter (where ${orders.status} = 'received')::int`,
       paid: sql<number>`count(*) filter (where ${orders.status} = 'paid')::int`,
@@ -315,6 +319,8 @@ async function findOrderMetrics(
 
   return {
     orderCount: toNumber(row?.orderCount),
+    taxableAmount: toMoney(row?.taxableAmount),
+    taxAmount: toMoney(row?.taxAmount),
     orderStatusBreakdown: {
       draft: toNumber(row?.draft),
       received: toNumber(row?.received),
@@ -596,6 +602,8 @@ function createEmptySummary(
     timezone: input.timezone,
     availableCurrencies: input.availableCurrencies,
     grossSales: 0,
+    taxableAmount: 0,
+    taxAmount: 0,
     orderCount: 0,
     averageOrderValue: 0,
     uniqueCustomerCount: 0,
@@ -674,6 +682,8 @@ export async function getTenantReportSummaryRecord(
     timezone: input.timezone,
     availableCurrencies: input.availableCurrencies,
     ...current,
+    taxableAmount: currentOrders.taxableAmount,
+    taxAmount: currentOrders.taxAmount,
     pendingPickupCount: workload.pendingPickupCount,
     inProgressCount: workload.inProgressCount,
     overdueCount: workload.overdueCount,

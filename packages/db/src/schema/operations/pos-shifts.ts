@@ -374,6 +374,9 @@ export const posZReports = pgTable(
     discountAmount: numeric("discount_amount", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),
+    /** Null on reports closed before tax snapshots were introduced. */
+    taxableAmount: numeric("taxable_amount", { precision: 12, scale: 2 }),
+    taxAmount: numeric("tax_amount", { precision: 12, scale: 2 }),
     refundAmount: numeric("refund_amount", { precision: 12, scale: 2 })
       .notNull()
       .default("0"),

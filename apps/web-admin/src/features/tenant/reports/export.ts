@@ -9,6 +9,8 @@ type CsvRow = CsvCell[];
 /** Localized labels passed into the builders so the exported file matches the UI locale. */
 export type ReportExportLabels = {
   grossSales: string;
+  taxableAmount: string;
+  taxAmount: string;
   orderCount: string;
   pendingPickup: string;
   inProgress: string;
@@ -61,6 +63,8 @@ export function buildReportCsv(
   const kpiHeader: CsvRow = [labels.metricHeader, labels.valueHeader];
   const kpiRows: CsvRow[] = [
     [labels.grossSales, summary.grossSales],
+    [labels.taxableAmount, summary.taxableAmount],
+    [labels.taxAmount, summary.taxAmount],
     [labels.orderCount, summary.orderCount],
     [labels.pendingPickup, summary.pendingPickupCount],
     [labels.inProgress, summary.inProgressCount],
@@ -95,6 +99,8 @@ export type ZReportLabels = {
   totals: string;
   paymentBreakdown: string;
   grossSales: string;
+  taxableAmount: string;
+  taxAmount: string;
   orderCount: string;
   pendingPickup: string;
   inProgress: string;
@@ -134,6 +140,8 @@ export function buildZReportCsv(
       labels.grossSales,
       `${summary.grossSales} ${currency}`.trim(),
     ],
+    [labels.taxableAmount, `${summary.taxableAmount} ${currency}`.trim()],
+    [labels.taxAmount, `${summary.taxAmount} ${currency}`.trim()],
     [labels.orderCount, summary.orderCount],
     [labels.pendingPickup, summary.pendingPickupCount],
     [labels.inProgress, summary.inProgressCount],

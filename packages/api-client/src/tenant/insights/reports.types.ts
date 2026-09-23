@@ -3,6 +3,8 @@ export type ReportSummary = {
   timezone: string;
   availableCurrencies: string[];
   grossSales: number;
+  taxableAmount: number;
+  taxAmount: number;
   orderCount: number;
   averageOrderValue: number;
   uniqueCustomerCount: number;

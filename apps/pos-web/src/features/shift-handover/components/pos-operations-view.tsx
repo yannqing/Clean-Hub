@@ -77,6 +77,10 @@ const COPY = {
     cashInHand: "随身现金",
     expectedCash: "系统应有现金",
     netSales: "本收银台净销售额",
+    taxableAmount: "应税金额",
+    taxAmount: "订单原始税额",
+    exportCsv: "下载 CSV",
+    taxUnavailable: "旧报表未记录税额",
     unsettled: "待确认支付",
     pendingOrders: "待收款订单",
     readyTickets: "待取件工单",
@@ -134,6 +138,10 @@ const COPY = {
     cashInHand: "Cash in hand",
     expectedCash: "Expected cash",
     netSales: "Register net sales",
+    taxableAmount: "Taxable amount",
+    taxAmount: "Gross order tax",
+    exportCsv: "Download CSV",
+    taxUnavailable: "Tax not recorded on older reports",
     unsettled: "Unsettled payments",
     pendingOrders: "Unpaid orders",
     readyTickets: "Ready tickets",
@@ -191,6 +199,10 @@ const COPY = {
     cashInHand: "Espèces en main",
     expectedCash: "Espèces attendues",
     netSales: "Ventes nettes de la caisse",
+    taxableAmount: "Base imposable",
+    taxAmount: "TVA brute des commandes",
+    exportCsv: "Télécharger CSV",
+    taxUnavailable: "Taxe non enregistrée sur les anciens rapports",
     unsettled: "Paiements à confirmer",
     pendingOrders: "Commandes impayées",
     readyTickets: "Tickets prêts",
@@ -234,6 +246,37 @@ function dateTime(value: string, locale: string, timeZone: string) {
     timeStyle: "short",
     timeZone,
   }).format(new Date(value));
+}
+
+function downloadZReport(report: PosZReport, labels: typeof COPY[Locale]) {
+  const rows: Array<Array<string | number | null>> = [
+    ["Z Report", report.id],
+    ["Date", report.cutoffAt],
+    ["Currency", report.currency],
+    ["Orders", report.orderCount],
+    [labels.taxableAmount, report.taxableAmount],
+    [labels.taxAmount, report.taxAmount],
+    [labels.netSales, report.netSales],
+    [labels.expectedCash, report.expectedCash],
+    [labels.confirmVariance, report.variance],
+    ...report.paymentBreakdown.map((payment) => [
+      `${payment.method}${payment.provider ? ` / ${payment.provider}` : ""}`,
+      payment.netAmount,
+    ]),
+  ];
+  const escapeCell = (value: string | number | null) => {
+    const text = value === null ? "" : String(value);
+    return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
+  };
+  const csv = `\uFEFF${rows.map((row) => row.map(escapeCell).join(",")).join("\r\n")}\r\n`;
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `z-report-${report.cutoffAt.slice(0, 10)}-${report.id}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function StatusPill({ active, label }: { active: boolean; label: string }) {
@@ -454,6 +497,8 @@ export function PosOperationsView({
                 <div>
                   <p className="font-medium">{dateTime(report.cutoffAt, locale, timeZone)}</p>
                   <p className="mt-1 text-xs text-muted-foreground">{report.orderCount} orders · {report.paymentBreakdown.length} methods</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{report.taxAmount === null ? copy.taxUnavailable : `${copy.taxableAmount}: ${money(report.taxableAmount, report.currency, locale)} · ${copy.taxAmount}: ${money(report.taxAmount, report.currency, locale)}`}</p>
+                  <Button className="mt-2" onClick={() => downloadZReport(report, copy)} size="sm" type="button" variant="outline">{copy.exportCsv}</Button>
                 </div>
                 <div className="text-right">
                   <p className="font-semibold">{money(report.netSales, report.currency, locale)}</p>

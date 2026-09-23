@@ -151,6 +151,8 @@ function toZReport(row: typeof posZReports.$inferSelect): PosZReport {
     orderCount: row.orderCount,
     grossSales: row.grossSales,
     discountAmount: row.discountAmount,
+    taxableAmount: row.taxableAmount,
+    taxAmount: row.taxAmount,
     refundAmount: row.refundAmount,
     correctionAmount: row.correctionAmount,
     unsettledPaymentCount: row.unsettledPaymentCount,
@@ -908,6 +910,8 @@ export type HandoverSnapshot = {
   orderCount: number;
   grossSales: string;
   discountAmount: string;
+  taxableAmount: string;
+  taxAmount: string;
   refundAmount: string;
   correctionAmount: string;
   unsettledPaymentCount: number;
@@ -970,6 +974,8 @@ export async function calculateHandoverSnapshot(
         count: sql<number>`count(*)::int`,
         gross: sql<string>`coalesce(sum(${orders.subtotalAmount}), 0)`,
         discount: sql<string>`coalesce(sum(${orders.discountAmount}), 0)`,
+        taxable: sql<string>`coalesce(sum(${orders.taxableAmount}) filter (where ${orders.status} in ('received', 'paid', 'delivered')), 0)`,
+        tax: sql<string>`coalesce(sum(${orders.taxAmount}) filter (where ${orders.status} in ('received', 'paid', 'delivered')), 0)`,
       })
       .from(orders)
       .where(
@@ -1181,6 +1187,8 @@ export async function calculateHandoverSnapshot(
     orderCount: orderRows[0]?.count ?? 0,
     grossSales: money(grossSales),
     discountAmount: money(discountAmount),
+    taxableAmount: orderRows[0]?.taxable ?? "0.00",
+    taxAmount: orderRows[0]?.tax ?? "0.00",
     refundAmount: money(refundAmount),
     correctionAmount: money(correctionAmount),
     unsettledPaymentCount: unsettledPaymentRows[0]?.count ?? 0,
@@ -1263,6 +1271,8 @@ export async function createHandoverAndZReport(
       orderCount: input.snapshot.orderCount,
       grossSales: input.snapshot.grossSales,
       discountAmount: input.snapshot.discountAmount,
+      taxableAmount: input.snapshot.taxableAmount,
+      taxAmount: input.snapshot.taxAmount,
       refundAmount: input.snapshot.refundAmount,
       correctionAmount: input.snapshot.correctionAmount,
       unsettledPaymentCount: input.snapshot.unsettledPaymentCount,
@@ -1338,6 +1348,8 @@ export async function insertRegisterZReport(
       orderCount: input.snapshot.orderCount,
       grossSales: input.snapshot.grossSales,
       discountAmount: input.snapshot.discountAmount,
+      taxableAmount: input.snapshot.taxableAmount,
+      taxAmount: input.snapshot.taxAmount,
       refundAmount: input.snapshot.refundAmount,
       correctionAmount: input.snapshot.correctionAmount,
       unsettledPaymentCount: input.snapshot.unsettledPaymentCount,

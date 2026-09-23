@@ -11,6 +11,8 @@ export type FinanceAvailableBranch = {
 };
 
 export type FinanceSummaryMetrics = {
+  orderTaxableAmount: number;
+  orderTaxAmount: number;
   grossCollected: number;
   refundAmount: number;
   correctionAmount: number;

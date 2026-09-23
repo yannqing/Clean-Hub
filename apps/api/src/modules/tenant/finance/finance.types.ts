@@ -11,6 +11,9 @@ export type FinanceAvailableBranch = {
 };
 
 export type FinanceSummaryMetrics = {
+  /** Order-created basis, separate from the payment cash ledger below. */
+  orderTaxableAmount: number;
+  orderTaxAmount: number;
   grossCollected: number;
   refundAmount: number;
   correctionAmount: number;

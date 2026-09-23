@@ -129,7 +129,8 @@ function applyDateRange(
   column:
     | typeof paymentTransactions.paidAt
     | typeof refundRequests.refundedAt
-    | typeof posPaymentAdjustments.occurredAt,
+    | typeof posPaymentAdjustments.occurredAt
+    | typeof orders.createdAt,
   range: DateRange,
   timezone: string,
 ): void {
@@ -486,6 +487,29 @@ async function findPaidOrderCount(
     .where(and(...createPaymentFilters(input, range)));
 
   return toNumber(rows[0]?.count);
+}
+
+async function findOrderTaxMetrics(
+  db: Database,
+  input: FinanceRepositoryInput,
+  range: DateRange,
+): Promise<{ taxableAmount: number; taxAmount: number }> {
+  const filters: SQL[] = [
+    eq(orders.tenantId, input.tenantId),
+    eq(orders.currency, input.currency),
+    inArray(orders.status, ["received", "paid", "delivered"]),
+    isNull(orders.deletedAt),
+  ];
+  applyBranchScope(filters, input, orders.branchId);
+  applyDateRange(filters, orders.createdAt, range, input.timezone);
+  const [row] = await db.select({
+    taxableAmount: sql<string>`coalesce(sum(${orders.taxableAmount}), 0)::text`,
+    taxAmount: sql<string>`coalesce(sum(${orders.taxAmount}), 0)::text`,
+  }).from(orders).where(and(...filters));
+  return {
+    taxableAmount: toMoney(row?.taxableAmount),
+    taxAmount: toMoney(row?.taxAmount),
+  };
 }
 
 async function findPendingRefundMetrics(
@@ -990,7 +1014,7 @@ function createSummary(
   paidOrderCount: number,
   pendingRefunds: { amount: number; count: number },
   outstandingOrders: { amount: number; count: number },
-): FinanceSummaryMetrics {
+): Omit<FinanceSummaryMetrics, "orderTaxableAmount" | "orderTaxAmount"> {
   const ledger = emptyLedger();
 
   for (const group of methodGroups) {
@@ -1118,6 +1142,8 @@ function createEmptySummary(
     availableCurrencies: input.availableCurrencies,
     availableBranches: input.availableBranches,
     summary: {
+      orderTaxableAmount: 0,
+      orderTaxAmount: 0,
       grossCollected: 0,
       refundAmount: 0,
       correctionAmount: 0,
@@ -1162,12 +1188,14 @@ export async function getTenantFinanceSummaryRecord(
     methodAdjustments,
     methodRefunds,
     paidOrderCount,
+    orderTax,
     pendingRefunds,
   ] = await Promise.all([
     findPaymentMethodPayments(db, input, range),
     findPaymentMethodAdjustments(db, input, range),
     findPaymentMethodRefunds(db, input, range),
     findPaidOrderCount(db, input, range),
+    findOrderTaxMetrics(db, input, range),
     findPendingRefundMetrics(db, input),
   ]);
   const [
@@ -1204,13 +1232,11 @@ export async function getTenantFinanceSummaryRecord(
     timezone: input.timezone,
     availableCurrencies: input.availableCurrencies,
     availableBranches: input.availableBranches,
-    summary: createSummary(
-      paymentMethods,
-      methodGroups,
-      paidOrderCount,
-      pendingRefunds,
-      outstandingOrders,
-    ),
+    summary: {
+      ...createSummary(paymentMethods, methodGroups, paidOrderCount, pendingRefunds, outstandingOrders),
+      orderTaxableAmount: orderTax.taxableAmount,
+      orderTaxAmount: orderTax.taxAmount,
+    },
     paymentMethods,
     dailyTrend: combineDailyTrend([
       dailyPayments,
