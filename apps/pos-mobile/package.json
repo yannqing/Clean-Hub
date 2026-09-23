@@ -24,6 +24,7 @@
     "smoke:native-release-validation": "node scripts/native-release-validation.smoke.mjs"
   },
   "dependencies": {
+    "@capacitor-community/sqlite": "^8.1.1",
     "@capacitor/android": "^8.4.1",
     "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
