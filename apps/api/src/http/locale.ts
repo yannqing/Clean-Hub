@@ -1,4 +1,4 @@
-import { defaultLocale, normalizeLocale, type SupportedLocale } from "@cleanhub/i18n";
+import { defaultLocale, normalizeLocale, type SupportedLocale } from "@cleanhub/i18n/locales";
 
 /**
  * The locale an API response should speak.

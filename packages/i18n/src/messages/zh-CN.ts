@@ -363,6 +363,15 @@ export const zhCNMessages = {
       statusUnavailable: "状态不可用。",
       callbackUnavailable: "模拟回调不可用。",
     },
+    notifications: {
+      setupTitle: "开启订单通知",
+      setupBody: "开启后，本设备会收到订单状态和可取件提醒。",
+      deniedBody: "此设备的通知权限已关闭。请在系统设置中开启后，再重新检查。",
+      errorBody: "此设备暂时无法完成通知注册，请检查网络后重试。",
+      enable: "开启通知",
+      checkAgain: "重新检查",
+      tryAgain: "重试",
+    },
   },
   delivery: {
     title: "配送",
@@ -1524,6 +1533,9 @@ export const zhCNMessages = {
       methodMobileMoney: "移动支付",
       methodMixed: "混合",
       methodPayLater: "稍后付款",
+      offlineCatalog: "使用离线目录",
+      offlineCatalogHint:
+        "正在使用 {updatedAt} 同步的本机目录。仅允许离线销售的商品可以结账。",
     },
     catalog: {
       title: "产品服务",

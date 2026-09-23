@@ -374,6 +374,15 @@ export const enMessages = {
       statusUnavailable: "Status unavailable.",
       callbackUnavailable: "Mock callback unavailable.",
     },
+    notifications: {
+      setupTitle: "Turn on order notifications",
+      setupBody: "Once enabled, this device receives order status and ready-for-pickup alerts.",
+      deniedBody: "Notifications are blocked for this device. Allow them in your system settings, then check again.",
+      errorBody: "This device could not register for notifications. Check your connection and try again.",
+      enable: "Turn on notifications",
+      checkAgain: "Check again",
+      tryAgain: "Try again",
+    },
   },
   delivery: {
     title: "Deliveries",
@@ -1596,6 +1605,9 @@ export const enMessages = {
       methodMobileMoney: "Mobile money",
       methodMixed: "Mixed",
       methodPayLater: "Pay later",
+      offlineCatalog: "Offline catalogue",
+      offlineCatalogHint:
+        "Using the local catalogue synced at {updatedAt}. Only products allowed offline can be sold.",
     },
     catalog: {
       title: "Products & services",

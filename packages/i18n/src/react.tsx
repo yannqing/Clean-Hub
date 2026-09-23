@@ -14,12 +14,12 @@ import {
   defaultLocale,
   resolveLocale,
   type SupportedLocale,
-} from "./locales.js";
+} from "./locales";
 import {
   translate,
   type TranslationKey,
   type TranslationParams,
-} from "./translate.js";
+} from "./translate";
 
 export type LocaleStorageAdapter = {
   get(): Promise<string | null>;
@@ -64,15 +64,13 @@ export function I18nProvider({
     let mounted = true;
 
     void storage?.get().then((storedLocale) => {
-      if (!mounted) {
+      if (!mounted || !storedLocale) {
         return;
       }
 
       setLocaleState(
         resolveLocale({
-          // A device locale becomes available only after a WebView hydrates.
-          // Fall back to it when the customer has not picked a language yet.
-          userPreference: storedLocale ?? initialLocale,
+          userPreference: storedLocale,
           tenantDefault: tenantDefaultLocale,
           deviceLocale,
           defaultLocale: fallback,
@@ -83,7 +81,7 @@ export function I18nProvider({
     return () => {
       mounted = false;
     };
-  }, [deviceLocale, fallback, initialLocale, storage, tenantDefaultLocale]);
+  }, [deviceLocale, fallback, storage, tenantDefaultLocale]);
 
   useEffect(() => {
     if (typeof document !== "undefined") {

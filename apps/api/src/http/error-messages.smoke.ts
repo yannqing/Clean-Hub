@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative } from "node:path";
 
-import { supportedLocales } from "@cleanhub/i18n";
+import { supportedLocales } from "@cleanhub/i18n/locales";
 
 import { listLocalizedErrorMessages, localizeErrorMessage } from "./error-messages.js";
 

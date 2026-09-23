@@ -1,4 +1,4 @@
-import type { SupportedLocale } from "@cleanhub/i18n";
+import type { SupportedLocale } from "@cleanhub/i18n/locales";
 
 /**
  * Localised API error messages, keyed by the English message itself.

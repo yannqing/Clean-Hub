@@ -376,6 +376,15 @@ export const frMessages = {
       statusUnavailable: "Statut indisponible.",
       callbackUnavailable: "Callback mock indisponible.",
     },
+    notifications: {
+      setupTitle: "Activer les notifications de commande",
+      setupBody: "Une fois activées, cet appareil recevra l'état des commandes et les alertes de retrait.",
+      deniedBody: "Les notifications sont bloquées sur cet appareil. Autorisez-les dans les réglages système, puis vérifiez de nouveau.",
+      errorBody: "Cet appareil n'a pas pu s'enregistrer pour les notifications. Vérifiez la connexion et réessayez.",
+      enable: "Activer les notifications",
+      checkAgain: "Vérifier de nouveau",
+      tryAgain: "Réessayer",
+    },
   },
   delivery: {
     title: "Livraisons",
@@ -1619,6 +1628,9 @@ export const frMessages = {
       methodMobileMoney: "Mobile money",
       methodMixed: "Mixte",
       methodPayLater: "Paiement differe",
+      offlineCatalog: "Catalogue hors ligne",
+      offlineCatalogHint:
+        "Catalogue local synchronisé à {updatedAt}. Seuls les produits autorisés hors ligne peuvent être vendus.",
     },
     catalog: {
       title: "Produits et services",

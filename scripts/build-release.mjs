@@ -201,6 +201,10 @@ async function writeReleaseCompose() {
       BACKUP_DIRECTORY: /backups
       BACKUP_INTERVAL_SECONDS: \${BACKUP_INTERVAL_SECONDS:-900}
       BACKUP_LOCAL_RETENTION_DAYS: \${BACKUP_LOCAL_RETENTION_DAYS:-7}
+      # The health window must follow the interval. A fixed 30 minutes marks a
+      # daily backup unhealthy for 23 and a half hours out of every 24, and an
+      # alarm that is always ringing is one nobody reads.
+      BACKUP_STALE_AFTER_MINUTES: \${BACKUP_STALE_AFTER_MINUTES:-30}
     entrypoint:
       - /bin/sh
       - /opt/cleanhub/postgres/backup-loop.sh
@@ -210,7 +214,7 @@ async function writeReleaseCompose() {
     healthcheck:
       test:
         - CMD-SHELL
-        - 'test -n "$${composeDollar}(find /backups/.last-success -mmin -30 -print -quit 2>/dev/null)"'
+        - 'test -n "$${composeDollar}(find /backups/.last-success -mmin -$${composeDollar}{BACKUP_STALE_AFTER_MINUTES:-30} -print -quit 2>/dev/null)"'
       interval: 60s
       timeout: 5s
       retries: 3
@@ -517,7 +521,7 @@ async function writeReleaseCompose() {
       - "443:443/udp"
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - ${DOWNLOADS_HOST_PATH:-/opt/cleanhub/shared/downloads}:/srv/downloads:ro
+      - \${DOWNLOADS_HOST_PATH:-/opt/cleanhub/shared/downloads}:/srv/downloads:ro
       - cleanhub-caddy-data:/data
       - cleanhub-caddy-config:/config
     depends_on:
