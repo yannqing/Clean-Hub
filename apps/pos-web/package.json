@@ -24,7 +24,7 @@
     "smoke:notice-labels": "tsx src/lib/notice-labels.smoke.ts"
   },
   "dependencies": {
-    "@capacitor/core": "^8.4.1",
+    "@capacitor/core": "^8.5.2",
     "@capacitor/device": "^8.0.3",
     "@capacitor/preferences": "^8.0.1",
     "@cleanhub/api-client": "workspace:*",

@@ -24,16 +24,17 @@
   },
   "dependencies": {
     "@capacitor-community/bluetooth-le": "^8.2.0",
-    "@capacitor/android": "^8.1.0",
+    "@capacitor-firebase/messaging": "^8.5.2",
+    "@capacitor/android": "^8.5.2",
     "@capacitor/camera": "^8.2.0",
-    "@capacitor/cli": "^8.1.0",
-    "@capacitor/core": "^8.1.0",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
     "@capacitor/geolocation": "^8.2.0",
-    "@capacitor/ios": "^8.1.0",
+    "@capacitor/ios": "^8.5.2",
     "@capacitor/preferences": "^8.0.1",
-    "@capacitor/push-notifications": "^8.1.1",
     "@cleanhub/hardware": "workspace:*",
-    "@cleanhub/offline": "workspace:*"
+    "@cleanhub/offline": "workspace:*",
+    "firebase": "^12.19.0"
   },
   "devDependencies": {
     "@types/node": "^20",
