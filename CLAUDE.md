@@ -164,6 +164,25 @@ implementation of the same POS in Kotlin, roughly 10k lines under
 - `NativePosSync.kt` — snapshot refresh and offline checkout replay
 - `NativePosHardware.kt` — T1101 printer, scanner and cash drawer
 - `NativePosApiClient.kt` / `NativePosSession.kt` — transport and credentials
+- `NativePosStrings.kt` — every cashier-facing string, in zh-CN, en and fr
+
+**All user-facing copy lives in `NativePosStrings.kt`.** Do not write a
+display string inline; add a key and its three translations, then read it
+through `copy.<key>`. Two rules follow from how that file is built:
+
+- It is a **map**, not a data class with one parameter per string. A data
+  class stops loading past roughly 254 parameters
+  (`ClassFormatError: Too many arguments in method signature`), which
+  compiles cleanly and only fails on a running terminal. `NativePosCopyTest`
+  enforces what the compiler no longer can: same keys in all three
+  languages, every accessor resolving, matching `%s`/`%d` placeholders.
+- Classes built once and kept — `NativePosHardware`, `NativePosDatabase`,
+  `NativePosApiClient` — take a **language supplier** (`() -> String?`),
+  not a fixed language. The cashier can switch language at the PIN screen
+  at any time, and a handover must change the printer's error text too.
+
+Server-supplied error messages are still shown as the API sends them; the
+API is not localised per terminal.
 
 **Server business rules are duplicated here.** Changing any of these in
 `apps/api` or `packages/domain` without changing the Kotlin lets the two drift
