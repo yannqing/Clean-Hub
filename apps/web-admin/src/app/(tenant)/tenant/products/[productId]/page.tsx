@@ -5,8 +5,8 @@ import { getAuthSessionQuery } from "@/features/auth/queries";
 import { ProductCreateView } from "@/features/tenant/products/components";
 import {
   getProductDetailQuery,
-  getProductFormDatasetQuery,
 } from "@/features/tenant/products/queries";
+import { getProductFormDatasetQuery } from "@/features/tenant/products/queries/get-product-form-dataset.query";
 import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
 
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;

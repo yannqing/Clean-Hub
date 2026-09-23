@@ -1,5 +1,5 @@
 import { ProductCreateView } from "@/features/tenant/products/components";
-import { getProductFormDatasetQuery } from "@/features/tenant/products/queries";
+import { getProductFormDatasetQuery } from "@/features/tenant/products/queries/get-product-form-dataset.query";
 import { getTenantServerApiRequestOptions } from "@/features/tenant/server/api-request-options";
 
 export default async function NewProductPage() {

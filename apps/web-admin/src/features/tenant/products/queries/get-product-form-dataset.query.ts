@@ -1,3 +1,5 @@
+import "server-only";
+
 import { webAdminApi } from "@/lib/api-client";
 
 import type { ApiRequestOptions } from "@cleanhub/api-client";
