@@ -667,10 +667,132 @@ internal class NativePosCopy(
     val customerIntakePrefix: String get() = get("customerIntakePrefix")
     val verifyAndSelectStore: String get() = get("verifyAndSelectStore")
     val reissueCredential: String get() = get("reissueCredential")
+    val hardwareServiceDisconnected: String get() = get("hardwareServiceDisconnected")
+    val nearbyDevicesForPaired: String get() = get("nearbyDevicesForPaired")
+    val bluetoothUnsupported: String get() = get("bluetoothUnsupported")
+    val bluetoothOff: String get() = get("bluetoothOff")
+    val bluetoothDeviceFallback: String get() = get("bluetoothDeviceFallback")
+    val noPermissionReadPaired: String get() = get("noPermissionReadPaired")
+    val needDefaultPrinterRegistered: String get() = get("needDefaultPrinterRegistered")
+    val nearbyDevicesToConnect: String get() = get("nearbyDevicesToConnect")
+    val boundPrinterNotPaired: String get() = get("boundPrinterNotPaired")
+    val bluetoothPrinterReady: String get() = get("bluetoothPrinterReady")
+    val bluetoothAddressInvalid: String get() = get("bluetoothAddressInvalid")
+    val noPermissionConnectBluetooth: String get() = get("noPermissionConnectBluetooth")
+    val printServiceNotConnected: String get() = get("printServiceNotConnected")
+    val notDefaultPrinterQueued: String get() = get("notDefaultPrinterQueued")
+    val builtInPrinterReady: String get() = get("builtInPrinterReady")
+    val printServiceDisconnected: String get() = get("printServiceDisconnected")
+    val printerNotSupported: String get() = get("printerNotSupported")
+    val printContentEmpty: String get() = get("printContentEmpty")
+    val printCopiesRange: String get() = get("printCopiesRange")
+    val receiptSentTo: String get() = get("receiptSentTo")
+    val builtInScannerReady: String get() = get("builtInScannerReady")
+    val scannerNeedsForeground: String get() = get("scannerNeedsForeground")
+    val noScannerOrCamera: String get() = get("noScannerOrCamera")
+    val scanServiceNotConnected: String get() = get("scanServiceNotConnected")
+    val scannerStarted: String get() = get("scannerStarted")
+    val scanServiceDisconnected: String get() = get("scanServiceDisconnected")
+    val drawerServiceNotConnected: String get() = get("drawerServiceNotConnected")
+    val drawerServiceDisconnected: String get() = get("drawerServiceDisconnected")
+    val printContentTooLong: String get() = get("printContentTooLong")
+    val bluetoothPrinterFallback: String get() = get("bluetoothPrinterFallback")
+    val cannotConnectBluetoothPrinter: String get() = get("cannotConnectBluetoothPrinter")
+    val hardwareReady: String get() = get("hardwareReady")
+    val printerCoverOpenShort: String get() = get("printerCoverOpenShort")
+    val printerOutOfPaperShort: String get() = get("printerOutOfPaperShort")
+    val printerOverheatedShort: String get() = get("printerOverheatedShort")
+    val printerBusyShort: String get() = get("printerBusyShort")
+    val batteryLowShort: String get() = get("batteryLowShort")
+    val hardwareStatusAbnormal: String get() = get("hardwareStatusAbnormal")
+    val printerBusy: String get() = get("printerBusy")
+    val batteryLowNoPrint: String get() = get("batteryLowNoPrint")
+    val hardwareTimeout: String get() = get("hardwareTimeout")
+    val hardwareUnsupported: String get() = get("hardwareUnsupported")
+    val hardwareServiceNotConnected: String get() = get("hardwareServiceNotConnected")
+    val hardwareOperationFailed: String get() = get("hardwareOperationFailed")
+    val printCopiesRangeTen: String get() = get("printCopiesRangeTen")
+    val closedWhilePrinting: String get() = get("closedWhilePrinting")
+    val localDataExpired: String get() = get("localDataExpired")
+    val noValidShiftOrDrawer: String get() = get("noValidShiftOrDrawer")
+    val totalMustBePositive: String get() = get("totalMustBePositive")
+    val tenderBelowTotalShort: String get() = get("tenderBelowTotalShort")
+    val discountReasonRequired: String get() = get("discountReasonRequired")
+    val receiptContentEmpty: String get() = get("receiptContentEmpty")
+    val ticketHasNoBillableItems: String get() = get("ticketHasNoBillableItems")
+    val ticketAlreadyClosed: String get() = get("ticketAlreadyClosed")
+    val cartCurrencyMismatch: String get() = get("cartCurrencyMismatch")
+    val catalogChanged: String get() = get("catalogChanged")
+    val offlineBufferExhausted: String get() = get("offlineBufferExhausted")
+    val apiNotConfigured: String get() = get("apiNotConfigured")
+    val apiRequestFailed: String get() = get("apiRequestFailed")
+    val networkInterrupted: String get() = get("networkInterrupted")
+    val serviceItemFallback: String get() = get("serviceItemFallback")
     val openTicket: String get() = get("openTicket")
 }
 
 private val COPY_ZH_VALUES: Map<String, String> = mapOf(
+    "printCopiesRangeTen" to "打印份数应为 1–10。",
+    "closedWhilePrinting" to "应用在打印过程中关闭，请由收银员确认后手动重试。",
+    "localDataExpired" to "本机 POS 数据已过期，请恢复网络后重新同步。",
+    "noValidShiftOrDrawer" to "没有有效的班次或钱箱会话，请先开始班次并打开钱箱。",
+    "totalMustBePositive" to "应收金额必须大于零。",
+    "tenderBelowTotalShort" to "实收现金不能少于应收金额。",
+    "discountReasonRequired" to "使用优惠码时必须填写至少 3 个字符的原因。",
+    "receiptContentEmpty" to "收据内容不能为空。",
+    "ticketHasNoBillableItems" to "工单没有可结算的服务项目。",
+    "ticketAlreadyClosed" to "该工单已经结束，不能再次收款。",
+    "cartCurrencyMismatch" to "购物车币种与当前门店币种不一致。",
+    "catalogChanged" to "商品目录已变化，请恢复网络后重试。",
+    "offlineBufferExhausted" to "离线库存缓冲不足，不能继续销售该商品。",
+    "apiNotConfigured" to "该 APK 没有配置 POS API 地址。",
+    "apiRequestFailed" to "POS API 请求失败（HTTP %d）。",
+    "networkInterrupted" to "网络连接中断，请稍后重试。",
+    "serviceItemFallback" to "服务项目",
+    "hardwareServiceDisconnected" to "硬件服务已断开",
+    "nearbyDevicesForPaired" to "请先允许“附近设备”权限，才能读取已配对的蓝牙打印机。",
+    "bluetoothUnsupported" to "当前设备不支持蓝牙。",
+    "bluetoothOff" to "蓝牙未开启，请先在系统设置中打开蓝牙。",
+    "bluetoothDeviceFallback" to "蓝牙设备 %s",
+    "noPermissionReadPaired" to "没有权限读取已配对蓝牙设备。",
+    "needDefaultPrinterRegistered" to "请先由店主或经理登记并设定默认收据打印机。",
+    "nearbyDevicesToConnect" to "请先允许“附近设备”权限，才能连接蓝牙打印机。",
+    "boundPrinterNotPaired" to "已绑定的蓝牙打印机未处于系统配对状态。",
+    "bluetoothPrinterReady" to "蓝牙打印机已就绪。",
+    "bluetoothAddressInvalid" to "蓝牙打印机地址无效，请重新绑定。",
+    "noPermissionConnectBluetooth" to "没有权限连接蓝牙打印机。",
+    "printServiceNotConnected" to "%s 打印服务未连接。",
+    "notDefaultPrinterQueued" to "当前设备不是后台登记的默认收据打印机，收据继续保留在本地队列。",
+    "builtInPrinterReady" to "内置打印机已就绪。",
+    "printServiceDisconnected" to "打印服务已断开，请刷新硬件状态后重试。",
+    "printerNotSupported" to "所选打印机不是当前设备支持的打印机。",
+    "printContentEmpty" to "打印内容不能为空。",
+    "printCopiesRange" to "打印份数应为 1–5。",
+    "receiptSentTo" to "收据已发送到 %s。",
+    "builtInScannerReady" to "内置扫码器已就绪，请使用扫描头扫描条码。",
+    "scannerNeedsForeground" to "POS-T8 扫码需要从当前界面启动系统扫码器。",
+    "noScannerOrCamera" to "未检测到可用的内置扫码器或摄像头。",
+    "scanServiceNotConnected" to "%s 扫码服务未连接。",
+    "scannerStarted" to "扫码器已启动，请扫描条码。",
+    "scanServiceDisconnected" to "扫码服务已断开，请刷新硬件状态后重试。",
+    "drawerServiceNotConnected" to "%s 钱箱服务未连接。",
+    "drawerServiceDisconnected" to "钱箱服务已断开，请刷新硬件状态后重试。",
+    "printContentTooLong" to "打印内容超过允许长度。",
+    "bluetoothPrinterFallback" to "蓝牙打印机",
+    "cannotConnectBluetoothPrinter" to "无法连接蓝牙打印机，请确认设备已开机且仍保持配对。",
+    "hardwareReady" to "就绪",
+    "printerCoverOpenShort" to "打印机仓盖未关闭",
+    "printerOutOfPaperShort" to "打印机缺纸",
+    "printerOverheatedShort" to "打印机温度过高",
+    "printerBusyShort" to "打印机忙",
+    "batteryLowShort" to "设备电量过低",
+    "hardwareStatusAbnormal" to "硬件状态异常（%d）",
+    "printerBusy" to "打印机正在处理其他任务，请稍后重试。",
+    "batteryLowNoPrint" to "设备电量过低，暂时无法打印。",
+    "hardwareTimeout" to "硬件响应超时，请检查设备后重试。",
+    "hardwareUnsupported" to "当前设备不支持此硬件功能。",
+    "hardwareServiceNotConnected" to "%s 硬件服务未连接。",
+    "hardwareOperationFailed" to "%s 硬件操作失败（%d）。",
     "verifyAndSelectStore" to "验证并选择门店",
     "reissueCredential" to "重新签发终端凭证",
     "customerIntakePrefix" to "客户 %s · 服务开单",
@@ -1307,6 +1429,67 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_EN_VALUES: Map<String, String> = mapOf(
+    "printCopiesRangeTen" to "Copies must be between 1 and 10.",
+    "closedWhilePrinting" to "The app closed while printing. A cashier should check and retry by hand.",
+    "localDataExpired" to "This terminal's POS data has expired. Restore the network and sync again.",
+    "noValidShiftOrDrawer" to "No valid shift or drawer session. Clock in and open the drawer first.",
+    "totalMustBePositive" to "The amount due must be more than zero.",
+    "tenderBelowTotalShort" to "Cash received cannot be less than the amount due.",
+    "discountReasonRequired" to "A reason of at least 3 characters is required to use a discount code.",
+    "receiptContentEmpty" to "The receipt has no content.",
+    "ticketHasNoBillableItems" to "This ticket has no service items to charge.",
+    "ticketAlreadyClosed" to "This ticket is already closed and cannot be charged again.",
+    "cartCurrencyMismatch" to "The cart's currency does not match this store's.",
+    "catalogChanged" to "The catalogue changed. Restore the network and try again.",
+    "offlineBufferExhausted" to "The offline stock buffer is used up; this product cannot be sold further.",
+    "apiNotConfigured" to "This build has no POS API address configured.",
+    "apiRequestFailed" to "The POS API request failed (HTTP %d).",
+    "networkInterrupted" to "The connection dropped. Try again shortly.",
+    "serviceItemFallback" to "Service item",
+    "hardwareServiceDisconnected" to "The hardware service disconnected",
+    "nearbyDevicesForPaired" to "Allow the “Nearby devices” permission to read paired Bluetooth printers.",
+    "bluetoothUnsupported" to "This device does not support Bluetooth.",
+    "bluetoothOff" to "Bluetooth is off. Turn it on in the system settings.",
+    "bluetoothDeviceFallback" to "Bluetooth device %s",
+    "noPermissionReadPaired" to "No permission to read paired Bluetooth devices.",
+    "needDefaultPrinterRegistered" to "An owner or manager must register and set a default receipt printer first.",
+    "nearbyDevicesToConnect" to "Allow the “Nearby devices” permission to connect a Bluetooth printer.",
+    "boundPrinterNotPaired" to "The bound Bluetooth printer is no longer paired in the system.",
+    "bluetoothPrinterReady" to "The Bluetooth printer is ready.",
+    "bluetoothAddressInvalid" to "The Bluetooth printer address is not valid. Bind it again.",
+    "noPermissionConnectBluetooth" to "No permission to connect to the Bluetooth printer.",
+    "printServiceNotConnected" to "The %s print service is not connected.",
+    "notDefaultPrinterQueued" to "This device is not the registered default receipt printer; the receipt stays in this terminal's queue.",
+    "builtInPrinterReady" to "The built-in printer is ready.",
+    "printServiceDisconnected" to "The print service disconnected. Refresh the hardware status and try again.",
+    "printerNotSupported" to "The selected printer is not supported by this device.",
+    "printContentEmpty" to "There is nothing to print.",
+    "printCopiesRange" to "Copies must be between 1 and 5.",
+    "receiptSentTo" to "The receipt was sent to %s.",
+    "builtInScannerReady" to "The built-in scanner is ready. Use the scan head to read a barcode.",
+    "scannerNeedsForeground" to "On the POS-T8 the system scanner must be started from this screen.",
+    "noScannerOrCamera" to "No built-in scanner or camera was detected.",
+    "scanServiceNotConnected" to "The %s scan service is not connected.",
+    "scannerStarted" to "The scanner is running. Scan a barcode.",
+    "scanServiceDisconnected" to "The scan service disconnected. Refresh the hardware status and try again.",
+    "drawerServiceNotConnected" to "The %s cash drawer service is not connected.",
+    "drawerServiceDisconnected" to "The cash drawer service disconnected. Refresh the hardware status and try again.",
+    "printContentTooLong" to "The content is longer than printing allows.",
+    "bluetoothPrinterFallback" to "Bluetooth printer",
+    "cannotConnectBluetoothPrinter" to "Cannot reach the Bluetooth printer. Check that it is switched on and still paired.",
+    "hardwareReady" to "Ready",
+    "printerCoverOpenShort" to "The printer cover is open",
+    "printerOutOfPaperShort" to "The printer is out of paper",
+    "printerOverheatedShort" to "The printer is too hot",
+    "printerBusyShort" to "The printer is busy",
+    "batteryLowShort" to "The battery is too low",
+    "hardwareStatusAbnormal" to "Hardware fault (%d)",
+    "printerBusy" to "The printer is busy with another job. Try again shortly.",
+    "batteryLowNoPrint" to "The battery is too low to print.",
+    "hardwareTimeout" to "The hardware did not respond. Check the device and try again.",
+    "hardwareUnsupported" to "This device does not support that hardware function.",
+    "hardwareServiceNotConnected" to "The %s hardware service is not connected.",
+    "hardwareOperationFailed" to "The %s hardware operation failed (%d).",
     "verifyAndSelectStore" to "Verify and choose a store",
     "reissueCredential" to "Reissue the terminal credential",
     "customerIntakePrefix" to "Customer %s · start a ticket",
@@ -1943,6 +2126,67 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_FR_VALUES: Map<String, String> = mapOf(
+    "printCopiesRangeTen" to "Le nombre de copies doit être entre 1 et 10.",
+    "closedWhilePrinting" to "L'application s'est fermée pendant l'impression. Un caissier doit vérifier et relancer manuellement.",
+    "localDataExpired" to "Les données POS de cette caisse ont expiré. Rétablissez le réseau et synchronisez.",
+    "noValidShiftOrDrawer" to "Aucun service ni session de tiroir valide. Pointez et ouvrez le tiroir d'abord.",
+    "totalMustBePositive" to "Le montant dû doit être supérieur à zéro.",
+    "tenderBelowTotalShort" to "Les espèces reçues ne peuvent pas être inférieures au montant dû.",
+    "discountReasonRequired" to "Un motif d'au moins 3 caractères est obligatoire pour utiliser un code de remise.",
+    "receiptContentEmpty" to "Le reçu n'a aucun contenu.",
+    "ticketHasNoBillableItems" to "Ce bon n'a aucun article à facturer.",
+    "ticketAlreadyClosed" to "Ce bon est déjà clôturé et ne peut pas être facturé de nouveau.",
+    "cartCurrencyMismatch" to "La devise du panier ne correspond pas à celle du magasin.",
+    "catalogChanged" to "Le catalogue a changé. Rétablissez le réseau et réessayez.",
+    "offlineBufferExhausted" to "La réserve de stock hors ligne est épuisée ; ce produit ne peut plus être vendu.",
+    "apiNotConfigured" to "Cette version n'a pas d'adresse d'API POS configurée.",
+    "apiRequestFailed" to "La requête vers l'API POS a échoué (HTTP %d).",
+    "networkInterrupted" to "La connexion a été interrompue. Réessayez sous peu.",
+    "serviceItemFallback" to "Article de service",
+    "hardwareServiceDisconnected" to "Le service matériel s'est déconnecté",
+    "nearbyDevicesForPaired" to "Autorisez « Appareils à proximité » pour lire les imprimantes Bluetooth associées.",
+    "bluetoothUnsupported" to "Cet appareil ne prend pas en charge le Bluetooth.",
+    "bluetoothOff" to "Le Bluetooth est désactivé. Activez-le dans les réglages.",
+    "bluetoothDeviceFallback" to "Appareil Bluetooth %s",
+    "noPermissionReadPaired" to "Pas d'autorisation pour lire les appareils Bluetooth associés.",
+    "needDefaultPrinterRegistered" to "Un propriétaire ou responsable doit d'abord enregistrer une imprimante de reçus par défaut.",
+    "nearbyDevicesToConnect" to "Autorisez « Appareils à proximité » pour connecter une imprimante Bluetooth.",
+    "boundPrinterNotPaired" to "L'imprimante Bluetooth liée n'est plus associée dans le système.",
+    "bluetoothPrinterReady" to "L'imprimante Bluetooth est prête.",
+    "bluetoothAddressInvalid" to "L'adresse de l'imprimante Bluetooth n'est pas valide. Liez-la de nouveau.",
+    "noPermissionConnectBluetooth" to "Pas d'autorisation pour se connecter à l'imprimante Bluetooth.",
+    "printServiceNotConnected" to "Le service d'impression %s n'est pas connecté.",
+    "notDefaultPrinterQueued" to "Cet appareil n'est pas l'imprimante de reçus par défaut enregistrée ; le reçu reste dans la file de cette caisse.",
+    "builtInPrinterReady" to "L'imprimante intégrée est prête.",
+    "printServiceDisconnected" to "Le service d'impression s'est déconnecté. Actualisez l'état du matériel et réessayez.",
+    "printerNotSupported" to "L'imprimante choisie n'est pas prise en charge par cet appareil.",
+    "printContentEmpty" to "Rien à imprimer.",
+    "printCopiesRange" to "Le nombre de copies doit être entre 1 et 5.",
+    "receiptSentTo" to "Le reçu a été envoyé à %s.",
+    "builtInScannerReady" to "Le scanner intégré est prêt. Utilisez la tête de lecture.",
+    "scannerNeedsForeground" to "Sur le POS-T8, le scanner système doit être lancé depuis cet écran.",
+    "noScannerOrCamera" to "Aucun scanner intégré ni appareil photo détecté.",
+    "scanServiceNotConnected" to "Le service de lecture %s n'est pas connecté.",
+    "scannerStarted" to "Le scanner est actif. Scannez un code-barres.",
+    "scanServiceDisconnected" to "Le service de lecture s'est déconnecté. Actualisez l'état du matériel et réessayez.",
+    "drawerServiceNotConnected" to "Le service de tiroir-caisse %s n'est pas connecté.",
+    "drawerServiceDisconnected" to "Le service du tiroir-caisse s'est déconnecté. Actualisez l'état du matériel et réessayez.",
+    "printContentTooLong" to "Le contenu dépasse la longueur autorisée.",
+    "bluetoothPrinterFallback" to "Imprimante Bluetooth",
+    "cannotConnectBluetoothPrinter" to "Impossible de joindre l'imprimante Bluetooth. Vérifiez qu'elle est allumée et toujours associée.",
+    "hardwareReady" to "Prêt",
+    "printerCoverOpenShort" to "Le capot de l'imprimante est ouvert",
+    "printerOutOfPaperShort" to "L'imprimante n'a plus de papier",
+    "printerOverheatedShort" to "L'imprimante est trop chaude",
+    "printerBusyShort" to "L'imprimante est occupée",
+    "batteryLowShort" to "La batterie est trop faible",
+    "hardwareStatusAbnormal" to "Panne matérielle (%d)",
+    "printerBusy" to "L'imprimante traite une autre tâche. Réessayez sous peu.",
+    "batteryLowNoPrint" to "La batterie est trop faible pour imprimer.",
+    "hardwareTimeout" to "Le matériel n'a pas répondu. Vérifiez l'appareil et réessayez.",
+    "hardwareUnsupported" to "Cet appareil ne prend pas en charge cette fonction.",
+    "hardwareServiceNotConnected" to "Le service matériel %s n'est pas connecté.",
+    "hardwareOperationFailed" to "L'opération matérielle %s a échoué (%d).",
     "verifyAndSelectStore" to "Vérifier et choisir un magasin",
     "reissueCredential" to "Réémettre les identifiants",
     "customerIntakePrefix" to "Client %s · créer un bon",

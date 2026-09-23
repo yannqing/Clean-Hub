@@ -53,7 +53,7 @@ class NativePosApiClient(private val session: NativePosSession) {
         body: JSONObject? = null,
         retryAfterRefresh: Boolean = true,
     ): JSONObject {
-        if (!configured()) throw NativePosApiException(0, "POS_API_NOT_CONFIGURED", "该 APK 没有配置 POS API 地址。")
+        if (!configured()) throw NativePosApiException(0, "POS_API_NOT_CONFIGURED", nativePosCopy(session.pinLanguageCode()).apiNotConfigured)
         val response = execute(method, path, body)
         if (response.status == 401 && retryAfterRefresh && path != "/auth/refresh") {
             // A refresh that fails means the session is gone. Retrying the
@@ -69,7 +69,7 @@ class NativePosApiClient(private val session: NativePosSession) {
                 response.status,
                 error?.optString("code")?.takeIf { it.isNotBlank() },
                 error?.optString("message")?.takeIf { it.isNotBlank() }
-                    ?: "POS API 请求失败（HTTP ${response.status}）。",
+                    ?: nativePosCopy(session.pinLanguageCode()).apiRequestFailed.format(response.status),
             )
         }
         return response.body.toJsonOrNull() ?: JSONObject()
@@ -115,7 +115,7 @@ class NativePosApiClient(private val session: NativePosSession) {
             throw NativePosApiException(
                 0,
                 "NETWORK_ERROR",
-                error.message?.takeIf { it.isNotBlank() } ?: "网络连接中断，请稍后重试。",
+                error.message?.takeIf { it.isNotBlank() } ?: nativePosCopy(session.pinLanguageCode()).networkInterrupted,
             )
         } finally {
             connection.disconnect()

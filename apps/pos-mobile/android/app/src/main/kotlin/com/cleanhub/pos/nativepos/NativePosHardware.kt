@@ -109,8 +109,18 @@ private enum class NativeHardwareProfile(
     ),
 }
 
-internal class NativePosHardware(context: Context) {
+internal class NativePosHardware(
+    context: Context,
+    /**
+     * Read per call rather than captured: the hardware object is remembered
+     * for the life of the app, but the cashier can change language at the PIN
+     * screen at any point, and a jammed printer must say so in the language
+     * the person holding it chose.
+     */
+    private val languageCode: () -> String? = { null },
+) {
     private val appContext = context.applicationContext
+    private val copy: NativePosCopy get() = nativePosCopy(languageCode())
     private val profile = resolveProfile()
     private val scanListeners = linkedSetOf<(String) -> Unit>()
 
@@ -189,7 +199,7 @@ internal class NativePosHardware(context: Context) {
             baseStatus(true, code, printerStatusText(code))
         } catch (_: RemoteException) {
             printerService = null
-            baseStatus(false, null, "硬件服务已断开")
+            baseStatus(false, null, copy.hardwareServiceDisconnected)
         }
     }
 
@@ -203,12 +213,12 @@ internal class NativePosHardware(context: Context) {
     /** Call on a worker dispatcher. This is passive and never scans or pairs nearby devices. */
     fun pairedBluetoothPrinters(): List<NativeBluetoothPrinter> {
         if (!hasBluetoothConnectPermission()) {
-            throw NativePosValidationException("请先允许“附近设备”权限，才能读取已配对的蓝牙打印机。")
+            throw NativePosValidationException(copy.nearbyDevicesForPaired)
         }
         val adapter = BluetoothAdapter.getDefaultAdapter()
-            ?: throw NativePosValidationException("当前设备不支持蓝牙。")
+            ?: throw NativePosValidationException(copy.bluetoothUnsupported)
         if (!adapter.isEnabled) {
-            throw NativePosValidationException("蓝牙未开启，请先在系统设置中打开蓝牙。")
+            throw NativePosValidationException(copy.bluetoothOff)
         }
         return try {
             adapter.bondedDevices
@@ -217,53 +227,53 @@ internal class NativePosHardware(context: Context) {
                     NativeBluetoothPrinter(
                         id = "$BLUETOOTH_PRINTER_PREFIX${device.address}",
                         name = device.name?.trim().takeUnless { it.isNullOrBlank() }
-                            ?: "蓝牙设备 ${device.address}",
+                            ?: copy.bluetoothDeviceFallback.format(device.address),
                     )
                 }
                 .sortedBy { it.name.lowercase() }
         } catch (_: SecurityException) {
-            throw NativePosValidationException("没有权限读取已配对蓝牙设备。")
+            throw NativePosValidationException(copy.noPermissionReadPaired)
         }
     }
 
     /** Check the selected print route before claiming a durable receipt job. */
     fun printerReadiness(printerId: String?): NativeHardwareOperationResult {
         if (printerId.isNullOrBlank()) {
-            return NativeHardwareOperationResult(false, "请先由店主或经理登记并设定默认收据打印机。")
+            return NativeHardwareOperationResult(false, copy.needDefaultPrinterRegistered)
         }
         if (isBluetoothPrinterId(printerId)) {
             if (!hasBluetoothConnectPermission()) {
-                return NativeHardwareOperationResult(false, "请先允许“附近设备”权限，才能连接蓝牙打印机。")
+                return NativeHardwareOperationResult(false, copy.nearbyDevicesToConnect)
             }
             val adapter = BluetoothAdapter.getDefaultAdapter()
-                ?: return NativeHardwareOperationResult(false, "当前设备不支持蓝牙。")
-            if (!adapter.isEnabled) return NativeHardwareOperationResult(false, "蓝牙未开启，请先在系统设置中打开蓝牙。")
+                ?: return NativeHardwareOperationResult(false, copy.bluetoothUnsupported)
+            if (!adapter.isEnabled) return NativeHardwareOperationResult(false, copy.bluetoothOff)
             return try {
                 val address = printerId.removePrefix(BLUETOOTH_PRINTER_PREFIX)
                 val device = adapter.getRemoteDevice(address)
                 if (device.bondState != BluetoothDevice.BOND_BONDED) {
-                    NativeHardwareOperationResult(false, "已绑定的蓝牙打印机未处于系统配对状态。")
+                    NativeHardwareOperationResult(false, copy.boundPrinterNotPaired)
                 } else {
-                    NativeHardwareOperationResult(true, "蓝牙打印机已就绪。")
+                    NativeHardwareOperationResult(true, copy.bluetoothPrinterReady)
                 }
             } catch (_: IllegalArgumentException) {
-                NativeHardwareOperationResult(false, "蓝牙打印机地址无效，请重新绑定。")
+                NativeHardwareOperationResult(false, copy.bluetoothAddressInvalid)
             } catch (_: SecurityException) {
-                NativeHardwareOperationResult(false, "没有权限连接蓝牙打印机。")
+                NativeHardwareOperationResult(false, copy.noPermissionConnectBluetooth)
             }
         }
         val service = printerService
-            ?: return NativeHardwareOperationResult(false, "${profile.displayName} 打印服务未连接。")
+            ?: return NativeHardwareOperationResult(false, copy.printServiceNotConnected.format(profile.displayName))
         if (printerId != profile.printerId) {
-            return NativeHardwareOperationResult(false, "当前设备不是后台登记的默认收据打印机，收据继续保留在本地队列。")
+            return NativeHardwareOperationResult(false, copy.notDefaultPrinterQueued)
         }
         return try {
             val code = service.printerStatus
-            if (code == 0) NativeHardwareOperationResult(true, "内置打印机已就绪。")
+            if (code == 0) NativeHardwareOperationResult(true, copy.builtInPrinterReady)
             else NativeHardwareOperationResult(false, printerErrorMessage(code))
         } catch (_: RemoteException) {
             printerService = null
-            NativeHardwareOperationResult(false, "打印服务已断开，请刷新硬件状态后重试。")
+            NativeHardwareOperationResult(false, copy.printServiceDisconnected)
         }
     }
 
@@ -275,12 +285,12 @@ internal class NativePosHardware(context: Context) {
     ): NativeHardwareOperationResult {
         if (isBluetoothPrinterId(printerId)) return printBluetoothReceipt(content, copies, printerId.orEmpty())
         if (printerId != profile.printerId) {
-            return NativeHardwareOperationResult(false, "所选打印机不是当前设备支持的打印机。")
+            return NativeHardwareOperationResult(false, copy.printerNotSupported)
         }
         val service = printerService
-            ?: return NativeHardwareOperationResult(false, "${profile.displayName} 打印服务未连接。")
-        if (content.isBlank()) return NativeHardwareOperationResult(false, "打印内容不能为空。")
-        if (copies !in 1..5) return NativeHardwareOperationResult(false, "打印份数应为 1–5。")
+            ?: return NativeHardwareOperationResult(false, copy.printServiceNotConnected.format(profile.displayName))
+        if (content.isBlank()) return NativeHardwareOperationResult(false, copy.printContentEmpty)
+        if (copies !in 1..5) return NativeHardwareOperationResult(false, copy.printCopiesRange)
         return try {
             val printerStatus = service.printerStatus
             if (printerStatus != 0) {
@@ -297,10 +307,10 @@ internal class NativePosHardware(context: Context) {
                 val finishResult = service.printEndAutoOut()
                 if (finishResult != 0) return NativeHardwareOperationResult(false, printerErrorMessage(finishResult))
             }
-            NativeHardwareOperationResult(true, "收据已发送到 ${profile.printerName}。")
+            NativeHardwareOperationResult(true, copy.receiptSentTo.format(profile.printerName))
         } catch (_: RemoteException) {
             printerService = null
-            NativeHardwareOperationResult(false, "打印服务已断开，请刷新硬件状态后重试。")
+            NativeHardwareOperationResult(false, copy.printServiceDisconnected)
         }
     }
 
@@ -308,40 +318,40 @@ internal class NativePosHardware(context: Context) {
     fun requestScan(): NativeHardwareOperationResult {
         if (profile == NativeHardwareProfile.T8) {
             return when {
-                keyboardScannerAvailable() -> NativeHardwareOperationResult(true, "内置扫码器已就绪，请使用扫描头扫描条码。")
-                scannerActivityIntent() != null -> NativeHardwareOperationResult(false, "POS-T8 扫码需要从当前界面启动系统扫码器。")
-                else -> NativeHardwareOperationResult(false, "未检测到可用的内置扫码器或摄像头。")
+                keyboardScannerAvailable() -> NativeHardwareOperationResult(true, copy.builtInScannerReady)
+                scannerActivityIntent() != null -> NativeHardwareOperationResult(false, copy.scannerNeedsForeground)
+                else -> NativeHardwareOperationResult(false, copy.noScannerOrCamera)
             }
         }
         val service = printerService
-            ?: return NativeHardwareOperationResult(false, "${profile.displayName} 扫码服务未连接。")
+            ?: return NativeHardwareOperationResult(false, copy.scanServiceNotConnected.format(profile.displayName))
         return try {
             val result = service.triggerQscScan()
             if (result == 0) {
-                NativeHardwareOperationResult(true, "扫码器已启动，请扫描条码。")
+                NativeHardwareOperationResult(true, copy.scannerStarted)
             } else {
                 NativeHardwareOperationResult(false, printerErrorMessage(result))
             }
         } catch (_: RemoteException) {
             printerService = null
-            NativeHardwareOperationResult(false, "扫码服务已断开，请刷新硬件状态后重试。")
+            NativeHardwareOperationResult(false, copy.scanServiceDisconnected)
         }
     }
 
     /** Call only after the server has authorised the manual drawer action. */
     fun openCashDrawer(): NativeHardwareOperationResult {
         val service = printerService
-            ?: return NativeHardwareOperationResult(false, "${profile.displayName} 钱箱服务未连接。")
+            ?: return NativeHardwareOperationResult(false, copy.drawerServiceNotConnected.format(profile.displayName))
         return try {
             val result = service.openCashBox()
             if (result == 0) {
-                NativeHardwareOperationResult(true, "钱箱已打开。")
+                NativeHardwareOperationResult(true, copy.drawerOpened)
             } else {
                 NativeHardwareOperationResult(false, printerErrorMessage(result))
             }
         } catch (_: RemoteException) {
             printerService = null
-            NativeHardwareOperationResult(false, "钱箱服务已断开，请刷新硬件状态后重试。")
+            NativeHardwareOperationResult(false, copy.drawerServiceDisconnected)
         }
     }
 
@@ -361,15 +371,15 @@ internal class NativePosHardware(context: Context) {
         copies: Int,
         printerId: String,
     ): NativeHardwareOperationResult {
-        if (content.isBlank()) return NativeHardwareOperationResult(false, "打印内容不能为空。")
-        if (content.length > MAX_PRINT_CONTENT_LENGTH) return NativeHardwareOperationResult(false, "打印内容超过允许长度。")
-        if (copies !in 1..5) return NativeHardwareOperationResult(false, "打印份数应为 1–5。")
+        if (content.isBlank()) return NativeHardwareOperationResult(false, copy.printContentEmpty)
+        if (content.length > MAX_PRINT_CONTENT_LENGTH) return NativeHardwareOperationResult(false, copy.printContentTooLong)
+        if (copies !in 1..5) return NativeHardwareOperationResult(false, copy.printCopiesRange)
         val readiness = printerReadiness(printerId)
         if (!readiness.success) return readiness
         val address = printerId.removePrefix(BLUETOOTH_PRINTER_PREFIX)
         return try {
             val adapter = BluetoothAdapter.getDefaultAdapter()
-                ?: return NativeHardwareOperationResult(false, "当前设备不支持蓝牙。")
+                ?: return NativeHardwareOperationResult(false, copy.bluetoothUnsupported)
             val device = adapter.getRemoteDevice(address)
             val width = if ((device.name ?: "").contains("M810", ignoreCase = true)) 576 else 384
             device.createRfcommSocketToServiceRecord(SERIAL_PORT_PROFILE_UUID).use { socket ->
@@ -378,13 +388,13 @@ internal class NativePosHardware(context: Context) {
                     repeat(copies) { writeEscPosReceipt(output, content, width) }
                 }
             }
-            NativeHardwareOperationResult(true, "收据已发送到 ${device.name ?: "蓝牙打印机"}。")
+            NativeHardwareOperationResult(true, copy.receiptSentTo.format(device.name ?: copy.bluetoothPrinterFallback))
         } catch (_: IllegalArgumentException) {
-            NativeHardwareOperationResult(false, "蓝牙打印机地址无效，请重新绑定。")
+            NativeHardwareOperationResult(false, copy.bluetoothAddressInvalid)
         } catch (_: SecurityException) {
-            NativeHardwareOperationResult(false, "没有权限连接蓝牙打印机。")
+            NativeHardwareOperationResult(false, copy.noPermissionConnectBluetooth)
         } catch (_: IOException) {
-            NativeHardwareOperationResult(false, "无法连接蓝牙打印机，请确认设备已开机且仍保持配对。")
+            NativeHardwareOperationResult(false, copy.cannotConnectBluetoothPrinter)
         }
     }
 
@@ -565,25 +575,25 @@ internal class NativePosHardware(context: Context) {
     }
 
     private fun printerStatusText(code: Int): String = when (code) {
-        0 -> "就绪"
-        -1201 -> "打印机仓盖未关闭"
-        -1203 -> "打印机缺纸"
-        -1204 -> "打印机温度过高"
-        -1206 -> "打印机忙"
-        -1209 -> "设备电量过低"
-        else -> "硬件状态异常（$code）"
+        0 -> copy.hardwareReady
+        -1201 -> copy.printerCoverOpenShort
+        -1203 -> copy.printerOutOfPaperShort
+        -1204 -> copy.printerOverheatedShort
+        -1206 -> copy.printerBusyShort
+        -1209 -> copy.batteryLowShort
+        else -> copy.hardwareStatusAbnormal.format(code)
     }
 
     private fun printerErrorMessage(code: Int): String = when (code) {
-        -1201 -> "打印机仓盖未关闭。"
-        -1203 -> "打印机缺纸，请装入热敏纸后重试。"
-        -1204 -> "打印机温度过高，请稍后重试。"
-        -1206 -> "打印机正在处理其他任务，请稍后重试。"
-        -1209 -> "设备电量过低，暂时无法打印。"
-        -1003 -> "硬件响应超时，请检查设备后重试。"
-        -1099, -1104 -> "当前设备不支持此硬件功能。"
-        -1100, -1101, -1103, -1105, -1106 -> "${profile.displayName} 硬件服务未连接。"
-        else -> "${profile.displayName} 硬件操作失败（$code）。"
+        -1201 -> copy.printerCoverOpen
+        -1203 -> copy.printerOutOfPaper
+        -1204 -> copy.printerOverheated
+        -1206 -> copy.printerBusy
+        -1209 -> copy.batteryLowNoPrint
+        -1003 -> copy.hardwareTimeout
+        -1099, -1104 -> copy.hardwareUnsupported
+        -1100, -1101, -1103, -1105, -1106 -> copy.hardwareServiceNotConnected.format(profile.displayName)
+        else -> copy.hardwareOperationFailed.format(profile.displayName, code)
     }
 
     private companion object {

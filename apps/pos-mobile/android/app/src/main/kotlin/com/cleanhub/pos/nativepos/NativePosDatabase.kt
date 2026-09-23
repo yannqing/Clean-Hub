@@ -34,7 +34,13 @@ private data class NativeOfflineStockState(
  * reservations and immutable checkout commands are stored separately so a
  * process death cannot turn a completed cash collection into a lost sale.
  */
-class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+class NativePosDatabase(
+    context: Context,
+    /** Read per call so a language change reaches these refusals without a restart. */
+    private val languageCode: () -> String? = { null },
+) : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+    private val copy: NativePosCopy get() = nativePosCopy(languageCode())
+
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             """
@@ -202,7 +208,7 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
 
     /** Terminal settings are copied locally so a cold-started offline APK keeps its print policy. */
     fun replaceReceiptPrintSettings(autoPrintReceipt: Boolean, printCopies: Int) {
-        require(printCopies in 1..10) { "打印份数应为 1–10。" }
+        require(printCopies in 1..10) { copy.printCopiesRangeTen }
         writableDatabase.insertWithOnConflict("receipt_print_settings", null, ContentValues().apply {
             put("singleton", 1)
             put("auto_print_receipt", if (autoPrintReceipt) 1 else 0)
@@ -377,7 +383,7 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
             "pending_receipt_print",
             ContentValues().apply {
                 put("status", "failed")
-                put("last_error", "应用在打印过程中关闭，请由收银员确认后手动重试。")
+                put("last_error", copy.closedWhilePrinting)
             },
             "status = 'printing'",
             null,
@@ -504,20 +510,20 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
         reserveOfflineStock: Boolean,
         receiptPrintDraft: NativeReceiptPrintDraft? = null,
     ): NativeCheckoutResult {
-        require(!cart.isEmpty) { "购物车为空。" }
+        require(!cart.isEmpty) { copy.cartIsEmpty }
         val now = System.currentTimeMillis()
-        val terminal = snapshot(now).terminal ?: throw NativePosValidationException("本机 POS 数据已过期，请恢复网络后重新同步。")
-        val cashState = snapshot(now).cashState ?: throw NativePosValidationException("没有有效的班次或钱箱会话，请先开始班次并打开钱箱。")
+        val terminal = snapshot(now).terminal ?: throw NativePosValidationException(copy.localDataExpired)
+        val cashState = snapshot(now).cashState ?: throw NativePosValidationException(copy.noValidShiftOrDrawer)
         if (!cashState.isOfflineCashReady()) {
-            throw NativePosValidationException("现金收款需要已开始的班次和已打开的钱箱。")
+            throw NativePosValidationException(copy.shiftAndDrawerRequired)
         }
         val totalMinor = checkoutRequest.expectedTotalMinor
-        require(totalMinor > 0) { "应收金额必须大于零。" }
-        if (checkoutRequest.tenderedMinor < totalMinor) throw NativePosValidationException("实收现金不能少于应收金额。")
+        require(totalMinor > 0) { copy.totalMustBePositive }
+        if (checkoutRequest.tenderedMinor < totalMinor) throw NativePosValidationException(copy.tenderBelowTotalShort)
         val discountCode = checkoutRequest.discountCode?.trim()?.takeIf { it.isNotEmpty() }
         val discountReason = checkoutRequest.discountReason?.trim()?.takeIf { it.isNotEmpty() }
         if (discountCode != null && (discountReason == null || discountReason.length < 3)) {
-            throw NativePosValidationException("使用优惠码时必须填写至少 3 个字符的原因。")
+            throw NativePosValidationException(copy.discountReasonRequired)
         }
 
         writableDatabase.beginTransaction()
@@ -584,8 +590,8 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                 put("status", "pending")
             })
             val printJobId = receiptPrintDraft?.let { draft ->
-                require(draft.content.isNotBlank()) { "收据内容不能为空。" }
-                require(draft.copies in 1..10) { "打印份数应为 1–10。" }
+                require(draft.content.isNotBlank()) { copy.receiptContentEmpty }
+                require(draft.copies in 1..10) { copy.printCopiesRangeTen }
                 NativeUlid.create(now + 2).also { jobId ->
                     writableDatabase.insertOrThrow("pending_receipt_print", null, ContentValues().apply {
                         put("job_id", jobId)
@@ -619,21 +625,21 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
         items: List<NativeTicketItem>,
         tenderedMinor: Long,
     ): NativeCheckoutResult {
-        require(items.isNotEmpty()) { "工单没有可结算的服务项目。" }
+        require(items.isNotEmpty()) { copy.ticketHasNoBillableItems }
         if (ticket.ticketStatus == "cancelled" || ticket.ticketStatus == "picked_up") {
-            throw NativePosValidationException("该工单已经结束，不能再次收款。")
+            throw NativePosValidationException(copy.ticketAlreadyClosed)
         }
         val now = System.currentTimeMillis()
         snapshot(now).terminal
-            ?: throw NativePosValidationException("本机 POS 数据已过期，请恢复网络后重新同步。")
+            ?: throw NativePosValidationException(copy.localDataExpired)
         val cashState = snapshot(now).cashState
-            ?: throw NativePosValidationException("没有有效的班次或钱箱会话，请先开始班次并打开钱箱。")
+            ?: throw NativePosValidationException(copy.noValidShiftOrDrawer)
         if (!cashState.isOfflineCashReady()) {
-            throw NativePosValidationException("现金收款需要已开始的班次和已打开的钱箱。")
+            throw NativePosValidationException(copy.shiftAndDrawerRequired)
         }
         val totalMinor = items.sumOf { it.lineAmountMinor }
         if (tenderedMinor < totalMinor) {
-            throw NativePosValidationException("实收现金不能少于应收金额。")
+            throw NativePosValidationException(copy.tenderBelowTotalShort)
         }
 
         writableDatabase.beginTransaction()
@@ -750,7 +756,7 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
 
     /** Replaces one scoped cart; callers serialize writes before invoking it. */
     fun replaceCart(terminal: NativeTerminal, cart: NativePosCart) {
-        require(cart.currency == terminal.currency) { "购物车币种与当前门店币种不一致。" }
+        require(cart.currency == terminal.currency) { copy.cartCurrencyMismatch }
         writableDatabase.beginTransaction()
         try {
             writableDatabase.insertWithOnConflict("pos_cart_state", null, ContentValues().apply {
@@ -1250,7 +1256,7 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
             "SELECT track_inventory, available_quantity, allow_negative_stock, offline_stock_buffer, reserved_offline_quantity FROM catalog_product WHERE sku_id = ?",
             arrayOf(line.skuId),
         ).use { cursor ->
-            if (!cursor.moveToFirst()) throw NativePosValidationException("商品目录已变化，请恢复网络后重试。")
+            if (!cursor.moveToFirst()) throw NativePosValidationException(copy.catalogChanged)
             NativeOfflineStockState(
                 trackInventory = cursor.getInt(0) == 1,
                 availableQuantity = if (cursor.isNull(1)) null else cursor.getLong(1),
@@ -1267,7 +1273,7 @@ class NativePosDatabase(context: Context) : SQLiteOpenHelper(context, DATABASE_N
                     stock.availableQuantity - stock.offlineStockBuffer - stock.reservedOfflineQuantity < line.quantity
             )
         ) {
-            throw NativePosValidationException("离线库存缓冲不足，不能继续销售该商品。")
+            throw NativePosValidationException(copy.offlineBufferExhausted)
         }
         writableDatabase.execSQL(
             "UPDATE catalog_product SET reserved_offline_quantity = reserved_offline_quantity + ? WHERE sku_id = ?",

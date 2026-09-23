@@ -390,8 +390,8 @@ private val TICKET_ITEM_STATUS_TRANSITIONS: Map<String, List<String>> = mapOf(
 @Composable
 fun NativePosApp(applicationContext: Context) {
     val hostActivity = applicationContext as? Activity
-    val database = remember { NativePosDatabase(applicationContext) }
     val session = remember { NativePosSession(applicationContext) }
+    val database = remember { NativePosDatabase(applicationContext) { session.pinLanguageCode() } }
     val api = remember { NativePosApiClient(session) }
     val scope = rememberCoroutineScope()
     val cartWriteMutex = remember { Mutex() }
@@ -421,7 +421,7 @@ fun NativePosApp(applicationContext: Context) {
     var moreStatisticsPeriod by remember { mutableStateOf("today") }
     var moreNotifications by remember { mutableStateOf<List<NativeMoreNotification>>(emptyList()) }
     var terminalSettings by remember { mutableStateOf<NativeTerminalSettingsSummary?>(null) }
-    val hardware = remember(applicationContext) { NativePosHardware(applicationContext) }
+    val hardware = remember(applicationContext) { NativePosHardware(applicationContext) { session.pinLanguageCode() } }
     var hardwareStatus by remember { mutableStateOf<NativeHardwareStatus?>(null) }
     var hardwareDevices by remember { mutableStateOf<List<NativeHardwareDevice>>(emptyList()) }
     var bluetoothPrinters by remember { mutableStateOf<List<NativeBluetoothPrinter>>(emptyList()) }
