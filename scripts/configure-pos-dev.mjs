@@ -267,6 +267,9 @@ function configure(mode, hostOverride) {
     ? `http://${lanHost}:4000`
     : "http://localhost:4000";
   const nativePosUrl = lanHost ? `http://${lanHost}:3001` : null;
+  // Native Android does not use the POS Web origin. Its API client is
+  // compiled into BuildConfig, so it must point to the API service directly.
+  const nativeApiBaseUrl = lanHost ? `http://${lanHost}:4000` : null;
   const corsOrigins = buildCorsOrigins(
     readEnvValue(rootEnv, "CORS_ORIGINS"),
     previousLanHost,
@@ -286,6 +289,7 @@ function configure(mode, hostOverride) {
   });
   writeEnvironmentFile(posMobileEnvPath, posMobileEnv, {
     CLEANHUB_POS_RUNTIME: "development",
+    CLEANHUB_POS_API_BASE_URL: nativeApiBaseUrl,
     CLEANHUB_POS_SERVER_URL: nativePosUrl,
     CLEANHUB_POS_ALLOW_CLEARTEXT: "true",
   });
