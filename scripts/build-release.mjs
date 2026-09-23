@@ -517,6 +517,7 @@ async function writeReleaseCompose() {
       - "443:443/udp"
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${DOWNLOADS_HOST_PATH:-/opt/cleanhub/shared/downloads}:/srv/downloads:ro
       - cleanhub-caddy-data:/data
       - cleanhub-caddy-config:/config
     depends_on:

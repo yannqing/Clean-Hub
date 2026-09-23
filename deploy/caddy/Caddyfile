@@ -37,6 +37,16 @@
 
 	encode zstd gzip
 
+	# Signed Android release packages are published here from the server's
+	# persistent downloads directory. Keep this handler before the API proxy.
+	handle_path /downloads/* {
+		root * /srv/downloads
+		header Content-Type application/vnd.android.package-archive
+		header Content-Disposition attachment
+		header Cache-Control "public, max-age=3600"
+		file_server
+	}
+
 	reverse_proxy api:4000
 
 	header {
