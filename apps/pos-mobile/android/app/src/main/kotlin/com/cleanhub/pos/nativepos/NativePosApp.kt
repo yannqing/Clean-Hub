@@ -366,7 +366,7 @@ private val POS_MUTED = Color(0xFF716A7D)
  * local queue to replay it from, so the app refuses it up front rather than
  * letting the cashier fill in a whole form and fail on submit.
  */
-private const val TICKET_REQUIRES_NETWORK = "该操作需要联网；恢复网络后即可继续。"
+
 
 private val TICKET_STATUS_TRANSITIONS: Map<String, List<String>> = mapOf(
     "draft" to listOf("pending", "cancelled"),
@@ -455,14 +455,14 @@ fun NativePosApp(applicationContext: Context) {
                 available = refreshedStatus.scannerConnected,
             )
             else -> null
-        } ?: throw NativePosValidationException("未识别的内置设备。")
+        } ?: throw NativePosValidationException(copy.unknownBuiltInDevice)
         if (!descriptor.available || descriptor.hardwareKey == null || descriptor.name == null || descriptor.localDeviceId == null) {
-            throw NativePosValidationException("本机 $deviceType 当前不可用，请先刷新状态并完成设备测试。")
+            throw NativePosValidationException(copy.deviceUnavailable.format(deviceType))
         }
         val testResult = withContext(Dispatchers.IO) {
             when {
-                deviceType == "printer" -> hardware.printReceipt("CleanHub\n内置打印机登记测试\n", 1)
-                scannerAlreadyTested -> NativeHardwareOperationResult(true, "扫码测试成功。")
+                deviceType == "printer" -> hardware.printReceipt("CleanHub\n${copy.printerRegistrationTest}\n", 1)
+                scannerAlreadyTested -> NativeHardwareOperationResult(true, copy.scanTestSucceeded)
                 else -> hardware.requestScan()
             }
         }
@@ -481,7 +481,7 @@ fun NativePosApp(applicationContext: Context) {
         }
         hardwareStatus = withContext(Dispatchers.IO) { hardware.status() }
         hardwareDevices = devices
-        message = if (deviceType == "printer") "内置打印机已测试并登记为收据打印机。" else "扫码测试成功，内置扫码器已登记。"
+        message = if (deviceType == "printer") copy.printerRegistered else copy.scannerRegistered
     }
 
     fun completeHardwareScan(value: String) {
@@ -492,14 +492,14 @@ fun NativePosApp(applicationContext: Context) {
             scannerRegistrationPending = false
             scannerSession = scannerSession?.copy(
                 value = value,
-                status = "条码已读取，正在登记内置扫码器…",
+                status = copy.barcodeReadRegistering,
             )
             scope.launch {
                 busy = true
                 try {
                     registerBuiltInHardware("scanner", scannerAlreadyTested = true)
                     scannerSession = scannerSession?.copy(
-                        status = "内置扫码器已登记，可在收银、开单和查询页直接使用。",
+                        status = copy.scannerReadyEverywhere,
                     )
                 } catch (error: Exception) {
                     message = error.userMessage(copy)
@@ -509,8 +509,8 @@ fun NativePosApp(applicationContext: Context) {
                 }
             }
         } else {
-            message = "扫码测试成功：$value"
-            scannerSession = scannerSession?.copy(value = value, status = "扫码读取成功。")
+            message = copy.scanTestResult.format(value)
+            scannerSession = scannerSession?.copy(value = value, status = copy.scanReadSucceeded)
         }
     }
 
@@ -541,9 +541,9 @@ fun NativePosApp(applicationContext: Context) {
         if (value == null) {
             scannerRegistrationPending = false
             message = if (result.resultCode == Activity.RESULT_CANCELED) {
-                "扫码测试已取消。"
+                copy.scanTestCancelled
             } else {
-                "系统扫码器没有返回有效条码。"
+                copy.scannerReturnedNothing
             }
         } else {
             completeHardwareScan(value)
@@ -563,7 +563,7 @@ fun NativePosApp(applicationContext: Context) {
             android.view.KeyEvent.KEYCODE_NUMPAD_ENTER -> {
                 val value = keyboardScannerBuffer.trim()
                 if (value.isBlank()) {
-                    message = "没有读取到条码内容，请再扫描一次。"
+                    message = copy.noBarcodeScanAgain
                 } else {
                     completeHardwareScan(value)
                 }
@@ -703,7 +703,7 @@ fun NativePosApp(applicationContext: Context) {
         scope.launch {
             busy = true
             try {
-                message = executeReceiptPrint() ?: "没有待打印的收据。"
+                message = executeReceiptPrint() ?: copy.noReceiptToPrint
                 receiptPrintQueue = withContext(Dispatchers.IO) { database.receiptPrintQueueState() }
             } catch (error: Exception) {
                 message = error.userMessage(copy)
@@ -737,14 +737,14 @@ fun NativePosApp(applicationContext: Context) {
         val nextQuantity = (cart.products.firstOrNull { it.skuId == product.skuId }?.quantity ?: 0) + 1
         when {
             !internetAvailable && !canAddOffline(product, nextQuantity) -> {
-                message = "${product.name} 的离线可用库存不足。"
+                message = copy.offlineStockShort.format(product.name)
             }
             internetAvailable && !canAddOnline(product, nextQuantity) -> {
-                message = "${product.name} 的可用库存不足。"
+                message = copy.stockShort.format(product.name)
             }
             else -> {
                 updateCart(cart.copy(products = cart.products.upsert(product, nextQuantity)))
-                message = "${product.name} 已加入收银清单。"
+                message = copy.addedToTill.format(product.name)
             }
         }
     }
@@ -778,9 +778,9 @@ fun NativePosApp(applicationContext: Context) {
                 NativePosSyncWorker.schedule(applicationContext)
                 reload()
                 message = when {
-                    result.failedSales > 0 -> "有 ${result.failedSales} 笔离线现金订单需要管理员处理。"
-                    result.replayedSales > 0 -> "已同步 ${result.replayedSales} 笔离线现金订单。"
-                    else -> "目录、班次和钱箱状态已同步。"
+                    result.failedSales > 0 -> copy.failedSalesNeedManager.format(result.failedSales)
+                    result.replayedSales > 0 -> copy.replayedSales.format(result.replayedSales)
+                    else -> copy.syncedCatalogShift
                 }
             } catch (error: Exception) {
                 message = error.userMessage(copy)
@@ -793,11 +793,11 @@ fun NativePosApp(applicationContext: Context) {
     fun toggleOfflineMode() {
         if (!offlineModeEnabled) {
             offlineModeEnabled = true
-            message = "已进入离线演练：应用将只使用本机缓存和离线队列；设备网络未被关闭。"
+            message = copy.offlineDrillOn
             return
         }
         if (!physicalInternetAvailable) {
-            message = "设备当前没有可用网络，无法恢复联网模式。"
+            message = copy.noNetworkToRestore
             return
         }
         offlineModeEnabled = false
@@ -822,7 +822,7 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 hardwareStatus = refreshed.first
                 refreshed.second?.let { hardwareDevices = it }
-                message = if (internetAvailable) "已刷新本机硬件和已登记设备。" else "已刷新本机硬件状态。"
+                message = if (internetAvailable) copy.refreshedHardwareAndDevices else copy.refreshedHardware
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -834,16 +834,16 @@ fun NativePosApp(applicationContext: Context) {
     fun requestBluetoothPermissions() {
         val activity = hostActivity
         if (activity == null) {
-            message = "当前终端无法发起蓝牙授权，请重新打开 POS。"
+            message = copy.bluetoothNeedsRestart
             return
         }
         val missing = hardware.missingBluetoothPermissions()
         if (missing.isEmpty()) {
-            message = "蓝牙权限已允许，请点击“读取已配对设备”。"
+            message = copy.bluetoothAllowed
             return
         }
         ActivityCompat.requestPermissions(activity, missing.toTypedArray(), BLUETOOTH_PERMISSION_REQUEST_CODE)
-        message = "请在系统弹窗中允许“附近设备”权限，然后点击“读取已配对打印机”。"
+        message = copy.bluetoothPromptHint
     }
 
     fun refreshBluetoothPrinters() {
@@ -851,7 +851,7 @@ fun NativePosApp(applicationContext: Context) {
             busy = true
             try {
                 bluetoothPrinters = withContext(Dispatchers.IO) { hardware.pairedBluetoothPrinters() }
-                message = if (bluetoothPrinters.isEmpty()) "没有读取到已配对的蓝牙打印机。" else "已读取 ${bluetoothPrinters.size} 台已配对蓝牙打印机。"
+                message = if (bluetoothPrinters.isEmpty()) copy.noPairedBluetoothPrinters else copy.readPairedPrinters.format(bluetoothPrinters.size)
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -862,7 +862,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun bindBluetoothPrinter(device: NativeHardwareDevice, printer: NativeBluetoothPrinter) {
         if (!internetAvailable) {
-            message = "绑定蓝牙打印机需要联网保存终端配置。"
+            message = copy.bindNeedsNetwork
             return
         }
         scope.launch {
@@ -872,9 +872,9 @@ fun NativePosApp(applicationContext: Context) {
                     hardware.printReceipt(
                         content = listOf(
                             "CleanHub",
-                            "蓝牙打印机连接测试",
-                            "打印机：${printer.name}",
-                            "终端：${snapshot?.terminal?.terminalId ?: "未登记"}",
+                            copy.bluetoothTestTitle,
+                            copy.printerLinePrefix.format(printer.name),
+                            copy.terminalLinePrefix.format(snapshot?.terminal?.terminalId ?: copy.notRegistered),
                             "",
                         ).joinToString("\n"),
                         copies = 1,
@@ -900,7 +900,7 @@ fun NativePosApp(applicationContext: Context) {
                     }
                 }
                 hardwareDevices = devices
-                message = "已测试并绑定 ${printer.name}。"
+                message = copy.boundPrinter.format(printer.name)
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -917,9 +917,9 @@ fun NativePosApp(applicationContext: Context) {
                     hardware.printReceipt(
                         content = listOf(
                             "CleanHub",
-                            "内置打印机测试页",
-                            "终端：${snapshot?.terminal?.terminalId ?: "未登记"}",
-                            "时间：${java.time.Instant.now()}",
+                            copy.printerTestPageTitle,
+                            copy.terminalLinePrefix.format(snapshot?.terminal?.terminalId ?: copy.notRegistered),
+                            copy.timeLinePrefix.format(java.time.Instant.now()),
                             "",
                         ).joinToString("\n"),
                         copies = 1,
@@ -942,7 +942,7 @@ fun NativePosApp(applicationContext: Context) {
         val systemScannerIntent = hardware.scannerActivityIntent()
         if (systemScannerIntent != null) {
             scannerRegistrationPending = false
-            message = "请使用系统扫码器扫描条码；扫描完成后会回到 POS 显示结果。"
+            message = copy.useSystemScanner
             scannerActivityLauncher.launch(systemScannerIntent)
             return
         }
@@ -962,7 +962,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun connectBuiltInHardware(deviceType: String) {
         if (!internetAvailable) {
-            message = "设备登记需要联网；离线时仍可使用已配置的本机硬件。"
+            message = copy.registrationNeedsNetwork
             return
         }
         if (deviceType == "scanner") {
@@ -972,7 +972,7 @@ fun NativePosApp(applicationContext: Context) {
             val systemScannerIntent = hardware.scannerActivityIntent()
             if (systemScannerIntent != null) {
                 scannerRegistrationPending = true
-                message = "请扫描任意条码完成测试；读取成功后会自动登记内置扫码器。"
+                message = copy.scanAnyBarcode
                 scannerActivityLauncher.launch(systemScannerIntent)
                 return
             }
@@ -991,7 +991,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun openDrawerFromHardwareSettings() {
         if (!internetAvailable) {
-            message = "手动开钱箱需要联网授权。"
+            message = copy.drawerNeedsNetworkAuth
             return
         }
         scope.launch {
@@ -1035,7 +1035,7 @@ fun NativePosApp(applicationContext: Context) {
                 when (destination) {
                     NativeMoreDestination.Orders -> {
                         val branchId = snapshot?.terminal?.branchId
-                            ?: throw NativePosValidationException("未找到当前门店，请先同步。")
+                            ?: throw NativePosValidationException(copy.branchNotFound)
                         moreOrders = withContext(Dispatchers.IO) {
                             api.get("/pos/orders?branchId=$branchId&limit=50&offset=0")
                                 .optJSONArray("data")
@@ -1044,7 +1044,7 @@ fun NativePosApp(applicationContext: Context) {
                     }
                     NativeMoreDestination.Statistics -> {
                         val branchId = snapshot?.terminal?.branchId
-                            ?: throw NativePosValidationException("未找到当前门店，请先同步。")
+                            ?: throw NativePosValidationException(copy.branchNotFound)
                         moreStatistics = withContext(Dispatchers.IO) {
                             api.get("/pos/statistics/overview?period=$moreStatisticsPeriod&branchId=$branchId")
                                 .toNativeMoreStatistics()
@@ -1080,7 +1080,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun openMoreOrder(orderId: String) {
         if (!internetAvailable) {
-            message = "订单详情和订单收款需要联网。"
+            message = copy.orderDetailNeedsNetwork
             return
         }
         moreDestination = NativeMoreDestination.OrderDetail
@@ -1108,7 +1108,7 @@ fun NativePosApp(applicationContext: Context) {
             return
         }
         if (!internetAvailable) {
-            message = "设备离线时只能检索本机已缓存的客户、商品和工单。"
+            message = copy.offlineSearchLimited
             return
         }
         scope.launch {
@@ -1156,7 +1156,7 @@ fun NativePosApp(applicationContext: Context) {
                         }
                     }
                 } else {
-                    message = "该工单尚未缓存，请恢复网络后打开。"
+                    message = copy.ticketNotCached
                 }
             }
             "customer" -> {
@@ -1179,7 +1179,7 @@ fun NativePosApp(applicationContext: Context) {
                         }
                     }
                 } else {
-                    message = "该客户尚未缓存，请恢复网络后打开。"
+                    message = copy.customerNotCached
                 }
             }
         }
@@ -1193,13 +1193,13 @@ fun NativePosApp(applicationContext: Context) {
         roundingRule: String,
     ) {
         if (!internetAvailable) {
-            message = "设备离线时不能修改终端设置。"
+            message = copy.settingsNeedNetwork
             return
         }
         val timeout = lockTimeoutSeconds.toIntOrNull()
         val copies = printCopies.toIntOrNull()
         if (timeout == null || timeout !in 30..86400 || copies == null || copies !in 1..3) {
-            message = "自动锁定时间应为 30–86400 秒，打印份数应为 1–3。"
+            message = copy.settingsOutOfRange
             return
         }
         scope.launch {
@@ -1219,7 +1219,7 @@ fun NativePosApp(applicationContext: Context) {
                         )
                     }
                 }
-                message = "终端设置已保存。"
+                message = copy.settingsSaved
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1230,7 +1230,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun performShiftAction(action: String) {
         if (!internetAvailable) {
-            message = "班次操作需要联网提交。"
+            message = copy.shiftNeedsNetwork
             return
         }
         scope.launch {
@@ -1241,12 +1241,12 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 val refreshWarning = refreshCashOperationsAfterMutation()
                 val successMessage = when (action) {
-                    "clock_in" -> "班次已开始。"
-                    "break_start" -> "已开始休息。"
-                    "break_end" -> "已结束休息。"
-                    else -> "班次状态已更新。"
+                    "clock_in" -> copy.shiftStarted
+                    "break_start" -> copy.breakStarted
+                    "break_end" -> copy.breakEnded
+                    else -> copy.shiftStatusUpdated
                 }
-                message = if (refreshWarning == null) successMessage else "$successMessage 本机缓存稍后会自动刷新。"
+                message = if (refreshWarning == null) successMessage else copy.cacheRefreshesLater.format(successMessage)
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1257,11 +1257,11 @@ fun NativePosApp(applicationContext: Context) {
 
     fun createCashMovement(type: String, amount: String, reason: String) {
         if (!internetAvailable) {
-            message = "现金存入和支出需要联网提交。"
+            message = copy.cashMovementNeedsNetwork
             return
         }
         if (!isPositiveDecimal(amount) || reason.trim().length < 3) {
-            message = "请输入大于 0 的金额和至少 3 个字的原因。"
+            message = copy.cashMovementInvalid
             return
         }
         scope.launch {
@@ -1276,8 +1276,8 @@ fun NativePosApp(applicationContext: Context) {
                     })
                 }
                 val refreshWarning = refreshCashOperationsAfterMutation()
-                val successMessage = if (type == "pay_in") "现金存入已记录。" else "现金支出已记录。"
-                message = if (refreshWarning == null) successMessage else "$successMessage 本机缓存稍后会自动刷新。"
+                val successMessage = if (type == "pay_in") copy.payInRecorded else copy.payOutRecorded
+                message = if (refreshWarning == null) successMessage else copy.cacheRefreshesLater.format(successMessage)
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1288,18 +1288,18 @@ fun NativePosApp(applicationContext: Context) {
 
     fun recordMoreOrderCash(order: NativeMoreOrderDetail, tenderedAmount: String) {
         if (!internetAvailable) {
-            message = "已有订单的收款需要联网；离线现金销售请从收银页创建。"
+            message = copy.orderPaymentNeedsNetwork
             return
         }
         val cashState = snapshot?.cashState
         if (cashState?.isOfflineCashReady() != true) {
-            message = "请先在班次与收银中开启可用的钱箱会话。"
+            message = copy.needOpenCashSession
             return
         }
         val outstanding = outstandingAmount(order.totalAmount, order.paidAmount)
         val actualTenderedAmount = tenderedAmount.ifBlank { outstanding }
         if (!isPositiveDecimal(outstanding) || !isAtLeast(actualTenderedAmount, outstanding)) {
-            message = "实收现金必须不小于待收金额 $outstanding ${order.currency}。"
+            message = copy.tenderBelowOutstanding.format("$outstanding ${order.currency}")
             return
         }
         // Generated once per payment attempt and kept until it succeeds, so a
@@ -1350,7 +1350,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun changeMoreOrderStatus(order: NativeMoreOrderDetail, target: String) {
         if (!internetAvailable) {
-            message = "订单状态更新需要联网。"
+            message = copy.orderStatusNeedsNetwork
             return
         }
         scope.launch {
@@ -1366,7 +1366,7 @@ fun NativePosApp(applicationContext: Context) {
                     detail.toNativeMoreOrderDetail(payments.optJSONArray("data"))
                 }
                 reload()
-                message = "订单状态已更新。"
+                message = copy.orderStatusUpdated
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1377,7 +1377,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun markNotificationRead(deliveryId: String) {
         if (!internetAvailable) {
-            message = "设备离线时无法更新通知状态。"
+            message = copy.notificationNeedsNetwork
             return
         }
         scope.launch {
@@ -1397,7 +1397,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun markAllNotificationsRead() {
         if (!internetAvailable) {
-            message = "设备离线时无法更新通知状态。"
+            message = copy.notificationNeedsNetwork
             return
         }
         scope.launch {
@@ -1405,7 +1405,7 @@ fun NativePosApp(applicationContext: Context) {
             try {
                 withContext(Dispatchers.IO) { api.patch("/pos/notifications/read-all", JSONObject()) }
                 moreNotifications = moreNotifications.map { it.copy(readStatus = "read") }
-                message = "全部通知已标记为已读。"
+                message = copy.allNotificationsRead
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1416,7 +1416,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun archiveNotification(deliveryId: String) {
         if (!internetAvailable) {
-            message = "设备离线时无法归档通知。"
+            message = copy.archiveNeedsNetwork
             return
         }
         scope.launch {
@@ -1447,7 +1447,7 @@ fun NativePosApp(applicationContext: Context) {
                 reload()
                 unlocked = true
                 activeTab = NativePosTab.Workspace
-                message = "员工登录成功，本地目录与收银状态已更新。"
+                message = copy.loginSucceeded
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1469,14 +1469,14 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 when {
                     result.lockedForSeconds != null -> {
-                        message = "PIN 已临时锁定，请 ${result.lockedForSeconds} 秒后重试。"
+                        message = copy.pinTemporarilyLocked.format(result.lockedForSeconds)
                     }
                     result.verified -> {
                         unlocked = true
                         activeTab = NativePosTab.Workspace
                         message = null
                     }
-                    else -> message = "PIN 不正确，请重试。"
+                    else -> message = copy.pinIncorrect
                 }
             } catch (error: Exception) {
                 message = error.userMessage(copy)
@@ -1495,7 +1495,7 @@ fun NativePosApp(applicationContext: Context) {
                     NativePosSyncEngine(applicationContext).synchronize()
                 }
                 reload()
-                message = "班次已开始，请打开钱箱后收银。"
+                message = copy.shiftStartedOpenDrawer
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1506,12 +1506,12 @@ fun NativePosApp(applicationContext: Context) {
 
     fun openRegister(openingFloat: String) {
         if (!internetAvailable) {
-            message = "开启收银台需要联网提交。"
+            message = copy.openRegisterNeedsNetwork
             return
         }
         val normalizedOpeningFloat = openingFloat.trim()
         if (normalizedOpeningFloat.isNotEmpty() && !isPositiveDecimal(normalizedOpeningFloat) && normalizedOpeningFloat != "0") {
-            message = "备用金必须是大于或等于 0 的金额。"
+            message = copy.floatInvalid
             return
         }
         scope.launch {
@@ -1526,9 +1526,9 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 val refreshWarning = refreshCashOperationsAfterMutation()
                 message = if (refreshWarning == null) {
-                    "收银台已开启；现在可以离线收取现金。"
+                    copy.registerOpenedOfflineReady
                 } else {
-                    "收银台已开启；本机缓存稍后会自动刷新。"
+                    copy.registerOpenedCacheLater
                 }
             } catch (error: Exception) {
                 message = error.userMessage(copy)
@@ -1540,7 +1540,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun closeRegister(countedCash: String, notes: String) {
         if (!internetAvailable) {
-            message = "关闭收银台需要联网提交。"
+            message = copy.closeRegisterNeedsNetwork
             return
         }
         scope.launch {
@@ -1554,9 +1554,9 @@ fun NativePosApp(applicationContext: Context) {
                 }
                 val refreshWarning = refreshCashOperationsAfterMutation()
                 message = if (refreshWarning == null) {
-                    "收银台已关闭，日结数据已生成。"
+                    copy.registerClosedZReady
                 } else {
-                    "收银台已关闭；本机缓存稍后会自动刷新。"
+                    copy.registerClosedCacheLater
                 }
             } catch (error: Exception) {
                 message = error.userMessage(copy)
@@ -1579,7 +1579,7 @@ fun NativePosApp(applicationContext: Context) {
                 cart = NativePosCart.empty(cart.currency)
                 selectedTicketDetail = null
                 activeTab = NativePosTab.Workspace
-                message = "班次已结束，请由下一位员工输入 PIN 登录。"
+                message = copy.shiftEndedNextCashier
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1590,7 +1590,7 @@ fun NativePosApp(applicationContext: Context) {
 
     fun createCustomer(fullName: String, phone: String) {
         if (!internetAvailable) {
-            message = "创建客户需要联网；恢复网络后即可继续。"
+            message = copy.createCustomerNeedsNetwork
             return
         }
         // Creating a customer is two calls -- the account, then the profile
@@ -1627,7 +1627,7 @@ fun NativePosApp(applicationContext: Context) {
                 // Both halves landed, so the next customer starts fresh.
                 pendingCustomerDraft = null
                 reload()
-                message = "客户已创建并同步到本机。"
+                message = copy.customerCreated
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1652,7 +1652,7 @@ fun NativePosApp(applicationContext: Context) {
             try {
                 val ticketId = withContext(Dispatchers.IO) {
                     val terminal = database.snapshot().terminal
-                        ?: throw NativePosValidationException("未找到本机门店信息，请先同步。")
+                        ?: throw NativePosValidationException(copy.localBranchNotFound)
                     val ticket = api.post("/pos/service-tickets", JSONObject().apply {
                         put("customerId", customer.id)
                         put("branchId", terminal.branchId)
@@ -1663,7 +1663,7 @@ fun NativePosApp(applicationContext: Context) {
                             put(
                                 "expectedPickupAt",
                                 localTicketDateTimeToIso(value, terminal.timeZone)
-                                    ?: throw NativePosValidationException("预计取件时间格式无效，请使用 YYYY-MM-DD HH:mm。"),
+                                    ?: throw NativePosValidationException(copy.pickupTimeInvalid),
                             )
                         }
                         if (remark.isNotBlank()) put("remark", remark.trim())
@@ -1675,7 +1675,7 @@ fun NativePosApp(applicationContext: Context) {
                 activeTab = NativePosTab.Tickets
                 selectedTicketDetail = snapshot?.tickets?.firstOrNull { it.id == ticketId }
                     ?.let { NativeTicketDetail(it, emptyList()) }
-                message = "服务工单已创建。请在工单详情中录入服务项目。"
+                message = copy.ticketCreated
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1730,8 +1730,8 @@ fun NativePosApp(applicationContext: Context) {
                         put("serviceId", draft.service.id)
                         put("itemType", draft.itemType)
                         if (draft.service.pricingUnit == "per_kg") {
-                            put("weight", draft.weight ?: throw NativePosValidationException("请输入服务重量。"))
-                            put("bagCount", draft.bagCount ?: throw NativePosValidationException("请输入袋数。"))
+                            put("weight", draft.weight ?: throw NativePosValidationException(copy.weightRequired))
+                            put("bagCount", draft.bagCount ?: throw NativePosValidationException(copy.bagCountRequired))
                         } else {
                             put("quantity", draft.quantity)
                         }
@@ -1746,7 +1746,7 @@ fun NativePosApp(applicationContext: Context) {
                     NativePosSyncEngine(applicationContext).synchronize()
                 }
                 refreshSelectedTicket(ticket.id, ticket.currency)
-                message = "服务项目已加入工单。"
+                message = copy.itemAddedToTicket
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1772,8 +1772,8 @@ fun NativePosApp(applicationContext: Context) {
                         put("serviceId", update.service.id)
                         put("itemType", update.itemType)
                         if (update.service.pricingUnit == "per_kg") {
-                            put("weight", update.weight ?: throw NativePosValidationException("请输入服务重量。"))
-                            put("bagCount", update.bagCount ?: throw NativePosValidationException("请输入袋数。"))
+                            put("weight", update.weight ?: throw NativePosValidationException(copy.weightRequired))
+                            put("bagCount", update.bagCount ?: throw NativePosValidationException(copy.bagCountRequired))
                         } else {
                             put("quantity", update.quantity)
                         }
@@ -1788,7 +1788,7 @@ fun NativePosApp(applicationContext: Context) {
                     NativePosSyncEngine(applicationContext).synchronize()
                 }
                 refreshSelectedTicket(ticket.id, ticket.currency)
-                message = "服务项目已更新。"
+                message = copy.itemUpdated
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1803,7 +1803,7 @@ fun NativePosApp(applicationContext: Context) {
             return
         }
         if (reason.isBlank()) {
-            message = "删除服务项目时必须填写原因。"
+            message = copy.deleteReasonMissing
             return
         }
         scope.launch {
@@ -1815,7 +1815,7 @@ fun NativePosApp(applicationContext: Context) {
                     NativePosSyncEngine(applicationContext).synchronize()
                 }
                 refreshSelectedTicket(ticket.id, ticket.currency)
-                message = "服务项目已删除。"
+                message = copy.itemDeleted
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1830,7 +1830,7 @@ fun NativePosApp(applicationContext: Context) {
             return
         }
         if (nextStatus !in TICKET_ITEM_STATUS_TRANSITIONS[item.itemStatus].orEmpty()) {
-            message = "该服务项目当前不能继续流转。"
+            message = copy.itemCannotTransition
             return
         }
         scope.launch {
@@ -1841,7 +1841,7 @@ fun NativePosApp(applicationContext: Context) {
                     NativePosSyncEngine(applicationContext).synchronize()
                 }
                 refreshSelectedTicket(ticket.id, ticket.currency)
-                message = "服务项目状态已更新。"
+                message = copy.itemStatusUpdated
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -1852,12 +1852,12 @@ fun NativePosApp(applicationContext: Context) {
 
     fun addTicketItemsToCart(ticket: NativeServiceTicket, items: List<NativeTicketItem>) {
         if (ticket.currency != cart.currency) {
-            message = "工单币种与当前门店币种不一致。"
+            message = copy.ticketCurrencyMismatch
             return
         }
         val cartCustomer = cart.customer
         if (cartCustomer != null && cartCustomer.id != ticket.customerId) {
-            message = "购物车中已有其他客户的项目，请先完成或清空购物车。"
+            message = copy.cartHasOtherCustomer
             return
         }
         val existingIds = cart.ticketItems.mapTo(mutableSetOf()) { it.ticketItemId }
@@ -1880,7 +1880,7 @@ fun NativePosApp(applicationContext: Context) {
             )
         }
         if (additions.isEmpty()) {
-            message = "该工单的项目已经在购物车中。"
+            message = copy.ticketItemsAlreadyInCart
             return
         }
         updateCart(
@@ -1895,7 +1895,7 @@ fun NativePosApp(applicationContext: Context) {
             )
         }
         activeTab = NativePosTab.Sale
-        message = "已将 ${additions.size} 个工单项目加入收银购物车。"
+        message = copy.addedTicketItemsToCart.format(additions.size)
     }
 
     fun changeTicketStatus(ticket: NativeServiceTicket, nextStatus: String, reason: String?) {
@@ -1904,11 +1904,11 @@ fun NativePosApp(applicationContext: Context) {
             return
         }
         if (nextStatus !in TICKET_STATUS_TRANSITIONS[ticket.ticketStatus].orEmpty()) {
-            message = "该工单当前不能继续流转。"
+            message = copy.ticketCannotTransition
             return
         }
         if (nextStatus == "cancelled" && reason.isNullOrBlank()) {
-            message = "取消工单时必须填写原因。"
+            message = copy.cancelReasonMissing
             return
         }
         scope.launch {
@@ -1923,7 +1923,7 @@ fun NativePosApp(applicationContext: Context) {
                     NativePosSyncEngine(applicationContext).synchronize()
                 }
                 refreshSelectedTicket(ticket.id, ticket.currency)
-                message = "工单状态已更新为“${ticketStatusLabel(nextStatus, copy)}”。"
+                message = copy.ticketStatusUpdated.format(ticketStatusLabel(nextStatus, copy))
             } catch (error: Exception) {
                 message = error.userMessage(copy)
             } finally {
@@ -2046,11 +2046,11 @@ fun NativePosApp(applicationContext: Context) {
                                         val role = auth.optString("role")
                                         if (role != "owner" && role != "manager") {
                                             session.clearAdministratorSession()
-                                            throw NativePosValidationException("只有店主或经理可以初始化 POS 终端。")
+                                            throw NativePosValidationException(copy.managerOnlyEnroll)
                                         }
                                         val profile = api.get("/tenant/profile")
                                         val branches = profile.optJSONArray("accessibleBranches").toSetupBranches()
-                                        if (branches.isEmpty()) throw NativePosValidationException("该账号没有可用门店。")
+                                        if (branches.isEmpty()) throw NativePosValidationException(copy.noBranchesAvailable)
                                         val bootstrap = api.bootstrap()
                                         NativeAdministrator(
                                             branches = branches,
@@ -2095,7 +2095,7 @@ fun NativePosApp(applicationContext: Context) {
                                         })
                                         session.clearAdministratorSession()
                                     }
-                                    message = "终端已绑定。请使用员工 6 位 PIN 完成首次登录。"
+                                    message = copy.terminalEnrolled
                                     setupAdministrator = null
                                     reload()
                                 } catch (error: Exception) {
@@ -2121,12 +2121,12 @@ fun NativePosApp(applicationContext: Context) {
                                 val role = auth.optString("role")
                                 if (role != "owner" && role != "manager") {
                                     session.clearAdministratorSession()
-                                    throw NativePosValidationException("只有店主或经理可以恢复终端凭证。")
+                                    throw NativePosValidationException(copy.managerOnlyRecover)
                                 }
                                 api.post("/pos/auth/devices/${session.deviceId()}/credential-rotation", JSONObject().put("reason", "Move this POS installation to the native Android app"))
                                 session.clearAdministratorSession()
                             }
-                            message = "终端凭证已恢复。请使用员工 PIN 登录并同步。"
+                            message = copy.terminalRecovered
                         } catch (error: Exception) {
                             message = error.administratorLoginMessage()
                         } finally {
@@ -2216,9 +2216,9 @@ fun NativePosApp(applicationContext: Context) {
                             onAdd = { product ->
                                 val nextQuantity = (cart.products.firstOrNull { it.skuId == product.skuId }?.quantity ?: 0) + 1
                                 if (!internetAvailable && !canAddOffline(product, nextQuantity)) {
-                                    message = "${product.name} 的离线可用库存不足。"
+                                    message = copy.offlineStockShort.format(product.name)
                                 } else if (internetAvailable && !canAddOnline(product, nextQuantity)) {
-                                    message = "${product.name} 的可用库存不足。"
+                                    message = copy.stockShort.format(product.name)
                                 }
                                 else updateCart(cart.copy(products = cart.products.upsert(product, nextQuantity)))
                             },
@@ -2464,13 +2464,13 @@ private fun NativeCashCheckoutFailureDialog(copy: NativePosCopy, message: String
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    "无法完成现金结款",
+                    copy.cashCheckoutFailedTitle,
                     color = POS_INK,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    "本次收款没有完成，购物车内容仍会保留。",
+                    copy.cartKeptAfterFailure,
                     color = POS_MUTED,
                     style = MaterialTheme.typography.bodyMedium,
                 )
@@ -2492,7 +2492,7 @@ private fun NativeCashCheckoutFailureDialog(copy: NativePosCopy, message: String
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
                 ) {
-                    Text("知道了")
+                    Text(copy.gotIt)
                 }
             }
         }
@@ -2527,19 +2527,19 @@ private fun NativeHardwareScannerSessionView(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            if (isRegistration) "测试并登记扫码器" else "扫码测试",
+                            if (isRegistration) copy.testAndRegisterScanner else copy.scanTest,
                             color = Color.White,
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                         )
                         Text(
-                            "使用设备顶部的红外扫码头读取条码",
+                            copy.useInfraredHead,
                             color = Color(0xFFBDB5C7),
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                     TextButton(onClick = onClose) {
-                        Text(if (scanning) "取消" else "完成", color = Color.White)
+                        Text(if (scanning) copy.cancel else copy.done, color = Color.White)
                     }
                 }
 
@@ -2569,7 +2569,7 @@ private fun NativeHardwareScannerSessionView(
                         ) {
                             Text("▣", color = Color(0xFF39D98A), style = MaterialTheme.typography.displayMedium)
                             Text(
-                                if (scanning) "持续扫描中" else "读取完成",
+                                if (scanning) copy.scanningContinuously else copy.readComplete,
                                 color = Color.White,
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
@@ -2585,9 +2585,9 @@ private fun NativeHardwareScannerSessionView(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFF25212D)),
                     ) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("红外扫码模块已就绪", color = Color(0xFF39D98A), fontWeight = FontWeight.SemiBold)
+                            Text(copy.infraredReady, color = Color(0xFF39D98A), fontWeight = FontWeight.SemiBold)
                             Text(
-                                if (isRegistration) "扫描任意条码后，系统会自动完成扫码器登记。" else "将任意条码对准设备顶部扫码窗，读取结果会自动显示。",
+                                if (isRegistration) copy.scanAnyToRegister else copy.aimAnyBarcode,
                                 color = Color(0xFFBDB5C7),
                                 style = MaterialTheme.typography.bodySmall,
                             )
@@ -2600,7 +2600,7 @@ private fun NativeHardwareScannerSessionView(
                         colors = CardDefaults.cardColors(containerColor = Color(0xFFE7F6EC)),
                     ) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text("已读取条码", color = Color(0xFF16803A), fontWeight = FontWeight.SemiBold)
+                            Text(copy.barcodeRead, color = Color(0xFF16803A), fontWeight = FontWeight.SemiBold)
                             Text(session.value.orEmpty(), color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                             session.status?.let { Text(it, color = POS_MUTED, style = MaterialTheme.typography.bodySmall) }
                         }
@@ -2608,11 +2608,11 @@ private fun NativeHardwareScannerSessionView(
                 }
 
                 if (busy && !scanning) {
-                    Text("正在保存设备登记…", color = Color(0xFFBDB5C7), style = MaterialTheme.typography.bodySmall)
+                    Text(copy.savingRegistration, color = Color(0xFFBDB5C7), style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "本设备没有普通摄像头，扫码使用独立的红外扫码模块。",
+                    copy.noOrdinaryCamera,
                     color = Color(0xFF81798D),
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -2672,8 +2672,8 @@ private fun NativePosShell(
                         onClick = onToggleOfflineMode,
                         enabled = !busy,
                         modifier = Modifier.padding(end = 4.dp),
-                    ) { Text(if (offlineModeEnabled) "恢复联网" else "离线演练") }
-                    OutlinedButton(onClick = onLock, modifier = Modifier.padding(end = 8.dp)) { Text("锁定") }
+                    ) { Text(if (offlineModeEnabled) copy.restoreOnline else copy.offlineDrill) }
+                    OutlinedButton(onClick = onLock, modifier = Modifier.padding(end = 8.dp)) { Text(copy.lock) }
                 },
             )
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
@@ -4566,7 +4566,7 @@ private fun NativeMoreCustomersView(
         Text(copy.customersCachedHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
         TextField(value = query, onValueChange = { query = it }, label = { Text(copy.nameAccountOrPhone) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = { creating = !creating }, enabled = !busy, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT)) { Text(if (creating) "收起建档" else "新建客户") }
+            Button(onClick = { creating = !creating }, enabled = !busy, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT)) { Text(if (creating) copy.collapseRegistration else copy.newCustomerToggle) }
             OutlinedButton(onClick = onStartIntake, enabled = !busy, modifier = Modifier.weight(1f)) { Text(copy.newServiceTicket) }
         }
         if (creating) {
@@ -4615,7 +4615,7 @@ private fun NativeMoreCatalogView(
     onAddProduct: (NativeProduct) -> Unit,
 ) {
     NativeMorePage(copy, copy.menuCatalog, onBack) {
-        Button(onClick = onStartSale, enabled = !busy, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT)) { Text("前往收银") }
+        Button(onClick = onStartSale, enabled = !busy, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT)) { Text(copy.goToTill) }
         Text(copy.productsHeading, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
         products.forEach { product ->
             Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), colors = CardDefaults.cardColors(containerColor = POS_PANEL_BACKGROUND)) {
@@ -4687,7 +4687,7 @@ private fun NativeMoreScanView(
             OutlinedButton(onClick = { onAddProduct(product) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.productAddToTill.format(product.name)) }
         }
         customerMatches.forEach { customer ->
-            OutlinedButton(onClick = { onStartIntakeForCustomer(customer) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("客户 ${customer.fullName} · 服务开单") }
+            OutlinedButton(onClick = { onStartIntakeForCustomer(customer) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.customerIntakePrefix.format(customer.fullName)) }
         }
         if (searchResults.isNotEmpty()) {
             Text(copy.onlineSearchResults, color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
@@ -4730,7 +4730,7 @@ private fun NativeMoreOrdersView(
             ) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(copy.orderPrefix.format(order.id.takeLast(8).uppercase()), color = POS_INK, fontWeight = FontWeight.SemiBold)
-                    Text("${order.customerName ?: "散客"} · ${order.itemCount} 项 · ${order.status} · ${order.paymentStatus}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text("${order.customerName ?: copy.walkInCustomer} · ${copy.itemsCountSuffix.format(order.itemCount)} · ${order.status} · ${order.paymentStatus}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     Text("${order.totalAmount} ${order.currency} · ${copy.tapToProcessOrder}", color = POS_ACCENT, style = MaterialTheme.typography.labelMedium)
                 }
             }
@@ -4857,7 +4857,7 @@ private fun NativeMoreNotificationsView(
     NativeMorePage(copy, copy.menuNotifications, onBack) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = onRefresh, enabled = !busy, modifier = Modifier.weight(1f)) { Text(if (busy) copy.loading else copy.refreshNotifications) }
-            OutlinedButton(onClick = onMarkAllRead, enabled = internetAvailable && !busy && notifications.any { it.readStatus == "unread" }, modifier = Modifier.weight(1f)) { Text("全部已读") }
+            OutlinedButton(onClick = onMarkAllRead, enabled = internetAvailable && !busy && notifications.any { it.readStatus == "unread" }, modifier = Modifier.weight(1f)) { Text(copy.markAllRead) }
         }
         if (!busy && notifications.isEmpty()) Text(copy.noNotifications, color = POS_MUTED)
         notifications.forEach { notification ->
@@ -4867,10 +4867,10 @@ private fun NativeMoreNotificationsView(
                     Text(notification.content, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     Text("${notification.priority} · ${notification.createdAt}", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
                     if (notification.readStatus == "unread") {
-                        OutlinedButton(onClick = { onMarkRead(notification.deliveryId) }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text("标记已读") }
+                        OutlinedButton(onClick = { onMarkRead(notification.deliveryId) }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.markRead) }
                     }
                     if (notification.relatedId != null && notification.relatedType in setOf("ticket", "order")) {
-                        OutlinedButton(onClick = { onOpenRelated(notification) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (notification.relatedType == "order") "打开关联订单" else "打开关联工单") }
+                        OutlinedButton(onClick = { onOpenRelated(notification) }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (notification.relatedType == "order") copy.openRelatedOrder else copy.openRelatedTicket) }
                     }
                     if (notification.readStatus != "archived") {
                         TextButton(onClick = { onArchive(notification.deliveryId) }, enabled = internetAvailable && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.archiveNotification) }
@@ -5010,7 +5010,7 @@ private fun NativeMoreHardwareView(
                         style = MaterialTheme.typography.bodySmall,
                     )
                     NativeReferenceRow(
-                        "状态",
+                        copy.statusHeading,
                         if (hardwareStatus.printerConnected) hardwareStatus.printerStatus ?: copy.connected else copy.notConnected,
                         hardwareStatus.printerId,
                     )
@@ -5038,7 +5038,7 @@ private fun NativeMoreHardwareView(
                         style = MaterialTheme.typography.bodySmall,
                     )
                     NativeReferenceRow(
-                        "状态",
+                        copy.statusHeading,
                         if (hardwareStatus.scannerConnected) copy.connectedReadyToScan else copy.notConnected,
                         hardwareStatus.scannerId,
                     )
@@ -5217,14 +5217,14 @@ private fun NativeBottomNavigation(copy: NativePosCopy, activeTab: NativePosTab,
     }
 }
 
-@Composable private fun LoadingView() = Text("正在加载本地 POS 数据…", Modifier.padding(24.dp))
+@Composable private fun LoadingView() = Text(nativePosCopy(null).loadingLocalData, Modifier.padding(24.dp))
 
 @Composable
 private fun FirstLaunchView(copy: NativePosCopy, apiConfigured: Boolean, busy: Boolean, message: String?, onStart: () -> Unit) {
-    FormColumn("初始化此 POS 终端") {
-        Text("首次需联网，由店主或经理绑定门店。完成后，收银界面、商品、现金订单和同步队列都运行在此 APK 的本地数据库中。")
-        if (!apiConfigured) Text("此安装包没有 POS API 地址，无法完成初始化。", color = MaterialTheme.colorScheme.error)
-        Button(onClick = onStart, enabled = apiConfigured && !busy) { Text("开始初始化") }
+    FormColumn(copy.initialiseTerminal) {
+        Text(copy.initialiseIntro)
+        if (!apiConfigured) Text(copy.noApiUrl, color = MaterialTheme.colorScheme.error)
+        Button(onClick = onStart, enabled = apiConfigured && !busy) { Text(copy.startInitialisation) }
         ErrorText(message)
     }
 }
@@ -5233,12 +5233,12 @@ private fun FirstLaunchView(copy: NativePosCopy, apiConfigured: Boolean, busy: B
 private fun AdministratorLoginView(copy: NativePosCopy, internetAvailable: Boolean, busy: Boolean, message: String?, onSubmit: (String, String) -> Unit) {
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    FormColumn("店主或经理登录") {
-        Text("此登录只用于绑定本台设备；绑定完成后会立即退出管理员账号。")
-        NetworkStatusIndicator(internetAvailable)
-        TextField(identifier, { identifier = it }, label = { Text("邮箱") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(password, { password = it }, label = { Text("密码") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { onSubmit(identifier, password) }, enabled = identifier.isNotBlank() && password.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) { Text("验证并选择门店") }
+    FormColumn(copy.managerLogin) {
+        Text(copy.managerLoginIntro)
+        NetworkStatusIndicator(copy, internetAvailable)
+        TextField(identifier, { identifier = it }, label = { Text(copy.emailLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        TextField(password, { password = it }, label = { Text(copy.passwordLabel) }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
+        Button(onClick = { onSubmit(identifier, password) }, enabled = identifier.isNotBlank() && password.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.verifyAndSelectStore) }
         ErrorText(message)
     }
 }
@@ -5254,14 +5254,14 @@ private fun TerminalEnrollmentView(
 ) {
     var branchId by remember { mutableStateOf(branches.first().id) }
     var label by remember { mutableStateOf("${branches.first().name} POS") }
-    FormColumn(if (requiresReenrollment) "重新绑定本台终端" else "绑定本台终端") {
+    FormColumn(if (requiresReenrollment) copy.rebindTerminal else copy.bindTerminal) {
         if (requiresReenrollment) {
             Text(
-                "检测到本机此前已绑定 POS。确认后会撤销旧终端凭证并关闭其未完成班次，再按下面选择的门店重新绑定。",
+                copy.rebindWarning,
                 color = MaterialTheme.colorScheme.error,
             )
         }
-        Text("选择门店")
+        Text(copy.selectStore)
         branches.forEach { branch ->
             OutlinedButton(onClick = { branchId = branch.id; if (label.isBlank()) label = "${branch.name} POS" }, modifier = Modifier.fillMaxWidth()) {
                 Text(if (branch.id == branchId) "✓ ${branch.name}" else branch.name)
@@ -5269,7 +5269,7 @@ private fun TerminalEnrollmentView(
         }
         TextField(label, { label = it }, label = { Text(copy.terminalName) }, singleLine = true, modifier = Modifier.fillMaxWidth())
         Button(onClick = { onEnroll(branchId, label) }, enabled = label.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) {
-            Text(if (requiresReenrollment) "撤销旧终端并重新绑定" else "绑定并继续")
+            Text(if (requiresReenrollment) copy.revokeAndRebind else copy.bindAndContinue)
         }
         ErrorText(message)
     }
@@ -5279,12 +5279,12 @@ private fun TerminalEnrollmentView(
 private fun TerminalCredentialRecoveryView(copy: NativePosCopy, internetAvailable: Boolean, busy: Boolean, message: String?, onRecover: (String, String) -> Unit) {
     var identifier by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    FormColumn("恢复此终端的凭证") {
-        Text("检测到此前 POS 的本地数据，但原有终端凭证不能迁移到原生安全存储。请由店主或经理重新签发本台设备凭证。")
-        NetworkStatusIndicator(internetAvailable)
-        TextField(identifier, { identifier = it }, label = { Text("邮箱") }, singleLine = true, modifier = Modifier.fillMaxWidth())
-        TextField(password, { password = it }, label = { Text("密码") }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
-        Button(onClick = { onRecover(identifier, password) }, enabled = identifier.isNotBlank() && password.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) { Text("重新签发终端凭证") }
+    FormColumn(copy.recoverCredential) {
+        Text(copy.recoverIntro)
+        NetworkStatusIndicator(copy, internetAvailable)
+        TextField(identifier, { identifier = it }, label = { Text(copy.emailLabel) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        TextField(password, { password = it }, label = { Text(copy.passwordLabel) }, visualTransformation = PasswordVisualTransformation(), singleLine = true, modifier = Modifier.fillMaxWidth())
+        Button(onClick = { onRecover(identifier, password) }, enabled = identifier.isNotBlank() && password.isNotBlank() && !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.reissueCredential) }
         ErrorText(message)
     }
 }
@@ -5548,9 +5548,9 @@ private fun PinKey(label: String, enabled: Boolean, control: Boolean = false, on
 
 @Composable
 private fun CachedDataExpiredView(copy: NativePosCopy, busy: Boolean, message: String?, onSynchronize: () -> Unit) {
-    FormColumn("本地目录需要更新") {
-        Text("离线目录超过有效期。恢复网络并同步后，才能继续销售；已保存的现金订单仍保留在本机。")
-        Button(onClick = onSynchronize, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("立即同步") }
+    FormColumn(copy.catalogNeedsUpdate) {
+        Text(copy.catalogExpired)
+        Button(onClick = onSynchronize, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(copy.syncNow) }
         ErrorText(message)
     }
 }
@@ -5579,7 +5579,7 @@ private fun FormColumn(title: String, content: @Composable ColumnScope.() -> Uni
 @Composable private fun ErrorText(message: String?) { message?.let { Text(it, color = MaterialTheme.colorScheme.error) } }
 
 @Composable
-private fun NetworkStatusIndicator(internetAvailable: Boolean) {
+private fun NetworkStatusIndicator(copy: NativePosCopy, internetAvailable: Boolean) {
     val color = if (internetAvailable) Color(0xFF16803A) else MaterialTheme.colorScheme.error
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -5588,7 +5588,7 @@ private fun NetworkStatusIndicator(internetAvailable: Boolean) {
     ) {
         Box(Modifier.size(10.dp).clip(CircleShape).background(color))
         Text(
-            text = if (internetAvailable) "设备已联网" else "设备离线",
+            text = if (internetAvailable) copy.deviceOnline else copy.deviceOffline,
             modifier = Modifier.padding(start = 8.dp),
             color = color,
             style = MaterialTheme.typography.bodyMedium,
@@ -5665,7 +5665,7 @@ private fun NativeSaleView(
             SaleStatusPill(copy, internetAvailable, current.pendingSales)
             if (current.failedSales > 0) {
                 Text(
-                    "${current.failedSales} 笔待处理",
+                    copy.pendingCount.format(current.failedSales),
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.labelMedium,
                 )
@@ -5687,7 +5687,7 @@ private fun NativeSaleView(
         }
         if (internetAvailable && current.cashState?.isOfflineCashReady() != true) {
             Text(
-                "本次收款会先联网核验班次和钱箱状态。",
+                copy.checkoutVerifiesOnline,
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = POS_MUTED,
                 style = MaterialTheme.typography.bodySmall,
@@ -5812,7 +5812,7 @@ private fun CashOperationsView(
 @Composable
 private fun SaleStatusPill(copy: NativePosCopy, internetAvailable: Boolean, pendingSales: Int) {
     val statusColor = if (internetAvailable) Color(0xFF16803A) else Color(0xFFD06B16)
-    val statusLabel = if (internetAvailable) "已联网" else "离线收银"
+    val statusLabel = if (internetAvailable) copy.online else copy.offlineTill
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
@@ -5823,7 +5823,7 @@ private fun SaleStatusPill(copy: NativePosCopy, internetAvailable: Boolean, pend
     ) {
         Box(Modifier.size(7.dp).clip(CircleShape).background(statusColor))
         Text(
-            if (pendingSales > 0) "$statusLabel · 待同步 $pendingSales 笔" else statusLabel,
+            if (pendingSales > 0) copy.pendingSyncSuffix.format(statusLabel, pendingSales) else statusLabel,
             color = statusColor,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.SemiBold,
@@ -5882,13 +5882,13 @@ private fun ProductCatalogCard(
                 Text(formatMoney(product.amountMinor, product.currency), color = POS_INK, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
             if (offlineStockUnavailable) {
-                Text("离线库存不足", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                Text(copy.offlineStockShortShort, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
             } else if (cartQuantity == 0L) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    Text("加入 +", color = POS_ACCENT, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                    Text(copy.addPlus, color = POS_ACCENT, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                 }
             } else {
                 CartQuantityStepper(quantity = cartQuantity, onAdd = onAdd, onRemove = onRemove)
@@ -5948,11 +5948,11 @@ private fun CheckoutPanel(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("购物车", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(if (itemCount == 0L) "尚未选择项目" else "$itemCount 项", color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
+                Text(copy.cartTitle, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(if (itemCount == 0L) copy.noItemsSelected else copy.itemsCountSuffix.format(itemCount), color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
             }
             cart.customer?.let { customer ->
-                Text("客户：${customer.name}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                Text(copy.customerPrefixShort.format(customer.name), color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
             }
             OutlinedButton(
                 onClick = { cartDrawerOpen = true },
@@ -5960,16 +5960,16 @@ private fun CheckoutPanel(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(14.dp),
             ) {
-                Text(if (cart.isEmpty) "购物车为空" else "查看购物车明细 · $itemCount 项")
+                Text(if (cart.isEmpty) copy.cartEmptyShort else copy.viewCartDetail.format(itemCount))
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("应收", color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
+                Text(copy.amountDueShort, color = POS_MUTED, style = MaterialTheme.typography.bodyMedium)
                 Text(formatMoney(totalMinor, cart.currency), color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             }
             message?.let {
                 Text(
                     it,
-                    color = if (it.startsWith("现金订单已")) Color(0xFF16803A) else MaterialTheme.colorScheme.error,
+                    color = if (it.startsWith(copy.cashOrderPrefix)) Color(0xFF16803A) else MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -5979,7 +5979,7 @@ private fun CheckoutPanel(
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-            ) { Text(if (busy) "正在保存…" else "结款") }
+            ) { Text(if (busy) copy.saving else copy.pay) }
         }
     }
     if (cartDrawerOpen) {
@@ -6057,10 +6057,10 @@ private fun NativeCartDrawer(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                            Text("购物车明细", color = POS_INK, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text("${cart.itemCount} 项 · ${formatMoney(cart.totalMinor, cart.currency)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                            Text(copy.cartDetail, color = POS_INK, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text("${copy.itemsCountSuffix.format(cart.itemCount)} · ${formatMoney(cart.totalMinor, cart.currency)}", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                         }
-                        TextButton(onClick = onDismiss, enabled = !busy) { Text("关闭") }
+                        TextButton(onClick = onDismiss, enabled = !busy) { Text(copy.close) }
                     }
                     cart.customer?.let { customer ->
                         Card(
@@ -6068,7 +6068,7 @@ private fun NativeCartDrawer(
                             shape = RoundedCornerShape(14.dp),
                             colors = CardDefaults.cardColors(containerColor = Color(0xFFF1EDF8)),
                         ) {
-                            Text("客户：${customer.name}", modifier = Modifier.padding(12.dp), color = POS_INK, style = MaterialTheme.typography.bodyMedium)
+                            Text(copy.customerPrefixShort.format(customer.name), modifier = Modifier.padding(12.dp), color = POS_INK, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                     LazyColumn(
@@ -6078,6 +6078,7 @@ private fun NativeCartDrawer(
                     ) {
                         items(cart.products, key = { "product:${it.skuId}" }) { line ->
                             NativeCheckoutProductLine(
+                                copy,
                                 line = line,
                                 busy = busy,
                                 onAdd = { onAddProduct(line) },
@@ -6095,7 +6096,7 @@ private fun NativeCartDrawer(
                                     Text(line.name, color = POS_INK, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                                     Text("${line.ticketCode} · ×${line.quantity}", color = POS_MUTED, style = MaterialTheme.typography.labelSmall)
                                     TextButton(onClick = { onRemoveTicketItem(line.ticketItemId) }, enabled = !busy, contentPadding = PaddingValues(0.dp)) {
-                                        Text("移除服务项目", color = MaterialTheme.colorScheme.error)
+                                        Text(copy.removeServiceItem, color = MaterialTheme.colorScheme.error)
                                     }
                                 }
                             }
@@ -6107,7 +6108,7 @@ private fun NativeCartDrawer(
                         modifier = Modifier.fillMaxWidth().height(52.dp),
                         shape = RoundedCornerShape(16.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                    ) { Text("前往结款") }
+                    ) { Text(copy.goToPayment) }
                 }
             }
         }
@@ -6117,6 +6118,7 @@ private fun NativeCartDrawer(
 /** Mirrors POS Web's cart row: quantity can be changed or the line can be removed in one place. */
 @Composable
 private fun NativeCheckoutProductLine(
+    copy: NativePosCopy,
     line: NativeCartLine,
     busy: Boolean,
     onAdd: () -> Unit,
@@ -6142,7 +6144,7 @@ private fun NativeCheckoutProductLine(
                     Text(line.skuId, color = POS_MUTED, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 TextButton(onClick = onDelete, enabled = !busy, contentPadding = PaddingValues(horizontal = 4.dp, vertical = 0.dp)) {
-                    Text("删除", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
+                    Text(copy.delete, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.labelSmall)
                 }
             }
             CartQuantityStepper(quantity = line.quantity, onAdd = onAdd, onRemove = onRemove)
@@ -6243,8 +6245,8 @@ private fun NativeCashCheckoutDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text("确认结款", color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                        Text("本期仅支持现金收款；金额以服务端价格预览为准。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(copy.confirmPayment, color = POS_INK, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(copy.cashOnlyNotice, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     }
                     TextButton(onClick = onDismiss, enabled = !busy) { Text(copy.back) }
                 }
@@ -6258,16 +6260,16 @@ private fun NativeCashCheckoutDialog(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text("应收金额", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(copy.amountDue, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                         Text(formatMoney(totalMinor, cart.currency), color = POS_INK, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                        Text("${cart.itemCount} 项 · 现金", color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
+                        Text(copy.itemsCashSuffix.format(cart.itemCount), color = POS_MUTED, style = MaterialTheme.typography.labelMedium)
                     }
                 }
 
                 if (pricingLoading) {
-                    Text("正在核验商品价格、优惠和税费…", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.verifyingPricing, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                 } else if (pricingError != null) {
-                    Text("价格核验失败：$pricingError", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.pricingFailed.format(pricingError), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 } else {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -6278,19 +6280,19 @@ private fun NativeCashCheckoutDialog(
                             modifier = Modifier.fillMaxWidth().padding(14.dp),
                             verticalArrangement = Arrangement.spacedBy(7.dp),
                         ) {
-                            NativeCheckoutAmountRow("商品与服务", pricing.subtotalMinor, cart.currency)
+                            NativeCheckoutAmountRow(copy.productsAndServices, pricing.subtotalMinor, cart.currency)
                             pricing.discounts.forEach { discount ->
                                 NativeCheckoutAmountRow(discount.title, -discount.amountMinor, cart.currency, Color(0xFF16803A))
                             }
                             if (pricing.taxMinor != 0L) {
-                                val taxLabel = "税费 ${formatNativeTaxRate(pricing.taxRate)}${if (pricing.pricesIncludeTax) "（已含税）" else ""}"
+                                val taxLabel = copy.taxLabelWithRate.format(formatNativeTaxRate(pricing.taxRate)) + if (pricing.pricesIncludeTax) copy.taxIncluded else ""
                                 NativeCheckoutAmountRow(taxLabel, pricing.taxMinor, cart.currency)
                             }
                             if (pricing.roundingAdjustmentMinor != 0L) {
-                                NativeCheckoutAmountRow("系统抹零", pricing.roundingAdjustmentMinor, cart.currency)
+                                NativeCheckoutAmountRow(copy.systemRounding, pricing.roundingAdjustmentMinor, cart.currency)
                             }
                             if (cashRoundingDiscountMinor > 0L) {
-                                NativeCheckoutAmountRow("现金抹零", -cashRoundingDiscountMinor, cart.currency, Color(0xFF16803A))
+                                NativeCheckoutAmountRow(copy.cashRoundingLine, -cashRoundingDiscountMinor, cart.currency, Color(0xFF16803A))
                             }
                         }
                     }
@@ -6298,11 +6300,11 @@ private fun NativeCashCheckoutDialog(
 
                 if (canManageSensitiveOperations) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("优惠与税务", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(copy.discountsAndTax, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         TextField(
                             value = discountCode,
                             onValueChange = { discountCode = it },
-                            label = { Text("优惠码（可选）") },
+                            label = { Text(copy.discountCodeOptional) },
                             singleLine = true,
                             enabled = !busy && internetAvailable,
                             modifier = Modifier.fillMaxWidth(),
@@ -6311,7 +6313,7 @@ private fun NativeCashCheckoutDialog(
                             TextField(
                                 value = discountReason,
                                 onValueChange = { discountReason = it },
-                                label = { Text("使用优惠原因") },
+                                label = { Text(copy.discountReason) },
                                 singleLine = true,
                                 enabled = !busy && internetAvailable,
                                 modifier = Modifier.fillMaxWidth(),
@@ -6321,21 +6323,21 @@ private fun NativeCashCheckoutDialog(
                             TextField(
                                 value = taxExemptionReason,
                                 onValueChange = { taxExemptionReason = it },
-                                label = { Text("免税原因（可选）") },
+                                label = { Text(copy.taxExemptReason) },
                                 singleLine = true,
                                 enabled = !busy && internetAvailable,
                                 modifier = Modifier.fillMaxWidth(),
                             )
                         }
                         if (!internetAvailable) {
-                            Text("离线收银不支持优惠码或免税调整。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                            Text(copy.noOfflineDiscounts, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("现金抹零", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("按钱箱实际可找零面额向下抹零。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.cashRoundingLine, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(copy.cashRoundingHint, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     listOf(1, 5, 10, 25, 50, 100).chunked(3).forEach { row ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -6349,15 +6351,15 @@ private fun NativeCashCheckoutDialog(
                                     modifier = Modifier.weight(1f),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = if (selected) ButtonDefaults.buttonColors(containerColor = POS_ACCENT) else ButtonDefaults.buttonColors(containerColor = POS_PANEL_BACKGROUND, contentColor = POS_INK),
-                                ) { Text(if (step == 1) "不抹零" else "$step") }
+                                ) { Text(if (step == 1) copy.noRounding else "$step") }
                             }
                         }
                     }
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("实收现金", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text("请选择顾客交付的金额", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.cashReceivedTitle, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(copy.chooseTenderedAmount, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     cashTenderPresets(totalMinor, cart.currency).chunked(2).forEach { row ->
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -6391,13 +6393,13 @@ private fun NativeCashCheckoutDialog(
                         enabled = !busy,
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
-                    ) { Text("其他金额") }
+                    ) { Text(copy.otherAmount) }
                     if (useCustomTender) {
                         TextField(
                             value = customTenderedText,
                             onValueChange = { customTenderedText = it.filter { char -> char.isDigit() || char == '.' } },
-                            label = { Text("输入实收现金") },
-                            placeholder = { Text("例如 100.00") },
+                            label = { Text(copy.enterCashReceived) },
+                            placeholder = { Text(copy.amountPlaceholder) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )
@@ -6405,20 +6407,20 @@ private fun NativeCashCheckoutDialog(
                 }
 
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("小票交付", color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(copy.receiptDelivery, color = POS_INK, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         NativeReceiptDeliveryButton(copy,
-                            label = "打印小票",
+                            label = copy.receiptPrint,
                             selected = receiptDelivery == NativeReceiptDelivery.Print,
                             enabled = !busy && receiptPrinterConfigured,
                             onClick = { receiptDelivery = NativeReceiptDelivery.Print },
                             modifier = Modifier.weight(1f),
                         )
                         NativeReceiptDeliveryButton(copy,
-                            label = "不发送",
+                            label = copy.noSend,
                             selected = receiptDelivery == NativeReceiptDelivery.None,
                             enabled = !busy,
                             onClick = { receiptDelivery = NativeReceiptDelivery.None },
@@ -6430,14 +6432,14 @@ private fun NativeCashCheckoutDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         NativeReceiptDeliveryButton(copy,
-                            label = if (checkoutSettings.emailReceiptEnabled) "邮件小票" else "邮件未配置",
+                            label = if (checkoutSettings.emailReceiptEnabled) copy.emailReceipt else copy.emailNotConfigured,
                             selected = receiptDelivery == NativeReceiptDelivery.Email,
                             enabled = !busy && checkoutSettings.emailReceiptEnabled,
                             onClick = { receiptDelivery = NativeReceiptDelivery.Email },
                             modifier = Modifier.weight(1f),
                         )
                         NativeReceiptDeliveryButton(copy,
-                            label = "短信未配置",
+                            label = copy.smsNotConfigured,
                             selected = receiptDelivery == NativeReceiptDelivery.Sms,
                             enabled = false,
                             onClick = { receiptDelivery = NativeReceiptDelivery.Sms },
@@ -6445,7 +6447,7 @@ private fun NativeCashCheckoutDialog(
                         )
                     }
                     if (!receiptPrinterConfigured) {
-                        Text("请先在终端设置中绑定默认收据打印机。", color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
+                        Text(copy.bindDefaultPrinterFirst, color = POS_MUTED, style = MaterialTheme.typography.bodySmall)
                     }
                 }
 
@@ -6459,7 +6461,7 @@ private fun NativeCashCheckoutDialog(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("找零", color = Color(0xFF16803A), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(copy.changeLabel, color = Color(0xFF16803A), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                         Text(
                             formatMoney(changeMinor, cart.currency),
                             color = Color(0xFF16803A),
@@ -6470,7 +6472,7 @@ private fun NativeCashCheckoutDialog(
                 }
 
                 if (useCustomTender && customTenderedMinor == null) {
-                    Text("请输入有效的实收金额。", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Text(copy.enterValidTender, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 } else if (tenderedMinor != null && tenderedMinor < totalMinor) {
                     Text(copy.tenderBelowTotal, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                 }
@@ -6495,7 +6497,7 @@ private fun NativeCashCheckoutDialog(
                     modifier = Modifier.fillMaxWidth().height(54.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = POS_ACCENT),
-                ) { Text(if (busy) "正在保存…" else "确认收款") }
+                ) { Text(if (busy) copy.saving else copy.confirmCollection) }
             }
         }
     }
@@ -6614,7 +6616,7 @@ private fun JSONArray?.toNativeMoreOrderItems(): List<NativeMoreOrderItem> = bui
         val value = this@toNativeMoreOrderItems.optJSONObject(index) ?: continue
         add(NativeMoreOrderItem(
             id = value.optString("id"),
-            name = value.optString("itemName").ifBlank { "订单项目" },
+            name = value.optString("itemName").ifBlank { nativePosCopy(null).orderItemFallback },
             quantity = value.optString("quantity", "1"),
             lineAmount = value.optString("lineAmount", "0"),
         ))
@@ -6659,7 +6661,7 @@ private fun JSONObject.toNativeMoreTicket(currency: String): NativeServiceTicket
     id = optString("id"),
     ticketNo = optString("ticketNo").takeIf { it.isNotBlank() && it != "null" },
     customerId = optString("customerId"),
-    customerName = optString("customerName").ifBlank { "客户" },
+    customerName = optString("customerName").ifBlank { nativePosCopy(null).customerFallback },
     ticketType = optString("ticketType", "laundry"),
     ticketStatus = optString("ticketStatus", "pending"),
     priority = optString("priority", "normal"),
@@ -6675,8 +6677,8 @@ private fun JSONObject.toNativeMoreTicket(currency: String): NativeServiceTicket
 private fun JSONObject.toNativeMoreCustomer(): NativeCustomer = NativeCustomer(
     id = optString("id"),
     accountId = optString("customerAccountId"),
-    fullName = optString("fullName").ifBlank { "客户" },
-    accountName = optString("accountName").ifBlank { optString("fullName", "客户") },
+    fullName = optString("fullName").ifBlank { nativePosCopy(null).customerFallback },
+    accountName = optString("accountName").ifBlank { optString("fullName", nativePosCopy(null).customerFallback) },
     phone = optString("phone").takeIf { it.isNotBlank() && it != "null" },
     email = optString("email").takeIf { it.isNotBlank() && it != "null" },
     status = optString("status", "active"),
@@ -6763,7 +6765,7 @@ private fun JSONArray?.toNativeMoreNotifications(): List<NativeMoreNotification>
         val deliveryId = value.optString("id").takeIf { it.isNotBlank() } ?: continue
         add(NativeMoreNotification(
             deliveryId = deliveryId,
-            title = value.optString("title", "通知"),
+            title = value.optString("title", nativePosCopy(null).notificationFallback),
             content = value.optString("content", ""),
             priority = value.optString("priority", "normal"),
             readStatus = value.optString("readStatus", "unread"),
@@ -6832,7 +6834,7 @@ private fun JSONObject.toNativeCartPricing(): NativeCartPricing = NativeCartPric
             val entry = source.optJSONObject(index) ?: continue
             add(
                 NativeCartPricingDiscount(
-                    title = entry.optString("title").ifBlank { entry.optString("code", "优惠") },
+                    title = entry.optString("title").ifBlank { entry.optString("code", nativePosCopy(null).discountFallback) },
                     amountMinor = parseMoney(entry.optString("amount", "0")) ?: 0,
                 ),
             )
@@ -6953,7 +6955,7 @@ private fun buildNativeCashReceiptDraft(
 ): NativeReceiptPrintDraft {
     val total = amountDueMinor
     val change = (tenderedMinor - total).coerceAtLeast(0)
-    val terminalName = terminal?.terminalId?.takeLast(8)?.uppercase() ?: "本机终端"
+    val terminalName = terminal?.terminalId?.takeLast(8)?.uppercase() ?: copy.thisTerminalFallback
     val issuedAt = runCatching {
         java.time.ZonedDateTime.now(java.time.ZoneId.of(terminal?.timeZone ?: "UTC"))
             .toLocalDateTime()
@@ -6964,11 +6966,11 @@ private fun buildNativeCashReceiptDraft(
         content = buildList {
             add(terminal?.merchantName?.ifBlank { "CleanHub" } ?: "CleanHub")
             add(terminal?.branchName?.ifBlank { null } ?: "")
-            add("现金收据")
-            add("订单：${cart.checkoutId.takeLast(8).uppercase()}")
-            add("终端：$terminalName")
-            add("时间：$issuedAt")
-            cart.customer?.let { add("客户：${it.name}") }
+            add(copy.cashReceipt)
+            add(copy.orderLinePrefix.format(cart.checkoutId.takeLast(8).uppercase()))
+            add(copy.terminalLinePrefix.format(terminalName))
+            add(copy.timeLinePrefix.format(issuedAt))
+            cart.customer?.let { add(copy.receiptCustomerPrefix.format(it.name)) }
             add("------------------------------")
             cart.products.forEach { line ->
                 add("${line.name} ×${line.quantity}  ${formatMoney(line.amountMinor * line.quantity, cart.currency)}")
@@ -6977,10 +6979,10 @@ private fun buildNativeCashReceiptDraft(
                 add("${line.name} ×${line.quantity}  ${formatMoney(line.lineAmountMinor, cart.currency)}")
             }
             add("------------------------------")
-            add("应收：${formatMoney(total, cart.currency)}")
-            add("实收现金：${formatMoney(tenderedMinor, cart.currency)}")
-            if (change > 0) add("找零：${formatMoney(change, cart.currency)}")
-            add("谢谢惠顾")
+            add(copy.receiptDuePrefix.format(formatMoney(total, cart.currency)))
+            add(copy.receiptTenderedPrefix.format(formatMoney(tenderedMinor, cart.currency)))
+            if (change > 0) add(copy.receiptChangePrefix.format(formatMoney(change, cart.currency)))
+            add(copy.thankYou)
             add("")
         }.filter { it.isNotBlank() }.joinToString("\n"),
     )
@@ -6989,7 +6991,7 @@ private fun buildNativeCashReceiptDraft(
 private fun formatMoney(minor: Long, currency: String): String = "%s %d.%02d".format(java.util.Locale.ROOT, currency, minor / 100, minor % 100)
 
 private fun formatNativeActivityTime(value: String): String {
-    if (value.isBlank()) return "刚刚更新"
+    if (value.isBlank()) return nativePosCopy(null).justUpdated
     return runCatching {
         java.time.Instant.parse(value)
             .atZone(java.time.ZoneId.systemDefault())
@@ -7004,11 +7006,11 @@ private fun JSONArray?.toSetupBranches(): List<NativeSetupBranch> = buildList {
         if (branch.optString("status") == "active") add(NativeSetupBranch(branch.getString("id"), branch.getString("name")))
     }
 }
-private fun Throwable.administratorLoginMessage(): String {
+private fun Throwable.administratorLoginMessage(copy: NativePosCopy = nativePosCopy(null)): String {
     if (this is NativePosApiException) {
         return when (code) {
-            "INVALID_CREDENTIALS" -> "账号或密码错误，请重试。"
-            "ACCOUNT_LOCKED" -> "登录尝试过多，账号已暂时锁定。"
+            "INVALID_CREDENTIALS" -> copy.invalidCredentials
+            "ACCOUNT_LOCKED" -> copy.accountLocked
             else -> userMessage()
         }
     }
@@ -7028,11 +7030,11 @@ private fun Throwable.userMessage(copy: NativePosCopy = nativePosCopy(null)): St
     // IOException, so it has to be recognised here or the cashier sees the
     // underlying socket message instead of something actionable.
     is NativePosApiException -> when {
-        code == "INVALID_CREDENTIALS" -> "PIN 错误，请重试。"
+        code == "INVALID_CREDENTIALS" -> copy.pinIncorrectShort
         code == "NETWORK_ERROR" -> copy.networkError
-        else -> message ?: "无法连接 POS 服务。"
+        else -> message ?: copy.cannotReachPos
     }
     is IOException -> copy.networkError
-    is NativePosValidationException -> message ?: "输入无效。"
+    is NativePosValidationException -> message ?: copy.invalidInput
     else -> copy.genericFailure
 }

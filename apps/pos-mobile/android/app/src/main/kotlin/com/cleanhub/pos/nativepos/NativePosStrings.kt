@@ -439,10 +439,466 @@ internal class NativePosCopy(
     val receiptQueueSummary: String get() = get("receiptQueueSummary")
     val printNextReceipt: String get() = get("printNextReceipt")
     val useDefaultPrinterHint: String get() = get("useDefaultPrinterHint")
+    val unknownBuiltInDevice: String get() = get("unknownBuiltInDevice")
+    val deviceUnavailable: String get() = get("deviceUnavailable")
+    val printerRegistrationTest: String get() = get("printerRegistrationTest")
+    val scanTestSucceeded: String get() = get("scanTestSucceeded")
+    val printerRegistered: String get() = get("printerRegistered")
+    val scannerRegistered: String get() = get("scannerRegistered")
+    val barcodeReadRegistering: String get() = get("barcodeReadRegistering")
+    val scannerReadyEverywhere: String get() = get("scannerReadyEverywhere")
+    val scanTestResult: String get() = get("scanTestResult")
+    val scanReadSucceeded: String get() = get("scanReadSucceeded")
+    val scanTestCancelled: String get() = get("scanTestCancelled")
+    val scannerReturnedNothing: String get() = get("scannerReturnedNothing")
+    val noBarcodeScanAgain: String get() = get("noBarcodeScanAgain")
+    val noReceiptToPrint: String get() = get("noReceiptToPrint")
+    val offlineStockShort: String get() = get("offlineStockShort")
+    val stockShort: String get() = get("stockShort")
+    val addedToTill: String get() = get("addedToTill")
+    val failedSalesNeedManager: String get() = get("failedSalesNeedManager")
+    val replayedSales: String get() = get("replayedSales")
+    val syncedCatalogShift: String get() = get("syncedCatalogShift")
+    val offlineDrillOn: String get() = get("offlineDrillOn")
+    val noNetworkToRestore: String get() = get("noNetworkToRestore")
+    val refreshedHardwareAndDevices: String get() = get("refreshedHardwareAndDevices")
+    val refreshedHardware: String get() = get("refreshedHardware")
+    val bluetoothNeedsRestart: String get() = get("bluetoothNeedsRestart")
+    val bluetoothAllowed: String get() = get("bluetoothAllowed")
+    val bluetoothPromptHint: String get() = get("bluetoothPromptHint")
+    val noPairedBluetoothPrinters: String get() = get("noPairedBluetoothPrinters")
+    val readPairedPrinters: String get() = get("readPairedPrinters")
+    val bindNeedsNetwork: String get() = get("bindNeedsNetwork")
+    val bluetoothTestTitle: String get() = get("bluetoothTestTitle")
+    val printerLinePrefix: String get() = get("printerLinePrefix")
+    val terminalLinePrefix: String get() = get("terminalLinePrefix")
+    val notRegistered: String get() = get("notRegistered")
+    val boundPrinter: String get() = get("boundPrinter")
+    val printerTestPageTitle: String get() = get("printerTestPageTitle")
+    val timeLinePrefix: String get() = get("timeLinePrefix")
+    val useSystemScanner: String get() = get("useSystemScanner")
+    val registrationNeedsNetwork: String get() = get("registrationNeedsNetwork")
+    val scanAnyBarcode: String get() = get("scanAnyBarcode")
+    val drawerNeedsNetworkAuth: String get() = get("drawerNeedsNetworkAuth")
+    val branchNotFound: String get() = get("branchNotFound")
+    val localBranchNotFound: String get() = get("localBranchNotFound")
+    val orderDetailNeedsNetwork: String get() = get("orderDetailNeedsNetwork")
+    val offlineSearchLimited: String get() = get("offlineSearchLimited")
+    val ticketNotCached: String get() = get("ticketNotCached")
+    val customerNotCached: String get() = get("customerNotCached")
+    val settingsNeedNetwork: String get() = get("settingsNeedNetwork")
+    val settingsOutOfRange: String get() = get("settingsOutOfRange")
+    val settingsSaved: String get() = get("settingsSaved")
+    val shiftNeedsNetwork: String get() = get("shiftNeedsNetwork")
+    val breakStarted: String get() = get("breakStarted")
+    val breakEnded: String get() = get("breakEnded")
+    val cashMovementNeedsNetwork: String get() = get("cashMovementNeedsNetwork")
+    val cashMovementInvalid: String get() = get("cashMovementInvalid")
+    val payInRecorded: String get() = get("payInRecorded")
+    val payOutRecorded: String get() = get("payOutRecorded")
+    val cacheRefreshesLater: String get() = get("cacheRefreshesLater")
+    val orderPaymentNeedsNetwork: String get() = get("orderPaymentNeedsNetwork")
+    val needOpenCashSession: String get() = get("needOpenCashSession")
+    val tenderBelowOutstanding: String get() = get("tenderBelowOutstanding")
+    val orderStatusNeedsNetwork: String get() = get("orderStatusNeedsNetwork")
+    val orderStatusUpdated: String get() = get("orderStatusUpdated")
+    val notificationNeedsNetwork: String get() = get("notificationNeedsNetwork")
+    val allNotificationsRead: String get() = get("allNotificationsRead")
+    val archiveNeedsNetwork: String get() = get("archiveNeedsNetwork")
+    val loginSucceeded: String get() = get("loginSucceeded")
+    val pinTemporarilyLocked: String get() = get("pinTemporarilyLocked")
+    val pinIncorrect: String get() = get("pinIncorrect")
+    val shiftStartedOpenDrawer: String get() = get("shiftStartedOpenDrawer")
+    val openRegisterNeedsNetwork: String get() = get("openRegisterNeedsNetwork")
+    val floatInvalid: String get() = get("floatInvalid")
+    val registerOpenedOfflineReady: String get() = get("registerOpenedOfflineReady")
+    val registerOpenedCacheLater: String get() = get("registerOpenedCacheLater")
+    val closeRegisterNeedsNetwork: String get() = get("closeRegisterNeedsNetwork")
+    val registerClosedZReady: String get() = get("registerClosedZReady")
+    val registerClosedCacheLater: String get() = get("registerClosedCacheLater")
+    val shiftEndedNextCashier: String get() = get("shiftEndedNextCashier")
+    val createCustomerNeedsNetwork: String get() = get("createCustomerNeedsNetwork")
+    val customerCreated: String get() = get("customerCreated")
+    val pickupTimeInvalid: String get() = get("pickupTimeInvalid")
+    val ticketCreated: String get() = get("ticketCreated")
+    val weightRequired: String get() = get("weightRequired")
+    val bagCountRequired: String get() = get("bagCountRequired")
+    val itemAddedToTicket: String get() = get("itemAddedToTicket")
+    val itemUpdated: String get() = get("itemUpdated")
+    val deleteReasonMissing: String get() = get("deleteReasonMissing")
+    val itemDeleted: String get() = get("itemDeleted")
+    val itemCannotTransition: String get() = get("itemCannotTransition")
+    val itemStatusUpdated: String get() = get("itemStatusUpdated")
+    val ticketCurrencyMismatch: String get() = get("ticketCurrencyMismatch")
+    val cartHasOtherCustomer: String get() = get("cartHasOtherCustomer")
+    val ticketItemsAlreadyInCart: String get() = get("ticketItemsAlreadyInCart")
+    val addedTicketItemsToCart: String get() = get("addedTicketItemsToCart")
+    val ticketCannotTransition: String get() = get("ticketCannotTransition")
+    val cancelReasonMissing: String get() = get("cancelReasonMissing")
+    val ticketStatusUpdated: String get() = get("ticketStatusUpdated")
+    val managerOnlyEnroll: String get() = get("managerOnlyEnroll")
+    val noBranchesAvailable: String get() = get("noBranchesAvailable")
+    val terminalEnrolled: String get() = get("terminalEnrolled")
+    val managerOnlyRecover: String get() = get("managerOnlyRecover")
+    val terminalRecovered: String get() = get("terminalRecovered")
+    val cashCheckoutFailedTitle: String get() = get("cashCheckoutFailedTitle")
+    val cartKeptAfterFailure: String get() = get("cartKeptAfterFailure")
+    val gotIt: String get() = get("gotIt")
+    val shiftStatusUpdated: String get() = get("shiftStatusUpdated")
+    val testAndRegisterScanner: String get() = get("testAndRegisterScanner")
+    val scanTest: String get() = get("scanTest")
+    val useInfraredHead: String get() = get("useInfraredHead")
+    val cancel: String get() = get("cancel")
+    val done: String get() = get("done")
+    val scanningContinuously: String get() = get("scanningContinuously")
+    val readComplete: String get() = get("readComplete")
+    val infraredReady: String get() = get("infraredReady")
+    val scanAnyToRegister: String get() = get("scanAnyToRegister")
+    val aimAnyBarcode: String get() = get("aimAnyBarcode")
+    val barcodeRead: String get() = get("barcodeRead")
+    val savingRegistration: String get() = get("savingRegistration")
+    val noOrdinaryCamera: String get() = get("noOrdinaryCamera")
+    val restoreOnline: String get() = get("restoreOnline")
+    val offlineDrill: String get() = get("offlineDrill")
+    val lock: String get() = get("lock")
+    val newCustomerToggle: String get() = get("newCustomerToggle")
+    val startSale: String get() = get("startSale")
+    val markRead: String get() = get("markRead")
+    val markAllRead: String get() = get("markAllRead")
+    val openRelated: String get() = get("openRelated")
+    val openNotification: String get() = get("openNotification")
+    val loadingLocalData: String get() = get("loadingLocalData")
+    val initialiseTerminal: String get() = get("initialiseTerminal")
+    val initialiseIntro: String get() = get("initialiseIntro")
+    val noApiUrl: String get() = get("noApiUrl")
+    val startInitialisation: String get() = get("startInitialisation")
+    val managerLogin: String get() = get("managerLogin")
+    val managerLoginIntro: String get() = get("managerLoginIntro")
+    val emailLabel: String get() = get("emailLabel")
+    val passwordLabel: String get() = get("passwordLabel")
+    val signIn: String get() = get("signIn")
+    val rebindTerminal: String get() = get("rebindTerminal")
+    val bindTerminal: String get() = get("bindTerminal")
+    val rebindWarning: String get() = get("rebindWarning")
+    val selectStore: String get() = get("selectStore")
+    val revokeAndRebind: String get() = get("revokeAndRebind")
+    val bindAndContinue: String get() = get("bindAndContinue")
+    val recoverCredential: String get() = get("recoverCredential")
+    val recoverIntro: String get() = get("recoverIntro")
+    val recover: String get() = get("recover")
+    val catalogNeedsUpdate: String get() = get("catalogNeedsUpdate")
+    val catalogExpired: String get() = get("catalogExpired")
+    val syncNow: String get() = get("syncNow")
+    val deviceOnline: String get() = get("deviceOnline")
+    val deviceOffline: String get() = get("deviceOffline")
+    val pendingCount: String get() = get("pendingCount")
+    val checkoutVerifiesOnline: String get() = get("checkoutVerifiesOnline")
+    val offlineTill: String get() = get("offlineTill")
+    val pendingSyncSuffix: String get() = get("pendingSyncSuffix")
+    val offlineStockShortShort: String get() = get("offlineStockShortShort")
+    val addPlus: String get() = get("addPlus")
+    val cartTitle: String get() = get("cartTitle")
+    val noItemsSelected: String get() = get("noItemsSelected")
+    val cartEmptyShort: String get() = get("cartEmptyShort")
+    val viewCartDetail: String get() = get("viewCartDetail")
+    val customerPrefixShort: String get() = get("customerPrefixShort")
+    val amountDueShort: String get() = get("amountDueShort")
+    val cashOrderPrefix: String get() = get("cashOrderPrefix")
+    val pay: String get() = get("pay")
+    val cartDetail: String get() = get("cartDetail")
+    val close: String get() = get("close")
+    val removeServiceItem: String get() = get("removeServiceItem")
+    val goToPayment: String get() = get("goToPayment")
+    val delete: String get() = get("delete")
+    val confirmPayment: String get() = get("confirmPayment")
+    val cashOnlyNotice: String get() = get("cashOnlyNotice")
+    val itemsCashSuffix: String get() = get("itemsCashSuffix")
+    val verifyingPricing: String get() = get("verifyingPricing")
+    val pricingFailed: String get() = get("pricingFailed")
+    val productsAndServices: String get() = get("productsAndServices")
+    val taxLabelWithRate: String get() = get("taxLabelWithRate")
+    val taxIncluded: String get() = get("taxIncluded")
+    val systemRounding: String get() = get("systemRounding")
+    val cashRoundingLine: String get() = get("cashRoundingLine")
+    val discountsAndTax: String get() = get("discountsAndTax")
+    val discountCodeOptional: String get() = get("discountCodeOptional")
+    val discountReason: String get() = get("discountReason")
+    val taxExemptReason: String get() = get("taxExemptReason")
+    val noOfflineDiscounts: String get() = get("noOfflineDiscounts")
+    val cashRoundingHint: String get() = get("cashRoundingHint")
+    val noRounding: String get() = get("noRounding")
+    val cashReceivedTitle: String get() = get("cashReceivedTitle")
+    val chooseTenderedAmount: String get() = get("chooseTenderedAmount")
+    val otherAmount: String get() = get("otherAmount")
+    val enterCashReceived: String get() = get("enterCashReceived")
+    val amountPlaceholder: String get() = get("amountPlaceholder")
+    val receiptDelivery: String get() = get("receiptDelivery")
+    val noSend: String get() = get("noSend")
+    val emailReceipt: String get() = get("emailReceipt")
+    val emailNotConfigured: String get() = get("emailNotConfigured")
+    val smsNotConfigured: String get() = get("smsNotConfigured")
+    val bindDefaultPrinterFirst: String get() = get("bindDefaultPrinterFirst")
+    val changeLabel: String get() = get("changeLabel")
+    val enterValidTender: String get() = get("enterValidTender")
+    val confirmCollection: String get() = get("confirmCollection")
+    val orderItemFallback: String get() = get("orderItemFallback")
+    val customerFallback: String get() = get("customerFallback")
+    val notificationFallback: String get() = get("notificationFallback")
+    val discountFallback: String get() = get("discountFallback")
+    val thisTerminalFallback: String get() = get("thisTerminalFallback")
+    val cashReceipt: String get() = get("cashReceipt")
+    val orderLinePrefix: String get() = get("orderLinePrefix")
+    val receiptCustomerPrefix: String get() = get("receiptCustomerPrefix")
+    val receiptDuePrefix: String get() = get("receiptDuePrefix")
+    val receiptTenderedPrefix: String get() = get("receiptTenderedPrefix")
+    val receiptChangePrefix: String get() = get("receiptChangePrefix")
+    val thankYou: String get() = get("thankYou")
+    val justUpdated: String get() = get("justUpdated")
+    val invalidCredentials: String get() = get("invalidCredentials")
+    val accountLocked: String get() = get("accountLocked")
+    val pinIncorrectShort: String get() = get("pinIncorrectShort")
+    val cannotReachPos: String get() = get("cannotReachPos")
+    val invalidInput: String get() = get("invalidInput")
+    val statusHeading: String get() = get("statusHeading")
+    val collapseRegistration: String get() = get("collapseRegistration")
+    val goToTill: String get() = get("goToTill")
+    val openRelatedOrder: String get() = get("openRelatedOrder")
+    val openRelatedTicket: String get() = get("openRelatedTicket")
+    val customerIntakePrefix: String get() = get("customerIntakePrefix")
+    val verifyAndSelectStore: String get() = get("verifyAndSelectStore")
+    val reissueCredential: String get() = get("reissueCredential")
     val openTicket: String get() = get("openTicket")
 }
 
 private val COPY_ZH_VALUES: Map<String, String> = mapOf(
+    "verifyAndSelectStore" to "验证并选择门店",
+    "reissueCredential" to "重新签发终端凭证",
+    "customerIntakePrefix" to "客户 %s · 服务开单",
+    "collapseRegistration" to "收起建档",
+    "goToTill" to "前往收银",
+    "openRelatedOrder" to "打开关联订单",
+    "openRelatedTicket" to "打开关联工单",
+    "shiftStatusUpdated" to "班次状态已更新。",
+    "testAndRegisterScanner" to "测试并登记扫码器",
+    "scanTest" to "扫码测试",
+    "useInfraredHead" to "使用设备顶部的红外扫码头读取条码",
+    "cancel" to "取消",
+    "done" to "完成",
+    "scanningContinuously" to "持续扫描中",
+    "readComplete" to "读取完成",
+    "infraredReady" to "红外扫码模块已就绪",
+    "scanAnyToRegister" to "扫描任意条码后，系统会自动完成扫码器登记。",
+    "aimAnyBarcode" to "将任意条码对准设备顶部扫码窗，读取结果会自动显示。",
+    "barcodeRead" to "已读取条码",
+    "savingRegistration" to "正在保存设备登记…",
+    "noOrdinaryCamera" to "本设备没有普通摄像头，扫码使用独立的红外扫码模块。",
+    "restoreOnline" to "恢复联网",
+    "offlineDrill" to "离线演练",
+    "lock" to "锁定",
+    "newCustomerToggle" to "新建客户",
+    "startSale" to "开始收银",
+    "markRead" to "标记已读",
+    "markAllRead" to "全部已读",
+    "openRelated" to "查看关联",
+    "openNotification" to "查看通知",
+    "loadingLocalData" to "正在加载本地 POS 数据…",
+    "initialiseTerminal" to "初始化此 POS 终端",
+    "initialiseIntro" to "首次需联网，由店主或经理绑定门店。完成后，收银界面、商品、现金订单和同步队列都运行在此 APK 的本地数据库中。",
+    "noApiUrl" to "此安装包没有 POS API 地址，无法完成初始化。",
+    "startInitialisation" to "开始初始化",
+    "managerLogin" to "店主或经理登录",
+    "managerLoginIntro" to "此登录只用于绑定本台设备；绑定完成后会立即退出管理员账号。",
+    "emailLabel" to "邮箱",
+    "passwordLabel" to "密码",
+    "signIn" to "登录",
+    "rebindTerminal" to "重新绑定本台终端",
+    "bindTerminal" to "绑定本台终端",
+    "rebindWarning" to "检测到本机此前已绑定 POS。确认后会撤销旧终端凭证并关闭其未完成班次，再按下面选择的门店重新绑定。",
+    "selectStore" to "选择门店",
+    "revokeAndRebind" to "撤销旧终端并重新绑定",
+    "bindAndContinue" to "绑定并继续",
+    "recoverCredential" to "恢复此终端的凭证",
+    "recoverIntro" to "检测到此前 POS 的本地数据，但原有终端凭证不能迁移到原生安全存储。请由店主或经理重新签发本台设备凭证。",
+    "recover" to "恢复凭证",
+    "catalogNeedsUpdate" to "本地目录需要更新",
+    "catalogExpired" to "离线目录超过有效期。恢复网络并同步后，才能继续销售；已保存的现金订单仍保留在本机。",
+    "syncNow" to "立即同步",
+    "deviceOnline" to "设备已联网",
+    "deviceOffline" to "设备离线",
+    "pendingCount" to "%d 笔待处理",
+    "checkoutVerifiesOnline" to "本次收款会先联网核验班次和钱箱状态。",
+    "offlineTill" to "离线收银",
+    "pendingSyncSuffix" to "%s · 待同步 %d 笔",
+    "offlineStockShortShort" to "离线库存不足",
+    "addPlus" to "加入 +",
+    "cartTitle" to "购物车",
+    "noItemsSelected" to "尚未选择项目",
+    "cartEmptyShort" to "购物车为空",
+    "viewCartDetail" to "查看购物车明细 · %d 项",
+    "customerPrefixShort" to "客户：%s",
+    "amountDueShort" to "应收",
+    "cashOrderPrefix" to "现金订单已",
+    "pay" to "结款",
+    "cartDetail" to "购物车明细",
+    "close" to "关闭",
+    "removeServiceItem" to "移除服务项目",
+    "goToPayment" to "前往结款",
+    "delete" to "删除",
+    "confirmPayment" to "确认结款",
+    "cashOnlyNotice" to "本期仅支持现金收款；金额以服务端价格预览为准。",
+    "itemsCashSuffix" to "%d 项 · 现金",
+    "verifyingPricing" to "正在核验商品价格、优惠和税费…",
+    "pricingFailed" to "价格核验失败：%s",
+    "productsAndServices" to "商品与服务",
+    "taxLabelWithRate" to "税费 %s",
+    "taxIncluded" to "（已含税）",
+    "systemRounding" to "系统抹零",
+    "cashRoundingLine" to "现金抹零",
+    "discountsAndTax" to "优惠与税务",
+    "discountCodeOptional" to "优惠码（可选）",
+    "discountReason" to "使用优惠原因",
+    "taxExemptReason" to "免税原因（可选）",
+    "noOfflineDiscounts" to "离线收银不支持优惠码或免税调整。",
+    "cashRoundingHint" to "按钱箱实际可找零面额向下抹零。",
+    "noRounding" to "不抹零",
+    "cashReceivedTitle" to "实收现金",
+    "chooseTenderedAmount" to "请选择顾客交付的金额",
+    "otherAmount" to "其他金额",
+    "enterCashReceived" to "输入实收现金",
+    "amountPlaceholder" to "例如 100.00",
+    "receiptDelivery" to "小票交付",
+    "noSend" to "不发送",
+    "emailReceipt" to "邮件小票",
+    "emailNotConfigured" to "邮件未配置",
+    "smsNotConfigured" to "短信未配置",
+    "bindDefaultPrinterFirst" to "请先在终端设置中绑定默认收据打印机。",
+    "changeLabel" to "找零",
+    "enterValidTender" to "请输入有效的实收金额。",
+    "confirmCollection" to "确认收款",
+    "orderItemFallback" to "订单项目",
+    "customerFallback" to "客户",
+    "notificationFallback" to "通知",
+    "discountFallback" to "优惠",
+    "thisTerminalFallback" to "本机终端",
+    "cashReceipt" to "现金收据",
+    "orderLinePrefix" to "订单：%s",
+    "receiptCustomerPrefix" to "客户：%s",
+    "receiptDuePrefix" to "应收：%s",
+    "receiptTenderedPrefix" to "实收现金：%s",
+    "receiptChangePrefix" to "找零：%s",
+    "thankYou" to "谢谢惠顾",
+    "justUpdated" to "刚刚更新",
+    "invalidCredentials" to "账号或密码错误，请重试。",
+    "accountLocked" to "登录尝试过多，账号已暂时锁定。",
+    "pinIncorrectShort" to "PIN 错误，请重试。",
+    "cannotReachPos" to "无法连接 POS 服务。",
+    "invalidInput" to "输入无效。",
+    "statusHeading" to "状态",
+    "unknownBuiltInDevice" to "未识别的内置设备。",
+    "deviceUnavailable" to "本机 %s 当前不可用，请先刷新状态并完成设备测试。",
+    "printerRegistrationTest" to "内置打印机登记测试",
+    "scanTestSucceeded" to "扫码测试成功。",
+    "printerRegistered" to "内置打印机已测试并登记为收据打印机。",
+    "scannerRegistered" to "扫码测试成功，内置扫码器已登记。",
+    "barcodeReadRegistering" to "条码已读取，正在登记内置扫码器…",
+    "scannerReadyEverywhere" to "内置扫码器已登记，可在收银、开单和查询页直接使用。",
+    "scanTestResult" to "扫码测试成功：%s",
+    "scanReadSucceeded" to "扫码读取成功。",
+    "scanTestCancelled" to "扫码测试已取消。",
+    "scannerReturnedNothing" to "系统扫码器没有返回有效条码。",
+    "noBarcodeScanAgain" to "没有读取到条码内容，请再扫描一次。",
+    "noReceiptToPrint" to "没有待打印的收据。",
+    "offlineStockShort" to "%s 的离线可用库存不足。",
+    "stockShort" to "%s 的可用库存不足。",
+    "addedToTill" to "%s 已加入收银清单。",
+    "failedSalesNeedManager" to "有 %d 笔离线现金订单需要管理员处理。",
+    "replayedSales" to "已同步 %d 笔离线现金订单。",
+    "syncedCatalogShift" to "目录、班次和钱箱状态已同步。",
+    "offlineDrillOn" to "已进入离线演练：应用将只使用本机缓存和离线队列；设备网络未被关闭。",
+    "noNetworkToRestore" to "设备当前没有可用网络，无法恢复联网模式。",
+    "refreshedHardwareAndDevices" to "已刷新本机硬件和已登记设备。",
+    "refreshedHardware" to "已刷新本机硬件状态。",
+    "bluetoothNeedsRestart" to "当前终端无法发起蓝牙授权，请重新打开 POS。",
+    "bluetoothAllowed" to "蓝牙权限已允许，请点击“读取已配对设备”。",
+    "bluetoothPromptHint" to "请在系统弹窗中允许“附近设备”权限，然后点击“读取已配对打印机”。",
+    "noPairedBluetoothPrinters" to "没有读取到已配对的蓝牙打印机。",
+    "readPairedPrinters" to "已读取 %d 台已配对蓝牙打印机。",
+    "bindNeedsNetwork" to "绑定蓝牙打印机需要联网保存终端配置。",
+    "bluetoothTestTitle" to "蓝牙打印机连接测试",
+    "printerLinePrefix" to "打印机：%s",
+    "terminalLinePrefix" to "终端：%s",
+    "notRegistered" to "未登记",
+    "boundPrinter" to "已测试并绑定 %s。",
+    "printerTestPageTitle" to "内置打印机测试页",
+    "timeLinePrefix" to "时间：%s",
+    "useSystemScanner" to "请使用系统扫码器扫描条码；扫描完成后会回到 POS 显示结果。",
+    "registrationNeedsNetwork" to "设备登记需要联网；离线时仍可使用已配置的本机硬件。",
+    "scanAnyBarcode" to "请扫描任意条码完成测试；读取成功后会自动登记内置扫码器。",
+    "drawerNeedsNetworkAuth" to "手动开钱箱需要联网授权。",
+    "branchNotFound" to "未找到当前门店，请先同步。",
+    "localBranchNotFound" to "未找到本机门店信息，请先同步。",
+    "orderDetailNeedsNetwork" to "订单详情和订单收款需要联网。",
+    "offlineSearchLimited" to "设备离线时只能检索本机已缓存的客户、商品和工单。",
+    "ticketNotCached" to "该工单尚未缓存，请恢复网络后打开。",
+    "customerNotCached" to "该客户尚未缓存，请恢复网络后打开。",
+    "settingsNeedNetwork" to "设备离线时不能修改终端设置。",
+    "settingsOutOfRange" to "自动锁定时间应为 30–86400 秒，打印份数应为 1–3。",
+    "settingsSaved" to "终端设置已保存。",
+    "shiftNeedsNetwork" to "班次操作需要联网提交。",
+    "breakStarted" to "已开始休息。",
+    "breakEnded" to "已结束休息。",
+    "cashMovementNeedsNetwork" to "现金存入和支出需要联网提交。",
+    "cashMovementInvalid" to "请输入大于 0 的金额和至少 3 个字的原因。",
+    "payInRecorded" to "现金存入已记录。",
+    "payOutRecorded" to "现金支出已记录。",
+    "cacheRefreshesLater" to "%s 本机缓存稍后会自动刷新。",
+    "orderPaymentNeedsNetwork" to "已有订单的收款需要联网；离线现金销售请从收银页创建。",
+    "needOpenCashSession" to "请先在班次与收银中开启可用的钱箱会话。",
+    "tenderBelowOutstanding" to "实收现金必须不小于待收金额 %s。",
+    "orderStatusNeedsNetwork" to "订单状态更新需要联网。",
+    "orderStatusUpdated" to "订单状态已更新。",
+    "notificationNeedsNetwork" to "设备离线时无法更新通知状态。",
+    "allNotificationsRead" to "全部通知已标记为已读。",
+    "archiveNeedsNetwork" to "设备离线时无法归档通知。",
+    "loginSucceeded" to "员工登录成功，本地目录与收银状态已更新。",
+    "pinTemporarilyLocked" to "PIN 已临时锁定，请 %d 秒后重试。",
+    "pinIncorrect" to "PIN 不正确，请重试。",
+    "shiftStartedOpenDrawer" to "班次已开始，请打开钱箱后收银。",
+    "openRegisterNeedsNetwork" to "开启收银台需要联网提交。",
+    "floatInvalid" to "备用金必须是大于或等于 0 的金额。",
+    "registerOpenedOfflineReady" to "收银台已开启；现在可以离线收取现金。",
+    "registerOpenedCacheLater" to "收银台已开启；本机缓存稍后会自动刷新。",
+    "closeRegisterNeedsNetwork" to "关闭收银台需要联网提交。",
+    "registerClosedZReady" to "收银台已关闭，日结数据已生成。",
+    "registerClosedCacheLater" to "收银台已关闭；本机缓存稍后会自动刷新。",
+    "shiftEndedNextCashier" to "班次已结束，请由下一位员工输入 PIN 登录。",
+    "createCustomerNeedsNetwork" to "创建客户需要联网；恢复网络后即可继续。",
+    "customerCreated" to "客户已创建并同步到本机。",
+    "pickupTimeInvalid" to "预计取件时间格式无效，请使用 YYYY-MM-DD HH:mm。",
+    "ticketCreated" to "服务工单已创建。请在工单详情中录入服务项目。",
+    "weightRequired" to "请输入服务重量。",
+    "bagCountRequired" to "请输入袋数。",
+    "itemAddedToTicket" to "服务项目已加入工单。",
+    "itemUpdated" to "服务项目已更新。",
+    "deleteReasonMissing" to "删除服务项目时必须填写原因。",
+    "itemDeleted" to "服务项目已删除。",
+    "itemCannotTransition" to "该服务项目当前不能继续流转。",
+    "itemStatusUpdated" to "服务项目状态已更新。",
+    "ticketCurrencyMismatch" to "工单币种与当前门店币种不一致。",
+    "cartHasOtherCustomer" to "购物车中已有其他客户的项目，请先完成或清空购物车。",
+    "ticketItemsAlreadyInCart" to "该工单的项目已经在购物车中。",
+    "addedTicketItemsToCart" to "已将 %d 个工单项目加入收银购物车。",
+    "ticketCannotTransition" to "该工单当前不能继续流转。",
+    "cancelReasonMissing" to "取消工单时必须填写原因。",
+    "ticketStatusUpdated" to "工单状态已更新为“%s”。",
+    "managerOnlyEnroll" to "只有店主或经理可以初始化 POS 终端。",
+    "noBranchesAvailable" to "该账号没有可用门店。",
+    "terminalEnrolled" to "终端已绑定。请使用员工 6 位 PIN 完成首次登录。",
+    "managerOnlyRecover" to "只有店主或经理可以恢复终端凭证。",
+    "terminalRecovered" to "终端凭证已恢复。请使用员工 PIN 登录并同步。",
+    "cashCheckoutFailedTitle" to "无法完成现金结款",
+    "cartKeptAfterFailure" to "本次收款没有完成，购物车内容仍会保留。",
+    "gotIt" to "知道了",
     "online" to "已联网",
     "offline" to "离线",
     "offlineMode" to "离线模式",
@@ -851,6 +1307,234 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_EN_VALUES: Map<String, String> = mapOf(
+    "verifyAndSelectStore" to "Verify and choose a store",
+    "reissueCredential" to "Reissue the terminal credential",
+    "customerIntakePrefix" to "Customer %s · start a ticket",
+    "collapseRegistration" to "Hide the form",
+    "goToTill" to "Go to the till",
+    "openRelatedOrder" to "Open the linked order",
+    "openRelatedTicket" to "Open the linked ticket",
+    "shiftStatusUpdated" to "Shift status updated.",
+    "testAndRegisterScanner" to "Test and register the scanner",
+    "scanTest" to "Scan test",
+    "useInfraredHead" to "Use the infrared scan head on top of the device to read a barcode",
+    "cancel" to "Cancel",
+    "done" to "Done",
+    "scanningContinuously" to "Scanning",
+    "readComplete" to "Read complete",
+    "infraredReady" to "The infrared scan module is ready",
+    "scanAnyToRegister" to "Scan any barcode and the scanner registers itself.",
+    "aimAnyBarcode" to "Aim any barcode at the scan window on top of the device; the result appears automatically.",
+    "barcodeRead" to "Barcode read",
+    "savingRegistration" to "Saving the device registration…",
+    "noOrdinaryCamera" to "This device has no ordinary camera; scanning uses a separate infrared module.",
+    "restoreOnline" to "Go back online",
+    "offlineDrill" to "Offline drill",
+    "lock" to "Lock",
+    "newCustomerToggle" to "New customer",
+    "startSale" to "Start a sale",
+    "markRead" to "Mark as read",
+    "markAllRead" to "Mark all read",
+    "openRelated" to "Open related",
+    "openNotification" to "Open",
+    "loadingLocalData" to "Loading this terminal's POS data…",
+    "initialiseTerminal" to "Set up this POS terminal",
+    "initialiseIntro" to "The first setup needs a connection, and an owner or manager to bind a store. After that the till, products, cash orders and sync queue all run in this APK's local database.",
+    "noApiUrl" to "This build has no POS API address, so it cannot be set up.",
+    "startInitialisation" to "Start setup",
+    "managerLogin" to "Owner or manager sign-in",
+    "managerLoginIntro" to "This sign-in only binds this device; the administrator is signed out as soon as it finishes.",
+    "emailLabel" to "Email",
+    "passwordLabel" to "Password",
+    "signIn" to "Sign in",
+    "rebindTerminal" to "Re-enrol this terminal",
+    "bindTerminal" to "Enrol this terminal",
+    "rebindWarning" to "This device was enrolled before. Confirming revokes the old terminal credential, closes its unfinished shifts, and re-enrols against the store selected below.",
+    "selectStore" to "Choose a store",
+    "revokeAndRebind" to "Revoke the old terminal and re-enrol",
+    "bindAndContinue" to "Enrol and continue",
+    "recoverCredential" to "Recover this terminal's credential",
+    "recoverIntro" to "Local data from a previous POS was found, but its terminal credential cannot be migrated into native secure storage. An owner or manager must reissue this terminal's credential.",
+    "recover" to "Recover",
+    "catalogNeedsUpdate" to "The local catalogue needs updating",
+    "catalogExpired" to "The offline catalogue has expired. Restore the network and sync before selling again; cash orders already saved stay on this terminal.",
+    "syncNow" to "Sync now",
+    "deviceOnline" to "This terminal is online",
+    "deviceOffline" to "This terminal is offline",
+    "pendingCount" to "%d waiting",
+    "checkoutVerifiesOnline" to "This payment checks the shift and drawer status online first.",
+    "offlineTill" to "Offline till",
+    "pendingSyncSuffix" to "%s · %d waiting to sync",
+    "offlineStockShortShort" to "Not enough offline stock",
+    "addPlus" to "Add +",
+    "cartTitle" to "Cart",
+    "noItemsSelected" to "Nothing selected yet",
+    "cartEmptyShort" to "The cart is empty",
+    "viewCartDetail" to "View the cart · %d items",
+    "customerPrefixShort" to "Customer: %s",
+    "amountDueShort" to "Due",
+    "cashOrderPrefix" to "Cash order",
+    "pay" to "Take payment",
+    "cartDetail" to "Cart detail",
+    "close" to "Close",
+    "removeServiceItem" to "Remove the service item",
+    "goToPayment" to "Go to payment",
+    "delete" to "Delete",
+    "confirmPayment" to "Confirm the payment",
+    "cashOnlyNotice" to "Cash only for now; the amount follows the server's price preview.",
+    "itemsCashSuffix" to "%d items · cash",
+    "verifyingPricing" to "Checking prices, discounts and tax…",
+    "pricingFailed" to "Price check failed: %s",
+    "productsAndServices" to "Products and services",
+    "taxLabelWithRate" to "Tax %s",
+    "taxIncluded" to "(included)",
+    "systemRounding" to "System rounding",
+    "cashRoundingLine" to "Cash rounding",
+    "discountsAndTax" to "Discounts and tax",
+    "discountCodeOptional" to "Discount code (optional)",
+    "discountReason" to "Reason for the discount",
+    "taxExemptReason" to "Tax exemption reason (optional)",
+    "noOfflineDiscounts" to "Discount codes and tax exemptions are not available offline.",
+    "cashRoundingHint" to "Rounds down to a note the drawer can actually give change in.",
+    "noRounding" to "No rounding",
+    "cashReceivedTitle" to "Cash received",
+    "chooseTenderedAmount" to "Choose the amount the customer handed over",
+    "otherAmount" to "Other amount",
+    "enterCashReceived" to "Enter the cash received",
+    "amountPlaceholder" to "For example 100.00",
+    "receiptDelivery" to "Receipt",
+    "noSend" to "Do not send",
+    "emailReceipt" to "Email receipt",
+    "emailNotConfigured" to "Email not configured",
+    "smsNotConfigured" to "SMS not configured",
+    "bindDefaultPrinterFirst" to "Bind a default receipt printer in the terminal settings first.",
+    "changeLabel" to "Change",
+    "enterValidTender" to "Enter a valid amount received.",
+    "confirmCollection" to "Confirm",
+    "orderItemFallback" to "Order item",
+    "customerFallback" to "Customer",
+    "notificationFallback" to "Notification",
+    "discountFallback" to "Discount",
+    "thisTerminalFallback" to "This terminal",
+    "cashReceipt" to "Cash receipt",
+    "orderLinePrefix" to "Order: %s",
+    "receiptCustomerPrefix" to "Customer: %s",
+    "receiptDuePrefix" to "Due: %s",
+    "receiptTenderedPrefix" to "Cash received: %s",
+    "receiptChangePrefix" to "Change: %s",
+    "thankYou" to "Thank you",
+    "justUpdated" to "Just updated",
+    "invalidCredentials" to "Wrong account or password. Try again.",
+    "accountLocked" to "Too many sign-in attempts; the account is temporarily locked.",
+    "pinIncorrectShort" to "Incorrect PIN. Try again.",
+    "cannotReachPos" to "Cannot reach the POS service.",
+    "invalidInput" to "Invalid input.",
+    "statusHeading" to "Status",
+    "unknownBuiltInDevice" to "Unrecognised built-in device.",
+    "deviceUnavailable" to "The %s on this terminal is unavailable. Refresh the status and run the device test first.",
+    "printerRegistrationTest" to "Built-in printer registration test",
+    "scanTestSucceeded" to "Scan test succeeded.",
+    "printerRegistered" to "The built-in printer was tested and registered as the receipt printer.",
+    "scannerRegistered" to "Scan test succeeded; the built-in scanner is registered.",
+    "barcodeReadRegistering" to "Barcode read. Registering the built-in scanner…",
+    "scannerReadyEverywhere" to "The built-in scanner is registered and ready on the till, intake and search screens.",
+    "scanTestResult" to "Scan test succeeded: %s",
+    "scanReadSucceeded" to "Scan read succeeded.",
+    "scanTestCancelled" to "The scan test was cancelled.",
+    "scannerReturnedNothing" to "The system scanner returned no valid barcode.",
+    "noBarcodeScanAgain" to "No barcode content was read. Scan again.",
+    "noReceiptToPrint" to "No receipt is waiting to print.",
+    "offlineStockShort" to "Not enough offline stock for %s.",
+    "stockShort" to "Not enough stock for %s.",
+    "addedToTill" to "%s was added to the till.",
+    "failedSalesNeedManager" to "%d offline cash orders need a manager.",
+    "replayedSales" to "%d offline cash orders were synced.",
+    "syncedCatalogShift" to "The catalogue, shift and drawer status are synced.",
+    "offlineDrillOn" to "Offline drill on: the app uses only its local cache and offline queue. The device's network is not switched off.",
+    "noNetworkToRestore" to "No network is available, so online mode cannot be restored.",
+    "refreshedHardwareAndDevices" to "Local hardware and registered devices were refreshed.",
+    "refreshedHardware" to "The local hardware status was refreshed.",
+    "bluetoothNeedsRestart" to "This terminal cannot request Bluetooth permission. Reopen the POS.",
+    "bluetoothAllowed" to "Bluetooth is allowed. Tap “Read paired devices”.",
+    "bluetoothPromptHint" to "Allow the “Nearby devices” permission in the system prompt, then tap “Read paired devices”.",
+    "noPairedBluetoothPrinters" to "No paired Bluetooth printer was found.",
+    "readPairedPrinters" to "%d paired Bluetooth printers found.",
+    "bindNeedsNetwork" to "Binding a Bluetooth printer needs a connection to save the terminal configuration.",
+    "bluetoothTestTitle" to "Bluetooth printer connection test",
+    "printerLinePrefix" to "Printer: %s",
+    "terminalLinePrefix" to "Terminal: %s",
+    "notRegistered" to "Not registered",
+    "boundPrinter" to "%s was tested and bound.",
+    "printerTestPageTitle" to "Built-in printer test page",
+    "timeLinePrefix" to "Time: %s",
+    "useSystemScanner" to "Use the system scanner to read a barcode; the POS shows the result when it finishes.",
+    "registrationNeedsNetwork" to "Registering a device needs a connection. Hardware already configured still works offline.",
+    "scanAnyBarcode" to "Scan any barcode to finish the test; the built-in scanner registers itself once it reads one.",
+    "drawerNeedsNetworkAuth" to "Opening the drawer by hand needs an online authorisation.",
+    "branchNotFound" to "This store was not found. Sync first.",
+    "localBranchNotFound" to "No local store information found. Sync first.",
+    "orderDetailNeedsNetwork" to "Order detail and taking payment on an order need a connection.",
+    "offlineSearchLimited" to "Offline, only cached customers, products and tickets can be searched.",
+    "ticketNotCached" to "This ticket is not cached. Open it once the network is back.",
+    "customerNotCached" to "This customer is not cached. Open them once the network is back.",
+    "settingsNeedNetwork" to "Terminal settings cannot be changed while offline.",
+    "settingsOutOfRange" to "Auto-lock must be 30–86400 seconds and copies must be 1–3.",
+    "settingsSaved" to "Terminal settings saved.",
+    "shiftNeedsNetwork" to "Shift actions need a connection.",
+    "breakStarted" to "Break started.",
+    "breakEnded" to "Break ended.",
+    "cashMovementNeedsNetwork" to "Pay-ins and pay-outs need a connection.",
+    "cashMovementInvalid" to "Enter an amount above 0 and a reason of at least 3 characters.",
+    "payInRecorded" to "Pay-in recorded.",
+    "payOutRecorded" to "Pay-out recorded.",
+    "cacheRefreshesLater" to "%s The local cache refreshes shortly.",
+    "orderPaymentNeedsNetwork" to "Taking payment on an existing order needs a connection. For offline cash, start the sale from the till.",
+    "needOpenCashSession" to "Open a cash session in Shift and cash first.",
+    "tenderBelowOutstanding" to "Cash received cannot be less than the %s outstanding.",
+    "orderStatusNeedsNetwork" to "Updating an order's status needs a connection.",
+    "orderStatusUpdated" to "Order status updated.",
+    "notificationNeedsNetwork" to "Notification status cannot be updated while offline.",
+    "allNotificationsRead" to "All notifications were marked as read.",
+    "archiveNeedsNetwork" to "Notifications cannot be archived while offline.",
+    "loginSucceeded" to "Signed in. The local catalogue and till status are up to date.",
+    "pinTemporarilyLocked" to "The PIN is locked for %d seconds. Try again after that.",
+    "pinIncorrect" to "Incorrect PIN. Try again.",
+    "shiftStartedOpenDrawer" to "Shift started. Open the drawer before taking cash.",
+    "openRegisterNeedsNetwork" to "Opening the register needs a connection.",
+    "floatInvalid" to "The float must be zero or more.",
+    "registerOpenedOfflineReady" to "The register is open; cash can now be taken offline.",
+    "registerOpenedCacheLater" to "The register is open; the local cache refreshes shortly.",
+    "closeRegisterNeedsNetwork" to "Closing the register needs a connection.",
+    "registerClosedZReady" to "The register is closed and the day's figures are ready.",
+    "registerClosedCacheLater" to "The register is closed; the local cache refreshes shortly.",
+    "shiftEndedNextCashier" to "Shift ended. The next member of staff can sign in with their PIN.",
+    "createCustomerNeedsNetwork" to "Creating a customer needs a connection. Try again once the network is back.",
+    "customerCreated" to "The customer was created and synced to this terminal.",
+    "pickupTimeInvalid" to "The expected pickup time is not valid. Use YYYY-MM-DD HH:mm.",
+    "ticketCreated" to "The service ticket was created. Add its service items in the ticket detail.",
+    "weightRequired" to "Enter the weight.",
+    "bagCountRequired" to "Enter the number of bags.",
+    "itemAddedToTicket" to "The service item was added to the ticket.",
+    "itemUpdated" to "The service item was updated.",
+    "deleteReasonMissing" to "A reason is required to delete a service item.",
+    "itemDeleted" to "The service item was deleted.",
+    "itemCannotTransition" to "This service item cannot move to that status yet.",
+    "itemStatusUpdated" to "The service item's status was updated.",
+    "ticketCurrencyMismatch" to "The ticket's currency does not match this store's.",
+    "cartHasOtherCustomer" to "The cart holds another customer's items. Finish or clear it first.",
+    "ticketItemsAlreadyInCart" to "This ticket's items are already in the cart.",
+    "addedTicketItemsToCart" to "%d ticket items were added to the till cart.",
+    "ticketCannotTransition" to "This ticket cannot move to that status yet.",
+    "cancelReasonMissing" to "A reason is required to cancel a ticket.",
+    "ticketStatusUpdated" to "The ticket moved to “%s”.",
+    "managerOnlyEnroll" to "Only an owner or manager can set up a POS terminal.",
+    "noBranchesAvailable" to "This account has no available store.",
+    "terminalEnrolled" to "The terminal is enrolled. Sign in with a 6-digit staff PIN.",
+    "managerOnlyRecover" to "Only an owner or manager can recover the terminal credential.",
+    "terminalRecovered" to "The terminal credential was recovered. Sign in with a staff PIN and sync.",
+    "cashCheckoutFailedTitle" to "Cash payment could not be completed",
+    "cartKeptAfterFailure" to "The payment did not go through; the cart is kept as it is.",
+    "gotIt" to "Got it",
     "online" to "Online",
     "offline" to "Offline",
     "offlineMode" to "Offline mode",
@@ -1259,6 +1943,234 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_FR_VALUES: Map<String, String> = mapOf(
+    "verifyAndSelectStore" to "Vérifier et choisir un magasin",
+    "reissueCredential" to "Réémettre les identifiants",
+    "customerIntakePrefix" to "Client %s · créer un bon",
+    "collapseRegistration" to "Masquer le formulaire",
+    "goToTill" to "Aller à la caisse",
+    "openRelatedOrder" to "Ouvrir la commande liée",
+    "openRelatedTicket" to "Ouvrir le bon lié",
+    "shiftStatusUpdated" to "État du service mis à jour.",
+    "testAndRegisterScanner" to "Tester et enregistrer le scanner",
+    "scanTest" to "Test de scan",
+    "useInfraredHead" to "Utilisez la tête de lecture infrarouge sur le dessus de l'appareil",
+    "cancel" to "Annuler",
+    "done" to "Terminé",
+    "scanningContinuously" to "Lecture en cours",
+    "readComplete" to "Lecture terminée",
+    "infraredReady" to "Le module de lecture infrarouge est prêt",
+    "scanAnyToRegister" to "Scannez n'importe quel code-barres et le scanner s'enregistrera.",
+    "aimAnyBarcode" to "Visez un code-barres avec la fenêtre de lecture sur le dessus ; le résultat s'affiche automatiquement.",
+    "barcodeRead" to "Code-barres lu",
+    "savingRegistration" to "Enregistrement de l'appareil…",
+    "noOrdinaryCamera" to "Cet appareil n'a pas d'appareil photo ordinaire ; la lecture utilise un module infrarouge dédié.",
+    "restoreOnline" to "Revenir en ligne",
+    "offlineDrill" to "Simulation hors ligne",
+    "lock" to "Verrouiller",
+    "newCustomerToggle" to "Nouveau client",
+    "startSale" to "Démarrer une vente",
+    "markRead" to "Marquer comme lu",
+    "markAllRead" to "Tout marquer comme lu",
+    "openRelated" to "Voir l'élément lié",
+    "openNotification" to "Ouvrir",
+    "loadingLocalData" to "Chargement des données POS de cette caisse…",
+    "initialiseTerminal" to "Initialiser cette caisse",
+    "initialiseIntro" to "La première configuration demande une connexion et un propriétaire ou responsable pour lier un magasin. Ensuite, la caisse, les produits, les commandes et la file de synchro fonctionnent dans la base locale de cet APK.",
+    "noApiUrl" to "Cette version n'a pas d'adresse d'API POS ; l'initialisation est impossible.",
+    "startInitialisation" to "Démarrer l'initialisation",
+    "managerLogin" to "Connexion propriétaire ou responsable",
+    "managerLoginIntro" to "Cette connexion ne sert qu'à lier cet appareil ; l'administrateur est déconnecté dès la fin.",
+    "emailLabel" to "E-mail",
+    "passwordLabel" to "Mot de passe",
+    "signIn" to "Se connecter",
+    "rebindTerminal" to "Réenregistrer cette caisse",
+    "bindTerminal" to "Enregistrer cette caisse",
+    "rebindWarning" to "Cet appareil a déjà été enregistré. La confirmation révoque les anciens identifiants, clôture les services inachevés et réenregistre la caisse sur le magasin choisi.",
+    "selectStore" to "Choisir un magasin",
+    "revokeAndRebind" to "Révoquer l'ancienne caisse et réenregistrer",
+    "bindAndContinue" to "Enregistrer et continuer",
+    "recoverCredential" to "Récupérer les identifiants de cette caisse",
+    "recoverIntro" to "Des données locales d'un POS précédent ont été trouvées, mais leurs identifiants ne peuvent pas être migrés vers le stockage sécurisé natif. Un propriétaire ou responsable doit les réémettre.",
+    "recover" to "Récupérer",
+    "catalogNeedsUpdate" to "Le catalogue local doit être mis à jour",
+    "catalogExpired" to "Le catalogue hors ligne a expiré. Rétablissez le réseau et synchronisez avant de vendre ; les commandes espèces enregistrées restent sur cette caisse.",
+    "syncNow" to "Synchroniser maintenant",
+    "deviceOnline" to "Cette caisse est en ligne",
+    "deviceOffline" to "Cette caisse est hors ligne",
+    "pendingCount" to "%d en attente",
+    "checkoutVerifiesOnline" to "Ce paiement vérifie d'abord l'état du service et du tiroir en ligne.",
+    "offlineTill" to "Caisse hors ligne",
+    "pendingSyncSuffix" to "%s · %d en attente de synchro",
+    "offlineStockShortShort" to "Stock hors ligne insuffisant",
+    "addPlus" to "Ajouter +",
+    "cartTitle" to "Panier",
+    "noItemsSelected" to "Rien de sélectionné",
+    "cartEmptyShort" to "Le panier est vide",
+    "viewCartDetail" to "Voir le panier · %d articles",
+    "customerPrefixShort" to "Client : %s",
+    "amountDueShort" to "Dû",
+    "cashOrderPrefix" to "Commande espèces",
+    "pay" to "Encaisser",
+    "cartDetail" to "Détail du panier",
+    "close" to "Fermer",
+    "removeServiceItem" to "Retirer l'article de service",
+    "goToPayment" to "Aller au paiement",
+    "delete" to "Supprimer",
+    "confirmPayment" to "Confirmer le paiement",
+    "cashOnlyNotice" to "Espèces uniquement pour l'instant ; le montant suit l'aperçu de prix du serveur.",
+    "itemsCashSuffix" to "%d articles · espèces",
+    "verifyingPricing" to "Vérification des prix, remises et taxes…",
+    "pricingFailed" to "Échec de la vérification des prix : %s",
+    "productsAndServices" to "Produits et services",
+    "taxLabelWithRate" to "Taxe %s",
+    "taxIncluded" to "(incluse)",
+    "systemRounding" to "Arrondi système",
+    "cashRoundingLine" to "Arrondi espèces",
+    "discountsAndTax" to "Remises et taxes",
+    "discountCodeOptional" to "Code de remise (facultatif)",
+    "discountReason" to "Motif de la remise",
+    "taxExemptReason" to "Motif d'exonération (facultatif)",
+    "noOfflineDiscounts" to "Les codes de remise et exonérations ne sont pas disponibles hors ligne.",
+    "cashRoundingHint" to "Arrondit à la baisse selon les coupures disponibles dans le tiroir.",
+    "noRounding" to "Aucun arrondi",
+    "cashReceivedTitle" to "Espèces reçues",
+    "chooseTenderedAmount" to "Choisissez le montant remis par le client",
+    "otherAmount" to "Autre montant",
+    "enterCashReceived" to "Saisir les espèces reçues",
+    "amountPlaceholder" to "Par exemple 100.00",
+    "receiptDelivery" to "Reçu",
+    "noSend" to "Ne pas envoyer",
+    "emailReceipt" to "Reçu par e-mail",
+    "emailNotConfigured" to "E-mail non configuré",
+    "smsNotConfigured" to "SMS non configuré",
+    "bindDefaultPrinterFirst" to "Liez d'abord une imprimante de reçus par défaut dans les réglages.",
+    "changeLabel" to "Monnaie",
+    "enterValidTender" to "Saisissez un montant reçu valide.",
+    "confirmCollection" to "Confirmer",
+    "orderItemFallback" to "Article de commande",
+    "customerFallback" to "Client",
+    "notificationFallback" to "Notification",
+    "discountFallback" to "Remise",
+    "thisTerminalFallback" to "Cette caisse",
+    "cashReceipt" to "Reçu espèces",
+    "orderLinePrefix" to "Commande : %s",
+    "receiptCustomerPrefix" to "Client : %s",
+    "receiptDuePrefix" to "Dû : %s",
+    "receiptTenderedPrefix" to "Espèces reçues : %s",
+    "receiptChangePrefix" to "Monnaie : %s",
+    "thankYou" to "Merci de votre visite",
+    "justUpdated" to "À l'instant",
+    "invalidCredentials" to "Compte ou mot de passe incorrect. Réessayez.",
+    "accountLocked" to "Trop de tentatives ; le compte est temporairement verrouillé.",
+    "pinIncorrectShort" to "PIN incorrect. Réessayez.",
+    "cannotReachPos" to "Impossible de joindre le service POS.",
+    "invalidInput" to "Saisie invalide.",
+    "statusHeading" to "État",
+    "unknownBuiltInDevice" to "Appareil intégré non reconnu.",
+    "deviceUnavailable" to "Le %s de cette caisse est indisponible. Actualisez l'état et lancez le test d'abord.",
+    "printerRegistrationTest" to "Test d'enregistrement de l'imprimante intégrée",
+    "scanTestSucceeded" to "Test de scan réussi.",
+    "printerRegistered" to "L'imprimante intégrée a été testée et enregistrée comme imprimante de reçus.",
+    "scannerRegistered" to "Test de scan réussi ; le scanner intégré est enregistré.",
+    "barcodeReadRegistering" to "Code-barres lu. Enregistrement du scanner intégré…",
+    "scannerReadyEverywhere" to "Le scanner intégré est enregistré et prêt sur les écrans caisse, accueil et recherche.",
+    "scanTestResult" to "Test de scan réussi : %s",
+    "scanReadSucceeded" to "Lecture réussie.",
+    "scanTestCancelled" to "Le test de scan a été annulé.",
+    "scannerReturnedNothing" to "Le scanner système n'a renvoyé aucun code-barres valide.",
+    "noBarcodeScanAgain" to "Aucun code-barres lu. Scannez de nouveau.",
+    "noReceiptToPrint" to "Aucun reçu en attente d'impression.",
+    "offlineStockShort" to "Stock hors ligne insuffisant pour %s.",
+    "stockShort" to "Stock insuffisant pour %s.",
+    "addedToTill" to "%s a été ajouté à la caisse.",
+    "failedSalesNeedManager" to "%d commandes espèces hors ligne nécessitent un responsable.",
+    "replayedSales" to "%d commandes espèces hors ligne ont été synchronisées.",
+    "syncedCatalogShift" to "Le catalogue, le service et l'état du tiroir sont synchronisés.",
+    "offlineDrillOn" to "Simulation hors ligne activée : l'application n'utilise que son cache local et sa file hors ligne. Le réseau de l'appareil n'est pas coupé.",
+    "noNetworkToRestore" to "Aucun réseau disponible ; le mode en ligne ne peut pas être rétabli.",
+    "refreshedHardwareAndDevices" to "Le matériel local et les appareils enregistrés ont été actualisés.",
+    "refreshedHardware" to "L'état du matériel local a été actualisé.",
+    "bluetoothNeedsRestart" to "Cette caisse ne peut pas demander l'autorisation Bluetooth. Rouvrez le POS.",
+    "bluetoothAllowed" to "Bluetooth autorisé. Touchez « Lire les appareils associés ».",
+    "bluetoothPromptHint" to "Autorisez « Appareils à proximité » dans l'invite système, puis touchez « Lire les appareils associés ».",
+    "noPairedBluetoothPrinters" to "Aucune imprimante Bluetooth associée trouvée.",
+    "readPairedPrinters" to "%d imprimantes Bluetooth associées trouvées.",
+    "bindNeedsNetwork" to "Lier une imprimante Bluetooth demande une connexion pour enregistrer la configuration.",
+    "bluetoothTestTitle" to "Test de connexion de l'imprimante Bluetooth",
+    "printerLinePrefix" to "Imprimante : %s",
+    "terminalLinePrefix" to "Caisse : %s",
+    "notRegistered" to "Non enregistrée",
+    "boundPrinter" to "%s a été testée et liée.",
+    "printerTestPageTitle" to "Page de test de l'imprimante intégrée",
+    "timeLinePrefix" to "Heure : %s",
+    "useSystemScanner" to "Utilisez le scanner système pour lire un code-barres ; le POS affichera le résultat.",
+    "registrationNeedsNetwork" to "Enregistrer un appareil demande une connexion. Le matériel déjà configuré reste utilisable hors ligne.",
+    "scanAnyBarcode" to "Scannez n'importe quel code-barres pour terminer le test ; le scanner intégré s'enregistrera automatiquement.",
+    "drawerNeedsNetworkAuth" to "Ouvrir le tiroir manuellement demande une autorisation en ligne.",
+    "branchNotFound" to "Magasin introuvable. Synchronisez d'abord.",
+    "localBranchNotFound" to "Aucune information de magasin locale. Synchronisez d'abord.",
+    "orderDetailNeedsNetwork" to "Le détail d'une commande et son encaissement demandent une connexion.",
+    "offlineSearchLimited" to "Hors ligne, seuls les clients, produits et bons en cache sont consultables.",
+    "ticketNotCached" to "Ce bon n'est pas en cache. Ouvrez-le au retour du réseau.",
+    "customerNotCached" to "Ce client n'est pas en cache. Ouvrez sa fiche au retour du réseau.",
+    "settingsNeedNetwork" to "Les réglages de la caisse ne peuvent pas être modifiés hors ligne.",
+    "settingsOutOfRange" to "Le verrouillage auto doit être entre 30 et 86400 secondes, et les copies entre 1 et 3.",
+    "settingsSaved" to "Réglages de la caisse enregistrés.",
+    "shiftNeedsNetwork" to "Les actions de service demandent une connexion.",
+    "breakStarted" to "Pause commencée.",
+    "breakEnded" to "Pause terminée.",
+    "cashMovementNeedsNetwork" to "Les entrées et sorties d'espèces demandent une connexion.",
+    "cashMovementInvalid" to "Saisissez un montant supérieur à 0 et un motif d'au moins 3 caractères.",
+    "payInRecorded" to "Entrée d'espèces enregistrée.",
+    "payOutRecorded" to "Sortie d'espèces enregistrée.",
+    "cacheRefreshesLater" to "%s Le cache local sera actualisé sous peu.",
+    "orderPaymentNeedsNetwork" to "Encaisser une commande existante demande une connexion. Hors ligne, démarrez la vente depuis la caisse.",
+    "needOpenCashSession" to "Ouvrez d'abord une session de caisse dans Service et caisse.",
+    "tenderBelowOutstanding" to "Les espèces reçues ne peuvent pas être inférieures au montant restant dû de %s.",
+    "orderStatusNeedsNetwork" to "Mettre à jour l'état d'une commande demande une connexion.",
+    "orderStatusUpdated" to "État de la commande mis à jour.",
+    "notificationNeedsNetwork" to "L'état des notifications ne peut pas être mis à jour hors ligne.",
+    "allNotificationsRead" to "Toutes les notifications ont été marquées comme lues.",
+    "archiveNeedsNetwork" to "Les notifications ne peuvent pas être archivées hors ligne.",
+    "loginSucceeded" to "Connecté. Le catalogue local et l'état de la caisse sont à jour.",
+    "pinTemporarilyLocked" to "Le PIN est verrouillé pendant %d secondes. Réessayez ensuite.",
+    "pinIncorrect" to "PIN incorrect. Réessayez.",
+    "shiftStartedOpenDrawer" to "Service commencé. Ouvrez le tiroir avant d'encaisser.",
+    "openRegisterNeedsNetwork" to "Ouvrir la caisse demande une connexion.",
+    "floatInvalid" to "Le fonds doit être supérieur ou égal à zéro.",
+    "registerOpenedOfflineReady" to "La caisse est ouverte ; les espèces peuvent être encaissées hors ligne.",
+    "registerOpenedCacheLater" to "La caisse est ouverte ; le cache local sera actualisé sous peu.",
+    "closeRegisterNeedsNetwork" to "Clôturer la caisse demande une connexion.",
+    "registerClosedZReady" to "La caisse est clôturée et les chiffres du jour sont prêts.",
+    "registerClosedCacheLater" to "La caisse est clôturée ; le cache local sera actualisé sous peu.",
+    "shiftEndedNextCashier" to "Service terminé. Le prochain employé peut se connecter avec son PIN.",
+    "createCustomerNeedsNetwork" to "Créer un client demande une connexion. Réessayez au retour du réseau.",
+    "customerCreated" to "Le client a été créé et synchronisé sur cette caisse.",
+    "pickupTimeInvalid" to "L'heure de retrait prévue n'est pas valide. Utilisez AAAA-MM-JJ HH:mm.",
+    "ticketCreated" to "Le bon de service a été créé. Ajoutez ses articles dans le détail du bon.",
+    "weightRequired" to "Saisissez le poids.",
+    "bagCountRequired" to "Saisissez le nombre de sacs.",
+    "itemAddedToTicket" to "L'article de service a été ajouté au bon.",
+    "itemUpdated" to "L'article de service a été mis à jour.",
+    "deleteReasonMissing" to "Un motif est obligatoire pour supprimer un article.",
+    "itemDeleted" to "L'article de service a été supprimé.",
+    "itemCannotTransition" to "Cet article ne peut pas encore passer à cet état.",
+    "itemStatusUpdated" to "L'état de l'article a été mis à jour.",
+    "ticketCurrencyMismatch" to "La devise du bon ne correspond pas à celle du magasin.",
+    "cartHasOtherCustomer" to "Le panier contient les articles d'un autre client. Terminez ou videz-le d'abord.",
+    "ticketItemsAlreadyInCart" to "Les articles de ce bon sont déjà dans le panier.",
+    "addedTicketItemsToCart" to "%d articles du bon ont été ajoutés au panier.",
+    "ticketCannotTransition" to "Ce bon ne peut pas encore passer à cet état.",
+    "cancelReasonMissing" to "Un motif est obligatoire pour annuler un bon.",
+    "ticketStatusUpdated" to "Le bon est passé à « %s ».",
+    "managerOnlyEnroll" to "Seul un propriétaire ou un responsable peut initialiser une caisse.",
+    "noBranchesAvailable" to "Ce compte n'a aucun magasin disponible.",
+    "terminalEnrolled" to "La caisse est enregistrée. Connectez-vous avec un PIN à 6 chiffres.",
+    "managerOnlyRecover" to "Seul un propriétaire ou un responsable peut récupérer les identifiants de la caisse.",
+    "terminalRecovered" to "Les identifiants ont été récupérés. Connectez-vous avec un PIN et synchronisez.",
+    "cashCheckoutFailedTitle" to "Le paiement en espèces n'a pas abouti",
+    "cartKeptAfterFailure" to "Le paiement n'a pas abouti ; le panier est conservé tel quel.",
+    "gotIt" to "Compris",
     "online" to "En ligne",
     "offline" to "Hors ligne",
     "offlineMode" to "Mode hors ligne",
