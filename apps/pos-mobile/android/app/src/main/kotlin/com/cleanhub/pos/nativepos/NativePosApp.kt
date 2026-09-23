@@ -6876,7 +6876,10 @@ private fun calculateNativeLocalPricing(
     val tax = if (percentage.signum() == 0) {
         0L
     } else {
-        val divisor = if (settings.pricesIncludeTax) java.math.BigDecimal(100).add(percentage) else java.math.BigDecimal(100)
+        // The rate is a fraction -- 0.18 is 18% -- as the owner's settings form
+        // stores it and the receipt displays it. Dividing by 100 here read it
+        // as 0.18% and priced every taxed offline sale with a hundredth of its tax.
+        val divisor = if (settings.pricesIncludeTax) java.math.BigDecimal.ONE.add(percentage) else java.math.BigDecimal.ONE
         base.multiply(percentage).divide(divisor, 0, java.math.RoundingMode.HALF_UP).longValueExact()
     }
     val taxable = if (settings.pricesIncludeTax) subtotal - tax else subtotal

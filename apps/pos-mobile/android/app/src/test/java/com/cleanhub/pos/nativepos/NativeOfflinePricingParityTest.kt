@@ -32,14 +32,14 @@ class NativeOfflinePricingParityTest {
         fun roundToIncrement(value: Long, increment: Long): Long =
             if (increment <= 1L) value else ((value + increment / 2) / increment) * increment
 
-        // taxRateToScale: Math.round(Number(value) * 10_000)
+        // taxRateToScale: Math.round(Number(value) * 10_000); TAX_RATE_SCALE = 10_000
         val rateScaled = Math.round(taxRate.toDouble() * 10_000.0).coerceAtLeast(0L)
-        val percentDenominator = 100L * 10_000L
+        val taxRateScale = 10_000L
         val tax = when {
             rateScaled == 0L -> 0L
             pricesIncludeTax ->
-                roundRatio(subtotalMinor * rateScaled, percentDenominator + rateScaled)
-            else -> roundRatio(subtotalMinor * rateScaled, percentDenominator)
+                roundRatio(subtotalMinor * rateScaled, taxRateScale + rateScaled)
+            else -> roundRatio(subtotalMinor * rateScaled, taxRateScale)
         }
         val beforeRounding = if (pricesIncludeTax) subtotalMinor else subtotalMinor + tax
         val configuredStep = when (roundingRule) {
@@ -66,9 +66,9 @@ class NativeOfflinePricingParityTest {
             0L
         } else {
             val divisor = if (pricesIncludeTax) {
-                BigDecimal(100).add(percentage)
+                BigDecimal.ONE.add(percentage)
             } else {
-                BigDecimal(100)
+                BigDecimal.ONE
             }
             base.multiply(percentage).divide(divisor, 0, RoundingMode.HALF_UP).longValueExact()
         }
@@ -91,8 +91,9 @@ class NativeOfflinePricingParityTest {
             0L, 1L, 3L, 7L, 49L, 50L, 51L, 99L, 100L, 101L,
             333L, 1_234L, 5_225L, 9_999L, 10_000L, 123_456L, 999_999L,
         )
-        // Rates a branch can actually be configured with, including Senegal's
-        // 18% VAT and rates whose thirds do not divide cleanly.
+        // Rates as the owner's settings form stores them -- fractions, so 0.1800
+        // is Senegal's 18% VAT -- including rates whose thirds do not divide
+        // cleanly.
         val rates = listOf("0.0000", "0.1800", "0.2000", "0.0550", "0.0725", "0.1000", "0.0333")
         val roundingRules = listOf("none", "round_jiao", "round_yuan")
         // 1 = a two-decimal currency such as EUR; 100 = XOF and the other
@@ -122,5 +123,23 @@ class NativeOfflinePricingParityTest {
 
         // Guard the guard: a loop that silently stopped comparing would pass.
         assertEquals(17 * 7 * 2 * 3 * 2, compared)
+    }
+
+    /**
+     * Parity alone is not correctness. Both implementations read 0.18 as 0.18%
+     * for as long as they agreed with each other, and this test passed
+     * throughout. These are the amounts a customer and a tax inspector expect.
+     */
+    @Test
+    fun eighteenPercentIsEighteenPercentOnBothSides() {
+        // Tax-exclusive 10,000 F CFA at 18%: 1,800 of tax, 11,800 to pay.
+        val exclusive = Triple(180_000L, 1_180_000L, 0L)
+        assertEquals(exclusive, serverTotals(1_000_000L, "0.1800", false, "none", 100L))
+        assertEquals(exclusive, nativeTotals(1_000_000L, "0.1800", false, "none", 100L))
+
+        // Tax-inclusive 11,800 holds the same 1,800 and is what the customer pays.
+        val inclusive = Triple(180_000L, 1_180_000L, 0L)
+        assertEquals(inclusive, serverTotals(1_180_000L, "0.1800", true, "none", 100L))
+        assertEquals(inclusive, nativeTotals(1_180_000L, "0.1800", true, "none", 100L))
     }
 }

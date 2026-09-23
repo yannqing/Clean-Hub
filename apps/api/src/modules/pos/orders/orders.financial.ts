@@ -76,6 +76,19 @@ function roundToIncrement(value: bigint, increment: bigint): bigint {
   return ((value + increment / BigInt(2)) / increment) * increment;
 }
 
+/**
+ * Tax rates are stored as a fraction: 0.1800 is 18%. That is what the owner's
+ * settings form writes (it divides the typed percentage by 100), what every
+ * receipt displays (it multiplies by 100) and what the offline tills compute
+ * with. This scale is ten-thousandths of that fraction, matching the column's
+ * four decimal places, so 0.1800 becomes 1800 and the whole rate is 10_000.
+ *
+ * This used to divide by 100 * 10_000, reading 0.18 as 0.18%: every taxed
+ * order came out with a hundredth of its tax, and disagreed with the till that
+ * had just shown the customer the correct total.
+ */
+const TAX_RATE_SCALE = BigInt(10_000);
+
 function taxRateToScale(value: string): bigint {
   const scaled = Math.round(Number(value) * 10_000);
   return BigInt(Number.isFinite(scaled) ? Math.max(0, scaled) : 0);
@@ -97,13 +110,12 @@ export function calculatePosFinancialTotals(input: {
     input.rules.taxEnabled && !exemption
       ? taxRateToScale(input.rules.taxRate)
       : BigInt(0);
-  const percentDenominator = BigInt(100 * 10_000);
   const taxMinor =
     rateScaled === BigInt(0)
       ? BigInt(0)
       : input.rules.pricesIncludeTax
-        ? roundRatio(baseMinor * rateScaled, percentDenominator + rateScaled)
-        : roundRatio(baseMinor * rateScaled, percentDenominator);
+        ? roundRatio(baseMinor * rateScaled, TAX_RATE_SCALE + rateScaled)
+        : roundRatio(baseMinor * rateScaled, TAX_RATE_SCALE);
   const taxableMinor = input.rules.pricesIncludeTax
     ? baseMinor - taxMinor
     : baseMinor;

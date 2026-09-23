@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import { MAX_POS_PRINT_COPIES } from "@cleanhub/hardware";
 
+import { taxRateFractionSchema } from "../../tax/tax.validation.js";
+
 const ULID_PATTERN = /^[0-9A-HJKMNP-TV-Z]{26}$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const CURRENCY_PATTERN = /^[A-Z]{3}$/;
@@ -146,12 +148,7 @@ export const updatePosChannelSettingsBodySchema = z
       .enum(["none", "round_yuan", "round_jiao"])
       .optional(),
     taxEnabled: z.boolean().optional(),
-    defaultTaxRate: z
-      .string()
-      .trim()
-      .regex(/^\d{1,3}(?:\.\d{1,4})?$/)
-      .refine((value) => Number(value) >= 0 && Number(value) <= 100)
-      .optional(),
+    defaultTaxRate: taxRateFractionSchema.optional(),
     pricesIncludeTax: z.boolean().optional(),
     taxRegistrationNumber: z
       .union([z.string().trim().max(200), z.null()])

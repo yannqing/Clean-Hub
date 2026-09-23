@@ -145,4 +145,55 @@ assert.equal(
   "choosing 'no rounding' leaves the priced total untouched",
 );
 
+// Real tax rates, stated as absolute amounts rather than as agreement with
+// another implementation. Every earlier case ran with tax disabled, which is
+// how a server reading 0.18 as 0.18% survived: it agreed with the Android till
+// that mirrored it, and both were wrong by a factor of a hundred.
+//
+// Rates are fractions, as the owner's settings form stores them: 0.18 is 18%.
+const senegalVat = { taxEnabled: true, taxRate: "0.1800" };
+
+// Tax-exclusive 10,000 F CFA at 18% is 1,800 of tax and 11,800 to pay.
+const exclusive = totalsFor("XOF", BigInt(1_000_000), BigInt(0), {
+  ...senegalVat,
+  pricesIncludeTax: false,
+});
+assert.equal(exclusive.taxMinor, BigInt(180_000), "18% of 10,000 is 1,800");
+assert.equal(exclusive.taxableMinor, BigInt(1_000_000));
+assert.equal(exclusive.totalMinor, BigInt(1_180_000));
+
+// Tax-inclusive 11,800 contains the same 1,800: 11,800 x 0.18 / 1.18.
+const inclusive = totalsFor("XOF", BigInt(1_180_000), BigInt(0), {
+  ...senegalVat,
+  pricesIncludeTax: true,
+});
+assert.equal(inclusive.taxMinor, BigInt(180_000), "11,800 TTC holds 1,800 TVA");
+assert.equal(inclusive.taxableMinor, BigInt(1_000_000));
+assert.equal(
+  inclusive.totalMinor,
+  BigInt(1_180_000),
+  "an inclusive price is what the customer pays; tax must not be added again",
+);
+
+// A discount comes off before tax.
+assert.equal(
+  totalsFor("XOF", BigInt(1_000_000), BigInt(100_000), {
+    ...senegalVat,
+    pricesIncludeTax: false,
+  }).taxMinor,
+  BigInt(162_000),
+  "18% of 9,000 after a 1,000 discount is 1,620",
+);
+
+// An exemption zeroes the tax whatever the configured rate.
+assert.equal(
+  calculatePosFinancialTotals({
+    subtotalMinor: BigInt(1_000_000),
+    discountMinor: BigInt(0),
+    rules: { ...noTax, ...senegalVat, currency: "XOF", pricesIncludeTax: false },
+    taxExemptionReason: "Embassy",
+  }).taxMinor,
+  BigInt(0),
+);
+
 console.log("POS order financial smoke passed.");
