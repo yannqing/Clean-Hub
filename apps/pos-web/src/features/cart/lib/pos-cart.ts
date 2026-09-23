@@ -159,6 +159,7 @@ export function addProductToPosCart(
     allowNegativeStock: product.allowNegativeStock,
     allowOfflineSale: product.allowOfflineSale,
     offlineStockBuffer: product.offlineStockBuffer,
+    taxRate: product.taxRate,
     coverUrl: product.media.find((media) => media.isPrimary)?.downloadUrl ??
       product.media[0]?.downloadUrl ??
       null,

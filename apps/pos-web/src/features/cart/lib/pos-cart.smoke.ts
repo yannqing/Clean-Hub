@@ -139,6 +139,7 @@ const firstProduct = addProductToPosCart(cart, {
   allowNegativeStock: false,
   allowOfflineSale: true,
   offlineStockBuffer: "0",
+  taxRate: null,
   media: [],
 });
 assert.equal(firstProduct.changed, true);
@@ -165,6 +166,7 @@ cart = addProductToPosCart(cart, {
   allowNegativeStock: false,
   allowOfflineSale: true,
   offlineStockBuffer: "0",
+  taxRate: null,
   media: [],
 }).cart;
 assert.equal(cart.lines[0]?.kind, "product");
@@ -193,6 +195,7 @@ const overStock = addProductToPosCart(cart, {
   allowNegativeStock: false,
   allowOfflineSale: true,
   offlineStockBuffer: "0",
+  taxRate: null,
   media: [],
 });
 assert.equal(overStock.changed, false, "cart must reject stale over-selling");

@@ -1505,6 +1505,7 @@ export const zhCNMessages = {
       claim: "认领",
       claimNeedsEmptyCart: "当前购物车非空，请先挂起或清空后再认领。",
       taxInclusiveSuffix: "（含税）",
+      taxLine: "增值税 {rate}",
       amountDueNow: "本次收款",
       unpaidLabel: "未收",
       choosePaymentMethod: "选择支付方式",

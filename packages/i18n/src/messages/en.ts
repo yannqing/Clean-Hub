@@ -1573,6 +1573,7 @@ export const enMessages = {
       claimNeedsEmptyCart:
         "This cart is not empty. Park or clear it before claiming another.",
       taxInclusiveSuffix: " (tax included)",
+      taxLine: "VAT {rate}",
       amountDueNow: "Due now",
       unpaidLabel: "Unpaid",
       choosePaymentMethod: "Choose a payment method",

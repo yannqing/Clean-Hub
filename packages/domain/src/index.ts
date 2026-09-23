@@ -16,4 +16,5 @@ export * from "./pin";
 export * from "./pos-terminal-status";
 export * from "./receipt";
 export * from "./roles";
+export * from "./tax";
 export * from "./timezone";

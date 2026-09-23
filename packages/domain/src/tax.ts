@@ -1,6 +1,11 @@
 /**
  * Per-rate tax for a basket whose lines may carry different rates.
  *
+ * Shared by the API and pos-web so the server total and an offline till's
+ * total agree to the franc; the offline replay rejects a sale whose expected
+ * total differs. The Android till transcribes this in Kotlin
+ * (`calculateNativeLocalPricing`), pinned by NativeOfflinePricingParityTest.
+ *
  * Tax is computed once per rate group, not once per line. That is how a VAT
  * return is filed -- taxable base and tax per rate -- and it keeps rounding to
  * one step per group: rounding every line separately drifts by a franc per
@@ -214,4 +219,17 @@ export function calculateTaxedTotals(input: {
       taxMinor: allocations.get(line.key)?.taxMinor ?? ZERO,
     })),
   };
+}
+
+/**
+ * "0.1800" -> "18%", "0.0750" -> "7.5%", for receipts and totals.
+ *
+ * Exact: `Number("0.07") * 100` is 7.000000000000001, which is how a receipt
+ * came to read "VAT 7.000000000000001%".
+ */
+export function formatTaxRatePercent(value: string): string {
+  const scaled = taxRateToScale(value);
+  const whole = scaled / BigInt(100);
+  const hundredths = (scaled % BigInt(100)).toString().padStart(2, "0").replace(/0+$/, "");
+  return hundredths ? `${whole}.${hundredths}%` : `${whole}%`;
 }

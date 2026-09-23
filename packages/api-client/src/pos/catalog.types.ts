@@ -34,6 +34,11 @@ export type PosCatalogService = {
   turnaroundMinutes: number | null;
   amount: string;
   currency: string;
+  /**
+   * The service's own tax rate as a fraction ("0.1800"), or null when it is
+   * sold at the tenant default from checkout settings.
+   */
+  taxRate: string | null;
   media: PosCatalogMedia[];
 };
 
@@ -59,6 +64,8 @@ export type PosCatalogProduct = {
   allowNegativeStock: boolean;
   allowOfflineSale: boolean;
   offlineStockBuffer: string;
+  /** Own tax rate as a fraction, or null for the tenant default. */
+  taxRate: string | null;
   media: PosCatalogMedia[];
 };
 

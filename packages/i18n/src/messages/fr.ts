@@ -1595,6 +1595,7 @@ export const frMessages = {
       claimNeedsEmptyCart:
         "Ce panier n'est pas vide. Mettez-le en attente ou videz-le avant d'en reprendre un autre.",
       taxInclusiveSuffix: " (taxe comprise)",
+      taxLine: "TVA {rate}",
       amountDueNow: "A encaisser",
       unpaidLabel: "Impaye",
       choosePaymentMethod: "Choisir un moyen de paiement",

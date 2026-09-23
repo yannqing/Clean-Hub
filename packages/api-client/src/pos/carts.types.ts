@@ -24,6 +24,12 @@ export type PosSavedCartProductLine = {
   allowOfflineSale: boolean;
   offlineStockBuffer: string;
   coverUrl: string | null;
+  /**
+   * The product's own tax rate, or null for the tenant default. Optional
+   * because carts saved before per-item tax have no such field; those lines
+   * price at the default, exactly as they did then.
+   */
+  taxRate?: string | null;
 };
 
 export type PosSavedCartTicketItemLine = {
@@ -123,6 +129,15 @@ export type PosCartPricePreviewLine = {
   weight: string | null;
   unitAmount: string;
   lineAmount: string;
+  /** The rate this line was taxed at, after the tenant default and any exemption. */
+  taxRate: string;
+};
+
+/** Taxable base and tax per rate, the way a VAT return and a receipt show them. */
+export type PosTaxBreakdownEntry = {
+  taxRate: string;
+  taxableAmount: string;
+  taxAmount: string;
 };
 
 export type PosCartPricePreviewDiscount = {
@@ -141,7 +156,9 @@ export type PosCartPricePreview = {
   discountAmount: string;
   taxableAmount: string;
   taxAmount: string;
+  /** The dominant rate (largest taxable base); see taxBreakdown for mixed baskets. */
   taxRate: string;
+  taxBreakdown: PosTaxBreakdownEntry[];
   pricesIncludeTax: boolean;
   taxExemptionReason: string | null;
   taxRegistrationNumber: string | null;

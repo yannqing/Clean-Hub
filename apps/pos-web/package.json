@@ -17,6 +17,7 @@
     "smoke:offline-cash-state": "tsx src/features/cart/lib/pos-offline-cash-state.smoke.ts",
     "smoke:ticket-labels": "tsx src/lib/ticket-labels.smoke.ts",
     "smoke:cart": "tsx src/features/cart/lib/pos-cart.smoke.ts",
+    "smoke:local-pricing": "tsx src/features/cart/lib/local-pricing.smoke.ts",
     "smoke:offline-catalog": "tsx src/features/catalog/lib/pos-offline-catalog.smoke.ts",
     "smoke:offline-operations": "tsx src/features/offline/lib/pos-offline-operations.smoke.ts",
     "smoke:cash-drawer": "tsx src/features/hardware/lib/cash-drawer.smoke.ts",

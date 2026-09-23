@@ -19,7 +19,7 @@ import type { AuthContext } from "../../auth/auth.types.js";
 import {
   calculateTaxedTotals,
   type TaxLineAllocation,
-} from "../../tax/tax.calculation.js";
+} from "@cleanhub/domain/tax";
 import {
   effectiveLineTaxRate,
   resolveCatalogTaxRates,

@@ -80,10 +80,9 @@ import { parsePosOrderQrPayload } from "@cleanhub/domain/order-codes";
 import {
   CASH_ROUNDING_STEPS,
   cashRoundingStepToMinor,
-  getCurrencyPayableStep,
   roundCashDown,
-  roundToStep,
 } from "@cleanhub/domain/currency";
+import { formatTaxRatePercent } from "@cleanhub/domain/tax";
 
 import { posToast as toast } from "@/lib/pos-toast";
 import { posMessage } from "@/lib/pos-message";
@@ -95,6 +94,7 @@ import type {
   PosCartSnapshot,
 } from "../cart.types";
 import {
+  calculateLocalCartPricing,
   calculatePosCartTotal,
   splitMixedPaymentTotal,
   tendersMatchSeededTotal,
@@ -705,11 +705,13 @@ function CartPanel({
   const [parkedLoading, setParkedLoading] = useState(false);
   const hasTicketLines = cart.lines.some((line) => line.kind === "ticket_item");
   const productLines = cart.lines.filter((line) => line.kind === "product");
-  const localTotal = calculateLocalFinancialTotal(
-    calculatePosCartTotal(cart),
-    runtime,
-  );
+  const localPricing = calculateLocalCartPricing(cart, runtime);
+  const localTotal = localPricing.totalAmount;
   const effectivePreview = previewUpdatedAt === cart.updatedAt ? preview : null;
+  // Online the server's preview is the truth; offline the till prices the
+  // cart itself with the same per-rate rules, so its taxes show there too.
+  const displayedTaxBreakdown =
+    effectivePreview?.taxBreakdown ?? (isOnline ? [] : localPricing.taxBreakdown);
   const pricedTotal = effectivePreview?.totalAmount ?? localTotal;
   const offlineProductEligible = productLines.every(
     (line) =>
@@ -1999,21 +2001,26 @@ function CartPanel({
                   </div>
                 </div>
               ) : null}
-              {effectivePreview && Number(effectivePreview.taxAmount) !== 0 ? (
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>
-                    VAT {Number(effectivePreview.taxRate) * 100}%
-                    {effectivePreview.pricesIncludeTax ? t("pos.cart.taxInclusiveSuffix") : ""}
-                  </span>
-                  <span>
-                    {formatPosMoney(
-                      effectivePreview.taxAmount,
-                      cart.currency,
-                      locale,
-                    )}
-                  </span>
-                </div>
-              ) : null}
+              {displayedTaxBreakdown
+                .filter((entry) => Number(entry.taxAmount) !== 0)
+                .map((entry) => (
+                  <div
+                    className="flex justify-between text-xs text-muted-foreground"
+                    key={entry.taxRate}
+                  >
+                    <span>
+                      {t("pos.cart.taxLine", {
+                        rate: formatTaxRatePercent(entry.taxRate),
+                      })}
+                      {(effectivePreview?.pricesIncludeTax ?? runtime.pricesIncludeTax)
+                        ? t("pos.cart.taxInclusiveSuffix")
+                        : ""}
+                    </span>
+                    <span>
+                      {formatPosMoney(entry.taxAmount, cart.currency, locale)}
+                    </span>
+                  </div>
+                ))}
               {effectivePreview &&
               Number(effectivePreview.roundingAdjustmentAmount) !== 0 ? (
                 <div className="flex justify-between text-xs text-muted-foreground">
@@ -2338,8 +2345,7 @@ function CartPanel({
               </div>
             </section>
 
-            {canManageSensitiveOperations &&
-            effectivePreview?.taxRate !== "0.000000" ? (
+            {canManageSensitiveOperations && runtime.taxEnabled ? (
               <label className="block text-xs font-semibold text-muted-foreground">
                 {t("pos.cart.taxExemptionLabel")}
                 <Input
@@ -2493,49 +2499,6 @@ function cardOutcomeLabel(
   outcome: "succeeded" | "failed" | "cancelled" | "timed_out",
 ): string {
   return posMessage(`pos.cardOutcomeState.${outcome}` as TranslationKey);
-}
-
-/**
- * Offline fallback for the priced total, mirroring the server's
- * `calculatePosFinancialTotals`.
- *
- * The currency's smallest payable unit is a hard floor here too, exactly as on
- * the server: without it an offline XOF sale showed 52.37, an amount with no
- * coin behind it, and the total then disagreed with the server on sync.
- */
-function calculateLocalFinancialTotal(
-  subtotal: string,
-  rules: Pick<
-    ReturnType<typeof usePosRuntimeConfig>,
-    | "currency"
-    | "taxEnabled"
-    | "defaultTaxRate"
-    | "pricesIncludeTax"
-    | "roundingRule"
-  >,
-): string {
-  const subtotalMinor = Math.round(Number(subtotal) * 100);
-  const rate = rules.taxEnabled ? Math.max(0, Number(rules.defaultTaxRate)) : 0;
-  const taxMinor =
-    rate === 0
-      ? 0
-      : rules.pricesIncludeTax
-        ? Math.round((subtotalMinor * rate) / (1 + rate))
-        : Math.round(subtotalMinor * rate);
-  const beforeRounding = rules.pricesIncludeTax
-    ? subtotalMinor
-    : subtotalMinor + taxMinor;
-  const configuredStep =
-    rules.roundingRule === "round_yuan"
-      ? BigInt(100)
-      : rules.roundingRule === "round_jiao"
-        ? BigInt(10)
-        : BigInt(1);
-  const currencyStep = getCurrencyPayableStep(rules.currency);
-  const step = configuredStep > currencyStep ? configuredStep : currencyStep;
-  return toMoney(
-    Number(roundToStep(BigInt(beforeRounding), step)) / 100,
-  );
 }
 
 function buildCashTenderPresets(total: string, currency: string): number[] {

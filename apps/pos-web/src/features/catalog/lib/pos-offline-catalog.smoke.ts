@@ -42,6 +42,7 @@ const catalog: PosCatalogResponse = {
       allowNegativeStock: false,
       allowOfflineSale: true,
       offlineStockBuffer: "2",
+      taxRate: "0.1800",
       media: [
         {
           id: "01J00000000000000000000007",
@@ -66,6 +67,7 @@ const catalog: PosCatalogResponse = {
       labelRule: "per_item",
       applicableItemTypes: ["cloth"],
       turnaroundMinutes: 60,
+      taxRate: null,
       amount: "10.00",
       currency: "XOF",
       media: [],

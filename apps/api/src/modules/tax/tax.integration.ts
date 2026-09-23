@@ -40,7 +40,7 @@ import {
 /**
  * Per-item tax through the real checkout path against a real database.
  *
- * The pure calculation is covered by tax.calculation.smoke.ts. This proves the
+ * The pure calculation is covered by @cleanhub/domain tax.smoke.ts. This proves the
  * plumbing around it: each order line picks up its own service's rate from
  * the catalogue, falls back to the tenant default when it has none, and the
  * rate it was taxed at is written onto the line where tax reports read it.

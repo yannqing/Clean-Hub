@@ -105,7 +105,7 @@ jobs:
           pnpm --filter @cleanhub/api smoke:pos-carts
           pnpm --filter @cleanhub/api smoke:pos-orders
           pnpm --filter @cleanhub/api smoke:pos-financial
-          pnpm --filter @cleanhub/api smoke:tax-calculation
+          pnpm --filter @cleanhub/domain smoke:tax
           pnpm --filter @cleanhub/api smoke:pos-service-tickets
           pnpm --filter @cleanhub/api smoke:temporary-password
           pnpm --filter @cleanhub/api smoke:customer-password-gate
@@ -115,6 +115,7 @@ jobs:
           pnpm --filter @cleanhub/api smoke:error-messages
           pnpm check:native-pos-parity
           pnpm --filter @cleanhub/pos-web smoke:cart
+          pnpm --filter @cleanhub/pos-web smoke:local-pricing
           pnpm --filter @cleanhub/pos-web smoke:offline-operations
           pnpm --filter @cleanhub/pos-web smoke:cash-drawer
           pnpm --filter @cleanhub/web-admin smoke:proxy

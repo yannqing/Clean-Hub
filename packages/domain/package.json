@@ -7,7 +7,8 @@
   "types": "src/index.ts",
   "scripts": {
     "smoke:currency": "tsx src/currency.smoke.ts",
-    "smoke:money": "tsx src/money.smoke.ts"
+    "smoke:money": "tsx src/money.smoke.ts",
+    "smoke:tax": "tsx src/tax.smoke.ts"
   },
   "exports": {
     ".": "./src/index.ts",
@@ -18,6 +19,7 @@
     "./pin": "./src/pin.ts",
     "./pos-terminal-status": "./src/pos-terminal-status.ts",
     "./receipt": "./src/receipt.ts",
+    "./tax": "./src/tax.ts",
     "./timezone": "./src/timezone.ts"
   },
   "devDependencies": {

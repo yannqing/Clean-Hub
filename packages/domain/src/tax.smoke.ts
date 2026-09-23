@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import {
   allocateProportionally,
   calculateTaxedTotals,
+  formatTaxRatePercent,
   normalizeTaxRate,
   TAX_RATE_SCALE,
   taxRateToScale,
-} from "./tax.calculation.js";
+} from "./tax";
 
 const b = (value: number) => BigInt(value);
 
@@ -208,5 +209,12 @@ assert.equal(
   b(1_000),
 );
 assert.equal(overAttributed.baseMinor, b(1_000));
+
+assert.equal(formatTaxRatePercent("0.1800"), "18%");
+assert.equal(formatTaxRatePercent("0.0700"), "7%", "not 7.000000000000001%");
+assert.equal(formatTaxRatePercent("0.0750"), "7.5%");
+assert.equal(formatTaxRatePercent("0.0735"), "7.35%");
+assert.equal(formatTaxRatePercent("0.0000"), "0%");
+assert.equal(formatTaxRatePercent("1.0000"), "100%");
 
 console.log("Tax calculation smoke passed.");

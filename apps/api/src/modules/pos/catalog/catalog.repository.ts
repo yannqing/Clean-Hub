@@ -13,6 +13,7 @@ import {
   serviceCategories,
   serviceMedia,
   services,
+  taxRates,
   type Database,
 } from "@cleanhub/db";
 import {
@@ -196,8 +197,18 @@ export async function findPosCatalogServices(
         ? sql<string>`coalesce(${serviceBranchSettings.priceOverrideAmount}, ${prices.amount})`
         : prices.amount,
       currency: prices.currency,
+      // The service's own rate; null means the tenant default applies.
+      taxRate: taxRates.rate,
     })
     .from(services)
+    .leftJoin(
+      taxRates,
+      and(
+        eq(taxRates.tenantId, services.tenantId),
+        eq(taxRates.id, services.taxRateId),
+        isNull(taxRates.deletedAt),
+      ),
+    )
     .innerJoin(
       serviceCategories,
       and(
@@ -262,8 +273,18 @@ export async function findPosCatalogServiceById(
       >`coalesce(${serviceBranchSettings.turnaroundMinutesOverride}, ${services.turnaroundMinutes})`,
       amount: sql<string>`coalesce(${serviceBranchSettings.priceOverrideAmount}, ${prices.amount})`,
       currency: prices.currency,
+      // The service's own rate; null means the tenant default applies.
+      taxRate: taxRates.rate,
     })
     .from(services)
+    .leftJoin(
+      taxRates,
+      and(
+        eq(taxRates.tenantId, services.tenantId),
+        eq(taxRates.id, services.taxRateId),
+        isNull(taxRates.deletedAt),
+      ),
+    )
     .innerJoin(
       serviceCategories,
       and(
@@ -380,6 +401,7 @@ export async function findPosCatalogProducts(
       allowNegativeStock: branchProductSettings.allowNegativeStock,
       allowOfflineSale: branchProductSettings.allowOfflineSale,
       offlineStockBuffer: branchProductSettings.offlineStockBuffer,
+      taxRate: taxRates.rate,
     })
     .from(productSkus)
     .innerJoin(
@@ -387,6 +409,14 @@ export async function findPosCatalogProducts(
       and(
         eq(products.tenantId, productSkus.tenantId),
         eq(products.id, productSkus.productId),
+      ),
+    )
+    .leftJoin(
+      taxRates,
+      and(
+        eq(taxRates.tenantId, products.tenantId),
+        eq(taxRates.id, products.taxRateId),
+        isNull(taxRates.deletedAt),
       ),
     )
     .leftJoin(
@@ -471,6 +501,7 @@ export async function findPosCatalogProducts(
       allowNegativeStock: row.allowNegativeStock,
       allowOfflineSale: row.allowOfflineSale,
       offlineStockBuffer: row.offlineStockBuffer,
+      taxRate: row.taxRate,
     });
     if (!input.includeAll && catalog.length >= input.limit) {
       break;
