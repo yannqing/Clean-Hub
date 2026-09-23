@@ -9,6 +9,7 @@ const { resolvePosRuntimeConfig } = require("./runtime-config.cjs");
 const POS_ENV_KEYS = [
   "CLEANHUB_POS_RUNTIME",
   "CLEANHUB_POS_SERVER_URL",
+  "CLEANHUB_POS_API_BASE_URL",
   "CLEANHUB_POS_ALLOW_CLEARTEXT",
   "CLEANHUB_POS_VERSION",
   "CLEANHUB_POS_BUILD_NUMBER",
@@ -23,7 +24,7 @@ function readEnvironmentFile(fileName) {
   return parse(readFileSync(filePath, "utf8"));
 }
 
-export function loadPosEnvironment({ production = false } = {}) {
+export function loadPosEnvironment({ production = false, allowMissingServer = false } = {}) {
   const fileEnvironment = readEnvironmentFile(
     production ? ".env.production" : ".env",
   );
@@ -37,6 +38,7 @@ export function loadPosEnvironment({ production = false } = {}) {
 
   const runtimeConfig = resolvePosRuntimeConfig(environment, {
     requireProduction: production,
+    allowMissingServer,
   });
 
   return {

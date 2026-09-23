@@ -1,5 +1,8 @@
 import { loadPosEnvironment } from "./environment.mjs";
-import { validateNativeRelease } from "./native-release-validation.mjs";
+import {
+  validateNativeAndroidRelease,
+  validateNativeRelease,
+} from "./native-release-validation.mjs";
 import { run } from "./process.mjs";
 import { paths, writeRuntimeAsset } from "./runtime-assets.mjs";
 
@@ -20,6 +23,9 @@ if (
 const platforms = platformArgument ? [platformArgument] : ["android", "ios"];
 const { environment, runtimeConfig } = loadPosEnvironment({
   production: true,
+  // iOS remains the Capacitor POS shell; an Android-only run does not require
+  // an unused WebView origin.
+  allowMissingServer: platformArgument === "android",
 });
 
 if (action !== "validate") {
@@ -30,15 +36,27 @@ if (action !== "validate") {
     });
   }
 
+  const syncEnvironment = {
+    ...environment,
+    ...(platformArgument === "android"
+      ? { CLEANHUB_POS_NATIVE_ANDROID: "true" }
+      : {}),
+  };
   await writeRuntimeAsset(runtimeConfig);
   await run("cap", ["sync", ...(platformArgument ? [platformArgument] : [])], {
     cwd: paths.appRoot,
-    env: environment,
+    env: syncEnvironment,
   });
 }
 
 for (const platform of platforms) {
-  await validateNativeRelease(platform, runtimeConfig.serverUrl);
+  if (platform === "android") {
+    await validateNativeAndroidRelease(
+      environment.CLEANHUB_POS_API_BASE_URL?.trim() ?? runtimeConfig.serverUrl,
+    );
+  } else {
+    await validateNativeRelease(platform, runtimeConfig.serverUrl);
+  }
 }
 
 console.log(

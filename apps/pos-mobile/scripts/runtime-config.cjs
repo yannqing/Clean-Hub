@@ -34,9 +34,9 @@ function isReservedProductionHost(hostname) {
   );
 }
 
-function normalizeServerUrl(value, { isProduction, allowCleartext }) {
+function normalizeServerUrl(value, { isProduction, allowCleartext, allowMissingServer }) {
   if (!value) {
-    if (isProduction) {
+    if (isProduction && !allowMissingServer) {
       throw new Error(
         "CLEANHUB_POS_SERVER_URL is required for a production POS shell.",
       );
@@ -120,6 +120,7 @@ function resolvePosRuntimeConfig(environment, options = {}) {
     {
       isProduction,
       allowCleartext,
+      allowMissingServer: options.allowMissingServer === true,
     },
   );
 

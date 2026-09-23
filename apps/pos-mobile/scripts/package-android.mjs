@@ -12,7 +12,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadPosEnvironment } from "./environment.mjs";
-import { validateNativeRelease } from "./native-release-validation.mjs";
+import { validateNativeAndroidRelease } from "./native-release-validation.mjs";
 import { run } from "./process.mjs";
 import { paths, writeRuntimeAsset } from "./runtime-assets.mjs";
 
@@ -101,18 +101,22 @@ async function copyArtifact(sourcePath, fileName, kind) {
 
 const { environment, runtimeConfig } = loadPosEnvironment({
   production: isRelease,
+  allowMissingServer: true,
 });
 const version = resolveVersion(environment);
 const buildNumber = resolveBuildNumber(environment);
+const apiBaseUrl =
+  environment.CLEANHUB_POS_API_BASE_URL?.trim() ?? runtimeConfig.serverUrl;
 
-if (!runtimeConfig.serverUrl) {
+if (!apiBaseUrl) {
   throw new Error(
-    `CLEANHUB_POS_SERVER_URL is required to package a usable ${mode} POS APK.`,
+    `CLEANHUB_POS_API_BASE_URL (or CLEANHUB_POS_SERVER_URL) is required to package a usable ${mode} POS APK.`,
   );
 }
 
 const gradleEnvironment = {
   ...environment,
+  CLEANHUB_POS_NATIVE_ANDROID: "true",
   CLEANHUB_POS_VERSION: version,
   CLEANHUB_POS_BUILD_NUMBER: buildNumber,
   CLEANHUB_ANDROID_VERSION_NAME: version,
@@ -139,9 +143,7 @@ if (isRelease) {
   });
 }
 
-console.log(
-  `Packaging CleanHub POS Android ${mode} ${version} (${buildNumber}) for ${runtimeConfig.serverUrl}.`,
-);
+console.log(`Packaging CleanHub POS Android ${mode} ${version} (${buildNumber}) for ${apiBaseUrl}.`);
 
 await run("tsc", ["-p", "tsconfig.json"], {
   cwd: paths.appRoot,
@@ -153,9 +155,7 @@ await run("cap", ["sync", "android"], {
   env: gradleEnvironment,
 });
 
-if (isRelease) {
-  await validateNativeRelease("android", runtimeConfig.serverUrl);
-}
+if (isRelease) await validateNativeAndroidRelease(apiBaseUrl);
 
 const gradleCommand =
   process.platform === "win32" ? "gradlew.bat" : "./gradlew";
@@ -234,7 +234,7 @@ await writeFile(
       mode,
       version,
       buildNumber: Number(buildNumber),
-      serverOrigin: runtimeConfig.serverUrl,
+      apiOrigin: apiBaseUrl,
       generatedAt: new Date().toISOString(),
       artifacts,
     },

@@ -510,6 +510,7 @@ async function writeReleaseCompose() {
     environment:
       WEB_ADMIN_PUBLIC_HOST: \${WEB_ADMIN_PUBLIC_HOST:?WEB_ADMIN_PUBLIC_HOST is required}
       POS_PUBLIC_HOST: \${POS_PUBLIC_HOST:?POS_PUBLIC_HOST is required}
+      API_PUBLIC_HOST: \${API_PUBLIC_HOST:?API_PUBLIC_HOST is required}
     ports:
       - "80:80"
       - "443:443"
