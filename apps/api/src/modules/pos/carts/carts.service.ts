@@ -21,6 +21,10 @@ import {
   resolveOrderItemPricing,
 } from "../orders/orders.service.js";
 import {
+  effectiveLineTaxRate,
+  resolveCatalogTaxRates,
+} from "../../tax/tax.rates.js";
+import {
   calculatePosFinancialTotals,
   financialTotalsToMoney,
   resolvePosFinancialRules,
@@ -509,17 +513,45 @@ export async function previewCurrentPosCart(
     terminal.tenantId,
     branch.defaultCurrency,
   );
-  const financial = financialTotalsToMoney(
-    calculatePosFinancialTotals({
-      subtotalMinor,
-      discountMinor,
-      rules,
-      taxExemptionReason: input.data.taxExemptionReason,
-    }),
+  // Price each line at its own rate, exactly as checkout will, so the total the
+  // cashier quotes is the total the order is saved with.
+  const catalogRates = await resolveCatalogTaxRates(db, {
+    tenantId: terminal.tenantId,
+    serviceIds: pricingLines.map((line) => line.serviceId),
+    productIds: pricingLines.map((line) => line.productId),
+  });
+  const discountByLine = new Map<string, bigint>();
+  for (const selection of selections) {
+    for (const allocation of selection.result.allocations) {
+      discountByLine.set(
+        allocation.orderItemId,
+        (discountByLine.get(allocation.orderItemId) ?? BigInt(0)) + allocation.amountMinor,
+      );
+    }
+  }
+  const financialLines = pricingLines.map((line) => ({
+    key: line.id,
+    grossMinor: moneyToMinor(line.lineAmount),
+    taxRate: effectiveLineTaxRate(catalogRates, line, rules.taxRate),
+    discountMinor: discountByLine.get(line.id),
+  }));
+  const financialTotals = calculatePosFinancialTotals({
+    subtotalMinor,
+    discountMinor,
+    rules,
+    taxExemptionReason: input.data.taxExemptionReason,
+    lines: financialLines,
+  });
+  const lineTaxRates = new Map(
+    financialTotals.lineTaxes.map((line) => [line.key, line.taxRate]),
   );
+  const financial = financialTotalsToMoney(financialTotals);
   return {
     currency: branch.defaultCurrency,
-    lines: resolvedLines,
+    lines: resolvedLines.map((line) => ({
+      ...line,
+      taxRate: lineTaxRates.get(line.id) ?? "0.0000",
+    })),
     discounts: selections.map(({ rule, result }) => ({
       discountId: rule.id,
       title: rule.title,

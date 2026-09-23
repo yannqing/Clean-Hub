@@ -20,6 +20,7 @@ import { users } from "../identity/users.js";
 import { mediaObjects } from "../platform/media.js";
 import { branches } from "../tenancy/branches.js";
 import { tenants } from "../tenancy/tenants.js";
+import { taxRates } from "./tax-rates.js";
 import { catalogItemStatusEnum } from "./services.js";
 
 export const productCategoryAttributeValueTypeEnum = pgEnum(
@@ -90,6 +91,8 @@ export const products = pgTable(
     description: text("description"),
     tags: jsonb("tags").$type<string[]>().notNull().default([]),
     status: catalogItemStatusEnum("status").notNull().default("active"),
+    /** Null means the tenant's default rate from pos_channel_settings. */
+    taxRateId: ulidColumn("tax_rate_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -104,6 +107,11 @@ export const products = pgTable(
   },
   (table) => [
     uniqueIndex("products_tenant_id_id_unique").on(table.tenantId, table.id),
+    foreignKey({
+      name: "products_tenant_tax_rate_fk",
+      columns: [table.tenantId, table.taxRateId],
+      foreignColumns: [taxRates.tenantId, taxRates.id],
+    }).onDelete("restrict"),
     foreignKey({
       name: "products_tenant_category_fk",
       columns: [table.tenantId, table.categoryId],

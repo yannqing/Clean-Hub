@@ -19,6 +19,7 @@ import { users } from "../identity/users.js";
 import { mediaObjects } from "../platform/media.js";
 import { branches } from "../tenancy/branches.js";
 import { tenants } from "../tenancy/tenants.js";
+import { taxRates } from "./tax-rates.js";
 
 export const businessLineEnum = pgEnum("business_line", [
   "laundry",
@@ -121,6 +122,8 @@ export const services = pgTable(
       .notNull()
       .default(sql`ARRAY['cloth', 'shoe', 'carpet']::text[]`),
     status: catalogItemStatusEnum("status").notNull().default("active"),
+    /** Null means the tenant's default rate from pos_channel_settings. */
+    taxRateId: ulidColumn("tax_rate_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -135,6 +138,11 @@ export const services = pgTable(
   },
   (table) => [
     uniqueIndex("services_tenant_id_id_unique").on(table.tenantId, table.id),
+    foreignKey({
+      name: "services_tenant_tax_rate_fk",
+      columns: [table.tenantId, table.taxRateId],
+      foreignColumns: [taxRates.tenantId, taxRates.id],
+    }).onDelete("restrict"),
     uniqueIndex("services_active_code_unique")
       .on(table.tenantId, table.code)
       .where(sql`${table.deletedAt} is null and ${table.code} is not null`),

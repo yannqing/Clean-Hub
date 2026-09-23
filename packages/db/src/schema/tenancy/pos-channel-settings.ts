@@ -94,7 +94,9 @@ export const posChannelSettings = pgTable(
     ),
     check(
       "pos_channel_settings_tax_rate_check",
-      sql`${table.defaultTaxRate} >= 0 and ${table.defaultTaxRate} <= 100`,
+      // A fraction: 0.18 is 18%. Bounding it at 100 let `18` be stored and
+      // read back everywhere as 1800%.
+      sql`${table.defaultTaxRate} >= 0 and ${table.defaultTaxRate} <= 1`,
     ),
     check(
       "pos_channel_settings_lock_timeout_check",

@@ -1,6 +1,8 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import {
+  orderDiscountAllocations,
+  orderDiscountApplications,
   orderItems,
   orders,
   posChannelSettings,
@@ -14,6 +16,14 @@ import {
 } from "@cleanhub/domain/currency";
 
 import type { AuthContext } from "../../auth/auth.types.js";
+import {
+  calculateTaxedTotals,
+  type TaxLineAllocation,
+} from "../../tax/tax.calculation.js";
+import {
+  effectiveLineTaxRate,
+  resolveCatalogTaxRates,
+} from "../../tax/tax.rates.js";
 import { minorToMoney, moneyToMinor } from "../discounts/pricing-engine.js";
 
 export type PosFinancialRules = {
@@ -30,15 +40,38 @@ export type PosFinancialRules = {
   currency?: string | null;
 };
 
+export type PosTaxBreakdownEntry = {
+  taxRate: string;
+  taxableMinor: bigint;
+  taxMinor: bigint;
+};
+
 export type PosFinancialTotals = {
   taxableMinor: bigint;
   taxMinor: bigint;
+  /**
+   * The dominant rate -- the group with the largest base -- so a single-rate
+   * order reads exactly as before. A mixed order's full picture is in
+   * `taxBreakdown`, which is what receipts and tax reports print.
+   */
   taxRate: string;
+  taxBreakdown: PosTaxBreakdownEntry[];
+  /** Per-line allocation, in the order of the lines passed in. */
+  lineTaxes: TaxLineAllocation[];
   pricesIncludeTax: boolean;
   taxExemptionReason: string | null;
   taxRegistrationNumber: string | null;
   roundingAdjustmentMinor: bigint;
   totalMinor: bigint;
+};
+
+export type PosFinancialLine = {
+  key: string;
+  grossMinor: bigint;
+  /** The line's own rate; null or absent means the tenant default. */
+  taxRate?: string | null;
+  /** Discount already attributed to this line by the discount engine. */
+  discountMinor?: bigint;
 };
 
 /**
@@ -66,62 +99,45 @@ function signedMinorToMoney(value: bigint): string {
   return value < BigInt(0) ? `-${minorToMoney(-value)}` : minorToMoney(value);
 }
 
-function roundRatio(numerator: bigint, denominator: bigint): bigint {
-  if (denominator <= BigInt(0)) return BigInt(0);
-  return (numerator + denominator / BigInt(2)) / denominator;
-}
-
 function roundToIncrement(value: bigint, increment: bigint): bigint {
   if (increment <= BigInt(1)) return value;
   return ((value + increment / BigInt(2)) / increment) * increment;
 }
 
 /**
- * Tax rates are stored as a fraction: 0.1800 is 18%. That is what the owner's
- * settings form writes (it divides the typed percentage by 100), what every
- * receipt displays (it multiplies by 100) and what the offline tills compute
- * with. This scale is ten-thousandths of that fraction, matching the column's
- * four decimal places, so 0.1800 becomes 1800 and the whole rate is 10_000.
+ * Price an order: tax per rate group, then round to what can be paid.
  *
- * This used to divide by 100 * 10_000, reading 0.18 as 0.18%: every taxed
- * order came out with a hundredth of its tax, and disagreed with the till that
- * had just shown the customer the correct total.
+ * `lines` carries each line's own rate. Without it the whole subtotal is one
+ * line at the tenant default, which is exactly the single-rate calculation
+ * this replaced -- callers that do not itemise keep their results unchanged.
  */
-const TAX_RATE_SCALE = BigInt(10_000);
-
-function taxRateToScale(value: string): bigint {
-  const scaled = Math.round(Number(value) * 10_000);
-  return BigInt(Number.isFinite(scaled) ? Math.max(0, scaled) : 0);
-}
-
 export function calculatePosFinancialTotals(input: {
   subtotalMinor: bigint;
   discountMinor: bigint;
   rules: PosFinancialRules;
   taxExemptionReason?: string | null;
+  lines?: PosFinancialLine[];
 }): PosFinancialTotals {
-  const discount =
-    input.discountMinor > input.subtotalMinor
-      ? input.subtotalMinor
-      : input.discountMinor;
-  const baseMinor = input.subtotalMinor - discount;
   const exemption = input.taxExemptionReason?.trim() || null;
-  const rateScaled =
-    input.rules.taxEnabled && !exemption
-      ? taxRateToScale(input.rules.taxRate)
-      : BigInt(0);
-  const taxMinor =
-    rateScaled === BigInt(0)
-      ? BigInt(0)
-      : input.rules.pricesIncludeTax
-        ? roundRatio(baseMinor * rateScaled, TAX_RATE_SCALE + rateScaled)
-        : roundRatio(baseMinor * rateScaled, TAX_RATE_SCALE);
-  const taxableMinor = input.rules.pricesIncludeTax
-    ? baseMinor - taxMinor
-    : baseMinor;
+  const lines =
+    input.lines && input.lines.length > 0
+      ? input.lines
+      : [{ key: "order", grossMinor: input.subtotalMinor }];
+  const taxed = calculateTaxedTotals({
+    lines: lines.map((line) => ({
+      key: line.key,
+      grossMinor: line.grossMinor,
+      taxRate: line.taxRate ?? input.rules.taxRate,
+      discountMinor: line.discountMinor,
+    })),
+    discountMinor: input.discountMinor,
+    taxEnabled: input.rules.taxEnabled,
+    pricesIncludeTax: input.rules.pricesIncludeTax,
+    exemption,
+  });
   const beforeRounding = input.rules.pricesIncludeTax
-    ? baseMinor
-    : baseMinor + taxMinor;
+    ? taxed.baseMinor
+    : taxed.baseMinor + taxed.taxMinor;
   // A currency's smallest payable unit is a hard floor, not a preference: the
   // configured rule may round more coarsely than the currency, never finer.
   const currencyStep = getCurrencyPayableStep(input.rules.currency);
@@ -133,10 +149,19 @@ export function calculatePosFinancialTotals(input: {
         : BigInt(1);
   const step = configuredStep > currencyStep ? configuredStep : currencyStep;
   const rounded = roundToIncrement(beforeRounding, step);
+  const taxBreakdown = taxed.groups
+    .filter((group) => group.baseMinor !== BigInt(0) || taxed.groups.length === 1)
+    .map((group) => ({
+      taxRate: group.taxRate,
+      taxableMinor: group.taxableMinor,
+      taxMinor: group.taxMinor,
+    }));
   return {
-    taxableMinor,
-    taxMinor,
-    taxRate: rateScaled === BigInt(0) ? "0.0000" : input.rules.taxRate,
+    taxableMinor: taxed.taxableMinor,
+    taxMinor: taxed.taxMinor,
+    taxRate: taxed.groups[0]?.taxRate ?? "0.0000",
+    taxBreakdown,
+    lineTaxes: taxed.lines,
     pricesIncludeTax: input.rules.pricesIncludeTax,
     taxExemptionReason: exemption,
     taxRegistrationNumber: input.rules.taxRegistrationNumber,
@@ -225,18 +250,13 @@ export async function applyPosOrderFinancialRules(
     input.tenantId,
     order.currency,
   );
-  const pricedTotals = calculatePosFinancialTotals({
-    subtotalMinor: moneyToMinor(order.subtotalAmount),
-    discountMinor: moneyToMinor(order.discountAmount),
-    rules,
-    taxExemptionReason: input.taxExemptionReason,
-  });
-  const totals =
-    input.cashRoundingStepMinor && input.cashRoundingStepMinor > BigInt(1)
-      ? applyCashRoundingToTotals(pricedTotals, input.cashRoundingStepMinor)
-      : pricedTotals;
   const itemRows = await db
-    .select({ id: orderItems.id, lineAmount: orderItems.lineAmount })
+    .select({
+      id: orderItems.id,
+      lineAmount: orderItems.lineAmount,
+      serviceId: orderItems.serviceId,
+      productSkuId: orderItems.productSkuId,
+    })
     .from(orderItems)
     .where(
       and(
@@ -246,33 +266,81 @@ export async function applyPosOrderFinancialRules(
       ),
     )
     .orderBy(orderItems.createdAt, orderItems.id);
-  const grossTotal = itemRows.reduce(
-    (sum, item) => sum + moneyToMinor(item.lineAmount),
-    BigInt(0),
+
+  // Each line is taxed at its own service's or product's rate. The discount
+  // engine's per-line attribution is honoured, so a code on one exempt item
+  // cannot lower the tax on a standard-rated one.
+  const [catalogRates, discountRows] = await Promise.all([
+    resolveCatalogTaxRates(db, {
+      tenantId: input.tenantId,
+      serviceIds: itemRows.map((item) => item.serviceId),
+      productSkuIds: itemRows.map((item) => item.productSkuId),
+    }),
+    db
+      .select({
+        orderItemId: orderDiscountAllocations.orderItemId,
+        amount: sql<string>`coalesce(sum(${orderDiscountAllocations.amount}), 0)::text`,
+      })
+      .from(orderDiscountAllocations)
+      .innerJoin(
+        orderDiscountApplications,
+        and(
+          eq(orderDiscountApplications.tenantId, orderDiscountAllocations.tenantId),
+          eq(orderDiscountApplications.id, orderDiscountAllocations.applicationId),
+        ),
+      )
+      .where(
+        and(
+          eq(orderDiscountAllocations.tenantId, input.tenantId),
+          eq(orderDiscountAllocations.orderId, input.orderId),
+          eq(orderDiscountApplications.status, "applied"),
+        ),
+      )
+      .groupBy(orderDiscountAllocations.orderItemId),
+  ]);
+  const discountByItem = new Map(
+    discountRows
+      .filter((row) => row.orderItemId)
+      .map((row) => [row.orderItemId as string, moneyToMinor(row.amount)]),
   );
-  let allocatedTaxable = BigInt(0);
-  let allocatedTax = BigInt(0);
-  for (const [index, item] of itemRows.entries()) {
-    const last = index === itemRows.length - 1;
-    const gross = moneyToMinor(item.lineAmount);
-    const taxable = last
-      ? totals.taxableMinor - allocatedTaxable
-      : grossTotal === BigInt(0)
-        ? BigInt(0)
-        : roundRatio(totals.taxableMinor * gross, grossTotal);
-    const tax = last
-      ? totals.taxMinor - allocatedTax
-      : grossTotal === BigInt(0)
-        ? BigInt(0)
-        : roundRatio(totals.taxMinor * gross, grossTotal);
-    allocatedTaxable += taxable;
-    allocatedTax += tax;
+  const lines: PosFinancialLine[] = itemRows.map((item) => ({
+    key: item.id,
+    grossMinor: moneyToMinor(item.lineAmount),
+    taxRate: effectiveLineTaxRate(catalogRates, item, rules.taxRate),
+    discountMinor: discountByItem.get(item.id),
+  }));
+  // The order subtotal is the authority on what is being charged. Any part of
+  // it the lines do not account for is taxed at the default rather than lost.
+  const subtotalMinor = moneyToMinor(order.subtotalAmount);
+  const itemisedMinor = lines.reduce((sum, line) => sum + line.grossMinor, BigInt(0));
+  if (subtotalMinor > itemisedMinor) {
+    lines.push({ key: "unitemised", grossMinor: subtotalMinor - itemisedMinor });
+  }
+
+  const pricedTotals = calculatePosFinancialTotals({
+    subtotalMinor,
+    discountMinor: moneyToMinor(order.discountAmount),
+    rules,
+    taxExemptionReason: input.taxExemptionReason,
+    lines,
+  });
+  const totals =
+    input.cashRoundingStepMinor && input.cashRoundingStepMinor > BigInt(1)
+      ? applyCashRoundingToTotals(pricedTotals, input.cashRoundingStepMinor)
+      : pricedTotals;
+  const allocationByItem = new Map(
+    totals.lineTaxes.map((line) => [line.key, line]),
+  );
+  for (const item of itemRows) {
+    const allocation = allocationByItem.get(item.id);
     await db
       .update(orderItems)
       .set({
-        taxableAmount: minorToMoney(taxable),
-        taxAmount: minorToMoney(tax),
-        taxRateSnapshot: totals.taxRate,
+        taxableAmount: minorToMoney(allocation?.taxableMinor ?? BigInt(0)),
+        taxAmount: minorToMoney(allocation?.taxMinor ?? BigInt(0)),
+        // The rate this line was actually taxed at, so reports can file tax
+        // by rate from the lines alone, whatever the catalogue says later.
+        taxRateSnapshot: allocation?.taxRate ?? "0.0000",
         taxExemptionReason: totals.taxExemptionReason,
         updatedAt: new Date(),
         updatedBy: input.actorUserId,
@@ -317,6 +385,11 @@ export function financialTotalsToMoney(totals: PosFinancialTotals) {
     taxableAmount: minorToMoney(totals.taxableMinor),
     taxAmount: minorToMoney(totals.taxMinor),
     taxRate: totals.taxRate,
+    taxBreakdown: totals.taxBreakdown.map((entry) => ({
+      taxRate: entry.taxRate,
+      taxableAmount: minorToMoney(entry.taxableMinor),
+      taxAmount: minorToMoney(entry.taxMinor),
+    })),
     pricesIncludeTax: totals.pricesIncludeTax,
     taxExemptionReason: totals.taxExemptionReason,
     taxRegistrationNumber: totals.taxRegistrationNumber,

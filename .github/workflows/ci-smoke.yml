@@ -79,6 +79,9 @@ jobs:
       - name: Run tenant order integration test
         run: pnpm test:integration:tenant-orders
 
+      - name: Run per-item tax integration test
+        run: pnpm --filter @cleanhub/api test:integration:tax
+
       - name: Typecheck core apps
         run: |
           pnpm --filter @cleanhub/api-client typecheck
@@ -102,6 +105,7 @@ jobs:
           pnpm --filter @cleanhub/api smoke:pos-carts
           pnpm --filter @cleanhub/api smoke:pos-orders
           pnpm --filter @cleanhub/api smoke:pos-financial
+          pnpm --filter @cleanhub/api smoke:tax-calculation
           pnpm --filter @cleanhub/api smoke:pos-service-tickets
           pnpm --filter @cleanhub/api smoke:temporary-password
           pnpm --filter @cleanhub/api smoke:customer-password-gate
