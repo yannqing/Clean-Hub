@@ -667,6 +667,8 @@ internal class NativePosCopy(
     val customerIntakePrefix: String get() = get("customerIntakePrefix")
     val verifyAndSelectStore: String get() = get("verifyAndSelectStore")
     val reissueCredential: String get() = get("reissueCredential")
+    val builtInThermalPrinterOf: String get() = get("builtInThermalPrinterOf")
+    val builtInScannerOf: String get() = get("builtInScannerOf")
     val hardwareServiceDisconnected: String get() = get("hardwareServiceDisconnected")
     val nearbyDevicesForPaired: String get() = get("nearbyDevicesForPaired")
     val bluetoothUnsupported: String get() = get("bluetoothUnsupported")
@@ -732,6 +734,8 @@ internal class NativePosCopy(
 }
 
 private val COPY_ZH_VALUES: Map<String, String> = mapOf(
+    "builtInThermalPrinterOf" to "%s 内置热敏打印机",
+    "builtInScannerOf" to "%s 内置扫码器",
     "printCopiesRangeTen" to "打印份数应为 1–10。",
     "closedWhilePrinting" to "应用在打印过程中关闭，请由收银员确认后手动重试。",
     "localDataExpired" to "本机 POS 数据已过期，请恢复网络后重新同步。",
@@ -1429,6 +1433,8 @@ private val COPY_ZH_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_EN_VALUES: Map<String, String> = mapOf(
+    "builtInThermalPrinterOf" to "%s built-in thermal printer",
+    "builtInScannerOf" to "%s built-in scanner",
     "printCopiesRangeTen" to "Copies must be between 1 and 10.",
     "closedWhilePrinting" to "The app closed while printing. A cashier should check and retry by hand.",
     "localDataExpired" to "This terminal's POS data has expired. Restore the network and sync again.",
@@ -2126,6 +2132,8 @@ private val COPY_EN_VALUES: Map<String, String> = mapOf(
 )
 
 private val COPY_FR_VALUES: Map<String, String> = mapOf(
+    "builtInThermalPrinterOf" to "Imprimante thermique intégrée %s",
+    "builtInScannerOf" to "Scanner intégré %s",
     "printCopiesRangeTen" to "Le nombre de copies doit être entre 1 et 10.",
     "closedWhilePrinting" to "L'application s'est fermée pendant l'impression. Un caissier doit vérifier et relancer manuellement.",
     "localDataExpired" to "Les données POS de cette caisse ont expiré. Rétablissez le réseau et synchronisez.",

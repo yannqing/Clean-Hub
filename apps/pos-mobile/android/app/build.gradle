@@ -19,6 +19,28 @@ def releaseKeyAlias = envOrProperty('CLEANHUB_ANDROID_KEY_ALIAS')
 def releaseKeyPassword = envOrProperty('CLEANHUB_ANDROID_KEY_PASSWORD')
 def hasReleaseSigning = releaseKeystorePath && releaseKeystorePassword && releaseKeyAlias && releaseKeyPassword
 
+// Without signing config, assembleRelease quietly produces
+// app-release-unsigned.apk, which Android refuses to install with only "App
+// not installed" to show for it. Fail at configuration time instead, naming
+// what is missing. Debug builds and non-release tasks are unaffected.
+gradle.taskGraph.whenReady { graph ->
+    def buildsRelease = graph.allTasks.any { task ->
+        task.project == project && task.name in ['assembleRelease', 'bundleRelease']
+    }
+    if (buildsRelease && !hasReleaseSigning) {
+        def missing = []
+        if (!releaseKeystorePath) missing << 'CLEANHUB_ANDROID_KEYSTORE_PATH'
+        if (!releaseKeystorePassword) missing << 'CLEANHUB_ANDROID_KEYSTORE_PASSWORD'
+        if (!releaseKeyAlias) missing << 'CLEANHUB_ANDROID_KEY_ALIAS'
+        if (!releaseKeyPassword) missing << 'CLEANHUB_ANDROID_KEY_PASSWORD'
+        throw new GradleException(
+            "A release build needs signing credentials or it produces an " +
+            "uninstallable unsigned APK. Missing: ${missing.join(', ')}. " +
+            "Use `pnpm --filter @cleanhub/pos-mobile package:android` to build a release."
+        )
+    }
+}
+
 android {
     namespace = "com.cleanhub.pos"
     compileSdk = rootProject.ext.compileSdkVersion

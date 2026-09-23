@@ -66,10 +66,8 @@ private enum class NativeHardwareProfile(
     val printerAction: String?,
     val printerId: String?,
     val printerHardwareKey: String?,
-    val printerName: String?,
     val scannerId: String?,
     val scannerHardwareKey: String?,
-    val scannerName: String?,
 ) {
     T1101(
         host = "pos-t1101",
@@ -78,10 +76,8 @@ private enum class NativeHardwareProfile(
         printerAction = "net.nyx.printerservice.IPrinterService",
         printerId = "t1101:built-in",
         printerHardwareKey = "t1101:built-in:printer",
-        printerName = "POS-T1101 内置热敏打印机",
         scannerId = "t1101:built-in",
         scannerHardwareKey = "t1101:built-in:scanner",
-        scannerName = "POS-T1101 内置扫码器",
     ),
     T8(
         host = "pos-t8",
@@ -90,10 +86,8 @@ private enum class NativeHardwareProfile(
         printerAction = "com.incar.printerservice.IPrinterService",
         printerId = "t8:built-in",
         printerHardwareKey = "t8:built-in:printer",
-        printerName = "POS-T8 内置热敏打印机",
         scannerId = "t8:built-in",
         scannerHardwareKey = "t8:built-in:scanner",
-        scannerName = "POS-T8 内置扫码器",
     ),
     Unsupported(
         host = "android",
@@ -102,10 +96,8 @@ private enum class NativeHardwareProfile(
         printerAction = null,
         printerId = null,
         printerHardwareKey = null,
-        printerName = null,
         scannerId = null,
         scannerHardwareKey = null,
-        scannerName = null,
     ),
 }
 
@@ -307,7 +299,7 @@ internal class NativePosHardware(
                 val finishResult = service.printEndAutoOut()
                 if (finishResult != 0) return NativeHardwareOperationResult(false, printerErrorMessage(finishResult))
             }
-            NativeHardwareOperationResult(true, copy.receiptSentTo.format(profile.printerName))
+            NativeHardwareOperationResult(true, copy.receiptSentTo.format(copy.builtInThermalPrinterOf.format(profile.displayName)))
         } catch (_: RemoteException) {
             printerService = null
             NativeHardwareOperationResult(false, copy.printServiceDisconnected)
@@ -504,10 +496,13 @@ internal class NativePosHardware(
         printerStatus = printerStatus,
         printerStatusCode = printerStatusCode,
         printerId = profile.printerId,
-        printerName = profile.printerName,
+        // Built from the catalogue rather than a constant: the device name is
+        // shown on the hardware screen, so a French cashier must not meet
+        // "POS-T1101 内置热敏打印机" there.
+        printerName = profile.printerId?.let { copy.builtInThermalPrinterOf.format(profile.displayName) },
         printerHardwareKey = profile.printerHardwareKey,
         scannerId = profile.scannerId,
-        scannerName = profile.scannerName,
+        scannerName = profile.scannerId?.let { copy.builtInScannerOf.format(profile.displayName) },
         scannerHardwareKey = profile.scannerHardwareKey,
     )
 

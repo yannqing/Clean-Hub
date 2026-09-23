@@ -13,17 +13,18 @@ package com.cleanhub.pos.nativepos
  * which point a further payment on the same order is genuinely a new one and
  * must get its own key.
  *
- * Keys are per order id, so two orders being settled in parallel never collide.
+ * Keys are per subject -- an order id for a payment, or a cash movement's own
+ * identity -- so two operations in flight together never collide.
  */
 class NativePaymentIdempotency(private val newKey: () -> String = { NativeUlid.create() }) {
     private val keys = mutableMapOf<String, String>()
 
-    /** The key for this order's in-flight payment, minting one if needed. */
-    fun keyFor(orderId: String): String = keys.getOrPut(orderId) { newKey() }
+    /** The key for this subject's in-flight request, minting one if needed. */
+    fun keyFor(subject: String): String = keys.getOrPut(subject) { newKey() }
 
-    /** Call once the payment has landed, so the next one starts a new key. */
-    fun release(orderId: String) {
-        keys.remove(orderId)
+    /** Call once the request has landed, so the next one starts a new key. */
+    fun release(subject: String) {
+        keys.remove(subject)
     }
 
     /** Visible for tests. */

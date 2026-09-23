@@ -62,4 +62,43 @@ class NativePaymentIdempotencyTest {
 
         assertEquals(0, keys.inFlightCount())
     }
+
+    /**
+     * Cash movements share this keyring. Their subject is the movement itself
+     * -- type, amount and reason -- because a pay-out the cashier re-taps after
+     * a timeout is the same movement, while a genuinely second pay-out of the
+     * same amount is entered separately and must be allowed through.
+     */
+    @Test
+    fun aRetriedCashMovementReusesItsKeyButANewOneDoesNot() {
+        val keys = counting()
+
+        val first = keys.keyFor("pay_out|50.00|Bank run")
+        val retryAfterTimeout = keys.keyFor("pay_out|50.00|Bank run")
+        assertEquals(first, retryAfterTimeout)
+
+        // Different reason, so a different movement.
+        assertNotEquals(first, keys.keyFor("pay_out|50.00|Supplier"))
+        // Different amount, so a different movement.
+        assertNotEquals(first, keys.keyFor("pay_out|60.00|Bank run"))
+        // A pay-in is not the pay-out being retried.
+        assertNotEquals(first, keys.keyFor("pay_in|50.00|Bank run"))
+    }
+
+    /**
+     * Once the server has the movement, an identical one entered later is a
+     * real second movement and must not be deduplicated against the first.
+     */
+    @Test
+    fun anIdenticalCashMovementAfterReleaseGetsANewKey() {
+        val keys = counting()
+        val subject = "pay_in|20.00|Float top-up"
+
+        val first = keys.keyFor(subject)
+        keys.release(subject)
+        val second = keys.keyFor(subject)
+
+        assertNotEquals(first, second)
+        assertEquals(0, keys.inFlightCount() - 1)
+    }
 }

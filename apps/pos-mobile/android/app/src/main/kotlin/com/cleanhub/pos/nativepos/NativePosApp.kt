@@ -416,6 +416,10 @@ fun NativePosApp(applicationContext: Context) {
     // Ids for a customer creation that may need retrying; see createCustomer.
     var pendingCustomerDraft by remember { mutableStateOf<NativeCustomerDraft?>(null) }
     val moreOrderCashKeys = remember { NativePaymentIdempotency() }
+    // A pay-in or pay-out carries a key that survives a retry, for the same
+    // reason a payment does: the server dedupes on it, and a fresh key per tap
+    // turns a lost response into a second movement the drawer never received.
+    val cashMovementKeys = remember { NativePaymentIdempotency() }
     var moreSearchResults by remember { mutableStateOf<List<NativeMoreSearchResult>>(emptyList()) }
     var moreStatistics by remember { mutableStateOf<NativeMoreStatistics?>(null) }
     var moreStatisticsPeriod by remember { mutableStateOf("today") }
@@ -1264,6 +1268,9 @@ fun NativePosApp(applicationContext: Context) {
             message = copy.cashMovementInvalid
             return
         }
+        // The same type, amount and reason is the same movement being retried,
+        // not a second one: re-tapping after a timeout must reuse its key.
+        val movementSubject = "$type|$amount|${reason.trim()}"
         scope.launch {
             busy = true
             try {
@@ -1272,9 +1279,12 @@ fun NativePosApp(applicationContext: Context) {
                         put("movementType", type)
                         put("amount", amount)
                         put("reason", reason.trim())
-                        put("idempotencyKey", NativeUlid.create())
+                        put("idempotencyKey", cashMovementKeys.keyFor(movementSubject))
                     })
                 }
+                // Released only once the server has it; until then a retry must
+                // carry the same key.
+                cashMovementKeys.release(movementSubject)
                 val refreshWarning = refreshCashOperationsAfterMutation()
                 val successMessage = if (type == "pay_in") copy.payInRecorded else copy.payOutRecorded
                 message = if (refreshWarning == null) successMessage else copy.cacheRefreshesLater.format(successMessage)
