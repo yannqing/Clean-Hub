@@ -16,6 +16,21 @@ class NativePosApiException(
 ) : IllegalStateException(message)
 
 /**
+ * A fresh device has no refresh credential. In that state a 401 from a login
+ * endpoint is the login error itself, not a signal that a refresh is possible.
+ */
+internal fun shouldRefreshAfterUnauthorized(
+    status: Int,
+    path: String,
+    retryAfterRefresh: Boolean,
+    hasRefreshToken: Boolean,
+): Boolean =
+    status == 401 &&
+        retryAfterRefresh &&
+        hasRefreshToken &&
+        path !in setOf("/auth/login", "/auth/pos-pin-login", "/auth/refresh")
+
+/**
  * Minimal cookie-authenticated API transport for the native APK. It deliberately
  * uses the same POS cookie names and client header as the web terminal, so
  * terminal credential rotation and backend revocation apply to both clients.
@@ -55,7 +70,13 @@ class NativePosApiClient(private val session: NativePosSession) {
     ): JSONObject {
         if (!configured()) throw NativePosApiException(0, "POS_API_NOT_CONFIGURED", nativePosCopy(session.pinLanguageCode()).apiNotConfigured)
         val response = execute(method, path, body)
-        if (response.status == 401 && retryAfterRefresh && path != "/auth/refresh") {
+        if (shouldRefreshAfterUnauthorized(
+                status = response.status,
+                path = path,
+                retryAfterRefresh = retryAfterRefresh,
+                hasRefreshToken = session.hasRefreshToken(),
+            )
+        ) {
             // A refresh that fails means the session is gone. Retrying the
             // original call with the same dead cookies only produces a second,
             // more confusing 401, so surface the refresh failure instead and

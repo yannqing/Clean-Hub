@@ -32,6 +32,9 @@ class NativePosSession(context: Context) {
     fun hasTerminalCredential(): Boolean =
         !preferences.getString("cookie:$TERMINAL_COOKIE", null).isNullOrBlank()
 
+    fun hasRefreshToken(): Boolean =
+        !preferences.getString("cookie:$REFRESH_COOKIE", null).isNullOrBlank()
+
     fun cookieHeader(): String = COOKIE_NAMES.mapNotNull { name ->
         preferences.getString("cookie:$name", null)?.let { "$name=$it" }
     }.joinToString("; ")
