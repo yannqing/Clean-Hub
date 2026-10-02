@@ -12,18 +12,7 @@ function getErrorMessage(error: unknown): string {
     : "Failed to review restore request.";
 }
 
-/**
- * Drive a restore request through one of its review transitions.
- *
- * Target endpoints (mocked at the api-client layer until the backend lands):
- *   - approve  → POST /saas/restore-requests/:id/approve
- *   - reject   → POST /saas/restore-requests/:id/reject
- *   - complete → POST /saas/restore-requests/:id/complete
- *   - cancel   → POST /saas/restore-requests/:id/cancel
- *
- * `input.reviewNote` is forwarded to approve/reject and ignored for
- * complete/cancel (which take no body).
- */
+/** Persist a restore review transition through the SaaS API. */
 export async function reviewRestoreRequestAction(
   restoreRequestId: string,
   action: ReviewAction,
@@ -50,11 +39,13 @@ export async function reviewRestoreRequestAction(
       case "complete":
         result = await webAdminApi.saas.restoreRequests.complete(
           restoreRequestId,
+          input,
         );
         break;
       case "cancel":
         result = await webAdminApi.saas.restoreRequests.cancel(
           restoreRequestId,
+          input,
         );
         break;
       default: {

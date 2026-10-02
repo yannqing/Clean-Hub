@@ -2,18 +2,14 @@
 
 import { useSaasI18n } from "@/i18n";
 
-/**
- * Fields a real backup worker would write into `backup_jobs.result_metadata`.
- *
- * The current `BackupJobListItem` DTO does not surface these (no worker
- * populates them yet); this shape is what the UI renders when the metadata is
- * present. Today the panel always shows the "not captured" placeholder.
- */
+/** Verified artifact metadata written by the PostgreSQL backup worker. */
 export type BackupStorageMetadataValue = {
   dumpUrl?: string | null;
+  dumpKey?: string | null;
   sizeBytes?: number | null;
   checksum?: string | null;
   storageType?: string | null;
+  physicalScope?: string | null;
 };
 
 type BackupStorageMetadataProps = {
@@ -24,9 +20,8 @@ type BackupStorageMetadataProps = {
 /**
  * Read-only panel that surfaces the dump artifact metadata for a backup job.
  *
- * Reads from the free-form `result_metadata` jsonb the worker will eventually
- * populate. Until then it renders an honest "not captured yet" line so the UI
- * never implies a dump exists when one doesn't.
+ * Reads from `result_metadata` and never implies a dump exists before the
+ * backup worker records a successful verification.
  */
 export function BackupStorageMetadata({
   metadata,
@@ -36,6 +31,9 @@ export function BackupStorageMetadata({
   const rows: Array<{ label: string; value: string }> = [];
   if (metadata?.dumpUrl) {
     rows.push({ label: m.backups.storageMetadata.dumpUrl, value: metadata.dumpUrl });
+  }
+  if (metadata?.dumpKey) {
+    rows.push({ label: m.backups.storageMetadata.dumpKey, value: metadata.dumpKey });
   }
   if (typeof metadata?.sizeBytes === "number") {
     rows.push({
@@ -54,6 +52,9 @@ export function BackupStorageMetadata({
       label: m.backups.storageMetadata.storageType,
       value: metadata.storageType,
     });
+  }
+  if (metadata?.physicalScope === "platform") {
+    rows.push({ label: m.backups.detail.scope, value: m.common.platform });
   }
 
   return (

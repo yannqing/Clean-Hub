@@ -19,6 +19,7 @@ export type BackupJobListItem = {
   startedAt: string | null;
   finishedAt: string | null;
   failureReason: string | null;
+  resultMetadata: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
 };

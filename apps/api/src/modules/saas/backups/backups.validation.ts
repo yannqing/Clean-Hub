@@ -10,11 +10,20 @@ export const backupJobListQuerySchema = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
-export const createBackupJobBodySchema = z.object({
-  scope: z.enum(["platform", "tenant"]),
-  tenantId: z.string().regex(ULID_PATTERN).optional(),
-  reason: z.string().trim().max(500).optional(),
-});
+export const createBackupJobBodySchema = z
+  .object({
+    scope: z.enum(["platform", "tenant"]),
+    tenantId: z.string().regex(ULID_PATTERN).optional(),
+    reason: z.string().trim().max(500).optional(),
+  })
+  .refine(
+    (value) =>
+      value.scope === "platform" ? !value.tenantId : Boolean(value.tenantId),
+    {
+      message:
+        "Tenant-scoped requests require a tenant ID; platform requests must omit it.",
+    },
+  );
 
 export const backupJobParamsSchema = z.object({
   backupId: z.string().regex(ULID_PATTERN),
@@ -32,4 +41,13 @@ export const restoreRequestListQuerySchema = z.object({
   backupJobId: z.string().regex(ULID_PATTERN).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
   offset: z.coerce.number().int().min(0).default(0),
+});
+
+export const reviewRestoreRequestParamsSchema = z.object({
+  requestId: z.string().regex(ULID_PATTERN),
+  action: z.enum(["approve", "reject", "complete", "cancel"]),
+});
+
+export const reviewRestoreRequestBodySchema = z.object({
+  reviewNote: z.string().trim().max(500).optional(),
 });

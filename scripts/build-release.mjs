@@ -11,7 +11,7 @@ import {
   unlink,
   writeFile,
 } from "node:fs/promises";
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
@@ -201,6 +201,7 @@ async function writeReleaseCompose() {
       BACKUP_DIRECTORY: /backups
       BACKUP_INTERVAL_SECONDS: \${BACKUP_INTERVAL_SECONDS:-900}
       BACKUP_LOCAL_RETENTION_DAYS: \${BACKUP_LOCAL_RETENTION_DAYS:-7}
+      BACKUP_JOB_POLL_SECONDS: \${BACKUP_JOB_POLL_SECONDS:-30}
       # The health window must follow the interval. A fixed 30 minutes marks a
       # daily backup unhealthy for 23 and a half hours out of every 24, and an
       # alarm that is always ringing is one nobody reads.
@@ -932,6 +933,12 @@ async function copyPosWebStandalone() {
 }
 
 async function writeManifest() {
+  const gitRevision = spawnSync("git", ["rev-parse", "--verify", "HEAD"], {
+    cwd: rootDir,
+    encoding: "utf8",
+  });
+  const sourceCommit =
+    gitRevision.status === 0 ? gitRevision.stdout.trim() : null;
   const files = [
     "Dockerfile",
     "docker-compose.yml",
@@ -964,6 +971,7 @@ async function writeManifest() {
       {
         name: "cleanhub",
         generatedAt: new Date().toISOString(),
+        sourceCommit,
         artifactPath: relative(rootDir, artifactDir).replaceAll("\\", "/"),
         checksums,
       },

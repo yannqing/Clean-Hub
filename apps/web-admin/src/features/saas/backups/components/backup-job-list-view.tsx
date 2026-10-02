@@ -21,6 +21,7 @@ import { DataTable } from "@cleanhub/ui/data-table";
 import { DatabaseBackup, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { getCurrentAuthQuery } from "@/features/auth/queries";
 import {
   SaasPageHeader,
   saasCompactTableClassName,
@@ -43,6 +44,7 @@ import { BackupStorageMetadata } from "./backup-storage-metadata";
 
 type ScopeFilter = "all" | BackupJobScope;
 type StatusFilter = "all" | BackupJobStatus;
+const pageSize = 50;
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "";
@@ -97,6 +99,7 @@ function toListItem(backupJob: BackupJobListItem): BackupJobListItem {
     startedAt: backupJob.startedAt,
     finishedAt: backupJob.finishedAt,
     failureReason: backupJob.failureReason,
+    resultMetadata: backupJob.resultMetadata,
     createdAt: backupJob.createdAt,
     updatedAt: backupJob.updatedAt,
   };
@@ -106,6 +109,11 @@ export function BackupJobListView() {
   const { m, formatDateTime } = useSaasI18n();
   const [backupJobs, setBackupJobs] = useState<BackupJobListItem[]>([]);
   const [restoreRequests, setRestoreRequests] = useState<RestoreRequest[]>([]);
+  const [backupOffset, setBackupOffset] = useState(0);
+  const [restoreOffset, setRestoreOffset] = useState(0);
+  const [backupHasNext, setBackupHasNext] = useState(false);
+  const [restoreHasNext, setRestoreHasNext] = useState(false);
+  const [canReviewRestores, setCanReviewRestores] = useState(false);
   const [selectedBackupJob, setSelectedBackupJob] =
     useState<BackupJobListItem | null>(null);
   const [scope, setScope] = useState<ScopeFilter>("all");
@@ -118,15 +126,29 @@ export function BackupJobListView() {
     string | null
   >(null);
 
+  useEffect(() => {
+    let isCurrent = true;
+    getCurrentAuthQuery()
+      .then((auth) => {
+        if (isCurrent) setCanReviewRestores(auth.role === "super_admin");
+      })
+      .catch(() => {
+        if (isCurrent) setCanReviewRestores(false);
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, []);
+
   const listQuery = useMemo(
     () => ({
-      limit: 50,
-      offset: 0,
+      limit: pageSize + 1,
+      offset: backupOffset,
       scope: scope === "all" ? undefined : scope,
       status: status === "all" ? undefined : status,
       tenantId: tenantId.trim() || undefined,
     }),
-    [scope, status, tenantId],
+    [backupOffset, scope, status, tenantId],
   );
 
   const loadBackupJobs = useCallback(async () => {
@@ -135,7 +157,8 @@ export function BackupJobListView() {
 
     try {
       const data = await getBackupJobListQuery(listQuery);
-      setBackupJobs(data);
+      setBackupJobs(data.slice(0, pageSize));
+      setBackupHasNext(data.length > pageSize);
       setSelectedBackupJob((current) =>
         current
           ? (data.find((backupJob) => backupJob.id === current.id) ?? current)
@@ -149,12 +172,18 @@ export function BackupJobListView() {
   }, [listQuery, m.backups.loadError]);
 
   function handleBackupJobCreated(backupJob: BackupJobListItem) {
-    setBackupJobs((current) => [toListItem(backupJob), ...current]);
+    setBackupOffset(0);
+    setBackupJobs((current) =>
+      [toListItem(backupJob), ...current].slice(0, pageSize),
+    );
     setSelectedBackupJob(backupJob);
   }
 
   function handleRestoreRequestCreated(restoreRequest: RestoreRequest) {
-    setRestoreRequests((current) => [restoreRequest, ...current]);
+    setRestoreOffset(0);
+    setRestoreRequests((current) =>
+      [restoreRequest, ...current].slice(0, pageSize),
+    );
   }
 
   function handleRestoreRequestReviewed(updated: RestoreRequest) {
@@ -172,7 +201,8 @@ export function BackupJobListView() {
           return;
         }
 
-        setBackupJobs(data);
+        setBackupJobs(data.slice(0, pageSize));
+        setBackupHasNext(data.length > pageSize);
         setSelectedBackupJob((current) =>
           current
             ? (data.find((backupJob) => backupJob.id === current.id) ?? current)
@@ -199,13 +229,14 @@ export function BackupJobListView() {
   useEffect(() => {
     let isCurrent = true;
 
-    getRestoreRequestListQuery({ limit: 50, offset: 0 })
+    getRestoreRequestListQuery({ limit: pageSize + 1, offset: restoreOffset })
       .then((data) => {
         if (!isCurrent) {
           return;
         }
 
-        setRestoreRequests(data);
+        setRestoreRequests(data.slice(0, pageSize));
+        setRestoreHasNext(data.length > pageSize);
       })
       .catch((loadError: unknown) => {
         if (isCurrent) {
@@ -225,7 +256,7 @@ export function BackupJobListView() {
     return () => {
       isCurrent = false;
     };
-  }, [m.backups.restoreLoadError]);
+  }, [m.backups.restoreLoadError, restoreOffset]);
 
   return (
     <section className="space-y-7 pb-8">
@@ -264,6 +295,7 @@ export function BackupJobListView() {
               <Select
                 onValueChange={(value) => {
                   setLoading(true);
+                  setBackupOffset(0);
                   setScope(value as ScopeFilter);
                 }}
                 value={scope}
@@ -292,6 +324,7 @@ export function BackupJobListView() {
               <Select
                 onValueChange={(value) => {
                   setLoading(true);
+                  setBackupOffset(0);
                   setStatus(value as StatusFilter);
                 }}
                 value={status}
@@ -322,6 +355,7 @@ export function BackupJobListView() {
                 id="backup-tenant-filter"
                 onChange={(event) => {
                   setLoading(true);
+                  setBackupOffset(0);
                   setTenantId(event.target.value);
                 }}
                 placeholder={m.common.optionalTenantUlid}
@@ -405,6 +439,34 @@ export function BackupJobListView() {
               </DataTable>
             </div>
           )}
+          {!loading && !error && (backupOffset > 0 || backupHasNext) ? (
+            <div className="flex justify-end gap-2">
+              <Button
+                disabled={backupOffset === 0}
+                onClick={() => {
+                  setLoading(true);
+                  setBackupOffset(Math.max(0, backupOffset - pageSize));
+                }}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {m.common.previousPage}
+              </Button>
+              <Button
+                disabled={!backupHasNext}
+                onClick={() => {
+                  setLoading(true);
+                  setBackupOffset(backupOffset + pageSize);
+                }}
+                size="sm"
+                type="button"
+                variant="outline"
+              >
+                {m.common.nextPage}
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <aside className="grid content-start gap-5">
@@ -458,13 +520,21 @@ export function BackupJobListView() {
                   ) : null}
                 </div>
 
-                <BackupStorageMetadata />
+                <BackupStorageMetadata
+                  metadata={selectedBackupJob.resultMetadata}
+                />
               </div>
 
-              <CreateRestoreRequestForm
-                backupJobId={selectedBackupJob.id}
-                onCreated={handleRestoreRequestCreated}
-              />
+              {selectedBackupJob.status === "succeeded" ? (
+                <CreateRestoreRequestForm
+                  backupJobId={selectedBackupJob.id}
+                  onCreated={handleRestoreRequestCreated}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {m.backups.restoreRequiresSuccess}
+                </p>
+              )}
             </>
           ) : (
             <div className="rounded-md border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -561,6 +631,7 @@ export function BackupJobListView() {
                           <RestoreRequestReviewActions
                             restoreRequest={restoreRequest}
                             onReviewed={handleRestoreRequestReviewed}
+                            canReview={canReviewRestores}
                           />
                         </TableCell>
                       </TableRow>
@@ -569,6 +640,36 @@ export function BackupJobListView() {
                 </DataTable>
               </div>
             )}
+            {!restoreRequestsLoading &&
+            !restoreRequestsError &&
+            (restoreOffset > 0 || restoreHasNext) ? (
+              <div className="flex justify-end gap-2">
+                <Button
+                  disabled={restoreOffset === 0}
+                  onClick={() => {
+                    setRestoreRequestsLoading(true);
+                    setRestoreOffset(Math.max(0, restoreOffset - pageSize));
+                  }}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {m.common.previousPage}
+                </Button>
+                <Button
+                  disabled={!restoreHasNext}
+                  onClick={() => {
+                    setRestoreRequestsLoading(true);
+                    setRestoreOffset(restoreOffset + pageSize);
+                  }}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  {m.common.nextPage}
+                </Button>
+              </div>
+            ) : null}
           </div>
         </aside>
       </div>

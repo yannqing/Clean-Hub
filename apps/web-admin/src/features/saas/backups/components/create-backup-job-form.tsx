@@ -57,6 +57,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
       onSubmit={handleSubmit}
     >
       <h2 className="text-sm font-semibold">{m.backups.manualBackup}</h2>
+      <p className="text-xs text-muted-foreground">{m.backups.backupPhysicalScopeHint}</p>
 
       <div className="grid gap-3 md:grid-cols-2">
         <div className="grid gap-2">
@@ -86,6 +87,7 @@ export function CreateBackupJobForm({ onCreated }: CreateBackupJobFormProps) {
             id="backup-tenant-id"
             onChange={(event) => setTenantId(event.target.value)}
             placeholder={m.common.optionalTenantUlid}
+            required={scope === "tenant"}
             value={scope === "platform" ? "" : tenantId}
           />
         </div>

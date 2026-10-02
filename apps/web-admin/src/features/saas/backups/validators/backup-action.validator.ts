@@ -36,6 +36,9 @@ export function validateCreateBackupJob(
       error: "Tenant ID must be a valid ULID.",
     };
   }
+  if (input.scope === "tenant" && !tenantId) {
+    return { ok: false, error: "Tenant ID is required for tenant-scoped requests." };
+  }
 
   if (reason && reason.length > 500) {
     return {

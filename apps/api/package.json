@@ -47,6 +47,8 @@
     "test:integration:pos-realtime": "tsx src/realtime/realtime.handshake.integration.ts",
     "test:integration:pos-realtime-proxy": "tsx src/realtime/realtime.proxy.integration.ts",
     "smoke:saas-tenant-offboarding": "tsx src/modules/saas/tenants/tenant-offboarding.smoke.ts",
+    "smoke:saas-backups": "tsx src/modules/saas/backups/backups.smoke.ts",
+    "smoke:saas-overview": "tsx src/modules/saas/overview/overview.smoke.ts",
     "smoke:tenant-users": "tsx src/modules/tenant/users/tenant-users.repository.smoke.ts",
     "smoke:tenant-resource-branch-scope": "tsx src/modules/tenant/tenant-resource-branch-scope.smoke.ts",
     "smoke:tenant-timezone": "tsx src/modules/auth/tenant-timezone.smoke.ts",

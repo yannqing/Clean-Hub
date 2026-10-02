@@ -1,7 +1,12 @@
 import { createId } from "@cleanhub/id";
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 
-import { backupJobs, restoreRequests, type Database } from "@cleanhub/db";
+import {
+  backupJobs,
+  restoreRequests,
+  tenants,
+  type Database,
+} from "@cleanhub/db";
 
 import type {
   BackupJobListInput,
@@ -14,6 +19,18 @@ import type {
 
 function toIsoString(value: Date | null): string | null {
   return value ? value.toISOString() : null;
+}
+
+export async function backupTenantExists(
+  db: Database,
+  tenantId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: tenants.id })
+    .from(tenants)
+    .where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
+    .limit(1);
+  return Boolean(row);
 }
 
 export async function findBackupJobs(
@@ -30,6 +47,7 @@ export async function findBackupJobs(
       startedAt: backupJobs.startedAt,
       finishedAt: backupJobs.finishedAt,
       failureReason: backupJobs.failureReason,
+      resultMetadata: backupJobs.resultMetadata,
       createdAt: backupJobs.createdAt,
       updatedAt: backupJobs.updatedAt,
     })
@@ -83,6 +101,7 @@ export async function insertBackupJob(
       startedAt: backupJobs.startedAt,
       finishedAt: backupJobs.finishedAt,
       failureReason: backupJobs.failureReason,
+      resultMetadata: backupJobs.resultMetadata,
       createdAt: backupJobs.createdAt,
       updatedAt: backupJobs.updatedAt,
     });
@@ -101,12 +120,18 @@ export async function insertBackupJob(
 export async function findBackupJobForRestoreById(
   db: Database,
   backupJobId: string,
-): Promise<{ id: string; tenantId: string | null; scope: string } | null> {
+): Promise<{
+  id: string;
+  tenantId: string | null;
+  scope: string;
+  status: string;
+} | null> {
   const rows = await db
     .select({
       id: backupJobs.id,
       tenantId: backupJobs.tenantId,
       scope: backupJobs.scope,
+      status: backupJobs.status,
     })
     .from(backupJobs)
     .where(and(eq(backupJobs.id, backupJobId), isNull(backupJobs.deletedAt)))
@@ -185,7 +210,9 @@ export async function findRestoreRequests(
       and(
         isNull(restoreRequests.deletedAt),
         input.status ? eq(restoreRequests.status, input.status) : undefined,
-        input.tenantId ? eq(restoreRequests.tenantId, input.tenantId) : undefined,
+        input.tenantId
+          ? eq(restoreRequests.tenantId, input.tenantId)
+          : undefined,
         input.backupJobId
           ? eq(restoreRequests.backupJobId, input.backupJobId)
           : undefined,
@@ -201,4 +228,91 @@ export async function findRestoreRequests(
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }));
+}
+
+export async function findRestoreRequestForReview(
+  db: Database,
+  requestId: string,
+): Promise<RestoreRequestListItem | null> {
+  const found = await db
+    .select({
+      id: restoreRequests.id,
+      backupJobId: restoreRequests.backupJobId,
+      tenantId: restoreRequests.tenantId,
+      requestedBy: restoreRequests.requestedBy,
+      reason: restoreRequests.reason,
+      status: restoreRequests.status,
+      reviewedBy: restoreRequests.reviewedBy,
+      reviewedAt: restoreRequests.reviewedAt,
+      reviewNote: restoreRequests.reviewNote,
+      createdAt: restoreRequests.createdAt,
+      updatedAt: restoreRequests.updatedAt,
+    })
+    .from(restoreRequests)
+    .where(
+      and(eq(restoreRequests.id, requestId), isNull(restoreRequests.deletedAt)),
+    )
+    .limit(1);
+  const row = found[0];
+  return row
+    ? {
+        ...row,
+        reviewedAt: toIsoString(row.reviewedAt),
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      }
+    : null;
+}
+
+export async function transitionRestoreRequest(
+  db: Database,
+  input: {
+    id: string;
+    expectedStatus: RestoreRequestListItem["status"];
+    status: RestoreRequestListItem["status"];
+    actorUserId: string;
+    reviewNote?: string;
+  },
+): Promise<RestoreRequestListItem | null> {
+  const now = new Date();
+  const rows = await db
+    .update(restoreRequests)
+    .set({
+      status: input.status,
+      reviewedBy: input.actorUserId,
+      reviewedAt: now,
+      reviewNote: input.reviewNote ?? undefined,
+      updatedAt: now,
+      updatedBy: input.actorUserId,
+      version: sql`${restoreRequests.version} + 1`,
+    })
+    .where(
+      and(
+        eq(restoreRequests.id, input.id),
+        eq(restoreRequests.status, input.expectedStatus),
+        isNull(restoreRequests.deletedAt),
+      ),
+    )
+    .returning({
+      id: restoreRequests.id,
+      backupJobId: restoreRequests.backupJobId,
+      tenantId: restoreRequests.tenantId,
+      requestedBy: restoreRequests.requestedBy,
+      reason: restoreRequests.reason,
+      status: restoreRequests.status,
+      reviewedBy: restoreRequests.reviewedBy,
+      reviewedAt: restoreRequests.reviewedAt,
+      reviewNote: restoreRequests.reviewNote,
+      createdAt: restoreRequests.createdAt,
+      updatedAt: restoreRequests.updatedAt,
+    });
+  const row = rows[0];
+  return row
+    ? {
+        ...row,
+        reviewedAt: toIsoString(row.reviewedAt),
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      }
+    : null;
 }

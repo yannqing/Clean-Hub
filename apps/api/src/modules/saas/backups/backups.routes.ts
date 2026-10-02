@@ -6,6 +6,7 @@ import {
   createRestoreRequestController,
   listBackupJobsController,
   listRestoreRequestsController,
+  reviewRestoreRequestController,
 } from "./backups.controller.js";
 
 export function createSaasBackupRoutes() {
@@ -22,6 +23,7 @@ export function createSaasRestoreRequestRoutes() {
   const routes = new Hono<AppBindings>();
 
   routes.get("/", listRestoreRequestsController);
+  routes.post("/:requestId/:action", reviewRestoreRequestController);
 
   return routes;
 }

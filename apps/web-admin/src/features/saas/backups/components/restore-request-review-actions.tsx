@@ -14,6 +14,7 @@ import type {
 
 type RestoreRequestReviewActionsProps = {
   restoreRequest: RestoreRequest;
+  canReview: boolean;
   /** Called with the post-review request so the parent list can reconcile. */
   onReviewed: (updated: RestoreRequest) => void;
 };
@@ -59,6 +60,7 @@ function availableActions(status: RestoreRequestStatus): ReviewAction[] {
 export function RestoreRequestReviewActions({
   restoreRequest,
   onReviewed,
+  canReview,
 }: RestoreRequestReviewActionsProps) {
   const { m } = useSaasI18n();
   const [note, setNote] = useState("");
@@ -69,10 +71,7 @@ export function RestoreRequestReviewActions({
   async function handleAction(action: ReviewAction) {
     setPendingAction(action);
 
-    const input =
-      action === "approve" || action === "reject"
-        ? { reviewNote: note }
-        : undefined;
+    const input = { reviewNote: note };
     const result = await reviewRestoreRequestAction(
       restoreRequest.id,
       action,
@@ -100,7 +99,7 @@ export function RestoreRequestReviewActions({
     onReviewed(result.data);
   }
 
-  if (actions.length === 0) {
+  if (!canReview || actions.length === 0) {
     return (
       <Badge variant={getStatusVariant(restoreRequest.status)}>
         {m.common.restoreStatusLabels[restoreRequest.status]}
@@ -148,7 +147,10 @@ export function RestoreRequestReviewActions({
           return (
             <Button
               className="h-7 px-2 text-[11px]"
-              disabled={pendingAction !== null}
+              disabled={
+                pendingAction !== null ||
+                (action === "complete" && !note.trim())
+              }
               key={action}
               onClick={() => handleAction(action)}
               size="sm"
