@@ -43,7 +43,7 @@ import { interpolate } from "@/i18n/messages/saas";
 import { canManageSaasUsers } from "@/lib/permissions";
 
 import { saasUserStatusOptions } from "../constants";
-import { getSaasUserListQuery } from "../queries";
+import { getSaasUserListQuery, getSaasUserStatsQuery } from "../queries";
 import type {
   AuthContext,
   SaasUserStatus,
@@ -59,7 +59,6 @@ type SaasUserMetrics = SaasUserStatusCounts & {
 
 const pageSize = 10;
 const lookaheadLimit = pageSize + 1;
-const metricsLimit = 100;
 
 const emptyMetrics: SaasUserMetrics = {
   active: 0,
@@ -113,14 +112,6 @@ export function SaasUserListView() {
     }),
     [offset, query, status],
   );
-  const metricsQuery = useMemo(
-    () => ({
-      limit: metricsLimit,
-      offset: 0,
-      q: query.trim() || undefined,
-    }),
-    [query],
-  );
   const canManageMembers =
     !authLoading && !authError && canManageSaasUsers(authContext);
 
@@ -130,18 +121,18 @@ export function SaasUserListView() {
 
     Promise.all([
       getSaasUserListQuery(listQuery),
-      getSaasUserListQuery(metricsQuery),
+      getSaasUserStatsQuery(query.trim() || undefined),
     ])
       .then(([pageResponse, metricsResponse]) => {
         if (requestIdRef.current !== requestId) {
           return;
         }
 
-        setUsers(pageResponse.data.slice(0, pageSize));
-        setHasNext(pageResponse.data.length > pageSize);
+        setUsers(pageResponse.slice(0, pageSize));
+        setHasNext(pageResponse.length > pageSize);
         setMetrics({
-          ...metricsResponse.meta.statusCounts,
-          total: metricsResponse.meta.total,
+          ...metricsResponse.statusCounts,
+          total: metricsResponse.total,
         });
       })
       .catch((loadError: unknown) => {
@@ -154,7 +145,7 @@ export function SaasUserListView() {
           setLoading(false);
         }
       });
-  }, [listQuery, m.users.loadError, metricsQuery, refreshKey]);
+  }, [listQuery, m.users.loadError, query, refreshKey]);
 
   useEffect(() => {
     let isCurrent = true;

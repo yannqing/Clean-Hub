@@ -5,6 +5,7 @@ import {
   createSaasUserController,
   getSaasUserController,
   listSaasUsersController,
+  getSaasUserStatsController,
   resetSaasUserPasswordController,
   updateSaasUserController,
   updateSaasUserRolesController,
@@ -15,6 +16,7 @@ export function createSaasUsersRoutes() {
   const routes = new Hono<AppBindings>();
 
   routes.get("/", listSaasUsersController);
+  routes.get("/stats", getSaasUserStatsController);
   routes.post("/", createSaasUserController);
   routes.get("/:userId", getSaasUserController);
   routes.patch("/:userId/roles", updateSaasUserRolesController);

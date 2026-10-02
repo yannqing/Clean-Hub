@@ -1,9 +1,24 @@
-import { and, count, eq, isNull, sql, sum } from "drizzle-orm";
+import {
+  and,
+  count,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+  sum,
+  type SQL,
+} from "drizzle-orm";
 
 import {
   branches,
   feedbackTickets,
   orders,
+  paymentTransactions,
+  posPaymentAdjustments,
+  refundRequests,
+  restoreRequests,
+  securityEvents,
   tenants,
   type Database,
 } from "@cleanhub/db";
@@ -36,13 +51,40 @@ export async function findTenantCounts(db: Database): Promise<{
   };
 }
 
-export async function findPendingFeedbackCount(db: Database): Promise<number> {
-  const rows = await db
-    .select({ value: count() })
-    .from(feedbackTickets)
-    .where(and(eq(feedbackTickets.status, "open"), isNull(feedbackTickets.deletedAt)));
-
-  return rows[0]?.value ?? 0;
+export async function findTodoCounts(db: Database): Promise<{
+  feedbackTickets: number;
+  restoreRequests: number;
+  securityEvents: number;
+}> {
+  const [feedback, restores, security] = await Promise.all([
+    db
+      .select({ value: count() })
+      .from(feedbackTickets)
+      .where(
+        and(
+          inArray(feedbackTickets.status, ["open", "in_progress"]),
+          isNull(feedbackTickets.deletedAt),
+        ),
+      ),
+    db
+      .select({ value: count() })
+      .from(restoreRequests)
+      .where(
+        and(
+          eq(restoreRequests.status, "pending"),
+          isNull(restoreRequests.deletedAt),
+        ),
+      ),
+    db
+      .select({ value: count() })
+      .from(securityEvents)
+      .where(inArray(securityEvents.severity, ["high", "critical"])),
+  ]);
+  return {
+    feedbackTickets: feedback[0]?.value ?? 0,
+    restoreRequests: restores[0]?.value ?? 0,
+    securityEvents: security[0]?.value ?? 0,
+  };
 }
 
 export async function findBranchCount(db: Database): Promise<number> {
@@ -54,31 +96,116 @@ export async function findBranchCount(db: Database): Promise<number> {
   return rows[0]?.value ?? 0;
 }
 
-/**
- * Returns the count and total revenue of non-cancelled orders created today
- * (UTC day boundary). `paidAmount` is summed so partially paid orders are
- * reflected accurately in platform revenue.
- */
-export async function findTodayOrderMetrics(db: Database): Promise<{
-  orderCount: number;
-  revenueAmount: number;
-}> {
+function todayFilter(
+  column:
+    | SQL
+    | typeof orders.createdAt
+    | typeof paymentTransactions.paidAt
+    | typeof refundRequests.refundedAt,
+  timezone: string,
+) {
+  return and(
+    sql`${column} >= (date_trunc('day', now() at time zone ${timezone}) at time zone ${timezone})`,
+    sql`${column} < ((date_trunc('day', now() at time zone ${timezone}) + interval '1 day') at time zone ${timezone})`,
+  );
+}
+
+export async function findTodayOrderCount(
+  db: Database,
+  timezone: string,
+): Promise<number> {
   const rows = await db
-    .select({
-      orderCount: count(),
-      revenueAmount: sum(orders.paidAmount),
-    })
+    .select({ orderCount: count() })
     .from(orders)
     .where(
       and(
         isNull(orders.deletedAt),
-        sql`${orders.createdAt} >= date_trunc('day', now())`,
+        todayFilter(orders.createdAt, timezone),
         sql`${orders.status} <> 'cancelled'`,
       ),
     );
 
-  const orderCount = rows[0]?.orderCount ?? 0;
-  const revenueAmount = Number(rows[0]?.revenueAmount ?? 0);
+  return rows[0]?.orderCount ?? 0;
+}
 
-  return { orderCount, revenueAmount };
+/** Settled payment cash flow today, net of POS adjustments and refunds. */
+export async function findTodayRevenueByCurrency(
+  db: Database,
+  timezone: string,
+): Promise<Array<{ currency: string; amount: number }>> {
+  const paymentRows = await db
+    .select({
+      currency: paymentTransactions.currency,
+      amount: sum(paymentTransactions.amount),
+    })
+    .from(paymentTransactions)
+    .where(
+      and(
+        inArray(paymentTransactions.paymentStatus, ["paid", "refunded"]),
+        isNotNull(paymentTransactions.paidAt),
+        isNull(paymentTransactions.deletedAt),
+        todayFilter(paymentTransactions.paidAt, timezone),
+      ),
+    )
+    .groupBy(paymentTransactions.currency)
+    .orderBy(paymentTransactions.currency);
+
+  const adjustmentTime = sql`coalesce(${posPaymentAdjustments.resolvedAt}, ${posPaymentAdjustments.occurredAt})`;
+  const adjustmentRows = await db
+    .select({
+      currency: posPaymentAdjustments.currency,
+      amount: sql<string>`sum(case
+      when ${posPaymentAdjustments.adjustmentType} = 'refund' and ${posPaymentAdjustments.direction} = 'debit' then -${posPaymentAdjustments.amount}
+      when ${posPaymentAdjustments.adjustmentType} = 'refund' and ${posPaymentAdjustments.direction} = 'credit' then ${posPaymentAdjustments.amount}
+      when ${posPaymentAdjustments.adjustmentType} = 'correction' and ${posPaymentAdjustments.direction} = 'credit' then ${posPaymentAdjustments.amount}
+      else -${posPaymentAdjustments.amount}
+    end)::text`,
+    })
+    .from(posPaymentAdjustments)
+    .where(
+      and(
+        eq(posPaymentAdjustments.status, "succeeded"),
+        todayFilter(adjustmentTime, timezone),
+      ),
+    )
+    .groupBy(posPaymentAdjustments.currency);
+
+  const refundRows = await db
+    .select({
+      currency: refundRequests.currency,
+      amount: sum(refundRequests.amount),
+    })
+    .from(refundRequests)
+    .where(
+      and(
+        eq(refundRequests.status, "refunded"),
+        isNotNull(refundRequests.refundedAt),
+        isNull(refundRequests.deletedAt),
+        todayFilter(refundRequests.refundedAt, timezone),
+      ),
+    )
+    .groupBy(refundRequests.currency);
+
+  const totals = new Map<string, number>();
+  for (const row of paymentRows) {
+    totals.set(
+      row.currency,
+      (totals.get(row.currency) ?? 0) + Number(row.amount ?? 0),
+    );
+  }
+  for (const row of adjustmentRows) {
+    totals.set(
+      row.currency,
+      (totals.get(row.currency) ?? 0) + Number(row.amount ?? 0),
+    );
+  }
+  for (const row of refundRows) {
+    totals.set(
+      row.currency,
+      (totals.get(row.currency) ?? 0) - Number(row.amount ?? 0),
+    );
+  }
+  return [...totals]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([currency, amount]) => ({ currency, amount }));
 }

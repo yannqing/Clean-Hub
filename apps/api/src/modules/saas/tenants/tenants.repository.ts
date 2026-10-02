@@ -21,9 +21,7 @@ import {
   platformTaxTemplates,
   posChannelSettings,
   posTerminalSettings,
-  products,
   roles,
-  services,
   taxRates,
   tenantFeatureFlags,
   tenantSettings,
@@ -34,6 +32,10 @@ import {
 } from "@cleanhub/db";
 
 import { writeAuditLog } from "../../audit/audit.helper.js";
+import {
+  findPosCatalogProducts,
+  findPosCatalogServices,
+} from "../../pos/catalog/catalog.repository.js";
 import type {
   CreateSaasTenantRequest,
   ListSaasTenantsQuery,
@@ -412,21 +414,21 @@ export async function findSaasTenantDetailById(
     .from(users)
     .where(and(eq(users.tenantId, tenantId), isNull(users.deletedAt)));
 
-  const [ownerRows, branchRows, serviceRows, productRows, terminalRows, taxRows] = await Promise.all([
+  const [ownerRows, branchRows, terminalRows, taxRows] = await Promise.all([
     db.select({ value: count() }).from(users)
       .innerJoin(userRoles, and(eq(userRoles.userId, users.id), eq(userRoles.tenantId, tenantId), isNull(userRoles.revokedAt)))
       .innerJoin(roles, and(eq(roles.id, userRoles.roleId), eq(roles.code, "owner"), eq(roles.status, "active"), isNull(roles.deletedAt)))
       .where(and(eq(users.tenantId, tenantId), eq(users.status, "active"), isNull(users.deletedAt))),
-    db.select({ value: count() }).from(branches).where(and(
+    db.select({ id: branches.id }).from(branches).where(and(
       eq(branches.tenantId, tenantId), eq(branches.status, "active"), isNull(branches.deletedAt),
     )),
-    db.select({ value: count() }).from(services).where(and(
-      eq(services.tenantId, tenantId), eq(services.status, "active"), isNull(services.deletedAt),
-    )),
-    db.select({ value: count() }).from(products).where(and(
-      eq(products.tenantId, tenantId), eq(products.status, "active"), isNull(products.deletedAt),
-    )),
-    db.select({ value: count() }).from(posTerminalSettings).where(and(
+    db.select({ branchId: posTerminalSettings.branchId }).from(posTerminalSettings)
+      .innerJoin(branches, and(
+        eq(branches.id, posTerminalSettings.branchId),
+        eq(branches.tenantId, tenantId),
+        eq(branches.status, "active"),
+        isNull(branches.deletedAt),
+      )).where(and(
       eq(posTerminalSettings.tenantId, tenantId), eq(posTerminalSettings.status, "active"),
       sql`${posTerminalSettings.credentialDigest} is not null`,
     )),
@@ -435,6 +437,21 @@ export async function findSaasTenantDetailById(
       taxRegistrationNumber: posChannelSettings.taxRegistrationNumber,
     }).from(posChannelSettings).where(eq(posChannelSettings.tenantId, tenantId)).limit(1),
   ]);
+  const enrolledBranchIds = new Set(terminalRows.map((row) => row.branchId));
+  const candidateBranches = enrolledBranchIds.size
+    ? branchRows.filter((branch) => enrolledBranchIds.has(branch.id))
+    : branchRows;
+  let hasSellableCatalogItem = false;
+  for (const branch of candidateBranches) {
+    const [sellableServices, sellableProducts] = await Promise.all([
+      findPosCatalogServices(db, { tenantId, branchId: branch.id, limit: 1 }),
+      findPosCatalogProducts(db, { tenantId, branchId: branch.id, limit: 1 }),
+    ]);
+    if (sellableServices.length || sellableProducts.length) {
+      hasSellableCatalogItem = true;
+      break;
+    }
+  }
 
   return {
     ...toTenantSummary(tenant),
@@ -446,9 +463,9 @@ export async function findSaasTenantDetailById(
     userCount: userCountRows[0]?.value ?? 0,
     readiness: {
       activeOwnerCount: ownerRows[0]?.value ?? 0,
-      activeBranchCount: branchRows[0]?.value ?? 0,
-      activeCatalogItemCount: (serviceRows[0]?.value ?? 0) + (productRows[0]?.value ?? 0),
-      enrolledTerminalCount: terminalRows[0]?.value ?? 0,
+      activeBranchCount: branchRows.length,
+      activeCatalogItemCount: hasSellableCatalogItem ? 1 : 0,
+      enrolledTerminalCount: terminalRows.length,
       taxEnabled: taxRows[0]?.taxEnabled ?? false,
       taxRegistrationNumberSet: Boolean(taxRows[0]?.taxRegistrationNumber?.trim()),
     },

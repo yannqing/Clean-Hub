@@ -1,4 +1,8 @@
 export type SaasUserStatus = "invited" | "active" | "disabled" | "suspended";
+export type SaasUserStats = {
+  total: number;
+  statusCounts: Record<SaasUserStatus, number>;
+};
 export type SaasUserLanguage = "en" | "fr" | "zh-CN";
 export type SaasUserRoleCode = "super_admin" | "support";
 

@@ -2,6 +2,7 @@ import { createId } from "@cleanhub/id";
 import {
   and,
   asc,
+  count,
   desc,
   eq,
   ilike,
@@ -914,6 +915,35 @@ export async function findSaasUsers(
     lastLoginAt: toIsoString(row.lastLoginAt),
     createdAt: row.createdAt.toISOString(),
   }));
+}
+
+export async function findSaasUserStats(
+  db: Database,
+  q?: string,
+): Promise<{ total: number; statusCounts: Record<SaasUserStatus, number> }> {
+  const searchQuery = normalizeSearchQuery(q);
+  const rows = await db.select({
+    status: users.status,
+    value: count(),
+  }).from(users).leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+    .where(and(
+      eq(users.userType, "saas"),
+      isNull(users.tenantId),
+      isNull(users.deletedAt),
+      searchQuery ? or(
+        ilike(users.email, searchQuery),
+        ilike(users.phone, searchQuery),
+        ilike(userProfiles.displayName, searchQuery),
+      ) : undefined,
+    )).groupBy(users.status);
+  const statusCounts: Record<SaasUserStatus, number> = {
+    active: 0, disabled: 0, invited: 0, suspended: 0,
+  };
+  for (const row of rows) statusCounts[row.status] = row.value;
+  return {
+    total: Object.values(statusCounts).reduce((total, value) => total + value, 0),
+    statusCounts,
+  };
 }
 
 export async function findSaasUserDetailById(

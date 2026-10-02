@@ -472,7 +472,7 @@ export function TenantDetailView({
                     {([
                       [readinessCopy.owner, tenant.readiness.activeOwnerCount > 0, tenant.readiness.activeOwnerCount],
                       [readinessCopy.branch, tenant.readiness.activeBranchCount > 0, tenant.readiness.activeBranchCount],
-                      [readinessCopy.catalog, tenant.readiness.activeCatalogItemCount > 0, tenant.readiness.activeCatalogItemCount],
+                      [readinessCopy.catalog, tenant.readiness.activeCatalogItemCount > 0, null],
                       [readinessCopy.terminal, tenant.readiness.enrolledTerminalCount > 0, tenant.readiness.enrolledTerminalCount],
                       [readinessCopy.tax, tenant.readiness.taxEnabled, null],
                       [readinessCopy.taxNumber, tenant.readiness.taxRegistrationNumberSet, null],

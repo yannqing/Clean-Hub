@@ -7,6 +7,7 @@ import {
   getSaasUserDetail,
   listSaasRoles,
   listSaasUsers,
+  getSaasUserStats,
   resetSaasUserPassword,
   updateSaasUser,
   updateSaasUserRoles,
@@ -52,6 +53,14 @@ export async function listSaasUsersController(c: Context<AppBindings>) {
   });
 
   return c.json(users);
+}
+
+export async function getSaasUserStatsController(c: Context<AppBindings>) {
+  const query = listSaasUsersQuerySchema.pick({ q: true }).parse(c.req.query());
+  return c.json(await getSaasUserStats({
+    authContext: c.get("authContext"),
+    q: query.q,
+  }));
 }
 
 export async function getSaasUserController(c: Context<AppBindings>) {

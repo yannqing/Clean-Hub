@@ -110,12 +110,3 @@ export async function insertSecurityEvent(
     metadata: input.metadata,
   });
 }
-
-export async function hasSecurityEvents(db: Database): Promise<boolean> {
-  const rows = await db
-    .select({ id: securityEvents.id })
-    .from(securityEvents)
-    .limit(1);
-
-  return rows.length > 0;
-}

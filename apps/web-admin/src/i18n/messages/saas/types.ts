@@ -108,7 +108,8 @@ export type SaasMessages = {
     searchPlaceholder: string;
     quickActionsLabel: string;
     sendLabel: string;
-    recommendations: string[];
+    searchNoResults: string;
+    searchLoading: string;
     loadError: string;
     quickEntries: {
       tenants: {
@@ -439,6 +440,7 @@ export type SaasMessages = {
     restoreSection: string;
     selectBackupHint: string;
     manualBackup: string;
+    backupPhysicalScopeHint: string;
     scope: string;
     reason: string;
     backupReasonPlaceholder: string;
@@ -448,6 +450,7 @@ export type SaasMessages = {
     restoreReasonPlaceholder: string;
     submitRestore: string;
     restoreSubmitted: string;
+    restoreRequiresSuccess: string;
     columns: {
       created: string;
       requestedBy: string;
@@ -488,6 +491,7 @@ export type SaasMessages = {
     storageMetadata: {
       title: string;
       dumpUrl: string;
+      dumpKey: string;
       sizeBytes: string;
       checksum: string;
       storageType: string;

@@ -106,16 +106,12 @@ export const saasMessagesEn: SaasMessages = {
     badge: "SaaS platform",
     title: "Platform Overview",
     welcomeTitle: "Welcome to CleanHub. What would you like to handle first?",
-    searchLabel: "Search the platform workspace",
-    searchPlaceholder: "Search tenants, users, tickets, or logs...",
+    searchLabel: "Search tenants or platform users",
+    searchPlaceholder: "Search tenant names, codes, or platform users...",
     quickActionsLabel: "Open quick actions",
-    sendLabel: "Submit search",
-    recommendations: [
-      "Review recently added tenants",
-      "Which feedback tickets need attention?",
-      "Show today's platform activity",
-      "Check recent security events",
-    ],
+    sendLabel: "Search",
+    searchNoResults: "No matching tenants or platform users.",
+    searchLoading: "Searching...",
     loadError: "Failed to load platform overview.",
     quickEntries: {
       tenants: {
@@ -478,15 +474,17 @@ export const saasMessagesEn: SaasMessages = {
     selectBackupHint:
       "Select a backup task before submitting a restore request for manual review.",
     manualBackup: "Manual Backup",
+    backupPhysicalScopeHint: "The artifact is always a full database backup. Tenant scope only associates the request with a tenant for manual recovery review.",
     scope: "Scope",
     reason: "Reason",
     backupReasonPlaceholder: "Optional note for the backup task record",
     createBackupTask: "Create backup task",
-    backupCreated: "Backup task record created.",
+    backupCreated: "Backup queued. A restore can be requested after verification.",
     restoreReason: "Restore reason",
     restoreReasonPlaceholder: "Explain why this restore needs manual review",
     submitRestore: "Submit restore request",
     restoreSubmitted: "Restore request submitted.",
+    restoreRequiresSuccess: "A restore can only be requested from a verified, successful backup.",
     columns: {
       created: "Created",
       requestedBy: "Requested by",
@@ -505,10 +503,10 @@ export const saasMessagesEn: SaasMessages = {
     review: {
       approve: "Approve",
       reject: "Reject",
-      complete: "Mark completed",
+      complete: "Confirm manual restore completed",
       cancel: "Cancel request",
       reviewNote: "Review note",
-      reviewNotePlaceholder: "Optional note recorded with this decision",
+      reviewNotePlaceholder: "Required to confirm a manual restore; optional otherwise",
       applyNote: "Apply",
     },
     reviewToasts: {
@@ -527,6 +525,7 @@ export const saasMessagesEn: SaasMessages = {
     storageMetadata: {
       title: "Storage metadata",
       dumpUrl: "Dump URL",
+      dumpKey: "Backup file",
       sizeBytes: "Size (bytes)",
       checksum: "Checksum",
       storageType: "Storage type",

@@ -21,6 +21,7 @@ import {
   findSaasRoles,
   findSaasUserAuditSnapshotById,
   findSaasUserDetailById,
+  findSaasUserStats,
   findUserByNormalizedEmail,
   findSaasUserByPhone,
   findSaasUsers,
@@ -106,6 +107,14 @@ export async function listSaasUsers(
   requireSaasUsersAccess(input.authContext, ["super_admin", "support"]);
 
   return findSaasUsers(db, input.query);
+}
+
+export async function getSaasUserStats(
+  input: { authContext: AuthContext; q?: string },
+  db: Database = getDb(),
+) {
+  requireSaasUsersAccess(input.authContext, ["super_admin", "support"]);
+  return findSaasUserStats(db, input.q);
 }
 
 export async function getSaasUserDetail(

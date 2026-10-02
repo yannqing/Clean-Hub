@@ -38,6 +38,10 @@ import {
 
 import { webAdminRoutes } from "@/config/routes";
 import { SaasMetricStrip } from "@/features/saas/shared";
+import { getTenantListQuery } from "@/features/saas/tenants/queries";
+import type { TenantSummary } from "@/features/saas/tenants/types";
+import { getSaasUserListQuery } from "@/features/saas/users/queries";
+import type { SaasUserSummary } from "@/features/saas/users/types";
 import { useSaasI18n } from "@/i18n";
 import { formatMoney } from "@/lib/format";
 
@@ -45,17 +49,27 @@ import { getSaasOverviewQuery } from "../queries";
 import type { SaasOverview } from "../types";
 
 export function SaasOverviewView() {
-  const { m } = useSaasI18n();
+  const { m, locale } = useSaasI18n();
   const [overview, setOverview] = useState<SaasOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [searchResult, setSearchResult] = useState<{
+    tenants: TenantSummary[];
+    users: SaasUserSummary[];
+  } | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [searchActive, setSearchActive] = useState(false);
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const searchAreaRef = useRef<HTMLDivElement>(null);
+  const searchRequestIdRef = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const canSend = query.trim().length > 0;
-  const showSearchMode = searchActive || contextMenuOpen;
+  const showSearchMode =
+    contextMenuOpen ||
+    (searchActive &&
+      (searchResult !== null || searchLoading || searchError !== null));
 
   const loadOverview = useCallback(async () => {
     setLoading(true);
@@ -164,7 +178,13 @@ export function SaasOverviewView() {
     {
       icon: HandCoins,
       label: m.overview.metrics.todayRevenue,
-      value: overview ? formatMoney(overview.todayRevenueAmount) : "—",
+      value: overview
+        ? overview.todayRevenueByCurrency
+            .map(({ currency, amount }) =>
+              formatMoney(amount, currency, locale),
+            )
+            .join(" · ") || "—"
+        : "—",
     },
     {
       icon: MessageSquareWarning,
@@ -208,12 +228,34 @@ export function SaasOverviewView() {
     setSearchActive(false);
   }
 
-  function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSearchSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (canSend) {
-      setQuery(query.trim());
-      inputRef.current?.focus();
+    const search = query.trim();
+    if (!search) return;
+    const requestId = ++searchRequestIdRef.current;
+    setSearchActive(true);
+    setSearchLoading(true);
+    setSearchError(null);
+    setSearchResult(null);
+    try {
+      const [tenants, users] = await Promise.all([
+        getTenantListQuery({ q: search, limit: 5, offset: 0 }),
+        getSaasUserListQuery({ q: search, limit: 5, offset: 0 }),
+      ]);
+      if (requestId === searchRequestIdRef.current) {
+        setSearchResult({ tenants: tenants.data, users });
+      }
+    } catch (searchFailure) {
+      if (requestId === searchRequestIdRef.current) {
+        setSearchError(
+          searchFailure instanceof Error
+            ? searchFailure.message
+            : m.overview.loadError,
+        );
+      }
+    } finally {
+      if (requestId === searchRequestIdRef.current) setSearchLoading(false);
     }
   }
 
@@ -248,7 +290,13 @@ export function SaasOverviewView() {
               className="h-12 rounded-full border-border bg-background pl-11 pr-24 text-sm shadow-sm transition-shadow placeholder:text-muted-foreground focus-visible:shadow-md focus-visible:ring-2"
               data-testid="saas-home-search"
               id="saas-home-search"
-              onChange={(event) => setQuery(event.target.value)}
+              onChange={(event) => {
+                searchRequestIdRef.current += 1;
+                setQuery(event.target.value);
+                setSearchResult(null);
+                setSearchError(null);
+                setSearchLoading(false);
+              }}
               placeholder={m.overview.searchPlaceholder}
               ref={inputRef}
               role="searchbox"
@@ -334,26 +382,62 @@ export function SaasOverviewView() {
           >
             <div className="overflow-hidden">
               <div className="grid gap-2 text-left sm:grid-cols-2">
-                {m.overview.recommendations.map((recommendation) => (
-                  <button
-                    className="flex min-h-11 items-center gap-2 rounded-xl border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    key={recommendation}
-                    onClick={() => {
-                      setQuery(recommendation);
-                      inputRef.current?.focus();
-                    }}
-                    tabIndex={showSearchMode ? 0 : -1}
-                    type="button"
+                {searchLoading ? (
+                  <p className="col-span-full text-sm text-muted-foreground">
+                    {m.overview.searchLoading}
+                  </p>
+                ) : searchError ? (
+                  <p
+                    className="col-span-full text-sm text-destructive"
+                    role="alert"
                   >
-                    <Icon
-                      aria-hidden
-                      className="text-muted-foreground"
-                      icon={Search}
-                      size={15}
-                    />
-                    <span>{recommendation}</span>
-                  </button>
-                ))}
+                    {searchError}
+                  </p>
+                ) : searchResult ? (
+                  searchResult.tenants.length + searchResult.users.length ===
+                  0 ? (
+                    <p className="col-span-full text-sm text-muted-foreground">
+                      {m.overview.searchNoResults}
+                    </p>
+                  ) : (
+                    <>
+                      {searchResult.tenants.map((tenant) => (
+                        <Link
+                          className="rounded-xl border bg-background px-3 py-2 text-sm hover:bg-muted/60"
+                          href={webAdminRoutes.saas.tenant(tenant.id)}
+                          key={tenant.id}
+                        >
+                          <span className="block text-xs text-muted-foreground">
+                            {m.overview.quickEntries.tenants.title}
+                          </span>
+                          <span className="block font-medium">
+                            {tenant.name}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {tenant.pressingCode}
+                          </span>
+                        </Link>
+                      ))}
+                      {searchResult.users.map((user) => (
+                        <Link
+                          className="rounded-xl border bg-background px-3 py-2 text-sm hover:bg-muted/60"
+                          href={webAdminRoutes.saas.user(user.id)}
+                          key={user.id}
+                        >
+                          <span className="block text-xs text-muted-foreground">
+                            {m.overview.quickEntries.users.title}
+                          </span>
+                          <span className="block font-medium">
+                            {user.displayName}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {user.email ?? user.phone ?? user.id}
+                          </span>
+                        </Link>
+                      ))}
+                    </>
+                  )
+                ) : null}
               </div>
             </div>
           </div>

@@ -1,11 +1,13 @@
 import { getDb, type Database } from "@cleanhub/db";
 
 import { requireSaasRole } from "../../auth/permission.helper.js";
+import { findPlatformSettings } from "../platform-settings/platform-settings.repository.js";
 import {
   findBranchCount,
-  findPendingFeedbackCount,
+  findTodoCounts,
   findTenantCounts,
-  findTodayOrderMetrics,
+  findTodayOrderCount,
+  findTodayRevenueByCurrency,
 } from "./overview.repository.js";
 import type { GetSaasOverviewInput, SaasOverview } from "./overview.types.js";
 
@@ -14,17 +16,27 @@ export async function getSaasOverview(
   db: Database = getDb(),
 ): Promise<SaasOverview> {
   requireSaasRole(input.authContext, ["super_admin", "support"]);
+  const configuredTimezone =
+    (await findPlatformSettings(db))?.timezone ?? "UTC";
+  let timezone = configuredTimezone;
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: configuredTimezone });
+  } catch {
+    timezone = "UTC";
+  }
 
   const [
     tenantCounts,
-    pendingFeedbackCount,
+    todoCounts,
     branchCount,
-    todayOrderMetrics,
+    todayOrderCount,
+    todayRevenueByCurrency,
   ] = await Promise.all([
     findTenantCounts(db),
-    findPendingFeedbackCount(db),
+    findTodoCounts(db),
     findBranchCount(db),
-    findTodayOrderMetrics(db),
+    findTodayOrderCount(db, timezone),
+    findTodayRevenueByCurrency(db, timezone),
   ]);
 
   return {
@@ -32,8 +44,9 @@ export async function getSaasOverview(
     activeTenantCount: tenantCounts.active,
     suspendedTenantCount: tenantCounts.suspended,
     branchCount,
-    todayOrderCount: todayOrderMetrics.orderCount,
-    todayRevenueAmount: todayOrderMetrics.revenueAmount,
-    pendingFeedbackCount,
+    todayOrderCount,
+    todayRevenueByCurrency,
+    pendingFeedbackCount: todoCounts.feedbackTickets,
+    todoCounts,
   };
 }

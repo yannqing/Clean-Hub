@@ -5,6 +5,7 @@ import type {
   ResetSaasUserPasswordResult,
   SaasUserDetail,
   SaasUserSummary,
+  SaasUserStats,
   UpdateSaasUserRequest,
   UpdateSaasUserRolesRequest,
   UpdateSaasUserStatusRequest,
@@ -53,6 +54,8 @@ export function createSaasUsersApi(client: ApiClient) {
     getSaasUsers,
     get: (userId: string) => getSaasUser(userId),
     list: (query?: QueryParams) => getSaasUsers(query),
+    stats: (query?: { q?: string }) =>
+      client.get<SaasUserStats>("/saas/users/stats", { query }),
     update: (userId: string, input: UpdateSaasUserRequest) =>
       updateSaasUser(userId, input),
     updateStatus: (userId: string, input: UpdateSaasUserStatusRequest) =>

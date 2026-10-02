@@ -4,6 +4,11 @@ export type SaasOverview = {
   suspendedTenantCount: number;
   branchCount: number;
   todayOrderCount: number;
-  todayRevenueAmount: number;
+  todayRevenueByCurrency: Array<{ currency: string; amount: number }>;
   pendingFeedbackCount: number;
+  todoCounts: {
+    feedbackTickets: number;
+    restoreRequests: number;
+    securityEvents: number;
+  };
 };
